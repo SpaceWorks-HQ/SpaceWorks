@@ -10,6 +10,7 @@ from django.db.models.functions import Lower
 from django.utils.crypto import get_random_string
 
 from apps.makerspaces.capabilities import default_enabled_features, validate_capabilities
+from apps.makerspaces.module_registry import default_enabled_module_keys
 from apps.makerspaces.secrets import decrypt_value, encrypt_value
 from apps.makerspaces.validators import (
     DEFAULT_PRESENCE_PRESETS,
@@ -44,35 +45,15 @@ def normalize_frontend_domain(value):
     return (parsed.hostname or "") or None
 
 
-DEFAULT_ENABLED_MODULES = [
-    "public_inventory",
-    "request_workflow",
-    "staff_admin",
-    "guest_handover",
-    "scanner",
-    "printing",
-    "telegram",
-    "evidence_uploads",
-    "qr_management",
-    "bulk_import",
-    "containers",
-    "stock_transfers",
-    "stocktake",
-    "reports",
-    "qr_print_batches",
-    "asset_units",
-    "procurement",
-    "machines",
-    "machine_service",
-    "events",
-    "bookings",
-    "maintenance",
-    "membership",
-]
+# Derived from the module registry -- kept as a module-level name because the
+# /control/ form and several tests import it. Add a module in module_registry.py.
+DEFAULT_ENABLED_MODULES = default_enabled_module_keys()
 
 
 def default_enabled_modules():
-    return list(DEFAULT_ENABLED_MODULES)
+    # Referenced by migration 0009 as a JSONField default, so this import path is
+    # load-bearing and must keep resolving. Returns a fresh list every call.
+    return default_enabled_module_keys()
 
 
 def default_theme_config():

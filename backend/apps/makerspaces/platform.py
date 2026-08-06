@@ -6,29 +6,12 @@ from apps.inventory import public_image_storage
 from apps.integrations.email import email_enabled
 from apps.makerspaces.models import Makerspace, default_branding_config, default_theme_config
 from apps.makerspaces.capabilities import FEATURE_MODULES, FEATURES
+from apps.makerspaces.module_registry import is_frontend_exposed, module_workflows
 
-
-MODULE_WORKFLOWS = {
-    "public_inventory": ["catalog"],
-    "request_workflow": ["request_submit", "request_status"],
-    "staff_admin": ["staff_inventory", "staff_requests"],
-    "guest_handover": ["guest_issue", "guest_return"],
-    "scanner": ["qr_scan", "container_lookup"],
-    "qr_management": ["qr_generate", "qr_revoke", "qr_print"],
-    "bulk_import": ["bulk_import"],
-    "containers": ["container_lookup", "container_move"],
-    "stock_transfers": ["stock_transfer"],
-    "stocktake": ["stocktake"],
-    "reports": ["analytics", "report_export"],
-    "qr_print_batches": ["qr_print_batch"],
-    "asset_units": ["asset_qr_generation"],
-    "printing": ["printing_requests"],
-    "machine_service": ["machine_service_requests"],
-    "telegram": ["telegram_alerts"],
-    "maintenance": ["maintenance"],
-    "procurement": ["procurement"],
-    "evidence_uploads": ["evidence_uploads"],
-}
+# Derived from the module registry, which also decides frontend exposure: an
+# internal master switch declares frontend_exposed=False and is dropped from both
+# the bootstrap `modules` list and these workflows.
+MODULE_WORKFLOWS = module_workflows()
 
 FEATURE_WORKFLOWS = {
     "inventory.self_checkout": ["self_checkout", "self_return"],
@@ -130,7 +113,9 @@ def feature_enabled(makerspace, key):
     ) and all(feature_enabled(makerspace, feature) for feature in definition.requires_features)
 
 def bootstrap_payload(makerspace):
-    modules = sorted(set(makerspace.enabled_modules or []))
+    modules = sorted(
+        key for key in set(makerspace.enabled_modules or []) if is_frontend_exposed(key)
+    )
     features = sorted(key for key, definition in FEATURES.items() if definition.frontend_exposed and feature_enabled(makerspace, key))
     theme = default_theme_config()
     theme.update(makerspace.theme_config or {})

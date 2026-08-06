@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
 
+from apps.makerspaces.module_registry import BY_KEY, MODULE_KEYS, module_dependencies
+
 
 @dataclass(frozen=True)
 class FeatureDefinition:
@@ -11,9 +13,10 @@ class FeatureDefinition:
     # None => standalone feature with no parent-module prerequisite (effective purely
     # when enabled). Used for capabilities that are not a child of any single module,
     # e.g. self-checkout / direct handouts, which a private makerspace runs without a
-    # public catalogue. A string parent must be listed in FEATURE_MODULES.
+    # public catalogue. A string parent must be a registered module key.
     parent_module: str | None
     label: str
+    description: str = ""
     default_enabled: bool = False
     requires_modules: tuple[str, ...] = ()
     requires_features: tuple[str, ...] = ()
@@ -23,18 +26,32 @@ class FeatureDefinition:
 FEATURE_DEFINITIONS = (
     FeatureDefinition(
         "payments.machines", "machines", "Machine payments",
+        "Charge for machine service requests via Stripe.",
         requires_modules=("machine_service",),
     ),
-    FeatureDefinition("payments.bookings", "bookings", "Booking payments"),
-    FeatureDefinition("payments.events", "events", "Event payments"),
-    FeatureDefinition("payments.membership", "membership", "Membership payments"),
+    FeatureDefinition(
+        "payments.bookings", "bookings", "Booking payments",
+        "Charge for resource bookings via Stripe.",
+    ),
+    FeatureDefinition(
+        "payments.events", "events", "Event payments",
+        "Charge for event registrations via Stripe.",
+    ),
+    FeatureDefinition(
+        "payments.membership", "membership", "Membership payments",
+        "Charge membership dues via Stripe.",
+    ),
     FeatureDefinition(
         "inventory.self_checkout", None, "Self checkout",
+        "Member self-checkout and staff direct handouts of QR tools.",
         default_enabled=True,
     ),
 )
 FEATURES = {definition.key: definition for definition in FEATURE_DEFINITIONS}
-FEATURE_MODULES = {"public_inventory", "machines", "machine_service", "bookings", "events", "membership"}
+# A feature's parent/required modules are validated against the module registry
+# rather than a hand-kept set, so adding a module can no longer leave a valid
+# parent silently unrecognised (which would disable the feature).
+FEATURE_MODULES = MODULE_KEYS
 
 
 def default_enabled_features():
@@ -48,8 +65,16 @@ def validate_capabilities(enabled_modules, enabled_features):
     features = _canonical_features(enabled_features)
     module_set = set(modules)
     errors = {}
-    if "printing" in module_set and "machine_service" not in module_set:
-        errors["enabled_modules"] = "Printing requires machine service to be enabled."
+    for key, required in module_dependencies().items():
+        if key not in module_set:
+            continue
+        missing = [module for module in required if module not in module_set]
+        if missing:
+            errors.setdefault("enabled_modules", []).append(
+                f"{BY_KEY[key].label} requires "
+                f"{', '.join(BY_KEY[module].label.lower() for module in missing)} "
+                "to be enabled."
+            )
     for key in features:
         definition = FEATURES[key]
         required_modules = [

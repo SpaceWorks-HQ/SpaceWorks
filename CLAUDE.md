@@ -145,6 +145,23 @@ route through it. `/auth/me` + `/auth/login` carry typed effective `actions` per
 membership/role-assignment APIs enforce non-escalation (can't grant a role you don't hold; can't touch a
 MANAGE_MAKERSPACE target/role) with makerspace-first lock ordering.
 
+**`apps/makerspaces/module_registry.py` is the single source of truth for module keys.** All 24
+`ModuleDefinition`s live there (`key`, `label`, `description`, `app_label`, `enforcement`,
+`requires_modules`, `default_enabled`, `is_core`, `frontend_exposed`, `frontend_workflows`), and the
+lists that used to be hand-kept in parallel now **derive** from it: `models.DEFAULT_ENABLED_MODULES`,
+`platform.MODULE_WORKFLOWS`, `capabilities.FEATURE_MODULES`, and the former hardcoded
+`printing → machine_service` branch (now `requires_modules` data). Add a module **only** in the registry.
+Two rules the registry must not break: it **never imports `makerspaces.models`** (models imports it, so
+the reverse edge is a cycle), and `default_enabled_module_keys()` returns a **fresh list** because it
+backs a JSONField default. `frontend_exposed=False` marks an internal master switch and drops the key
+from both the bootstrap `modules` array and `MODULE_WORKFLOWS`, preserving the byte-for-byte payload
+invariant; unknown legacy keys stay exposed (`_canonical_modules` deliberately preserves them).
+`is_core` marks the six un-toggleable modules — `public_inventory`, `request_workflow`, `staff_admin`,
+`evidence_uploads`, `qr_management`, `scanner` — because the Hard Rules require a box QR scan **and** an
+issue photo to issue hardware. `tests/makerspaces/test_module_registry.py` is the drift guard: it
+AST-parses `apps/` and fails if a registered module has no real guard call site, if a guarded key is
+unregistered, if the derived lists change, or if a migration-referenced callable stops resolving.
+
 **Two-level capabilities (modules + features).** `Makerspace.enabled_modules` (whole modules) is
 **superadmin-only** — edited only in the `/control/` capability matrix; a staff-API PATCH containing
 `enabled_modules` is a hard **403**. `Makerspace.enabled_features` (namespaced sub-features via the
@@ -385,7 +402,8 @@ cd backend && pytest
   makerspace scoping, superadmin hide/archive exclusion).
 - `backend/apps/makerspaces/` — `Makerspace` model (tenant root; unique `slug`; `frontend_domain`,
   module flags, `resource_limit_overrides`, `archived_at`, `superadmin_access_enabled`), bootstrap views,
-  dynamic CORS, module guards, `platform.py` origin helpers, `limits.py` (fair-use quotas), `lifecycle.py`
+  dynamic CORS, module guards, `module_registry.py` (canonical module definitions — all module lists
+  derive from it), `platform.py` origin helpers, `limits.py` (fair-use quotas), `lifecycle.py`
   (archive/purge), `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`
   (managed subdomains), `secrets.py`.
 - `backend/apps/audit/` — append-only `AuditLog` + `audit.record(...)` (Postgres-trigger immutable).
