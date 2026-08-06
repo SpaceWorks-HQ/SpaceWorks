@@ -30,7 +30,9 @@ class ModuleDefinition:
     # Modules that must also be enabled for this one to be valid. Replaces the
     # hardcoded printing -> machine_service branch in `validate_capabilities`.
     requires_modules: tuple[str, ...] = ()
-    default_enabled: bool = True
+    # Modules are opt-in: a new makerspace installs core plus whatever profile the
+    # operator chose. Core modules are always on and need not set this.
+    default_enabled: bool = False
     # Core modules are not toggleable: the system is incoherent without them. The
     # Hard Rules require a box QR scan AND an issue photo to hand hardware over, so
     # evidence/QR/scanner are core alongside the catalogue, request flow and staff API.
@@ -142,7 +144,7 @@ MODULES = (
     # sourcing the admin choices from this registry is the actual fix (phase 3).
     ModuleDefinition(
         "notifications", "Notifications", "In-app notification inbox and emitters.",
-        "notifications", GUARD, default_enabled=False,
+        "notifications", GUARD,
     ),
 )
 
@@ -153,10 +155,17 @@ MODULE_KEYS = frozenset(BY_KEY)
 def default_enabled_module_keys():
     """Enabled-by-default module keys for a new makerspace (a fresh list every call).
 
+    Core is always included; everything else is opt-in and arrives via an install
+    profile or `install_module`.
+
     Returned fresh because this backs a JSONField default: handing out the registry's
     own collection would let one makerspace's row mutate every future default.
     """
-    return [definition.key for definition in MODULES if definition.default_enabled]
+    return [
+        definition.key
+        for definition in MODULES
+        if definition.default_enabled or definition.is_core
+    ]
 
 
 def core_module_keys():
@@ -235,9 +244,9 @@ def _validate_registry():
             raise ImproperlyConfiguredRegistry(
                 f"{definition.key} requires unknown module(s): {', '.join(unknown)}."
             )
-        if definition.is_core and not definition.default_enabled:
+        if definition.is_core and definition.default_enabled:
             raise ImproperlyConfiguredRegistry(
-                f"{definition.key} is core and must be enabled by default."
+                f"{definition.key} is core, which already implies default_enabled."
             )
         if definition.enforcement not in {GUARD, FEATURE_PARENT, NONE}:
             raise ImproperlyConfiguredRegistry(

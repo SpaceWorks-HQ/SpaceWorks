@@ -162,6 +162,18 @@ issue photo to issue hardware. `tests/makerspaces/test_module_registry.py` is th
 AST-parses `apps/` and fails if a registered module has no real guard call site, if a guarded key is
 unregistered, if the derived lists change, or if a migration-referenced callable stops resolving.
 
+**Modules are OPT-IN.** `DEFAULT_ENABLED_MODULES` is now **core only** (6 keys) — a new makerspace
+installs core plus whatever profile the operator chose (`minimal` 6 / `recommended` 17 / `everything` 24).
+`ModuleDefinition.default_enabled` defaults to **False** and core must not set it (core is on by
+definition; two sources for one fact is the drift the registry exists to remove). **Existing makerspaces
+are untouched** — a default change never rewrites stored JSON rows, and `_canonical_modules` preserves
+unknown keys. Because almost every backend test exercises a module's behaviour rather than the install
+default, `tests/conftest.py` has an autouse fixture that patches **only the `enabled_modules` field
+default** to the `everything` profile; anything reading `default_enabled_modules()` /
+`DEFAULT_ENABLED_MODULES` directly still sees the real opt-in value, which is how
+`tests/makerspaces/test_module_registry.py` and `test_module_install.py` still assert production
+defaults. A test asserting a module's *disabled* path must now disable it explicitly.
+
 **Module install path (opt-in modularity).** `/control/` is deliberately not proxied on the public
 frontend port, so it can never be the only way to enable a module — a non-technical operator cannot
 reach it. `apps/makerspaces/module_install.py` is the single service behind

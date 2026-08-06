@@ -50,6 +50,12 @@ def make_print_manager(username, makerspace):
 
 def test_notifications_module_disabled_returns_400():
     makerspace = make_space("notif-module-off")
+    # `notifications` is a registered, installable module now, so the disabled path has
+    # to be set up explicitly rather than inherited from the default.
+    makerspace.enabled_modules = [
+        key for key in makerspace.enabled_modules if key != "notifications"
+    ]
+    makerspace.save(update_fields=["enabled_modules"])
     manager = make_member("notif-module-off-manager", makerspace)
 
     response = authenticated_client(manager).get(list_url(makerspace))

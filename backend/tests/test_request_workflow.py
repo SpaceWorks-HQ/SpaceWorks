@@ -267,7 +267,12 @@ def test_successful_submission_creates_pending_request_items_audit_and_notifies(
     assert response.status_code == 201
     assert set(response.data) == {"public_token", "status"}
     assert response.data["status"] == HardwareRequest.Status.PENDING_APPROVAL
-    assert len(callbacks) == 0
+    # The in-app notification emit is the only deferred work. It used to be zero only
+    # because `notifications` was unreachable -- it is a real installable module now,
+    # so the guard is "nothing else got deferred", not "nothing at all".
+    assert [callback.__qualname__ for callback in callbacks] == [
+        "emit_notification.<locals>._create"
+    ]
     hardware_request = HardwareRequest.objects.get()
     assert str(hardware_request.public_token) == response.data["public_token"]
     assert hardware_request.status == HardwareRequest.Status.PENDING_APPROVAL

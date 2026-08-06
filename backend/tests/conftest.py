@@ -70,3 +70,25 @@ def evidence_objects_exist_by_default(monkeypatch):
 
     monkeypatch.setattr("apps.evidence.storage.validate_evidence_object", validate)
 
+
+
+@pytest.fixture(autouse=True)
+def all_modules_enabled_for_test_makerspaces(monkeypatch):
+    """Give makerspaces created in tests every module.
+
+    Modules are opt-in in production: a new makerspace gets core plus whatever
+    install profile the operator chose. Almost every test here exercises a specific
+    module's behaviour rather than the install default, so without this they would
+    each have to enable the module under test -- noise that says nothing about the
+    thing being tested.
+
+    Only the *field* default is patched. Anything that reads
+    `default_enabled_module_keys()` / `DEFAULT_ENABLED_MODULES` directly still sees
+    the real opt-in value, which is how tests/makerspaces/test_module_registry.py and
+    test_module_install.py keep asserting the production default.
+    """
+    from apps.makerspaces.models import Makerspace
+    from apps.makerspaces.module_profiles import EVERYTHING, profile_modules
+
+    field = Makerspace._meta.get_field("enabled_modules")
+    monkeypatch.setattr(field, "default", lambda: profile_modules(EVERYTHING))

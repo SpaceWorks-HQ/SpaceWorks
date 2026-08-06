@@ -5,6 +5,7 @@ from django.apps import apps
 
 from apps.makerspaces.capabilities import FEATURE_MODULES
 from apps.makerspaces.models import DEFAULT_ENABLED_MODULES
+from apps.makerspaces.module_profiles import EVERYTHING, profile_modules
 from tests.return_helpers import make_space
 
 
@@ -29,6 +30,8 @@ def test_membership_module_migration_preserves_existing_entries_and_is_idempoten
 def test_membership_is_a_default_feature_module():
     makerspace = make_space("membership-payment-default")
 
-    assert "membership" in DEFAULT_ENABLED_MODULES
+    # Opt-in: installable rather than on by default, but still a valid feature parent.
+    assert "membership" not in DEFAULT_ENABLED_MODULES
+    assert "membership" in profile_modules(EVERYTHING)
     assert "membership" in FEATURE_MODULES
     assert "membership" in makerspace.enabled_modules

@@ -126,9 +126,19 @@ def test_every_enforced_module_key_is_registered():
     assert unregistered == set(), f"Guarded but unregistered module keys: {sorted(unregistered)}."
 
 
-def test_derived_defaults_and_workflows_are_unchanged():
-    assert DEFAULT_ENABLED_MODULES == LEGACY_DEFAULT_ENABLED_MODULES
-    assert default_enabled_modules() == LEGACY_DEFAULT_ENABLED_MODULES
+def test_modules_are_opt_in_and_a_new_makerspace_gets_core_only():
+    # Modules default off (plan D4). The pre-opt-in set survives intact as the
+    # `everything` profile, so nothing was dropped -- only the default changed.
+    from apps.makerspaces.module_profiles import EVERYTHING, profile_modules
+
+    assert set(DEFAULT_ENABLED_MODULES) == module_registry.core_module_keys()
+    assert default_enabled_modules() == DEFAULT_ENABLED_MODULES
+    assert set(profile_modules(EVERYTHING)) == set(LEGACY_DEFAULT_ENABLED_MODULES) | {
+        "notifications"
+    }
+
+
+def test_derived_workflows_are_unchanged():
     assert MODULE_WORKFLOWS == LEGACY_MODULE_WORKFLOWS
 
 
@@ -164,11 +174,15 @@ def test_migration_referenced_callables_still_resolve(dotted_path):
     assert callable(getattr(import_module(module_path), attribute))
 
 
-def test_core_modules_match_the_approved_split_and_are_default_on():
+def test_core_modules_match_the_approved_split_and_are_always_installed():
     assert module_registry.core_module_keys() == APPROVED_CORE
+    installed_by_default = set(default_enabled_modules())
     for definition in module_registry.MODULES:
         if definition.is_core:
-            assert definition.default_enabled
+            # Core is on by definition, so it must not also claim default_enabled --
+            # two sources for one fact is exactly the drift this registry removes.
+            assert not definition.default_enabled
+            assert definition.key in installed_by_default
 
 
 def test_registry_is_internally_consistent():

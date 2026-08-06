@@ -220,13 +220,15 @@ def test_bookings_module_migration_is_idempotent_and_reverse_is_targeted():
     assert second.enabled_modules == ["another-custom"]
 
 
-def test_new_makerspaces_enable_bookings_by_default_after_events():
-    makerspace = make_makerspace("bookings-enabled-by-default")
+def test_bookings_is_an_installable_module():
+    # Modules are opt-in, so `bookings` is no longer on by default. It must still be a
+    # registered module that the `everything` profile installs. (The old assertion
+    # pinned its position within enabled_modules, which canonicalization sorts anyway.)
+    from apps.makerspaces.models import DEFAULT_ENABLED_MODULES
+    from apps.makerspaces.module_profiles import EVERYTHING, profile_modules
 
-    assert "bookings" in makerspace.enabled_modules
-    assert makerspace.enabled_modules.index("bookings") == (
-        makerspace.enabled_modules.index("events") + 1
-    )
+    assert "bookings" not in DEFAULT_ENABLED_MODULES
+    assert "bookings" in profile_modules(EVERYTHING)
 
 
 def test_booking_status_data_migration_and_lossy_reverse():
