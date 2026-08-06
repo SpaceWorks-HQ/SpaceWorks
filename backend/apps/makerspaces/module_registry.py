@@ -146,6 +146,13 @@ MODULES = (
         "notifications", "Notifications", "In-app notification inbox and emitters.",
         "notifications", GUARD,
     ),
+    # Tenant email delivery only. Account recovery and email verification are platform
+    # mail (`makerspace=None`) and are NOT this module's to disable -- see
+    # `integrations.dispatch.EMAIL_MODULE_EXEMPT`.
+    ModuleDefinition(
+        "email", "Email", "Outbound email delivery for this makerspace.",
+        "integrations", GUARD,
+    ),
 )
 
 BY_KEY = {definition.key: definition for definition in MODULES}

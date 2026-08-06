@@ -17,7 +17,7 @@ EVERYTHING = "everything"
 _RECOMMENDED_EXTRAS = frozenset({
     "guest_handover", "bulk_import", "containers", "stock_transfers", "stocktake",
     "reports", "qr_print_batches", "asset_units", "machines", "machine_service",
-    "notifications",
+    "notifications", "email",
 })
 
 PROFILES = {

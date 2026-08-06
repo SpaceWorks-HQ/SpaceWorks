@@ -81,6 +81,11 @@ class EmailLog(ScopedPiiModelMixin, models.Model):
         SENDING = "sending", "Sending"
         SENT = "sent", "Sent"
         FAILED = "failed", "Failed"
+        # Terminal and deliberate: the `email` module is off for this makerspace, so the
+        # message was never attempted. Distinct from FAILED because nothing went wrong
+        # and there is nothing to retry -- `retry_email_log` refuses it, and callers
+        # reading `.status` must not report it as a delivery.
+        SKIPPED = "skipped", "Skipped"
 
     makerspace = models.ForeignKey(
         "makerspaces.Makerspace",

@@ -129,13 +129,18 @@ def test_every_enforced_module_key_is_registered():
 def test_modules_are_opt_in_and_a_new_makerspace_gets_core_only():
     # Modules default off (plan D4). The pre-opt-in set survives intact as the
     # `everything` profile, so nothing was dropped -- only the default changed.
+    # `POST_LEGACY_KEYS` is the deliberate growth since that baseline; a key added to the
+    # registry without being listed here fails this test, which is the point.
     from apps.makerspaces.module_profiles import EVERYTHING, profile_modules
+
+    POST_LEGACY_KEYS = {"notifications", "email"}
 
     assert set(DEFAULT_ENABLED_MODULES) == module_registry.core_module_keys()
     assert default_enabled_modules() == DEFAULT_ENABLED_MODULES
-    assert set(profile_modules(EVERYTHING)) == set(LEGACY_DEFAULT_ENABLED_MODULES) | {
-        "notifications"
-    }
+    assert (
+        set(profile_modules(EVERYTHING))
+        == set(LEGACY_DEFAULT_ENABLED_MODULES) | POST_LEGACY_KEYS
+    )
 
 
 def test_derived_workflows_are_unchanged():
@@ -186,7 +191,8 @@ def test_core_modules_match_the_approved_split_and_are_always_installed():
 
 
 def test_registry_is_internally_consistent():
-    assert len(module_registry.MODULES) == 24
+    # 24 at the registry's introduction, plus `email` (plan A5).
+    assert len(module_registry.MODULES) == 25
     assert len(module_registry.BY_KEY) == len(module_registry.MODULES)
     for definition in module_registry.MODULES:
         assert definition.label and definition.description and definition.app_label

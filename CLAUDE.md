@@ -231,6 +231,25 @@ retained — their subject still exists. CLI: `python manage.py purge_module_dat
 [--actor username] [--yes|--list]`, slug-typed confirmation, and a platform-scoped
 `makerspace.module_purge_started`/`module_purged` audit pair naming a real superuser actor.
 
+**The `email` module gates tenant mail only.** `integrations.dispatch.email_module_blocks(makerspace,
+stream, event)` is the single gate, and it is checked in **three** places, not one: `dispatch_email()`
+(new mail), `_deliver()` (a row can sit in Celery across an uninstall, and retry re-enters here), and
+transitively `retry_email_log()`, whose existing FAILED/SENDING whitelist already refuses the new status.
+A blocked message becomes a **terminal `EmailLog.Status.SKIPPED`** row — recorded, not dropped, so the
+operator can see what the toggle suppressed — and `SKIPPED` is neither a delivery nor a failure:
+`notify._dispatch_email_delivery` counts it as neither, because `notify_return_due` returns
+`bool(delivered_counts)` and a skip must not read as a reminder that went out. Three messages are
+**exempt, matched on stream AND event** (an event name alone is not unique across streams):
+`("account","password_reset")`, `("account","email_verification")` — missing the second leaves a new
+account unable to verify and therefore unable to join — and `("hardware","return_reminder")`, a
+duty-of-care message in the accountability flow. **Platform mail (`makerspace=None`) is never gated**:
+no tenant owns it, and the platform-level `integrations.email.email_enabled()` behind `/api/v1/config`
+is *deliverability*, not tenant enablement — conflating them hides forgot-password from the login screen.
+Because modules are opt-in, a newly registered key is off by default, which is right for a new makerspace
+and catastrophic for an existing one; migration `makerspaces/0050` is the one-time backfill (with a working
+reverse) that keeps every pre-existing space sending mail across the upgrade. Any future default-on module
+key needs the same treatment.
+
 **Two-level capabilities (modules + features).** `Makerspace.enabled_modules` (whole modules) is
 **superadmin-only** — edited only in the `/control/` capability matrix; a staff-API PATCH containing
 `enabled_modules` is a hard **403**. `Makerspace.enabled_features` (namespaced sub-features via the

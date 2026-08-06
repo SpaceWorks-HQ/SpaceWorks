@@ -90,6 +90,11 @@ def _dispatch_email_delivery(makerspace, feature_event, delivery, sync, delivere
             extra={"makerspace_id": getattr(makerspace, "pk", None)},
         )
         return
+    if log.status == EmailLog.Status.SKIPPED:
+        # Neither delivered nor failed: the makerspace turned email off, so counting it
+        # either way misreports the lifecycle result (`notify_return_due` returns
+        # `bool(delivered_counts)`, and a skip must not read as a sent reminder).
+        return
     target = failed if log.status == EmailLog.Status.FAILED else delivered
     _increment(target, NotificationChannel.EMAIL)
 

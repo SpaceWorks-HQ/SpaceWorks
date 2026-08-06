@@ -11,6 +11,37 @@ from apps.makerspaces import domain_verification, limits
 
 logger = logging.getLogger(__name__)
 
+# Mail a makerspace may not switch off, matched on **stream AND event** -- an event name
+# alone is not unique across streams, so matching on `event` would silently exempt an
+# unrelated message that happened to share the name.
+#
+# The first two are account recovery. They are platform mail (`makerspace=None`) and so
+# are already outside the tenant gate below; they are named here anyway because the gate
+# must not become tenant-scoped by accident, and because losing `email_verification`
+# leaves a new account unable to verify and therefore unable to join at all.
+# `return_reminder` is an overdue-loan duty-of-care message tied to the accountability
+# flow, not a notification preference.
+EMAIL_MODULE_EXEMPT = frozenset({
+    ("account", "password_reset"),
+    ("account", "email_verification"),
+    ("hardware", "return_reminder"),
+})
+
+
+def email_module_blocks(makerspace, stream, event):
+    """True when the `email` module is off for this makerspace and the mail is gateable.
+
+    Platform mail has no makerspace and is never gated: there is no tenant whose toggle
+    could apply, and gating it would take out forgot-password for everyone.
+    """
+    if makerspace is None:
+        return False
+    if (stream, event) in EMAIL_MODULE_EXEMPT:
+        return False
+    from apps.makerspaces.platform import module_enabled
+
+    return not module_enabled(makerspace, "email")
+
 
 def _create_email_log(**values):
     """Hold the shared fence across the mapped EmailLog insert."""
@@ -44,6 +75,24 @@ def dispatch_email(
         stream, event, audience = "platform", "platform_email", "system"
     if not persist_body and not sync:
         raise ValueError("persist_body=False requires sync=True")
+
+    if email_module_blocks(makerspace, stream, event):
+        # Recorded rather than dropped: the operator needs to see what their toggle
+        # suppressed. The body is stored only when the caller allowed persistence --
+        # a skipped row must not become the place a redacted body leaks into.
+        return _create_email_log(
+            makerspace=makerspace,
+            to_email=to_email,
+            subject=subject,
+            text_body=text_body if persist_body else "",
+            html_body=html_body if persist_body else "",
+            stream=stream,
+            event=event,
+            audience=audience,
+            connection_kind=connection,
+            status=EmailLog.Status.SKIPPED,
+            error="Email is disabled for this makerspace.",
+        )
 
     if (
         not domain_verification.is_self_host()
@@ -147,6 +196,15 @@ def _deliver(log):
 
     with transaction.atomic():
         assert_mapped_write_allowed(log.makerspace_id)
+
+    # Re-checked at delivery, not just at dispatch: a queued row can sit in Celery
+    # across a module uninstall, and the retry path re-enters here too. Gating only
+    # `dispatch_email` would let everything already in flight through.
+    if email_module_blocks(log.makerspace, log.stream, log.event):
+        log.status = EmailLog.Status.SKIPPED
+        log.error = "Email is disabled for this makerspace."
+        log.save(update_fields=["status", "error", "updated_at"])
+        return log
 
     try:
         from apps.integrations.email import (
