@@ -18,7 +18,7 @@ to the very end** (after all Parts) — no per-Part QA gate. Specs live (gitigno
 `docs/superpowers/specs/2026-07-1*`.
 
 **Shipped on `dev` (see condensed changelog for the module list):** Events, Bookings, Maintenance,
-Analytics/reports, public Roadmap, Machine Manager role + delegated role assignment, public
+Analytics/reports, Machine Manager role + delegated role assignment, public
 self-booking + shared custom forms, per-feature×per-channel notification matrix (Slack/Mattermost),
 scoped PII encryption (Parts H1–H4), custom editable per-makerspace roles (Part L), and **Phase C**.
 Phase C is complete on `dev`: capabilities toggles; Stripe payments C.2/C.3; advisory geofenced
@@ -248,7 +248,7 @@ invariants above). Use `git log --oneline`/`git blame` for the implementing comm
   migration `0018` fail-safe backfill) (`8d39cb0`).
 - **FabLab Parts C–N + L + H + Settings + K** (2026-07-16→18, `dev`): Events, Bookings (+ public
   self-booking + shared `forms_schema` custom forms + structured event location), Maintenance, Analytics
-  reports, public Roadmap, Machine Manager role + SM-delegated role assignment, per-feature×per-channel
+  reports, public Roadmap (later tombstoned), Machine Manager role + SM-delegated role assignment, per-feature×per-channel
   notification matrix (Slack/Mattermost), scoped PII encryption H1–H4, custom roles L, machine service
   requests N (in worktree). New apps: `events`, `bookings`, `maintenance`, `roadmap`, `forms_schema`,
   `encryption`, machine-service models under `machines`.
@@ -420,18 +420,17 @@ cd backend && pytest
   transitions (atomic + row-locked + audited; also `assign_box`/`issue_request`/`return_items`);
   `permissions.py`, `exceptions.py` (workflow→HTTP map + `ErrorSerializer._EXCEPTION_MAP`),
   `notifications.py` (Telegram seam), public submit/verify/status views, `send_return_reminders` command.
-- `backend/apps/checkin/` — fail-closed Check-In API client (`verify()`, `CheckinUnavailable`→503 /
-  `CheckinDenied`→403; `stub` vs `http` via `CHECKIN_MODE`).
 - `backend/apps/payments/` — immutable multi-subject Payment authority, per-space raw credentials + managed
   Stripe Connect resolution, checkout/webhook settlement, reconciliation, and native PaymentSheet intents.
-- `backend/apps/printing/` — 3D Printing Manager: `PrintBucket`/`PrintRequest`/`PrintPrinter`/
-  `FilamentSpool`/`ManualPrintLog`; `workflow.py` (single source of truth), `permissions.py`
-  (`CanManagePrinting`), `emails.py`, `storage.py` (print upload presign), `reports_*`, public
-  submit/status mirroring the hardware public posture (AllowAny + throttle + honeypot + no-PII status).
-  `ManagedPrintRequestSerializer` (staff, price/payment) is split from the shared price-free serializer.
+- `backend/apps/printing/` — **TOMBSTONED** (Project B). Contains only an `AppConfig` and an empty
+  `models.py`; it stays in `INSTALLED_APPS` solely so its historical migrations remain installed. 3D
+  printing is now a `MachineType` inside `apps/machines/` — look there, not here.
 - `backend/apps/warranty/`, `apps/machines/`, `apps/maintenance/`, `apps/events/`, `apps/bookings/`,
-  `apps/roadmap/`, `apps/forms_schema/`, `apps/encryption/`, `apps/procurement/`, `apps/notifications/`,
+  `apps/forms_schema/`, `apps/encryption/`, `apps/procurement/`, `apps/notifications/`,
   `apps/operations/report_registry.py` — the FabLab + governance modules (see condensed changelog).
+- `backend/apps/roadmap/` — **TOMBSTONED**: the `RoadmapItem` model is retained for migration history
+  only. No URLs, no serializers, no admin surface, no frontend.
+  `tests/roadmap/test_removed_surfaces.py` asserts the surfaces stay removed.
 - `backend/tests/` — pytest behavior tests (external behavior, not implementation).
 - `frontend/src/features/inventory/` — public catalog/detail/self-checkout + `ProductCard`/
   `AvailabilityBadge`. `frontend/src/features/staff/` — staff console panels (grouped nav via
@@ -485,11 +484,11 @@ The goal is not just to ship code, but to understand why each production-quality
 - **Follow the global Claude config.** The gated workflow in `~/.claude/CLAUDE.md` (Stages 1–6, Codex delegation, mandatory review/QA gates) governs all work in this repo. Repo-specific rules below add to it; they do not override it.
 - **Document every API endpoint in Swagger / OpenAPI.** Every route in the API surface (PRD §14) must have an OpenAPI spec entry — request/response schemas, auth requirements, and error responses. Keep the spec in sync with the code; an undocumented endpoint is incomplete.
 - **Keep files modular — target ~200 lines per file, hard ceiling ~300.** One clear responsibility per file. When a module file grows past the target, split it (e.g. route handlers, validation, and service logic in separate files). The deep modules in §12 are logical boundaries, not single files. **Established split pattern:** when an app's `views.py`/`serializers.py`/`admin.py`/`services.py` outgrows the ceiling, split classes/functions into domain submodules (`views_*`, `serializers_*`, `admin_*`, `services_*`) and keep the original file as a **thin re-export barrel** (explicit `from .submodule import (...)`, never `import *`) so `from app.views import X` and `views.X` keep resolving; for `admin.py` the barrel must still import the admin submodules so the `@admin.register` side effects fire. Every backend code file is within the ceiling **except `backend/config/settings.py`** — Django settings are conventionally a single file (accepted exception).
-- **Production-level code, not prototype code.** Validate all inputs at the boundary, handle external-service failure explicitly (especially the Check-In API — fail safe, never crash a request flow), use structured logging, return consistent typed error responses, and never leave `TODO`/stub auth or scoping in a merged path. Every state-changing endpoint must emit its audit log entry (PRD §11). Honor the immutability/append-only and makerspace-scoping invariants already documented above as enforced code, not convention.
+- **Production-level code, not prototype code.** Validate all inputs at the boundary, handle external-service failure explicitly (especially outbound integrations — Stripe, Telegram, SMTP, object storage — fail safe, never crash a request flow), use structured logging, return consistent typed error responses, and never leave `TODO`/stub auth or scoping in a merged path. Every state-changing endpoint must emit its audit log entry (PRD §11). Honor the immutability/append-only and makerspace-scoping invariants already documented above as enforced code, not convention.
 
 ## What This System Is
 
-A multi-tenant system for managing community hardware loans across makerspaces. The central concern is **traceability of physical handovers**: every issue and return must produce evidence (QR scans + photos + remarks + audit log) so that accountability for lost/damaged hardware is never ambiguous. Public users browse and request; when self-checkout is enabled they may also issue/return eligible QR tools after Check-In verification and evidence upload. Staff physically issue reviewed requests and direct handouts according to action scope.
+A multi-tenant system for managing community hardware loans across makerspaces. The central concern is **traceability of physical handovers**: every issue and return must produce evidence (QR scans + photos + remarks + audit log) so that accountability for lost/damaged hardware is never ambiguous. Public users browse and request; when self-checkout is enabled they may also issue/return eligible QR tools after authentication and evidence upload. Staff physically issue reviewed requests and direct handouts according to action scope.
 
 ## Architecture: Concepts That Span Multiple Modules
 
@@ -506,7 +505,7 @@ The PRD specifies a layered design where UIs and the Telegram bot are thin clien
 - **Inventory Availability** — quantity math + asset status for QR-tracked tools.
 - **QR Code & Box** — generates/resolves/revokes QR codes, assigns boxes to requests, tracks scan history.
 - **Evidence Photo** — immutable issue/return photo storage linked to actor + request + QR scans; object storage, never public.
-- **Check-In API Client** — wraps the external check-in service that verifies requesters and returns `username`. Must fail safely if that API is down.
+- **Check-In API Client** — **RETIRED** (`73a480c`, Part M7). `apps/checkin/` no longer exists and there is no `CHECKIN_MODE` setting. Requester identity now comes from authenticated member accounts, so there is no external verify dependency left to fail safe on.
 - **Telegram Integration** — sends per-makerspace group alerts and processes accept/reject callbacks (delegating to Request Workflow).
 
 ## Request State Machine
@@ -529,7 +528,7 @@ Every domain entity is scoped to a `makerspace_id`. A makerspace owns its invent
 - Hardware **cannot be returned** without a return photo and a return remark/notes.
 - Issued quantity cannot exceed accepted quantity without authorized workflow permission.
 - Guest Admins can issue accepted requests and process scoped returns through the same evidence/QR/remark/audit workflow as staff. They **cannot** accept/reject, edit inventory, manage QR, or create direct handouts. Direct handouts (a loan with no reviewed request) require the dedicated `ISSUE_DIRECT_LOAN` action, granted only to Space Manager + Inventory Manager.
-- Public request lookup verifies the identifier through Check-In and scopes results to that verified identity — it never matches free-text contact fields (no enumeration by known email/phone).
+- Public request submission requires an **authenticated member** (`RequestSubmitView` → `IsAuthenticated`), and request lookup is scoped to that verified identity — it never matches free-text contact fields (no enumeration by known email/phone). The anti-enumeration invariant is unchanged; since the Check-In retirement (`73a480c`) it is enforced by member auth rather than an external verify call.
 - Inventory Managers can run the full hardware lifecycle but **cannot** manage printing, staff, or makerspace settings.
 - Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks active status.
 - Evidence photos and QR scan records are **immutable**; audit logs are **append-only**.
