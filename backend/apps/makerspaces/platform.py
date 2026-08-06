@@ -142,9 +142,11 @@ def bootstrap_payload(makerspace):
         "public_stats_enabled": makerspace.public_stats_enabled,
         "membership_policy": makerspace.membership_policy,
     }
-    # Advisory geofence: expose the flag ONLY when configured, so dormant/self-host bootstrap
-    # payloads stay byte-for-byte unchanged (self-host invariant).
-    if makerspace.geofence_effective:
+    # Advisory geofence: expose the flag ONLY when configured AND the feature is on, so
+    # dormant/self-host bootstrap payloads stay byte-for-byte unchanged (self-host
+    # invariant) and a disabled feature cannot leave the client asking for coordinates
+    # the backend will ignore.
+    if makerspace.geofence_effective and feature_enabled(makerspace, "presence.geofence"):
         makerspace_payload["geofence_enabled"] = True
     return {
         "makerspace": makerspace_payload,

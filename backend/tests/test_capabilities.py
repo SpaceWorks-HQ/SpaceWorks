@@ -18,8 +18,21 @@ def test_feature_registry_rejects_unknown_duplicate_and_missing_dependencies():
 
 
 def test_feature_defaults_are_dormant_except_legacy_compatible_self_checkout():
-    assert default_enabled_features() == ["inventory.self_checkout"]
-    assert not any(key.startswith("payments.") for key in default_enabled_features())
+    # The A6 master switches default ON so that adding them changes nothing for a space
+    # already using the capability -- they are additive `AND`s in front of readiness
+    # checks that stay dormant on their own. `payments.enabled` being on therefore
+    # enables nothing by itself: every per-DOMAIN payments feature must still be off by
+    # default, which is what the second assertion pins.
+    assert default_enabled_features() == [
+        "inventory.self_checkout",
+        "payments.enabled",
+        "mobile.push",
+        "presence.geofence",
+    ]
+    assert not any(
+        key.startswith("payments.") and key != "payments.enabled"
+        for key in default_enabled_features()
+    )
 
 
 def test_self_checkout_is_standalone_and_independent_of_public_inventory():
@@ -216,3 +229,44 @@ def test_membership_payment_uses_the_registered_membership_module():
     modules, features = validate_capabilities(["membership"], ["payments.membership"])
     assert features == ["payments.membership"]
     assert modules == sorted(core_module_keys() | {"membership"})
+
+
+def test_frontend_feature_definitions_match_the_backend():
+    """`frontend/src/lib/features.ts` is a hand-kept mirror of the backend registry.
+
+    A parallel list is exactly the drift the capability registry exists to remove, and
+    here it is load-bearing: the staff console renders its checkboxes from the frontend
+    copy, so a feature missing there is invisible to the Space Manager who is supposed
+    to own it, and a stale `parent_module` renders a checkbox that is wrongly disabled
+    (an omitted checkbox is dropped from the PATCH and silently clears the capability).
+    """
+    import json
+    import re
+    from pathlib import Path
+
+    from apps.makerspaces.capabilities import FEATURE_DEFINITIONS
+
+    source = (
+        Path(__file__).resolve().parents[2] / "frontend" / "src" / "lib" / "features.ts"
+    ).read_text(encoding="utf-8")
+    body = source.split("FEATURE_DEFINITIONS: readonly FeatureDefinition[] = [", 1)[1]
+    body = body.split("];", 1)[0]
+
+    mirrored = []
+    for line in body.splitlines():
+        match = re.search(
+            r'key:\s*"([^"]+)",\s*parent_module:\s*(null|"[^"]*"),\s*label:\s*"([^"]+)"',
+            line,
+        )
+        if match:
+            key, parent, label = match.groups()
+            mirrored.append((key, None if parent == "null" else json.loads(parent), label))
+
+    expected = [
+        (definition.key, definition.parent_module, definition.label)
+        for definition in FEATURE_DEFINITIONS
+        if definition.frontend_exposed
+    ]
+    assert sorted(mirrored) == sorted(expected), (
+        "frontend/src/lib/features.ts has drifted from capabilities.FEATURE_DEFINITIONS."
+    )

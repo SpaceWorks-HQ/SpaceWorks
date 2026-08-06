@@ -24,6 +24,14 @@ def haversine_distance_m(latitude_a, longitude_a, latitude_b, longitude_b):
 
 
 def evaluate_geofence(makerspace, *, latitude, longitude, accuracy):
+    # Additive master switch (plan A6) in front of the existing configuration check, not
+    # a replacement. `None` means "not checked", which is exactly the dormant behaviour
+    # an unconfigured space already has -- and the geofence stays ADVISORY either way:
+    # this can only remove a classification, never start blocking a check-in.
+    from apps.makerspaces.platform import feature_enabled
+
+    if not feature_enabled(makerspace, "presence.geofence"):
+        return None
     if not makerspace.geofence_effective:
         return None
     if latitude is None or longitude is None or accuracy is None:

@@ -21,6 +21,12 @@ def push_configured():
 
 
 def deliver_native_push(log):
+    # Additive master switch (plan A6): the platform credential check below still runs,
+    # so enabling the feature on an unconfigured platform delivers nothing.
+    from apps.makerspaces.platform import feature_enabled
+
+    if log.makerspace_id and not feature_enabled(log.makerspace, "mobile.push"):
+        return False
     settings_row = PlatformPushSettings.load()
     if not (settings_row.fcm_configured or settings_row.apns_configured):
         return False

@@ -51,6 +51,29 @@ FEATURE_DEFINITIONS = (
         "Member self-checkout and staff direct handouts of QR tools.",
         default_enabled=True,
     ),
+    # The three below are standalone master switches (plan A6). Each is an additive
+    # `AND` in front of an existing readiness check, never a replacement -- turning one
+    # ON must not make an unconfigured capability start working. They default ENABLED so
+    # that adding them changes nothing for a makerspace that was already using the
+    # capability; migration 0051 backfills the same keys onto rows that predate them.
+    FeatureDefinition(
+        "payments.enabled", None, "Payments",
+        "Master switch for online payments; each domain still needs its own "
+        "payments.* feature and configured Stripe credentials.",
+        default_enabled=True,
+    ),
+    FeatureDefinition(
+        "mobile.push", None, "Native push",
+        "Native push notifications to this makerspace's registered devices; still "
+        "requires platform FCM/APNs credentials.",
+        default_enabled=True,
+    ),
+    FeatureDefinition(
+        "presence.geofence", None, "Presence geofence",
+        "Advisory proximity classification on check-in; still requires the makerspace "
+        "geofence to be configured. Never an access gate.",
+        default_enabled=True,
+    ),
 )
 FEATURES = {definition.key: definition for definition in FEATURE_DEFINITIONS}
 # A feature's parent/required modules are validated against the module registry

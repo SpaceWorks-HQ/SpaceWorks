@@ -62,7 +62,7 @@ def test_payment_delete_is_immutable_outside_purge():
 
 def test_verified_webhook_is_idempotent_and_marks_matching_checkout_paid():
     space = make_space("c3-payment-webhook")
-    space.enabled_features = ["payments.machines"]
+    space.enabled_features = ["payments.enabled", "payments.machines"]
     space.save(update_fields=["enabled_features", "updated_at"])
     configured_settings(space)
     actor = make_member("c3-payment-webhook-user", space)
@@ -92,7 +92,7 @@ def test_async_checkout_webhook_settles_matching_pending_payment():
 
 def test_completion_creates_payment_and_checkout_failure_never_blocks(monkeypatch):
     space = make_space("c3-payment-complete")
-    space.enabled_features = ["payments.machines"]
+    space.enabled_features = ["payments.enabled", "payments.machines"]
     space.save(update_fields=["enabled_features", "updated_at"])
     configured_settings(space)
     actor = make_member("c3-payment-complete-user", space)

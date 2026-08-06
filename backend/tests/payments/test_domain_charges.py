@@ -27,7 +27,9 @@ pytestmark = pytest.mark.django_db
 
 
 def enable_payments(makerspace, domain, *, currency="usd"):
-    makerspace.enabled_features = [f"payments.{domain}"]
+    # The A6 master switch is an additive AND, so a per-domain feature alone is
+    # no longer enough to charge.
+    makerspace.enabled_features = ["payments.enabled", f"payments.{domain}"]
     makerspace.save(update_fields=["enabled_features", "updated_at"])
     settings = configured_settings(makerspace)
     settings.default_currency = currency
@@ -170,7 +172,7 @@ def test_zero_feature_credentials_and_membership_module_disable_charging(monkeyp
     zero, feature_off, credentials_off = actor_and_spaces
     enable_payments(zero[0], "bookings")
     configured_settings(feature_off[0])
-    credentials_off[0].enabled_features = ["payments.bookings"]
+    credentials_off[0].enabled_features = ["payments.enabled", "payments.bookings"]
     credentials_off[0].save(update_fields=["enabled_features", "updated_at"])
 
     for makerspace, actor in actor_and_spaces:

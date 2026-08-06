@@ -70,16 +70,24 @@ def test_default_currency_is_lowercased_and_validated():
 def test_online_payments_requires_feature_and_configuration():
     makerspace = make_space("payment-availability")
 
+    def features(*keys):
+        makerspace.enabled_features = list(keys)
+        makerspace.save(update_fields=["enabled_features", "updated_at"])
+
     assert online_payments_enabled(makerspace, "machines") is False
-    makerspace.enabled_features = ["payments.machines"]
-    makerspace.save(update_fields=["enabled_features", "updated_at"])
+    features("payments.enabled", "payments.machines")
+    # Features on, credentials absent.
     assert online_payments_enabled(makerspace, "machines") is False
 
     configured_settings(makerspace)
     assert online_payments_enabled(makerspace, "machines") is True
 
-    makerspace.enabled_features = []
-    makerspace.save(update_fields=["enabled_features", "updated_at"])
+    # The A6 master switch is an additive AND: dropping it turns everything off even
+    # with the domain feature on and credentials configured.
+    features("payments.machines")
+    assert online_payments_enabled(makerspace, "machines") is False
+
+    features()
     assert online_payments_enabled(makerspace, "machines") is False
 
 
