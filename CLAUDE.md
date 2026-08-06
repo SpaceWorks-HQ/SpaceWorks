@@ -191,6 +191,46 @@ module can no longer express "private makerspace"; the existing `Makerspace.publ
 switch does, and the **minimal profile turns it off** so a minimal install publishes nothing until the
 operator opts in.
 
+**Disabling a module is race-safe under the row lock, never at the form.** `require_module` at a view
+boundary reads an **unlocked** row, so a concurrent uninstall can commit in the window between that check
+and the create. `guards.require_module_locked(makerspace, key)` re-checks under `select_for_update` and
+must be called **inside the creation service's `transaction.atomic()`, next to `check_quota`** — every
+`module_install` mutation takes the same makerspace lock, so one lock and one ordering serializes creators
+against disablers exactly the way `check_quota` serializes creators against each other. Validating on the
+disable side instead does not help: it loses the same race from the other end. Guarded creation paths:
+event create + publish, booking create, machine create + unretire, machine-service submit
+(`service_workflow._require_module(..., locked=True)`, whose error shape stays identical to the unlocked
+call). Calling it outside `atomic()` raises `TransactionManagementError` rather than silently not locking.
+
+**Per-module purge is NEW semantics, and is the irreversible second step after uninstall.**
+`lifecycle.purge()` deletes an entire archived makerspace; `makerspaces/module_purge.py` deletes **one
+module's rows while the makerspace stays live**. Contract: the module must **already be uninstalled**
+(uninstall retains everything and is reversible — no single command may both hide and destroy),
+**superadmin-only**, re-checked under the makerspace lock inside one `transaction.atomic()` that suspends
+immutability triggers transaction-scoped the same two ways the makerspace purge does
+(`session_replication_role='replica'` self-host, `app.allow_immutable_delete` GUC on
+`MANAGED_POSTGRES`), with object-storage keys collected **before** the delete and removed **after** the
+commit, best-effort. `module_purge_plans.py` is the per-module declaration; a module absent from it either
+owns no data or is listed in `NOT_SEPARABLE` with the reason (core modules, and `machines`, whose rows
+host warranty, consumables and service history). Two deletions nothing else performs and that a plan must
+declare: **`Payment` rows** (immutable and generic-keyed, so they must go **before** their subject or
+survive as dangling references — and only the subject types this module owns, since a whole-tenant delete
+would destroy another installed module's charges), and **`PiiBlindIndex` rows** (keyed HMACs of PII with
+**no FK** to the source row, so nothing cascades them — leaving them is a real leak). Encrypted envelopes
+live on the source row itself, so they go with it. **A per-module purge must respect the modules that are
+still installed**, which is why `_machine_service_delete` is not `service_lifecycle.delete_for_makerspace`:
+consumable **pools stay** (they are gated by `require_module(..., "machines")` and are PROTECT-referenced
+by surviving manual usage entries), while usage entries **derived from a purged service request go** —
+they carry the requester's name/email/phone copied off the request, and their blind-index rows are cleared
+**per object id, not per label**, or the surviving manual entries lose their search rows. Consumable ledger
+rows are deleted, not reversed: the material really was consumed, so a pool keeps its `remaining_grams` and
+loses only the trail. `MakerspaceMembership` survives a `membership` purge
+(core RBAC state, plan A7); its waiver acceptance is under an all-or-none check constraint, so the three
+acceptance fields are cleared **together** before the waivers go. Membership-dues Payments are deliberately
+retained — their subject still exists. CLI: `python manage.py purge_module_data <key> [--makerspace slug]
+[--actor username] [--yes|--list]`, slug-typed confirmation, and a platform-scoped
+`makerspace.module_purge_started`/`module_purged` audit pair naming a real superuser actor.
+
 **Two-level capabilities (modules + features).** `Makerspace.enabled_modules` (whole modules) is
 **superadmin-only** — edited only in the `/control/` capability matrix; a staff-API PATCH containing
 `enabled_modules` is a hard **403**. `Makerspace.enabled_features` (namespaced sub-features via the

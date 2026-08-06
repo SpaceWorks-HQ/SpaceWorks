@@ -11,6 +11,7 @@ from apps.bookings.exceptions import BookingConflict, BookingInvalidTransition
 from apps.bookings.models import BookableSpace, Booking
 from apps.forms_schema.validation import validate_answers
 from apps.makerspaces import limits
+from apps.makerspaces.guards import require_module_locked
 
 
 def _locked_space(space_id):
@@ -91,6 +92,7 @@ def create_booking(
     booking.custom_answers = validate_answers(
         locked_space.custom_form, custom_answers
     )
+    require_module_locked(locked_space.makerspace, 'bookings')
     limits.check_quota(locked_space.makerspace, 'bookings', adding=1)
     if status == Booking.Status.CONFIRMED and _confirmed_overlap(
         locked_space, starts_at, ends_at

@@ -15,6 +15,7 @@ from apps.events.models import Event, EventRegistration
 from apps.events.notifications import notify_event_lifecycle
 from apps.forms_schema.validation import validate_form_schema
 from apps.makerspaces import limits
+from apps.makerspaces.guards import require_module_locked
 from apps.makerspaces.models import Makerspace
 
 EVENT_FIELDS = frozenset(
@@ -89,6 +90,7 @@ def create_event(
     payment_amount=0,
 ):
     locked_space = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+    require_module_locked(locked_space, "events")
     event = Event(
         makerspace=locked_space,
         created_by=actor,
@@ -189,6 +191,7 @@ def publish(event, *, actor):
     _validate(locked)
     if locked.ends_at < timezone.now():
         raise EventInvalidTransition("Ended events cannot be published.")
+    require_module_locked(locked.makerspace, "events")
     limits.check_quota(locked.makerspace, "events", adding=1)
     locked.status = Event.Status.PUBLISHED
     locked.save(update_fields=["status", "updated_at"])

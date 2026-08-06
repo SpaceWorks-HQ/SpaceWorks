@@ -18,7 +18,7 @@ from apps.machines import access
 from apps.machines.models import Machine, MachineType
 from apps.machines.serializers import MachineListResponseSerializer, MachineSerializer
 from apps.makerspaces import limits
-from apps.makerspaces.guards import require_module
+from apps.makerspaces.guards import require_module, require_module_locked
 
 
 class _MachinePagination(PageNumberPagination):
@@ -105,6 +105,7 @@ class MachineListCreateView(APIView):
         if not access.can_create_machine(request.user, makerspace_id, machine_type):
             raise PermissionDenied()
         with transaction.atomic():
+            require_module_locked(makerspace, 'machines')
             limits.check_quota(makerspace, 'machines', adding=1)
             machine = Machine.objects.create(
                 makerspace=makerspace,

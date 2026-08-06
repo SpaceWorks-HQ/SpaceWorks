@@ -12,6 +12,7 @@ from apps.machines.models import (
     Machine, MachineDocument, MachineErrorLog, MachineOperator, MachineUsageEntry,
 )
 from apps.makerspaces import limits
+from apps.makerspaces.guards import require_module_locked
 
 
 def _retired(machine):
@@ -171,6 +172,7 @@ def unretire_machine(machine, actor):
     if not access.can_unretire_machine(actor, machine):
         raise PermissionDenied()
     machine = Machine.objects.select_for_update().get(pk=machine.pk)
+    require_module_locked(machine.makerspace, "machines")
     limits.check_quota(machine.makerspace, "machines", adding=1)
     machine.is_active = True
     machine.save(update_fields=["is_active", "updated_at"])

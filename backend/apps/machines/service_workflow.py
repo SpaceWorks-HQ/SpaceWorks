@@ -30,7 +30,7 @@ def submit(bucket_or_machine, requester, *, requester_name, contact_email, conta
         makerspace = target.makerspace
         machine_type = target.machine_type if isinstance(target, ServiceQueue) else target.machine_type
         _validate_capability_payload(machine_type, capability_payload or {})
-        _require_module(makerspace)
+        _require_module(makerspace, locked=True)
         limits.check_quota(makerspace, "machine_service_open", adding=1)
         limits.check_quota(makerspace, "machine_service_submit", adding=1)
         if isinstance(target, ServiceQueue):
@@ -302,7 +302,14 @@ def _require_available(machine):
         raise ServiceMachineUnavailable("Machine is not available for service requests.")
 
 
-def _require_module(makerspace):
+def _require_module(makerspace, *, locked=False):
+    # `locked=True` re-reads the makerspace under `select_for_update` so a
+    # concurrent uninstall cannot commit between this check and the create
+    # (plan A8). The error shape is deliberately identical either way.
+    if locked:
+        from apps.makerspaces.models import Makerspace
+
+        makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
     if not module_enabled(makerspace, "machine_service"):
         raise ValidationError("Machine service is disabled for this makerspace.")
 
