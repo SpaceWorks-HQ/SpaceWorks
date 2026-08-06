@@ -4,7 +4,12 @@ from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
 
-from apps.makerspaces.module_registry import BY_KEY, MODULE_KEYS, module_dependencies
+from apps.makerspaces.module_registry import (
+    BY_KEY,
+    MODULE_KEYS,
+    core_module_keys,
+    module_dependencies,
+)
 
 
 @dataclass(frozen=True)
@@ -104,7 +109,11 @@ def _canonical_modules(value):
         isinstance(key, str) and key for key in value
     ):
         raise ValidationError({"enabled_modules": "Enter a list of non-empty module keys."})
-    return sorted(set(value))
+    # Core modules are structural: the system is incoherent without them, so they are
+    # added back rather than rejected. Rejecting would make every caller carry the core
+    # set, and would fail otherwise-valid operations on a row that somehow lost one.
+    # Unknown legacy keys are still preserved -- this only ever adds.
+    return sorted(set(value) | core_module_keys())
 
 def _canonical_features(value):
     if not isinstance(value, (list, tuple)) or not all(

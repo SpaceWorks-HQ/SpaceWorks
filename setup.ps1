@@ -42,6 +42,15 @@ else {
   $webhost = ($webaddr -replace '^[a-zA-Z][a-zA-Z0-9+.-]*://', '' -replace '/.*$', '' -replace ':.*$', '')
   if (-not $webhost) { $webhost = "localhost" }
   $msname  = Read-Host "Name of your makerspace [My Makerspace]";                 if (-not $msname)  { $msname  = "My Makerspace" }
+  Write-Host "Which modules should be installed?"
+  Write-Host "  minimal     - core only (nothing published publicly)"
+  Write-Host "  recommended - core plus the inventory lifecycle, reports and machines"
+  Write-Host "  everything  - all modules"
+  $msprofile = Read-Host "Module profile [recommended]"; if (-not $msprofile) { $msprofile = "recommended" }
+  if ($msprofile -notin @("minimal", "recommended", "everything")) {
+    Warn "Unknown profile '$msprofile'; using recommended."
+    $msprofile = "recommended"
+  }
   $adminUser  = Read-Host "Admin login username [admin]";                         if (-not $adminUser)  { $adminUser  = "admin" }
   $adminEmail = Read-Host "Admin email [admin@example.com]";                      if (-not $adminEmail) { $adminEmail = "admin@example.com" }
   $adminPass = [System.Net.NetworkCredential]::new("", (Read-Host "Admin password (leave blank to auto-generate)" -AsSecureString)).Password
@@ -90,7 +99,7 @@ if (-not $ready) { Die "The app did not become ready in time. Check logs with: d
 
 if ($firstRun) {
   Say "Creating your admin account and makerspace..."
-  docker @compose exec -T backend python manage.py setup_instance --username $adminUser --email $adminEmail --password $adminPass --makerspace-name $msname
+  docker @compose exec -T backend python manage.py setup_instance --username $adminUser --email $adminEmail --password $adminPass --makerspace-name $msname --profile $msprofile
   if ($LASTEXITCODE -ne 0) { Die "Could not create the admin account. See the output above." }
 
   if ($stripeSecretKey) {

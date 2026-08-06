@@ -5,6 +5,8 @@ from django.core.management.base import BaseCommand
 from django.utils.text import slugify
 
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.module_install import apply_profile
+from apps.makerspaces.module_profiles import DEFAULT_PROFILE, PROFILES
 
 
 class Command(BaseCommand):
@@ -16,6 +18,12 @@ class Command(BaseCommand):
         parser.add_argument("--password", default=None)
         parser.add_argument("--makerspace-name", default=os.getenv("SETUP_MAKERSPACE_NAME", "My Makerspace"))
         parser.add_argument("--makerspace-slug", default=os.getenv("SETUP_MAKERSPACE_SLUG", ""))
+        parser.add_argument(
+            "--profile",
+            choices=sorted(PROFILES),
+            default=os.getenv("SETUP_MODULE_PROFILE", "") or DEFAULT_PROFILE,
+            help="Which modules to install on the first makerspace.",
+        )
 
     def handle(self, *args, **options):
         username = options["username"] or os.getenv("SETUP_SUPERADMIN_USERNAME") or "superadmin"
@@ -56,12 +64,23 @@ class Command(BaseCommand):
             slug=slug,
             defaults={"name": options["makerspace_name"], "created_by": user},
         )
+        # Only on creation: re-running setup must never silently rewrite the modules an
+        # operator has since chosen.
+        if space_created:
+            apply_profile(makerspace, options["profile"], actor=user)
+
         self.stdout.write(
             self.style.SUCCESS(
                 f"{'Created' if created else 'Found'} superadmin {user.username}; "
                 f"{'created' if space_created else 'found'} makerspace {makerspace.slug}."
             )
         )
+        if space_created:
+            self.stdout.write(
+                f"Installed the '{options['profile']}' module profile "
+                f"({len(makerspace.enabled_modules)} modules). "
+                "Change it with: python manage.py list_modules / install_module <key>."
+            )
         if created and not explicit_password:
             self.stdout.write(
                 self.style.WARNING(

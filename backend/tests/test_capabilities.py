@@ -2,6 +2,7 @@ import pytest
 from django.core.exceptions import ValidationError
 
 from apps.makerspaces.capabilities import default_enabled_features, validate_capabilities
+from apps.makerspaces.module_registry import core_module_keys
 
 
 def test_feature_registry_rejects_unknown_duplicate_and_missing_dependencies():
@@ -24,7 +25,10 @@ def test_feature_defaults_are_dormant_except_legacy_compatible_self_checkout():
 def test_self_checkout_is_standalone_and_independent_of_public_inventory():
     # Regression: self-checkout / direct handouts previously gated on the standalone
     # `self_checkout` module and NEVER required a public catalogue. A private makerspace
-    # (no public_inventory) that enables the feature must keep it effective.
+    # that enables the feature must keep it effective.
+    #
+    # `public_inventory` is now a core module, so "private" is expressed by the
+    # `public_inventory_enabled` catalogue switch rather than by omitting the module.
     from apps.makerspaces.models import Makerspace
     from apps.makerspaces.platform import feature_enabled
 
@@ -32,20 +36,20 @@ def test_self_checkout_is_standalone_and_independent_of_public_inventory():
         name="Private", slug="private",
         enabled_modules=["staff_admin", "scanner"],
         enabled_features=["inventory.self_checkout"],
+        public_inventory_enabled=False,
     )
     assert feature_enabled(private, "inventory.self_checkout") is True
-    # And it validates with no parent module present.
-    assert validate_capabilities([], ["inventory.self_checkout"]) == (
-        [],
-        ["inventory.self_checkout"],
-    )
+    # And it validates with no parent module requested: canonicalization adds only the
+    # core modules, never a parent for this standalone feature.
+    modules, features = validate_capabilities([], ["inventory.self_checkout"])
+    assert features == ["inventory.self_checkout"]
+    assert modules == sorted(core_module_keys())
 
 
 def test_machine_payment_requires_machines_and_machine_service():
-    assert validate_capabilities(["machines", "machine_service"], ["payments.machines"]) == (
-        ["machine_service", "machines"],
-        ["payments.machines"],
-    )
+    modules, features = validate_capabilities(["machines", "machine_service"], ["payments.machines"])
+    assert features == ["payments.machines"]
+    assert modules == sorted(core_module_keys() | {"machine_service", "machines"})
 
 
 def test_effective_feature_requires_parent_and_typed_guard():
@@ -153,9 +157,9 @@ def test_admin_form_rejects_child_without_parent_even_when_ui_is_bypassed():
     with pytest.raises(Exception):
         form.clean_capabilities()
 
-def test_admin_form_allows_standalone_self_checkout_without_public_inventory():
-    # The /control/ matrix must persist a parentless feature even when no public
-    # catalogue module is enabled (P2 silent-clear guard).
+def test_admin_form_allows_standalone_self_checkout_without_a_parent_module():
+    # The /control/ matrix must persist a parentless feature even when the operator
+    # selected no parent module for it (P2 silent-clear guard).
     from apps.makerspaces.admin_capabilities import MakerspaceAdminForm
     from apps.makerspaces.models import Makerspace
 
@@ -166,7 +170,8 @@ def test_admin_form_allows_standalone_self_checkout_without_public_inventory():
     }
     form.clean_capabilities()
     assert "inventory.self_checkout" in instance.enabled_features
-    assert "public_inventory" not in instance.enabled_modules
+    # Only core modules are added back; no optional module is inferred from the feature.
+    assert set(instance.enabled_modules) == core_module_keys() | {"staff_admin"}
 
 
 def test_membership_payment_uses_the_registered_membership_module():
@@ -178,7 +183,6 @@ def test_membership_payment_uses_the_registered_membership_module():
         enabled_features=["payments.membership"],
     )
     assert feature_enabled(makerspace, "payments.membership") is True
-    assert validate_capabilities(["membership"], ["payments.membership"]) == (
-        ["membership"],
-        ["payments.membership"],
-    )
+    modules, features = validate_capabilities(["membership"], ["payments.membership"])
+    assert features == ["payments.membership"]
+    assert modules == sorted(core_module_keys() | {"membership"})

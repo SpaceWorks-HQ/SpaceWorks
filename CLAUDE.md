@@ -162,6 +162,23 @@ issue photo to issue hardware. `tests/makerspaces/test_module_registry.py` is th
 AST-parses `apps/` and fails if a registered module has no real guard call site, if a guarded key is
 unregistered, if the derived lists change, or if a migration-referenced callable stops resolving.
 
+**Module install path (opt-in modularity).** `/control/` is deliberately not proxied on the public
+frontend port, so it can never be the only way to enable a module — a non-technical operator cannot
+reach it. `apps/makerspaces/module_install.py` is the single service behind
+`python manage.py list_modules | install_module <key> | uninstall_module <key>` (`--makerspace <slug>`,
+defaulting to the only makerspace). Installing resolves `requires_modules` transitively; uninstalling
+**refuses core modules and modules another installed module requires**, and only clears the capability
+key — **data is always retained** and reinstalling restores the surfaces. Every mutation locks the
+makerspace row, validates through `validate_capabilities`, and audits `makerspace.capabilities_changed`.
+`apps/makerspaces/module_profiles.py` defines **minimal / recommended / everything**; `setup.sh`,
+`setup.ps1` and `setup_instance --profile` (env `SETUP_MODULE_PROFILE`, default `recommended`) apply one,
+**only when the makerspace is first created** so a re-run never rewrites an operator's choices.
+Core modules are **added back by `_canonical_modules`, not rejected** — no caller has to carry the core
+set and no otherwise-valid save fails on a row that lost one. Because `public_inventory` is core, the
+module can no longer express "private makerspace"; the existing `Makerspace.public_inventory_enabled`
+switch does, and the **minimal profile turns it off** so a minimal install publishes nothing until the
+operator opts in.
+
 **Two-level capabilities (modules + features).** `Makerspace.enabled_modules` (whole modules) is
 **superadmin-only** — edited only in the `/control/` capability matrix; a staff-API PATCH containing
 `enabled_modules` is a hard **403**. `Makerspace.enabled_features` (namespaced sub-features via the

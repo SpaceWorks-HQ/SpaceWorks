@@ -182,6 +182,33 @@ def module_dependencies():
     }
 
 
+def with_dependencies(keys):
+    """Expand keys to include everything they transitively require.
+
+    Installing `printing` must pull in `machine_service`, or the install immediately
+    fails the very dependency rule the registry declares.
+    """
+    resolved, queue = set(), list(keys)
+    while queue:
+        key = queue.pop()
+        if key in resolved:
+            continue
+        resolved.add(key)
+        definition = BY_KEY.get(key)
+        if definition is not None:
+            queue.extend(definition.requires_modules)
+    return resolved
+
+
+def dependents_of(key, among):
+    """Which of `among` require `key` -- i.e. what breaks if `key` is removed."""
+    return sorted(
+        candidate
+        for candidate in among
+        if candidate in BY_KEY and key in BY_KEY[candidate].requires_modules
+    )
+
+
 def is_frontend_exposed(key):
     """Whether a key may appear in the bootstrap payload.
 

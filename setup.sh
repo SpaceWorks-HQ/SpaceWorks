@@ -31,6 +31,15 @@ else
   WEBHOST="${WEBADDR#*://}"; WEBHOST="${WEBHOST%%/*}"; WEBHOST="${WEBHOST%%:*}"
   [ -n "$WEBHOST" ] || WEBHOST="localhost"
   read -r -p "Name of your makerspace [My Makerspace]: "                   MSNAME;   MSNAME="${MSNAME:-My Makerspace}"
+  echo "Which modules should be installed?"
+  echo "  minimal     - core only (nothing published publicly)"
+  echo "  recommended - core plus the inventory lifecycle, reports and machines"
+  echo "  everything  - all modules"
+  read -r -p "Module profile [recommended]: " MSPROFILE; MSPROFILE="${MSPROFILE:-recommended}"
+  case "$MSPROFILE" in
+    minimal|recommended|everything) ;;
+    *) warn "Unknown profile '$MSPROFILE'; using recommended."; MSPROFILE="recommended" ;;
+  esac
   read -r -p "Admin login username [admin]: "                             ADMINUSER; ADMINUSER="${ADMINUSER:-admin}"
   read -r -p "Admin email [admin@example.com]: "                          ADMINEMAIL; ADMINEMAIL="${ADMINEMAIL:-admin@example.com}"
   read -r -s -p "Admin password (leave blank to auto-generate): "         ADMINPASS; echo
@@ -79,7 +88,7 @@ if [ "$FIRST_RUN" = 1 ]; then
   say "Creating your admin account and makerspace..."
   "${COMPOSE[@]}" exec -T backend python manage.py setup_instance \
     --username "$ADMINUSER" --email "$ADMINEMAIL" --password "$ADMINPASS" \
-    --makerspace-name "$MSNAME"
+    --makerspace-name "$MSNAME" --profile "$MSPROFILE"
 
   if [ -n "$STRIPE_SECRET_KEY" ]; then
     SETUP_STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
