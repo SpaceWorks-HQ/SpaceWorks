@@ -12,6 +12,7 @@ from apps.admin_api.serializers_member_memberships import (
 )
 from apps.admin_api.views_roles import ERRORS
 from apps.makerspaces import membership_services
+from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import MakerspaceMembership
 
 
@@ -63,7 +64,9 @@ class AdminMembershipVerifyView(APIView):
 
     @extend_schema(request=None, tags=["Admin memberships"], responses={200: AdminMembershipSerializer, **ERRORS})
     def post(self, request, pk):
-        membership = membership_services.verify_member(request.user, _membership_for_verifier(request.user, pk))
+        membership = _membership_for_verifier(request.user, pk)
+        require_module(membership.makerspace, "membership")
+        membership = membership_services.verify_member(request.user, membership)
         return Response(AdminMembershipSerializer(membership).data)
 
 
@@ -72,5 +75,7 @@ class AdminMembershipUnverifyView(APIView):
 
     @extend_schema(request=None, tags=["Admin memberships"], responses={200: AdminMembershipSerializer, **ERRORS})
     def post(self, request, pk):
-        membership = membership_services.unverify_member(request.user, _membership_for_verifier(request.user, pk))
+        membership = _membership_for_verifier(request.user, pk)
+        require_module(membership.makerspace, "membership")
+        membership = membership_services.unverify_member(request.user, membership)
         return Response(AdminMembershipSerializer(membership).data)

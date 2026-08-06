@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.hardware_requests.exceptions import ErrorSerializer
+from apps.makerspaces.guards import require_module
 from apps.makerspaces.member_activity_serializers import MemberActivitySerializer
 from apps.makerspaces.member_activity_service import active_membership, member_activity
 from apps.presence.guard import MemberPresenceRequired
@@ -27,4 +28,5 @@ class MemberActivityView(APIView):
         membership = active_membership(request.user, makerspace_id)
         if membership is None:
             raise MemberPresenceRequired()
+        require_module(membership.makerspace, "membership")
         return Response(MemberActivitySerializer(member_activity(membership)).data)

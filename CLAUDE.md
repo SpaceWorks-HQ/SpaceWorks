@@ -206,7 +206,22 @@ substrate** in the capabilities layer — enforcement lands in the payment track
 `/control/` matrix widget must derive its disable rule from each feature's real `parent_module` (never
 disable a parentless feature — a disabled checkbox is omitted from POST and would silently clear the
 capability). Widget templates live in the **app** templates dir (`apps/<app>/templates/...`), not project
-`templates/`, so the form renderer (app-dirs only) finds them.
+`templates/`, so the form renderer (app-dirs only) finds them. The matrix's **module** choices come from
+`module_registry.MODULES`, never from "defaults + keys already on the row" — that older rule made any
+non-default module unreachable for a makerspace that didn't already have it (`notifications` was enforced
+but un-enableable), and under opt-in defaults it would have hidden nearly the whole registry. Core is
+**labelled, not disabled**, and unrecognised stored keys stay selectable so an untouched save can't drop
+them.
+
+**The `membership` module gates the community feature, not RBAC (A7).** `MakerspaceMembership` is core
+RBAC state, so gating it wholesale would lock a makerspace out of its own staff administration.
+**Never gated:** membership list/create, role assignment, revoke, capabilities, staff roster,
+`memberships/me`. **Gated by `membership`:** public join request, request queue/approve/revoke,
+verify/unverify, member waiver + accept, member activity, referrals. Invitations run staff and community
+intent down **one** path in `membership_services.invite_membership`, discriminated by the assigned role's
+`granted_actions` — a role granting no actions is a community invitation (gated) however it is named; a
+role granting actions is a staff invitation and must keep working with the module off. Module gates are
+**additive `AND`s** — `refer_membership` still checks `referrals_enabled` and `can_refer`.
 
 **Payments (Stripe, C.2/C.3; dormant until configured).** `apps/payments.Payment` is the **single payment
 authority** (one row per subject via unique `(makerspace, subject_type, subject_id)`; positive amount;

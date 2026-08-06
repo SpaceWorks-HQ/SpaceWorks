@@ -174,6 +174,36 @@ def test_admin_form_allows_standalone_self_checkout_without_a_parent_module():
     assert set(instance.enabled_modules) == core_module_keys() | {"staff_admin"}
 
 
+def test_admin_form_offers_every_registered_module_on_a_fresh_makerspace():
+    # The matrix used to build its choices from "defaults + keys already on the row",
+    # so a module that was not default-on could never be switched on for a makerspace
+    # that did not already have it -- `notifications` was enforced but unreachable.
+    # Now that modules are opt-in, that bug would hide almost the whole registry.
+    from apps.makerspaces.admin_capabilities import MakerspaceAdminForm
+    from apps.makerspaces.models import Makerspace
+    from apps.makerspaces.module_registry import MODULES
+
+    form = MakerspaceAdminForm(instance=Makerspace(name="Fresh", slug="fresh"))
+    offered = {value for value, _ in form.fields["capabilities"].choices}
+
+    assert "module:notifications" in offered
+    assert {f"module:{definition.key}" for definition in MODULES} <= offered
+
+
+def test_admin_form_keeps_unrecognised_stored_module_keys_selectable():
+    # A legacy key not in the registry must stay checkable, or saving an untouched
+    # form would silently drop it.
+    from apps.makerspaces.admin_capabilities import MakerspaceAdminForm
+    from apps.makerspaces.models import Makerspace
+
+    instance = Makerspace(name="Legacy", slug="legacy", enabled_modules=["staff_admin", "old_thing"])
+    form = MakerspaceAdminForm(instance=instance)
+    offered = {value for value, _ in form.fields["capabilities"].choices}
+
+    assert "module:old_thing" in offered
+    assert "module:old_thing" in form.initial["capabilities"]
+
+
 def test_membership_payment_uses_the_registered_membership_module():
     from apps.makerspaces.models import Makerspace
     from apps.makerspaces.platform import feature_enabled
