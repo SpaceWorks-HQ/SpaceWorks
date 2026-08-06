@@ -65,6 +65,9 @@ SECRET_KEY=$(New-Key 50)
 API_CLIENT_ENC_KEY=$(New-FernetKey)
 ALLOWED_HOSTS=$webhost,localhost,127.0.0.1,backend
 CORS_ALLOWED_ORIGINS=http://$webhost
+# Absolute base for links in outbound email (password reset, invitations). Without it
+# those links are emitted as bare paths like "/reset-password?..." and are unclickable.
+PUBLIC_APP_BASE_URL=http://$webhost
 HTTP_PORT=80
 ENABLE_HTTPS=false
 "@

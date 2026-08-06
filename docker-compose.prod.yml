@@ -84,6 +84,9 @@ services:
       CONN_MAX_AGE: ${CONN_MAX_AGE:-0}
       DISABLE_SERVER_SIDE_CURSORS: ${DISABLE_SERVER_SIDE_CURSORS:-False}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      # Absolute base for links in outbound email. Unset => links are emitted as bare
+      # paths (e.g. "/reset-password?...") and password reset is unusable.
+      PUBLIC_APP_BASE_URL: ${PUBLIC_APP_BASE_URL:-}
       API_CLIENT_ENC_KEY: ${API_CLIENT_ENC_KEY:-}
       # Security hardening. Keep ENABLE_HTTPS=false for this HTTP-behind-nginx stack;
       # set it true only when a TLS proxy forwards X-Forwarded-Proto: https.
