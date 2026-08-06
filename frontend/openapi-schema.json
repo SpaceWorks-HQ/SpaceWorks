@@ -29141,10 +29141,11 @@
                     "pending",
                     "sending",
                     "sent",
-                    "failed"
+                    "failed",
+                    "skipped"
                 ],
                 "type": "string",
-                "description": "* `pending` - Pending\n* `sending` - Sending\n* `sent` - Sent\n* `failed` - Failed"
+                "description": "* `pending` - Pending\n* `sending` - Sending\n* `sent` - Sent\n* `failed` - Failed\n* `skipped` - Skipped"
             },
             "EmailTemplateDetail": {
                 "type": "object",

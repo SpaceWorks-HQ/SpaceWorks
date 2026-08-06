@@ -250,6 +250,41 @@ and catastrophic for an existing one; migration `makerspaces/0050` is the one-ti
 reverse) that keeps every pre-existing space sending mail across the upgrade. Any future default-on module
 key needs the same treatment.
 
+**A6 master switches are additive `AND`s, never replacements.** `payments.enabled`, `mobile.push` and
+`presence.geofence` are standalone (`parent_module=None`) features that sit **in front of** the readiness
+check each capability already had — `online_payments_enabled` still requires the per-domain
+`payments.<domain>` feature *and* resolved credentials; `deliver_native_push` still requires platform
+FCM/APNs; `evaluate_geofence` still requires `geofence_effective`. Turning a master switch **on** can
+therefore never make an unconfigured capability start working, and turning `presence.geofence` **off**
+returns `None` ("not checked") — the geofence stays **advisory** and gains no power to block. They must
+stay **independently switchable**: do *not* express the coupling as `requires_features` on the domain
+features, because that would make the kill switch un-flippable until every domain was unticked first.
+All three **default enabled** so their introduction changed nothing, and migration `makerspaces/0051`
+backfills them onto pre-existing rows (`enabled_features` is stored per row, so a `default_enabled` flip
+alone would read as OFF for every existing space). Bootstrap omits `geofence_enabled` entirely when the
+feature is off, preserving the byte-for-byte dormant-payload invariant. A test that enables
+`payments.<domain>` by assigning `enabled_features` wholesale must now include `payments.enabled` too.
+
+**Social sign-in is platform-scoped and must never become a tenant feature** — it resolves before a
+makerspace is selected, so a `social.*` feature key would be unreachable at token-verification time and
+read as disabled for everyone (`test_a6_toggle_scoping.py` pins this). Disabling a provider is the
+dangerous direction: `accounts/social_lockout.py` refuses, at the `/control/` form, to clear the last
+credential of accounts that have that provider, no other provider, and no usable password — those users
+cannot be recovered by forgot-password because there is no password to reset. Inactive users don't block
+the change. This is the platform-wide twin of the per-user `last_credential` guard in
+`unlink_social_identity`.
+
+**The staff console's feature list is a hand-kept mirror and is drift-guarded.**
+`frontend/src/lib/features.ts` `FEATURE_DEFINITIONS` backs the Space-Manager feature checkboxes;
+`tests/test_capabilities.py::test_frontend_feature_definitions_match_the_backend` parses that file and
+fails if it diverges from `capabilities.FEATURE_DEFINITIONS` (keep the one-object-literal-per-line shape
+the guard reads). A feature missing there is invisible to the Space Manager who owns it, and a stale
+`parent_module` renders a wrongly-disabled checkbox — which is omitted from the PATCH and silently clears
+the capability. **Regenerating the OpenAPI snapshot requires the pinned toolchain**: `requirements.txt`
+pins `drf-spectacular>=0.30`, and regenerating with an older installed version rewrites ~240 unrelated
+lines (`allow_blank` `oneOf` wrappers, `nullable` on file fields) — check `pip show drf-spectacular`
+before `manage.py spectacular`, and expect the diff to contain only what you changed.
+
 **Two-level capabilities (modules + features).** `Makerspace.enabled_modules` (whole modules) is
 **superadmin-only** — edited only in the `/control/` capability matrix; a staff-API PATCH containing
 `enabled_modules` is a hard **403**. `Makerspace.enabled_features` (namespaced sub-features via the

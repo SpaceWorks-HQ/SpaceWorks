@@ -1140,7 +1140,7 @@ export type EmailLog = {
   "sent_at": string | null;
 };
 
-export type EmailLogStatusEnum = "pending" | "sending" | "sent" | "failed";
+export type EmailLogStatusEnum = "pending" | "sending" | "sent" | "failed" | "skipped";
 
 export type EmailTemplateDetail = {
   "stream": string;
