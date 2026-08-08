@@ -67,7 +67,7 @@ urlpatterns = [
     path("api/v1/webhooks/stripe/<str:public_code>", StripeWebhookView.as_view(), name="stripe-webhook"),
     path('api/v1/', include('apps.machines.urls')),
     *separable("events", "api/v1/public/", "apps.events.urls_public"),
-    path('api/v1/public/', include('apps.bookings.urls_public')),
+    *separable("bookings", "api/v1/public/", "apps.bookings.urls_public"),
     *separable("presence", "api/v1/public/", "apps.presence.urls"),
     path("api/v1/", include("apps.payments.urls")),
     path(
@@ -97,6 +97,7 @@ urlpatterns = [
     *separable("maintenance", "api/v1/admin/", "apps.maintenance.urls"),
     *separable("presence", "api/v1/admin/", "apps.presence.urls_admin"),
     *separable("events", "api/v1/admin/", "apps.events.urls_admin"),
+    *separable("bookings", "api/v1/admin/", "apps.bookings.urls_admin"),
     path("api/v1/admin/", include("apps.boxes.urls")),
     path("api/v1/admin/", include("apps.evidence.urls")),
     path("api/v1/", include("apps.operations.urls")),

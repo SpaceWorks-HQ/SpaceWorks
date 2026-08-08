@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
-from apps.admin_api.serializers_bookings import (
+from apps.bookings.serializers_admin import (
     BookableSpaceAdminSerializer,
     BookableSpaceListResponseSerializer,
     BookableSpaceWriteSerializer,

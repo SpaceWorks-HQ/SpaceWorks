@@ -50,10 +50,16 @@ def test_no_maintenance_route_resolves(path):
 
 
 def test_the_machine_routes_that_stayed_in_admin_api_still_resolve():
-    """Maintenance shared the machines/ prefix; withdrawing it must not take neighbours."""
+    """Maintenance shared the machines/ prefix; withdrawing it must not take neighbours.
+
+    The neighbours named here are ones no later phase withdraws. Bookable spaces used to
+    be one of them and no longer is: phase 14 relocated bookings out of `admin_api` and
+    this profile tombstones it, which would have failed this test for a reason that has
+    nothing to do with maintenance.
+    """
     assert resolve("/api/v1/admin/machines/1/publicity").url_name == "admin-machine-publicity"
     assert resolve("/api/v1/admin/makerspaces/1/roles/1").url_name == "admin-role-detail"
-    assert resolve("/api/v1/admin/makerspaces/1/spaces/").url_name == "admin-bookable-space-list-create"
+    assert resolve("/api/v1/admin/makerspaces/1/memberships").url_name == "admin-membership-list-create"
 
 
 def test_the_admin_does_not_register_the_models():

@@ -2,10 +2,10 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin
 
 from apps.bookings.models import BookableSpace, Booking
+from apps.separability.tombstones import app_is_tombstoned
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
-@admin.register(BookableSpace)
 class BookableSpaceAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     list_display = (
         'name',
@@ -34,7 +34,6 @@ class BookableSpaceAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         return False
 
 
-@admin.register(Booking)
 class BookingAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     list_display = ('booker_name', 'space', 'starts_at', 'ends_at', 'status')
     list_filter = ('status',)
@@ -53,3 +52,12 @@ class BookingAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# Registered rather than decorated: the admin screens are runtime surfaces a tombstone
+# removes, while the rows stay reachable through the ORM and the purge path. The setting
+# is consulted instead of the manifest because admin autodiscovery runs before this
+# app's ready(). See separability.tombstones.app_is_tombstoned.
+if not app_is_tombstoned("bookings"):
+    admin.site.register(BookableSpace, BookableSpaceAdmin)
+    admin.site.register(Booking, BookingAdmin)

@@ -9,23 +9,6 @@ from apps.admin_api.views_email_templates import (
 )
 from apps.admin_api.views_email_logs import EmailLogListView, EmailLogRetryView
 from apps.admin_api.views_integration_health import IntegrationHealthView
-from apps.admin_api.views_bookable_spaces import (
-    BookableSpaceDeactivateView,
-    BookableSpaceDetailView,
-    BookableSpaceImageDeleteView,
-    BookableSpaceImageFinalizeView,
-    BookableSpaceImagePresignView,
-    BookableSpaceListCreateView,
-)
-from apps.admin_api.views_bookings import (
-    BookingApproveView,
-    BookingCancelView,
-    BookingCompleteView,
-    BookingNoShowView,
-    BookingRejectView,
-    SpaceBookingListView,
-)
-from apps.admin_api.views_booking_rules import BookableSpaceBookingRulesView
 from apps.admin_api.views_hosting import MakerspaceProvisionSubdomainView
 from apps.admin_api.views_machine_documents import (
     MachineDocumentDeleteView,
@@ -271,71 +254,6 @@ urlpatterns = [
         "makerspaces/<int:makerspace_id>/roles/<int:role_id>",
         RoleDetailView.as_view(),
         name="admin-role-detail",
-    ),
-    path(
-        'makerspaces/<int:makerspace_id>/spaces/',
-        BookableSpaceListCreateView.as_view(),
-        name='admin-bookable-space-list-create',
-    ),
-    path(
-        'spaces/<int:pk>/',
-        BookableSpaceDetailView.as_view(),
-        name='admin-bookable-space-detail',
-    ),
-    path(
-        'spaces/<int:pk>/deactivate/',
-        BookableSpaceDeactivateView.as_view(),
-        name='admin-bookable-space-deactivate',
-    ),
-    path(
-        'spaces/<int:pk>/image/presign/',
-        BookableSpaceImagePresignView.as_view(),
-        name='admin-bookable-space-image-presign',
-    ),
-    path(
-        'spaces/<int:pk>/image/finalize/',
-        BookableSpaceImageFinalizeView.as_view(),
-        name='admin-bookable-space-image-finalize',
-    ),
-    path(
-        'spaces/<int:pk>/image/',
-        BookableSpaceImageDeleteView.as_view(),
-        name='admin-bookable-space-image-delete',
-    ),
-    path(
-        'spaces/<int:pk>/bookings/',
-        SpaceBookingListView.as_view(),
-        name='admin-space-booking-list',
-    ),
-    path(
-        'spaces/<int:pk>/booking-rules/',
-        BookableSpaceBookingRulesView.as_view(),
-        name='admin-bookable-space-booking-rules',
-    ),
-    path(
-        'bookings/<int:pk>/approve/',
-        BookingApproveView.as_view(),
-        name='admin-booking-approve',
-    ),
-    path(
-        'bookings/<int:pk>/reject/',
-        BookingRejectView.as_view(),
-        name='admin-booking-reject',
-    ),
-    path(
-        'bookings/<int:pk>/cancel/',
-        BookingCancelView.as_view(),
-        name='admin-booking-cancel',
-    ),
-    path(
-        'bookings/<int:pk>/complete/',
-        BookingCompleteView.as_view(),
-        name='admin-booking-complete',
-    ),
-    path(
-        'bookings/<int:pk>/no-show/',
-        BookingNoShowView.as_view(),
-        name='admin-booking-no-show',
     ),
     path(
         'makerspace/<int:makerspace_id>/machines',

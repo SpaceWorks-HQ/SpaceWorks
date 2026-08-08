@@ -7,14 +7,14 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
-from apps.admin_api.serializers_bookings import (
+from apps.bookings.serializers_admin import (
     BookingAdminSerializer,
     BookingListFilterSerializer,
     BookingListResponseSerializer,
     EmptyActionSerializer,
 )
 from apps.admin_api.serializers_payment_summary import scoped_payment_context
-from apps.admin_api.views_bookable_spaces import manageable_space
+from apps.bookings.views_admin_spaces import manageable_space
 from apps.bookings import services
 from apps.bookings.models import Booking
 from apps.hardware_requests.view_helpers import (
