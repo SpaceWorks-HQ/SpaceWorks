@@ -205,8 +205,12 @@ class ApiIntegrationSettingsSerializer(serializers.ModelSerializer):
     mattermost_webhook_url = serializers.CharField(
         write_only=True, required=False, allow_blank=True, max_length=2048
     )
+    discord_webhook_url = serializers.CharField(
+        write_only=True, required=False, allow_blank=True, max_length=2048
+    )
     slack_webhook_url_set = serializers.SerializerMethodField()
     mattermost_webhook_url_set = serializers.SerializerMethodField()
+    discord_webhook_url_set = serializers.SerializerMethodField()
 
     class Meta:
         model = Makerspace
@@ -229,6 +233,8 @@ class ApiIntegrationSettingsSerializer(serializers.ModelSerializer):
             "slack_webhook_url_set",
             "mattermost_webhook_url",
             "mattermost_webhook_url_set",
+            "discord_webhook_url",
+            "discord_webhook_url_set",
             "default_loan_days",
         ]
         read_only_fields = [
@@ -239,6 +245,7 @@ class ApiIntegrationSettingsSerializer(serializers.ModelSerializer):
             "smtp_password_set",
             "slack_webhook_url_set",
             "mattermost_webhook_url_set",
+            "discord_webhook_url_set",
         ]
 
     def get_telegram_bot_token_set(self, obj) -> bool:
@@ -253,10 +260,16 @@ class ApiIntegrationSettingsSerializer(serializers.ModelSerializer):
     def get_mattermost_webhook_url_set(self, obj) -> bool:
         return bool(obj.mattermost_webhook_url)
 
+    def get_discord_webhook_url_set(self, obj) -> bool:
+        return bool(obj.discord_webhook_url)
+
     def validate_slack_webhook_url(self, value):
         return validate_webhook_url(value)
 
     def validate_mattermost_webhook_url(self, value):
+        return validate_webhook_url(value)
+
+    def validate_discord_webhook_url(self, value):
         return validate_webhook_url(value)
 
     def validate_default_loan_days(self, value):
@@ -274,6 +287,7 @@ class ApiIntegrationSettingsSerializer(serializers.ModelSerializer):
         smtp_password = validated_data.pop("smtp_password", missing)
         slack_webhook_url = validated_data.pop("slack_webhook_url", missing)
         mattermost_webhook_url = validated_data.pop("mattermost_webhook_url", missing)
+        discord_webhook_url = validated_data.pop("discord_webhook_url", missing)
         for field, value in validated_data.items():
             setattr(instance, field, value)
         if telegram_bot_token is not missing:
@@ -284,5 +298,7 @@ class ApiIntegrationSettingsSerializer(serializers.ModelSerializer):
             instance.set_slack_webhook_url(slack_webhook_url)
         if mattermost_webhook_url is not missing:
             instance.set_mattermost_webhook_url(mattermost_webhook_url)
+        if discord_webhook_url is not missing:
+            instance.set_discord_webhook_url(discord_webhook_url)
         instance.save()
         return instance

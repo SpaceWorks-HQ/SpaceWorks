@@ -153,6 +153,27 @@ MODULES = (
         "email", "Email", "Outbound email delivery for this makerspace.",
         "integrations", GUARD,
     ),
+    # One module key per notification channel, so a makerspace ships only the channels
+    # it actually uses. `telegram` and `email` above are the same idea and predate these;
+    # these three complete the set. All are `integrations`-owned and independently
+    # switchable -- a space on Discord alone should carry no Slack surface at all.
+    #
+    # Each is an additive AND in front of the credential check that already existed:
+    # turning a key ON can never make an unconfigured channel start sending, and turning
+    # it OFF stops sending even though the webhook is still stored (so re-enabling needs
+    # no re-entry of the credential).
+    ModuleDefinition(
+        "slack", "Slack", "Per-makerspace Slack incoming-webhook alerts.",
+        "integrations", GUARD,
+    ),
+    ModuleDefinition(
+        "mattermost", "Mattermost", "Per-makerspace Mattermost incoming-webhook alerts.",
+        "integrations", GUARD,
+    ),
+    ModuleDefinition(
+        "discord", "Discord", "Per-makerspace Discord incoming-webhook alerts.",
+        "integrations", GUARD,
+    ),
 )
 
 BY_KEY = {definition.key: definition for definition in MODULES}

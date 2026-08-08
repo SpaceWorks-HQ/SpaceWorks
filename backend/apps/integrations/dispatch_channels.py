@@ -50,6 +50,8 @@ def _channel_configured(makerspace, channel) -> bool:
             return bool(makerspace.get_slack_webhook_url())
         if channel == NonEmailNotificationChannel.MATTERMOST:
             return bool(makerspace.get_mattermost_webhook_url())
+        if channel == NonEmailNotificationChannel.DISCORD:
+            return bool(makerspace.get_discord_webhook_url())
         if channel == NonEmailNotificationChannel.NATIVE_PUSH:
             from apps.integrations.push import push_configured
 
@@ -63,11 +65,50 @@ def _channel_configured(makerspace, channel) -> bool:
         return False
 
 
+def channel_module_blocks(makerspace, channel) -> bool:
+    """True when this channel's module is uninstalled for the makerspace.
+
+    An additive AND in front of the credential check that already existed: enabling the
+    key cannot make an unconfigured channel send, and disabling it stops sending while
+    the stored webhook survives, so re-enabling needs no credential re-entry.
+
+    Fails OPEN on an unexpected error, matching every other guard in this file: a broken
+    capability lookup must not silently mute a makerspace's alerts.
+    """
+    from apps.integrations.models import CHANNEL_MODULE_KEYS
+
+    key = CHANNEL_MODULE_KEYS.get(channel)
+    if key is None or makerspace is None:
+        return False
+    try:
+        from apps.makerspaces.platform import module_enabled
+
+        return not module_enabled(makerspace, key)
+    except Exception:
+        logger.warning(
+            "notification_channel_module_check_failed",
+            extra={"makerspace_id": getattr(makerspace, "pk", None), "channel": channel},
+        )
+        return False
+
+
 def dispatch_channel(
     *, makerspace, channel, feature, event, text_body, payload=None, sync=False
 ) -> NotificationDeliveryLog:
     if channel not in NonEmailNotificationChannel.values:
         raise ValueError(f"Unsupported notification channel: {channel}")
+
+    if channel_module_blocks(makerspace, channel):
+        return NotificationDeliveryLog.objects.create(
+            makerspace=makerspace,
+            channel=channel,
+            feature=feature,
+            event=event,
+            text_body=text_body,
+            payload=payload or {},
+            status=NotificationDeliveryStatus.SKIPPED,
+            error="notification_channel_module_disabled",
+        )
 
     if not _channel_configured(makerspace, channel):
         return NotificationDeliveryLog.objects.create(
@@ -129,6 +170,15 @@ def _enqueue_notification(log_id):
 
 def _deliver_notification(log) -> NotificationDeliveryLog:
     if log.status == NotificationDeliveryStatus.SENT:
+        return log
+
+    # Re-checked here, not only at dispatch: a PENDING row can sit in the Celery queue
+    # across a module uninstall, and a retry re-enters through this function. Without
+    # this the toggle would be honoured for new alerts but not for queued ones.
+    if channel_module_blocks(log.makerspace, log.channel):
+        log.status = NotificationDeliveryStatus.SKIPPED
+        log.error = "notification_channel_module_disabled"
+        log.save(update_fields=["status", "error", "updated_at"])
         return log
 
     try:

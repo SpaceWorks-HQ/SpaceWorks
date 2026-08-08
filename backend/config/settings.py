@@ -70,6 +70,7 @@ MANAGED_RESOURCE_LIMITS = {
     "telegram": 100,
     "slack": 100,
     "mattermost": 100,
+    "discord": 100,
     "native_push": 500,
     "api_clients": 1,
     "custom_roles": 20,

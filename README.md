@@ -39,11 +39,21 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
 - **3D-printing manager** — public print requests, printer/spool management, filament tracking,
   slicer estimates, and an optional (staff-private) cash charge at collection.
 - **QR everywhere** — boxes, tools, and individual assets; immutable scan history.
-- **Action-based staff console** — editable per-makerspace roles over a fixed action set, five seeded
+- **Action-based staff console** — editable per-makerspace roles over a fixed action set, four seeded
   defaults, and a superadmin-only Django control plane.
 - **Reports & ledger** — what's out, who has it, overdue tracking, CSV/XLSX export.
-- **Notifications** — per-makerspace Telegram alerts and async (Celery) email.
+- **Notifications** — per-makerspace **Telegram, Slack, Mattermost and Discord** alerts plus async
+  (Celery) email, with a per-feature × per-channel matrix. Each channel is its own module.
+- **Modular by install** — turn whole modules on and off per makerspace; uninstalling hides surfaces
+  and always keeps the data. See [Modules](#modules).
+- **Sign-in options** — username/password always; optionally Google, Apple, any OIDC provider
+  (Keycloak, Authentik, Azure AD, Okta), and **phone + SMS code** for members.
 - **Traceable by design** — append-only audit log; immutable evidence photos and scan records.
+
+> **What works out of the box:** username/password. Google, Apple and OIDC need credentials you
+> create with that provider, and phone sign-in needs an SMS account — none of them can ship
+> preconfigured, because they are issued against *your* domain. `setup.sh` walks you through Google
+> and you can skip it; password login is unaffected either way.
 
 ## Quick start
 
@@ -74,6 +84,60 @@ docker compose -f docker-compose.prod.yml up -d
 
 This pulls **`ghcr.io/spaceworks-hq/spaceworks-backend`** + **`ghcr.io/spaceworks-hq/spaceworks-frontend`** and brings up the
 full stack automatically.
+
+## Modules
+
+A makerspace only carries the parts it uses. Space Works ships **28 modules**; **6 are core** and
+always on (the public catalogue, request workflow, staff admin, evidence uploads, QR management and
+the scanner). The rest are **opt-in**.
+
+Core is not negotiable because the hardware-handover rules depend on it: issuing a tool requires a box
+QR scan *and* a photo, so a machines-only workshop still carries the request/QR/evidence spine.
+
+**Pick a profile at install time** — `setup.sh` asks, or pass `--profile`:
+
+| Profile | Modules | For |
+|---|---|---|
+| `minimal` | 6 | Core only; nothing published publicly |
+| `workshop` | 13 | A machine shop: machines, service queue, maintenance |
+| `lending` | 15 | A tool library: the full lending lifecycle, no machines |
+| `recommended` | 18 | Core plus the inventory lifecycle, reports and machines |
+| `everything` | 28 | All modules |
+
+**Change it later.** Uninstalling clears the capability and hides the surfaces; **your data is always
+retained** and reinstalling brings it back:
+
+```bash
+docker compose exec backend python manage.py list_modules
+docker compose exec backend python manage.py install_module bookings
+docker compose exec backend python manage.py uninstall_module bookings
+```
+
+Core modules cannot be uninstalled, nor can one another installed module depends on.
+
+### Notification channels are modules
+
+`email`, `telegram`, `slack`, `mattermost` and `discord` are each a module, so a space that lives in
+Discord ships no Slack surface at all. Turning a channel's module on never makes it start sending on
+its own — you still add the webhook or token, and you still enable the events you want in the
+per-feature × per-channel matrix. Turning it off stops delivery but **keeps the stored credential**,
+so re-enabling needs no re-entry.
+
+Chat channels are configured **per makerspace** (the space owns the channel and pays for it). Sign-in
+providers are the opposite — they resolve before a makerspace is chosen, so they are configured once
+for the whole deployment.
+
+### Removing a module from the build entirely
+
+Uninstalling is per makerspace. A deployment that will *never* use an area can drop its code surfaces
+too — no routes, no admin, no OpenAPI paths — while keeping every row and migration:
+
+```bash
+docker compose exec backend python manage.py suggest_tombstones   # prints the line to paste
+```
+
+Add the result to `.env` as `TOMBSTONED_APPS=`. It is deliberately conservative: an app is only
+suggested when **no** makerspace on the deployment uses any of its modules.
 
 ## Documentation
 
@@ -140,7 +204,7 @@ never grantable to any role.
 Outside this system entirely: **Public** users browse, submit requests, and — where enabled —
 self-checkout and return eligible QR tools, gated on member presence and photo evidence.
 
-> Earlier versions shipped five fixed, code-defined roles. Roles are now editable data; the five
+> Earlier versions shipped five fixed, code-defined roles. Roles are now editable data; the four
 > above are seeded defaults rather than the whole vocabulary.
 
 Staff work in the **React console** at `/admin`; the superadmin-only **Django control plane** lives at

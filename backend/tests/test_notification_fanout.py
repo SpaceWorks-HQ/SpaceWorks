@@ -169,11 +169,14 @@ def test_raising_build_and_dispatch_never_escape(monkeypatch):
     result = notify.notify_lifecycle(
         space, feature="printing", event="submitted", build=payload, sync=True
     )
+    # Every channel the space has enabled must be counted as failed -- derived rather
+    # than listed so adding a channel does not silently narrow what this asserts.
     assert result.failed_counts == {
         NotificationChannel.EMAIL: 1,
         NotificationChannel.TELEGRAM: 1,
         NotificationChannel.SLACK: 1,
         NotificationChannel.MATTERMOST: 1,
+        NotificationChannel.DISCORD: 1,
         NotificationChannel.NATIVE_PUSH: 1,
     }
 

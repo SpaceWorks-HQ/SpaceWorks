@@ -114,6 +114,7 @@ def _run_guarded(makerspace, feature, event, build, sync):
             NotificationChannel.TELEGRAM,
             NotificationChannel.SLACK,
             NotificationChannel.MATTERMOST,
+            NotificationChannel.DISCORD,
             NotificationChannel.NATIVE_PUSH,
         ):
             if not enabled[channel]:
@@ -143,6 +144,12 @@ def _run_guarded(makerspace, feature, event, build, sync):
                         "channel": channel,
                     },
                 )
+                continue
+            if log.status == NotificationDeliveryStatus.SKIPPED:
+                # Neither delivered nor failed -- the same reasoning as the email skip
+                # above: the makerspace uninstalled this channel's module, and counting
+                # a skip as a delivery makes `bool(delivered_counts)` claim a reminder
+                # went out when nothing was sent.
                 continue
             target = failed if log.status == NotificationDeliveryStatus.FAILED else delivered
             _increment(target, channel)

@@ -568,6 +568,8 @@ export type ApiIntegrationSettings = {
   "slack_webhook_url_set": boolean;
   "mattermost_webhook_url"?: string;
   "mattermost_webhook_url_set": boolean;
+  "discord_webhook_url"?: string;
+  "discord_webhook_url_set": boolean;
   "default_loan_days"?: number;
 };
 
@@ -853,7 +855,7 @@ export type ChangePasswordResponse = {
   "detail": string;
 };
 
-export type ChannelEnum = "email" | "telegram" | "slack" | "mattermost" | "native_push";
+export type ChannelEnum = "email" | "telegram" | "slack" | "mattermost" | "discord" | "native_push";
 
 export type CheckoutUrl = {
   "checkout_url": string;
@@ -1580,7 +1582,7 @@ export type IssueRequest = {
   "rejects"?: Array<IssueReject>;
 };
 
-export type Key9b4Enum = "email" | "telegram" | "slack" | "mattermost" | "native_push";
+export type KeyCbbEnum = "email" | "telegram" | "slack" | "mattermost" | "discord" | "native_push";
 
 export type KeyD07Enum = "hardware_requests" | "printing" | "events" | "bookings" | "maintenance" | "members";
 
@@ -2109,6 +2111,8 @@ export type Makerspace = {
   "slack_webhook_url_set": boolean;
   "mattermost_webhook_url"?: string;
   "mattermost_webhook_url_set": boolean;
+  "discord_webhook_url"?: string;
+  "discord_webhook_url_set": boolean;
   "default_loan_days"?: number;
   "presence_preset_minutes"?: unknown;
   "created_at": string;
@@ -2417,7 +2421,7 @@ export type Notification = {
 };
 
 export type NotificationChannel = {
-  "key": Key9b4Enum;
+  "key": KeyCbbEnum;
   "label": string;
 };
 
@@ -2691,6 +2695,8 @@ export type PatchedApiIntegrationSettings = {
   "slack_webhook_url_set"?: boolean;
   "mattermost_webhook_url"?: string;
   "mattermost_webhook_url_set"?: boolean;
+  "discord_webhook_url"?: string;
+  "discord_webhook_url_set"?: boolean;
   "default_loan_days"?: number;
 };
 
@@ -2906,6 +2912,8 @@ export type PatchedMakerspace = {
   "slack_webhook_url_set"?: boolean;
   "mattermost_webhook_url"?: string;
   "mattermost_webhook_url_set"?: boolean;
+  "discord_webhook_url"?: string;
+  "discord_webhook_url_set"?: boolean;
   "default_loan_days"?: number;
   "presence_preset_minutes"?: unknown;
   "created_at"?: string;

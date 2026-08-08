@@ -27233,6 +27233,15 @@
                         "type": "boolean",
                         "readOnly": true
                     },
+                    "discord_webhook_url": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "maxLength": 2048
+                    },
+                    "discord_webhook_url_set": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "default_loan_days": {
                         "type": "integer",
                         "maximum": 2147483647,
@@ -27241,6 +27250,7 @@
                 },
                 "required": [
                     "cors_allowed_origins",
+                    "discord_webhook_url_set",
                     "mattermost_webhook_url_set",
                     "public_api_key",
                     "public_code",
@@ -28429,10 +28439,11 @@
                     "telegram",
                     "slack",
                     "mattermost",
+                    "discord",
                     "native_push"
                 ],
                 "type": "string",
-                "description": "* `email` - Email\n* `telegram` - Telegram\n* `slack` - Slack\n* `mattermost` - Mattermost\n* `native_push` - Native push"
+                "description": "* `email` - Email\n* `telegram` - Telegram\n* `slack` - Slack\n* `mattermost` - Mattermost\n* `discord` - Discord\n* `native_push` - Native push"
             },
             "CheckoutUrl": {
                 "type": "object",
@@ -31243,16 +31254,17 @@
                     "evidence_id"
                 ]
             },
-            "Key9b4Enum": {
+            "KeyCbbEnum": {
                 "enum": [
                     "email",
                     "telegram",
                     "slack",
                     "mattermost",
+                    "discord",
                     "native_push"
                 ],
                 "type": "string",
-                "description": "* `email` - Email\n* `telegram` - Telegram\n* `slack` - Slack\n* `mattermost` - Mattermost\n* `native_push` - Native push"
+                "description": "* `email` - Email\n* `telegram` - Telegram\n* `slack` - Slack\n* `mattermost` - Mattermost\n* `discord` - Discord\n* `native_push` - Native push"
             },
             "KeyD07Enum": {
                 "enum": [
@@ -33522,6 +33534,15 @@
                         "type": "boolean",
                         "readOnly": true
                     },
+                    "discord_webhook_url": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "maxLength": 2048
+                    },
+                    "discord_webhook_url_set": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "default_loan_days": {
                         "type": "integer",
                         "maximum": 2147483647,
@@ -33544,6 +33565,7 @@
                     "cover_image_key",
                     "cover_image_url",
                     "created_at",
+                    "discord_webhook_url_set",
                     "domain_verification_record",
                     "domain_verification_token",
                     "domain_verified_at",
@@ -34783,7 +34805,7 @@
                 "type": "object",
                 "properties": {
                     "key": {
-                        "$ref": "#/components/schemas/Key9b4Enum"
+                        "$ref": "#/components/schemas/KeyCbbEnum"
                     },
                     "label": {
                         "type": "string"
@@ -35926,6 +35948,15 @@
                         "type": "boolean",
                         "readOnly": true
                     },
+                    "discord_webhook_url": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "maxLength": 2048
+                    },
+                    "discord_webhook_url_set": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "default_loan_days": {
                         "type": "integer",
                         "maximum": 2147483647,
@@ -36737,6 +36768,15 @@
                         "maxLength": 2048
                     },
                     "mattermost_webhook_url_set": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "discord_webhook_url": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "maxLength": 2048
+                    },
+                    "discord_webhook_url_set": {
                         "type": "boolean",
                         "readOnly": true
                     },

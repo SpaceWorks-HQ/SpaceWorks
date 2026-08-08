@@ -81,16 +81,29 @@ def _guarded_module_keys():
                         if isinstance(argument, ast.Constant) and isinstance(argument.value, str)
                     )
             elif isinstance(node, ast.Assign):
-                if not (
+                names = {
+                    target.id for target in node.targets if isinstance(target, ast.Name)
+                }
+                if (
                     isinstance(node.value, ast.Constant)
                     and isinstance(node.value.value, str)
-                ):
-                    continue
-                if any(
-                    isinstance(target, ast.Name) and target.id == "MODULE_KEY"
-                    for target in node.targets
+                    and "MODULE_KEY" in names
                 ):
                     keys.add(node.value.value)
+                # A guard may also be mapping-driven: one `module_enabled(ms, key)` call
+                # fed by a declared table, rather than one literal call per key. The
+                # notification channels do this (`CHANNEL_MODULE_KEYS`) because the five
+                # channels share a single gate. The table's values ARE the enforcement
+                # declaration, so they count -- otherwise the only way to satisfy this
+                # guard would be to un-DRY the gate into five identical branches.
+                elif isinstance(node.value, ast.Dict) and any(
+                    name.endswith("MODULE_KEYS") for name in names
+                ):
+                    keys.update(
+                        value.value
+                        for value in node.value.values
+                        if isinstance(value, ast.Constant) and isinstance(value.value, str)
+                    )
     return keys
 
 
@@ -133,7 +146,13 @@ def test_modules_are_opt_in_and_a_new_makerspace_gets_core_only():
     # registry without being listed here fails this test, which is the point.
     from apps.makerspaces.module_profiles import EVERYTHING, profile_modules
 
-    POST_LEGACY_KEYS = {"notifications", "email"}
+    # `slack`/`mattermost`/`discord` are the per-channel notification module keys. The
+    # first two were previously ungated (webhook presence alone decided), which is why
+    # makerspaces/0056 backfills them onto existing rows; `discord` is genuinely new and
+    # stays opt-in.
+    POST_LEGACY_KEYS = {
+        "notifications", "email", "slack", "mattermost", "discord",
+    }
 
     assert set(DEFAULT_ENABLED_MODULES) == module_registry.core_module_keys()
     assert default_enabled_modules() == DEFAULT_ENABLED_MODULES
@@ -191,8 +210,9 @@ def test_core_modules_match_the_approved_split_and_are_always_installed():
 
 
 def test_registry_is_internally_consistent():
-    # 24 at the registry's introduction, plus `email` (plan A5).
-    assert len(module_registry.MODULES) == 25
+    # 24 at the registry's introduction, plus `email` (plan A5), plus the three
+    # per-channel notification keys `slack`/`mattermost`/`discord`.
+    assert len(module_registry.MODULES) == 28
     assert len(module_registry.BY_KEY) == len(module_registry.MODULES)
     for definition in module_registry.MODULES:
         assert definition.label and definition.description and definition.app_label

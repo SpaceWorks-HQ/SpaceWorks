@@ -63,8 +63,12 @@ class MakerspaceSerializer(serializers.ModelSerializer):
     mattermost_webhook_url = serializers.CharField(
         write_only=True, required=False, allow_blank=True, max_length=2048
     )
+    discord_webhook_url = serializers.CharField(
+        write_only=True, required=False, allow_blank=True, max_length=2048
+    )
     slack_webhook_url_set = serializers.SerializerMethodField()
     mattermost_webhook_url_set = serializers.SerializerMethodField()
+    discord_webhook_url_set = serializers.SerializerMethodField()
     logo_url = serializers.SerializerMethodField()
     cover_image_url = serializers.SerializerMethodField()
     domain_verification_record = serializers.SerializerMethodField()
@@ -143,6 +147,8 @@ class MakerspaceSerializer(serializers.ModelSerializer):
             "slack_webhook_url_set",
             "mattermost_webhook_url",
             "mattermost_webhook_url_set",
+            "discord_webhook_url",
+            "discord_webhook_url_set",
             "default_loan_days",
             "presence_preset_minutes",
             "created_at",
@@ -165,6 +171,7 @@ class MakerspaceSerializer(serializers.ModelSerializer):
             "smtp_password_set",
             "slack_webhook_url_set",
             "mattermost_webhook_url_set",
+            "discord_webhook_url_set",
             # branding_config is returned (so the settings form can seed the
             # current display-name override) but only written via the validated
             # public_display_name field, never as an unchecked whole-blob PATCH.
@@ -201,10 +208,16 @@ class MakerspaceSerializer(serializers.ModelSerializer):
     def get_mattermost_webhook_url_set(self, obj) -> bool:
         return bool(obj.mattermost_webhook_url)
 
+    def get_discord_webhook_url_set(self, obj) -> bool:
+        return bool(obj.discord_webhook_url)
+
     def validate_slack_webhook_url(self, value):
         return validate_webhook_url(value)
 
     def validate_mattermost_webhook_url(self, value):
+        return validate_webhook_url(value)
+
+    def validate_discord_webhook_url(self, value):
         return validate_webhook_url(value)
 
     @extend_schema_field({"type": "string", "format": "uri", "nullable": True})
@@ -434,6 +447,7 @@ class MakerspaceSerializer(serializers.ModelSerializer):
         smtp_password = validated_data.pop("smtp_password", missing)
         slack_webhook_url = validated_data.pop("slack_webhook_url", missing)
         mattermost_webhook_url = validated_data.pop("mattermost_webhook_url", missing)
+        discord_webhook_url = validated_data.pop("discord_webhook_url", missing)
         public_display_name = validated_data.pop("public_display_name", missing)
         new_flag = validated_data.pop("superadmin_access_enabled", None)
         with transaction.atomic():
@@ -501,5 +515,7 @@ class MakerspaceSerializer(serializers.ModelSerializer):
                 locked.set_slack_webhook_url(slack_webhook_url)
             if mattermost_webhook_url is not missing:
                 locked.set_mattermost_webhook_url(mattermost_webhook_url)
+            if discord_webhook_url is not missing:
+                locked.set_discord_webhook_url(discord_webhook_url)
             locked.save()
             return locked

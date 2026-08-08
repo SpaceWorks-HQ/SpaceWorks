@@ -188,11 +188,16 @@ class Makerspace(models.Model):
     # 465-only provider (e.g. Gmail implicit SSL) instead of STARTTLS on 587.
     smtp_use_ssl = models.BooleanField(default=False)
     smtp_from_email = models.EmailField(blank=True)
-    # Per-makerspace chat webhooks (Slack + Slack-compatible Mattermost). Stored as Fernet
-    # ciphertext (or "") exactly like telegram_bot_token/smtp_password; TextField avoids
-    # truncation after base64 expansion. Never returned by any serializer (write-only + *_set).
+    # Per-makerspace chat webhooks (Slack, Slack-compatible Mattermost, and Discord).
+    # Stored as Fernet ciphertext (or "") exactly like telegram_bot_token/smtp_password;
+    # TextField avoids truncation after base64 expansion. Never returned by any
+    # serializer (write-only + *_set).
+    #
+    # Per-makerspace by nature, not by override: the tenant owns the destination channel
+    # and pays for it. Identity credentials are the opposite case and stay platform-wide.
     slack_webhook_url = models.TextField(blank=True, default="")
     mattermost_webhook_url = models.TextField(blank=True, default="")
+    discord_webhook_url = models.TextField(blank=True, default="")
     default_loan_days = models.PositiveIntegerField(default=7)
     presence_preset_minutes = models.JSONField(
         default=list, blank=True, validators=[validate_presence_presets]
@@ -292,6 +297,12 @@ class Makerspace(models.Model):
 
     def get_mattermost_webhook_url(self):
         return decrypt_value(self.mattermost_webhook_url)
+
+    def set_discord_webhook_url(self, raw):
+        self.discord_webhook_url = encrypt_value(raw)
+
+    def get_discord_webhook_url(self):
+        return decrypt_value(self.discord_webhook_url)
 
 
 class MakerspaceMembership(models.Model):

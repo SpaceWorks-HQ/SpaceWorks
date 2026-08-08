@@ -11,11 +11,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current work — FabLab expansion (branch `dev`)
 
-Active multi-part FabLab program built on `dev` via a **Codex-driven workflow** (Codex writes specs
-and code in parallel where files don't collide; Claude orchestrates, verifies each phase, and commits
-phase-per-commit with three co-author trailers). Per user direction, the **single user QA is deferred
-to the very end** (after all Parts) — no per-Part QA gate. Specs live (gitignored) under
-`docs/superpowers/specs/2026-07-1*`.
+Active multi-part FabLab program built on `dev`. Historically a **Codex-driven workflow** (Codex wrote
+specs and code in parallel where files didn't collide; Claude orchestrated and verified). **Codex is
+currently unusable — `codex doctor` reports no credentials — so Claude implements directly and the
+Codex Stage-1/2/4 gates are waived by owner direction.** Commit trailers must then name only the owner
+and Claude: a `Co-Authored-By: Codex` trailer on work Codex did not write is false attribution, and
+this overrides the unconditional three-trailer rule in the global config.
+
+Per user direction, the **single user QA is deferred to the very end** (after all Parts) — no per-Part
+QA gate. Specs live (gitignored) under `docs/superpowers/specs/2026-07-1*`. Commits sit **local and
+unpushed on `dev`**; pushing is the owner's call alone.
 
 **Shipped on `dev` (see condensed changelog for the module list):** Events, Bookings, Maintenance,
 Analytics/reports, Machine Manager role + delegated role assignment, public
@@ -25,7 +30,11 @@ Phase C is complete on `dev`: capabilities toggles; Stripe payments C.2/C.3; adv
 check-in C.7; C.3 hardening; C.6 custom machine-type config; unified per-space pricing; self-serve
 raw Stripe credentials + managed Stripe Connect; reconciliation; booking/event/membership charges;
 attested mobile device sessions + native push + Stripe PaymentSheet; and Google/Apple social sign-in
-for member and staff surfaces. The one deferred end-to-end user QA remains an owner-run release gate.
+for member and staff surfaces. Since then: machine-scoped `MANAGE_MACHINES`, deployment-removable
+`payments`/`updates`, lending/workshop install profiles + `suggest_tombstones`, configured generic OIDC
+providers, **phone + SMS as a verified member login identity**, a guided-but-skippable first-run Google
+step, and **one module key per notification channel (email/telegram/slack/mattermost/discord)**.
+The one deferred end-to-end user QA remains an owner-run release gate.
 
 **Standing build conventions for this program:**
 - **Parallel Codex via git worktree.** A second track runs in a sibling worktree
@@ -575,6 +584,82 @@ tokens carry `surface=member|staff`: member tokens are rejected by staff APIs, w
 the exact trusted staff origin and matching tenant scope on access and refresh. Provider secrets remain
 write-only/encrypted, and unconfigured social auth is omitted from public config.
 
+**Phone is a login identity on a SEPARATE column, and only when VERIFIED (phase 18).**
+`User.phone` stays free-text contact info (non-unique — two members may share a landline, and it is
+copied onto requests as text). The identity is `User.phone_e164` + `phone_verified_at`, with a
+partial unique constraint on non-empty `phone_e164` (the `uniq_telegram_user_id` shape). Reusing
+`phone` was rejected: it would have meant rewriting existing free-text values in a migration and
+putting a unique index on a column that already holds duplicates in real deployments; `phone_e164`
+starts empty everywhere, so its constraint always applies cleanly.
+- **`save()` clears `phone_verified_at` whenever `phone_e164` changes — unconditionally.** That is
+  the guard stopping an edited number from inheriting a verified stamp, and `/control/` can edit the
+  field, so it cannot live only in the service. Consequence: the linking service must write the
+  stamp **after** `save()` via `User.objects.filter(...).update(...)`, exactly as
+  `confirm_challenge` does for `email_verified_at`. Setting both in one `save()` silently loses it.
+- **Deferred raise, or the attempt cap is inert.** `confirm_link`/`confirm_login` collect a failure
+  and raise **after** `transaction.atomic()` exits. Raising inside rolls back the
+  `failed_attempts` increment with everything else, so the counter never rises and a code stays
+  guessable — the bug that shipped in the first draft and that `test_attempts_are_capped_per_challenge`
+  caught. `services_registration.confirm_challenge` defers for the same reason.
+- **MEMBER SURFACE ONLY.** `refresh["surface"]` is hardcoded `"member"`, never derived from the
+  request. An SMS code is the weakest factor here (SIM swap, number recycling) and staff hold
+  destructive powers, so staff must come through password or a social provider on the trusted origin.
+- **The login start endpoint is a uniform 200 in every case** — unknown, malformed, suspended, or on
+  cooldown. `ChallengeCooldown` is swallowed there on purpose: a 429 only for real numbers leaks
+  exactly what the generic ack protects. `LINK` and `LOGIN` challenges are discriminated by
+  `purpose`, so an abandoned link code cannot sign anyone in, and the code digest is
+  **domain-separated by number** because a login challenge is resolved by number, not by user.
+- **Requesting a code and guessing a code have SEPARATE per-number budgets**
+  (`phone_otp_number` vs `phone_confirm_number`). One shared bucket meant three typos locked a
+  member out for an hour holding a valid code.
+- **E.164 is required, never guessed.** `phone_numbers.normalize_e164` strips only separators humans
+  type and accepts a leading `00`; a bare local number is rejected rather than assigned a default
+  region, because an ambiguous identity is a login that hands one person's account to another. No
+  `phonenumbers` dependency.
+- **SMS is platform-scoped and dormant by default.** `PlatformSmsSettings` (singleton, encrypted
+  token, `/control/`-only) rather than env vars, matching `PlatformEmailSettings` — no new variable
+  through four compose services and both installers. `apps/integrations/sms/` is the provider seam
+  (`base.py` protocol, `twilio.py` the one impl, stdlib `urllib`), shaped like the encryption key
+  broker so a self-hoster outside Twilio's footprint can add one without touching call sites.
+  `get_sms_provider()` returns **None** when unconfigured and `/api/v1/config` **omits
+  `phone_login` entirely**, preserving the dormant-payload invariant. `reserve_platform_otp_sms_quota`
+  is the one quota that **also applies on self-host** — every text is billed to the operator, so it
+  is a cost ceiling, not fair use — and it fails **open**, because the security controls are the
+  cooldown and the attempt cap.
+- **`accounts.User` is deliberately absent from the PII encryption registry**, which is what makes a
+  plaintext unique index and a direct login lookup possible: scoped encryption is per-makerspace and
+  `User` is platform-global, so it could never be scoped-encrypted.
+
+**Notification channels are modules, one key each (phase 20).** `email`, `telegram`, `slack`,
+`mattermost` and `discord` each own a module key, so a space living in Discord ships no Slack
+surface. Each is an additive **AND** in front of the credential check that already existed:
+enabling a key cannot make an unconfigured channel send, and disabling it stops delivery while the
+**stored webhook survives**, so re-enabling needs no re-entry.
+- **`dispatch_channels.channel_module_blocks` is checked in TWO places**, mirroring the email gate:
+  `dispatch_channel` (new alerts) and `_deliver_notification` (a PENDING row can sit in Celery
+  across an uninstall, and a retry re-enters there). A blocked message becomes a terminal
+  `NotificationDeliveryStatus.SKIPPED` — recorded, not dropped — and `notify._run_guarded` counts
+  SKIPPED as **neither** delivered nor failed, because `bool(delivered_counts)` must not read a
+  suppressed channel as a reminder that went out. It fails **open** on a lookup error: a broken
+  capability check must not silently mute a space's alerts.
+- **`makerspaces/0056` backfills `slack`+`mattermost` UNCONDITIONALLY onto existing rows** — the
+  `0050` email precedent. Both were previously governed by webhook presence alone, so the opt-in
+  default would have muted every upgrading space silently. Unconditional (not "only spaces that
+  already hold a webhook") because granting the key restores the old rule *including* for a space
+  that configures Slack for the first time next month. `discord` is **not** backfilled: it is new,
+  so opt-in is correct for it.
+- **The notification matrix OMITS a channel whose module is uninstalled** rather than rendering it
+  disabled (`views_notification_rules._response_data` filters both `channels` and `preferences`).
+  A tickable column would accept the tick, store the preference, and then SKIP every send — the
+  same reasoning as pruning a tombstoned sidebar entry instead of permission-hiding it.
+- **Discord is not Slack-shaped.** `webhooks.py` maps channel → body key because Discord names the
+  field `content` and ignores `text` (400, nothing delivered), and trims to its hard 2000-character
+  limit, which rejects rather than clips. `native_push` has **no** module key — it is governed by
+  the standalone `mobile.push` feature.
+- **Chat credentials are per-makerspace by nature, identity credentials are platform-wide.** The
+  tenant owns the destination channel and pays for it; identity resolves before a tenant exists.
+  Do not re-propose per-makerspace auth credentials — that was considered and cancelled.
+
 **Presence geofence is ADVISORY, not an access gate (C.7).** Browser-supplied coordinates are spoofable, so
 `presence.geofence.evaluate_geofence` only classifies a reading (in_range / distance+accuracy buckets, raw
 coords never stored) and records it in the `presence.started` audit — it **never blocks** session creation, and
@@ -591,6 +676,12 @@ dead/broken feature for normal staff. New workflow actions ship their staff UI i
 Each line names a shipped feature and, where useful, the load-bearing rule it introduced (folded into the
 invariants above). Use `git log --oneline`/`git blame` for the implementing commits and per-file history.
 
+- **Auth + notification-channel modularity** (2026-08-08, `dev`, local): SMS provider seam + phone as a
+  verified member login identity (`f04fbb5`); guided-but-skippable Google sign-in in `setup.sh`/`setup.ps1`
+  plus the `configure_social_auth` command (`1210208`); Discord as an incoming-webhook channel and one
+  module key per notification channel, with the `0056` slack/mattermost backfill and a README module
+  section. **SAML and per-makerspace auth-credential overrides were both considered and dropped** —
+  OIDC already covers every IdP a makerspace runs, and identity is platform-scoped by construction.
 - **Phase C final tracks** (2026-07-23, `dev`): encrypted per-space Stripe credentials + managed Stripe
   Connect (`3b43f47`); makerspace-scoped reconciliation dashboard/reports (`1ad63f5`); unified booking,
   event-registration, and membership-dues Payment subjects (`159a88f`, hardened by `396cb27`); attested

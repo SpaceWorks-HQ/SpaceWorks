@@ -11,6 +11,7 @@ import type {
 type DeliverySettings = {
   slack_webhook_url_set: boolean;
   mattermost_webhook_url_set: boolean;
+  discord_webhook_url_set: boolean;
   telegram_bot_token_set: boolean;
   telegram_group_chat_id: string;
 };
@@ -186,6 +187,9 @@ function deliveryWarnings(
   }
   if (enabled("mattermost") && !settings.mattermost_webhook_url_set) {
     warnings.push("Mattermost is enabled but its incoming webhook is not configured.");
+  }
+  if (enabled("discord") && !settings.discord_webhook_url_set) {
+    warnings.push("Discord is enabled but its incoming webhook is not configured.");
   }
   if (
     enabled("telegram") &&

@@ -190,6 +190,7 @@ class NotificationChannel(models.TextChoices):
     TELEGRAM = "telegram", "Telegram"
     SLACK = "slack", "Slack"
     MATTERMOST = "mattermost", "Mattermost"
+    DISCORD = "discord", "Discord"
     NATIVE_PUSH = "native_push", "Native push"
 
 
@@ -197,7 +198,19 @@ class NonEmailNotificationChannel(models.TextChoices):
     TELEGRAM = "telegram", "Telegram"
     SLACK = "slack", "Slack"
     MATTERMOST = "mattermost", "Mattermost"
+    DISCORD = "discord", "Discord"
     NATIVE_PUSH = "native_push", "Native push"
+
+
+# Channels gated by a same-named module key. native_push is absent deliberately: it is
+# governed by the standalone `mobile.push` feature switch, not by a module.
+CHANNEL_MODULE_KEYS = {
+    "email": "email",
+    "telegram": "telegram",
+    "slack": "slack",
+    "mattermost": "mattermost",
+    "discord": "discord",
+}
 
 
 class NotificationDeliveryStatus(models.TextChoices):
@@ -205,6 +218,10 @@ class NotificationDeliveryStatus(models.TextChoices):
     SENDING = "sending", "Sending"
     SENT = "sent", "Sent"
     FAILED = "failed", "Failed"
+    # Terminal, and neither a delivery nor a failure: the makerspace has this channel's
+    # module uninstalled. Recorded rather than dropped so an operator can see what the
+    # toggle suppressed -- the same contract as EmailLog.Status.SKIPPED.
+    SKIPPED = "skipped", "Skipped"
 
 
 class NotificationPreference(models.Model):
