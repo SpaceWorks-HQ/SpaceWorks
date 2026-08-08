@@ -68,7 +68,7 @@ urlpatterns = [
     path('api/v1/', include('apps.machines.urls')),
     path('api/v1/public/', include('apps.events.urls_public')),
     path('api/v1/public/', include('apps.bookings.urls_public')),
-    path('api/v1/public/', include('apps.presence.urls')),
+    *separable("presence", "api/v1/public/", "apps.presence.urls"),
     path("api/v1/", include("apps.payments.urls")),
     path(
         "api/v1/internal/tls-check",
@@ -95,6 +95,7 @@ urlpatterns = [
     # belt-and-braces rather than load-bearing.
     *separable("warranty", "api/v1/admin/", "apps.warranty.urls"),
     *separable("maintenance", "api/v1/admin/", "apps.maintenance.urls"),
+    *separable("presence", "api/v1/admin/", "apps.presence.urls_admin"),
     path("api/v1/admin/", include("apps.boxes.urls")),
     path("api/v1/admin/", include("apps.evidence.urls")),
     path("api/v1/", include("apps.operations.urls")),

@@ -7,6 +7,7 @@ from apps.integrations.email import email_enabled
 from apps.makerspaces.models import Makerspace, default_branding_config, default_theme_config
 from apps.makerspaces.capabilities import FEATURE_MODULES, FEATURES
 from apps.makerspaces.module_registry import is_frontend_exposed, module_available, module_workflows
+from apps.separability.registry import runtime_active
 
 # Derived from the module registry, which also decides frontend exposure: an
 # internal master switch declares frontend_exposed=False and is dropped from both
@@ -158,7 +159,14 @@ def bootstrap_payload(makerspace):
     # dormant/self-host bootstrap payloads stay byte-for-byte unchanged (self-host
     # invariant) and a disabled feature cannot leave the client asking for coordinates
     # the backend will ignore.
-    if makerspace.geofence_effective and feature_enabled(makerspace, "presence.geofence"):
+    # `presence.geofence` is a standalone feature (parent_module=None), so no module
+    # key expresses that the app is gone -- the availability check has to be explicit
+    # or a tombstoned deployment would still ask the browser for coordinates.
+    if (
+        makerspace.geofence_effective
+        and feature_enabled(makerspace, "presence.geofence")
+        and runtime_active("presence")
+    ):
         makerspace_payload["geofence_enabled"] = True
     return {
         "makerspace": makerspace_payload,

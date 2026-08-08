@@ -129,7 +129,6 @@ from apps.admin_api.views_member_capabilities import (
     AdminMembershipVerifyView,
 )
 from apps.admin_api.views_roles import CapabilityCatalogView, RoleDetailView, RoleListCreateView
-from apps.presence.views import PresenceRosterView
 
 urlpatterns = [
     path(
@@ -156,11 +155,6 @@ urlpatterns = [
         "makerspace/<int:makerspace_id>/payment-settings/connect/onboard",
         StripeConnectOnboardingView.as_view(),
         name="admin-makerspace-payment-connect-onboard",
-    ),
-    path(
-        "makerspace/<int:makerspace_id>/presence-sessions/current",
-        PresenceRosterView.as_view(),
-        name="admin-presence-sessions-current",
     ),
     path("memberships", AdminMembershipRosterView.as_view(), name="admin-memberships-roster"),
     path("membership-requests", AdminMembershipRequestListView.as_view(), name="admin-membership-requests"),
