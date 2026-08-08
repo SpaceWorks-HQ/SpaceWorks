@@ -1,3 +1,9 @@
 .env
+.env.*
 node_modules
 dist
+# tsc -b composite output (see tsconfig.node.json) — a vite.config.js beside
+# vite.config.ts shadows it, because Vite resolves .js first.
+vite.config.js
+vite.config.d.ts
+**/*.tsbuildinfo

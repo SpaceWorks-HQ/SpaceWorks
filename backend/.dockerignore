@@ -1,6 +1,17 @@
+# NOTE: a bare `__pycache__` only matches at the build-context root — nested
+# directories need the `**/` prefix. Without it every apps/*/__pycache__ shipped
+# inside the image (stale .pyc next to the source it no longer matches).
 .env
+.env.*
 .venv
-__pycache__
-*.pyc
+venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
 .pytest_cache
 staticfiles
+*.sqlite3
+.coverage
+htmlcov
+# Celery beat's schedule shelve — runtime state, never part of an image.
+celerybeat-schedule*

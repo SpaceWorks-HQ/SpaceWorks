@@ -161,7 +161,14 @@ services:
     container_name: spaceworks-beat
     restart: unless-stopped
     environment: *backend-env
-    command: celery -A config beat -l info
+    # --schedule is explicit because beat otherwise drops its shelve in the CWD
+    # (/app). Under the dev bind mount that wrote a root-owned celerybeat-schedule
+    # straight into the repo working tree; the container also no longer runs as
+    # root, so /app is not writable anyway. The named volume keeps the last-run
+    # timestamps across restarts so periodic tasks don't all re-fire on boot.
+    command: celery -A config beat -l info --schedule /var/lib/celery/celerybeat-schedule
+    volumes:
+      - celerybeat_data:/var/lib/celery
     depends_on:
       db:
         condition: service_healthy
@@ -196,3 +203,4 @@ services:
 volumes:
   makerspace_manager_pgdata:
   minio_data:
+  celerybeat_data:

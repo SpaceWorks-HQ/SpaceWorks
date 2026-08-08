@@ -21,7 +21,7 @@ CORS_ALLOWED_ORIGINS=https://inventory.example.org
 MINIO_ROOT_USER=replace-with-a-random-access-key
 MINIO_ROOT_PASSWORD=replace-with-a-long-random-secret
 AWS_S3_PUBLIC_ENDPOINT_URL=https://files.inventory.example.org
-MINIO_CORS_ALLOWED_ORIGINS_JSON=["https://inventory.example.org"]
+MINIO_CORS_ALLOWED_ORIGINS=https://inventory.example.org
 MAKERSPACE_IMAGE_TAG=latest
 ```
 
@@ -163,7 +163,7 @@ For a real domain with automatic TLS, use the Caddy overlay:
 PUBLIC_DOMAIN=inventory.example.org
 CSRF_TRUSTED_ORIGINS=https://inventory.example.org
 AWS_S3_PUBLIC_ENDPOINT_URL=https://files.inventory.example.org
-MINIO_CORS_ALLOWED_ORIGINS_JSON=["https://inventory.example.org"]
+MINIO_CORS_ALLOWED_ORIGINS=https://inventory.example.org
 ```
 
 ```bash
@@ -251,7 +251,7 @@ If an instance flips from managed → self-host after deploy, run
 | `PUBLIC_IMAGE_URL_TTL_SECONDS` | no (default `300`) | Presigned upload URL lifetime for public images |
 | `AWS_S3_ENDPOINT_URL` | no (default `http://minio:9000`) | Backend-to-MinIO endpoint inside Compose |
 | `AWS_S3_PUBLIC_ENDPOINT_URL` | yes for uploads | Browser-reachable MinIO/S3 endpoint used in presigned URLs |
-| `MINIO_CORS_ALLOWED_ORIGINS_JSON` | yes for uploads | JSON array of frontend origins allowed to POST/GET objects |
+| `MINIO_CORS_ALLOWED_ORIGINS` | yes for uploads | Comma-separated frontend origins allowed to POST/GET objects (sets MinIO's `MINIO_API_CORS_ALLOW_ORIGIN`; defaults to `*`) |
 | `ENABLE_HTTPS` | no (default false) | Turns on SSL redirect, Secure cookies, HSTS |
 | `TRUST_X_FORWARDED_PROTO` | no (default false) | Trusts `X-Forwarded-Proto` only for the TLS proxy overlay |
 | `CSRF_TRUSTED_ORIGINS` | when HTTPS | `https://` origin(s) trusted for login POSTs |
@@ -284,7 +284,7 @@ For HTTPS deployments, put MinIO behind the same TLS proxy as the frontend, for 
 
 ```env
 AWS_S3_PUBLIC_ENDPOINT_URL=https://files.inventory.example.org
-MINIO_CORS_ALLOWED_ORIGINS_JSON=["https://inventory.example.org"]
+MINIO_CORS_ALLOWED_ORIGINS=https://inventory.example.org
 ```
 
 If you expose MinIO directly on a LAN during a local pilot, set `AWS_S3_PUBLIC_ENDPOINT_URL` to the

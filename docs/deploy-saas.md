@@ -133,7 +133,7 @@ default, but each remains a separate browser-upload flow that must be reviewed i
 headers change. `public-images` is the only download-anonymous bucket exposed through
 `https://files.space-works.tech`; never grant anonymous reads to the private bucket.
 
-Set `MINIO_CORS_ALLOWED_ORIGINS_JSON` for the origins that perform direct browser uploads, including
+Set `MINIO_CORS_ALLOWED_ORIGINS` (comma-separated) for the origins that perform direct browser uploads, including
 the platform HTTPS origins and each verified custom domain. A presigned URL is a bearer credential:
 any holder can perform the signed operation until it expires. Therefore do not enable credentialed
 CORS, keep private buckets private, keep URL lifetimes short, and narrow allowed methods and headers

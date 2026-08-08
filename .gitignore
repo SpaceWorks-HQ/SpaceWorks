@@ -17,7 +17,10 @@ node_modules/
 frontend/dist/
 frontend/.env
 
-# tsc -b composite build artifacts (emitted from tsconfig.node.json)
+# tsc -b composite build artifacts. tsconfig.node.json now emits into
+# frontend/node_modules/.tmp (already ignored) — a vite.config.js sitting beside
+# vite.config.ts shadows it, because Vite resolves .js first. These two entries
+# stay so a stale artifact from an older checkout can never be committed.
 frontend/vite.config.js
 frontend/vite.config.d.ts
 *.tsbuildinfo
@@ -44,6 +47,8 @@ docs/HANDOVER.md
 # Docker Compose local override — machine-specific dev config (ports, bind mounts).
 # Each developer keeps their own; it is auto-merged by `docker compose` and must not be committed.
 docker-compose.override.yml
+# Host dev launcher — hardcodes the same machine-specific ports as the override above.
+scripts/dev-local.sh
 docs/roadmap.md
 
 # OS / editor

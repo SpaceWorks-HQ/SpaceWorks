@@ -77,6 +77,15 @@ CORS_ALLOWED_ORIGINS=http://$webhost
 # Absolute base for links in outbound email (password reset, invitations). Without it
 # those links are emitted as bare paths like "/reset-password?..." and are unclickable.
 PUBLIC_APP_BASE_URL=http://$webhost
+# Browser-facing object storage. These MUST name the address your users type, not
+# localhost: they are baked into presigned evidence upload/view URLs and into every
+# public image src. Left at the compose default (http://localhost:9000) the site works
+# only from the server console and shows broken images to everyone else.
+AWS_S3_PUBLIC_ENDPOINT_URL=http://${webhost}:9000
+PUBLIC_IMAGE_BASE_URL=http://${webhost}:9000/public-images
+# MinIO must accept browser uploads from the app's origin, or presigned POSTs are
+# blocked by CORS before they ever reach storage.
+MINIO_CORS_ALLOWED_ORIGINS=http://$webhost
 HTTP_PORT=80
 ENABLE_HTTPS=false
 "@

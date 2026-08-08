@@ -43,18 +43,93 @@ for member and staff surfaces. The one deferred end-to-end user QA remains an ow
   "staged index is read-only" error (no files written). Keep the index clean during
   implementation; only `git add` right before the Stage-4 `codex review` (so it sees new
   untracked files), then `git reset` before the next Codex build.
-- **Test harness.** Local `spaceworks-db` (:5433), `spaceworks-redis`, `spaceworks-minio` (:9100) must be running. Run
-  tests with `DATABASE_URL="postgres://makerspace:makerspace@localhost:5433/makerspace_manager"` (or
-  the worktree's dedicated DB). **Never run two `pytest` procs against one DB** (TRUNCATE-FK teardown
+- **Test harness.** Local `spaceworks-db` (:5433), `spaceworks-redis` (:6379), `spaceworks-minio` (:9200) must be
+  running — `./scripts/dev-local.sh infra` starts exactly those. Run tests with
+  `./scripts/dev-local.sh test` (or `DATABASE_URL="postgres://makerspace:makerspace@localhost:5433/makerspace_manager"
+  pytest`, or the worktree's dedicated DB). **Never run two `pytest` procs against one DB** (TRUNCATE-FK teardown
   races + false concurrency failures) and **never run the full suite concurrently with `codex review`**
   (it runs its own pytest). If a background full-suite is killed by the environment, run it as
   **foreground chunks** (`pytest tests/<subdirs>`, `tests/test_[a-l]*.py`, `tests/test_[m-z]*.py`).
   Pre-existing non-regression: `test_machine_image_presign_finalize_delete_and_audit` fails because
-  MinIO is on :9100 vs the test default :9000.
+  MinIO is on a remapped host port vs the test default :9000.
+- **Local dev topology (Arch host) — three ways to run, one set of port remaps.** Host ports are
+  remapped in the gitignored, machine-specific `docker-compose.override.yml`: Postgres :5433, Redis
+  :6379, MinIO :9200/:9201 (:9100 is taken by a Dart dev tool on this machine). Secrets always come
+  from `backend/.env`.
+  1. **Everything in Docker with live reload — the default.** `./scripts/dev-docker.sh up -d --build`.
+     `docker-compose.dev.yml` (committed) layers onto the base file: `./backend` and `./frontend` are
+     bind-mounted, Django runs under autoreloading `runserver` with `DEBUG=True`, and the frontend is
+     the Vite dev server with HMR instead of nginx. Frontend `http://localhost:5000`, backend +
+     `/control/` + `/docs/` on `http://localhost:8000`. No host virtualenv, no host `npm install`.
+  2. **Everything in Docker, production-shaped.** `docker compose up -d --build` — gunicorn + nginx
+     serving the baked `dist`, i.e. what a makerspace operator actually runs. Frontend :8080,
+     backend :8002. Code changes need a rebuild.
+  3. **Infrastructure only in Docker, app on the host — fallback.** `./scripts/dev-local.sh` (gitignored,
+     machine-specific) exports host-facing rewrites of the container hostnames. Kept because host
+     `pytest` and one-off `manage.py` runs are faster than `exec`-ing into a container.
+
+  **`scripts/dev-docker.sh` exists because passing any `-f` to `docker compose` disables the automatic
+  merge of `docker-compose.override.yml`.** It spells the chain out as base → override → dev, in that
+  order: the override supplies the infrastructure port remaps, and the dev layer must come last so its
+  app-service commands, ports and bind mounts win. Every argument is forwarded verbatim, so it is a
+  drop-in prefix for any compose subcommand (`./scripts/dev-docker.sh exec backend python manage.py …`).
+  Two traps this topology already hit: **the base file hands `backend`'s environment to
+  `migrate`/`worker`/`beat` through a YAML anchor**, so a patch to `backend` alone never reaches them —
+  the override applies the MinIO host-port rewrite to all four (the Celery worker builds public image
+  URLs into outbound mail). And **`tsc -b` must not emit `vite.config.js` next to `vite.config.ts`** —
+  Vite resolves `.js` first, so a stale artifact silently shadows the real config; `tsconfig.node.json`
+  therefore emits into `node_modules/.tmp/`.
 - **Migration heads drift.** Specs quote stale migration numbers; every Codex prompt must
   `ls backend/apps/<app>/migrations/` and chain off the **actual** leaf, not the spec number. A new
   migration whose dep is a rewound app can break migration-executor tests (rewind the full graph
   forward in the test's `finally`).
+
+## Container/deployment invariants (do not regress)
+
+**The images run unprivileged.** `backend/Dockerfile` creates uid 10001 `app`, uses `COPY --chown`
+(a later `chown -R /app` would duplicate the whole tree into a second layer) and drops `USER app`
+before CMD. Two paths must therefore stay writable and owned by `app`: `STATIC_ROOT`
+(`/app/staticfiles`, written by the boot-time `collectstatic`) and `/var/lib/celery`. In **dev** the
+`./backend` bind mount is owned by the host user, and `makemigrations` has to write into it, so
+`docker-compose.dev.yml` sets `user: "${DEV_UID:-1000}:${DEV_GID:-1000}"` on `backend` only —
+worker/beat stay on the image uid because they only ever write to `/var/lib/celery`.
+
+**Celery beat must be given an explicit `--schedule`.** It otherwise drops its shelve in the CWD:
+under the dev bind mount that wrote a **root-owned `celerybeat-schedule` into the repo working tree**,
+and post-hardening `/app` is not writable at all. Both the base and prod compose point it at the
+`celerybeat_data` named volume so last-run timestamps survive a restart (otherwise every periodic task
+re-fires on boot).
+
+**Never split a shell command across lines in a YAML folded scalar (`>`).** A more-indented line keeps
+its newline instead of folding to a space, and a newline inside `sh -c` terminates the command. Splitting
+gunicorn's flags one-per-line made it run bare — silently falling back to its **127.0.0.1** default while
+each flag became a failing command. The killer detail: the healthcheck probes `localhost`, so the
+container reported **healthy** while nginx got connection-refused and every request 502'd. Keep the whole
+invocation on one line. A healthcheck that probes localhost cannot detect a localhost-only bind.
+
+**`mc cors set` is unusable — CORS lives on the MinIO server.** Modern `mc` sends S3 XML and rejects the
+JSON the compose file used to write ("decoding xml: EOF", exit 1). Because `backend` has
+`depends_on: createbuckets: service_completed_successfully`, that exit-1 left backend and frontend stuck
+in `Created` — **`setup.sh` could never bring the app up**. Origins are now set with
+`MINIO_API_CORS_ALLOW_ORIGIN` (comma-separated) on the `minio` service, fed by `MINIO_CORS_ALLOWED_ORIGINS`;
+`createbuckets` provisions buckets/policies only and runs under `set -e`. The old
+`MINIO_CORS_ALLOWED_ORIGINS_JSON` is gone from compose, both installers and the docs.
+
+**Browser-facing storage URLs must name the real host, never `localhost`.**
+`AWS_S3_PUBLIC_ENDPOINT_URL` / `PUBLIC_IMAGE_BASE_URL` are baked into presigned evidence upload/view URLs
+and every public image `src`. The compose default (`http://localhost:9000`) makes a deployment work only
+from the server console and show broken images to everyone else, so `setup.sh`/`setup.ps1` now write both
+from the answered web address. The compose default is kept (not made `:?` required) so existing
+deployments don't hard-break on upgrade.
+
+**`.dockerignore` patterns are root-anchored.** A bare `__pycache__`/`*.pyc` does not match nested
+directories — every `apps/*/__pycache__` was shipping inside the image. Nested patterns need `**/`.
+
+**Production compose defaults that are not optional:** every long-running service carries
+`restart: unless-stopped` (via the `x-restart` anchor) or the stack does not survive a host reboot, and a
+capped `json-file` `logging` block (via `x-logging`) or container logs fill the host disk. Third-party
+images are pinned to a verified release tag — **verify a tag actually resolves before pinning it**
+(`minio/mc` release tags do not match the epoch in the image's `release` label).
 
 ## Cross-cutting invariants (from shipped batches — do not regress)
 
@@ -505,26 +580,35 @@ Stack (in use):
 
 ### Local development
 
+The default path needs nothing installed on the host but Docker. Migrations run automatically as a
+`depends_on: service_completed_successfully` step, so `up` is the whole story:
+
 ```bash
-# 1. Database
-docker compose up -d db
+# Everything — db, redis, minio, Django, Celery worker/beat, Vite — with live reload.
+./scripts/dev-docker.sh up -d --build     # first run; drop --build afterwards
+./scripts/dev-docker.sh exec backend python manage.py seed_demo   # first run only
+./scripts/dev-docker.sh logs -f backend
+./scripts/dev-docker.sh restart worker beat   # Celery has no autoreload
+./scripts/dev-docker.sh down
 
-# 2. Backend (from backend/)  —  copy .env.example to .env if needed
-cd backend
-pip install -r requirements.txt
-python manage.py makemigrations accounts makerspaces inventory
-python manage.py migrate
-python manage.py seed_demo
-python manage.py runserver            # http://localhost:8000
+# After changing package.json, recreate the node_modules volume:
+./scripts/dev-docker.sh up -d --build -V frontend
 
-# 3. Frontend (from frontend/)
-cd frontend
-npm install
-npm run dev                           # http://localhost:5000
-
-# Tests (from backend/, DB must be up)
-cd backend && pytest
+# Tests
+./scripts/dev-docker.sh exec backend pytest
 ```
+
+Host fallback (faster `pytest` / one-off `manage.py`; needs `backend/.venv` + `npm install`):
+
+```bash
+./scripts/dev-local.sh infra          # db, redis, minio only
+./scripts/dev-local.sh migrate
+./scripts/dev-local.sh backend        # http://localhost:8000
+./scripts/dev-local.sh frontend       # http://localhost:5000
+./scripts/dev-local.sh test
+```
+
+**Never run both at once** — they bind the same host ports (:8000, :5000) and the same database.
 
 - Public inventory page: `http://localhost:5000/m/makerspace`
 - API: `http://localhost:8000/api` — Swagger UI at `/docs/`, ReDoc at `/redoc/`, schema at `/schema/`.
