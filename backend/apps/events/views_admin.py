@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
-from apps.admin_api.serializers_events import (
+from apps.events.serializers_admin import (
     EmptyActionSerializer,
     EventAdminSerializer,
     EventListResponseSerializer,

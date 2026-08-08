@@ -9,15 +9,6 @@ from apps.admin_api.views_email_templates import (
 )
 from apps.admin_api.views_email_logs import EmailLogListView, EmailLogRetryView
 from apps.admin_api.views_integration_health import IntegrationHealthView
-from apps.admin_api.views_events import (
-    EventCancelView,
-    EventCompleteView,
-    EventDetailView,
-    EventListCreateView,
-    EventPublishView,
-    EventRegistrationListView,
-    EventRegistrationMarkAttendedView,
-)
 from apps.admin_api.views_bookable_spaces import (
     BookableSpaceDeactivateView,
     BookableSpaceDetailView,
@@ -345,41 +336,6 @@ urlpatterns = [
         'bookings/<int:pk>/no-show/',
         BookingNoShowView.as_view(),
         name='admin-booking-no-show',
-    ),
-    path(
-        'makerspaces/<int:makerspace_id>/events/',
-        EventListCreateView.as_view(),
-        name='admin-event-list-create',
-    ),
-    path(
-        'events/<int:pk>/',
-        EventDetailView.as_view(),
-        name='admin-event-detail',
-    ),
-    path(
-        'events/<int:pk>/publish/',
-        EventPublishView.as_view(),
-        name='admin-event-publish',
-    ),
-    path(
-        'events/<int:pk>/cancel/',
-        EventCancelView.as_view(),
-        name='admin-event-cancel',
-    ),
-    path(
-        'events/<int:pk>/complete/',
-        EventCompleteView.as_view(),
-        name='admin-event-complete',
-    ),
-    path(
-        'events/<int:pk>/registrations/',
-        EventRegistrationListView.as_view(),
-        name='admin-event-registration-list',
-    ),
-    path(
-        'event-registrations/<int:pk>/mark-attended/',
-        EventRegistrationMarkAttendedView.as_view(),
-        name='admin-event-registration-mark-attended',
     ),
     path(
         'makerspace/<int:makerspace_id>/machines',

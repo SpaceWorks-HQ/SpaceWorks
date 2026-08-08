@@ -56,8 +56,14 @@ def test_no_presence_route_resolves(path):
 
 
 def test_the_neighbouring_public_routes_still_resolve():
-    """Presence shared /api/v1/public/ with events and bookings."""
-    assert resolve("/api/v1/public/forge/events/").url_name == "public-event-list"
+    """Presence shared /api/v1/public/ with events and bookings.
+
+    Machines, not events or bookings: phases 13 and 14 make both of those separable and
+    this profile tombstones them. A neighbour assertion is only worth anything while the
+    neighbour is still there, so it has to name a route no later phase withdraws --
+    `apps.machines` is the kernel and is not separable.
+    """
+    assert resolve("/api/v1/public/forge/machines").url_name == "public-machines"
 
 
 def test_the_admin_does_not_register_the_model():
