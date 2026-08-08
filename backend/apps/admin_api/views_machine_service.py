@@ -17,7 +17,7 @@ from apps.admin_api.serializers_machine_service import (
     ServiceFailSerializer, ServiceRejectSerializer, ServiceStartSerializer,
 )
 from apps.hardware_requests.exceptions import ErrorSerializer
-from apps.machines import service_workflow
+from apps.machines import role_scope, service_workflow
 from apps.machines.models import Machine, MachineServiceRequest
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
@@ -75,9 +75,37 @@ def _request_queryset(actor, makerspace_id=None):
     # role gains exactly its own makerspaces.
     queryset = rbac.scope_by_action(actor, rbac.Action.COLLECT_SERVICE_REQUEST, queryset,
                                     field="makerspace_id")
+    queryset = _narrow_to_machine_scope(actor, queryset)
     if makerspace_id is not None and _collect_only(actor, makerspace_id):
         return queryset.filter(status=MachineServiceRequest.Status.COMPLETED)
     return queryset
+
+
+def _narrow_to_machine_scope(actor, queryset):
+    """Cut the queue down to the jobs the actor's role is actually scoped to run.
+
+    `MANAGE_MACHINES` was makerspace-wide here, so a role scoped to the laser cutters
+    still read every printer job in the lab — its costs, its notes and its requester's
+    contact details. Only the MANAGE_MACHINES-derived part of the scope is narrowed:
+    a **collect-only** front-desk role holds a different action entirely, and machine
+    scoping has nothing to say about it, so its makerspaces are added back untouched.
+    """
+    manage_scope = rbac.makerspaces_for_action(actor, rbac.Action.MANAGE_MACHINES)
+    if manage_scope is rbac.ALL:
+        return queryset
+    collect_scope = rbac.makerspaces_for_action(actor, rbac.Action.COLLECT_SERVICE_REQUEST)
+    collect_only = (
+        set() if collect_scope is rbac.ALL else set(collect_scope) - set(manage_scope)
+    )
+    scoped = role_scope.scoped_related_q(
+        actor,
+        manage_scope,
+        machine_id_paths=role_scope.SERVICE_REQUEST_MACHINE_PATHS,
+        type_id_paths=role_scope.SERVICE_REQUEST_TYPE_PATHS,
+    )
+    if collect_only:
+        scoped |= Q(makerspace_id__in=collect_only)
+    return queryset.filter(scoped).distinct()
 
 
 def _manageable_request(actor, pk, action=rbac.Action.MANAGE_MACHINES):

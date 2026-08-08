@@ -163,8 +163,38 @@ def _require_subject_authority(actor, payments):
         )
         if visible != set(ids):
             raise PermissionDenied("Payment action is not permitted.")
+        if subject_type == Payment.SubjectType.MACHINE_SERVICE_REQUEST:
+            _require_machine_scope(actor, payments)
     if any(payment.subject_type not in SUBJECT_ACTIONS for payment in payments):
         raise PermissionDenied("Payment subject type is not supported.")
+
+
+def _require_machine_scope(actor, payments):
+    """MANAGE_MACHINES is scoped per role, so reconciling a charge follows the job.
+
+    Imported locally: `apps.machines` reaches into `apps.payments` for service pricing, so
+    a module-level edge back would close the cycle.
+    """
+    from apps.machines.models import MachineServiceRequest
+    from apps.machines.role_scope import scoped_service_requests
+
+    subject_ids = {
+        payment.subject_id
+        for payment in payments
+        if payment.subject_type == Payment.SubjectType.MACHINE_SERVICE_REQUEST
+    }
+    if not subject_ids:
+        return
+    requests = MachineServiceRequest.objects.filter(pk__in=subject_ids)
+    covered = set(
+        scoped_service_requests(
+            actor,
+            requests,
+            set(requests.values_list("makerspace_id", flat=True)),
+        ).values_list("pk", flat=True)
+    )
+    if covered != subject_ids:
+        raise PermissionDenied("Payment action is not permitted.")
 
 
 def _expire_checkout_best_effort(payment):

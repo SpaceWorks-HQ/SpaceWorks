@@ -865,6 +865,28 @@ Every domain entity is scoped to a `makerspace_id`. A makerspace owns its invent
     check and the list filter **must stay in step** — disagreeing is how a row lists and then 403s
     on click, which is why `capabilities_for_machines`' `_type_mgr` carries the same check.
   - **Tier 3 (per-machine operators) is untouched** — an operator row already names one machine.
+  - **The makerspace-level surfaces AND it in too** (Phase 3), or the narrowing would have been
+    cosmetic: the queue, the detail view, service files, consumable pools, machine payments,
+    publicity and the machine-service report were each gated on `MANAGE_MACHINES` alone, so a
+    laser-scoped role still read every printer job, its costs, its uploaded CAD and its requester's
+    contact details. `role_scope.scoped_related_q` is the shared helper; **callers name the lookup
+    paths explicitly** because the route from a row to a machine is genuinely per-model and often
+    plural — a service request reaches one through `assigned_machine` (null until allocated),
+    through its bucket, and through its queue's machine **type**. Naming them at the call site is
+    what makes a missed path reviewable. Reports take a resolved scope
+    (`build_machine_service_report(..., machine_scope=)`); `None` means "no actor to scope by" (the
+    report registry, the superadmin aggregate) and matches everything, and an EXEMPT actor resolves
+    to an empty `Q()` so their report is the query it always was.
+    - **A collect-only role is added back untouched.** Machine scoping narrows the
+      `MANAGE_MACHINES`-derived scope only; `COLLECT_SERVICE_REQUEST` is a different action and
+      front-desk handover has nothing to do with which machines a team runs.
+    - **Consumable pools with no machine stay visible to everyone** holding `MANAGE_MACHINES` in the
+      space — shared stock belongs to no team, and hiding it would make shared filament unmanageable
+      by everyone rather than by the wrong people.
+    - **Deliberately NOT narrowed:** `views_notification_recipients` (`MANAGE_MACHINES` there
+      selects who *receives* maintenance alerts — makerspace configuration, not machine data) and
+      `reconciliation.list_payments` (already gated on `MANAGE_MAKERSPACE`, which is exempt anyway).
+      The reconciliation **bulk** path is narrowed, via `_require_subject_authority`.
   - `can_create_machine` needs a **type** link specifically: a machine link granted one machine, not
     the right to add more of its kind. `can_see_machines` requires a link too, since a tab that
     renders an empty list and 403s on every action is worse than no tab. Resolution always ANDs the

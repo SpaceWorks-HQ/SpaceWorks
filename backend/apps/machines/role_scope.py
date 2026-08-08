@@ -255,6 +255,118 @@ def grant_builtin_type_scope(role):
     )
 
 
+def scope_q_for(scope, *, machine_id_paths=(), type_id_paths=()):
+    """A pure ``Q`` for an already-resolved scope, with **no** makerspace clause.
+
+    For callers that have already constrained the tenant themselves — the report builders,
+    which are handed one makerspace id (or none, for the superadmin aggregate) before they
+    start. ``EXEMPT`` becomes an empty ``Q()``, which is the identity for ``filter``, so a
+    space manager's report is byte-for-byte the query it was before this existed.
+    """
+    from django.db.models import Q
+
+    if scope is EXEMPT:
+        return Q()
+    type_ids, machine_ids = scope
+    if not type_ids and not machine_ids:
+        return Q(pk__in=[])
+    q = Q(pk__in=[])
+    if machine_ids:
+        for path in machine_id_paths:
+            q |= Q(**{f"{path}__in": machine_ids})
+    if type_ids:
+        for path in type_id_paths:
+            q |= Q(**{f"{path}__in": type_ids})
+    return q
+
+
+def scoped_related_q(
+    actor,
+    makerspace_ids,
+    *,
+    machine_id_paths=(),
+    type_id_paths=(),
+    makerspace_field="makerspace_id",
+):
+    """A ``Q`` narrowing rows that hang off a machine to the actor's role scope.
+
+    The makerspace-level surfaces (the service queue, consumable pools, payments,
+    reconciliation, reports) were all gated on ``MANAGE_MACHINES`` alone, which meant a
+    role scoped to the laser cutters still read every printer job in the lab, its costs
+    and its requesters' names. Each one now ANDs this in.
+
+    Callers pass the lookup paths explicitly rather than having them derived, because the
+    route from a row to a machine is genuinely per-model and often plural -- a service
+    request reaches one through ``assigned_machine`` (null until allocated), through its
+    bucket, and through its queue's machine **type**. Naming them at the call site is what
+    makes a missed path reviewable.
+
+    A row that reaches no machine at all matches nothing for a scoped role. That is the
+    fail-closed direction and it is intended: an unallocated request nobody's scope covers
+    should be invisible rather than universally visible.
+    """
+    from django.db.models import Q
+
+    q = Q(pk__in=[])
+    for ms_id, scope in manage_scopes_for(actor, makerspace_ids).items():
+        tenant = Q(**{makerspace_field: ms_id})
+        if scope is EXEMPT:
+            q |= tenant
+            continue
+        type_ids, machine_ids = scope
+        if not type_ids and not machine_ids:
+            continue
+        inner = Q(pk__in=[])
+        if machine_ids:
+            for path in machine_id_paths:
+                inner |= Q(**{f"{path}__in": machine_ids})
+        if type_ids:
+            for path in type_id_paths:
+                inner |= Q(**{f"{path}__in": type_ids})
+        q |= tenant & inner
+    return q
+
+
+# Every route from a machine-service request to a machine. `assigned_machine` is null
+# until the request is allocated, which is exactly when the queue's type is the only
+# thing that says who owns the job -- so the type paths are not a convenience, they are
+# what keeps a pending request visible to the team that will run it.
+SERVICE_REQUEST_MACHINE_PATHS = ("assigned_machine_id", "bucket__machine_id")
+SERVICE_REQUEST_TYPE_PATHS = (
+    "assigned_machine__machine_type_id",
+    "bucket__machine__machine_type_id",
+    "queue__machine_type_id",
+)
+
+
+def scoped_service_requests(actor, queryset, makerspace_ids):
+    """Narrow a MachineServiceRequest queryset to the actor's role scope."""
+    return queryset.filter(
+        scoped_related_q(
+            actor,
+            makerspace_ids,
+            machine_id_paths=SERVICE_REQUEST_MACHINE_PATHS,
+            type_id_paths=SERVICE_REQUEST_TYPE_PATHS,
+        )
+    ).distinct()
+
+
+def covers_service_request(actor, service_request):
+    """Object-level twin of :func:`scoped_service_requests`.
+
+    Kept as a queryset filter rather than a pure predicate so the two can never drift on
+    the paths they consider -- a detail view allowing what the list hides is the failure
+    mode this phase exists to prevent.
+    """
+    from .models_service import MachineServiceRequest
+
+    return scoped_service_requests(
+        actor,
+        MachineServiceRequest.objects.filter(pk=service_request.pk),
+        [service_request.makerspace_id],
+    ).exists()
+
+
 def scoped_q(actor, makerspace_ids):
     """A ``Q`` selecting the machines the actor's role scope reaches, at query level.
 
