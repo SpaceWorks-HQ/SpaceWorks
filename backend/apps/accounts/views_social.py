@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import audit_events
 from apps.accounts.auth_cookies import set_refresh_cookies
+from apps.accounts.models_oidc import provider_for_slug, provider_key, slug_from_provider_key
 from apps.accounts.models_social import SocialIdentity, SocialProvider, SocialSurface
 from apps.accounts.serializers import user_payload
 from apps.accounts.serializers_device import DeviceGrantSerializer
@@ -99,7 +100,10 @@ class SocialLoginView(APIView):
             )
             user, outcome = resolve_social_identity(provider=self.provider, claims=claims,
                 surface=data["surface"], apple_name=data.get("apple_name", ""),
-                staff_validator=validator if data["surface"] == SocialSurface.STAFF else None)
+                staff_validator=validator if data["surface"] == SocialSurface.STAFF else None,
+                # Only an OIDC provider can forbid auto-linking; the built-ins always
+                # verify email ownership, so `claims` carries no such key for them.
+                allow_auto_link=claims.get("allow_auto_link", True))
             if data["delivery"] == "device" and nonce_row.device_grant.user_id != user.pk:
                 raise SocialResolutionError("access_denied", 403)
             scope = staff_origin_scope(request)
@@ -139,6 +143,19 @@ class GoogleSocialLoginView(SocialLoginView):
 
 class AppleSocialLoginView(SocialLoginView):
     provider = SocialProvider.APPLE
+
+
+class OidcSocialLoginView(SocialLoginView):
+    """Login through a deployment-configured OIDC provider named in the URL.
+
+    The slug is resolved to a configured row on every request rather than captured at
+    import time, so disabling a provider takes effect immediately instead of at the next
+    restart -- the same reason `provider_for_slug` refuses disabled and half-filled rows.
+    """
+
+    @property
+    def provider(self):
+        return provider_key(self.kwargs["slug"])
 
 
 class SocialProviderListLinkView(APIView):
@@ -192,6 +209,14 @@ class SocialProviderDetailView(APIView):
 
 
 def _verify(provider, raw_token, nonce, audience):
+    slug = slug_from_provider_key(provider)
+    if slug is not None:
+        from apps.accounts.social_oidc import verify_oidc_token
+
+        row = provider_for_slug(slug)
+        if row is None:
+            raise SocialAuthUnavailable
+        return verify_oidc_token(raw_token, nonce=nonce, provider_row=row)
     if provider == SocialProvider.GOOGLE:
         from apps.accounts.social_google import verify_google_token
         return verify_google_token(raw_token, nonce=nonce, audience=audience)

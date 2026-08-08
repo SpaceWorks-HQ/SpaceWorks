@@ -319,6 +319,7 @@ export const openApiPaths = [
   "/api/v1/auth/social/apple",
   "/api/v1/auth/social/google",
   "/api/v1/auth/social/nonce",
+  "/api/v1/auth/social/oidc/{slug}",
   "/api/v1/auth/social/providers",
   "/api/v1/auth/social/providers/{provider}",
   "/api/v1/bootstrap",

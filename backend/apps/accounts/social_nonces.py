@@ -8,6 +8,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts.models_oidc import provider_for_slug, slug_from_provider_key
 from apps.accounts.models_social import (
     PlatformSocialAuthSettings,
     SocialDelivery,
@@ -43,6 +44,16 @@ def request_origin(request):
 
 
 def provider_settings(provider, client_platform):
+    # A generic OIDC provider carries its own configuration rather than living on the
+    # platform singleton, so it is resolved before that row is even consulted -- a
+    # deployment can run OIDC without ever configuring Google or Apple.
+    oidc_slug = slug_from_provider_key(provider)
+    if oidc_slug is not None:
+        oidc_row = provider_for_slug(oidc_slug)
+        if oidc_row is None:
+            raise SocialAuthUnavailable
+        return oidc_row, oidc_row.client_id
+
     row = PlatformSocialAuthSettings.objects.filter(pk=1).first()
     if row is None:
         raise SocialAuthUnavailable

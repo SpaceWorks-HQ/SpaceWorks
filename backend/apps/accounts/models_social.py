@@ -31,7 +31,10 @@ class SocialIdentity(models.Model):
         on_delete=models.CASCADE,
         related_name="social_identities",
     )
-    provider = models.CharField(max_length=16, choices=SocialProvider.choices)
+    # 64 and no `choices`: a generic OIDC provider is stored as `oidc:<slug>`, which is
+    # open-ended by design. Validity is decided by `models_oidc.provider_for_slug`, which
+    # answers from configuration -- an enum could never list them.
+    provider = models.CharField(max_length=64)
     provider_sub = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -48,7 +51,7 @@ class SocialIdentity(models.Model):
 
 
 class SocialLoginNonce(models.Model):
-    provider = models.CharField(max_length=16, choices=SocialProvider.choices)
+    provider = models.CharField(max_length=64)
     surface = models.CharField(max_length=16, choices=SocialSurface.choices)
     delivery = models.CharField(max_length=16, choices=SocialDelivery.choices)
     client_platform = models.CharField(

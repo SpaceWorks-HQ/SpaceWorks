@@ -24,6 +24,7 @@ from apps.accounts.views_device import (
 )
 from apps.accounts.views_social import (
     AppleSocialLoginView,
+    OidcSocialLoginView,
     GoogleSocialLoginView,
     SocialNonceView,
     SocialProviderDetailView,
@@ -34,6 +35,9 @@ urlpatterns = [
     path("social/nonce", SocialNonceView.as_view(), name="social-nonce"),
     path("social/google", GoogleSocialLoginView.as_view(), name="social-google"),
     path("social/apple", AppleSocialLoginView.as_view(), name="social-apple"),
+    # Declared before the `<str:provider>` detail route below only by accident of prefix
+    # ("social/oidc/..." vs "social/providers/..."), but kept adjacent to its siblings.
+    path("social/oidc/<slug:slug>", OidcSocialLoginView.as_view(), name="social-oidc"),
     path("social/providers", SocialProviderListLinkView.as_view(), name="social-providers"),
     path("social/providers/<str:provider>", SocialProviderDetailView.as_view(), name="social-provider-detail"),
     path("device/attestation-challenge", DeviceAttestationChallengeView.as_view(), name="device-attestation-challenge"),

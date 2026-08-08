@@ -43,6 +43,19 @@ class PublicConfigView(APIView):
                 "enabled": True,
                 "service_id": social.apple_service_id,
             }
+        from apps.accounts.models_oidc import enabled_providers
+
+        for row in enabled_providers():
+            # Namespaced under the same key so the login screen renders every provider
+            # from one list. Only the client id is published -- it is a public value by
+            # design, and there is no secret to leak because ID-token verification needs
+            # none.
+            configured[row.provider_key] = {
+                "enabled": True,
+                "display_name": row.display_name,
+                "client_id": row.client_id,
+                "issuer": row.issuer,
+            }
         if configured:
             payload["social_auth"] = configured
         return Response(payload)

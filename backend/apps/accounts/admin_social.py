@@ -2,6 +2,7 @@ from django import forms
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
+from apps.accounts.models_oidc import OidcProvider
 from apps.accounts.models_social import (
     PlatformSocialAuthSettings,
     SocialIdentity,
@@ -86,4 +87,29 @@ class SocialIdentityAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(OidcProvider)
+class OidcProviderAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    """Deployment-configured OpenID Connect providers.
+
+    Superadmin-only and platform-scoped, like the built-in providers and for the same
+    reason: identity resolves before a makerspace is selected, so a per-tenant provider
+    would be unreachable at token-verification time.
+    """
+
+    list_display = ("display_name", "slug", "issuer", "is_enabled", "allow_auto_link")
+    list_filter = ("is_enabled", "allow_auto_link")
+    search_fields = ("slug", "display_name", "issuer")
+    readonly_fields = ("created_at", "updated_at")
+
+    def has_delete_permission(self, request, obj=None):
+        """Deleting the provider row would orphan every SocialIdentity that names it.
+
+        Those users would keep a stored identity pointing at a provider the deployment
+        can no longer resolve, and any who never set a password could not recover --
+        the same lockout `social_lockout` refuses for the built-ins. Disable it instead:
+        the row stays, the login stops, and re-enabling restores it.
+        """
         return False

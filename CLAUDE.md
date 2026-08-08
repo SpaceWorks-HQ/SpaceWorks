@@ -541,6 +541,32 @@ tokens are encrypted with an HMAC dedup fingerprint, owned by a device grant, an
 reports them invalid. Native Stripe PaymentSheet delegates to the same Payment/Connect resolution and
 idempotency rules as web checkout.
 
+**Generic OIDC providers are configuration, not a second verification path (phase 17).**
+`accounts/models_oidc.OidcProvider` (superadmin-only, platform-scoped) holds `issuer`, `jwks_url`,
+`client_id` and two switches; `social_oidc.verify_oidc_token` reuses the same
+`social_jwt.decode_rs256_token` the built-ins use, because two RS256 implementations means two
+places to get RS256 wrong. This covers Keycloak, Authentik, Azure AD, Okta and Google Workspace —
+they differ only in configuration. Load-bearing details:
+- **No client secret is stored.** This is the ID-token flow: verifying a signature needs only the
+  JWKS, so there is no secret to leak and none is modelled.
+- The stored provider key is **`oidc:<slug>`**, namespaced so a provider slugged `google` cannot
+  shadow the built-in. `SocialIdentity.provider`/`SocialLoginNonce.provider` widened to 64 and lost
+  their `choices` — validity is answered by configuration (`provider_for_slug`), which an enum never
+  could. `_available_username` now strips the colon, which Django's username validator rejects.
+- **`allow_auto_link` exists for an IdP that does not verify email ownership.** With it off, an email
+  match demands an explicit link instead of silently handing over the account. Auto-link still
+  additionally requires provider-asserted `email_verified` **and** a locally verified address — the
+  switch only allows it to be considered. `email_verified` is parsed strictly: a missing claim must
+  never read as verified.
+- **`issuer` is compared verbatim, never normalized.** The built-ins accept two spellings only
+  because Google genuinely issues both; tolerating a trailing slash generally is how an issuer check
+  stops being a check. A provider row **cannot be deleted** in `/control/`, only disabled — deleting
+  it orphans every `SocialIdentity` naming it and locks out anyone who never set a password, the same
+  lockout `social_lockout` refuses for the built-ins.
+- **SAML is deliberately NOT included.** It is not a configuration variant of the same flow: it needs
+  XML signature verification (a new security-sensitive dependency), a POST binding, and its own
+  assertion/replay handling. It is its own phase, not a footnote to this one.
+
 **Social identity is global; authorization remains per makerspace.** `SocialIdentity(provider, sub)` links
 Google/Apple to the global `User`; it never grants a role. Provider JWTs are server-verified against bounded,
 cached static JWKS endpoints and one-time origin/device-bound nonces. Auto-linking is allowed only when both
