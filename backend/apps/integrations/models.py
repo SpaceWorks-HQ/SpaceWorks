@@ -202,10 +202,16 @@ class NonEmailNotificationChannel(models.TextChoices):
     NATIVE_PUSH = "native_push", "Native push"
 
 
-# Channels gated by a same-named module key. native_push is absent deliberately: it is
-# governed by the standalone `mobile.push` feature switch, not by a module.
+# Chat channels gated by a same-named module key.
+#
+# Two absences are deliberate. `native_push` is governed by the standalone `mobile.push`
+# feature switch, not a module. And `email` is NOT here even though an `email` module key
+# exists: some messages send regardless of it (`dispatch.EMAIL_MODULE_EXEMPT` covers
+# password reset, email verification and the return reminder), so treating email as
+# "gone when the module is off" would hide the matrix column while mail was still going
+# out — overstating what the toggle does. Tenant email is gated by
+# `dispatch.email_module_blocks`, which knows about the exemptions; this table does not.
 CHANNEL_MODULE_KEYS = {
-    "email": "email",
     "telegram": "telegram",
     "slack": "slack",
     "mattermost": "mattermost",

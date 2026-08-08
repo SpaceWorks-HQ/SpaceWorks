@@ -310,14 +310,41 @@ def test_linking_does_not_overwrite_an_existing_contact_number(sms_on):
     assert user.phone_e164 == NUMBER
 
 
-def test_a_number_already_verified_elsewhere_is_refused_before_any_text(sms_on):
+def test_linking_a_number_owned_by_someone_else_reveals_nothing_at_start(sms_on):
+    """The link endpoint must not become a membership oracle.
+
+    Answering "that belongs to someone else" here would let any logged-in member probe
+    which numbers are on the platform — precisely what the login path refuses to leak.
+    The collision is caught at confirm instead, under the row lock.
+    """
     verified_member("owner")
-    other = make_user("thief", role=User.Role.REQUESTER)
+    other = make_user("prober", role=User.Role.REQUESTER)
     client = APIClient()
     client.force_authenticate(user=other)
-    response = client.post(LINK_START, {"phone": NUMBER}, format="json")
+
+    taken = client.post(LINK_START, {"phone": NUMBER}, format="json")
+    free = client.post(LINK_START, {"phone": OTHER_NUMBER}, format="json")
+    assert taken.status_code == free.status_code == 200
+    assert taken.json() == free.json()
+
+
+def test_confirming_a_number_owned_by_someone_else_is_refused(sms_on):
+    """Where the collision is actually enforced — after the code checks out."""
+    owner = verified_member("real-owner")
+    other = make_user("prober2", role=User.Role.REQUESTER)
+    client = APIClient()
+    client.force_authenticate(user=other)
+    client.post(LINK_START, {"phone": NUMBER}, format="json")
+
+    response = client.post(
+        LINK_CONFIRM, {"phone": NUMBER, "code": code_from(sms_on)}, format="json"
+    )
     assert response.status_code == 400
-    assert sms_on == []  # the real owner is not pestered with a code
+    other.refresh_from_db()
+    assert other.phone_e164 == ""
+    # The real owner keeps the number.
+    owner.refresh_from_db()
+    assert owner.phone_e164 == NUMBER
 
 
 def test_editing_the_number_clears_its_verified_stamp():

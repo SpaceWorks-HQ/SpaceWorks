@@ -155,17 +155,13 @@ def start_link(user, raw_phone):
         from apps.accounts.phone_numbers import MESSAGE
 
         raise serializers.ValidationError({"phone": [MESSAGE]})
-    # Refuse a number already verified by somebody else BEFORE sending anything: the
-    # unique index would reject it at confirm time anyway, and texting a code to a
-    # number that belongs to another member is both useless and a nuisance to them.
-    if (
-        User.objects.filter(phone_e164=phone_e164, phone_verified_at__isnull=False)
-        .exclude(pk=user.pk)
-        .exists()
-    ):
-        raise serializers.ValidationError(
-            {"phone": ["That number is already linked to another account."]}
-        )
+    # Deliberately NO pre-send collision check. Answering "that number belongs to someone
+    # else" here would make this endpoint a membership oracle: any logged-in member could
+    # probe whether a given number is on the platform, which is exactly what the login
+    # path is careful never to reveal. The collision is still caught in confirm_link,
+    # under the row lock, so nothing can be taken over -- the attacker simply learns
+    # nothing. Cost accepted: the real owner may receive one unsolicited code per probe,
+    # bounded by the 5/hour per-number throttle.
     challenge, sent = _issue(user, phone_e164, PhoneChallengePurpose.LINK)
     audit_events.record_auth_event(
         user,

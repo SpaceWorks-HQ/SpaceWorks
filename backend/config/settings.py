@@ -367,6 +367,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.hardware_requests.tasks.send_return_reminders_task",
         "schedule": crontab(minute=0),
     },
+    # Spent email/phone verification challenges hold an address or a number and nothing
+    # deleted them. Off-peak because it is a pure delete nobody is waiting on.
+    "purge-auth-challenges": {
+        "task": "apps.accounts.tasks.purge_auth_challenges_task",
+        "schedule": crontab(hour=3, minute=30),
+    },
 }
 
 CORS_ALLOWED_ORIGINS = env.list(
