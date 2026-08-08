@@ -49,6 +49,10 @@ GLOBAL_ADMIN_MODELS = {
     "axes.accesslog",
     "integrations.platformemailsettings",
     "integrations.platformpushsettings",
+    # Platform-scoped for the same reason identity is: a sign-in code is sent before any
+    # makerspace has been selected, so there is no tenant to own the credentials.
+    "integrations.platformsmssettings",
+    "integrations.dailyotpsmscounter",
     "payments.platformstripeconnectsettings",
     "updates.platformupdatesettings",
     "encryption.piiglobalwritefence",

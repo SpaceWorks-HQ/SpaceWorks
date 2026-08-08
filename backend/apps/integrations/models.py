@@ -315,10 +315,16 @@ class DailyNotificationCounter(models.Model):
 
 
 from apps.integrations.models_push import PlatformPushSettings, PushDevice  # noqa: E402
+from apps.integrations.models_sms import (  # noqa: E402
+    DailyOtpSmsCounter,
+    PlatformSmsSettings,
+    SmsProviderChoice,
+)
 
 __all__ = [
     'DailyEmailCounter',
     'DailyNotificationCounter',
+    'DailyOtpSmsCounter',
     'EmailLog',
     'EmailNotificationMute',
     'EmailTemplate',
@@ -330,5 +336,7 @@ __all__ = [
     'NotificationPreference',
     'PlatformEmailSettings',
     'PlatformPushSettings',
+    'PlatformSmsSettings',
     'PushDevice',
+    'SmsProviderChoice',
 ]

@@ -22,6 +22,13 @@ from apps.accounts.views_device import (
     DeviceLogoutView,
     DeviceRefreshView,
 )
+from apps.accounts.views_phone import (
+    PhoneLinkConfirmView,
+    PhoneLinkStartView,
+    PhoneLoginConfirmView,
+    PhoneLoginStartView,
+    PhoneUnlinkView,
+)
 from apps.accounts.views_social import (
     AppleSocialLoginView,
     OidcSocialLoginView,
@@ -46,6 +53,11 @@ urlpatterns = [
     path("device/logout", DeviceLogoutView.as_view(), name="device-logout"),
     path("device/grants", DeviceGrantListView.as_view(), name="device-grants"),
     path("device/grants/<uuid:grant_id>", DeviceGrantDetailView.as_view(), name="device-grant-detail"),
+    path("phone/login/start", PhoneLoginStartView.as_view(), name="auth-phone-login-start"),
+    path("phone/login/confirm", PhoneLoginConfirmView.as_view(), name="auth-phone-login-confirm"),
+    path("phone/link/start", PhoneLinkStartView.as_view(), name="auth-phone-link-start"),
+    path("phone/link/confirm", PhoneLinkConfirmView.as_view(), name="auth-phone-link-confirm"),
+    path("phone", PhoneUnlinkView.as_view(), name="auth-phone-unlink"),
     path("login", LoginView.as_view(), name="auth-login"),
     path("refresh", RefreshView.as_view(), name="auth-refresh"),
     path("logout", LogoutView.as_view(), name="auth-logout"),

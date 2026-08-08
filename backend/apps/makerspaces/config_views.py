@@ -12,6 +12,7 @@ class PublicConfigSerializer(serializers.Serializer):
     email_enabled = serializers.BooleanField()
     public_image_max_bytes = serializers.IntegerField()
     social_auth = serializers.DictField(required=False)
+    phone_login = serializers.DictField(required=False)
 
 
 class PublicConfigView(APIView):
@@ -58,4 +59,11 @@ class PublicConfigView(APIView):
             }
         if configured:
             payload["social_auth"] = configured
+        # Omitted entirely when SMS is unconfigured, exactly like social_auth above: an
+        # absent key keeps the dormant payload byte-for-byte unchanged, and a login
+        # screen that renders a phone tab it cannot service is worse than no tab.
+        from apps.integrations.sms import sms_configured
+
+        if sms_configured():
+            payload["phone_login"] = {"enabled": True}
         return Response(payload)

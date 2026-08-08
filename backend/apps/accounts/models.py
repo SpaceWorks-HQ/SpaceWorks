@@ -18,7 +18,16 @@ class User(AbstractUser):
         RESTRICTED = "restricted", "Restricted"
         SUSPENDED = "suspended", "Suspended"
 
+    # Free-text contact info, copied onto requests/bookings as text. Stays exactly as
+    # the user typed it, non-unique: two members may legitimately share a landline.
     phone = models.CharField(max_length=32, blank=True)
+    # The LOGIN IDENTITY -- a separate, canonical E.164 column, deliberately not the
+    # same field. Reusing `phone` would have meant rewriting existing free-text values
+    # in a migration and putting a unique index on a column that already holds
+    # duplicates in real deployments. This one starts empty everywhere, so its
+    # constraint always applies cleanly.
+    phone_e164 = models.CharField(max_length=20, blank=True)
+    phone_verified_at = models.DateTimeField(null=True, blank=True)
     display_name = models.CharField(max_length=200, blank=True)
     email_verified_at = models.DateTimeField(null=True, blank=True)
     external_checkin_user_id = models.CharField(max_length=128, blank=True)
@@ -53,27 +62,48 @@ class User(AbstractUser):
                 condition=~models.Q(email=""),
                 name="uniq_ci_nonempty_email",
             ),
+            models.UniqueConstraint(
+                fields=["phone_e164"],
+                condition=~models.Q(phone_e164=""),
+                name="uniq_nonempty_phone_e164",
+            ),
         ]
 
     @classmethod
     def from_db(cls, db, field_names, values):
         instance = super().from_db(db, field_names, values)
         instance._loaded_email = instance.email
+        instance._loaded_phone_e164 = instance.phone_e164
         return instance
 
     def save(self, *args, **kwargs):
         # Changing a verified email must re-require verification: an admin/self email
         # edit clears email_verified_at (outstanding challenges reference the old email
         # snapshot and can no longer match the new current email, so they lapse).
+        cleared = []
         if getattr(self, "_loaded_email", None) is not None and _normalized_email(
             self._loaded_email
         ) != _normalized_email(self.email):
             self.email_verified_at = None
-            update_fields = kwargs.get("update_fields")
-            if update_fields is not None and "email_verified_at" not in update_fields:
-                kwargs["update_fields"] = list(update_fields) + ["email_verified_at"]
+            cleared.append("email_verified_at")
+        # The same rule for the phone identity, and it matters more here: phone_e164 is
+        # what the OTP login resolves an account by, so an edited number that kept its
+        # verified stamp would let whoever holds the NEW number sign in as this user
+        # without ever proving they hold it. /control/ can edit this field, so the guard
+        # cannot live only in the linking service.
+        if getattr(
+            self, "_loaded_phone_e164", None
+        ) is not None and self._loaded_phone_e164 != self.phone_e164:
+            self.phone_verified_at = None
+            cleared.append("phone_verified_at")
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and cleared:
+            kwargs["update_fields"] = list(update_fields) + [
+                name for name in cleared if name not in update_fields
+            ]
         super().save(*args, **kwargs)
         self._loaded_email = self.email
+        self._loaded_phone_e164 = self.phone_e164
 
 
 class EmailVerificationChallenge(models.Model):
@@ -119,6 +149,10 @@ from apps.accounts.models_devices import (  # noqa: E402
     DeviceRefreshFamily,
     DeviceRefreshToken,
 )
+from apps.accounts.models_phone import (  # noqa: E402
+    PhoneChallengePurpose,
+    PhoneVerificationChallenge,
+)
 from apps.accounts.models_social import (  # noqa: E402
     PlatformSocialAuthSettings,
     SocialClientPlatform,
@@ -138,6 +172,8 @@ __all__ = [
     'DeviceRefreshFamily',
     'DeviceRefreshToken',
     'EmailVerificationChallenge',
+    'PhoneChallengePurpose',
+    'PhoneVerificationChallenge',
     'PlatformSocialAuthSettings',
     'SocialClientPlatform',
     'SocialDelivery',

@@ -20917,6 +20917,237 @@
                 }
             }
         },
+        "/api/v1/auth/phone": {
+            "delete": {
+                "operationId": "api_v1_auth_phone_destroy",
+                "description": "Detach the number. Always safe: every account keeps an email credential.",
+                "summary": "Unlink the phone number",
+                "tags": [
+                    "Auth"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PhoneStatus"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/phone/link/confirm": {
+            "post": {
+                "operationId": "api_v1_auth_phone_link_confirm_create",
+                "description": "Attach the verified number to the caller's account.",
+                "summary": "Confirm and link a phone number",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneConfirm"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneConfirm"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneConfirm"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PhoneStatus"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid or expired code."
+                    },
+                    "429": {
+                        "description": "Request throttled."
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/phone/link/start": {
+            "post": {
+                "operationId": "api_v1_auth_phone_link_start_create",
+                "description": "Send a code to a number the caller wants to attach to their own account.",
+                "summary": "Request a code to link a phone number",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneStart"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneStart"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneStart"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PhoneStartResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid or already-linked number."
+                    },
+                    "404": {
+                        "description": "Phone sign-in is not configured."
+                    },
+                    "429": {
+                        "description": "Request throttled."
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/phone/login/confirm": {
+            "post": {
+                "operationId": "api_v1_auth_phone_login_confirm_create",
+                "description": "Exchange a valid code for a MEMBER session. Never mints a staff session.",
+                "summary": "Sign in with a phone code",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneConfirm"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneConfirm"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneConfirm"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Member session issued."
+                    },
+                    "400": {
+                        "description": "Invalid or expired code."
+                    },
+                    "404": {
+                        "description": "Phone sign-in is not configured."
+                    },
+                    "429": {
+                        "description": "Request throttled."
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/phone/login/start": {
+            "post": {
+                "operationId": "api_v1_auth_phone_login_start_create",
+                "description": "Request a login code for an already-verified number.",
+                "summary": "Request a phone sign-in code",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneStart"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneStart"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PhoneStart"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PhoneStartResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid request."
+                    },
+                    "404": {
+                        "description": "Phone sign-in is not configured."
+                    },
+                    "429": {
+                        "description": "Request throttled."
+                    }
+                }
+            }
+        },
         "/api/v1/auth/refresh": {
             "post": {
                 "operationId": "api_v1_auth_refresh_create",
@@ -37169,6 +37400,62 @@
                     "detail"
                 ]
             },
+            "PhoneConfirm": {
+                "type": "object",
+                "properties": {
+                    "phone": {
+                        "type": "string",
+                        "maxLength": 32
+                    },
+                    "code": {
+                        "type": "string",
+                        "maxLength": 6,
+                        "minLength": 6
+                    }
+                },
+                "required": [
+                    "code",
+                    "phone"
+                ]
+            },
+            "PhoneStart": {
+                "type": "object",
+                "properties": {
+                    "phone": {
+                        "type": "string",
+                        "maxLength": 32
+                    }
+                },
+                "required": [
+                    "phone"
+                ]
+            },
+            "PhoneStartResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "PhoneStatus": {
+                "type": "object",
+                "properties": {
+                    "phone_e164": {
+                        "type": "string"
+                    },
+                    "verified": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "phone_e164",
+                    "verified"
+                ]
+            },
             "PlatformEmailSettings": {
                 "type": "object",
                 "properties": {
@@ -38100,6 +38387,10 @@
                         "type": "integer"
                     },
                     "social_auth": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "phone_login": {
                         "type": "object",
                         "additionalProperties": {}
                     }

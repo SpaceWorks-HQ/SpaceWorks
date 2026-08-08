@@ -314,6 +314,11 @@ export const openApiPaths = [
   "/api/v1/auth/logout",
   "/api/v1/auth/me",
   "/api/v1/auth/member-sign-up",
+  "/api/v1/auth/phone",
+  "/api/v1/auth/phone/link/confirm",
+  "/api/v1/auth/phone/link/start",
+  "/api/v1/auth/phone/login/confirm",
+  "/api/v1/auth/phone/login/start",
   "/api/v1/auth/refresh",
   "/api/v1/auth/reset-password",
   "/api/v1/auth/social/apple",
@@ -3071,6 +3076,24 @@ export type PaymentSettingsError = {
   "detail": string;
 };
 
+export type PhoneConfirm = {
+  "phone": string;
+  "code": string;
+};
+
+export type PhoneStart = {
+  "phone": string;
+};
+
+export type PhoneStartResponse = {
+  "detail": string;
+};
+
+export type PhoneStatus = {
+  "phone_e164": string;
+  "verified": boolean;
+};
+
 export type PlatformEmailSettings = {
   "id": number;
   "smtp_host"?: string;
@@ -3293,6 +3316,9 @@ export type PublicConfig = {
   "email_enabled": boolean;
   "public_image_max_bytes": number;
   "social_auth"?: {
+  [key: string]: unknown;
+};
+  "phone_login"?: {
   [key: string]: unknown;
 };
 };

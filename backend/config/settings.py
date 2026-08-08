@@ -74,7 +74,12 @@ MANAGED_RESOURCE_LIMITS = {
     "api_clients": 1,
     "custom_roles": 20,
     "otp_email": 200,
+    "otp_sms": 100,
 }
+# Applies on SELF-HOST TOO, unlike the managed limits above: every auth text is billed
+# by the operator's SMS vendor, so this is a cost ceiling rather than a fair-use quota.
+# Blank disables the cap entirely.
+OTP_SMS_DAILY_CAP = env.int("OTP_SMS_DAILY_CAP", default=200)
 STORAGE_PRESIGN_METHOD = env("STORAGE_PRESIGN_METHOD", default="post")
 CRON_SECRET = env("CRON_SECRET", default="")
 ADMIN_SITE_NAME = env("ADMIN_SITE_NAME", default="Space Works")
@@ -426,6 +431,12 @@ REST_FRAMEWORK = {
         "push_device_registration": env("THROTTLE_PUSH_DEVICE_REGISTRATION", default="10/min"),
         "social_nonce": env("THROTTLE_SOCIAL_NONCE", default="10/min"),
         "social_login": env("THROTTLE_SOCIAL_LOGIN", default="10/min"),
+        # Tighter than the email OTP rates: every one of these costs the operator money
+        # and lands on a stranger's handset if the number is wrong.
+        "phone_otp_request": env("THROTTLE_PHONE_OTP_REQUEST", default="5/min"),
+        "phone_otp_number": env("THROTTLE_PHONE_OTP_NUMBER", default="5/hour"),
+        "phone_login_confirm": env("THROTTLE_PHONE_LOGIN_CONFIRM", default="10/min"),
+        "phone_confirm_number": env("THROTTLE_PHONE_CONFIRM_NUMBER", default="15/hour"),
         "password_reset_request": env(
             "THROTTLE_PASSWORD_RESET_REQUEST",
             default="5/min",
