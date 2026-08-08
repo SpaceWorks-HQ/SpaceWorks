@@ -58,6 +58,26 @@ else {
   $adminPass = [System.Net.NetworkCredential]::new("", (Read-Host "Admin password (leave blank to auto-generate)" -AsSecureString)).Password
   $genPass = $false
   if (-not $adminPass) { $adminPass = (New-Key 16); $genPass = $true }
+  # Google sign-in is GUIDED, never automatic. Client IDs are issued by Google against
+  # a specific origin, so no credential can ship in the box and "works out of the box"
+  # is impossible here -- guided is the ceiling. Skipping leaves username/password
+  # login fully working, which is the only login a fresh install has either way.
+  Write-Host ""
+  Write-Host "Optional: Google sign-in. To enable it you need a Google OAuth client ID:"
+  Write-Host "  1. Open https://console.cloud.google.com/apis/credentials"
+  Write-Host "  2. Create Credentials -> OAuth client ID -> Web application"
+  Write-Host "  3. Add this to 'Authorised JavaScript origins':  http://$webhost"
+  Write-Host "  4. Copy the Client ID (it ends in .apps.googleusercontent.com)"
+  Write-Host "Leave blank to skip - you can add it later in Platform settings."
+  $googleWebClientId = (Read-Host "Google Web client ID (optional)") -replace '\s', ''
+  if ($googleWebClientId -and -not $googleWebClientId.EndsWith(".apps.googleusercontent.com")) {
+    # Caught here rather than at first login: a wrong value makes the Google button
+    # appear and then fail token verification for every user, with nothing on screen
+    # explaining why.
+    Warn "That does not look like a Google client ID; skipping Google sign-in."
+    $googleWebClientId = ""
+  }
+
   $stripeSecretKey = Read-Host "Stripe secret key (optional; leave blank to skip)"
   $stripeWebhookSecret = [System.Net.NetworkCredential]::new("", (Read-Host "Stripe webhook secret (optional; leave blank to skip)" -AsSecureString)).Password
   $stripeDefaultCurrency = Read-Host "Stripe default currency [usd]"; if (-not $stripeDefaultCurrency) { $stripeDefaultCurrency = "usd" }
@@ -112,6 +132,12 @@ if ($firstRun) {
   Say "Creating your admin account and makerspace..."
   docker @compose exec -T backend python manage.py setup_instance --username $adminUser --email $adminEmail --password $adminPass --makerspace-name $msname --profile $msprofile
   if ($LASTEXITCODE -ne 0) { Die "Could not create the admin account. See the output above." }
+
+  if ($googleWebClientId) {
+    Say "Enabling Google sign-in..."
+    docker @compose exec -T backend python manage.py configure_social_auth --google-web-client-id $googleWebClientId
+    if ($LASTEXITCODE -ne 0) { Warn "Could not save the Google client ID. Add it later in Platform settings; password login is unaffected." }
+  }
 
   if ($stripeSecretKey) {
     $env:SETUP_STRIPE_SECRET_KEY = $stripeSecretKey
