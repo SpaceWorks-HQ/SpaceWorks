@@ -271,13 +271,15 @@ def test_superadmin_break_glass_create_is_space_manager_only_and_fresh_user_only
         },
         format="json",
     )
+    # Any non-Space-Manager role proves the break-glass rule; Machine Manager rather than
+    # the retired Print Manager, whose fixed-role route no longer exists.
     rejected_role = client.post(
-        reverse("admin-users-print-managers"),
+        reverse("admin-users-machine-managers"),
         {
-            "username": "hard-hide-new-print",
-            "email": "hard-hide-new-print@example.com",
+            "username": "hard-hide-new-machine",
+            "email": "hard-hide-new-machine@example.com",
             "makerspace_id": hidden.id,
-            "role": MakerspaceMembership.Role.PRINT_MANAGER,
+            "role": MakerspaceMembership.Role.MACHINE_MANAGER,
         },
         format="json",
     )
@@ -319,12 +321,12 @@ def test_staff_create_rejects_weak_supplied_password():
     client = authenticated_client(superadmin)
 
     response = client.post(
-        reverse("admin-users-print-managers"),
+        reverse("admin-users-machine-managers"),
         {
             "username": "hard-hide-weak-password-user",
             "email": "hard-hide-weak-password-user@example.com",
             "makerspace_id": makerspace.id,
-            "role": MakerspaceMembership.Role.PRINT_MANAGER,
+            "role": MakerspaceMembership.Role.MACHINE_MANAGER,
             "password": "123",
         },
         format="json",

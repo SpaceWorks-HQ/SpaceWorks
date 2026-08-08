@@ -25,8 +25,12 @@ from apps.makerspaces.models import Makerspace, MakerspaceMembership, Makerspace
 # never create another Space Manager or escalate toward superadmin (Part I non-escalation
 # guard). Creating/assigning SPACE_MANAGER and every restrict/restore/reset existential
 # guard stay superadmin-only.
+#
+# Only the roles still mounted as fixed-role routes. PRINT_MANAGER and GUEST_ADMIN are
+# absent because their routes are gone, so `target_role` can never be either -- unlike the
+# same-named tuple in `services_staff`, which guards *pre-existing* memberships and must
+# therefore keep them. The two are deliberately not shared.
 _SM_DELEGABLE_ROLES = (
-    MakerspaceMembership.Role.PRINT_MANAGER,
     MakerspaceMembership.Role.INVENTORY_MANAGER,
     MakerspaceMembership.Role.MACHINE_MANAGER,
 )

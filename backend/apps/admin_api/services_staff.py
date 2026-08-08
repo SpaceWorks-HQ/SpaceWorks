@@ -10,8 +10,19 @@ from apps.makerspaces import limits
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
 
 
-_SM_DELEGABLE_ROLES = (
+# Existing membership roles a Space Manager may modify. This asks a different question
+# from the same-named tuple in `views_users`, which lists the roles still *creatable*
+# through a fixed-role route -- so the two must not be merged, and this one is the longer
+# of the pair on purpose.
+#
+# The retired roles stay: migration 0046 left `role="print_manager"` strings on pre-0046
+# memberships and 0052 left `role="guest_admin"` ones, and both were roles a Space Manager
+# legitimately administered. Dropping them here would not retire anything, it would strand
+# those people behind superadmin-only for a rename they had no part in. SPACE_MANAGER and
+# CUSTOM are the ones deliberately absent -- that is the non-escalation guard.
+_SM_MODIFIABLE_EXISTING_ROLES = (
     MakerspaceMembership.Role.PRINT_MANAGER,
+    MakerspaceMembership.Role.GUEST_ADMIN,
     MakerspaceMembership.Role.INVENTORY_MANAGER,
     MakerspaceMembership.Role.MACHINE_MANAGER,
 )
@@ -78,7 +89,7 @@ def attach_staff_membership(
                     .values_list("role", flat=True)
                     .first()
                 )
-                if existing_role is not None and existing_role not in _SM_DELEGABLE_ROLES:
+                if existing_role is not None and existing_role not in _SM_MODIFIABLE_EXISTING_ROLES:
                     raise PermissionDenied(
                         "Only a superadmin can change a Space Manager membership."
                     )
