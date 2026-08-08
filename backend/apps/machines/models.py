@@ -24,6 +24,11 @@ from apps.machines.models_service import (
 )
 from apps.machines.printing_cutover_models import PrintingCutoverRepair, PrintingCutoverState
 
+# Role -> machine/type scope links. Imported here so Django registers them with this app;
+# they use string FK references, so the import order relative to MachineType/Machine below
+# does not matter.
+from apps.machines.models_role_scope import RoleMachineScope, RoleMachineTypeScope
+
 
 class MachineType(models.Model):
     """Machine type catalog. Global built-ins (makerspace=NULL) + per-lab custom rows."""

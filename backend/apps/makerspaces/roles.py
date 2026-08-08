@@ -29,7 +29,7 @@ def ensure_default_roles(makerspace):
         MEMBER_ROLE_DEFINITION,
     ):
         slug = slug_parts[0] if slug_parts else legacy_role
-        MakerspaceRole.objects.get_or_create(
+        role, created = MakerspaceRole.objects.get_or_create(
             makerspace=makerspace,
             slug=slug,
             defaults={
@@ -40,3 +40,13 @@ def ensure_default_roles(makerspace):
                 "is_protected": True,
             },
         )
+        if created:
+            # Machine authority is scoped per role (`machines.role_scope`), and scoping
+            # fails closed -- so a seeded Machine Manager with no links would be inert on
+            # every makerspace created after that feature landed. Imported lazily: this
+            # module is loaded from `AppConfig.ready()`, which must stay query-free and
+            # cannot pull in another app's models at import time. Only ever widens a role
+            # the moment it is created, so an administrator's later edits are untouched.
+            from apps.machines.role_scope import grant_builtin_type_scope
+
+            grant_builtin_type_scope(role)

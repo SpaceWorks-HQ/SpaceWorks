@@ -25,6 +25,11 @@ NESTED_MAKERSPACE_LOOKUPS = {
     "machines.machineconsumable": "machine__makerspace_id",
     "machines.servicebucket": "machine__makerspace_id",
     "machines.servicerequestconsumption": "service_request__makerspace_id",
+    # Scoped through the ROLE, not the machine: a type link may point at a global
+    # built-in type that belongs to no makerspace, so the role is the only end of the
+    # row that always names a tenant.
+    "machines.rolemachinetypescope": "role__makerspace_id",
+    "machines.rolemachinescope": "role__makerspace_id",
     "bookings.booking": "space__makerspace_id",
     "presence.presencesession": "makerspace_id",
     "payments.makerspacepaymentsettings": "makerspace_id",

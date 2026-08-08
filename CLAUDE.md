@@ -836,6 +836,39 @@ Every domain entity is scoped to a `makerspace_id`. A makerspace owns its invent
 - Hardware **cannot be returned** without a return photo and a return remark/notes.
 - Issued quantity cannot exceed accepted quantity without authorized workflow permission.
 - **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`). Handover staff get a **custom role** holding the handout actions. `rbac.HANDOUT_ACTIONS` is no longer a cap on what a role may hold — `role_services._validate_actions` dropped that branch — and now only defines what counts as handover-only for `rbac.is_handout_only`, which decides how narrow the console is. A handout role issues accepted requests, creates **direct handouts** (`ISSUE_DIRECT_LOAN` is in the set, pinned by `test_guest_admin_can_create_direct_loan`), processes scoped returns, and uploads evidence — through the same evidence/QR/remark/audit workflow as staff. It still cannot accept/reject requests, edit inventory, or manage QR unless granted those actions. **Both enum members are now gone** (`makerspaces/0053` moved every remaining `role="guest_admin"` membership onto a real role row — reusing the space's untouched handover role only when its actions still equal the frozen six, else creating a collision-safe "Front Desk" role — and `0054` dropped the choice; `accounts/0009`/`0010` did the same for `User.Role.GUEST_ADMIN`). The `_MEMBERSHIP_ROLE_ACTIONS` fallback entry went with them, so `print_manager` is now the only frozen legacy string. Tests build a front-desk staffer through `tests/handout_roles.py` (`handout_role`/`grant_handout`/`make_handout_member`), whose default action set is deliberately the exact six the built-in granted — so every boundary a guest-admin test used to assert is still asserted. The `guest-admin/` **URL paths** in `hardware_requests/urls.py` are untouched: they are the handover API surface (module key `guest_handover`), not the role, and renaming them would break clients.
+- **`MANAGE_MACHINES` is scoped per role, and the scoping fails CLOSED.** `machines/role_scope.py`
+  narrows **tier 1** of `access.py` using two link tables (`RoleMachineTypeScope`,
+  `RoleMachineScope`, migration `0019`): a role holding `MANAGE_MACHINES` reaches a machine when
+  **its type is linked or the machine itself is linked** — a union, not a hierarchy, so "all
+  printers plus that one laser" needs no third concept. **No links ⇒ no machines.** Two exemptions,
+  both in `role_scope` and neither optional: a role holding `MANAGE_MAKERSPACE` covers everything
+  *including types created later* (making a space manager enumerate types to administer their own
+  lab is a worse failure than the broad grant this replaces), and a membership with a **null
+  `assigned_role`** resolves through the frozen legacy fallback, which is not a role row and has
+  nothing to link — scoping it would silently strip a legacy Machine Manager.
+  - **Two seeding paths keep it from being a regression.** Migration `0020` links every existing
+    `MANAGE_MACHINES` role to every type that existed at that moment — **types, not machines**, so
+    coverage keeps extending to hardware bought after the upgrade; freezing each role at that day's
+    fleet would make the first new printer unmanageable. And `roles.ensure_default_roles` calls
+    `role_scope.grant_builtin_type_scope` on **creation**, because the seeded Machine Manager
+    default would otherwise be born inert on every makerspace created after the upgrade — grant
+    without links, and a Machines tab that never appears. Space Manager gets no links (it is exempt;
+    rows would be dead data misrepresenting the role in the console).
+  - **Tier 2 now requires a DIRECTLY granted `managing_action`** (`role_scope.grants_directly`, and
+    its query-level twin `makerspaces_granting_directly`). This is the hole that made the whole
+    feature nearly worthless: `IMPLIED_ACTIONS[MANAGE_MACHINES]` contains `MANAGE_PRINTING`, and the
+    built-in `3d_printer` type's `managing_action` **is** `manage_printing` — so a role scoped to
+    lasers alone still satisfied the type-manager check for every 3D printer in the lab, straight
+    through tier 1's links. A real Print Manager holds `manage_printing` outright and keeps its
+    unscoped type authority; a `MANAGE_MACHINES` holder gets printer authority through tier 1, where
+    the links apply. `rbac.can` is untouched, so nothing outside `machines/` changes. The object
+    check and the list filter **must stay in step** — disagreeing is how a row lists and then 403s
+    on click, which is why `capabilities_for_machines`' `_type_mgr` carries the same check.
+  - **Tier 3 (per-machine operators) is untouched** — an operator row already names one machine.
+  - `can_create_machine` needs a **type** link specifically: a machine link granted one machine, not
+    the right to add more of its kind. `can_see_machines` requires a link too, since a tab that
+    renders an empty list and 403s on every action is worse than no tab. Resolution always ANDs the
+    makerspace, so a link written across tenants is **inert, not a leak**.
 - **`COLLECT_SERVICE_REQUEST` splits job handover out of `MANAGE_MACHINES`.** Collecting a finished machine job is a front-desk act; `MANAGE_MACHINES` is the whole machine lifecycle, so requiring it to hand someone their print forced a front-desk role to also be able to retire a printer. `IMPLIED_ACTIONS[MANAGE_MACHINES]` now includes it, which is why the split needed **no migration and caused no regression** — every Space Manager and Machine Manager already holds `MANAGE_MACHINES`. `_manageable_request(actor, pk, action)` in `views_machine_service` takes the required action per operation: **only** collect passes the narrow one; accept/reject/start/complete/fail/reprint/create keep `MANAGE_MACHINES`. A collect-only actor's queryset is narrowed to `COMPLETED` rows (`_collect_only`), so the queue, drafts and in-progress work stay invisible — the list and detail reads are allowed on the narrow action precisely so the narrowed view has something to show. The action was deliberately **not** granted to anyone by migration: widening real permissions on deployments that never asked is not a migration's job.
 - Public request submission requires an **authenticated member** (`RequestSubmitView` → `IsAuthenticated`), and request lookup is scoped to that verified identity — it never matches free-text contact fields (no enumeration by known email/phone). The anti-enumeration invariant is unchanged; since the Check-In retirement (`73a480c`) it is enforced by member auth rather than an external verify call.
 - Inventory Managers can run the full hardware lifecycle but **cannot** manage printing, staff, or makerspace settings.

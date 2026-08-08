@@ -2,9 +2,21 @@
 
 Builds on apps.accounts.rbac (which already enforces hard-hide + archived scoping).
 Three tiers:
-  1. MANAGE_MACHINES (Space Manager + Superadmin) — full control of every machine.
+  1. MANAGE_MACHINES — full control of the machines the holder's ROLE is scoped to
+     (`role_scope`), which for a space manager or superadmin is all of them.
   2. Type managers — hold a machine type's managing_action (3d_printer -> manage_printing).
   3. Per-machine operators (MachineOperator.access_level: operate/manage/full).
+
+Tier 1 used to be makerspace-wide. It is now narrowed by `role_scope`, which asks which
+machine types/machines the actor's role row was linked to and fails closed when it was
+linked to none.
+
+Tier 3 is untouched — an operator row already names one machine. Tier 2 keeps its own
+breadth (a managing_action names one type, which is narrow by construction) but now
+requires the action to be granted **directly**: `MANAGE_MACHINES` implies
+`MANAGE_PRINTING`, and the built-in 3d_printer type's managing_action is exactly that, so
+an implied grant here would have let a laser-scoped role manage every printer in the lab
+straight through tier 1's links. See `role_scope.grants_directly`.
 
 Every operator check re-verifies LIVE active membership, so a stale assignment row for a
 removed/suspended member is inert and can never become a cross-tenant or stale escalation.
@@ -13,6 +25,7 @@ from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.accounts.rbac import Action
 
+from . import role_scope
 from .models import Machine, MachineOperator, MachineType
 
 FULL = MachineOperator.AccessLevel.FULL
@@ -42,13 +55,31 @@ def operator_level(actor, machine):
 
 
 def _type_manager(actor, makerspace_id, machine_type):
+    """Tier 2, and it must key on a DIRECTLY granted managing_action.
+
+    `MANAGE_MACHINES` implies `MANAGE_PRINTING`, and the built-in 3d_printer type's
+    managing_action is exactly that — so accepting an implied grant here would let a role
+    scoped to lasers manage every printer in the lab, straight through tier 1's links.
+    """
     action = (getattr(machine_type, "managing_action", "") or "").strip()
-    return bool(action) and rbac.can(actor, action, makerspace_id)
+    if not action or not rbac.can(actor, action, makerspace_id):
+        return False
+    return role_scope.grants_directly(actor, makerspace_id, action)
 
 
 def is_machine_admin(actor, machine):
-    """Tier 1/2: MANAGE_MACHINES or the machine type's manager (e.g. Print Manager)."""
-    return can_create_machine(actor, machine.makerspace_id, machine.machine_type)
+    """Tier 1/2: in-scope MANAGE_MACHINES, or the machine type's manager.
+
+    Not expressed via `can_create_machine` any more: creating needs a **type** link (there
+    is no machine yet to name), while administering an existing machine is also satisfied
+    by a per-machine link. Collapsing the two would make a machine-linked role unable to
+    touch the very machine it was linked to.
+    """
+    if rbac.can(actor, Action.MANAGE_MACHINES, machine.makerspace_id) and (
+        role_scope.covers_machine(actor, machine)
+    ):
+        return True
+    return _type_manager(actor, machine.makerspace_id, machine.machine_type)
 
 
 def is_full_operator(actor, machine):
@@ -58,7 +89,13 @@ def is_full_operator(actor, machine):
 # --- Roster (create) ---------------------------------------------------------
 
 def can_create_machine(actor, makerspace_id, machine_type):
-    if rbac.can(actor, Action.MANAGE_MACHINES, makerspace_id):
+    """Registering a machine needs a TYPE link — a per-machine link cannot authorize it.
+
+    A machine-scoped role was given one machine, not the right to add more of its kind.
+    """
+    if rbac.can(actor, Action.MANAGE_MACHINES, makerspace_id) and (
+        role_scope.covers_type(actor, makerspace_id, machine_type)
+    ):
         return True
     return _type_manager(actor, makerspace_id, machine_type)
 
@@ -131,6 +168,10 @@ def capabilities_for_machines(actor, machines):
         MachineOperator.objects.filter(machine__in=machines, user=actor)
         .values_list("machine_id", "access_level")
     )
+    # Resolved once for the whole batch. Per-machine now (a role can be scoped to some of
+    # a makerspace's machines), so it cannot be memoized by makerspace like the rest —
+    # but the lookup it feeds is pure, so this stays two queries for any fleet size.
+    scopes = role_scope.manage_scopes_for(actor, {m.makerspace_id for m in machines})
     manage_cache, type_cache, member_cache = {}, {}, {}
 
     def _manage(ms_id):
@@ -144,7 +185,12 @@ def capabilities_for_machines(actor, machines):
             return False
         key = (ms_id, action)
         if key not in type_cache:
-            type_cache[key] = rbac.can(actor, action, ms_id)
+            # Must match `_type_manager` exactly, direct-grant check included: the bulk
+            # path feeds the list view's per-row capability flags, and the two disagreeing
+            # is how a button renders enabled and then 403s.
+            type_cache[key] = rbac.can(actor, action, ms_id) and (
+                role_scope.grants_directly(actor, ms_id, action)
+            )
         return type_cache[key]
 
     def _member(ms_id):
@@ -155,7 +201,10 @@ def capabilities_for_machines(actor, machines):
     result = {}
     for machine in machines:
         ms_id = machine.makerspace_id
-        admin = _manage(ms_id) or _type_mgr(
+        in_scope = _manage(ms_id) and role_scope.scope_covers_machine(
+            scopes.get(ms_id, role_scope.NOTHING), machine
+        )
+        admin = in_scope or _type_mgr(
             ms_id, getattr(machine.machine_type, "managing_action", "")
         )
         level = op_levels.get(machine.pk) if _member(ms_id) else None
@@ -201,10 +250,15 @@ def scope_machines_for_actor(actor, queryset):
     if manage_scope is rbac.ALL:
         return queryset  # global superadmin (no hidden/archived) — unrestricted
 
-    q = Q(makerspace_id__in=manage_scope) if manage_scope else Q(pk__in=[])
+    # Was `Q(makerspace_id__in=manage_scope)`: holding MANAGE_MACHINES listed every machine
+    # in the space. Now the grant only reaches the linked types/machines, resolved at query
+    # level so a scoped list stays one query.
+    q = role_scope.scoped_q(actor, manage_scope) if manage_scope else Q(pk__in=[])
 
     for action in _managing_actions():
-        tscope = rbac.makerspaces_for_action(actor, action)
+        # Direct grants only -- see `role_scope.makerspaces_granting_directly`. Using the
+        # implication-expanding scope here would list every printer to a laser-scoped role.
+        tscope = role_scope.makerspaces_granting_directly(actor, action)
         if tscope is rbac.ALL:
             q |= Q(machine_type__managing_action=action)
         elif tscope:
@@ -238,9 +292,9 @@ def scope_manageable_machines_for_actor(actor, queryset):
     if manage_scope is rbac.ALL:
         return queryset
 
-    q = Q(makerspace_id__in=manage_scope) if manage_scope else Q(pk__in=[])
+    q = role_scope.scoped_q(actor, manage_scope) if manage_scope else Q(pk__in=[])
     for action in _managing_actions():
-        type_scope = rbac.makerspaces_for_action(actor, action)
+        type_scope = role_scope.makerspaces_granting_directly(actor, action)
         if type_scope is rbac.ALL:
             q |= Q(machine_type__managing_action=action)
         elif type_scope:
@@ -267,11 +321,20 @@ def scope_manageable_machines_for_actor(actor, queryset):
 
 
 def can_see_machines(actor, makerspace_id):
-    """Server-derived capability for the Machines tab within one makerspace."""
+    """Server-derived capability for the Machines tab within one makerspace.
+
+    A MANAGE_MACHINES holder whose role is scoped to nothing must not get the tab: it
+    would render an always-empty list and every action inside it would 403. Holding a
+    link is what earns the tab, not holding the action.
+    """
     if rbac.can(actor, Action.MANAGE_MACHINES, makerspace_id):
-        return True
+        scope = role_scope.manage_scope_for(actor, makerspace_id)
+        if scope is role_scope.EXEMPT or any(scope):
+            return True
     for action in _managing_actions():
-        if rbac.can(actor, action, makerspace_id):
+        if rbac.can(actor, action, makerspace_id) and role_scope.grants_directly(
+            actor, makerspace_id, action
+        ):
             return True
     if is_active_member(actor, makerspace_id):
         return MachineOperator.objects.filter(
