@@ -22,6 +22,13 @@ envVarGroups:
         value: "true"
       - key: TRUST_X_FORWARDED_PROTO
         value: "true"
+      # Render terminates TLS at its own edge proxy and appends the client to
+      # X-Forwarded-For, so exactly one proxy is trusted. Unset, DRF falls back to
+      # legacy behaviour and keys throttles on REMOTE_ADDR -- which here is Render's
+      # proxy, so every user in the world shares one rate-limit bucket. Raise this only
+      # if a CDN is put in front of Render.
+      - key: TRUSTED_PROXY_COUNT
+        value: "1"
       - key: SECURE_HSTS_SECONDS
         value: "0"
       - key: DATABASE_URL

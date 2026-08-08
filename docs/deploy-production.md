@@ -100,6 +100,15 @@ Phase 3 email delivery uses Redis + a Celery worker, so the production baseline 
 includes that paid Redis/worker capacity. The Django web service only records the
 email log and enqueues delivery; the worker performs SMTP delivery and retries.
 
+This blueprint deploys a **single-tenant, self-hosted** instance, which is what almost
+everyone wants. Multi-tenant managed hosting — tenant subdomains under a platform domain,
+tenant self-serve custom domains, fair-use resource limits — is a separate blueprint at
+`deploy/render.managed.yaml`, and you have to point Render at it deliberately. The two are
+kept apart because managed mode is dormant by default and must stay that way: it turns on
+when `PLATFORM_DOMAIN_SUFFIX` is non-blank, so an optional variable in this file would put
+a live switch one stray value away from a self-hosted deployment, and the failure is quiet
+— you would start handing tenants subdomains of a domain you may not control.
+
 You can also put the same Vite build on Cloudflare Pages or Netlify and set its
 runtime `config.js` `apiUrl` or `VITE_API_URL` to the backend API root.
 

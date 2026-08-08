@@ -1,4 +1,6 @@
+import re
 from io import StringIO
+from pathlib import Path
 
 import pytest
 from django.core.management import call_command
@@ -11,6 +13,8 @@ from apps.updates.models import PlatformUpdateSettings
 from tests.return_helpers import authenticated_client, make_user
 
 pytestmark = pytest.mark.django_db
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 def superadmin(name="updates-superadmin"):
@@ -128,3 +132,143 @@ def test_update_control_command_enables_and_claims_updates():
     assert settings.automatic_updates_enabled is True
     assert settings.status == PlatformUpdateSettings.Status.RUNNING
     assert output.getvalue().splitlines() == ["on", "run"]
+
+
+# --------------------------------------------------------------------------
+# The failure leg, and the recovery from it (plan Track D, phase 15).
+# --------------------------------------------------------------------------
+
+def test_a_failed_update_is_recorded_and_leaves_no_target_behind():
+    """A half-finished update must not read as one still in progress.
+
+    `target_version` is what the host updater acts on, so a failure that left it set
+    would describe a release the deployment is not running and is not moving towards.
+    """
+    services.claim_update(
+        current_version="0.5.0-main.1.aaaaaaaaaaaa",
+        available_version="0.5.0-main.2.bbbbbbbbbbbb",
+        force=True,
+    )
+
+    services.fail_update("  migrate exited 1: relation already exists  ")
+    settings = PlatformUpdateSettings.load()
+
+    assert settings.status == PlatformUpdateSettings.Status.FAILED
+    assert settings.target_version == ""
+    assert settings.last_error == "migrate exited 1: relation already exists"
+    assert settings.current_version == "0.5.0-main.1.aaaaaaaaaaaa"
+
+
+def test_a_failure_message_cannot_grow_without_bound():
+    """The updater pipes real stderr in, and this row is rendered in the console."""
+    services.fail_update("x" * 5000)
+
+    assert len(PlatformUpdateSettings.load().last_error) == 500
+
+
+def test_a_failed_update_can_be_retried_and_the_error_is_cleared():
+    """FAILED is a resting state, not a dead end: queueing again must be enough."""
+    services.fail_update("network unreachable")
+
+    services.queue_update()
+    queued = PlatformUpdateSettings.load()
+    assert queued.status == PlatformUpdateSettings.Status.QUEUED
+    assert queued.last_error == ""
+
+    assert services.claim_update(
+        current_version="0.5.0-main.1.aaaaaaaaaaaa",
+        available_version="0.5.0-main.2.bbbbbbbbbbbb",
+    ) is True
+    assert PlatformUpdateSettings.load().status == PlatformUpdateSettings.Status.RUNNING
+
+
+def test_the_host_updater_round_trip_runs_entirely_through_the_command():
+    """The full sequence scripts/update.sh drives: claim, back up, then fail or finish.
+
+    Every transition has to be reachable from the CLI, because the privileged host
+    updater is the only thing allowed to drive them -- see the Docker-socket tests below.
+    """
+    output = StringIO()
+    for args in (
+        ("claim", "--current=0.5.0-main.1.aaaaaaaaaaaa",
+         "--available=0.5.0-main.2.bbbbbbbbbbbb", "--force"),
+        ("record-backup", "--name=/var/backups/pre-update-20260808T100000Z.sql.gz"),
+        ("fail", "--message=compose up exited 1"),
+    ):
+        call_command("update_control", *args, stdout=output)
+
+    failed = PlatformUpdateSettings.load()
+    assert failed.status == PlatformUpdateSettings.Status.FAILED
+    assert failed.last_backup_name == "pre-update-20260808T100000Z.sql.gz"
+
+    call_command("update_control", "complete", "--version=0.5.0-main.2.bbbbbbbbbbbb", stdout=output)
+    finished = PlatformUpdateSettings.load()
+
+    assert finished.status == PlatformUpdateSettings.Status.IDLE
+    assert finished.current_version == "0.5.0-main.2.bbbbbbbbbbbb"
+    assert finished.last_error == ""
+    assert output.getvalue().splitlines() == ["run", "recorded", "failed", "complete"]
+
+
+# --------------------------------------------------------------------------
+# The privilege boundary: the web process never gets the Docker socket.
+# --------------------------------------------------------------------------
+#
+# This is the reason the update path is split in two at all. Restarting containers means
+# talking to the Docker daemon, and the daemon socket is root-equivalent on the host: a
+# container holding it can start a privileged container mounting `/`. So the web process,
+# which is the part exposed to the internet, only ever writes rows -- `update_control`
+# turns those rows into actions from a privileged *host* script that was never reachable
+# from a request. An RCE in Django then buys the attacker the database, which is bad, and
+# not the host, which is worse.
+#
+# These guard the shape of that split rather than any one line of it, because the tempting
+# regression is small and looks helpful: mounting the socket "just for the updater", or
+# shelling out to `docker compose restart` from a view to save the operator a step.
+
+def _compose_files():
+    return sorted(REPO_ROOT.glob("docker-compose*.yml"))
+
+
+def test_no_compose_file_hands_a_django_service_the_docker_socket():
+    offenders = [
+        path.name
+        for path in _compose_files()
+        if "docker.sock" in path.read_text(encoding="utf-8-sig")
+    ]
+
+    assert not offenders, (
+        f"{offenders} mount the Docker daemon socket. It is root-equivalent on the host, "
+        f"so a container holding it can escape to the host -- which is why updates are "
+        f"applied by scripts/update.sh and the web process only records state."
+    )
+
+
+def test_the_web_process_never_shells_out_to_docker():
+    """The application may describe an update; only the host script may perform one."""
+    docker_call = re.compile(r"""["']docker\b|\bdocker\s+compose\b|docker_client|from\s+docker\b""")
+    offenders, scanned = [], 0
+    for path in (REPO_ROOT / "backend" / "apps").rglob("*.py"):
+        if any(part in {"__pycache__", "migrations"} for part in path.parts):
+            continue
+        scanned += 1
+        if docker_call.search(path.read_text(encoding="utf-8-sig")):
+            offenders.append(str(path.relative_to(REPO_ROOT)))
+
+    assert scanned > 100, f"only scanned {scanned} files -- the walk is not finding apps/"
+    assert docker_call.search("subprocess.run(['docker', 'compose', 'up'])"), (
+        "the pattern no longer recognises a docker invocation, so this test proves nothing"
+    )
+    assert not offenders, (
+        f"{offenders} invoke Docker from application code. The web process has no socket "
+        f"to reach it with, so this cannot work in a real deployment even if it passes "
+        f"locally -- put the action in scripts/update.* and drive it from update_control."
+    )
+
+
+def test_the_host_script_is_the_thing_that_drives_docker():
+    """The negative tests above are only meaningful if the work happens somewhere."""
+    script = (REPO_ROOT / "scripts" / "update.sh").read_text(encoding="utf-8-sig")
+
+    assert "docker compose" in script
+    assert "update_control" in script

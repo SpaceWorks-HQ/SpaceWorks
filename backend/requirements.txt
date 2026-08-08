@@ -7,6 +7,11 @@ django-cors-headers>=4.9
 django-axes>=8,<9
 django-csp>=4,<5
 drf-spectacular>=0.30
+# Pinned explicitly although drf-spectacular already requires it: `spectacular
+# --format openapi-yaml` needs it, and so does the deploy-manifest drift guard in
+# tests/test_env_surface_drift.py. A direct use deserves a direct pin -- otherwise the
+# day drf-spectacular drops the dependency, an unrelated upgrade breaks both.
+PyYAML>=6,<7
 gunicorn>=23
 pytest>=9
 pytest-django>=4.12

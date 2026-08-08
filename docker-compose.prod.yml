@@ -114,6 +114,11 @@ services:
       # set it true only when a TLS proxy forwards X-Forwarded-Proto: https.
       ENABLE_HTTPS: ${ENABLE_HTTPS:-false}
       TRUST_X_FORWARDED_PROTO: ${TRUST_X_FORWARDED_PROTO:-false}
+      # The nginx frontend container is the one proxy in front of gunicorn, and it
+      # appends the client to X-Forwarded-For. Unset, DRF keys throttles on REMOTE_ADDR,
+      # which is nginx -- so every user shares one rate-limit bucket. Set this to 2 if a
+      # TLS proxy (Caddy, Traefik, a cloud load balancer) is put in front of nginx.
+      TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-1}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
       AXES_FAILURE_LIMIT: ${AXES_FAILURE_LIMIT:-5}
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}

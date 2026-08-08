@@ -1,0 +1,201 @@
+# Render Blueprint for MANAGED multi-tenant hosting (plan Track D, phase 15).
+#
+# This is deliberately a separate file from the repository root's `render.yaml`, which is
+# and stays the lean self-host blueprint. Render reads `render.yaml` at the repo root by
+# default, so a self-hoster who points Render at this project gets the single-tenant
+# deployment without having to delete anything. To deploy managed hosting instead, point
+# the Blueprint at this file explicitly.
+#
+# The split exists because managed mode is dormant-by-default and must remain so.
+# `PLATFORM_DOMAIN_SUFFIX` blank or whitespace makes `domain_verification.is_self_host()`
+# true, and every managed feature -- subdomain provisioning, tenant self-serve custom
+# domains, fair-use resource limits, the origin resolution gate -- is inert. Merging the
+# managed variables into the root blueprint as "optional" would put a live switch one
+# accidental value away from a self-hosted deployment, and the failure is not loud: a
+# self-hoster who set the suffix would start handing tenants subdomains of a domain they
+# do not own.
+#
+# Everything the self-host blueprint sets applies here too. Only the differences are
+# spelled out below; keep the two in step when the shared surface changes.
+
+envVarGroups:
+  - name: spaceworks-managed
+    envVars:
+      # ---- the switch that turns managed mode on ----
+      # The suffix tenants get subdomains under, e.g. ".space-works.tech". Normalised to
+      # the leading-dot lowercase form by settings.normalize_platform_domain_suffix; the
+      # leading dot is what makes endswith() reject look-alikes such as evilspace-works.tech.
+      # Blank here would make this blueprint identical to the self-host one.
+      - key: PLATFORM_DOMAIN_SUFFIX
+        sync: false
+      # Host that terminates TLS for tenant custom domains and asks the backend whether a
+      # certificate may be issued (see deploy/Caddyfile.saas). Blank leaves the resolution
+      # gate dormant.
+      - key: PLATFORM_ORIGIN_HOST
+        sync: false
+      # Staff origins trusted process-wide, in addition to each tenant's VERIFIED
+      # frontend_domain. Process-global on purpose: this list can mint staff sessions, so
+      # it is superadmin territory and never tenant-writable.
+      - key: PLATFORM_STAFF_ORIGINS
+        sync: false
+      # One shared instance serves every tenant behind Render's proxy, so the backend must
+      # accept the Host header of any provisioned subdomain or verified custom domain.
+      # Tenant resolution is done by apps.makerspaces.origin_scope, not by ALLOWED_HOSTS.
+      - key: BEHIND_TRUSTED_PROXY
+        value: "True"
+      # Minimum interval between a tenant changing its custom domain. 0 (the self-host
+      # default) is fine for one operator and is an abuse vector across many tenants.
+      - key: DOMAIN_CHANGE_COOLDOWN_SECONDS
+        value: "86400"
+      # Return URI for the platform Stripe Connect onboarding flow. Managed tenants
+      # resolve payments through Connect rather than holding raw Stripe credentials.
+      - key: STRIPE_CONNECT_REDIRECT_URI
+        sync: false
+
+      # ---- shared with the self-host blueprint ----
+      - key: SECRET_KEY
+        sync: false
+      - key: API_CLIENT_ENC_KEY
+        sync: false
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: ENABLE_HTTPS
+        value: "true"
+      - key: TRUST_X_FORWARDED_PROTO
+        value: "true"
+      # See render.yaml: Render's edge proxy is the one trusted hop. Getting this wrong
+      # matters more here than on a single-tenant box, because one throttle bucket shared
+      # across every tenant is a cross-tenant denial of service.
+      - key: TRUSTED_PROXY_COUNT
+        value: "1"
+      - key: SECURE_HSTS_SECONDS
+        value: "0"
+      - key: DATABASE_URL
+        sync: false
+      - key: MANAGED_POSTGRES
+        value: "True"
+      - key: CONN_MAX_AGE
+        value: "0"
+      - key: DISABLE_SERVER_SIDE_CURSORS
+        value: "True"
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false
+      - key: AWS_S3_PUBLIC_ENDPOINT_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_S3_REGION_NAME
+        value: auto
+      - key: STORAGE_PRESIGN_METHOD
+        value: put
+      - key: EMAIL_BACKEND
+        sync: false
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: PUBLIC_APP_BASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+
+services:
+  - type: redis
+    name: spaceworks-managed-redis
+    plan: starter
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+  - type: web
+    name: spaceworks-managed-backend
+    env: docker
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/health/readiness/
+    # Same reasoning as the self-host blueprint: collectstatic runs at START so the
+    # populated STATIC_ROOT lives in the container that serves traffic, and migrations
+    # stay a one-off against the direct/session pooler.
+    startCommand: python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    envVars:
+      - fromGroup: spaceworks-managed
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: spaceworks-managed-redis
+          property: connectionString
+
+  - type: worker
+    name: spaceworks-managed-worker
+    env: docker
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: celery -A config worker -l info
+    envVars:
+      - fromGroup: spaceworks-managed
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: spaceworks-managed-redis
+          property: connectionString
+
+  - type: worker
+    name: spaceworks-managed-beat
+    env: docker
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    # Explicit --schedule: beat otherwise drops its shelve in the CWD, and /app is not
+    # writable after the image drops to the unprivileged uid.
+    dockerCommand: celery -A config beat -l info --schedule /var/lib/celery/celerybeat-schedule
+    envVars:
+      - fromGroup: spaceworks-managed
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: spaceworks-managed-redis
+          property: connectionString
+
+  - type: web
+    name: spaceworks-managed-frontend
+    env: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      # Build-time and baked into the bundle by Vite, so sync:false makes Render prompt
+      # rather than ship a placeholder. Set it to https://<backend-host>/api .
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_TENANT_TOKEN
+        sync: false
+      - key: VITE_PUBLIC_API_KEY
+        sync: false
+      - key: VITE_PUBLIC_CLIENT_ID
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
