@@ -2,6 +2,13 @@ from django.conf import settings
 from django.db import models
 
 from apps.integrations.email_templates_registry import validate_email_template_strings
+from apps.integrations.notification_enums import (
+    CHANNEL_MODULE_KEYS,
+    NonEmailNotificationChannel,
+    NotificationChannel,
+    NotificationDeliveryStatus,
+    NotificationFeature,
+)
 from apps.makerspaces.secrets import decrypt_value, encrypt_value
 from apps.encryption.mappers import ScopedPiiModelMixin
 
@@ -176,60 +183,6 @@ class EmailNotificationMute(models.Model):
         return f"{self.makerspace}:{self.target}:{self.stream}/{self.event} muted"
 
 
-class NotificationFeature(models.TextChoices):
-    HARDWARE_REQUESTS = "hardware_requests", "Hardware requests"
-    PRINTING = "printing", "Printing"
-    EVENTS = "events", "Events"
-    BOOKINGS = "bookings", "Bookings"
-    MAINTENANCE = "maintenance", "Maintenance"
-    MEMBERS = "members", "Members"
-
-
-class NotificationChannel(models.TextChoices):
-    EMAIL = "email", "Email"
-    TELEGRAM = "telegram", "Telegram"
-    SLACK = "slack", "Slack"
-    MATTERMOST = "mattermost", "Mattermost"
-    DISCORD = "discord", "Discord"
-    NATIVE_PUSH = "native_push", "Native push"
-
-
-class NonEmailNotificationChannel(models.TextChoices):
-    TELEGRAM = "telegram", "Telegram"
-    SLACK = "slack", "Slack"
-    MATTERMOST = "mattermost", "Mattermost"
-    DISCORD = "discord", "Discord"
-    NATIVE_PUSH = "native_push", "Native push"
-
-
-# Chat channels gated by a same-named module key.
-#
-# Two absences are deliberate. `native_push` is governed by the standalone `mobile.push`
-# feature switch, not a module. And `email` is NOT here even though an `email` module key
-# exists: some messages send regardless of it (`dispatch.EMAIL_MODULE_EXEMPT` covers
-# password reset, email verification and the return reminder), so treating email as
-# "gone when the module is off" would hide the matrix column while mail was still going
-# out — overstating what the toggle does. Tenant email is gated by
-# `dispatch.email_module_blocks`, which knows about the exemptions; this table does not.
-CHANNEL_MODULE_KEYS = {
-    "telegram": "telegram",
-    "slack": "slack",
-    "mattermost": "mattermost",
-    "discord": "discord",
-}
-
-
-class NotificationDeliveryStatus(models.TextChoices):
-    PENDING = "pending", "Pending"
-    SENDING = "sending", "Sending"
-    SENT = "sent", "Sent"
-    FAILED = "failed", "Failed"
-    # Terminal, and neither a delivery nor a failure: the makerspace has this channel's
-    # module uninstalled. Recorded rather than dropped so an operator can see what the
-    # toggle suppressed -- the same contract as EmailLog.Status.SKIPPED.
-    SKIPPED = "skipped", "Skipped"
-
-
 class NotificationPreference(models.Model):
     """Per-makerspace (feature, channel) on/off cell. Additive — absence means the
     catalog default; it never alters EmailNotificationMute's exact-row semantics."""
@@ -338,6 +291,10 @@ class DailyNotificationCounter(models.Model):
 
 
 from apps.integrations.models_push import PlatformPushSettings, PushDevice  # noqa: E402
+from apps.integrations.models_recipients import (  # noqa: E402
+    NotificationRecipient,
+    NotificationRecipientKind,
+)
 from apps.integrations.models_sms import (  # noqa: E402
     DailyOtpSmsCounter,
     PlatformSmsSettings,
@@ -345,6 +302,7 @@ from apps.integrations.models_sms import (  # noqa: E402
 )
 
 __all__ = [
+    'CHANNEL_MODULE_KEYS',
     'DailyEmailCounter',
     'DailyNotificationCounter',
     'DailyOtpSmsCounter',
@@ -357,6 +315,8 @@ __all__ = [
     'NotificationDeliveryStatus',
     'NotificationFeature',
     'NotificationPreference',
+    'NotificationRecipient',
+    'NotificationRecipientKind',
     'PlatformEmailSettings',
     'PlatformPushSettings',
     'PlatformSmsSettings',
