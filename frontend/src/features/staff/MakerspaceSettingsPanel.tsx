@@ -17,7 +17,9 @@ import { MakerspaceMembershipSettings } from "./MakerspaceMembershipSettings";
 import { MakerspacePaymentSettings } from "./MakerspacePaymentSettings";
 import { MakerspaceSubdomainSettings } from "./MakerspaceSubdomainSettings";
 import { MakerspaceWebhookSettings } from "./MakerspaceWebhookSettings";
+import { NotificationDestinations } from "./NotificationDestinations";
 import { NotificationMuteMatrix } from "./NotificationMuteMatrix";
+import { NotificationRecipientPicker } from "./NotificationRecipientPicker";
 import { Panel, type Makerspace, useStaffGet } from "./StaffPanels";
 
 type Props = {
@@ -261,6 +263,11 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin }: Props) {
         <div className="min-w-0 rounded-md border border-line bg-bg p-4">
           <h3 className="text-base font-semibold text-ink">Notification channels</h3>
           <NotificationMuteMatrix makerspaceId={makerspace.id} />
+          <NotificationRecipientPicker makerspaceId={makerspace.id} />
+          <NotificationDestinations
+            availableChannels={enabledModules}
+            makerspaceId={makerspace.id}
+          />
         </div>
       </div>
     </Panel>

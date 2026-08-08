@@ -11232,6 +11232,284 @@
                 }
             }
         },
+        "/api/v1/admin/makerspace/{makerspace_id}/notification-destinations": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_notification_destinations_list",
+                "summary": "List or create chat notification destinations",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Makerspaces"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/NotificationDestination"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspace_notification_destinations_create",
+                "summary": "List or create chat notification destinations",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Makerspaces"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NotificationDestinationWrite"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NotificationDestinationWrite"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NotificationDestinationWrite"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotificationDestination"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid destination."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/notification-destinations/{destination_id}": {
+            "put": {
+                "operationId": "api_v1_admin_makerspace_notification_destinations_update",
+                "summary": "Update or delete a chat notification destination",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "destination_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Makerspaces"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NotificationDestinationWrite"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NotificationDestinationWrite"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NotificationDestinationWrite"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotificationDestination"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid destination."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "api_v1_admin_makerspace_notification_destinations_destroy",
+                "summary": "Update or delete a chat notification destination",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "destination_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Makerspaces"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Destination removed."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/notification-recipient-rules": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_notification_recipient_rules_retrieve",
+                "summary": "Read or replace per-event notification recipients",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Makerspaces"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Recipient selection."
+                    }
+                }
+            },
+            "put": {
+                "operationId": "api_v1_admin_makerspace_notification_recipient_rules_update",
+                "description": "Replace the whole selection for ONE (feature, event).\n\nReplace rather than merge, for the same reason the machine-scope editor does:\nwith a merge there is no way to untick the last recipient, and an empty list has\nto mean \"nobody selected\" rather than \"no change\". Deleting every rule for a\n(feature, event) returns it to the action-based default (D3).",
+                "summary": "Read or replace per-event notification recipients",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Makerspaces"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecipientRulesPut"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecipientRulesPut"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecipientRulesPut"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Recipient selection."
+                    },
+                    "400": {
+                        "description": "Invalid recipient rule."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspace/{makerspace_id}/notification-recipients": {
             "get": {
                 "operationId": "api_v1_admin_makerspace_notification_recipients_list",
@@ -28433,7 +28711,17 @@
                     "detail"
                 ]
             },
-            "ChannelEnum": {
+            "Channel7a7Enum": {
+                "enum": [
+                    "telegram",
+                    "slack",
+                    "mattermost",
+                    "discord"
+                ],
+                "type": "string",
+                "description": "* `telegram` - Telegram\n* `slack` - Slack\n* `mattermost` - Mattermost\n* `discord` - Discord"
+            },
+            "ChannelCbbEnum": {
                 "enum": [
                     "email",
                     "telegram",
@@ -28896,6 +29184,29 @@
                 ],
                 "type": "string",
                 "description": "* `web` - Web\n* `device` - Device"
+            },
+            "DestinationScope": {
+                "type": "object",
+                "properties": {
+                    "machine_type_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "machine_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "category_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    }
+                }
             },
             "DeviceChallengeResponse": {
                 "type": "object",
@@ -30380,7 +30691,7 @@
                     "maintenance_total_cost"
                 ]
             },
-            "FeatureEnum": {
+            "FeatureD07Enum": {
                 "enum": [
                     "hardware_requests",
                     "printing",
@@ -34816,6 +35127,96 @@
                     "label"
                 ]
             },
+            "NotificationDestination": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "channel": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Channel7a7Enum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "label": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "telegram_chat_id": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "credential_set": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "scope": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "channel",
+                    "created_at",
+                    "credential_set",
+                    "id",
+                    "is_active",
+                    "label",
+                    "scope",
+                    "telegram_chat_id",
+                    "updated_at"
+                ]
+            },
+            "NotificationDestinationWrite": {
+                "type": "object",
+                "properties": {
+                    "channel": {
+                        "$ref": "#/components/schemas/Channel7a7Enum"
+                    },
+                    "label": {
+                        "type": "string",
+                        "maxLength": 80
+                    },
+                    "webhook_url": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "maxLength": 2000
+                    },
+                    "telegram_chat_id": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "scope": {
+                        "$ref": "#/components/schemas/DestinationScope"
+                    }
+                },
+                "required": [
+                    "channel",
+                    "label"
+                ]
+            },
             "NotificationFeature": {
                 "type": "object",
                 "properties": {
@@ -34853,10 +35254,10 @@
                 "type": "object",
                 "properties": {
                     "feature": {
-                        "$ref": "#/components/schemas/FeatureEnum"
+                        "$ref": "#/components/schemas/FeatureD07Enum"
                     },
                     "channel": {
-                        "$ref": "#/components/schemas/ChannelEnum"
+                        "$ref": "#/components/schemas/ChannelCbbEnum"
                     },
                     "enabled": {
                         "type": "boolean"
@@ -34884,10 +35285,10 @@
                 "type": "object",
                 "properties": {
                     "feature": {
-                        "$ref": "#/components/schemas/FeatureEnum"
+                        "$ref": "#/components/schemas/FeatureD07Enum"
                     },
                     "channel": {
-                        "$ref": "#/components/schemas/ChannelEnum"
+                        "$ref": "#/components/schemas/ChannelCbbEnum"
                     },
                     "enabled": {
                         "type": "boolean"
@@ -40358,6 +40759,94 @@
                     "product_name",
                     "total_quantity"
                 ]
+            },
+            "RecipientRule": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "$ref": "#/components/schemas/RecipientRuleKindEnum"
+                    },
+                    "role_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "user_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "scope": {
+                        "$ref": "#/components/schemas/RecipientScope"
+                    }
+                },
+                "required": [
+                    "kind"
+                ]
+            },
+            "RecipientRuleKindEnum": {
+                "enum": [
+                    "role",
+                    "requester",
+                    "members",
+                    "user"
+                ],
+                "type": "string",
+                "description": "* `role` - Role\n* `requester` - Requester\n* `members` - All members\n* `user` - Named user"
+            },
+            "RecipientRulesPut": {
+                "type": "object",
+                "properties": {
+                    "feature": {
+                        "$ref": "#/components/schemas/RecipientRulesPutFeatureEnum"
+                    },
+                    "event": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "rules": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RecipientRule"
+                        }
+                    }
+                },
+                "required": [
+                    "event",
+                    "feature",
+                    "rules"
+                ]
+            },
+            "RecipientRulesPutFeatureEnum": {
+                "enum": [
+                    "bookings",
+                    "events",
+                    "maintenance",
+                    "members"
+                ],
+                "type": "string",
+                "description": "* `bookings` - bookings\n* `events` - events\n* `maintenance` - maintenance\n* `members` - members"
+            },
+            "RecipientScope": {
+                "type": "object",
+                "properties": {
+                    "machine_type_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "machine_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "category_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    }
+                }
             },
             "ReferralCreate": {
                 "type": "object",

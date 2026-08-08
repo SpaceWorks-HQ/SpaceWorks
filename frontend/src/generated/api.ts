@@ -201,6 +201,9 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/machine-types/{id}",
   "/api/v1/admin/makerspace/{makerspace_id}/machines",
   "/api/v1/admin/makerspace/{makerspace_id}/membership-invitations",
+  "/api/v1/admin/makerspace/{makerspace_id}/notification-destinations",
+  "/api/v1/admin/makerspace/{makerspace_id}/notification-destinations/{destination_id}",
+  "/api/v1/admin/makerspace/{makerspace_id}/notification-recipient-rules",
   "/api/v1/admin/makerspace/{makerspace_id}/notification-recipients",
   "/api/v1/admin/makerspace/{makerspace_id}/notification-rules",
   "/api/v1/admin/makerspace/{makerspace_id}/payment-settings",
@@ -855,7 +858,9 @@ export type ChangePasswordResponse = {
   "detail": string;
 };
 
-export type ChannelEnum = "email" | "telegram" | "slack" | "mattermost" | "discord" | "native_push";
+export type Channel7a7Enum = "telegram" | "slack" | "mattermost" | "discord";
+
+export type ChannelCbbEnum = "email" | "telegram" | "slack" | "mattermost" | "discord" | "native_push";
 
 export type CheckoutUrl = {
   "checkout_url": string;
@@ -984,6 +989,12 @@ export type Dashboard = {
 };
 
 export type DeliveryEnum = "web" | "device";
+
+export type DestinationScope = {
+  "machine_type_ids"?: Array<number>;
+  "machine_ids"?: Array<number>;
+  "category_ids"?: Array<number>;
+};
 
 export type DeviceChallengeResponse = {
   "challenge": string;
@@ -1353,7 +1364,7 @@ export type FabLabHealthRow = {
   "maintenance_overdue_schedules": number | null;
 };
 
-export type FeatureEnum = "hardware_requests" | "printing" | "events" | "bookings" | "maintenance" | "members";
+export type FeatureD07Enum = "hardware_requests" | "printing" | "events" | "bookings" | "maintenance" | "members";
 
 export type ForgotPasswordRequest = {
   "email": string;
@@ -2425,6 +2436,27 @@ export type NotificationChannel = {
   "label": string;
 };
 
+export type NotificationDestination = {
+  "id": number;
+  "channel": Channel7a7Enum;
+  "label": string;
+  "telegram_chat_id": string;
+  "is_active": boolean;
+  "credential_set": string;
+  "scope": string;
+  "created_at": string;
+  "updated_at": string;
+};
+
+export type NotificationDestinationWrite = {
+  "channel": Channel7a7Enum;
+  "label": string;
+  "webhook_url"?: string;
+  "telegram_chat_id"?: string;
+  "is_active"?: boolean;
+  "scope"?: DestinationScope;
+};
+
 export type NotificationFeature = {
   "key": KeyD07Enum;
   "label": string;
@@ -2436,8 +2468,8 @@ export type NotificationMarkAllRead = {
 };
 
 export type NotificationPreferenceCell = {
-  "feature": FeatureEnum;
-  "channel": ChannelEnum;
+  "feature": FeatureD07Enum;
+  "channel": ChannelCbbEnum;
   "enabled": boolean;
   "source": NotificationPreferenceCellSourceEnum;
 };
@@ -2445,8 +2477,8 @@ export type NotificationPreferenceCell = {
 export type NotificationPreferenceCellSourceEnum = "default" | "override";
 
 export type NotificationPreferenceChange = {
-  "feature": FeatureEnum;
-  "channel": ChannelEnum;
+  "feature": FeatureD07Enum;
+  "channel": ChannelCbbEnum;
   "enabled": boolean;
 };
 
@@ -3812,6 +3844,29 @@ export type RecentlyAddedReportRow = {
   "product_name": string;
   "created_at": string;
   "total_quantity": number;
+};
+
+export type RecipientRule = {
+  "kind": RecipientRuleKindEnum;
+  "role_id"?: number | null;
+  "user_id"?: number | null;
+  "scope"?: RecipientScope;
+};
+
+export type RecipientRuleKindEnum = "role" | "requester" | "members" | "user";
+
+export type RecipientRulesPut = {
+  "feature": RecipientRulesPutFeatureEnum;
+  "event": string;
+  "rules": Array<RecipientRule>;
+};
+
+export type RecipientRulesPutFeatureEnum = "bookings" | "events" | "maintenance" | "members";
+
+export type RecipientScope = {
+  "machine_type_ids"?: Array<number>;
+  "machine_ids"?: Array<number>;
+  "category_ids"?: Array<number>;
 };
 
 export type ReferralCreate = {

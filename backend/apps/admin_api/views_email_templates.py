@@ -21,7 +21,37 @@ from apps.makerspaces.models import Makerspace
 STREAM_ACTIONS = {
     "hardware": (rbac.Action.EDIT_INVENTORY, rbac.Action.MANAGE_MAKERSPACE),
     "printing": (rbac.Action.MANAGE_PRINTING, rbac.Action.MANAGE_MAKERSPACE),
+    "events": (rbac.Action.MANAGE_EVENTS, rbac.Action.MANAGE_MAKERSPACE),
+    "bookings": (rbac.Action.MANAGE_BOOKINGS, rbac.Action.MANAGE_MAKERSPACE),
+    "maintenance": (rbac.Action.MANAGE_MACHINES, rbac.Action.MANAGE_MAKERSPACE),
+    # Membership templates carry applicant and member identity, so they are the space
+    # manager's alone — there is no narrower action that should reach them.
+    "membership": (rbac.Action.MANAGE_MAKERSPACE,),
 }
+
+# The module a stream's templates belong to (D14). Editing wording for a feature the space
+# does not run is offering a setting that can never fire; `hardware`/`printing` map to
+# modules that are core or already gated at their own surfaces.
+STREAM_MODULES = {
+    "events": "events",
+    "bookings": "bookings",
+    "maintenance": "maintenance",
+    "membership": "membership",
+}
+
+
+def _stream_module_available(makerspace, stream):
+    key = STREAM_MODULES.get(stream)
+    if key is None:
+        return True
+    try:
+        from apps.makerspaces.platform import module_enabled
+
+        return bool(module_enabled(makerspace, key))
+    except Exception:
+        # Fail open, matching every other notification capability lookup: a broken check
+        # must not hide an editor an operator is entitled to.
+        return True
 
 
 def _resolve_makerspace(actor, makerspace_id, stream):
@@ -35,12 +65,14 @@ def _resolve_makerspace(actor, makerspace_id, stream):
     makerspace = qs.first()
     if makerspace is None:
         raise Http404
+    if not _stream_module_available(makerspace, stream):
+        raise Http404
     return makerspace
 
 
 def _visible_streams(actor, makerspace_id):
     streams = []
-    for stream in ("hardware", "printing"):
+    for stream in STREAM_ACTIONS:
         try:
             _resolve_makerspace(actor, makerspace_id, stream)
         except Http404:
