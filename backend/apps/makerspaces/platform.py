@@ -6,7 +6,7 @@ from apps.inventory import public_image_storage
 from apps.integrations.email import email_enabled
 from apps.makerspaces.models import Makerspace, default_branding_config, default_theme_config
 from apps.makerspaces.capabilities import FEATURE_MODULES, FEATURES
-from apps.makerspaces.module_registry import is_frontend_exposed, module_workflows
+from apps.makerspaces.module_registry import is_frontend_exposed, module_available, module_workflows
 
 # Derived from the module registry, which also decides frontend exposure: an
 # internal master switch declares frontend_exposed=False and is dropped from both
@@ -92,7 +92,21 @@ def resolve_frontend(*, tenant=None, slug=None, origin=None, host=None):
 
 
 def module_enabled(makerspace, module_key):
-    return module_key in set(makerspace.enabled_modules or [])
+    # Two independent switches, both of which must be on: the tenant enabled the
+    # module, and this deployment still ships the app that implements it. Merging
+    # them here rather than at each call site is what makes tombstoning safe -- a
+    # guard added in future code inherits the check without knowing it exists.
+    return module_key in set(makerspace.enabled_modules or []) and module_available(module_key)
+
+
+def available_modules(makerspace):
+    """The tenant's stored module keys, minus any whose owning app is tombstoned.
+
+    This is what an API tells a client it can use. The raw field stays intact for
+    `/control/` and for `module_install`, which must show and edit what is stored,
+    not what happens to be reachable today.
+    """
+    return sorted(key for key in set(makerspace.enabled_modules or []) if module_available(key))
 
 
 def feature_enabled(makerspace, key):
@@ -113,9 +127,7 @@ def feature_enabled(makerspace, key):
     ) and all(feature_enabled(makerspace, feature) for feature in definition.requires_features)
 
 def bootstrap_payload(makerspace):
-    modules = sorted(
-        key for key in set(makerspace.enabled_modules or []) if is_frontend_exposed(key)
-    )
+    modules = sorted(key for key in available_modules(makerspace) if is_frontend_exposed(key))
     features = sorted(key for key, definition in FEATURES.items() if definition.frontend_exposed and feature_enabled(makerspace, key))
     theme = default_theme_config()
     theme.update(makerspace.theme_config or {})

@@ -225,6 +225,25 @@ def dependents_of(key, among):
     )
 
 
+def module_available(key):
+    """Whether the app owning this module ships runtime surfaces in this deployment.
+
+    Orthogonal to per-makerspace enablement, and deliberately not merged with it: a
+    tombstoned app's key stays in a tenant's stored `enabled_modules` (uninstall
+    retains data and is reversible, and a deployment-level decision must not rewrite
+    tenant rows), but nothing the key names is reachable, so every consumer has to
+    read it as off.
+
+    Unknown legacy keys have no owning app and stay available, for the same reason
+    `is_frontend_exposed` keeps them: filtering them out would silently drop a
+    capability the registry has not learned about yet.
+    """
+    from apps.separability.registry import runtime_active
+
+    definition = BY_KEY.get(key)
+    return True if definition is None else runtime_active(definition.app_label)
+
+
 def is_frontend_exposed(key):
     """Whether a key may appear in the bootstrap payload.
 

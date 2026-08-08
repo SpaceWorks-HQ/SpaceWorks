@@ -162,6 +162,17 @@ def runtime_active(app_label):
     return _runtime_apps.get(app_label, True)
 
 
+def registered_runtime_apps():
+    """App labels that have declared a runtime state.
+
+    Distinct from ``runtime_active``, which answers True for an unregistered app.
+    Callers that need "has this app registered yet?" — the idempotence guard in
+    ``AppConfig.ready()`` — must ask this instead, or an *active* registration
+    looks identical to no registration at all.
+    """
+    return _runtime_apps.keys()
+
+
 def finalize():
     """Freeze every registry. Called once, after all AppConfig.ready() have run."""
     global _finalized

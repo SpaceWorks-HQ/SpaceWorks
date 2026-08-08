@@ -7,6 +7,7 @@ from django.db import connection, transaction
 
 from apps.audit import services as audit
 from apps.procurement.models import ToBuyItem
+from apps.separability.registry import runtime_active
 
 logger = logging.getLogger(__name__)
 OPEN_STATUSES = (ToBuyItem.Status.REQUESTED, ToBuyItem.Status.APPROVED, ToBuyItem.Status.ORDERED)
@@ -16,6 +17,12 @@ def maybe_flag_low_stock(actor, pool):
     """Create at most one open restock item once a pool reaches its threshold."""
     try:
         if not getattr(pool, "pk", None):
+            return None
+        # A live cross-app workflow hook, so it is runtime rather than retention: a
+        # deployment that has tombstoned procurement offers no screen on which this
+        # row could ever be seen or actioned, and writing it would grow a table
+        # nothing reads. Existing rows are untouched -- this only declines to add.
+        if not runtime_active("procurement"):
             return None
         from apps.machines.models import MachineConsumablePool
         with transaction.atomic():

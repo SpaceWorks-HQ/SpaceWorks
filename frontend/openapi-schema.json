@@ -33032,6 +33032,10 @@
                     },
                     "cors_allowed_origins": {},
                     "enabled_modules": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
                         "readOnly": true
                     },
                     "resource_limit_overrides": {},
@@ -36238,6 +36242,10 @@
                     },
                     "cors_allowed_origins": {},
                     "enabled_modules": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
                         "readOnly": true
                     },
                     "resource_limit_overrides": {},

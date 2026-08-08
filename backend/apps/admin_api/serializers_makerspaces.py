@@ -16,6 +16,7 @@ from apps.integrations.webhook_validation import validate_webhook_url
 from apps.makerspaces import domain_verification, limits
 from apps.makerspaces.hosting import canonical_host
 from apps.makerspaces.capabilities import validate_capabilities
+from apps.makerspaces.platform import available_modules
 from apps.makerspaces.models import (
     Makerspace,
     default_branding_config,
@@ -79,6 +80,7 @@ class MakerspaceSerializer(serializers.ModelSerializer):
         max_length=200,
         trim_whitespace=True,
     )
+    enabled_modules = serializers.SerializerMethodField()
 
     class Meta:
         model = Makerspace
@@ -168,6 +170,13 @@ class MakerspaceSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_enabled_modules(self, obj) -> list[str]:
+        # What the deployment serves, not what the row stores. Already read-only
+        # here (a staff PATCH carrying enabled_modules is a 403), so narrowing the
+        # read cannot narrow a write. `/control/` and `module_install` keep reading
+        # the raw field, because a superadmin must see and edit what is stored.
+        return available_modules(obj)
 
     def get_telegram_bot_token_set(self, obj) -> bool:
         return bool(obj.telegram_bot_token)

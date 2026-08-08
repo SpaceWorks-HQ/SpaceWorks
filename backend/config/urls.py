@@ -13,6 +13,22 @@ from apps.payments.views_connect import (
     StripeConnectCallbackView,
     StripeConnectWebhookView,
 )
+from apps.separability.registry import runtime_active
+
+
+def separable(app_label, route, urlconf, **kwargs):
+    """Routes for a separable app, spliced in place -- empty while it is tombstoned.
+
+    Returns a list so call sites can `*`-unpack it and keep the entry at its original
+    position: URL resolution is order-sensitive, and appending conditional routes at
+    the end of the list would change which pattern wins.
+
+    `include()` is called only when the app is active, deliberately. A tombstoned app
+    may have had its views deleted (`apps/printing` and `apps/roadmap` are the
+    precedent), and importing its urlconf to then discard it would crash on exactly
+    the deployments this exists to support.
+    """
+    return [path(route, include(urlconf), **kwargs)] if runtime_active(app_label) else []
 
 
 def docs_root(_request):
@@ -77,7 +93,7 @@ urlpatterns = [
     path("api/v1/admin/", include("apps.evidence.urls")),
     path("api/v1/", include("apps.operations.urls")),
     path("api/v1/integrations/", include("apps.integrations.urls")),
-    path("api/v1/procurement/", include("apps.procurement.urls")),
+    *separable("procurement", "api/v1/procurement/", "apps.procurement.urls"),
     path("api/v1/notifications/", include("apps.notifications.urls")),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path(

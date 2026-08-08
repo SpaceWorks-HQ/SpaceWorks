@@ -11,6 +11,9 @@ env = environ.Env(
     DEBUG=(bool, False),
 )
 environ.Env.read_env(BASE_DIR / ".env")
+# Imported after read_env: both read TOMBSTONED_APPS straight from the environment,
+# and the sidebar in config.unfold is built at import time.
+from apps.separability.tombstones import tombstoned_app_labels
 from config.unfold import UNFOLD
 
 SECRET_KEY = env("SECRET_KEY")
@@ -122,6 +125,14 @@ INSTALLED_APPS = [
     # separability registries.
     "apps.separability",
 ]
+
+# App labels whose runtime surfaces this deployment does not ship: no URLs, no admin
+# registration, no sidebar entry, no OpenAPI paths. Rows and migrations are retained,
+# and so is the retention registry, so nothing becomes unpurgeable or unencryptable.
+# Deployment-scoped rather than per-tenant, because URL routing and the schema are
+# process-global. App labels, not module keys -- one app can own several keys.
+# A label naming a core module's app is refused at startup (separability.E007).
+TOMBSTONED_APPS = tombstoned_app_labels()
 
 MIDDLEWARE = [
     "apps.makerspaces.middleware.TenantHostValidationMiddleware",

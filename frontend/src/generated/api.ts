@@ -2075,7 +2075,7 @@ export type Makerspace = {
   "hidden_from_central_directory"?: boolean;
   "public_api_key": string;
   "cors_allowed_origins"?: unknown;
-  "enabled_modules": unknown;
+  "enabled_modules": Array<string>;
   "resource_limit_overrides"?: unknown;
   "enabled_features"?: unknown;
   "theme_config"?: unknown;
@@ -2871,7 +2871,7 @@ export type PatchedMakerspace = {
   "hidden_from_central_directory"?: boolean;
   "public_api_key"?: string;
   "cors_allowed_origins"?: unknown;
-  "enabled_modules"?: unknown;
+  "enabled_modules"?: Array<string>;
   "resource_limit_overrides"?: unknown;
   "enabled_features"?: unknown;
   "theme_config"?: unknown;

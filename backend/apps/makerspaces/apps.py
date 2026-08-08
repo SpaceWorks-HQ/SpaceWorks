@@ -104,7 +104,7 @@ class MakerspacesConfig(AppConfig):
             register_purge_plan,
             register_runtime_app,
             registered_purge_modules,
-            runtime_active,
+            registered_runtime_apps,
         )
 
         already = registered_purge_modules()
@@ -112,8 +112,11 @@ class MakerspacesConfig(AppConfig):
             if plan.key not in already:
                 register_purge_plan(plan.key, plan)
 
-        # The two apps that are already tombstoned. Everything else defaults to
-        # active, so no app has to opt in to keep working.
+        # The two apps whose code is already gone. Unlike the separable apps, which
+        # read their state from TOMBSTONED_APPS, these are unconditional: there is
+        # nothing left to turn back on. Everything else defaults to active, so no app
+        # has to opt in to keep working.
+        registered = registered_runtime_apps()
         for app_label in ("printing", "roadmap"):
-            if runtime_active(app_label):
+            if app_label not in registered:
                 register_runtime_app(app_label, tombstoned=True)

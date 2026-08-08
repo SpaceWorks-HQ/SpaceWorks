@@ -125,6 +125,45 @@ def check_purge_registry_is_complete(app_configs, **kwargs):
 
 
 @register(Tags.models)
+def check_tombstones_are_legal(app_configs, **kwargs):
+    """Refuse to tombstone an app that was never made separable.
+
+    One rule covers three mistakes that look identical from the outside, because all
+    three produce a setting that reads as a working tombstone and does nothing:
+
+    * an app owning a **core** module, whose surfaces the rest of the system needs --
+      the Hard Rules require a box QR scan and an issue photo to hand hardware over,
+      so evidence and QR cannot be removed. Tombstoning those would not yield a
+      smaller install, it would yield a broken one, discovered as scattered 404s;
+    * an app nobody has done the separability work for, whose surfaces would stay
+      wired and whose retention hooks were never checked;
+    * a typo, or the dotted path where the label belongs.
+
+    Silence is the dangerous outcome here, not over-strictness: a rejected label costs
+    one startup, an accepted-but-inert one costs a deployment that believes it removed
+    an app it is still serving.
+    """
+    from django.conf import settings
+
+    from apps.separability.tombstones import SEPARABLE_APPS
+
+    illegal = sorted(set(getattr(settings, "TOMBSTONED_APPS", frozenset())) - SEPARABLE_APPS)
+    return [
+        Error(
+            f"TOMBSTONED_APPS names {label!r}, which is not a separable app.",
+            hint=(
+                "Separable apps are "
+                f"{', '.join(sorted(SEPARABLE_APPS))}. Use the app label, not the "
+                "module key or the dotted path, and add the app to SEPARABLE_APPS "
+                "only once its surfaces are actually gated."
+            ),
+            id="separability.E007",
+        )
+        for label in illegal
+    ]
+
+
+@register(Tags.models)
 def check_registries_are_frozen(app_configs, **kwargs):
     """Finalisation must have run, or late registration can still mutate the map."""
     from apps.separability.registry import is_finalized

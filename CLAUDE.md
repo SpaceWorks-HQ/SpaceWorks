@@ -116,6 +116,42 @@ frontend surfaces, origin-scope routes) registers only while the app is active.
   its migrations unapply — so `is_installed()` answers "are the tables there?" when the caller means
   "are the surfaces live?". Unregistered defaults to **active**, so no app must opt in to keep working.
 
+**Tombstoning an app: `TOMBSTONED_APPS` + `SEPARABLE_APPS` (Phase 8+, `separability/tombstones.py`).**
+A tombstone is a **deployment** decision, never per-tenant — URL routing, admin registration and the
+OpenAPI schema are process-global, so an app's surfaces are present for everyone or absent for everyone.
+It composes with, and does not replace, the per-makerspace `enabled_modules` switch: a module is usable
+only when the tenant enabled it **and** the deployment ships the app. The env var names **app labels,
+not module keys** (one app can own several keys — `printing`/`machines`/`machine_service` are all
+`apps.machines`), and it never touches data: rows, migrations, purge plans and PII mappings all stay.
+- **`SEPARABLE_APPS` is declared, not derived.** Nothing in the module registry encodes "can this app's
+  surfaces be removed without leaving the rest incoherent" — `is_core` comes closest and is a different
+  question (`apps.makerspaces` owns only non-core modules yet is the tenant root; `apps.inventory` owns
+  a core module *and* two optional ones). Anything in `TOMBSTONED_APPS` but absent from `SEPARABLE_APPS`
+  **refuses startup** (`separability.E007`), which is what turns a typo, a dotted path or a core app
+  from a silently inert setting into a boot failure. The set grows one app per B6 phase.
+- **`module_enabled()` is the chokepoint**, ANDing `module_registry.module_available(key)` in, so a
+  guard written later inherits the check without knowing it exists. `platform.available_modules()` is
+  the read side — used by the bootstrap payload and both staff makerspace serializers, because the
+  console turns those keys straight into tabs and a stale key renders a tab whose every request 404s.
+  `/control/` and `module_install` keep reading the **raw** field: a superadmin must see what is stored.
+- **Admin registration cannot ask the manifest.** `django.contrib.admin` sits above every `apps.*` entry
+  in `INSTALLED_APPS`, so autodiscovery imports every `admin.py` *before* the owning app's `ready()` has
+  registered anything. An `admin.py` must therefore call `app_is_tombstoned()` (settings) rather than
+  `runtime_active()` (manifest); both derive from `tombstoned_app_labels()`, so they cannot disagree.
+- **A sidebar entry must be omitted, not permission-hidden.** Unfold calls `str(link)` on every item to
+  compute `active` **before** consulting the permission callback, so a `reverse_lazy` to a route the
+  tombstoned app no longer registers raises `NoReverseMatch` and 500s the whole console.
+  `_item(..., app_label=...)` returns `None` and `_prune_navigation` drops it (and any group left
+  empty). `config/unfold.py` reads the env directly because settings *imports* it.
+- **URL includes are spliced in place, never appended** (`config.urls.separable`): resolution is
+  order-sensitive. `include()` is evaluated only when the app is active, because a genuinely gutted app
+  has no urlconf to import.
+- **The tombstone suite is a separate pytest run** (`tests/tombstone/`), because import-time surfaces
+  cannot be re-derived in-process and the all-active suite asserts the opposite for the same objects:
+  `TOMBSTONED_APPS=procurement pytest tests/tombstone`. A whole-tree run skips the directory; an
+  explicit run without the profile is a hard `UsageError`, never a green no-op. `TOMBSTONE_PROFILE_APPS`
+  in its conftest must stay in step with `SEPARABLE_APPS`.
+
 ## Container/deployment invariants (do not regress)
 
 **The images run unprivileged.** `backend/Dockerfile` creates uid 10001 `app`, uses `COPY --chown`

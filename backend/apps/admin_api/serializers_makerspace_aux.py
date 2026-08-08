@@ -1,10 +1,20 @@
 from rest_framework import serializers
 
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.platform import available_modules
 
 
 class MakerspaceSwitcherSerializer(serializers.ModelSerializer):
     """Minimal makerspace row for the staff console switcher."""
+
+    enabled_modules = serializers.SerializerMethodField()
+
+    def get_enabled_modules(self, obj) -> list[str]:
+        # The console turns these keys straight into tabs, so it must be told what
+        # this deployment actually serves. A tombstoned app's key stays stored on the
+        # row -- uninstall retains data -- but shipping it here would render a tab
+        # whose every request 404s.
+        return available_modules(obj)
 
     class Meta:
         model = Makerspace

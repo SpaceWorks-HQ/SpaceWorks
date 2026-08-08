@@ -3,6 +3,8 @@ import os
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
+from apps.separability.tombstones import tombstoned_app_labels
+
 SITE_NAME = os.environ.get("ADMIN_SITE_NAME", "Space Works")
 
 
@@ -18,7 +20,24 @@ def _is_active_superuser(request):
     )
 
 
-def _item(title, icon, route):
+def _item(title, icon, route, app_label=None):
+    """Build one sidebar entry, or None when its app has been tombstoned.
+
+    Omitted rather than permission-hidden, which would not be enough: Unfold calls
+    `str(link)` on every item to compute `active` *before* it consults the permission
+    callback, so a `reverse_lazy` pointing at a route a tombstoned app no longer
+    registers raises NoReverseMatch and 500s the entire console. `_prune_navigation`
+    drops the Nones once the literal below is built.
+
+    The tombstone list is read from the environment rather than from settings, because
+    settings imports *this* module -- see `tombstones.tombstoned_app_labels`.
+
+    `route` and `separable_app` are carried on the item so the drift-guard test can
+    read them back. Unfold copies items through and only ever reads keys it knows, so
+    the extra pair is inert.
+    """
+    if app_label is not None and app_label in tombstoned_app_labels():
+        return None
     # Every admin model is superadmin-only (U-SEC), so a single permission gate
     # applies to the whole sidebar.
     return {
@@ -26,6 +45,8 @@ def _item(title, icon, route):
         "icon": icon,
         "link": reverse_lazy(route),
         "permission": _is_active_superuser,
+        "route": route,
+        "separable_app": app_label,
     }
 
 
@@ -105,7 +126,7 @@ UNFOLD = {
                 "title": _("Procurement"),
                 "separator": True,
                 "items": [
-                    _item("To-buy list", "shopping_cart", "admin:procurement_tobuyitem_changelist"),
+                    _item("To-buy list", "shopping_cart", "admin:procurement_tobuyitem_changelist", app_label="procurement"),
                 ],
             },
             {
@@ -161,3 +182,21 @@ UNFOLD = {
         ],
     },
 }
+
+
+def _prune_navigation(unfold):
+    """Drop the entries `_item` returned None for, and any group left empty.
+
+    A group whose every item belonged to tombstoned apps would otherwise render as a
+    bare heading with a separator under it.
+    """
+    sidebar = unfold["SIDEBAR"]
+    sidebar["navigation"] = [
+        {**group, "items": kept}
+        for group in sidebar["navigation"]
+        if (kept := [item for item in group["items"] if item is not None])
+    ]
+    return unfold
+
+
+_prune_navigation(UNFOLD)

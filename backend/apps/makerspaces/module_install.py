@@ -21,6 +21,7 @@ from apps.makerspaces.module_registry import (
     MODULES,
     core_module_keys,
     dependents_of,
+    module_available,
     with_dependencies,
 )
 
@@ -40,6 +41,10 @@ def module_status(makerspace):
             "description": definition.description,
             "installed": definition.key in enabled or definition.key in core,
             "core": definition.key in core,
+            # False when the owning app is tombstoned. Reported separately from
+            # `installed` so a retained-but-unshipped key reads as what it is,
+            # rather than looking like the operator never enabled it.
+            "available": module_available(definition.key),
             "requires": list(definition.requires_modules),
         }
         for definition in MODULES
@@ -50,6 +55,16 @@ def install_module(makerspace, key, actor=None):
     """Enable `key` and anything it requires. Returns the keys newly added."""
     if key not in BY_KEY:
         raise ModuleInstallError(f"Unknown module {key!r}.")
+    # Refused rather than silently accepted: installing a module this deployment does
+    # not ship would write the key, report success and change nothing an operator can
+    # see. Includes the dependency closure, since pulling in an unavailable
+    # requirement produces the same dead capability one step removed.
+    unavailable = sorted(k for k in with_dependencies({key}) if not module_available(k))
+    if unavailable:
+        raise ModuleInstallError(
+            f"{', '.join(unavailable)} is not shipped by this deployment "
+            "(TOMBSTONED_APPS). Enabling it would have no effect."
+        )
     with transaction.atomic():
         locked = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
         before = set(locked.enabled_modules or [])
@@ -86,7 +101,10 @@ def uninstall_module(makerspace, key, actor=None):
 
 def apply_profile(makerspace, profile, actor=None):
     """Replace the module set with a named profile. Returns the resulting keys."""
-    keys = set(profile_modules(profile))
+    # A profile is a convenience list, not a demand: silently skipping what this
+    # deployment does not ship is right here, where refusing would make the setup
+    # wizard unusable on a tombstoned build.
+    keys = {key for key in profile_modules(profile) if module_available(key)}
     with transaction.atomic():
         locked = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
         # Unknown legacy keys are preserved: `_canonical_modules` keeps them and a
