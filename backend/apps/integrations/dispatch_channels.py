@@ -117,6 +117,12 @@ def dispatch_channel(
     if channel not in NonEmailNotificationChannel.values:
         raise ValueError(f"Unsupported notification channel: {channel}")
 
+    # Push resolves its recipients at delivery time, so the alert's subject has to travel
+    # on the row or a narrowed recipient rule would match nothing by then.
+    stored_payload = dict(payload or {})
+    if scope is not None and hasattr(scope, "as_dict"):
+        stored_payload["scope"] = scope.as_dict()
+
     def record(status, error="", destination=None):
         return NotificationDeliveryLog.objects.create(
             makerspace=makerspace,
@@ -126,7 +132,7 @@ def dispatch_channel(
             feature=feature,
             event=event,
             text_body=text_body,
-            payload=payload or {},
+            payload=stored_payload,
             status=status,
             error=error,
         )

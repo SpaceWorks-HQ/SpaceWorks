@@ -87,7 +87,9 @@ def selection_rows(makerspace, feature, event):
         return list(
             NotificationRecipient.objects.filter(
                 makerspace=makerspace, feature=feature, event=event
-            ).select_related("role", "user")
+            )
+            .select_related("role", "user")
+            .prefetch_related("machine_scopes", "machine_type_scopes", "category_scopes")
         )
     except Exception:
         logger.warning(
@@ -138,7 +140,52 @@ def _eligible_memberships(makerspace):
     )
 
 
-def _selected_memberships(makerspace, rows):
+def _rule_covers(row, scope) -> bool:
+    """Whether a recipient row's own narrowing admits this alert's subject.
+
+    No links means everything — the same default as a chat destination and the OPPOSITE
+    of role machine-scope, which fails closed. The asymmetry is deliberate: an unscoped
+    *role* must reach nothing (that is an access decision), while an unscoped *rule* is
+    simply an operator who did not narrow it.
+    """
+    machine_ids = {link.machine_id for link in row.machine_scopes.all()}
+    type_ids = {link.machine_type_id for link in row.machine_type_scopes.all()}
+    category_ids = {link.category_id for link in row.category_scopes.all()}
+    if not (machine_ids or type_ids or category_ids):
+        return True
+    if scope is None:
+        # The rule asked for specific subjects and this alert names none, so it cannot
+        # be one of them.
+        return False
+    return (
+        (scope.machine_id is not None and scope.machine_id in machine_ids)
+        or (scope.machine_type_id is not None and scope.machine_type_id in type_ids)
+        or (scope.category_id is not None and scope.category_id in category_ids)
+    )
+
+
+def _role_scope_admits(membership_scopes, membership, scope) -> bool:
+    """Whether the recipient's ROLE could reach this alert's machine at all.
+
+    D9's floor, and it applies to `kind=role` rows ONLY. Resolving it is asking "does this
+    role's MANAGE_MACHINES grant reach this machine", which is a question about authority
+    — meaningful when someone was selected *as a role*, meaningless when they were
+    selected as a person. Applying it to the member body or a named individual would make
+    those kinds unusable for maintenance alerts, since a plain member holds no machine
+    grant at all and would resolve to the fail-closed NOTHING.
+    """
+    if scope is None or scope.machine_id is None:
+        return True
+    from apps.machines import role_scope as machine_role_scope
+
+    resolved = membership_scopes.get(membership.pk, machine_role_scope.NOTHING)
+    if resolved is machine_role_scope.EXEMPT:
+        return True
+    type_ids, machine_ids = resolved
+    return scope.machine_id in machine_ids or scope.machine_type_id in type_ids
+
+
+def _selected_memberships(makerspace, rows, scope=None):
     """Memberships matched by a selection, in a stable order.
 
     Every kind resolves through a MEMBERSHIP of this makerspace — including `user`
@@ -147,32 +194,65 @@ def _selected_memberships(makerspace, rows):
     managed hosting it crosses tenants. An external contractor gets a no-action Member
     role first. The role FK is matched by id under a makerspace-scoped queryset, so a
     row pointing at another space's role is inert rather than a leak.
+
+    Composition is `role_scope AND (rule_scope OR all)` (D9) — narrowing only, never
+    widening, so a recipient can never be alerted about a machine they would 403 on.
     """
-    role_ids = {row.role_id for row in rows if row.role_id}
-    user_ids = {row.user_id for row in rows if row.user_id}
-    wants_members = any(row.kind == NotificationRecipientKind.MEMBERS for row in rows)
-    if not (role_ids or user_ids or wants_members):
+    role_rows = {row.role_id: row for row in rows if row.role_id}
+    user_rows = {row.user_id: row for row in rows if row.user_id}
+    member_rows = [row for row in rows if row.kind == NotificationRecipientKind.MEMBERS]
+    if not (role_rows or user_rows or member_rows):
         return []
 
-    matched = []
+    candidates = []
     for membership in _eligible_memberships(makerspace):
-        if wants_members:
-            matched.append(membership)
-        elif membership.assigned_role_id and membership.assigned_role_id in role_ids:
-            matched.append(membership)
-        elif membership.user_id in user_ids:
-            matched.append(membership)
-    return matched
+        # One row is responsible for each membership's inclusion, and it is the one whose
+        # narrowing applies. Members-wide is checked first so a broad tick is not
+        # accidentally narrowed by an unrelated per-role rule.
+        row = None
+        if member_rows:
+            row = member_rows[0]
+        elif membership.assigned_role_id in role_rows:
+            row = role_rows[membership.assigned_role_id]
+        elif membership.user_id in user_rows:
+            row = user_rows[membership.user_id]
+        if row is None:
+            continue
+        if not _rule_covers(row, scope):
+            continue
+        candidates.append((membership, row))
+
+    if not candidates:
+        return []
+
+    from apps.machines import role_scope as machine_role_scope
+
+    role_selected = [
+        membership
+        for membership, row in candidates
+        if row.kind == NotificationRecipientKind.ROLE
+    ]
+    membership_scopes = (
+        machine_role_scope.manage_scopes_for_memberships(role_selected)
+        if role_selected
+        else {}
+    )
+    return [
+        membership
+        for membership, row in candidates
+        if row.kind != NotificationRecipientKind.ROLE
+        or _role_scope_admits(membership_scopes, membership, scope)
+    ]
 
 
-def selected_emails(makerspace, feature, event) -> list[str]:
+def selected_emails(makerspace, feature, event, scope=None) -> list[str]:
     """Addresses for an explicit selection. Assumes has_selection() is True."""
     rows = selection_rows(makerspace, feature, event)
     if not rows:
         return []
     try:
         emails, seen = [], set()
-        for membership in _selected_memberships(makerspace, rows):
+        for membership in _selected_memberships(makerspace, rows, scope):
             email = (membership.user.email or "").strip()
             if not email:
                 continue
@@ -191,7 +271,7 @@ def selected_emails(makerspace, feature, event) -> list[str]:
         return []
 
 
-def selected_user_ids(makerspace, feature, event) -> list[int]:
+def selected_user_ids(makerspace, feature, event, scope=None) -> list[int]:
     """Push recipients for an explicit selection.
 
     Native push is a MEMBER channel as well as a staff one (D8) — the mobile form of the
@@ -205,7 +285,7 @@ def selected_user_ids(makerspace, feature, event) -> list[int]:
         return list(
             dict.fromkeys(
                 membership.user_id
-                for membership in _selected_memberships(makerspace, rows)
+                for membership in _selected_memberships(makerspace, rows, scope)
             )
         )
     except Exception:

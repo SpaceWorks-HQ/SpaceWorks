@@ -119,6 +119,47 @@ def manage_scope_for(actor, makerspace_id):
     return manage_scopes_for(actor, [makerspace_id]).get(makerspace_id, NOTHING)
 
 
+def manage_scopes_for_memberships(memberships):
+    """Map membership id -> EXEMPT or ``(type_ids, machine_ids)``.
+
+    The membership-keyed twin of :func:`manage_scopes_for`, for callers that already hold
+    the rows and would otherwise resolve one actor at a time. Notification recipient
+    resolution is exactly that shape: it has already selected the memberships and needs
+    each one's machine reach, so a per-actor call would put an N+1 behind every alert.
+
+    Two link queries regardless of how many memberships are passed, and the same answers
+    as the per-actor path — it is the same `_scope_for_membership` underneath, so the two
+    cannot drift.
+    """
+    memberships = list(memberships)
+    resolved = {}
+    role_to_memberships = defaultdict(list)
+    for membership in memberships:
+        answer, role_id = _scope_for_membership(membership)
+        if answer is not None:
+            resolved[membership.pk] = answer
+        else:
+            role_to_memberships[role_id].append(membership.pk)
+
+    if role_to_memberships:
+        role_ids = list(role_to_memberships)
+        types = defaultdict(set)
+        machines = defaultdict(set)
+        for role_id, type_id in RoleMachineTypeScope.objects.filter(
+            role_id__in=role_ids
+        ).values_list("role_id", "machine_type_id"):
+            types[role_id].add(type_id)
+        for role_id, machine_id in RoleMachineScope.objects.filter(
+            role_id__in=role_ids
+        ).values_list("role_id", "machine_id"):
+            machines[role_id].add(machine_id)
+        for role_id, membership_ids in role_to_memberships.items():
+            scope = (frozenset(types[role_id]), frozenset(machines[role_id]))
+            for membership_id in membership_ids:
+                resolved[membership_id] = scope
+    return resolved
+
+
 def scope_covers_machine(scope, machine):
     """Whether a resolved scope reaches one machine. Pure -- no queries."""
     if scope is EXEMPT:

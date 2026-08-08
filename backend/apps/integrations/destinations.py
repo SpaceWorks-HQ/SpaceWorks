@@ -53,6 +53,30 @@ class NotificationScope:
             for value in (self.machine_id, self.machine_type_id, self.category_id)
         )
 
+    def as_dict(self):
+        return {
+            "machine_id": self.machine_id,
+            "machine_type_id": self.machine_type_id,
+            "category_id": self.category_id,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        """Rebuild a scope stored on a delivery log.
+
+        Push resolves its recipients when the log is DELIVERED, not when it is created —
+        potentially in a Celery worker minutes later — so the subject has to travel with
+        the row. Without this a narrowed recipient rule would match nothing at delivery
+        time and silently drop every push recipient.
+        """
+        if not isinstance(data, dict):
+            return None
+        scope = cls()
+        scope.machine_id = data.get("machine_id")
+        scope.machine_type_id = data.get("machine_type_id")
+        scope.category_id = data.get("category_id")
+        return scope if scope else None
+
 
 def _matches(destination, scope) -> bool:
     machine_ids = {row.machine_id for row in destination.machine_scopes.all()}

@@ -38,6 +38,10 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
             log=log,
             next_steps=MAINTENANCE_REQUESTER_BODIES.get(event_name, ""),
         )
+        # The machine is what makes per-machine routing work on both sides: a chat room
+        # scoped to the laser (or to every 3D printer) matches on it, and a recipient rule
+        # narrowed the same way filters who is mailed.
+        scope = NotificationScope(machine=machine)
         staff = render(makerspace, "maintenance", "staff", event_name, context)
         emails = tuple(
             EmailDelivery(
@@ -48,16 +52,13 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
                 stream="maintenance",
             )
             for recipient in staff_emails_for_feature(
-                makerspace, "maintenance", event=event_name
+                makerspace, "maintenance", event=event_name, scope=scope
             )
         )
-        # The machine is what makes per-machine chat rooms work: a destination scoped to
-        # the laser (or to every 3D printer) matches on this, and an unscoped room still
-        # receives everything.
         return LifecyclePayload(
             text=staff["text_body"],
             emails=emails,
-            scope=NotificationScope(machine=machine),
+            scope=scope,
             context=context,
         )
 

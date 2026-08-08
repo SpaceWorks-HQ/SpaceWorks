@@ -1,10 +1,13 @@
 from django import forms
 from django.contrib import admin
-from unfold.admin import ModelAdmin
+from unfold.admin import ModelAdmin, TabularInline
 
 from apps.integrations.models_recipients import (
     NotificationRecipient,
     NotificationRecipientKind,
+    RecipientCategoryScope,
+    RecipientMachineScope,
+    RecipientMachineTypeScope,
 )
 from config.admin_access import SuperuserOnlyModelAdmin
 
@@ -60,12 +63,35 @@ class NotificationRecipientAdminForm(forms.ModelForm):
         return cleaned
 
 
+class RecipientMachineTypeScopeInline(TabularInline):
+    model = RecipientMachineTypeScope
+    extra = 0
+
+
+class RecipientMachineScopeInline(TabularInline):
+    model = RecipientMachineScope
+    extra = 0
+
+
+class RecipientCategoryScopeInline(TabularInline):
+    model = RecipientCategoryScope
+    extra = 0
+
+
 @admin.register(NotificationRecipient)
 class NotificationRecipientAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     """Per-event recipient selection. The staff console is the primary write surface;
-    this exists so a superadmin can inspect and repair rows."""
+    this exists so a superadmin can inspect and repair rows.
+
+    Scope inlines are optional narrowing: no links means the rule matches every subject.
+    """
 
     form = NotificationRecipientAdminForm
+    inlines = [
+        RecipientMachineTypeScopeInline,
+        RecipientMachineScopeInline,
+        RecipientCategoryScopeInline,
+    ]
     list_display = ("makerspace", "feature", "event", "kind", "role", "user", "created_at")
     list_filter = ("makerspace", "feature", "kind")
     search_fields = ("event", "user__username", "user__email", "role__name")

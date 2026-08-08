@@ -27,7 +27,7 @@ _FEATURE_STREAMS = {
 _STREAM_FEATURES = {value: key for key, value in _FEATURE_STREAMS.items()}
 
 
-def staff_emails_for_feature(makerspace, feature, event=None) -> list[str]:
+def staff_emails_for_feature(makerspace, feature, event=None, scope=None) -> list[str]:
     try:
         if not getattr(makerspace, "staff_notifications_enabled", True):
             return []
@@ -37,7 +37,9 @@ def staff_emails_for_feature(makerspace, feature, event=None) -> list[str]:
         # what keeps today's behaviour intact (bookings email is ON by default, so a
         # "default nobody" reading would have silently stopped live booking mail).
         if recipient_selection.has_selection(makerspace, feature, event):
-            return recipient_selection.selected_emails(makerspace, feature, event)
+            return recipient_selection.selected_emails(
+                makerspace, feature, event, scope
+            )
 
         required_action = _FEATURE_ACTIONS.get(feature)
         if required_action is None:
@@ -114,7 +116,7 @@ def staff_emails_for_stream(makerspace, stream, event=None) -> list[str]:
     return staff_emails_for_feature(makerspace, feature, event=event)
 
 
-def staff_user_ids_for_feature(makerspace, feature, event=None) -> list[int]:
+def staff_user_ids_for_feature(makerspace, feature, event=None, scope=None) -> list[int]:
     """Native-push recipients use the same action/mute matrix as staff email."""
     try:
         if not getattr(makerspace, "staff_notifications_enabled", True):
@@ -122,7 +124,9 @@ def staff_user_ids_for_feature(makerspace, feature, event=None) -> list[int]:
         # Push is filtered by the same selection as email (D8): it is the mobile form of
         # the member's own message, not a separate audience.
         if recipient_selection.has_selection(makerspace, feature, event):
-            return recipient_selection.selected_user_ids(makerspace, feature, event)
+            return recipient_selection.selected_user_ids(
+                makerspace, feature, event, scope
+            )
         required_action = _FEATURE_ACTIONS.get(feature)
         if required_action is None:
             return []

@@ -111,3 +111,75 @@ class NotificationRecipient(models.Model):
     def __str__(self):
         target = self.role_id or self.user_id or self.kind
         return f"{self.makerspace}:{self.feature}/{self.event} -> {target}"
+
+
+# --- optional per-rule narrowing -------------------------------------------------------
+#
+# Mirrors the destination scope tables and, before them, `RoleMachineTypeScope` /
+# `RoleMachineScope`: link rows, matched as a union, and **no links means everything**.
+# Composition is `role_scope AND (rule_scope OR all)`, so these can only ever narrow —
+# a rule naming a machine the recipient's role cannot reach yields nobody rather than
+# alerting someone about hardware they would 403 on.
+
+
+class RecipientMachineTypeScope(models.Model):
+    recipient = models.ForeignKey(
+        NotificationRecipient,
+        on_delete=models.CASCADE,
+        related_name="machine_type_scopes",
+    )
+    machine_type = models.ForeignKey(
+        "machines.MachineType",
+        on_delete=models.CASCADE,
+        related_name="notification_recipient_scopes",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["recipient", "machine_type"],
+                name="uniq_recipient_machine_type_scope",
+            )
+        ]
+
+
+class RecipientMachineScope(models.Model):
+    recipient = models.ForeignKey(
+        NotificationRecipient,
+        on_delete=models.CASCADE,
+        related_name="machine_scopes",
+    )
+    machine = models.ForeignKey(
+        "machines.Machine",
+        on_delete=models.CASCADE,
+        related_name="notification_recipient_scopes",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["recipient", "machine"],
+                name="uniq_recipient_machine_scope",
+            )
+        ]
+
+
+class RecipientCategoryScope(models.Model):
+    recipient = models.ForeignKey(
+        NotificationRecipient,
+        on_delete=models.CASCADE,
+        related_name="category_scopes",
+    )
+    category = models.ForeignKey(
+        "inventory.Category",
+        on_delete=models.CASCADE,
+        related_name="notification_recipient_scopes",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["recipient", "category"],
+                name="uniq_recipient_category_scope",
+            )
+        ]

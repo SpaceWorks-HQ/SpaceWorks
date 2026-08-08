@@ -323,6 +323,9 @@ from apps.integrations.models_push import PlatformPushSettings, PushDevice  # no
 from apps.integrations.models_recipients import (  # noqa: E402
     NotificationRecipient,
     NotificationRecipientKind,
+    RecipientCategoryScope,
+    RecipientMachineScope,
+    RecipientMachineTypeScope,
 )
 from apps.integrations.models_sms import (  # noqa: E402
     DailyOtpSmsCounter,
@@ -354,6 +357,9 @@ __all__ = [
     'NotificationRecipientKind',
     'PlatformEmailSettings',
     'PlatformPushSettings',
+    'RecipientCategoryScope',
+    'RecipientMachineScope',
+    'RecipientMachineTypeScope',
     'PlatformSmsSettings',
     'PushDevice',
     'SmsProviderChoice',
