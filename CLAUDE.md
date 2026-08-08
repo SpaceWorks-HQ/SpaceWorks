@@ -354,7 +354,15 @@ defaulting to the only makerspace). Installing resolves `requires_modules` trans
 **refuses core modules and modules another installed module requires**, and only clears the capability
 key — **data is always retained** and reinstalling restores the surfaces. Every mutation locks the
 makerspace row, validates through `validate_capabilities`, and audits `makerspace.capabilities_changed`.
-`apps/makerspaces/module_profiles.py` defines **minimal / recommended / everything**; `setup.sh`,
+`apps/makerspaces/module_profiles.py` defines **minimal / lending / workshop / recommended / everything**
+(`lending` = a tool library with no machines; `workshop` = machines + service queue + maintenance, no
+lending extras). **No profile can go below core**, so `workshop` still ships the request/evidence/QR
+spine — the Hard Rules make the loan flow the system rather than a feature of it. Going leaner than
+that is the *other* axis: `python manage.py suggest_tombstones` reads what every makerspace actually
+has installed and prints the `TOMBSTONED_APPS=` line to paste into `.env`. It is conservative by
+construction — an app is suggested only when **no** makerspace uses any of its modules, because a
+tombstone is process-global and would break the one tenant still using it. Apps owning no module key
+(`warranty`, `presence`, `payments`, `updates`) are listed separately for a by-hand decision. `setup.sh`,
 `setup.ps1` and `setup_instance --profile` (env `SETUP_MODULE_PROFILE`, default `recommended`) apply one,
 **only when the makerspace is first created** so a re-run never rewrites an operator's choices.
 Core modules are **added back by `_canonical_modules`, not rejected** — no caller has to carry the core

@@ -33,11 +33,13 @@ else
   read -r -p "Name of your makerspace [My Makerspace]: "                   MSNAME;   MSNAME="${MSNAME:-My Makerspace}"
   echo "Which modules should be installed?"
   echo "  minimal     - core only (nothing published publicly)"
+  echo "  lending     - a tool library: the hardware lending lifecycle, no machines"
+  echo "  workshop    - a machine shop: machines, the service queue and maintenance"
   echo "  recommended - core plus the inventory lifecycle, reports and machines"
   echo "  everything  - all modules"
   read -r -p "Module profile [recommended]: " MSPROFILE; MSPROFILE="${MSPROFILE:-recommended}"
   case "$MSPROFILE" in
-    minimal|recommended|everything) ;;
+    minimal|lending|workshop|recommended|everything) ;;
     *) warn "Unknown profile '$MSPROFILE'; using recommended."; MSPROFILE="recommended" ;;
   esac
   read -r -p "Admin login username [admin]: "                             ADMINUSER; ADMINUSER="${ADMINUSER:-admin}"

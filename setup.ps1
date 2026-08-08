@@ -44,10 +44,12 @@ else {
   $msname  = Read-Host "Name of your makerspace [My Makerspace]";                 if (-not $msname)  { $msname  = "My Makerspace" }
   Write-Host "Which modules should be installed?"
   Write-Host "  minimal     - core only (nothing published publicly)"
+  Write-Host "  lending     - a tool library: the hardware lending lifecycle, no machines"
+  Write-Host "  workshop    - a machine shop: machines, the service queue and maintenance"
   Write-Host "  recommended - core plus the inventory lifecycle, reports and machines"
   Write-Host "  everything  - all modules"
   $msprofile = Read-Host "Module profile [recommended]"; if (-not $msprofile) { $msprofile = "recommended" }
-  if ($msprofile -notin @("minimal", "recommended", "everything")) {
+  if ($msprofile -notin @("minimal", "lending", "workshop", "recommended", "everything")) {
     Warn "Unknown profile '$msprofile'; using recommended."
     $msprofile = "recommended"
   }
