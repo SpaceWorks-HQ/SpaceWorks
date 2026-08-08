@@ -31,7 +31,7 @@ from apps.separability.registry import register_runtime_app, registered_runtime_
 # Anything named in TOMBSTONED_APPS but absent here is refused at startup
 # (separability.E007), so a typo, a dotted path or a core app cannot quietly read as a
 # working tombstone.
-SEPARABLE_APPS = frozenset({"procurement"})
+SEPARABLE_APPS = frozenset({"procurement", "notifications"})
 
 
 def tombstoned_app_labels():
