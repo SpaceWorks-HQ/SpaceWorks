@@ -1,39 +1,13 @@
 """Lifecycle notification adapter for events and registrations."""
 
-from django.utils import formats, timezone
-
 from apps.events.models import Event, EventRegistration
+from apps.integrations.email_templates import render
+from apps.integrations.email_templates_fablab import events_context
+from apps.integrations.email_templates_registry_fablab_defaults import (
+    EVENTS_REQUESTER_BODIES,
+)
 from apps.integrations.notify import EmailDelivery, LifecyclePayload, notify_lifecycle
 from apps.integrations.staff_notifications import staff_emails_for_feature
-
-
-def _when(event):
-    starts_at = timezone.localtime(event.starts_at)
-    ends_at = timezone.localtime(event.ends_at)
-    return (
-        f"{formats.date_format(starts_at, 'DATETIME_FORMAT')} to "
-        f"{formats.date_format(ends_at, 'DATETIME_FORMAT')}"
-    )
-
-
-def _text(event, event_name, registration=None):
-    lines = [
-        f"Event #{event.pk} {event_name}.",
-        f"Title: {event.title}",
-        f"Time: {_when(event)}",
-        f"Status: {event.status}",
-    ]
-    if event.location:
-        lines.append(f"Location: {event.location}")
-    if registration is not None:
-        lines.extend(
-            (
-                f"Registration: #{registration.pk}",
-                f"Registrant: {registration.name}",
-                f"Registration status: {registration.status}",
-            )
-        )
-    return "\n".join(lines)
 
 
 def notify_event_lifecycle(
@@ -50,13 +24,18 @@ def notify_event_lifecycle(
                 pk=registration_id,
                 event=event,
             )
-        text = _text(event, event_name, registration)
-        subject = f"{makerspace.name} event #{event.pk} {event_name}"
+        context = events_context(
+            event,
+            event_name,
+            registration,
+            next_steps=EVENTS_REQUESTER_BODIES.get(event_name, ""),
+        )
+        staff = render(makerspace, "events", "staff", event_name, context)
         emails = tuple(
             EmailDelivery(
                 to_email=recipient,
-                subject=subject,
-                text_body=text,
+                subject=staff["subject"],
+                text_body=staff["text_body"],
                 audience="staff",
                 stream="events",
             )
@@ -64,7 +43,9 @@ def notify_event_lifecycle(
                 makerspace, "events", event=event_name
             )
         )
-        return LifecyclePayload(text=text, emails=emails)
+        return LifecyclePayload(
+            text=staff["text_body"], emails=emails, context=context
+        )
 
     return notify_lifecycle(
         makerspace,

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from django.core.exceptions import ValidationError
 from django.template import Context, Template, TemplateSyntaxError
 
+from .email_templates_registry_fablab import build_entries as _build_fablab_entries
 from .email_templates_registry_defaults import (
     HARDWARE_REQUESTER_DEFAULTS,
     HARDWARE_STAFF_DEFAULTS,
@@ -15,7 +16,7 @@ from .email_templates_registry_defaults import (
     PRINTING_STAFF_TEXT,
 )
 
-STREAMS = {"hardware", "printing"}
+STREAMS = {"hardware", "printing", "events", "bookings", "maintenance", "membership"}
 AUDIENCES = {"requester", "staff"}
 
 
@@ -278,6 +279,10 @@ REGISTRY = {
         ("printing", "staff", key): _printing_staff_entry(key)
         for key in PRINTING_STAFF_KEYS
     },
+    # The four FabLab streams, both audiences. Built by a helper in its own module so the
+    # 40 authored bodies do not swamp this file; the entries are the same shape as the
+    # ones above and go through the same validator.
+    **_build_fablab_entries(EmailTemplateRegistryEntry, bag, _label),
 }
 
 

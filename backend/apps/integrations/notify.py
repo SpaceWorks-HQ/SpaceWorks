@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from django.db import transaction
 
 from apps.integrations import notification_rules
+from apps.integrations.chat_templates import render_chat_text
 from apps.integrations.dispatch import dispatch_email
 from apps.integrations.dispatch_channels import dispatch_channel
 from apps.integrations.models import (
@@ -42,6 +43,10 @@ class LifecyclePayload:
     # domain object — the caller often has just a primary key. `None` means the alert
     # names no subject, and a room scoped to one machine will not receive it.
     scope: object | None = None
+    # Staff-audience template variables for an editable chat body. `None` means this
+    # adapter has no editable chat wording yet and `text` is sent verbatim — which is
+    # also what happens when a space has authored no ChatTemplate row.
+    context: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -115,6 +120,11 @@ def _run_guarded(makerspace, feature, event, build, sync):
         if enabled[NotificationChannel.EMAIL]:
             for delivery in payload.emails:
                 _dispatch_email_delivery(makerspace, event, delivery, sync, delivered, failed)
+        # Rendered once for all chat channels: one stored body per event, not one per
+        # channel. Falls back to `payload.text` whenever no row is authored.
+        chat_text = render_chat_text(
+            makerspace, feature, event, payload.text, payload.context
+        )
         for channel in (
             NotificationChannel.TELEGRAM,
             NotificationChannel.SLACK,
@@ -136,7 +146,13 @@ def _run_guarded(makerspace, feature, event, build, sync):
                     channel=channel,
                     feature=feature,
                     event=event,
-                    text_body=payload.text,
+                    text_body=(
+                        # Native push is not a room: it is the member's own device, and
+                        # it must not inherit a chat body written for a staff channel.
+                        payload.text
+                        if channel == NotificationChannel.NATIVE_PUSH
+                        else chat_text
+                    ),
                     payload=payload_data,
                     sync=sync,
                     scope=payload.scope,

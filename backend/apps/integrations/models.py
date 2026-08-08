@@ -17,6 +17,12 @@ class EmailTemplate(models.Model):
     class Stream(models.TextChoices):
         HARDWARE = "hardware", "Hardware"
         PRINTING = "printing", "Printing"
+        EVENTS = "events", "Events"
+        BOOKINGS = "bookings", "Bookings"
+        MAINTENANCE = "maintenance", "Maintenance"
+        # `membership`, not `members`: the feature key and the stream name genuinely
+        # differ here, and existing EmailLog rows already carry `membership`.
+        MEMBERSHIP = "membership", "Membership"
 
     class Audience(models.TextChoices):
         REQUESTER = "requester", "Requester"
@@ -306,6 +312,7 @@ class DailyNotificationCounter(models.Model):
         return f"{self.makerspace_id}:{self.channel}:{self.day}={self.count}"
 
 
+from apps.integrations.models_chat_templates import ChatTemplate  # noqa: E402
 from apps.integrations.models_destinations import (  # noqa: E402
     DestinationCategoryScope,
     DestinationMachineScope,
@@ -326,6 +333,7 @@ from apps.integrations.models_sms import (  # noqa: E402
 __all__ = [
     'CHANNEL_MODULE_KEYS',
     'ChatNotificationChannel',
+    'ChatTemplate',
     'DailyEmailCounter',
     'DailyNotificationCounter',
     'DailyOtpSmsCounter',

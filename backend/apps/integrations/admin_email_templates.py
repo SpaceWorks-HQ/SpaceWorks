@@ -2,6 +2,7 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin
 
 from apps.integrations.models import EmailTemplate
+from apps.integrations.models_chat_templates import ChatTemplate
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -31,3 +32,18 @@ class EmailTemplateAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         "created_at",
         "updated_at",
     )
+
+
+@admin.register(ChatTemplate)
+class ChatTemplateAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    """One chat body per (feature, event), shared by all four chat channels.
+
+    No `audience` column by design: chat is a staff surface, so there is only ever one
+    audience to author for — see `chat_templates.render_chat_text`.
+    """
+
+    list_display = ("makerspace", "feature", "event", "is_active", "updated_at")
+    list_filter = ("feature", "is_active", "makerspace")
+    search_fields = ("event", "text_body", "makerspace__name")
+    autocomplete_fields = ("makerspace",)
+    readonly_fields = ("created_at", "updated_at")
