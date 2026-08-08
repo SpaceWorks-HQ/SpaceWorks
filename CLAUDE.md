@@ -33,7 +33,9 @@ attested mobile device sessions + native push + Stripe PaymentSheet; and Google/
 for member and staff surfaces. Since then: machine-scoped `MANAGE_MACHINES`, deployment-removable
 `payments`/`updates`, lending/workshop install profiles + `suggest_tombstones`, configured generic OIDC
 providers, **phone + SMS as a verified member login identity**, a guided-but-skippable first-run Google
-step, and **one module key per notification channel (email/telegram/slack/mattermost/discord)**.
+step, **one module key per notification channel (email/telegram/slack/mattermost/discord)**, and
+**Notifications v2** (per-event recipients, per-room chat destinations, editable FabLab email/chat
+wording, object-scoped recipient rules, and the staff API + console for all of it).
 The one deferred end-to-end user QA remains an owner-run release gate.
 
 **Standing build conventions for this program:**
@@ -660,6 +662,88 @@ enabling a key cannot make an unconfigured channel send, and disabling it stops 
   tenant owns the destination channel and pays for it; identity resolves before a tenant exists.
   Do not re-propose per-makerspace auth credentials — that was considered and cancelled.
 
+**Notifications v2 — recipients, rooms, templates, scoping (phase 21).** Four additions on top of
+the per-feature×per-channel matrix, all additive and all dormant until an operator configures one.
+The governing rule for the whole area is that **it fails OPEN to the action-based default** — a
+broken selection, scope, module or template lookup must never mute a makerspace. This is deliberately
+the opposite of the *access* rules, which fail closed; do not "fix" one to match the other.
+- **`integrations/recipients.py` — per-event recipient selection, where NO ROWS MEANS TODAY'S
+  BEHAVIOUR, not "nobody".** `DEFAULT_CHANNEL_STATE` has bookings email+telegram **ON**, so a strict
+  default-nobody reading would have silently stopped booking mail that flows in production.
+  Rows become authoritative only once one exists for a (feature, event); deleting them all restores
+  the action-based default. Only `events`/`bookings`/`maintenance`/`members` are selectable —
+  **`hardware_requests` and `printing` keep `EmailNotificationMute` untouched**, being the alerts a
+  space cannot afford to lose to a wrong backfill. Kinds are `role` (a real FK, so a rename keeps its
+  rules and a delete removes them), `requester` (a **flag the caller reads**, never an address this
+  layer emits), `members`, and `user`. **A named `user` must hold a membership of that makerspace**,
+  enforced at the picker AND re-checked at send time: notification bodies carry requester names,
+  machine detail and booking info, so addressing an arbitrary platform account is a hand-operated
+  leak that crosses tenants on managed hosting. A member's `receives_notifications` opt-out **always
+  wins**, filtered in the query so no branch can forget it. The module gate lives inside
+  `selection_rows`, not in front of the resolver, so stale rows for an uninstalled module fall back
+  rather than mute. Native push is filtered by the same selection (it is the mobile form of the
+  member's own email), which is why `dispatch_channel` stores the scope on the log — push resolves
+  recipients at DELIVERY time and would otherwise match nothing.
+- **`NotificationDestination` — one row per room, and `[None]` means the legacy column.**
+  `destinations.resolve_destinations` returns destination rows **or the single sentinel `None`**,
+  which every sender already handles because it is the makerspace-column path that shipped. No rows
+  for a channel ⇒ `[None]` ⇒ byte-for-byte the old behaviour, which is what makes migration `0021`
+  (one space-wide destination per configured webhook **and per Telegram chat id**) safe; the
+  `Makerspace.*_webhook_url` columns stay readable for a release. The query is deliberately **not**
+  filtered on `is_active` — filtering there would make a deactivated sole room read as "no rooms" and
+  fall back to the credential underneath. **No scope links ⇒ space-wide**, the OPPOSITE default to
+  role machine-scope (an unscoped *role* must reach nothing; an unscoped *room* is not a permission).
+  An alert naming no subject reaches no *scoped* room. Credentials are typed per channel with a check
+  constraint, never one overloaded column. One log row per destination (D13), quota charged per room
+  because N rooms is N real sends, and `destination_label` is snapshotted so a queued row whose room
+  was deleted goes terminal instead of falling through to the makerspace-wide webhook.
+- **Telegram is the channel every "all four platforms" claim fails on.** It never went through
+  `send_webhook` — `telegram.send_message` reads the makerspace directly — so both senders take a
+  destination. **Telegram destinations carry NO bot token** (`resolve_bot_token` is makerspace →
+  `settings.TELEGRAM_BOT_TOKEN`): Telegram is bidirectional, and the accept/reject buttons post back
+  to ONE registered webhook authenticated by a single `TELEGRAM_WEBHOOK_SECRET`, so a second bot's
+  callbacks could not be authenticated or routed and its buttons would be dead. One bot in many
+  groups is the normal operator flow. Per-bot destinations need per-bot webhook secrets and inbound
+  routing — its own phase. Inbound routing resolves the actor from `from.id` and the request from the
+  callback data, never a chat id, which is why rooms cannot strand a callback.
+  `notification_enums.MAX_MESSAGE_LENGTH` is one table for all four (Telegram 4096, Slack 40000,
+  Mattermost 16383, Discord 2000) because Telegram and Discord **reject** an oversized body rather
+  than clipping it — a long maintenance alert simply never arrived.
+- **Templates extend `email_templates_registry`, never a second engine.** The four FabLab streams
+  (`events`/`bookings`/`maintenance`/**`membership`**) × both audiences × 20 events = 40 entries with
+  declared `fields`, `sample_context` and authored defaults reproducing what each adapter sent inline.
+  The `members` feature maps to the **`membership`** stream — the one pair where feature key and
+  stream name genuinely differ, because existing `EmailLog` rows carry `membership`. `ChatTemplate` is
+  **one body per (makerspace, feature, event) shared by all four chat channels** (per-channel bodies
+  quadruple the editing surface and let an operator edit one and forget the rest), falling back to
+  `LifecyclePayload.text` when absent, inactive, unknown, empty or broken. **Chat is a STAFF surface,
+  enforced in code**: `render_chat_text` raises on a requester audience and only ever resolves STAFF
+  registry entries, because a webhook is a room — posting "your booking is confirmed" into it exposes
+  that member's name to everyone with channel access. Native push takes `payload.text`, not the chat
+  body, since it is the member's own device rather than a room.
+- **Recipient object scoping composes as `role_scope AND (rule_scope OR all)` — narrowing only.**
+  Rule links reuse the destination shape (`no links ⇒ everything`); the role floor reuses
+  `machines/role_scope` via the new batch `manage_scopes_for_memberships` (two queries, not an N+1),
+  never a parallel resolver. **The floor applies to `kind=role` rows ONLY** — it answers "does this
+  role's `MANAGE_MACHINES` grant reach this machine", which is meaningful when someone was selected
+  *as a role* and meaningless when selected *as a person*; applying it to `members`/`user` would make
+  those kinds unusable for maintenance, since a plain member holds no machine grant and resolves to
+  the fail-closed `NOTHING`.
+- **Staff API + console are mandatory, not optional.** `/control/` is not proxied on the public
+  frontend port, so without `notification-recipient-rules` and `notification-destinations` a space
+  manager could not configure any of this. Saves **replace** rather than merge (a merge makes
+  unticking impossible), an unknown/foreign scope id is a **400 rather than a silent drop**, a room's
+  channel cannot be changed after creation, and the credential is **write-only** — blank on update
+  keeps the stored value, since the caller cannot read it back. `admin_api/notification_scope.py` is
+  the one scope writer shared by both surfaces. Email-template `STREAM_ACTIONS` gained the four new
+  streams (membership is `MANAGE_MAKERSPACE`-only: it carries applicant identity) plus a module gate.
+- **G4/G5 fallout:** `integrations/health.py` gained a `chat_destinations` section reporting every
+  room (configured / last delivery / last error, never the credential) plus the channels still on the
+  legacy path — it previously knew only Telegram, so destinations would have gone blind. And
+  `module_purge_plans` gained one plan per chat channel key: a channel owned no rows while its
+  credential was a `Makerspace` column, but a destination holds an encrypted secret, so
+  uninstall-then-purge of `discord` must destroy it. Delivery history survives (`SET_NULL` + label).
+
 **Presence geofence is ADVISORY, not an access gate (C.7).** Browser-supplied coordinates are spoofable, so
 `presence.geofence.evaluate_geofence` only classifies a reading (in_range / distance+accuracy buckets, raw
 coords never stored) and records it in the `presence.started` audit — it **never blocks** session creation, and
@@ -676,6 +760,14 @@ dead/broken feature for normal staff. New workflow actions ship their staff UI i
 Each line names a shipped feature and, where useful, the load-bearing rule it introduced (folded into the
 invariants above). Use `git log --oneline`/`git blame` for the implementing commits and per-file history.
 
+- **Notifications v2** (2026-08-09, `dev`, local): per-event recipient selection where no rows means
+  today's behaviour (`9d8d5a7`); per-room chat destinations with typed credentials, union scoping,
+  per-room log rows and a per-channel length table (`f7fd8b2`); editable email wording for the four
+  FabLab streams plus one shared chat body per event, staff-only by construction (`69b8e45`);
+  recipient rules narrowed by machine/type/category, composed so they can only narrow (`6eca688`);
+  staff API + console for recipients and rooms, with write-only credentials (`99dcb00`).
+  **Per-destination Telegram bot tokens were considered and dropped** — one webhook secret means a
+  second bot's accept/reject buttons would be dead.
 - **Auth + notification-channel modularity** (2026-08-08, `dev`, local): SMS provider seam + phone as a
   verified member login identity (`f04fbb5`); guided-but-skippable Google sign-in in `setup.sh`/`setup.ps1`
   plus the `configure_social_auth` command (`1210208`); Discord as an incoming-webhook channel and one

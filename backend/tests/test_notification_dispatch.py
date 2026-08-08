@@ -54,6 +54,18 @@ def response(status=204):
 
 
 def dispatch(space, channel="slack", **kwargs):
+    """The single log for a space with no destination rows.
+
+    `dispatch_channel` fans out to one row per room; these tests all exercise the legacy
+    makerspace-column path, which resolves to exactly one target, so unwrapping here keeps
+    every assertion below about the thing it was written to check.
+    """
+    logs = dispatch_all(space, channel, **kwargs)
+    assert len(logs) == 1
+    return logs[0]
+
+
+def dispatch_all(space, channel="slack", **kwargs):
     return dispatch_channel(
         makerspace=space,
         channel=channel,
@@ -162,7 +174,11 @@ def test_telegram_payload_is_durable_and_passed_to_sender(monkeypatch):
     log.refresh_from_db()
     assert log.payload == {"reply_markup": markup}
     assert log.status == NotificationDeliveryStatus.SENT
-    sender.assert_called_once_with(space, "Booking confirmed.", reply_markup=markup)
+    # destination=None is the legacy makerspace-column path: this space has no rooms, so
+    # the chat id still comes off the makerspace exactly as it did.
+    sender.assert_called_once_with(
+        space, "Booking confirmed.", reply_markup=markup, destination=None
+    )
 
 
 def test_async_dispatch_enqueues_after_commit(

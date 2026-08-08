@@ -88,6 +88,30 @@ Log into the **staff console** address (`/admin`) and:
    switches.
 5. **(Optional) Email & Telegram alerts** - set your makerspace's email (SMTP) and Telegram bot in
    the staff console's **Integration settings**. These are stored encrypted and never shown again.
+6. **(Optional) Decide who hears what** - in **Settings → Notification channels** you can tick which
+   kinds of alert go out by email, Telegram, Slack, Mattermost or Discord, choose who receives each
+   one, and reword the messages.
+
+### Who gets told, and where
+
+Out of the box, an alert goes to everyone whose job covers it — a booking alert reaches the people
+who manage bookings. You do not have to configure anything for that to work.
+
+If you want something different, three settings do it, all under **Settings → Notification
+channels**:
+
+- **Who gets notified** — pick recipients for one kind of alert: a role, one named member, everybody,
+  or the person the message is about. Leaving it empty means "notify by role", which is the default.
+  Anyone who has turned their own notifications off is never mailed, even if you pick them.
+- **Rooms** — if you use Slack, Discord, Mattermost or Telegram, you can have more than one channel.
+  Leave a room unrestricted and it hears everything; restrict it to a machine and it hears only that
+  machine. Useful when the laser team and the print room are different people.
+- **Email templates** — reword any message. Each one shows the details you can drop in (names, times,
+  machine, and so on) and previews before you save. There is a reset button if you change your mind.
+
+One rule the system enforces for you: messages written *for a member* ("your booking is confirmed")
+only ever go to that member by email or phone, never into a shared chat channel where everyone could
+read their name.
 
 ---
 
