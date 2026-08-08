@@ -68,11 +68,11 @@ def _validate_actions(actor, makerspace, actions, role=None):
             raise ValidationError(
                 {"granted_actions": "The Space Manager role must retain manage_makerspace."}
             )
-    if role and role.legacy_role == MakerspaceMembership.Role.GUEST_ADMIN:
-        if not values <= rbac.HANDOUT_ACTIONS:
-            raise ValidationError(
-                {"granted_actions": "Guest Admin actions must remain handout-only."}
-            )
+    # No Guest Admin ceiling any more: migration 0052 retired it as a built-in, so the
+    # handover role is an ordinary custom role and is bounded by the general rule above --
+    # you cannot grant an action you do not hold yourself. `rbac.HANDOUT_ACTIONS` survives
+    # as the definition of "handover-only" for `is_handout_only`, which decides what the
+    # console shows such a staffer; it is no longer a cap on what any role may hold.
     return sorted(values)
 
 

@@ -108,21 +108,29 @@ list of granted action strings (`view_inventory`, `accept_request`, `issue_direc
 what their role is called. So a makerspace can rename, re-scope, or invent roles to match how it
 actually works, and nothing downstream has to learn the new name.
 
-Every makerspace starts with five protected default roles:
+Every makerspace starts with four protected default roles:
 
 | Role | Granted actions | Notes |
 |---|---|---|
 | **Space Manager** | Everything grantable: full hardware lifecycle, inventory, QR, evidence, machines, events, bookings, audit, and makerspace settings | Must always keep `manage_makerspace` |
 | **Inventory Manager** | Full hardware lifecycle + inventory + QR + evidence + audit | No machines, staff or settings |
-| **Machine Manager** | `manage_machines` — assigned machines end-to-end, including usage, warranty and maintenance | Implies `manage_printing`, so it absorbed the old Print Manager |
-| **Guest Admin** | Handout-only: issue accepted requests, create direct handouts, process returns, upload evidence | Capped at the handout set; cannot be widened |
+| **Machine Manager** | `manage_machines` — every machine in the space, end to end: usage, warranty, maintenance, and handing finished jobs over | Implies `manage_printing` and `collect_service_request`, so it absorbed the old Print Manager |
 | **Member** | None | A role granting no actions *is* a community membership — that is how staff and member invitations are told apart |
 
 Beyond those, a Space Manager can **create custom roles** with any subset of actions they themselves
-hold, and can edit the defaults — including renaming them and narrowing what they grant. Two limits
-protect the defaults from being edited into incoherence: Space Manager must retain
-`manage_makerspace`, and Guest Admin must stay within the handout actions. Protected defaults cannot
-be deleted; custom roles can be, once nobody is assigned to them.
+hold, and can edit the defaults — including renaming them and narrowing what they grant. One limit
+protects the defaults from being edited into incoherence: Space Manager must retain
+`manage_makerspace`. Protected defaults cannot be deleted; custom roles can be, once nobody is
+assigned to them.
+
+**Front-desk handover is a custom role, not a built-in.** Earlier versions shipped a protected
+"Guest Admin", which handed every makerspace a role it might not want and made the one role people
+most wanted to reshape the one they could not delete. Build the role your space actually has — call it
+Front Desk, Duty Volunteer, whatever — and give it the handout actions: `view_inventory`,
+`assign_box`, `issue_request`, `issue_direct_loan`, `return_request`, `upload_evidence`, and
+`collect_service_request` to hand finished machine jobs to their owners. A role holding only these
+gets a deliberately narrow console (Requests, Direct handout, Job handover) instead of the full staff
+surface. Existing Guest Admin roles were converted in place and kept their name, actions and people.
 
 Escalation is blocked in both directions: you cannot grant an action you do not hold, you cannot
 create or assign a role carrying `manage_makerspace` (superadmin only), and you cannot modify a

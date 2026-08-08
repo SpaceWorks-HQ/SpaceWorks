@@ -37,6 +37,9 @@ def test_machine_manager_role_implies_manage_printing():
     assert rbac.effective_actions(machine_manager, makerspace.id) == {
         rbac.Action.MANAGE_MACHINES,
         rbac.Action.MANAGE_PRINTING,
+        # Handing a finished job to its requester is part of running the machines, so
+        # MANAGE_MACHINES implies it and a Machine Manager needs no separate grant.
+        rbac.Action.COLLECT_SERVICE_REQUEST,
     }
     # Other privileged actions remain denied.
     for action in (

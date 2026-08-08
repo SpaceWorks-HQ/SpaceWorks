@@ -149,15 +149,13 @@ def test_printing_recipients_follow_actions_but_mute_display_roles():
     assert inventory_manager.email not in emails
 
 
-def test_handout_only_includes_default_and_custom_handout_roles():
+def test_handout_only_includes_legacy_and_custom_handout_roles():
     makerspace = make_makerspace("l2b-handout-only")
+    # A membership still on the legacy `guest_admin` string with no role FK. Migration
+    # 0052 retired the seeded Guest Admin role, so there is nothing to point at -- this is
+    # the frozen `_MEMBERSHIP_ROLE_ACTIONS` fallback path, and it must keep resolving.
     guest = make_user("l2b-default-guest")
-    membership(
-        guest,
-        makerspace,
-        MakerspaceMembership.Role.GUEST_ADMIN,
-        seeded_role(makerspace, MakerspaceMembership.Role.GUEST_ADMIN),
-    )
+    membership(guest, makerspace, MakerspaceMembership.Role.GUEST_ADMIN, None)
     custom_handout = make_user("l2b-custom-handout")
     membership(
         custom_handout,

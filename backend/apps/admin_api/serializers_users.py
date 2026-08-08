@@ -42,10 +42,11 @@ class StaffCreateSerializer(serializers.Serializer):
     first_name = serializers.CharField(required=False, allow_blank=True)
     last_name = serializers.CharField(required=False, allow_blank=True)
     makerspace_id = serializers.IntegerField()
+    # GUEST_ADMIN is absent: it is no longer a built-in role (migration 0052), so there is
+    # no seeded role for this legacy fixed-role surface to attach a user to.
     role = serializers.ChoiceField(
         choices=[
             MakerspaceMembership.Role.SPACE_MANAGER,
-            MakerspaceMembership.Role.GUEST_ADMIN,
             MakerspaceMembership.Role.INVENTORY_MANAGER,
             MakerspaceMembership.Role.PRINT_MANAGER,
             MakerspaceMembership.Role.MACHINE_MANAGER,

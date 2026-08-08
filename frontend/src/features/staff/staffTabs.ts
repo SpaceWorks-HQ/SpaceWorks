@@ -45,7 +45,15 @@ const PATH_TABS = Object.fromEntries(
 export const STAFF_SELECTED_MAKERSPACE_KEY = "spaceworks.staff.selectedMakerspace";
 export const STAFF_ACTIVE_TAB_KEY = "spaceworks.staff.activeTab";
 
-export function filterTabsByEnabledModules(tabs: readonly string[], makerspace?: Makerspace) {
+// Only the two capability fields, not the whole Makerspace. A full row satisfies this
+// structurally, so every caller is unaffected -- and it stops the signature from claiming
+// a dependency on identity fields (slug, domain, chat id) that this never reads.
+type TabCapabilities = Pick<
+  Makerspace,
+  "enabled_modules" | "enabled_features" | "unavailable_apps"
+>;
+
+export function filterTabsByEnabledModules(tabs: readonly string[], makerspace?: TabCapabilities) {
   const unavailable = new Set(makerspace?.unavailable_apps ?? []);
   // Checked before the module gate and outside the early return below: an app the
   // deployment does not ship is unreachable no matter what the tenant enabled, and a

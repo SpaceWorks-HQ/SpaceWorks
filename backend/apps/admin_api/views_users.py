@@ -29,7 +29,6 @@ _SM_DELEGABLE_ROLES = (
     MakerspaceMembership.Role.PRINT_MANAGER,
     MakerspaceMembership.Role.INVENTORY_MANAGER,
     MakerspaceMembership.Role.MACHINE_MANAGER,
-    MakerspaceMembership.Role.GUEST_ADMIN,
 )
 
 

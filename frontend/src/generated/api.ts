@@ -289,7 +289,6 @@ export const openApiPaths = [
   "/api/v1/admin/stocktakes/{id}/complete",
   "/api/v1/admin/stocktakes/{id}/count-lines",
   "/api/v1/admin/stocktakes/{id}/resolve-scan",
-  "/api/v1/admin/users/guest-admins",
   "/api/v1/admin/users/inventory-managers",
   "/api/v1/admin/users/machine-managers",
   "/api/v1/admin/users/print-managers",

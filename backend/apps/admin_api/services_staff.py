@@ -14,15 +14,16 @@ _SM_DELEGABLE_ROLES = (
     MakerspaceMembership.Role.PRINT_MANAGER,
     MakerspaceMembership.Role.INVENTORY_MANAGER,
     MakerspaceMembership.Role.MACHINE_MANAGER,
-    MakerspaceMembership.Role.GUEST_ADMIN,
 )
 
 
 def _global_role_for_membership(legacy_role):
+    # The GUEST_ADMIN branch is gone with the built-in role. `User.Role.GUEST_ADMIN` stays
+    # in the enum because existing user rows hold that value, but nothing assigns it any
+    # more -- and it gated nothing reachable: its only consumer is `STAFF_ROLES`, read by
+    # `IsStaff`, whose sole `StaffAPIView` subclass overrides `permission_classes`.
     if legacy_role == MakerspaceMembership.Role.SPACE_MANAGER:
         return User.Role.SPACE_MANAGER
-    if legacy_role == MakerspaceMembership.Role.GUEST_ADMIN:
-        return User.Role.GUEST_ADMIN
     return User.Role.REQUESTER
 
 

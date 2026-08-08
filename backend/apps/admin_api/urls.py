@@ -570,12 +570,10 @@ urlpatterns = [
         {"role": MakerspaceMembership.Role.INVENTORY_MANAGER},
         name="admin-users-inventory-managers",
     ),
-    path(
-        "users/guest-admins",
-        views.StaffListCreateView.as_view(),
-        {"role": MakerspaceMembership.Role.GUEST_ADMIN},
-        name="admin-users-guest-admins",
-    ),
+    # `users/guest-admins` is gone: Guest Admin is no longer a built-in role, so there is
+    # no fixed role for this route to create. Handover staff are given a custom role
+    # through the role-assignment API, which is what the console has used all along --
+    # nothing in the frontend or the test suite ever called this endpoint.
     path(
         "users/print-managers",
         views.StaffListCreateView.as_view(),

@@ -41,6 +41,12 @@ class Action:
     ISSUE_DIRECT_LOAN = "issue_direct_loan"  # create a handout with NO reviewed request
     RETURN_REQUEST = "return_request"
     UPLOAD_EVIDENCE = "upload_evidence"
+    # Hand a finished machine-service job (a print, a laser cut) to its requester, and
+    # nothing else about that job. Separate from MANAGE_MACHINES because collection is a
+    # front-desk act while MANAGE_MACHINES is the whole machine lifecycle -- retiring a
+    # printer, editing maintenance, reading usage. Requiring the latter to perform the
+    # former is why a handover-only staffer previously could not hand over a print.
+    COLLECT_SERVICE_REQUEST = "collect_service_request"
     MANAGE_QR = "manage_qr"
     MANAGE_PRINTING = "manage_printing"
     MANAGE_MACHINES = "manage_machines"
@@ -51,7 +57,11 @@ class Action:
 
 
 IMPLIED_ACTIONS = {
-    Action.MANAGE_MACHINES: {Action.MANAGE_PRINTING},
+    # Collection is implied rather than granted, which is what makes this change carry no
+    # migration and no regression: every Space Manager and Machine Manager already holds
+    # MANAGE_MACHINES, so they keep collect authority without a single stored role
+    # changing. Only a role that holds *neither* has to be given the narrow action.
+    Action.MANAGE_MACHINES: {Action.MANAGE_PRINTING, Action.COLLECT_SERVICE_REQUEST},
 }
 
 
@@ -139,7 +149,12 @@ ROLE_FORBIDDEN_ACTIONS = frozenset({
 })
 ROLE_GRANTABLE_ACTIONS = frozenset(ALL_ACTIONS - ROLE_FORBIDDEN_ACTIONS)
 ROLE_SUPERADMIN_ASSIGNABLE_ACTIONS = frozenset({Action.MANAGE_MAKERSPACE})
-HANDOUT_ACTIONS = frozenset(_GUEST_ADMIN_ACTIONS)
+# The ceiling for a handover-only staffer, deliberately WIDER than the frozen legacy
+# grant above. `_GUEST_ADMIN_ACTIONS` is what an unmigrated null-FK membership resolves
+# to and must not drift, so adding COLLECT_SERVICE_REQUEST there would silently hand the
+# new authority to legacy rows. Widening only the ceiling means a role *may* hold it and
+# still read as handover-only, while nobody gains it without an explicit grant.
+HANDOUT_ACTIONS = frozenset(_GUEST_ADMIN_ACTIONS | {Action.COLLECT_SERVICE_REQUEST})
 _HANDOUT_MUTATIONS = frozenset(HANDOUT_ACTIONS - {Action.VIEW_INVENTORY})
 
 

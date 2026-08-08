@@ -40,28 +40,54 @@ SERVICE_FILTERS = [
 ]
 
 
-def _visible_makerspace(actor, makerspace_id):
+def _visible_makerspace(actor, makerspace_id, action=rbac.Action.MANAGE_MACHINES):
     makerspace = get_object_or_404(
         rbac.scope_by_makerspace(actor, Makerspace.objects.all(), makerspace_field="id"),
         pk=makerspace_id,
     )
     require_module(makerspace, "machine_service")
-    if not rbac.can(actor, rbac.Action.MANAGE_MACHINES, makerspace.pk):
+    if not rbac.can(actor, action, makerspace.pk):
         raise PermissionDenied()
     return makerspace
 
 
-def _request_queryset(actor):
+def _collect_only(actor, makerspace_id):
+    """Holds the narrow collect action but not machine management.
+
+    The distinction drives what such an actor may *see*, not only what they may do: a
+    front-desk handover role has no business reading the queue, draft requests or jobs
+    still on a machine, so its view is narrowed to the ones actually awaiting collection.
+    A MANAGE_MACHINES holder is never collect-only, because the implication makes them
+    hold both.
+    """
+    return (
+        rbac.can(actor, rbac.Action.COLLECT_SERVICE_REQUEST, makerspace_id)
+        and not rbac.can(actor, rbac.Action.MANAGE_MACHINES, makerspace_id)
+    )
+
+
+def _request_queryset(actor, makerspace_id=None):
     queryset = MachineServiceRequest.objects.select_related(
         "makerspace", "bucket__machine__machine_type", "queue__machine_type", "assigned_machine__machine_type", "requester"
     ).prefetch_related("files", "consumptions")
-    return rbac.scope_by_action(actor, rbac.Action.MANAGE_MACHINES, queryset,
-                                field="makerspace_id")
+    # Scoped on the narrow action, not MANAGE_MACHINES: `actions_satisfying` maps it back
+    # to MANAGE_MACHINES as well, so a manager's scope is unchanged while a collect-only
+    # role gains exactly its own makerspaces.
+    queryset = rbac.scope_by_action(actor, rbac.Action.COLLECT_SERVICE_REQUEST, queryset,
+                                    field="makerspace_id")
+    if makerspace_id is not None and _collect_only(actor, makerspace_id):
+        return queryset.filter(status=MachineServiceRequest.Status.COMPLETED)
+    return queryset
 
 
-def _manageable_request(actor, pk):
+def _manageable_request(actor, pk, action=rbac.Action.MANAGE_MACHINES):
     # Tenant visibility is established before the action check, so foreign/hidden
     # rows remain a 404 while an in-space but unauthorized actor receives a 403.
+    #
+    # `action` is MANAGE_MACHINES for every operation that changes what a machine did --
+    # accept, start, complete, fail, reprint. Only collection passes the narrow action,
+    # which is the whole point: handing a finished job to its owner is a front-desk act,
+    # while the rest of this API is the machine lifecycle.
     row = get_object_or_404(
         rbac.scope_by_makerspace(
             actor,
@@ -72,9 +98,9 @@ def _manageable_request(actor, pk):
         ), pk=pk,
     )
     require_module(row.makerspace, "machine_service")
-    if not rbac.can(actor, rbac.Action.MANAGE_MACHINES, row.makerspace_id):
+    if not rbac.can(actor, action, row.makerspace_id):
         raise PermissionDenied()
-    return get_object_or_404(_request_queryset(actor), pk=row.pk)
+    return get_object_or_404(_request_queryset(actor, row.makerspace_id), pk=row.pk)
 
 
 def _query_int(request, name):
@@ -101,8 +127,13 @@ class MachineServiceRequestListCreateView(APIView):
                    parameters=SERVICE_FILTERS,
                    responses={200: MachineServiceRequestSerializer(many=True), **SERVICE_ERRORS})
     def get(self, request, makerspace_id, *args, **kwargs):
-        makerspace = _visible_makerspace(request.user, makerspace_id)
-        rows = _request_queryset(request.user).filter(makerspace=makerspace)
+        # Reading the list is allowed on the narrow action so a handover role can find
+        # what is waiting; `_request_queryset` then trims it to collectable rows for an
+        # actor who cannot manage machines. Creating one below still requires management.
+        makerspace = _visible_makerspace(
+            request.user, makerspace_id, rbac.Action.COLLECT_SERVICE_REQUEST
+        )
+        rows = _request_queryset(request.user, makerspace.pk).filter(makerspace=makerspace)
         status_value = request.query_params.get("status")
         if status_value not in (None, ""):
             rows = rows.filter(status=status_value)
@@ -158,16 +189,24 @@ class MachineServiceRequestDetailView(APIView):
     @extend_schema(tags=["Admin machine service"], summary="Retrieve a machine service request",
                    responses={200: MachineServiceRequestSerializer, **SERVICE_ERRORS})
     def get(self, request, pk, *args, **kwargs):
-        return _response(_manageable_request(request.user, pk))
+        # Readable on the narrow action: collecting a job you cannot open is not a
+        # workflow. `_request_queryset` still hides non-collectable rows from a
+        # collect-only actor, so this 404s rather than leaking the queue.
+        return _response(
+            _manageable_request(request.user, pk, rbac.Action.COLLECT_SERVICE_REQUEST)
+        )
 
 
 class _MachineServiceActionView(APIView):
     permission_classes = [IsActiveStaff]
     input_serializer = EmptyServiceActionSerializer
     operation = None
+    # Every operation but collection edits the machine record of what happened, so the
+    # default is the broad action; MachineServiceCollectView narrows it.
+    required_action = rbac.Action.MANAGE_MACHINES
 
     def post(self, request, pk, *args, **kwargs):
-        row = _manageable_request(request.user, pk)
+        row = _manageable_request(request.user, pk, self.required_action)
         serializer = self.input_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -232,6 +271,7 @@ class MachineServiceFailView(_MachineServiceActionView):
 
 class MachineServiceCollectView(_MachineServiceActionView):
     operation = "collect"
+    required_action = rbac.Action.COLLECT_SERVICE_REQUEST
 
     @extend_schema(tags=["Admin machine service"], summary="Mark a machine service request collected",
                    request=EmptyServiceActionSerializer, responses={200: MachineServiceRequestSerializer, **SERVICE_ERRORS})

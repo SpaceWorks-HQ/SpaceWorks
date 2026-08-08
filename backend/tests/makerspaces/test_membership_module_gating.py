@@ -169,7 +169,10 @@ def test_membership_list_create_and_role_assignment_survive_without_the_module()
 
     created = client.post(
         reverse("admin-membership-list-create", kwargs={"makerspace_id": off.id}),
-        {"username": target.username, "role_id": role(off, "guest_admin").id},
+        # Any role that grants actions makes this a *staff* invitation, which is the path
+        # under test. Machine Manager rather than the old Guest Admin: 0052 retired that
+        # seeded role, and what matters here is only that the role grants something.
+        {"username": target.username, "role_id": role(off, "machine_manager").id},
         format="json",
     )
     assert created.status_code in (200, 201), created.data

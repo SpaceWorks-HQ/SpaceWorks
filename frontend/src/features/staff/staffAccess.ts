@@ -1,5 +1,5 @@
 const ALL_TABS = [
-  "dashboard", "notifications", "requests", "direct", "inventory", "needsfix", "categories", "machines", "events", "bookings", "members", "tobuy", "transfers",
+  "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "bookings", "members", "tobuy", "transfers",
   "stocktake", "containers", "ledger", "reports", "accountability", "warranty", "bulk", "qr", "scanner", "api", "settings", "emailtemplates", "users", "platform", "audit",
   "email-logs", "payments",
 ] as const;
@@ -11,6 +11,7 @@ export const TAB_LABELS: Record<string, string> = {
   notifications: "Notifications",
   requests: "Requests",
   direct: "Direct handout",
+  handover: "Job handover",
   ledger: "Ledger",
   inventory: "Inventory",
   categories: "Categories",
@@ -40,7 +41,7 @@ export const TAB_LABELS: Record<string, string> = {
 };
 
 export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
-  { label: "Operate", tabs: ["dashboard", "notifications", "requests", "direct", "payments", "ledger", "transfers", "stocktake", "tobuy"] },
+  { label: "Operate", tabs: ["dashboard", "notifications", "requests", "direct", "handover", "payments", "ledger", "transfers", "stocktake", "tobuy"] },
   { label: "Inventory", tabs: ["inventory", "categories", "needsfix", "containers", "bulk", "qr", "scanner"] },
   { label: "Machines", tabs: ["machines"] },
   { label: "Events", tabs: ["events"] },
@@ -66,11 +67,17 @@ export function getStaffAccess(actions: readonly string[], isSuperadmin: boolean
   const canUseToBuy = has("edit_inventory") || has("manage_printing") || has("manage_machines") || has("manage_makerspace");
   const canChooseToBuyKind = has("manage_makerspace");
   const canSeeDashboard = has("view_inventory") || has("manage_printing") || has("manage_machines") || has("manage_makerspace");
-  const HANDOUT = ["view_inventory", "assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence"];
-  const HANDOUT_MUTATIONS = ["assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence"];
+  // Mirrors rbac.HANDOUT_ACTIONS / _HANDOUT_MUTATIONS. `collect_service_request` belongs
+  // here so a front-desk role that also hands over finished machine jobs still reads as
+  // handover-only and keeps the narrow tab set, rather than being shown the whole console.
+  const HANDOUT = ["view_inventory", "assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence", "collect_service_request"];
+  const HANDOUT_MUTATIONS = ["assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence", "collect_service_request"];
   const handoutOnly = !isSuperadmin && actions.length > 0 && actions.every((action) => HANDOUT.includes(action)) && actions.some((action) => HANDOUT_MUTATIONS.includes(action));
+  // Mirrors the backend IMPLIED_ACTIONS edge: managing machines includes handing their
+  // finished work over, so a manager needs no separate grant.
+  const canCollectServiceRequests = has("collect_service_request") || canManageMachines;
   const printingOnly = canSeePrinting && !canEditInventory && !canManageMakerspace;
-  const baseTabs = handoutOnly ? (["requests", "direct"] as const) : ALL_TABS;
+  const baseTabs = handoutOnly ? (["requests", "direct", "handover"] as const) : ALL_TABS;
   const allowedTabs: readonly string[] = baseTabs.filter((tabName) => {
     if (tabName === "dashboard") return !handoutOnly && (isSuperadmin || canSeeDashboard);
     if (tabName === "notifications") return !handoutOnly && enabledModules.includes("notifications");
@@ -80,6 +87,7 @@ export function getStaffAccess(actions: readonly string[], isSuperadmin: boolean
     if (tabName === "bulk") return canEditInventory;
     if (tabName === "stocktake") return canEditInventory;
     if (tabName === "direct") return canIssueDirectLoan;
+    if (tabName === "handover") return enabledModules.includes("machine_service") && canCollectServiceRequests;
     if (tabName === "inventory") return canViewInventory;
     if (tabName === "ledger") return canViewInventory;
     if (tabName === "transfers") return canEditInventory || isSuperadmin;
@@ -118,8 +126,14 @@ export function getStaffAccess(actions: readonly string[], isSuperadmin: boolean
     canManageMachines,
     canManageEvents,
     canManageBookings,
+    canCollectServiceRequests,
     canChooseToBuyKind,
     allowedTabs,
-    defaultTab: handoutOnly ? "requests" : (allowedTabs.includes("dashboard") ? "dashboard" : (allowedTabs[0] ?? "dashboard")),
+    // A handover-only staffer lands on Requests when they have it -- but a collect-only
+    // role does not, and defaulting to a tab they cannot open would open the console on an
+    // error. Fall through to whatever they actually have.
+    defaultTab: handoutOnly
+      ? (allowedTabs.includes("requests") ? "requests" : (allowedTabs[0] ?? "handover"))
+      : (allowedTabs.includes("dashboard") ? "dashboard" : (allowedTabs[0] ?? "dashboard")),
   };
 }

@@ -38,6 +38,7 @@ const PlatformStripeConnectPanel = lazy(() => import("./PlatformStripeConnectPan
 const PlatformSocialAuthPanel = lazy(() => import("./PlatformSocialAuthPanel").then((m) => ({ default: m.PlatformSocialAuthPanel })));
 const MakerspaceSettingsPanel = lazy(() => import("./MakerspaceSettingsPanel").then((m) => ({ default: m.MakerspaceSettingsPanel })));
 const PaymentsPanel = lazy(() => import("./PaymentsPanel").then((m) => ({ default: m.PaymentsPanel })));
+const HandoverConsole = lazy(() => import("./panels/machine/HandoverConsole").then((m) => ({ default: m.HandoverConsole })));
 
 export function StaffTabContent({
   activeMakerspace,
@@ -51,6 +52,7 @@ export function StaffTabContent({
   canChooseToBuyKind,
   canEditInventory,
   canIssueDirectLoan,
+  canCollectServiceRequests,
   canUseToBuy,
   canManageQr,
   canManageMakerspace,
@@ -73,6 +75,7 @@ export function StaffTabContent({
   canChooseToBuyKind: boolean;
   canEditInventory: boolean;
   canIssueDirectLoan: boolean;
+  canCollectServiceRequests: boolean;
   canUseToBuy: boolean;
   canManageQr: boolean;
   canManageMakerspace: boolean;
@@ -176,6 +179,9 @@ export function StaffTabContent({
         />
       ) : null}
       {activeTab === "direct" && canIssueDirectLoan ? <DirectLoans key={makerspaceKey} makerspace={activeMakerspace} /> : null}
+      {activeTab === "handover" && canCollectServiceRequests ? (
+        <HandoverConsole key={makerspaceKey} makerspaceId={makerspaceKey} enabled />
+      ) : null}
       {activeTab === "bulk" && canEditInventory ? <BulkImport key={makerspaceKey} makerspace={activeMakerspace} /> : null}
       {activeTab === "qr" && canManageQr ? <QrTools key={makerspaceKey} makerspace={activeMakerspace} /> : null}
       {activeTab === "scanner" && canManageQr ? (

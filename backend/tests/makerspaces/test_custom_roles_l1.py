@@ -10,7 +10,15 @@ from apps.makerspaces.models import Makerspace, MakerspaceMembership, Makerspace
 
 
 LEGACY_ROLE_VALUES = [definition[0] for definition in roles.DEFAULT_ROLE_DEFINITIONS]
-HISTORICAL_ROLE_VALUES = [*LEGACY_ROLE_VALUES, MakerspaceMembership.Role.PRINT_MANAGER]
+# What migration 0039 seeded, which is not what is seeded today and must not be derived
+# from the current definitions. Both extras were retired later without rewriting history:
+# `print_manager` by 0046 and `guest_admin` by 0052, and 0039 still creates them when the
+# round-trip below replays it.
+HISTORICAL_ROLE_VALUES = [
+    *LEGACY_ROLE_VALUES,
+    MakerspaceMembership.Role.PRINT_MANAGER,
+    MakerspaceMembership.Role.GUEST_ADMIN,
+]
 
 
 def make_user(username):
@@ -52,7 +60,9 @@ def test_ensure_default_roles_is_idempotent():
     roles.ensure_default_roles(makerspace)
     roles.ensure_default_roles(makerspace)
 
-    assert MakerspaceRole.objects.filter(makerspace=makerspace).count() == 5
+    # Three protected defaults plus Member. Guest Admin is deliberately not among them:
+    # handover is a custom role now (0052).
+    assert MakerspaceRole.objects.filter(makerspace=makerspace).count() == 4
     assert_default_roles(makerspace)
 
 
@@ -229,3 +239,97 @@ def test_membership_clean_rejects_cross_tenant_assigned_role():
     )
     with pytest.raises(ValidationError):
         membership.clean()
+
+
+# --------------------------------------------------------------------------
+# Guest Admin retired as a built-in (migration 0052).
+# --------------------------------------------------------------------------
+
+@pytest.mark.django_db(transaction=True)
+def test_a_new_makerspace_gets_no_guest_admin_role():
+    """Handover is a local arrangement, not something every space is issued."""
+    makerspace = Makerspace.objects.create(name="No guest", slug="no-guest")
+
+    assert not MakerspaceRole.objects.filter(
+        makerspace=makerspace, legacy_role=MakerspaceMembership.Role.GUEST_ADMIN
+    ).exists()
+    assert not MakerspaceRole.objects.filter(makerspace=makerspace, slug="guest_admin").exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_migration_converts_a_seeded_guest_admin_without_touching_its_actions():
+    """Converting in place is the point: memberships PROTECT the row, so it cannot be
+    dropped and recreated without revoking everyone who holds it."""
+    from importlib import import_module
+
+    makerspace = Makerspace.objects.create(name="Legacy guest", slug="legacy-guest")
+    legacy = MakerspaceRole.objects.create(
+        makerspace=makerspace,
+        name="Guest Admin",
+        slug="guest_admin",
+        legacy_role=MakerspaceMembership.Role.GUEST_ADMIN,
+        granted_actions=["assign_box", "issue_request", "return_request", "view_inventory"],
+        is_default=True,
+        is_protected=True,
+    )
+    holder = MakerspaceMembership.objects.create(
+        makerspace=makerspace, user=make_user("legacy-guest-holder"), assigned_role=legacy,
+    )
+
+    module = import_module("apps.makerspaces.migrations.0052_retire_builtin_guest_admin_role")
+    module.forwards(_LiveApps(), None)
+
+    legacy.refresh_from_db()
+    assert legacy.legacy_role is None
+    assert legacy.is_default is False
+    assert legacy.is_protected is False
+    # Untouched: identity, authority and the assignment.
+    assert legacy.name == "Guest Admin"
+    assert legacy.granted_actions == [
+        "assign_box", "issue_request", "return_request", "view_inventory"
+    ]
+    holder.refresh_from_db()
+    assert holder.assigned_role_id == legacy.pk
+
+
+class _LiveApps:
+    """Stand-in for the migration `apps` registry, using the real models.
+
+    The converted columns are plain fields with no historical divergence, so the live
+    model answers identically and this avoids replaying the whole graph for one UPDATE.
+    """
+
+    @staticmethod
+    def get_model(app_label, model_name):
+        from django.apps import apps as django_apps
+
+        return django_apps.get_model(app_label, model_name)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_converted_handover_role_can_be_freely_edited_and_deleted():
+    """The cap is gone with the built-in: it keyed on `legacy_role`, now null."""
+    from apps.accounts import rbac
+    from apps.makerspaces import role_services
+
+    makerspace = Makerspace.objects.create(name="Free guest", slug="free-guest")
+    actor = make_user("free-guest-manager")
+    MakerspaceMembership.objects.create(
+        makerspace=makerspace, user=actor,
+        assigned_role=MakerspaceRole.objects.get(makerspace=makerspace, slug="space_manager"),
+    )
+    converted = MakerspaceRole.objects.create(
+        makerspace=makerspace, name="Front Desk", slug="front-desk",
+        granted_actions=["issue_request", "view_inventory"],
+    )
+
+    # Widened past the old handout ceiling, which a protected Guest Admin refused.
+    role_services.update_role(
+        makerspace=makerspace, role=converted, actor=actor,
+        granted_actions=["edit_inventory", "issue_request", "view_inventory"],
+    )
+    converted.refresh_from_db()
+    assert rbac.Action.EDIT_INVENTORY in converted.granted_actions
+
+    role_services.delete_role(makerspace=makerspace, role=converted, actor=actor)
+    assert not MakerspaceRole.objects.filter(pk=converted.pk).exists()

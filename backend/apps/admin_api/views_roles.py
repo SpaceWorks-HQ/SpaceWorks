@@ -17,7 +17,7 @@ ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404:
 
 _CATALOG = (
     ("Inventory", (("view_inventory", "Inventory and outstanding-loans ledger visibility."), ("edit_inventory", "Catalog, stock, needs-fix, stocktake, asset warranty, procurement, and containers."), ("manage_qr", "QR printing, scanner, and QR management."))),
-    ("Requests / Handover", (("accept_request", "Review hardware requests."), ("reject_request", "Reject hardware requests."), ("assign_box", "Assign physical handover boxes."), ("issue_request", "Issue accepted requests."), ("issue_direct_loan", "Create direct loans."), ("return_request", "Process returns."), ("upload_evidence", "Upload required handover evidence."))),
+    ("Requests / Handover", (("accept_request", "Review hardware requests."), ("reject_request", "Reject hardware requests."), ("assign_box", "Assign physical handover boxes."), ("issue_request", "Issue accepted requests."), ("issue_direct_loan", "Create direct loans."), ("return_request", "Process returns."), ("upload_evidence", "Upload required handover evidence."), ("collect_service_request", "Hand finished machine jobs to their requester, without machine management."))),
     ("Machines", (("manage_machines", "Machines, warranty, maintenance, documents, operators, usage, and reports."),)),
     ("Printing", (("manage_printing", "Print queue, printers, materials, warranty, reports, and printer-type machines."),)),
     ("Events", (("manage_events", "Event administration and attendance."),)),
