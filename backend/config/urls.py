@@ -94,6 +94,7 @@ urlpatterns = [
     # stayed behind. Every warranty pattern is a distinct literal, so ordering is
     # belt-and-braces rather than load-bearing.
     *separable("warranty", "api/v1/admin/", "apps.warranty.urls"),
+    *separable("maintenance", "api/v1/admin/", "apps.maintenance.urls"),
     path("api/v1/admin/", include("apps.boxes.urls")),
     path("api/v1/admin/", include("apps.evidence.urls")),
     path("api/v1/", include("apps.operations.urls")),

@@ -6,6 +6,7 @@ from apps.maintenance.models import (
     MaintenanceLogDocument,
     MaintenanceSchedule,
 )
+from apps.separability.tombstones import app_is_tombstoned
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -20,7 +21,6 @@ class _ReadOnlyMaintenanceAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         return False
 
 
-@admin.register(MaintenanceSchedule)
 class MaintenanceScheduleAdmin(_ReadOnlyMaintenanceAdmin):
     list_display = (
         "id", "machine", "description", "next_due", "interval_days", "is_active",
@@ -30,7 +30,6 @@ class MaintenanceScheduleAdmin(_ReadOnlyMaintenanceAdmin):
     raw_id_fields = ("machine", "created_by")
 
 
-@admin.register(MaintenanceLog)
 class MaintenanceLogAdmin(_ReadOnlyMaintenanceAdmin):
     list_display = ("id", "machine", "performed_by", "performed_at", "cost")
     list_filter = ("performed_at",)
@@ -38,7 +37,6 @@ class MaintenanceLogAdmin(_ReadOnlyMaintenanceAdmin):
     raw_id_fields = ("machine", "performed_by")
 
 
-@admin.register(MaintenanceLogDocument)
 class MaintenanceLogDocumentAdmin(_ReadOnlyMaintenanceAdmin):
     list_display = (
         "id", "log", "machine", "object_key", "size_bytes", "uploaded_by", "created_at",
@@ -51,3 +49,13 @@ class MaintenanceLogDocumentAdmin(_ReadOnlyMaintenanceAdmin):
     @admin.display(description="Machine")
     def machine(self, obj):
         return obj.log.machine
+
+
+# Registered rather than decorated: the admin screens are runtime surfaces a tombstone
+# removes, while the rows stay reachable through the ORM and the purge path. The
+# setting is consulted instead of the manifest because admin autodiscovery runs before
+# this app's ready(). See separability.tombstones.app_is_tombstoned.
+if not app_is_tombstoned("maintenance"):
+    admin.site.register(MaintenanceSchedule, MaintenanceScheduleAdmin)
+    admin.site.register(MaintenanceLog, MaintenanceLogAdmin)
+    admin.site.register(MaintenanceLogDocument, MaintenanceLogDocumentAdmin)

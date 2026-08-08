@@ -1,11 +1,11 @@
-from apps.admin_api.views_maintenance_documents import (
+from apps.maintenance.views_documents import (
     MaintenanceLogDocumentDetailView,
     MaintenanceLogDocumentFinalizeView,
     MaintenanceLogDocumentPresignView,
     MaintenanceLogDocumentUrlView,
 )
-from apps.admin_api.views_maintenance_logs import MaintenanceLogListCreateView
-from apps.admin_api.views_maintenance_schedules import (
+from apps.maintenance.views_logs import MaintenanceLogListCreateView
+from apps.maintenance.views_schedules import (
     MaintenanceScheduleDeactivateView,
     MaintenanceScheduleDetailView,
     MaintenanceScheduleListCreateView,

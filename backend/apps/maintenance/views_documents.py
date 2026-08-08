@@ -4,14 +4,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.admin_api.permissions import IsActiveStaff
-from apps.admin_api.serializers_maintenance import (
+from apps.maintenance.serializers import (
     MaintenanceDocumentFinalizeSerializer,
     MaintenanceDocumentPresignResponseSerializer,
     MaintenanceDocumentPresignSerializer,
     MaintenanceDocumentUrlSerializer,
     MaintenanceLogDocumentSerializer,
 )
-from apps.admin_api.views_maintenance_shared import (
+from apps.maintenance.views_shared import (
     resolve_document,
     resolve_log,
 )

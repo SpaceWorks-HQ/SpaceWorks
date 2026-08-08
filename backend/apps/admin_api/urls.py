@@ -104,16 +104,6 @@ from apps.admin_api.views_machines_actions import (
     MachineUnretireView,
     MachineUsageView,
 )
-from apps.admin_api.views_maintenance import (
-    MaintenanceLogDocumentDetailView,
-    MaintenanceLogDocumentFinalizeView,
-    MaintenanceLogDocumentPresignView,
-    MaintenanceLogDocumentUrlView,
-    MaintenanceLogListCreateView,
-    MaintenanceScheduleDeactivateView,
-    MaintenanceScheduleDetailView,
-    MaintenanceScheduleListCreateView,
-)
 from apps.admin_api.views_notification_recipients import NotificationRecipientsView
 from apps.admin_api.views_notification_rules import NotificationRulesView
 from apps.admin_api.views_platform import PlatformEmailSettingsView
@@ -296,46 +286,6 @@ urlpatterns = [
         "makerspaces/<int:makerspace_id>/roles/<int:role_id>",
         RoleDetailView.as_view(),
         name="admin-role-detail",
-    ),
-    path(
-        "makerspaces/<int:makerspace_id>/machines/<int:machine_id>/maintenance/schedules/",
-        MaintenanceScheduleListCreateView.as_view(),
-        name="admin-maintenance-schedule-list-create",
-    ),
-    path(
-        "maintenance/schedules/<int:pk>/",
-        MaintenanceScheduleDetailView.as_view(),
-        name="admin-maintenance-schedule-detail",
-    ),
-    path(
-        "maintenance/schedules/<int:pk>/deactivate/",
-        MaintenanceScheduleDeactivateView.as_view(),
-        name="admin-maintenance-schedule-deactivate",
-    ),
-    path(
-        "makerspaces/<int:makerspace_id>/machines/<int:machine_id>/maintenance/logs/",
-        MaintenanceLogListCreateView.as_view(),
-        name="admin-maintenance-log-list-create",
-    ),
-    path(
-        "maintenance/logs/<int:pk>/documents/presign/",
-        MaintenanceLogDocumentPresignView.as_view(),
-        name="admin-maintenance-log-document-presign",
-    ),
-    path(
-        "maintenance/logs/<int:pk>/documents/",
-        MaintenanceLogDocumentFinalizeView.as_view(),
-        name="admin-maintenance-log-document-finalize",
-    ),
-    path(
-        "maintenance/log-documents/<int:pk>/url/",
-        MaintenanceLogDocumentUrlView.as_view(),
-        name="admin-maintenance-log-document-url",
-    ),
-    path(
-        "maintenance/log-documents/<int:pk>/",
-        MaintenanceLogDocumentDetailView.as_view(),
-        name="admin-maintenance-log-document-detail",
     ),
     path(
         'makerspaces/<int:makerspace_id>/spaces/',

@@ -5,12 +5,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.admin_api.permissions import IsActiveStaff
-from apps.admin_api.serializers_maintenance import (
+from apps.maintenance.serializers import (
     MaintenanceLogListSerializer,
     MaintenanceLogSerializer,
     MaintenanceLogWriteSerializer,
 )
-from apps.admin_api.views_maintenance_shared import (
+from apps.maintenance.views_shared import (
     MaintenancePagination,
     page_response,
     require_machine_access,
