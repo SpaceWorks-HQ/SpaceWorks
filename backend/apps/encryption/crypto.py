@@ -38,6 +38,18 @@ class PiiKeyUnavailable(PiiUnavailable):
         super().__init__("Protected data is unavailable.")
 
 
+class UnmappedPiiModel(PiiUnavailable):
+    """A ScopedPiiModelMixin subclass reached save() with no registered fields.
+
+    This is the fail-closed backstop for the gap that otherwise fails OPEN: an
+    unregistered mapped model takes the plain-save branch, skipping encryption, the
+    blind index and the write fence, and stores plaintext with nothing raised. The
+    separability system check refuses startup in this state, so reaching here means
+    checks were bypassed (``--skip-checks``, or a registry mutated at runtime) —
+    refuse the write rather than silently store PII in the clear.
+    """
+
+
 class LegacyPlaintextRejected(PiiUnavailable):
     def __init__(self):
         super().__init__("Protected data is unavailable.")

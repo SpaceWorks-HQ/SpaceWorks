@@ -7,6 +7,7 @@ from apps.hardware_requests.self_checkout_models import PublicToolLoan
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
 from apps.makerspaces.platform import module_enabled
 from apps.presence.models import PresenceSession
+from apps.separability.registry import runtime_active
 
 
 RECENT_LIMIT = 20
@@ -43,7 +44,10 @@ def member_activity(membership):
         payload["bookings"] = _bookings(makerspace.id, member, now)
     if module_enabled(makerspace, "events"):
         payload["event_registrations"] = _event_registrations(makerspace.id, member)
-    if module_enabled(makerspace, "machine_service") and apps.is_installed("apps.machines"):
+    # runtime_active, not apps.is_installed: a tombstoned app stays in
+    # INSTALLED_APPS (its migrations must remain applied), so is_installed answers
+    # "are the tables there?" when this asks "are the surfaces live?".
+    if module_enabled(makerspace, "machine_service") and runtime_active("machines"):
         payload["machine_service_requests"] = _machine_service_requests(makerspace.id, member)
     return payload
 

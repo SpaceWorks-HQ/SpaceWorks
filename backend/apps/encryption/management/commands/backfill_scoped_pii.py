@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from apps.encryption.crypto import PiiUnavailable, is_envelope
-from apps.encryption.registry import ALL_FIELDS, BY_MODEL, makerspace_id_for
+from apps.encryption.registry import all_fields, fields_for_label, makerspace_id_for, registered_labels
 
 
 FILTERS = {
@@ -24,7 +24,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--makerspace", type=int, required=True)
-        parser.add_argument("--model", choices=sorted(BY_MODEL), required=True)
+        parser.add_argument("--model", choices=sorted(registered_labels()), required=True)
         parser.add_argument("--batch-size", type=int, default=100)
         parser.add_argument("--resume-after-pk", type=int, default=0)
         parser.add_argument("--dry-run", action="store_true")
@@ -51,7 +51,7 @@ class Command(BaseCommand):
             with transaction.atomic():
                 rows = list(model.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
                 for row in rows:
-                    for field in BY_MODEL[label]:
+                    for field in fields_for_label(label):
                         raw = row.__dict__.get(field.field_name, "")
                         if raw in ("", None):
                             counts["empty"] += 1

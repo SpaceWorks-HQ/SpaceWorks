@@ -108,7 +108,7 @@ class PiiBlindIndex(models.Model):
     def clean(self):
         allowed = {
             (field.model_label, field.field_name): field.index_kind
-            for field in __import__("apps.encryption.registry", fromlist=["ALL_FIELDS"]).ALL_FIELDS
+            for field in __import__("apps.encryption.registry", fromlist=["all_fields"]).all_fields()
             if field.index_kind in {"bloom", "bloom_exact"}
         }
         kind = allowed.get((self.model_label, self.field_name))

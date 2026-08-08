@@ -5,7 +5,7 @@ from django.conf import settings
 from apps.encryption.blind_index import active_generation
 from apps.encryption.crypto import PiiUnavailable, is_envelope
 from apps.encryption.models import MakerspaceEncryptionKey, PiiBlindIndex
-from apps.encryption.registry import ALL_FIELDS, makerspace_id_for
+from apps.encryption.registry import all_fields, makerspace_id_for
 from apps.encryption.services import unwrap_dek
 
 
@@ -21,7 +21,7 @@ def assert_ready(*, strict=False):
     # Existing envelopes imply an owning tenant must have precisely one live DEK,
     # and every retained version needs an authenticated broker preflight.
     owners = set()
-    for field in ALL_FIELDS:
+    for field in all_fields():
         model = __import__("django.apps", fromlist=["apps"]).apps.get_model(field.model_label)
         for row in model.objects.only("pk", field.field_name).iterator(chunk_size=200):
             raw = row.__dict__.get(field.field_name)
@@ -36,7 +36,7 @@ def assert_ready(*, strict=False):
     if strict:
         # Strict coverage is checked at source granularity by the reindex command;
         # this catches every present row that lacks an active provenance record.
-        for field in ALL_FIELDS:
+        for field in all_fields():
             if field.index_kind not in {"bloom", "bloom_exact"}:
                 continue
             model = __import__("django.apps", fromlist=["apps"]).apps.get_model(field.model_label)

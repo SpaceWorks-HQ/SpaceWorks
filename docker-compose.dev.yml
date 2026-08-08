@@ -36,11 +36,14 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      # The staff-console feature drift-guard (tests/test_capabilities.py) reads
-      # frontend/src/lib/features.ts at `parents[2] / "frontend"`. With ./backend
-      # mounted at /app that resolves to /frontend, so mount it read-only there —
-      # otherwise `exec backend pytest` reports a false drift failure.
+      # Two test suites read repo files by walking up from their own path, which
+      # with ./backend mounted at /app lands at the filesystem root:
+      #   tests/test_capabilities.py     -> parents[2] / "frontend"  -> /frontend
+      #   tests/encryption/test_doc_help -> parents[3] / "docs"      -> /docs
+      # Mount both read-only there or `exec backend pytest` reports false failures
+      # (a phantom feature-drift, and a missing PII runbook).
       - ./frontend:/frontend:ro
+      - ./docs:/docs:ro
 
   # Migrations run from the mounted tree, so a migration you just wrote applies
   # without rebuilding the image.

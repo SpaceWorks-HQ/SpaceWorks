@@ -84,6 +84,38 @@ for member and staff surfaces. The one deferred end-to-end user QA remains an ow
   migration whose dep is a rewound app can break migration-executor tests (rewind the full graph
   forward in the test's `finally`).
 
+**Separability: two registries, and the gap that fails OPEN (Phase 7, `apps/separability/`).**
+An app can be **tombstoned** — surfaces gone, rows and migrations retained (`apps/printing`,
+`apps/roadmap` are the precedent) — and that forces two registries with opposite lifetimes.
+**Retention** (PII field mappings, purge plans, storage collectors, historical payment subjects) is
+registered **even when tombstoned**: deregistering it makes retained rows unpurgeable and
+unencryptable and strands private S3 objects nothing can name. **Runtime** (URLs, reports, admin,
+frontend surfaces, origin-scope routes) registers only while the app is active.
+- **A missing PII registration fails OPEN, which is why B3 is a system check and not an assertion.**
+  `ScopedPiiModelMixin` asks the registry for a model's fields and reads an empty answer as "holds no
+  PII"; every protection then no-ops in the safe-looking direction — `__getattribute__` returns the raw
+  column, the `bulk_create` guard passes, the save boundary writes no envelope, the write fence is
+  skipped — and the row lands in the clear with nothing raised. `separability.E001` now **refuses
+  startup** (verified: deleting `bookings.Booking` from the map makes `manage.py check` a
+  `SystemCheckError`), and `UnmappedPiiModel` is the runtime backstop for a `--skip-checks` process.
+  The check is deliberately **not** gated on `PII_ENCRYPTION_ENABLED` — the deployment that has not
+  enabled encryption yet is exactly the one that will, and the gap must be caught before the flip.
+- **Registration happens in `AppConfig.ready()`, so it must be query-free and idempotent** — `ready()`
+  also runs for `migrate`, `makemigrations`, tests, Celery workers and management commands.
+- **`apps.separability` must stay LAST in `INSTALLED_APPS`.** Django imports every models module, then
+  calls every `ready()` in list order; being last is what guarantees all registration precedes
+  `finalize()`, which freezes the maps. Registering after the freeze raises rather than mutating a map
+  some consumers already read.
+- **Duplicate keys are fatal, never last-write-wins** — two apps claiming one purge node or PII model
+  means one is silently unprotected, and the loser is invisible.
+- **Consumers call accessors (`fields_for_label`, `all_fields`, `registered_labels`, `runtime_active`),
+  never `from ... import BY_MODEL`/`ALL_FIELDS`** — a module-level import binds an import-time snapshot
+  that stops being true once registration is per-app.
+- **`runtime_active(app_label)` replaces `apps.is_installed()`** at the two call sites that had it
+  (`member_activity_service`, `reports_health`): a tombstoned app is still installed — it must be, or
+  its migrations unapply — so `is_installed()` answers "are the tables there?" when the caller means
+  "are the surfaces live?". Unregistered defaults to **active**, so no app must opt in to keep working.
+
 ## Container/deployment invariants (do not regress)
 
 **The images run unprivileged.** `backend/Dockerfile` creates uid 10001 `app`, uses `COPY --chown`

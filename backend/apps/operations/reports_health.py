@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.makerspaces.models import Makerspace
 from apps.operations.report_registry import ReportResult
 from apps.operations.report_scope import eligible_makerspaces
+from apps.separability.registry import runtime_active
 
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ def _empty_record(space, aggregate):
     record = {}
     modules = set(space["enabled_modules"] or [])
     for section, metrics in SECTION_FIELDS.items():
-        enabled = apps.is_installed(f"apps.{section}") and section in modules
+        enabled = runtime_active(section) and section in modules
         record[f"{section}_enabled"] = enabled
         record[f"{section}_available"] = False
         record.update({metric: None for metric in metrics})
