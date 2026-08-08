@@ -121,7 +121,7 @@ def test_push_device_delete_is_owner_only(settings):
 def test_missing_platform_credentials_are_inert():
     makerspace = make_space("native-push-inert")
 
-    log = dispatch_channel(
+    [log] = dispatch_channel(
         makerspace=makerspace,
         channel=NotificationChannel.NATIVE_PUSH,
         feature=NotificationFeature.HARDWARE_REQUESTS,
@@ -160,7 +160,7 @@ def test_invalid_provider_token_is_deactivated_without_leaking_token(
         raise PushProviderError("provider detail containing secret", invalid_token=True)
 
     monkeypatch.setattr("apps.integrations.push.send_fcm", invalid)
-    log = dispatch_channel(
+    [log] = dispatch_channel(
         makerspace=makerspace,
         channel=NotificationChannel.NATIVE_PUSH,
         feature=NotificationFeature.HARDWARE_REQUESTS,

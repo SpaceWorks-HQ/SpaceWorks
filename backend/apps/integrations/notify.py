@@ -37,6 +37,11 @@ class LifecyclePayload:
     text: str
     emails: tuple[EmailDelivery, ...] = ()
     telegram_reply_markup: dict | None = None
+    # What this alert is about, for destination scoping. It rides on the payload rather
+    # than being a `notify_lifecycle` parameter because only `build()` has resolved the
+    # domain object — the caller often has just a primary key. `None` means the alert
+    # names no subject, and a room scoped to one machine will not receive it.
+    scope: object | None = None
 
 
 @dataclass(frozen=True)
@@ -126,7 +131,7 @@ def _run_guarded(makerspace, feature, event, build, sync):
                     and payload.telegram_reply_markup
                     else None
                 )
-                log = dispatch_channel(
+                logs = dispatch_channel(
                     makerspace=makerspace,
                     channel=channel,
                     feature=feature,
@@ -134,6 +139,7 @@ def _run_guarded(makerspace, feature, event, build, sync):
                     text_body=payload.text,
                     payload=payload_data,
                     sync=sync,
+                    scope=payload.scope,
                 )
             except Exception:
                 _increment(failed, channel)
@@ -145,14 +151,21 @@ def _run_guarded(makerspace, feature, event, build, sync):
                     },
                 )
                 continue
-            if log.status == NotificationDeliveryStatus.SKIPPED:
-                # Neither delivered nor failed -- the same reasoning as the email skip
-                # above: the makerspace uninstalled this channel's module, and counting
-                # a skip as a delivery makes `bool(delivered_counts)` claim a reminder
-                # went out when nothing was sent.
-                continue
-            target = failed if log.status == NotificationDeliveryStatus.FAILED else delivered
-            _increment(target, channel)
+            for log in logs:
+                if log.status == NotificationDeliveryStatus.SKIPPED:
+                    # Neither delivered nor failed -- the same reasoning as the email skip
+                    # above: the makerspace uninstalled this channel's module, and counting
+                    # a skip as a delivery makes `bool(delivered_counts)` claim a reminder
+                    # went out when nothing was sent.
+                    continue
+                target = (
+                    failed
+                    if log.status == NotificationDeliveryStatus.FAILED
+                    else delivered
+                )
+                # Counted per room, so three rooms is three deliveries: the counts back
+                # `bool(delivered_counts)`, and a partial fan-out must show both sides.
+                _increment(target, channel)
     except Exception:
         logger.warning(
             "lifecycle_notification_failed",

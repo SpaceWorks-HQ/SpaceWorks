@@ -4,6 +4,7 @@ from django.db import models
 from apps.integrations.email_templates_registry import validate_email_template_strings
 from apps.integrations.notification_enums import (
     CHANNEL_MODULE_KEYS,
+    ChatNotificationChannel,
     NonEmailNotificationChannel,
     NotificationChannel,
     NotificationDeliveryStatus,
@@ -231,6 +232,21 @@ class NotificationDeliveryLog(models.Model):
     channel = models.CharField(
         max_length=16, choices=NonEmailNotificationChannel.choices
     )
+    # Nullable twice over, for two different reasons. Rows written before destinations
+    # existed have none, and native push addresses a user rather than a room. SET_NULL so
+    # deleting a room does not erase its delivery history.
+    destination = models.ForeignKey(
+        "integrations.NotificationDestination",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="delivery_logs",
+    )
+    # Snapshot of the room's name, and the only way to tell "never had a destination" from
+    # "the destination was deleted" once the FK is nulled. Delivery refuses the second
+    # case rather than falling back to the makerspace-wide webhook, which would post a
+    # machine-scoped alert into the general channel.
+    destination_label = models.CharField(max_length=80, blank=True, default="")
     feature = models.CharField(max_length=32, choices=NotificationFeature.choices)
     event = models.CharField(max_length=64)
     text_body = models.TextField()
@@ -290,6 +306,12 @@ class DailyNotificationCounter(models.Model):
         return f"{self.makerspace_id}:{self.channel}:{self.day}={self.count}"
 
 
+from apps.integrations.models_destinations import (  # noqa: E402
+    DestinationCategoryScope,
+    DestinationMachineScope,
+    DestinationMachineTypeScope,
+    NotificationDestination,
+)
 from apps.integrations.models_push import PlatformPushSettings, PushDevice  # noqa: E402
 from apps.integrations.models_recipients import (  # noqa: E402
     NotificationRecipient,
@@ -303,9 +325,13 @@ from apps.integrations.models_sms import (  # noqa: E402
 
 __all__ = [
     'CHANNEL_MODULE_KEYS',
+    'ChatNotificationChannel',
     'DailyEmailCounter',
     'DailyNotificationCounter',
     'DailyOtpSmsCounter',
+    'DestinationCategoryScope',
+    'DestinationMachineScope',
+    'DestinationMachineTypeScope',
     'EmailLog',
     'EmailNotificationMute',
     'EmailTemplate',
@@ -313,6 +339,7 @@ __all__ = [
     'NotificationChannel',
     'NotificationDeliveryLog',
     'NotificationDeliveryStatus',
+    'NotificationDestination',
     'NotificationFeature',
     'NotificationPreference',
     'NotificationRecipient',

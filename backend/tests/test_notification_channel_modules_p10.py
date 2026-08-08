@@ -133,7 +133,7 @@ def test_an_unconfigured_discord_channel_fails_terminally_without_sending():
     space = make_space("p10-unconfigured")
     space.enabled_modules = sorted(set(space.enabled_modules or []) | {"discord"})
     space.save()
-    log = dispatch_channel(
+    [log] = dispatch_channel(
         makerspace=space,
         channel="discord",
         feature=NotificationFeature.HARDWARE_REQUESTS,
@@ -171,7 +171,7 @@ def test_uninstalling_the_module_skips_the_send_and_keeps_the_credential():
     space.save()
 
     assert channel_module_blocks(space, "discord") is True
-    log = dispatch_channel(
+    [log] = dispatch_channel(
         makerspace=space,
         channel="discord",
         feature=NotificationFeature.HARDWARE_REQUESTS,
@@ -214,7 +214,7 @@ def test_enabling_the_module_cannot_make_an_unconfigured_channel_send():
     space.enabled_modules = sorted(set(space.enabled_modules or []) | {"discord"})
     space.save()
     assert channel_module_blocks(space, "discord") is False
-    log = dispatch_channel(
+    [log] = dispatch_channel(
         makerspace=space,
         channel="discord",
         feature=NotificationFeature.HARDWARE_REQUESTS,

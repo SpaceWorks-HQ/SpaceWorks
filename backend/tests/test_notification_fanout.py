@@ -46,8 +46,9 @@ def successful_sinks(monkeypatch, emails, channels):
         return SimpleNamespace(status=EmailLog.Status.SENT)
 
     def channel_sink(**kwargs):
+        # A list, because dispatch_channel now fans out to one log row per destination.
         channels.append(kwargs)
-        return SimpleNamespace(status=NotificationDeliveryStatus.SENT)
+        return [SimpleNamespace(status=NotificationDeliveryStatus.SENT)]
 
     monkeypatch.setattr(notify, "dispatch_email", email_sink)
     monkeypatch.setattr(notify, "dispatch_channel", channel_sink)

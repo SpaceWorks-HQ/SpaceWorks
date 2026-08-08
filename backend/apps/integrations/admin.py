@@ -4,6 +4,7 @@ from django.contrib import admin
 from config.admin_access import SuperuserOnlyModelAdmin
 
 from apps.integrations import admin_email_templates  # noqa: F401
+from apps.integrations import admin_destinations  # noqa: F401
 from apps.integrations import admin_email_logs  # noqa: F401
 from apps.integrations import admin_notification_mutes  # noqa: F401
 from apps.integrations import admin_notifications  # noqa: F401

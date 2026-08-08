@@ -40,6 +40,38 @@ class NonEmailNotificationChannel(models.TextChoices):
     NATIVE_PUSH = "native_push", "Native push"
 
 
+class ChatNotificationChannel(models.TextChoices):
+    """The channels that post into a room, i.e. the ones a destination can name.
+
+    `NonEmailNotificationChannel` minus `native_push`: push is delivered per device to a
+    named user, so there is no room to address and no credential to store.
+    """
+
+    TELEGRAM = "telegram", "Telegram"
+    SLACK = "slack", "Slack"
+    MATTERMOST = "mattermost", "Mattermost"
+    DISCORD = "discord", "Discord"
+
+
+# Hard per-provider message ceilings, in characters. One table because the failure mode
+# is per channel and silent: Discord and Telegram REJECT an oversized body (400, nothing
+# delivered) rather than clipping it, so a long maintenance alert simply never arrives.
+# Every sender trims through `trim_for_channel` — trim-and-mark, never send-and-fail.
+MAX_MESSAGE_LENGTH = {
+    "telegram": 4096,  # Bot API sendMessage
+    "slack": 40000,  # incoming webhook `text`
+    "mattermost": 16383,  # incoming webhook `text`
+    "discord": 2000,  # webhook `content`
+}
+
+
+def trim_for_channel(channel: str, text: str) -> str:
+    limit = MAX_MESSAGE_LENGTH.get(channel)
+    if limit is None or len(text) <= limit:
+        return text
+    return text[: limit - 1] + "…"
+
+
 class NotificationDeliveryStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     SENDING = "sending", "Sending"

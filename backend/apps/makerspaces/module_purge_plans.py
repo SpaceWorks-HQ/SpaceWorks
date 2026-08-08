@@ -26,7 +26,9 @@ from typing import Callable
 from apps.makerspaces.module_purge_collectors import (
     bookings_delete,
     bookings_public_images,
+    discord_destinations_delete,
     events_delete,
+    mattermost_destinations_delete,
     machine_service_delete,
     machine_service_private_keys,
     maintenance_delete,
@@ -36,8 +38,10 @@ from apps.makerspaces.module_purge_collectors import (
     procurement_delete,
     procurement_private_keys,
     qr_print_batches_delete,
+    slack_destinations_delete,
     stock_transfers_delete,
     stocktake_delete,
+    telegram_destinations_delete,
 )
 
 
@@ -107,6 +111,24 @@ PLANS = (
         payment_subjects=("machine_service_request",),
         pii_labels=("machines.MachineServiceRequest",),
         private_keys=machine_service_private_keys,
+    ),
+    # One plan per chat channel, not one for "chat": a tenant may purge Discord while
+    # keeping the Slack rooms it still uses, and each key is uninstalled independently.
+    # Delivery logs deliberately survive (`destination` is SET_NULL) — the record that a
+    # message was attempted is history, the webhook URL is the secret.
+    ModulePurgePlan(
+        "telegram", "Telegram destinations and their chat ids.", telegram_destinations_delete
+    ),
+    ModulePurgePlan(
+        "slack", "Slack destinations and their stored webhooks.", slack_destinations_delete
+    ),
+    ModulePurgePlan(
+        "mattermost",
+        "Mattermost destinations and their stored webhooks.",
+        mattermost_destinations_delete,
+    ),
+    ModulePurgePlan(
+        "discord", "Discord destinations and their stored webhooks.", discord_destinations_delete
     ),
     ModulePurgePlan("stocktake", "Stocktake sessions, lines and ledger entries.", stocktake_delete),
     ModulePurgePlan("stock_transfers", "Stock transfers and their lines.", stock_transfers_delete),

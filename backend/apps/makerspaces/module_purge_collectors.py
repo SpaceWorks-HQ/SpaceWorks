@@ -94,6 +94,41 @@ def notifications_delete(makerspace, cursor):
     )
 
 
+def _chat_destinations_delete(makerspace, channel):
+    """Delete one chat channel's rooms and their stored credentials.
+
+    This was not needed while a channel's credential was a column on `Makerspace` — the
+    channel owned no rows at all. A destination holds an encrypted webhook URL or chat id,
+    so purging `discord` after uninstalling it must destroy those secrets, not leave them
+    readable in a table nothing surfaces any more. The scope link tables and the delivery
+    logs' `destination` FK both fall out of this by CASCADE and SET_NULL respectively:
+    history survives, the credential does not.
+    """
+    from apps.integrations.models_destinations import NotificationDestination
+
+    return _counts(
+        destinations=NotificationDestination.objects.filter(
+            makerspace=makerspace, channel=channel
+        ).delete()[0]
+    )
+
+
+def telegram_destinations_delete(makerspace, cursor):
+    return _chat_destinations_delete(makerspace, "telegram")
+
+
+def slack_destinations_delete(makerspace, cursor):
+    return _chat_destinations_delete(makerspace, "slack")
+
+
+def mattermost_destinations_delete(makerspace, cursor):
+    return _chat_destinations_delete(makerspace, "mattermost")
+
+
+def discord_destinations_delete(makerspace, cursor):
+    return _chat_destinations_delete(makerspace, "discord")
+
+
 def membership_delete(makerspace, cursor):
     from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver, MembershipRequest
 

@@ -1,5 +1,6 @@
 """Lifecycle notification adapter for machine maintenance."""
 
+from apps.integrations.destinations import NotificationScope
 from apps.integrations.notify import EmailDelivery, LifecyclePayload, notify_lifecycle
 from apps.integrations.staff_notifications import staff_emails_for_feature
 from apps.maintenance.models import MaintenanceLog, MaintenanceSchedule
@@ -71,7 +72,12 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
                 makerspace, "maintenance", event=event_name
             )
         )
-        return LifecyclePayload(text=text, emails=emails)
+        # The machine is what makes per-machine chat rooms work: a destination scoped to
+        # the laser (or to every 3D printer) matches on this, and an unscoped room still
+        # receives everything.
+        return LifecyclePayload(
+            text=text, emails=emails, scope=NotificationScope(machine=machine)
+        )
 
     return notify_lifecycle(
         makerspace,
