@@ -14,6 +14,8 @@ from apps.inventory.models import (
     TrackingMode,
 )
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from apps.makerspaces.module_install import apply_profile
+from apps.makerspaces.module_profiles import EVERYTHING
 from apps.machines.models import Machine, MachineConsumablePool, MachineServiceRequest, MachineType
 from apps.machines.service_workflow import submit as submit_service_request
 
@@ -87,6 +89,13 @@ class Command(BaseCommand):
                 },
             )
             spaces_created += int(created)
+            # Modules are opt-in, so a freshly created makerspace starts core-only and
+            # the machine-service seed below would hit `require_module` and abort the
+            # whole command. The demo data spans every module, so seed the `everything`
+            # profile - but only on creation, so a re-run never rewrites the module set
+            # of a space the operator has since tuned.
+            if created:
+                apply_profile(makerspace, EVERYTHING, actor=superadmin)
             ensure_default_categories(makerspace)
             manager = self._user(
                 spec["manager"],
