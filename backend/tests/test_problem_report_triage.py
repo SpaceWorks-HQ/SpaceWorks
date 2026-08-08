@@ -12,6 +12,7 @@ from apps.hardware_requests.models import (
 from apps.inventory.models import InventoryAsset, TrackingMode
 from apps.makerspaces.models import MakerspaceMembership
 from tests.return_helpers import authenticated_client, make_member, make_product, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -181,12 +182,7 @@ def test_triage_over_issued_quantity_is_rejected_with_clean_400():
 def test_triage_rbac_wrong_role_403_and_cross_tenant_404():
     makerspace = make_space("problem-rbac")
     other = make_space("problem-rbac-other")
-    guest = make_member(
-        "problem-rbac-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("problem-rbac-guest", makerspace)
     other_manager = make_member("problem-rbac-other-manager", other)
     product = make_product(makerspace, total_quantity=1, available_quantity=1)
     report, item = _returned_report(makerspace, product)

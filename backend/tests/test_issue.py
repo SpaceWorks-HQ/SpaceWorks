@@ -18,6 +18,7 @@ from apps.inventory import availability
 from apps.inventory.availability import InsufficientStock
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -425,12 +426,7 @@ def test_issue_preserves_manager_set_due_time(monkeypatch):
 
 def test_guest_admin_can_issue_accepted(monkeypatch):
     makerspace = make_space("guest-issue")
-    guest_admin = make_member(
-        "guest-issue-admin",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("guest-issue-admin", makerspace)
     product = make_product(makerspace)
     hardware_request = make_accepted_request(makerspace, product, 1)
     box = make_box(makerspace)
@@ -451,12 +447,7 @@ def test_guest_admin_can_issue_accepted(monkeypatch):
 
 def test_suspended_guest_cannot_issue_returns_403(monkeypatch):
     makerspace = make_space("suspended-guest-issue")
-    guest_admin = make_member(
-        "suspended-guest-issue-admin",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("suspended-guest-issue-admin", makerspace)
     guest_admin.access_status = User.AccessStatus.SUSPENDED
     guest_admin.save(update_fields=["access_status"])
     product = make_product(makerspace)

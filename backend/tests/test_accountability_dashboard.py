@@ -12,6 +12,7 @@ from apps.hardware_requests.models import (
 )
 from apps.makerspaces.models import MakerspaceMembership
 from tests.return_helpers import authenticated_client, make_member, make_product, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -152,12 +153,7 @@ def test_accountability_dashboard_cross_tenant_makerspace_returns_404():
 
 def test_accountability_dashboard_requires_view_audit_in_same_makerspace():
     makerspace = make_space("accountability-view-audit")
-    guest = make_member(
-        "accountability-guest-admin",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("accountability-guest-admin", makerspace)
 
     response = authenticated_client(guest).get(_url(makerspace))
 

@@ -1608,7 +1608,7 @@ export type LedgerUnit = {
   "serial_number": string;
 };
 
-export type LegacyRoleEnum = "space_manager" | "guest_admin" | "inventory_manager" | "print_manager" | "machine_manager";
+export type LegacyRoleEnum = "space_manager" | "inventory_manager" | "print_manager" | "machine_manager";
 
 export type LendingHistoryActor = {
   "username": string;
@@ -2225,7 +2225,7 @@ export type MembershipList = {
   "user": User;
   "makerspace_id": number;
   "makerspace_slug": string;
-  "role": RoleE91Enum;
+  "role": Role827Enum;
   "assigned_role": MembershipRoleSummary | null;
   "created_at": string;
   "payment": StaffPaymentSummary | null;
@@ -3904,12 +3904,12 @@ export type Role = {
   "updated_at": string;
 };
 
+export type Role827Enum = "space_manager" | "inventory_manager" | "print_manager" | "machine_manager" | "custom";
+
 export type RoleCreate = {
   "name": string;
   "granted_actions": Array<string>;
 };
-
-export type RoleE91Enum = "space_manager" | "guest_admin" | "inventory_manager" | "print_manager" | "machine_manager" | "custom";
 
 export type RoleId = {
   "role_id": number;
@@ -4103,7 +4103,7 @@ export type StaffMembership = {
   "user": User;
   "makerspace_id": number;
   "makerspace_slug": string;
-  "role"?: RoleE91Enum;
+  "role"?: Role827Enum;
   "created_at": string;
 };
 
@@ -4464,7 +4464,7 @@ export type User = {
   "is_active"?: boolean;
 };
 
-export type UserRoleEnum = "superadmin" | "space_manager" | "guest_admin" | "requester";
+export type UserRoleEnum = "superadmin" | "space_manager" | "requester";
 
 export type WaiverAcceptResponse = {
   "accepted": boolean;

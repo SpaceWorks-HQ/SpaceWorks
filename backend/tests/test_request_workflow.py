@@ -23,6 +23,7 @@ from apps.integrations.models import EmailTemplate
 from apps.inventory.models import InventoryAsset, InventoryProduct, TrackingMode
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.presence import services as presence
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -826,12 +827,7 @@ def test_wrong_action_accept_in_own_makerspace_returns_403_for_guest_and_request
     makerspace = make_space("wrong-action")
     product = make_product(makerspace)
     hardware_request = make_hardware_request(makerspace, product)
-    guest_admin = make_member(
-        "wrong-action-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("wrong-action-guest", makerspace)
     plain_requester = make_user("wrong-action-requester", access_status=User.AccessStatus.ACTIVE)
 
     response = authenticated_client(guest_admin).post(
@@ -856,12 +852,7 @@ def test_guest_admin_cannot_reject_but_can_get_accepted_queue_not_pending_queue(
         product,
         status=HardwareRequest.Status.ACCEPTED,
     )
-    guest_admin = make_member(
-        "guest-queue-admin",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("guest-queue-admin", makerspace)
     client = authenticated_client(guest_admin)
 
     response = client.post(
@@ -990,12 +981,7 @@ def test_suspended_staff_cannot_view_accepted_queue():
     # Stage-4 review fix (P2-2): the handover queue must enforce active access_status,
     # not just authentication + ISSUE_REQUEST membership.
     makerspace = make_space("suspended-staff-queue")
-    guest = make_member(
-        "suspended-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("suspended-guest", makerspace)
     guest.access_status = User.AccessStatus.SUSPENDED
     guest.save(update_fields=["access_status"])
 

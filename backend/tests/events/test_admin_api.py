@@ -13,6 +13,7 @@ from apps.events import services
 from apps.events.models import Event, EventRegistration
 from apps.makerspaces import origin_scope
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.handout_roles import grant_handout
 
 pytestmark = pytest.mark.django_db
 def make_space(slug='event-admin', **values):
@@ -128,14 +129,22 @@ def test_managers_and_visible_superadmins_succeed(superuser):
     ]
     assert all(response.status_code < 300 for response in responses)
 def test_visible_underprivileged_roles_get_403():
-    for role in (
-        MakerspaceMembership.Role.GUEST_ADMIN,
-        MakerspaceMembership.Role.INVENTORY_MANAGER,
-        MakerspaceMembership.Role.PRINT_MANAGER,
+    # Handover is a custom role since migrations 0052/0053, so it joins this list as an
+    # attach callable rather than as an enum member.
+    for label, attach in (
+        ('front-desk', grant_handout),
+        (
+            MakerspaceMembership.Role.INVENTORY_MANAGER,
+            lambda a, s: grant(a, s, MakerspaceMembership.Role.INVENTORY_MANAGER),
+        ),
+        (
+            MakerspaceMembership.Role.PRINT_MANAGER,
+            lambda a, s: grant(a, s, MakerspaceMembership.Role.PRINT_MANAGER),
+        ),
     ):
-        space = make_space(f'event-denied-{role}')
-        actor = make_user(f'event-denied-user-{role}')
-        grant(actor, space, role)
+        space = make_space(f'event-denied-{label}')
+        actor = make_user(f'event-denied-user-{label}')
+        attach(actor, space)
         event = make_event(space)
         registration = make_registration(event)
         assert all(

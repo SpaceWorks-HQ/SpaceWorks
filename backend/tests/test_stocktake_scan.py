@@ -7,6 +7,7 @@ from apps.makerspaces.models import MakerspaceMembership
 from apps.operations import services
 from apps.operations.models import StocktakeLine, StocktakeSession
 from tests.return_helpers import authenticated_client, make_box, make_member, make_product, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -107,12 +108,7 @@ def test_stocktake_resolve_scan_rejects_cross_makerspace_qr():
 
 def test_stocktake_resolve_scan_requires_edit_inventory_and_known_payload():
     data = _setup_stocktake_scan()
-    guest = make_member(
-        "stocktake-scan-guest",
-        data["makerspace"],
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("stocktake-scan-guest", data["makerspace"])
 
     denied = _resolve(authenticated_client(guest), data["stocktake"], data["product_qr"].payload)
     missing = _resolve(authenticated_client(data["manager"]), data["stocktake"], "missing-payload")

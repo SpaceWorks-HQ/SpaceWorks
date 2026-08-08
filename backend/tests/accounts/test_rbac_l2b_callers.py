@@ -149,13 +149,8 @@ def test_printing_recipients_follow_actions_but_mute_display_roles():
     assert inventory_manager.email not in emails
 
 
-def test_handout_only_includes_legacy_and_custom_handout_roles():
+def test_handout_only_recognises_custom_handout_roles():
     makerspace = make_makerspace("l2b-handout-only")
-    # A membership still on the legacy `guest_admin` string with no role FK. Migration
-    # 0052 retired the seeded Guest Admin role, so there is nothing to point at -- this is
-    # the frozen `_MEMBERSHIP_ROLE_ACTIONS` fallback path, and it must keep resolving.
-    guest = make_user("l2b-default-guest")
-    membership(guest, makerspace, MakerspaceMembership.Role.GUEST_ADMIN, None)
     custom_handout = make_user("l2b-custom-handout")
     membership(
         custom_handout,
@@ -175,9 +170,26 @@ def test_handout_only_includes_legacy_and_custom_handout_roles():
         ),
     )
 
-    assert rbac.is_handout_only(guest, makerspace.id)
     assert rbac.is_handout_only(custom_handout, makerspace.id)
     assert not rbac.is_handout_only(broader_custom, makerspace.id)
+
+
+def test_a_retired_guest_admin_membership_string_now_grants_nothing():
+    """The removal must stay removed, and must fail CLOSED when it does not.
+
+    Migration 0053 moved every such membership onto a real role row, so no row should hold
+    this string at all. If one somehow does -- a hand-written INSERT, a restored old dump --
+    the frozen `_MEMBERSHIP_ROLE_ACTIONS` entry is gone, so it resolves to no actions rather
+    than to the six the retired built-in used to carry. This is the one place the retired
+    string is still named on purpose: naming it is what pins the fail-closed behaviour.
+    """
+    makerspace = make_makerspace("l2b-retired-guest")
+    stale = make_user("l2b-retired-guest-user")
+    membership(stale, makerspace, "guest_admin", None)
+
+    assert rbac.effective_actions(stale, makerspace.id) == set()
+    assert not rbac.is_handout_only(stale, makerspace.id)
+    assert rbac.can(stale, rbac.Action.ISSUE_REQUEST, makerspace.id) is False
 
 
 def test_switcher_includes_custom_event_only_membership():

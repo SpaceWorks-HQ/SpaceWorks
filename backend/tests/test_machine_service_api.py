@@ -10,6 +10,7 @@ from apps.machines.service_consumable_pools import create_pool
 from apps.machines.service_workflow import submit
 from apps.makerspaces.models import MakerspaceMembership
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 
 pytestmark = pytest.mark.django_db
@@ -117,10 +118,7 @@ def test_manager_can_reject_and_fail_a_service_request():
 def test_wrong_role_is_forbidden_and_disabled_module_is_rejected():
     space = make_space("service-api-permission")
     manager = make_member("service-api-permission-manager", space, MakerspaceMembership.Role.MACHINE_MANAGER)
-    guest = make_member(
-        "service-api-permission-guest", space,
-        MakerspaceMembership.Role.GUEST_ADMIN, User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("service-api-permission-guest", space)
     row = request_row(space)
     assert authenticated_client(guest).get(list_url(space)).status_code == 403
     space.enabled_modules = [item for item in space.enabled_modules if item != "machine_service"]
@@ -234,13 +232,13 @@ def test_machine_and_space_managers_still_collect_without_being_granted_the_acti
     assert authenticated_client(manager).get(list_url(space)).status_code == 200
 
 
-def test_a_legacy_guest_admin_membership_gains_nothing():
-    """No silent widening: the frozen fallback grant must not pick up the new action."""
+def test_a_front_desk_role_without_the_collect_action_gains_nothing():
+    """No silent widening: splitting collection out of MANAGE_MACHINES must not hand it to
+    every handover role. `rbac.HANDOUT_ACTIONS` lists collection as work that still *reads*
+    as front-desk, which is a console-narrowing description and not a grant -- a role only
+    collects if someone put the action in it."""
     space = make_space("service-collect-legacy-guest")
-    guest = make_member(
-        "service-collect-legacy-guest-user", space,
-        MakerspaceMembership.Role.GUEST_ADMIN, User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("service-collect-legacy-guest-user", space)
     row = completed_request(space)
 
     assert authenticated_client(guest).post(

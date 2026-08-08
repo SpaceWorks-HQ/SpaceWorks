@@ -8,6 +8,7 @@ from rest_framework.test import APIClient
 from apps.accounts.models import User
 from apps.bookings.models import BookableSpace, Booking
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.handout_roles import grant_handout
 
 pytestmark = pytest.mark.django_db
 
@@ -100,7 +101,7 @@ def test_booking_approval_endpoint_returns_403_for_visible_non_manager():
         slug='booking-approval-denied',
     )
     actor = user('booking-approval-denied-user')
-    grant(actor, makerspace, MakerspaceMembership.Role.GUEST_ADMIN)
+    grant_handout(actor, makerspace)
     target = BookableSpace.objects.create(
         makerspace=makerspace,
         name='Workshop',

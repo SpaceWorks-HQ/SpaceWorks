@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.handout_roles import grant_handout
 
 pytestmark = pytest.mark.django_db
 
@@ -45,12 +46,12 @@ def test_scope_by_makerspace_filters_other_tenants():
     assert list(scoped) == [s1]
 
 
-def test_can_matrix_admin_vs_guest_admin():
+def test_can_matrix_space_manager_vs_front_desk():
     admin = make_user("ad", role=User.Role.SPACE_MANAGER)
-    guest = make_user("gu", role=User.Role.GUEST_ADMIN)
+    guest = make_user("gu", role=User.Role.REQUESTER)
     s = make_space("m1")
     MakerspaceMembership.objects.create(user=admin, makerspace=s, role="space_manager")
-    MakerspaceMembership.objects.create(user=guest, makerspace=s, role="guest_admin")
+    grant_handout(guest, s)
 
     assert rbac.can(admin, rbac.Action.ACCEPT_REQUEST, s.id) is True
     assert rbac.can(guest, rbac.Action.ACCEPT_REQUEST, s.id) is False
@@ -115,12 +116,12 @@ def test_inventory_manager_gets_full_hardware_actions_only():
 
 
 def test_membership_role_overrides_global_role():
-    # Globally `admin`, but only a guest_admin member of THIS makerspace.
+    # Globally `space_manager`, but only front-desk staff in THIS makerspace.
     u = make_user("mix", role=User.Role.SPACE_MANAGER)
     s = make_space("mx")
-    MakerspaceMembership.objects.create(user=u, makerspace=s, role="guest_admin")
-    assert rbac.can(u, rbac.Action.ACCEPT_REQUEST, s.id) is False  # guest can't accept
-    assert rbac.can(u, rbac.Action.ISSUE_REQUEST, s.id) is True    # guest can issue
+    grant_handout(u, s)
+    assert rbac.can(u, rbac.Action.ACCEPT_REQUEST, s.id) is False  # front desk can't accept
+    assert rbac.can(u, rbac.Action.ISSUE_REQUEST, s.id) is True    # front desk can issue
 
 
 def test_non_member_denied_even_with_global_staff_role():
@@ -137,13 +138,16 @@ from apps.accounts.permissions import IsSuperadmin, IsStaff
 def test_permission_classes_basic():
     rf = APIRequestFactory()
     su = make_user("p1", role=User.Role.SUPERADMIN)
-    guest = make_user("p2", role=User.Role.GUEST_ADMIN)
+    staff = make_user("p2", role=User.Role.SPACE_MANAGER)
+    member = make_user("p3", role=User.Role.REQUESTER)
     req = rf.get("/")
     req.user = su
     assert IsSuperadmin().has_permission(req, None) is True
-    req.user = guest
+    req.user = staff
     assert IsSuperadmin().has_permission(req, None) is False
     assert IsStaff().has_permission(req, None) is True
+    req.user = member
+    assert IsStaff().has_permission(req, None) is False
 
 
 def test_isstaff_rejects_suspended_after_login():

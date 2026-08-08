@@ -16,6 +16,7 @@ from tests.return_helpers import (
     return_payload,
     return_url,
 )
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -23,12 +24,7 @@ pytestmark = pytest.mark.django_db
 def test_guest_admin_can_return_and_cross_tenant_returns_404(monkeypatch):
     makerspace = make_space("return-perms")
     other_space = make_space("return-perms-other")
-    guest_admin = make_member(
-        "return-perms-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("return-perms-guest", makerspace)
     owner_admin = make_member("return-perms-owner", makerspace)
     other_admin = make_member("return-perms-other-admin", other_space)
     product = make_product(makerspace)

@@ -19,6 +19,7 @@ from apps.makerspaces.models import MakerspaceMembership
 from apps.warranty.models import Warranty, WarrantyDocument
 from apps.warranty.status import warranty_status
 from tests.return_helpers import authenticated_client, make_member, make_product, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -308,12 +309,7 @@ def test_warranty_rbac_status_code_contract():
         makerspace,
         membership_role=MakerspaceMembership.Role.PRINT_MANAGER,
     )
-    guest_admin = make_member(
-        "warranty-rbac-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("warranty-rbac-guest", makerspace)
     space_manager = make_member("warranty-rbac-space-manager", makerspace)
     other_member = make_member("warranty-rbac-other-user", other_space)
 
@@ -345,24 +341,9 @@ def test_machine_warranty_operator_type_manager_tenant_and_module_contract():
         name="Custom Machine",
         machine_type=custom_type,
     )
-    manage = make_member(
-        "warranty-machine-manage",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
-    full = make_member(
-        "warranty-machine-full",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
-    operate = make_member(
-        "warranty-machine-operate",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    manage = make_handout_member("warranty-machine-manage", makerspace)
+    full = make_handout_member("warranty-machine-full", makerspace)
+    operate = make_handout_member("warranty-machine-operate", makerspace)
     type_manager = make_member(
         "warranty-machine-type-manager",
         makerspace,
@@ -633,12 +614,7 @@ def test_warranty_report_gates_rows_by_host_action_and_makerspace_scope():
     uncovered_printer = make_printer(makerspace, name="Printer Uncovered")
     asset_warranty = attach_asset_warranty(covered_asset, vendor_name="Asset Report Vendor")
     printer_warranty = attach_printer_warranty(covered_printer, vendor_name="Printer Report Vendor")
-    guest_admin = make_member(
-        "warranty-report-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("warranty-report-guest", makerspace)
     inventory_manager = make_member(
         "warranty-report-inventory",
         makerspace,
@@ -695,12 +671,7 @@ def test_warranty_report_gates_rows_by_host_action_and_makerspace_scope():
 
 def test_warranty_report_machine_rows_include_manage_and_full_not_operate():
     makerspace = make_space("warranty-report-machine-tiers")
-    actor = make_member(
-        "warranty-report-machine-operator",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    actor = make_handout_member("warranty-report-machine-operator", makerspace)
     manage_machine = make_machine(makerspace, name="Manage Machine")
     full_machine = make_machine(makerspace, name="Full Machine")
     operate_machine = make_machine(makerspace, name="Operate Machine")

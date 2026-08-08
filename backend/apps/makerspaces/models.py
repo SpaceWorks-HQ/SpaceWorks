@@ -300,7 +300,6 @@ class MakerspaceMembership(models.Model):
     # of scoping/suspension is centralized in the Phase 2 RBAC layer, not here.
     class Role(models.TextChoices):
         SPACE_MANAGER = "space_manager", "Space Manager"
-        GUEST_ADMIN = "guest_admin", "Guest Admin"
         INVENTORY_MANAGER = "inventory_manager", "Inventory Manager"
         PRINT_MANAGER = "print_manager", "Print Manager"
         # Makerspace-wide machine authority: manages assigned machines end-to-end

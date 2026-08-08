@@ -18,6 +18,7 @@ from tests.return_helpers import (
     make_space,
     make_user,
 )
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -653,12 +654,7 @@ def test_inventory_quantity_adjustment_updates_buckets_and_audit():
 
 def test_inventory_quantity_adjustment_requires_edit_inventory_in_tenant():
     makerspace = make_space("inventory-adjust-rbac")
-    guest = make_member(
-        "inventory-adjust-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("inventory-adjust-guest", makerspace)
     product = make_product(makerspace, name="Blocked Wire")
 
     response = authenticated_client(guest).post(
@@ -675,12 +671,7 @@ def test_inventory_quantity_adjustment_requires_edit_inventory_in_tenant():
 def test_inventory_quantity_adjustment_hides_cross_tenant_product_before_permission():
     own_space = make_space("inventory-adjust-own")
     other_space = make_space("inventory-adjust-other")
-    guest = make_member(
-        "inventory-adjust-cross-guest",
-        own_space,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("inventory-adjust-cross-guest", own_space)
     other_product = make_product(other_space, name="Other Wire")
 
     response = authenticated_client(guest).post(
@@ -735,12 +726,7 @@ def test_api_client_rest_allows_makerspace_admin_and_scopes_others():
     assert other_client.get(f"/api/v1/admin/api-clients/{created.data['id']}").status_code == 404
 
     # A non-MANAGE_MAKERSPACE member (guest admin) is denied.
-    guest = make_member(
-        "client-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("client-guest", makerspace)
     denied_guest = authenticated_client(guest).get(
         f"/api/v1/admin/makerspace/{makerspace.id}/api-clients"
     )

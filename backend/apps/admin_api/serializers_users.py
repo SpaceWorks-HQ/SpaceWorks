@@ -43,8 +43,9 @@ class StaffCreateSerializer(serializers.Serializer):
     last_name = serializers.CharField(required=False, allow_blank=True)
     makerspace_id = serializers.IntegerField()
     # Only the roles this legacy fixed-role surface can still attach a user to, i.e. the
-    # ones that are still seeded. GUEST_ADMIN went with migration 0052 and PRINT_MANAGER
-    # with 0046; neither has a role row to point a membership at any more.
+    # ones that are still seeded. Guest Admin went with migrations 0052/0053 (and is no
+    # longer an enum member at all) and PRINT_MANAGER with 0046; neither has a role row to
+    # point a membership at any more.
     role = serializers.ChoiceField(
         choices=[
             MakerspaceMembership.Role.SPACE_MANAGER,

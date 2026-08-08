@@ -5,7 +5,7 @@ from rest_framework.permissions import BasePermission, IsAuthenticated
 from apps.accounts import rbac
 from apps.accounts.models import User
 
-STAFF_ROLES = (User.Role.SUPERADMIN, User.Role.SPACE_MANAGER, User.Role.GUEST_ADMIN)
+STAFF_ROLES = (User.Role.SUPERADMIN, User.Role.SPACE_MANAGER)
 
 
 def _active_staff(user):

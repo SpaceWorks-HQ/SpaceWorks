@@ -103,12 +103,6 @@ _SPACE_MANAGER_ACTIONS = {
     Action.MANAGE_MAKERSPACE, Action.MANAGE_MACHINES, Action.MANAGE_EVENTS,
     Action.MANAGE_BOOKINGS,
 }
-# Guest admins are handout-only: accepted request handovers, direct handout, returns,
-# and evidence upload. They still cannot review requests or edit inventory setup.
-_GUEST_ADMIN_ACTIONS = {
-    Action.VIEW_INVENTORY, Action.ASSIGN_BOX, Action.ISSUE_REQUEST,
-    Action.ISSUE_DIRECT_LOAN, Action.RETURN_REQUEST, Action.UPLOAD_EVIDENCE,
-}
 _PRINT_MANAGER_ACTIONS = {
     Action.MANAGE_PRINTING,
 }
@@ -125,11 +119,10 @@ _INVENTORY_MANAGER_ACTIONS = {
     Action.MANAGE_QR, Action.VIEW_AUDIT,
 }
 # Authority for non-superadmins is keyed on the PER-MAKERSPACE membership role,
-# NOT the global User.role (review fix #3). A user who is globally `space_manager` but only a
-# guest_admin member of makerspace B gets only guest_admin actions in B.
+# NOT the global User.role (review fix #3). A user who is globally `space_manager` but only
+# an inventory_manager member of makerspace B gets only inventory_manager actions in B.
 _MEMBERSHIP_ROLE_ACTIONS = {
     MakerspaceMembership.Role.SPACE_MANAGER: _SPACE_MANAGER_ACTIONS,
-    MakerspaceMembership.Role.GUEST_ADMIN: _GUEST_ADMIN_ACTIONS,
     MakerspaceMembership.Role.INVENTORY_MANAGER: _INVENTORY_MANAGER_ACTIONS,
     # Kept as the raw legacy value so an unmigrated/null-FK membership remains
     # session-compatible after the protected default is retired.
@@ -149,12 +142,20 @@ ROLE_FORBIDDEN_ACTIONS = frozenset({
 })
 ROLE_GRANTABLE_ACTIONS = frozenset(ALL_ACTIONS - ROLE_FORBIDDEN_ACTIONS)
 ROLE_SUPERADMIN_ASSIGNABLE_ACTIONS = frozenset({Action.MANAGE_MAKERSPACE})
-# The ceiling for a handover-only staffer, deliberately WIDER than the frozen legacy
-# grant above. `_GUEST_ADMIN_ACTIONS` is what an unmigrated null-FK membership resolves
-# to and must not drift, so adding COLLECT_SERVICE_REQUEST there would silently hand the
-# new authority to legacy rows. Widening only the ceiling means a role *may* hold it and
-# still read as handover-only, while nobody gains it without an explicit grant.
-HANDOUT_ACTIONS = frozenset(_GUEST_ADMIN_ACTIONS | {Action.COLLECT_SERVICE_REQUEST})
+# What counts as handover-only work: taking an accepted request or a finished machine job
+# to the counter, handing it over, taking it back, and photographing both ends of that.
+#
+# This is a DESCRIPTION, not a grant and no longer a ceiling. It is derived from no role --
+# the built-in that used to define it was retired, and `role_services._validate_actions`
+# dropped the cap that keyed on it, so any role may hold any subset of these alongside
+# anything else. Its only consumer is `is_handout_only`, which decides how narrow the staff
+# console renders for someone whose whole job is the front desk. Adding an action here
+# widens what still reads as "front desk"; it grants nothing to anyone.
+HANDOUT_ACTIONS = frozenset({
+    Action.VIEW_INVENTORY, Action.ASSIGN_BOX, Action.ISSUE_REQUEST,
+    Action.ISSUE_DIRECT_LOAN, Action.RETURN_REQUEST, Action.UPLOAD_EVIDENCE,
+    Action.COLLECT_SERVICE_REQUEST,
+})
 _HANDOUT_MUTATIONS = frozenset(HANDOUT_ACTIONS - {Action.VIEW_INVENTORY})
 
 

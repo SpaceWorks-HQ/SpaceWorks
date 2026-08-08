@@ -9,6 +9,7 @@ from apps.audit.models import AuditLog
 from apps.evidence.models import EvidencePhoto
 from apps.evidence.storage import StorageUnavailable
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -169,12 +170,7 @@ def test_admin_member_can_request_put_upload_url(monkeypatch, settings):
 def test_guest_admin_member_can_request_upload_url(monkeypatch):
     mock_upload(monkeypatch)
     makerspace = make_space("upload-guest")
-    user = make_member(
-        "upload-guest-user",
-        makerspace,
-        membership_role="guest_admin",
-        role=User.Role.GUEST_ADMIN,
-    )
+    user = make_handout_member("upload-guest-user", makerspace)
 
     response = authenticated_client(user).post(
         upload_url(makerspace),

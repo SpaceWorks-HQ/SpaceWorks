@@ -93,7 +93,10 @@ def test_custom_role_includes_its_assigned_actions():
 def test_null_assigned_role_uses_legacy_metadata_and_actions():
     makerspace = make_space("auth-payload-fallback")
     user = active_staff("auth-payload-fallback-user")
-    role = MakerspaceMembership.Role.GUEST_ADMIN
+    # PRINT_MANAGER, because it is the legacy string still carried by
+    # `rbac._MEMBERSHIP_ROLE_ACTIONS` as the frozen null-FK fallback. `guest_admin` used to
+    # serve here and no longer can: migration 0053 emptied it and the enum member is gone.
+    role = MakerspaceMembership.Role.PRINT_MANAGER
     MakerspaceMembership.objects.create(user=user, makerspace=makerspace, role=role)
 
     payload = membership_payload(user, makerspace)

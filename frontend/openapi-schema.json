@@ -30853,13 +30853,12 @@
             "LegacyRoleEnum": {
                 "enum": [
                     "space_manager",
-                    "guest_admin",
                     "inventory_manager",
                     "print_manager",
                     "machine_manager"
                 ],
                 "type": "string",
-                "description": "* `space_manager` - Space Manager\n* `guest_admin` - Guest Admin\n* `inventory_manager` - Inventory Manager\n* `print_manager` - Print Manager\n* `machine_manager` - Machine Manager"
+                "description": "* `space_manager` - Space Manager\n* `inventory_manager` - Inventory Manager\n* `print_manager` - Print Manager\n* `machine_manager` - Machine Manager"
             },
             "LendingHistoryActor": {
                 "type": "object",
@@ -33567,7 +33566,7 @@
                     "role": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/RoleE91Enum"
+                                "$ref": "#/components/schemas/Role827Enum"
                             }
                         ],
                         "readOnly": true
@@ -40176,6 +40175,17 @@
                     "updated_at"
                 ]
             },
+            "Role827Enum": {
+                "enum": [
+                    "space_manager",
+                    "inventory_manager",
+                    "print_manager",
+                    "machine_manager",
+                    "custom"
+                ],
+                "type": "string",
+                "description": "* `space_manager` - Space Manager\n* `inventory_manager` - Inventory Manager\n* `print_manager` - Print Manager\n* `machine_manager` - Machine Manager\n* `custom` - Custom"
+            },
             "RoleCreate": {
                 "type": "object",
                 "properties": {
@@ -40194,18 +40204,6 @@
                     "granted_actions",
                     "name"
                 ]
-            },
-            "RoleE91Enum": {
-                "enum": [
-                    "space_manager",
-                    "guest_admin",
-                    "inventory_manager",
-                    "print_manager",
-                    "machine_manager",
-                    "custom"
-                ],
-                "type": "string",
-                "description": "* `space_manager` - Space Manager\n* `guest_admin` - Guest Admin\n* `inventory_manager` - Inventory Manager\n* `print_manager` - Print Manager\n* `machine_manager` - Machine Manager\n* `custom` - Custom"
             },
             "RoleId": {
                 "type": "object",
@@ -40850,7 +40848,7 @@
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "role": {
-                        "$ref": "#/components/schemas/RoleE91Enum"
+                        "$ref": "#/components/schemas/Role827Enum"
                     },
                     "created_at": {
                         "type": "string",
@@ -42313,11 +42311,10 @@
                 "enum": [
                     "superadmin",
                     "space_manager",
-                    "guest_admin",
                     "requester"
                 ],
                 "type": "string",
-                "description": "* `superadmin` - Super Admin\n* `space_manager` - Space Manager\n* `guest_admin` - Guest Admin\n* `requester` - Requester"
+                "description": "* `superadmin` - Super Admin\n* `space_manager` - Space Manager\n* `requester` - Requester"
             },
             "WaiverAcceptResponse": {
                 "type": "object",

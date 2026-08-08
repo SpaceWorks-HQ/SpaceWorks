@@ -5,9 +5,10 @@ which made every makerspace carry a handover role whether or not it ran a front 
 made the one role people most wanted to reshape the one they could not delete. Handover is
 now expressed the same way any other local arrangement is: a custom role holding the
 handout actions, named whatever the space calls that job. Migration `0052` converted the
-existing seeded rows in place, so nobody lost a role or an assignment -- see it for the
-full reasoning. `MakerspaceMembership.Role.GUEST_ADMIN` survives in the enum as the frozen
-fallback for a membership whose role FK is still null, exactly as `print_manager` does.
+existing seeded rows in place and `0053` moved the memberships onto them, so nobody lost a
+role or an assignment -- see those for the full reasoning. Unlike `print_manager`, which
+still survives in the enum as the frozen fallback for a null role FK, `guest_admin` is gone
+from the enum entirely: `0053` left no membership holding the string.
 """
 
 DEFAULT_ROLE_DEFINITIONS = (

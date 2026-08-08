@@ -13,6 +13,7 @@ from apps.inventory.models import InventoryAsset, InventoryProduct, TrackingMode
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
 from apps.presence import services as presence
 from tests.return_helpers import make_issue_evidence, make_return_evidence
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -895,21 +896,11 @@ def test_direct_loan_duplicate_active_container_returns_409():
 
 
 def make_guest(makerspace):
-    user = User.objects.create_user(
-        username=f"guest-{makerspace.slug}",
-        role=User.Role.GUEST_ADMIN,
-        access_status=User.AccessStatus.ACTIVE,
-    )
-    MakerspaceMembership.objects.create(
-        user=user,
-        makerspace=makerspace,
-        role=MakerspaceMembership.Role.GUEST_ADMIN,
-    )
-    return user
+    return make_handout_member(f"guest-{makerspace.slug}", makerspace)
 
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=False)
-def test_guest_admin_can_create_direct_loan():
+def test_handout_role_can_create_direct_loan():
     makerspace = make_space("direct-guest-allow")
     guest = make_guest(makerspace)
     product = make_product(makerspace)

@@ -11,7 +11,6 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         SUPERADMIN = "superadmin", "Super Admin"
         SPACE_MANAGER = "space_manager", "Space Manager"
-        GUEST_ADMIN = "guest_admin", "Guest Admin"
         REQUESTER = "requester", "Requester"
 
     class AccessStatus(models.TextChoices):

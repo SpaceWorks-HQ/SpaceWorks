@@ -5,6 +5,7 @@ from apps.accounts.models import User
 from apps.makerspaces.models import MakerspaceMembership
 from apps.notifications.models import Notification
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -31,12 +32,7 @@ def enable_notifications(makerspace):
 
 
 def make_guest(username, makerspace):
-    return make_member(
-        username,
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    return make_handout_member(username, makerspace)
 
 
 def make_print_manager(username, makerspace):
