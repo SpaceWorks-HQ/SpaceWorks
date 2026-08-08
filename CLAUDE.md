@@ -123,6 +123,35 @@ It composes with, and does not replace, the per-makerspace `enabled_modules` swi
 only when the tenant enabled it **and** the deployment ships the app. The env var names **app labels,
 not module keys** (one app can own several keys — `printing`/`machines`/`machine_service` are all
 `apps.machines`), and it never touches data: rows, migrations, purge plans and PII mappings all stay.
+- **`payments` and `updates` joined `SEPARABLE_APPS` (phase 16).** A makerspace that takes no money
+  online ships **no Stripe surfaces at all**, and a deployment updated by its own host tooling ships
+  no in-app release control. The import counts are a red herring — 26 modules import `apps.payments`
+  and every one keeps working, because a tombstone removes *surfaces*, never models: the rows stay
+  readable, purgeable and nameable by the retention registry. Three things this needed beyond the
+  standard pattern:
+  - **The Stripe webhook is spliced out, not left answering.** An endpoint that still verified and
+    settled a charge for an app whose reconciliation console is gone would move real money nobody
+    can see. `config.urls.separable_paths` is the shape of `separable()` for inline single-view
+    routes rather than an app urlconf.
+  - **Some routes live in another app's urlconf.** `admin_api` owns the staff surface for payments
+    and updates, so those cannot be removed by dropping an `include()` — `admin_api/urls.py` has its
+    own in-place `_separable()` gate. The tombstone tests assert a **neighbouring** route in the
+    same list still resolves, because splicing in place is exactly where an off-by-one removes too
+    much.
+  - **`_managed_item` had to become None-safe.** It called `_item(...)` and then subscripted the
+    result; `_item` returns `None` for a tombstoned app, so the Stripe Connect entry would have
+    turned a supported tombstone into a boot crash.
+  Both apps own **feature** keys or no key at all, so `available_modules` has nothing to drop and
+  `unavailable_apps()` is what tells the console to hide the tabs — the same reason it exists for
+  `warranty` and `presence`. `TOMBSTONE_PROFILE_APPS` in `tests/tombstone/conftest.py` was extended
+  in step, and the profile is now nine apps.
+- **Still NOT separable, with reasons:** `integrations` (platform mail carries password reset and
+  email verification — removing it locks users out of their own accounts), `encryption` (the
+  `ScopedPiiModelMixin` substrate six models depend on), `operations` (owns six module keys and the
+  report registry that `machines`/`bookings`/`events` builders extend), `apiclients` (its HMAC
+  middleware authenticates the whole public API surface), plus the core apps. `machines` is
+  removable in principle and is the remaining piece for an inventory-only install; it has the widest
+  surface area of any candidate and is deliberately left to its own phase.
 - **`SEPARABLE_APPS` is declared, not derived.** Nothing in the module registry encodes "can this app's
   surfaces be removed without leaving the rest incoherent" — `is_core` comes closest and is a different
   question (`apps.makerspaces` owns only non-core modules yet is the tenant root; `apps.inventory` owns

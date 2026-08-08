@@ -216,7 +216,10 @@ def test_no_core_module_s_app_is_declared_separable():
 
 def test_every_app_outside_the_separable_set_is_refused():
     """Including the tenant root, which owns only non-core modules and is not separable."""
-    for app_label in ("makerspaces", "inventory", "accounts", "payments", "encryption"):
+    # `payments` used to be in this list and is now separable. What remains are the apps
+    # that genuinely cannot lose their surfaces: the tenant root, the catalogue, identity,
+    # and the encryption substrate every PII-holding model depends on.
+    for app_label in ("makerspaces", "inventory", "accounts", "encryption"):
         with override_settings(TOMBSTONED_APPS=frozenset({app_label})):
             assert _ids(checks.check_tombstones_are_legal(None)) == ["separability.E007"], app_label
 

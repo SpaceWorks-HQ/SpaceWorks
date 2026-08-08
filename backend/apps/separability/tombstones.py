@@ -33,6 +33,13 @@ from apps.separability.registry import register_runtime_app, registered_runtime_
 # working tombstone.
 SEPARABLE_APPS = frozenset({
     "procurement", "notifications", "warranty", "maintenance", "presence", "events", "bookings",
+    # A makerspace that takes no money online ships no Stripe surfaces at all. The models
+    # stay (historic charges must remain purgeable and readable), and `payments.enabled`
+    # already lets a tenant switch the feature off -- this removes the code paths too.
+    "payments",
+    # Superadmin-only release plumbing. A deployment updated by its own host tooling has
+    # no use for the in-app control surface.
+    "updates",
 })
 
 

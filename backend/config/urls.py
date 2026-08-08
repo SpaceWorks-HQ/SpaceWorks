@@ -16,6 +16,16 @@ from apps.payments.views_connect import (
 from apps.separability.registry import runtime_active
 
 
+def separable_paths(app_label, *routes):
+    """Already-built paths for a separable app, kept in place while it is active.
+
+    The `separable` helper below takes a urlconf module to include; these three Stripe
+    routes are declared inline because they are single views rather than an app urlconf,
+    so they need the same gate in a different shape.
+    """
+    return list(routes) if runtime_active(app_label) else []
+
+
 def separable(app_label, route, urlconf, **kwargs):
     """Routes for a separable app, spliced in place -- empty while it is tombstoned.
 
@@ -54,22 +64,32 @@ def docs_root(_request):
 
 
 urlpatterns = [
-    path(
-        "api/v1/webhooks/stripe/connect",
-        StripeConnectWebhookView.as_view(),
-        name="stripe-connect-webhook",
+    # Spliced, not appended: a deployment that ships no payment surfaces must not answer
+    # on the Stripe webhook either. An endpoint that accepts and verifies a charge for an
+    # app whose console is gone would settle money nobody can see or reconcile.
+    *separable_paths(
+        "payments",
+        path(
+            "api/v1/webhooks/stripe/connect",
+            StripeConnectWebhookView.as_view(),
+            name="stripe-connect-webhook",
+        ),
+        path(
+            "api/v1/payments/connect/callback",
+            StripeConnectCallbackView.as_view(),
+            name="stripe-connect-callback",
+        ),
+        path(
+            "api/v1/webhooks/stripe/<str:public_code>",
+            StripeWebhookView.as_view(),
+            name="stripe-webhook",
+        ),
     ),
-    path(
-        "api/v1/payments/connect/callback",
-        StripeConnectCallbackView.as_view(),
-        name="stripe-connect-callback",
-    ),
-    path("api/v1/webhooks/stripe/<str:public_code>", StripeWebhookView.as_view(), name="stripe-webhook"),
     path('api/v1/', include('apps.machines.urls')),
     *separable("events", "api/v1/public/", "apps.events.urls_public"),
     *separable("bookings", "api/v1/public/", "apps.bookings.urls_public"),
     *separable("presence", "api/v1/public/", "apps.presence.urls"),
-    path("api/v1/", include("apps.payments.urls")),
+    *separable("payments", "api/v1/", "apps.payments.urls"),
     path(
         "api/v1/internal/tls-check",
         TlsCheckView.as_view(),

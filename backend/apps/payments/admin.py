@@ -17,6 +17,7 @@ from apps.payments.models import (
     MakerspacePaymentSettings,
     PlatformStripeConnectSettings,
 )
+from apps.separability.tombstones import app_is_tombstoned
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -90,7 +91,6 @@ class MakerspacePaymentSettingsAdminForm(forms.ModelForm):
         return cleaned_data
 
 
-@admin.register(MakerspacePaymentSettings)
 class MakerspacePaymentSettingsAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     form = MakerspacePaymentSettingsAdminForm
     list_display = ("makerspace", "configured", "default_currency")
@@ -183,7 +183,6 @@ class PlatformStripeConnectSettingsAdminForm(forms.ModelForm):
         return cleaned_data
 
 
-@admin.register(PlatformStripeConnectSettings)
 class PlatformStripeConnectSettingsAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     form = PlatformStripeConnectSettingsAdminForm
     list_display = (
@@ -219,3 +218,12 @@ class PlatformStripeConnectSettingsAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         )
         for field in obj._meta.concrete_fields:
             setattr(obj, field.attname, getattr(updated, field.attname))
+
+
+# Registered only while the deployment ships payments. `app_is_tombstoned` rather than
+# `runtime_active` because django.contrib.admin autodiscovers every admin.py *before* the
+# owning app's ready() has registered anything -- the manifest is not populated yet.
+# The classes stay defined either way so the module still imports.
+if not app_is_tombstoned("payments"):
+    admin.site.register(MakerspacePaymentSettings, MakerspacePaymentSettingsAdmin)
+    admin.site.register(PlatformStripeConnectSettings, PlatformStripeConnectSettingsAdmin)

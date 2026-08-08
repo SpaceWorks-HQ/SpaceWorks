@@ -1,5 +1,7 @@
 from django.urls import path
 
+from apps.separability.registry import runtime_active
+
 from apps.admin_api import api_client_views, views
 from apps.admin_api.views_email_templates import (
     EmailTemplateDetailView,
@@ -104,31 +106,47 @@ from apps.admin_api.views_member_capabilities import (
 )
 from apps.admin_api.views_roles import CapabilityCatalogView, RoleDetailView, RoleListCreateView, RoleMachineScopeView
 
+def _separable(app_label, *routes):
+    """Routes belonging to a separable app whose views live in this urlconf.
+
+    `admin_api` owns the staff surface for several apps, so a few routes cannot be
+    removed by dropping an `include()` in `config.urls` -- they are declared here. Same
+    gate, different shape.
+    """
+    return list(routes) if runtime_active(app_label) else []
+
+
 urlpatterns = [
-    path(
-        "platform/update-settings",
-        PlatformUpdateSettingsView.as_view(),
-        name="admin-platform-update-settings",
+    *_separable(
+        "updates",
+        path(
+            "platform/update-settings",
+            PlatformUpdateSettingsView.as_view(),
+            name="admin-platform-update-settings",
+        ),
+        path(
+            "platform/update-settings/update-now",
+            PlatformUpdateRequestView.as_view(),
+            name="admin-platform-update-now",
+        ),
     ),
-    path(
-        "platform/update-settings/update-now",
-        PlatformUpdateRequestView.as_view(),
-        name="admin-platform-update-now",
-    ),
-    path(
-        "platform/payment-settings",
-        PlatformStripeConnectSettingsView.as_view(),
-        name="admin-platform-payment-settings",
-    ),
-    path(
-        "makerspace/<int:makerspace_id>/payment-settings",
-        MakerspacePaymentSettingsView.as_view(),
-        name="admin-makerspace-payment-settings",
-    ),
-    path(
-        "makerspace/<int:makerspace_id>/payment-settings/connect/onboard",
-        StripeConnectOnboardingView.as_view(),
-        name="admin-makerspace-payment-connect-onboard",
+    *_separable(
+        "payments",
+        path(
+            "platform/payment-settings",
+            PlatformStripeConnectSettingsView.as_view(),
+            name="admin-platform-payment-settings",
+        ),
+        path(
+            "makerspace/<int:makerspace_id>/payment-settings",
+            MakerspacePaymentSettingsView.as_view(),
+            name="admin-makerspace-payment-settings",
+        ),
+        path(
+            "makerspace/<int:makerspace_id>/payment-settings/connect/onboard",
+            StripeConnectOnboardingView.as_view(),
+            name="admin-makerspace-payment-connect-onboard",
+        ),
     ),
     path("memberships", AdminMembershipRosterView.as_view(), name="admin-memberships-roster"),
     path("membership-requests", AdminMembershipRequestListView.as_view(), name="admin-membership-requests"),
@@ -183,8 +201,11 @@ urlpatterns = [
         MachineServiceCollectView.as_view(),
         name="admin-machine-service-request-collect",
     ),
-    path("machine-service/payments/<int:pk>/mark-offline", PaymentMarkOfflineView.as_view(), name="admin-machine-service-payment-mark-offline"),
-    path("machine-service/payments/<int:pk>/waive", PaymentWaiveView.as_view(), name="admin-machine-service-payment-waive"),
+    *_separable(
+        "payments",
+        path("machine-service/payments/<int:pk>/mark-offline", PaymentMarkOfflineView.as_view(), name="admin-machine-service-payment-mark-offline"),
+        path("machine-service/payments/<int:pk>/waive", PaymentWaiveView.as_view(), name="admin-machine-service-payment-waive"),
+    ),
     path(
         "machine-service/requests/<int:pk>/reprint",
         MachineServiceReprintView.as_view(),

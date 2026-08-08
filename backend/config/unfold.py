@@ -54,8 +54,12 @@ def _managed_active_superuser(request):
     return bool(os.environ.get("PLATFORM_DOMAIN_SUFFIX", "").strip()) and _is_active_superuser(request)
 
 
-def _managed_item(title, icon, route):
-    item = _item(title, icon, route)
+def _managed_item(title, icon, route, app_label=None):
+    item = _item(title, icon, route, app_label=app_label)
+    if item is None:
+        # `_item` returns None for a tombstoned app; subscripting it here would turn a
+        # supported tombstone into a boot crash.
+        return None
     item["permission"] = _managed_active_superuser
     return item
 
@@ -163,9 +167,9 @@ UNFOLD = {
                     _item("API key requests", "approval", "admin:apiclients_apikeyrequest_changelist"),
                     _item("Subdomain requests", "dns", "admin:makerspaces_subdomainrequest_changelist"),
                     _item("Platform email", "mail", "admin:integrations_platformemailsettings_changelist"),
-                    _item("Software updates", "system_update", "admin:updates_platformupdatesettings_changelist"),
-                    _item("Payments", "payments", "admin:payments_makerspacepaymentsettings_changelist"),
-                    _managed_item("Stripe Connect", "account_balance", "admin:payments_platformstripeconnectsettings_changelist"),
+                    _item("Software updates", "system_update", "admin:updates_platformupdatesettings_changelist", app_label="updates"),
+                    _item("Payments", "payments", "admin:payments_makerspacepaymentsettings_changelist", app_label="payments"),
+                    _managed_item("Stripe Connect", "account_balance", "admin:payments_platformstripeconnectsettings_changelist", app_label="payments"),
                     _item("Email templates", "mail", "admin:integrations_emailtemplate_changelist"),
                     _item("Email logs", "mark_email_read", "admin:integrations_emaillog_changelist"),
                     _item("Email mutes", "notifications_off", "admin:integrations_emailnotificationmute_changelist"),

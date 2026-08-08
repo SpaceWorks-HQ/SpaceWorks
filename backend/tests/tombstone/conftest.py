@@ -28,6 +28,7 @@ from apps.separability.tombstones import tombstoned_app_labels
 # The apps these tests expect to be tombstoned. Grows by one per phase of plan B6.
 TOMBSTONE_PROFILE_APPS = frozenset({
     "procurement", "notifications", "warranty", "maintenance", "presence", "events", "bookings",
+    "payments", "updates",
 })
 
 _PROFILE_ACTIVE = tombstoned_app_labels() == TOMBSTONE_PROFILE_APPS
