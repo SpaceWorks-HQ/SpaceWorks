@@ -38,6 +38,9 @@ export type Makerspace = {
   cover_image_url?: string | null;
   enabled_modules?: string[];
   enabled_features?: string[];
+  // Separable apps this deployment does not ship. Empty unless TOMBSTONED_APPS is set,
+  // and only meaningful for tabs no module key describes (see TAB_APPS in staffTabs).
+  unavailable_apps?: string[];
   resource_limit_overrides?: Record<string, unknown>;
   branding_config?: {
     display_name?: string;

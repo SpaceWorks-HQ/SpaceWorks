@@ -6,14 +6,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.admin_api.permissions import IsActiveStaff
-from apps.admin_api.serializers_warranty import (
+from apps.warranty.serializers import (
     WarrantyDocumentFinalizeSerializer,
     WarrantyDocumentPresignSerializer,
     WarrantyDocumentSerializer,
     WarrantyDocumentUploadResponseSerializer,
     WarrantyDocumentUrlSerializer,
 )
-from apps.admin_api.warranty_access import enforce, resolve_document, resolve_warranty
+from apps.warranty.access import enforce, resolve_document, resolve_warranty
 from apps.audit import services as audit
 from apps.evidence.responses import storage_unavailable_response
 from apps.evidence.storage import StorageUnavailable

@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
-from apps.admin_api.serializers_warranty import (
+from apps.warranty.serializers import (
     WarrantyReportQuerySerializer,
     WarrantyReportRowSerializer,
 )

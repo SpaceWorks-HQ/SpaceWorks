@@ -123,17 +123,6 @@ from apps.admin_api.views_platform_updates import (
     PlatformUpdateSettingsView,
 )
 from apps.admin_api.views_subdomain_requests import SubdomainRequestListCreateView
-from apps.admin_api.views_warranty import (
-    AssetWarrantyView,
-    MachineWarrantyView,
-    MakerspaceWarrantyReportView,
-)
-from apps.admin_api.views_warranty_documents import (
-    WarrantyDocumentCreateView,
-    WarrantyDocumentDeleteView,
-    WarrantyDocumentPresignView,
-    WarrantyDocumentUrlView,
-)
 from apps.makerspaces.models import MakerspaceMembership
 from apps.admin_api.views_memberships import (
     MembershipListCreateView,
@@ -489,11 +478,6 @@ urlpatterns = [
         name='admin-machine-publicity',
     ),
     path(
-        'machines/<int:pk>/warranty',
-        MachineWarrantyView.as_view(),
-        name='admin-machine-warranty',
-    ),
-    path(
         'machines/<int:pk>/set-status',
         MachineSetStatusView.as_view(),
         name='admin-machine-set-status',
@@ -630,37 +614,11 @@ urlpatterns = [
     path("inventory/<int:product_pk>/assets", views.InventoryAssetListView.as_view(), name="admin-inventory-assets"),
     path("assets/<int:pk>", views.InventoryAssetDetailView.as_view(), name="admin-inventory-asset-detail"),
     path("assets/<int:pk>/fix-status", views.InventoryAssetStatusActionView.as_view(), name="admin-inventory-asset-fix-status"),
-    path("assets/<int:pk>/warranty", AssetWarrantyView.as_view(), name="admin-asset-warranty"),
     path("assets/<int:pk>/qr-history", views.AssetQrHistoryView.as_view(), name="admin-inventory-asset-qr-history"),
     path(
         "inventory/<int:pk>/image",
         views.InventoryProductImageView.as_view(),
         name="admin-inventory-image",
-    ),
-    path(
-        "warranty/<int:pk>/documents/presign",
-        WarrantyDocumentPresignView.as_view(),
-        name="admin-warranty-document-presign",
-    ),
-    path(
-        "warranty/<int:pk>/documents",
-        WarrantyDocumentCreateView.as_view(),
-        name="admin-warranty-documents",
-    ),
-    path(
-        "warranty/documents/<int:pk>/url",
-        WarrantyDocumentUrlView.as_view(),
-        name="admin-warranty-document-url",
-    ),
-    path(
-        "warranty/documents/<int:pk>",
-        WarrantyDocumentDeleteView.as_view(),
-        name="admin-warranty-document-detail",
-    ),
-    path(
-        "makerspace/<int:makerspace_id>/warranties",
-        MakerspaceWarrantyReportView.as_view(),
-        name="admin-makerspace-warranties",
     ),
     path(
         "inventory/needs-fix",

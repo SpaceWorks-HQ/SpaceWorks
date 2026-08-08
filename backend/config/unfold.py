@@ -95,8 +95,8 @@ UNFOLD = {
                     _item("Asset units", "qr_code_2", "admin:inventory_inventoryasset_changelist"),
                     _item("Containers", "package_2", "admin:boxes_box_changelist"),
                     _item("Inventory adjustments", "tune", "admin:operations_inventoryadjustment_changelist"),
-                    _item("Warranties", "verified", "admin:warranty_warranty_changelist"),
-                    _item("Warranty documents", "description", "admin:warranty_warrantydocument_changelist"),
+                    _item("Warranties", "verified", "admin:warranty_warranty_changelist", app_label="warranty"),
+                    _item("Warranty documents", "description", "admin:warranty_warrantydocument_changelist", app_label="warranty"),
                 ],
             },
             {

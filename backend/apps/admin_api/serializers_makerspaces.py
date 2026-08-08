@@ -17,6 +17,7 @@ from apps.makerspaces import domain_verification, limits
 from apps.makerspaces.hosting import canonical_host
 from apps.makerspaces.capabilities import validate_capabilities
 from apps.makerspaces.platform import available_modules
+from apps.separability.tombstones import unavailable_apps
 from apps.makerspaces.models import (
     Makerspace,
     default_branding_config,
@@ -81,6 +82,7 @@ class MakerspaceSerializer(serializers.ModelSerializer):
         trim_whitespace=True,
     )
     enabled_modules = serializers.SerializerMethodField()
+    unavailable_apps = serializers.SerializerMethodField()
 
     class Meta:
         model = Makerspace
@@ -120,6 +122,7 @@ class MakerspaceSerializer(serializers.ModelSerializer):
             "public_api_key",
             "cors_allowed_origins",
             "enabled_modules",
+            "unavailable_apps",
             "resource_limit_overrides",
             "enabled_features",
             "theme_config",
@@ -167,9 +170,17 @@ class MakerspaceSerializer(serializers.ModelSerializer):
             # public_display_name field, never as an unchecked whole-blob PATCH.
             "branding_config",
             "enabled_modules",
+            "unavailable_apps",
             "created_at",
             "updated_at",
         ]
+
+    def get_unavailable_apps(self, obj) -> list[str]:
+        # Must be on this serializer as well as the switcher: the makerspaces list
+        # picks per row, and a VIEW_INVENTORY user -- the common case -- gets this
+        # one. Present on only one of the two would hide the warranty tab for print
+        # managers and leave it 404ing for everyone else.
+        return unavailable_apps()
 
     def get_enabled_modules(self, obj) -> list[str]:
         # What the deployment serves, not what the row stores. Already read-only

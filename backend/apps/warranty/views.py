@@ -7,9 +7,9 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff, require_action
-from apps.admin_api.serializers_warranty import WarrantySerializer, WarrantyUpsertSerializer
-from apps.admin_api.views_warranty_report import MakerspaceWarrantyReportView
-from apps.admin_api.warranty_access import (
+from apps.warranty.serializers import WarrantySerializer, WarrantyUpsertSerializer
+from apps.warranty.views_report import MakerspaceWarrantyReportView
+from apps.warranty.access import (
     resolve_asset_host,
     resolve_machine_host,
 )

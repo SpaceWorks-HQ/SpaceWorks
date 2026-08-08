@@ -18,6 +18,15 @@ const TAB_MODULES: Record<string, string[]> = {
   warranty: ["staff_admin"],
 };
 
+// Tabs whose backing app can be tombstoned out of a deployment but which no module
+// key describes. `warranty` is gated by core `staff_admin`, so dropping a module key
+// cannot hide it -- without this the tab would survive the tombstone and 404 on every
+// request. Tabs that do have their own key need no entry: the server already omits a
+// tombstoned app's key from `enabled_modules`.
+const TAB_APPS: Record<string, string> = {
+  warranty: "warranty",
+};
+
 const TAB_PATHS: Record<string, string> = {
   direct: "direct-handout",
   needsfix: "to-be-fixed",
@@ -37,10 +46,16 @@ export const STAFF_SELECTED_MAKERSPACE_KEY = "spaceworks.staff.selectedMakerspac
 export const STAFF_ACTIVE_TAB_KEY = "spaceworks.staff.activeTab";
 
 export function filterTabsByEnabledModules(tabs: readonly string[], makerspace?: Makerspace) {
+  const unavailable = new Set(makerspace?.unavailable_apps ?? []);
+  // Checked before the module gate and outside the early return below: an app the
+  // deployment does not ship is unreachable no matter what the tenant enabled, and a
+  // makerspace row that has not loaded its modules yet must not show it either.
+  const shipped = tabs.filter((tabName) => !unavailable.has(TAB_APPS[tabName] ?? ""));
+
   const modules = makerspace?.enabled_modules;
-  if (!modules) return tabs;
+  if (!modules) return shipped;
   const enabled = new Set(modules);
-  return tabs.filter((tabName) => {
+  return shipped.filter((tabName) => {
     if (tabName === "direct") {
       return featureEnabled(makerspace.enabled_features ?? [], "inventory.self_checkout");
     }

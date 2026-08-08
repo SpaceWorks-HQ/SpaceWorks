@@ -33038,6 +33038,13 @@
                         },
                         "readOnly": true
                     },
+                    "unavailable_apps": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "readOnly": true
+                    },
                     "resource_limit_overrides": {},
                     "enabled_features": {},
                     "theme_config": {},
@@ -33158,6 +33165,7 @@
                     "slug",
                     "smtp_password_set",
                     "telegram_bot_token_set",
+                    "unavailable_apps",
                     "updated_at"
                 ]
             },
@@ -36242,6 +36250,13 @@
                     },
                     "cors_allowed_origins": {},
                     "enabled_modules": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "readOnly": true
+                    },
+                    "unavailable_apps": {
                         "type": "array",
                         "items": {
                             "type": "string"

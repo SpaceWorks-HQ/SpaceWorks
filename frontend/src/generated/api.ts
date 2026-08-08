@@ -2076,6 +2076,7 @@ export type Makerspace = {
   "public_api_key": string;
   "cors_allowed_origins"?: unknown;
   "enabled_modules": Array<string>;
+  "unavailable_apps": Array<string>;
   "resource_limit_overrides"?: unknown;
   "enabled_features"?: unknown;
   "theme_config"?: unknown;
@@ -2872,6 +2873,7 @@ export type PatchedMakerspace = {
   "public_api_key"?: string;
   "cors_allowed_origins"?: unknown;
   "enabled_modules"?: Array<string>;
+  "unavailable_apps"?: Array<string>;
   "resource_limit_overrides"?: unknown;
   "enabled_features"?: unknown;
   "theme_config"?: unknown;

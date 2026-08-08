@@ -89,6 +89,11 @@ urlpatterns = [
     path("api/v1/", include("apps.hardware_requests.urls")),
     path("api/v1/auth/", include("apps.accounts.urls")),   # staff auth surface
     path("api/v1/admin/", include("apps.admin_api.urls")),
+    # Mounted at admin_api's own prefix so the paths and route names are unchanged by
+    # the relocation, and *after* it so a relocated route can never shadow one that
+    # stayed behind. Every warranty pattern is a distinct literal, so ordering is
+    # belt-and-braces rather than load-bearing.
+    *separable("warranty", "api/v1/admin/", "apps.warranty.urls"),
     path("api/v1/admin/", include("apps.boxes.urls")),
     path("api/v1/admin/", include("apps.evidence.urls")),
     path("api/v1/", include("apps.operations.urls")),

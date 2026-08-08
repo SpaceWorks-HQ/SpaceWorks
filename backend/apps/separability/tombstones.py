@@ -31,7 +31,26 @@ from apps.separability.registry import register_runtime_app, registered_runtime_
 # Anything named in TOMBSTONED_APPS but absent here is refused at startup
 # (separability.E007), so a typo, a dotted path or a core app cannot quietly read as a
 # working tombstone.
-SEPARABLE_APPS = frozenset({"procurement", "notifications"})
+SEPARABLE_APPS = frozenset({"procurement", "notifications", "warranty"})
+
+
+def unavailable_apps():
+    """Separable apps this deployment does not ship, for clients that must hide UI.
+
+    Most console tabs are gated by a module key, and `platform.available_modules`
+    already drops a tombstoned app's key -- so most of the frontend needs nothing.
+    This exists for the apps that own **no module key of their own**: `warranty` is
+    gated by core `staff_admin` and `presence` by no module at all, so there is no key
+    to drop and their tabs would survive the tombstone and 404 on every request. B5
+    named warranty as the most exposed case for exactly this reason.
+
+    Deployment-global, so it is emitted **omitted-when-empty**: an untombstoned
+    deployment's payloads stay byte-for-byte what they were, the same discipline the
+    `geofence_enabled` bootstrap flag follows.
+    """
+    from apps.separability.registry import runtime_active
+
+    return sorted(app for app in SEPARABLE_APPS if not runtime_active(app))
 
 
 def tombstoned_app_labels():
