@@ -49,6 +49,36 @@ export function deleteRole(msId: number, roleId: number) {
   return staffRequest<void>(`/admin/makerspaces/${msId}/roles/${roleId}`, { method: "DELETE" });
 }
 
+export type MachineScopeOption = {
+  id: number;
+  label: string;
+  is_builtin?: boolean;
+  is_active?: boolean;
+};
+
+export type RoleMachineScope = {
+  machine_type_ids: number[];
+  machine_ids: number[];
+  available_machine_types: MachineScopeOption[];
+  available_machines: MachineScopeOption[];
+  /** False when the role is exempt (holds manage_makerspace) or grants no machine authority. */
+  scoping_applies: boolean;
+};
+
+export function getRoleMachineScope(msId: number, roleId: number) {
+  return staffRequest<RoleMachineScope>(`/admin/makerspaces/${msId}/roles/${roleId}/machine-scope`);
+}
+
+export function setRoleMachineScope(
+  msId: number,
+  roleId: number,
+  body: { machine_type_ids: number[]; machine_ids: number[] },
+) {
+  return staffRequest<RoleMachineScope>(`/admin/makerspaces/${msId}/roles/${roleId}/machine-scope`, {
+    method: "PUT", body: JSON.stringify(body),
+  });
+}
+
 export function listCapabilities(msId: number) {
   return staffRequest<Capability[]>(`/admin/makerspaces/${msId}/roles/capabilities`);
 }

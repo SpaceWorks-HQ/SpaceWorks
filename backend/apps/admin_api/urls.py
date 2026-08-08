@@ -102,7 +102,7 @@ from apps.admin_api.views_member_capabilities import (
     AdminMembershipUnverifyView,
     AdminMembershipVerifyView,
 )
-from apps.admin_api.views_roles import CapabilityCatalogView, RoleDetailView, RoleListCreateView
+from apps.admin_api.views_roles import CapabilityCatalogView, RoleDetailView, RoleListCreateView, RoleMachineScopeView
 
 urlpatterns = [
     path(
@@ -254,6 +254,11 @@ urlpatterns = [
         "makerspaces/<int:makerspace_id>/roles/<int:role_id>",
         RoleDetailView.as_view(),
         name="admin-role-detail",
+    ),
+    path(
+        "makerspaces/<int:makerspace_id>/roles/<int:role_id>/machine-scope",
+        RoleMachineScopeView.as_view(),
+        name="admin-role-machine-scope",
     ),
     path(
         'makerspace/<int:makerspace_id>/machines',

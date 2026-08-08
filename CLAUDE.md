@@ -887,6 +887,22 @@ Every domain entity is scoped to a `makerspace_id`. A makerspace owns its invent
       selects who *receives* maintenance alerts — makerspace configuration, not machine data) and
       `reconciliation.list_payments` (already gated on `MANAGE_MAKERSPACE`, which is exempt anyway).
       The reconciliation **bulk** path is narrowed, via `_require_subject_authority`.
+  - **The console owns the links** (Phase 4): `PUT/GET /admin/makerspaces/<id>/roles/<role_id>/machine-scope`
+    (`RoleMachineScopeView` → `machines/role_scope_services.py`), rendered by
+    `RoleMachineScopeEditor.tsx` inside the role editor. Console parity is not optional here —
+    scoping fails closed, so without this surface a Space Manager could create a machine-managing
+    role and have **no way to make it manage anything** short of `/control/` (unreachable for staff)
+    or the shell. The service lives in `apps.machines`, not `makerspaces.role_services`, so it
+    disappears with a `machines` tombstone instead of lingering as a management surface for an app
+    with nothing to manage. It takes the **makerspace lock before the role lock**, matching
+    `role_services` exactly — a concurrent role edit and scope edit take both, and a different order
+    between them deadlocks. Saves **replace** rather than merge (a merge makes unticking impossible),
+    an unknown/foreign id is a **400 rather than a silent drop** (a save that quietly discards half
+    the selection leaves the administrator believing a team has access it does not), and a change
+    audits `role.machine_scope_changed` — `role.updated` covers the action list and would not show it.
+    The payload carries `scoping_applies:false` for an exempt or non-machine role so the editor
+    renders inert rather than offering ticks `role_scope` will ignore. A role being **created** has no
+    id to link to, so the editor appears on reopen and says so.
   - `can_create_machine` needs a **type** link specifically: a machine link granted one machine, not
     the right to add more of its kind. `can_see_machines` requires a link too, since a tab that
     renders an empty list and 403s on every action is worse than no tab. Resolution always ANDs the

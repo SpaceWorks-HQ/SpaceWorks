@@ -15081,6 +15081,212 @@
                 }
             }
         },
+        "/api/v1/admin/makerspaces/{makerspace_id}/roles/{role_id}/machine-scope": {
+            "get": {
+                "operationId": "api_v1_admin_makerspaces_roles_machine_scope_retrieve",
+                "description": "Which machines a role's MANAGE_MACHINES grant reaches.\n\nConsole parity: machine scoping fails closed, so without this surface a Space Manager\ncould create a machine-managing role and have no way to make it able to manage\nanything — the capability would exist only in `/control/` and the shell.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "role_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin roles"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RoleMachineScope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "operationId": "api_v1_admin_makerspaces_roles_machine_scope_update",
+                "description": "Which machines a role's MANAGE_MACHINES grant reaches.\n\nConsole parity: machine scoping fails closed, so without this surface a Space Manager\ncould create a machine-managing role and have no way to make it able to manage\nanything — the capability would exist only in `/control/` and the shell.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "role_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin roles"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RoleMachineScopeWrite"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RoleMachineScopeWrite"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RoleMachineScopeWrite"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RoleMachineScope"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspaces/{makerspace_id}/roles/capabilities": {
             "get": {
                 "operationId": "api_v1_admin_makerspaces_roles_capabilities_list",
@@ -31435,6 +31641,27 @@
                     "username"
                 ]
             },
+            "MachineScopeOption": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "is_builtin": {
+                        "type": "boolean"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "id",
+                    "label"
+                ]
+            },
             "MachineServiceConsumption": {
                 "type": "object",
                 "properties": {
@@ -40214,6 +40441,70 @@
                 },
                 "required": [
                     "role_id"
+                ]
+            },
+            "RoleMachineScope": {
+                "type": "object",
+                "description": "The role's links plus everything it could be linked to, in one round trip.",
+                "properties": {
+                    "machine_type_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "machine_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "available_machine_types": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MachineScopeOption"
+                        },
+                        "readOnly": true
+                    },
+                    "available_machines": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MachineScopeOption"
+                        },
+                        "readOnly": true
+                    },
+                    "scoping_applies": {
+                        "type": "boolean",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "available_machine_types",
+                    "available_machines",
+                    "machine_ids",
+                    "machine_type_ids",
+                    "scoping_applies"
+                ]
+            },
+            "RoleMachineScopeWrite": {
+                "type": "object",
+                "properties": {
+                    "machine_type_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "machine_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "required": [
+                    "machine_ids",
+                    "machine_type_ids"
                 ]
             },
             "ServiceAccept": {

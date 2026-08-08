@@ -237,6 +237,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspaces/{makerspace_id}/roles",
   "/api/v1/admin/makerspaces/{makerspace_id}/roles/capabilities",
   "/api/v1/admin/makerspaces/{makerspace_id}/roles/{role_id}",
+  "/api/v1/admin/makerspaces/{makerspace_id}/roles/{role_id}/machine-scope",
   "/api/v1/admin/makerspaces/{makerspace_id}/spaces/",
   "/api/v1/admin/makerspaces/{makerspace_id}/uploads/evidence-url",
   "/api/v1/admin/makerspaces/{makerspace_id}/waiver",
@@ -1740,6 +1741,13 @@ export type MachineOperator = {
   "access_level": AccessLevelEnum;
   "assigned_by_username": string | null;
   "assigned_at": string;
+};
+
+export type MachineScopeOption = {
+  "id": number;
+  "label": string;
+  "is_builtin"?: boolean;
+  "is_active"?: boolean;
 };
 
 export type MachineServiceConsumption = {
@@ -3913,6 +3921,19 @@ export type RoleCreate = {
 
 export type RoleId = {
   "role_id": number;
+};
+
+export type RoleMachineScope = {
+  "machine_type_ids": Array<number>;
+  "machine_ids": Array<number>;
+  "available_machine_types": Array<MachineScopeOption>;
+  "available_machines": Array<MachineScopeOption>;
+  "scoping_applies": boolean;
+};
+
+export type RoleMachineScopeWrite = {
+  "machine_type_ids": Array<number>;
+  "machine_ids": Array<number>;
 };
 
 export type ServiceAccept = {
