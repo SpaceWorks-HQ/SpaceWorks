@@ -39,7 +39,8 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
 - **3D-printing manager** — public print requests, printer/spool management, filament tracking,
   slicer estimates, and an optional (staff-private) cash charge at collection.
 - **QR everywhere** — boxes, tools, and individual assets; immutable scan history.
-- **Role-based staff console** — 5 scoped roles; a superadmin-only Django control plane.
+- **Action-based staff console** — editable per-makerspace roles over a fixed action set, five seeded
+  defaults, and a superadmin-only Django control plane.
 - **Reports & ledger** — what's out, who has it, overdue tracking, CSV/XLSX export.
 - **Notifications** — per-makerspace Telegram alerts and async (Celery) email.
 - **Traceable by design** — append-only audit log; immutable evidence photos and scan records.
@@ -101,17 +102,38 @@ product intentionally does not expose a separate roadmap page.
 Access is scoped **per makerspace and per action**. Super Admin is global; every other role is a
 per-makerspace membership.
 
-| Role | Can do | Cannot do |
-|---|---|---|
-| **Super Admin** | Everything, globally: makerspaces, all hardware/printing/ops, staff, settings, API clients, audit; the Django control plane | — |
-| **Space Manager** | Full hardware lifecycle, direct handouts, inventory, staff & settings — for their space | Other makerspaces; Django admin |
-| **Inventory Manager** | Full hardware lifecycle + inventory + QR + evidence + audit — for their space | Printing, staff, settings; Django admin |
-| **Print Manager** | 3D-printing lifecycle, printers & spools | Hardware, inventory, staff; Django admin |
-| **Guest Admin** | Issue accepted requests + process returns (evidence/QR/remark) | Accept/reject, inventory, QR, direct handouts; Django admin |
-| **Public** | Browse, request, self-checkout/return eligible QR tools (member presence + photo evidence) | Anything authenticated |
+Authority comes from **actions, not role names**. A role is a row owned by one makerspace holding a
+list of granted action strings (`view_inventory`, `accept_request`, `issue_direct_loan`,
+`manage_machines`, …), and every permission check asks whether the actor holds the action — never
+what their role is called. So a makerspace can rename, re-scope, or invent roles to match how it
+actually works, and nothing downstream has to learn the new name.
 
-> Roles are **defined by the system, not by users** — nobody can invent roles or grant themselves
-> extra powers; they can only assign people to existing roles within their own makerspace.
+Every makerspace starts with five protected default roles:
+
+| Role | Granted actions | Notes |
+|---|---|---|
+| **Space Manager** | Everything grantable: full hardware lifecycle, inventory, QR, evidence, machines, events, bookings, audit, and makerspace settings | Must always keep `manage_makerspace` |
+| **Inventory Manager** | Full hardware lifecycle + inventory + QR + evidence + audit | No machines, staff or settings |
+| **Machine Manager** | `manage_machines` — assigned machines end-to-end, including usage, warranty and maintenance | Implies `manage_printing`, so it absorbed the old Print Manager |
+| **Guest Admin** | Handout-only: issue accepted requests, create direct handouts, process returns, upload evidence | Capped at the handout set; cannot be widened |
+| **Member** | None | A role granting no actions *is* a community membership — that is how staff and member invitations are told apart |
+
+Beyond those, a Space Manager can **create custom roles** with any subset of actions they themselves
+hold, and can edit the defaults — including renaming them and narrowing what they grant. Two limits
+protect the defaults from being edited into incoherence: Space Manager must retain
+`manage_makerspace`, and Guest Admin must stay within the handout actions. Protected defaults cannot
+be deleted; custom roles can be, once nobody is assigned to them.
+
+Escalation is blocked in both directions: you cannot grant an action you do not hold, you cannot
+create or assign a role carrying `manage_makerspace` (superadmin only), and you cannot modify a
+membership that already holds it. `transfer_stock` and `manage_staff` are superadmin-only and are
+never grantable to any role.
+
+Outside this system entirely: **Public** users browse, submit requests, and — where enabled —
+self-checkout and return eligible QR tools, gated on member presence and photo evidence.
+
+> Earlier versions shipped five fixed, code-defined roles. Roles are now editable data; the five
+> above are seeded defaults rather than the whole vocabulary.
 
 Staff work in the **React console** at `/admin`; the superadmin-only **Django control plane** lives at
 `/control/` (backend-only, never exposed on the public port). Two design rules are load-bearing — the
