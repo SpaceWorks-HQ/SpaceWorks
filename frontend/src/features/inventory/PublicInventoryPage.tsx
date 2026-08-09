@@ -171,6 +171,11 @@ export function PublicInventoryPage() {
                   Events
                 </Link>
               ) : null}
+              {modules.has("machines") ? (
+                <Link className="desk-button" to={tenantPath("machines")}>
+                  Machines
+                </Link>
+              ) : null}
               {modules.has("bookings") ? (
                 <Link className="desk-button" to={tenantPath("bookings")}>
                   Book a space

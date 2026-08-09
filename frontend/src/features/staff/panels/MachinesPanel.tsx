@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { EmptyState, Skeleton, StatusBadge } from "../../../components/ui";
+import { CollapsibleSection, EmptyState, Skeleton, StatusBadge } from "../../../components/ui";
 import { ImageThumbnail } from "../../../components/ui/ImageThumbnail";
 import { collectionResults, createMachine, getMachines, getMachineTypes, machineKeys, type MachineStatus } from "../machinesApi";
 import { MachineDrawer } from "./machine/MachineDrawer";
@@ -31,6 +31,28 @@ export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineType
     (typeFilter === "all" || machine.machine_type.id === Number(typeFilter)) &&
     (statusFilter === "all" || machine.status === statusFilter),
   ), [machines.data, statusFilter, typeFilter]);
+  // Group by type so a lab reads as "3D Printers (3)" rather than one flat list.
+  // Order follows the machine-type list, with any type not in it (a type the row
+  // references but the types query has not returned) appended rather than dropped.
+  const groups = useMemo(() => {
+    const byType = new Map<number, { name: string; icon: string; machines: typeof rows }>();
+    for (const machine of rows) {
+      const existing = byType.get(machine.machine_type.id);
+      if (existing) existing.machines.push(machine);
+      else byType.set(machine.machine_type.id, {
+        name: machine.machine_type.name, icon: machine.machine_type.icon, machines: [machine],
+      });
+    }
+    const ordered = types.filter((type) => byType.has(type.id)).map((type) => type.id);
+    const extra = [...byType.keys()].filter((id) => !ordered.includes(id));
+    return [...ordered, ...extra].map((id) => ({ id, ...byType.get(id)! }));
+  }, [rows, types]);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
+  const toggleGroup = (id: number) => setCollapsed((current) => {
+    const next = new Set(current);
+    if (!next.delete(id)) next.add(id);
+    return next;
+  });
 
   const create = useMutation({
     mutationFn: () => createMachine(makerspaceId, {
@@ -97,22 +119,28 @@ export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineType
         <EmptyState title={filtersActive ? "No matching machines" : "No machines yet"}
           description={filtersActive ? "Try a different type or status filter." : canManage ? "Create the first machine above." : "No machines are available in this makerspace."} />
       ) : null}
-      {rows.length ? (
-        <div className="overflow-hidden rounded-xl border border-line bg-panel">
-          <div className="hidden grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto_auto] gap-3 border-b border-line bg-surface px-3 py-2 text-xs font-semibold text-muted sm:grid">
-            <span>Name</span><span>Type</span><span>Status</span><span className="text-right">Usage</span>
-          </div>
-          {rows.map((machine) => (
-            <button key={machine.id} type="button" onClick={() => setSelectedId(machine.id)}
-              className="grid w-full gap-2 border-b border-line px-3 py-3 text-left last:border-b-0 hover:bg-surface sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto_auto] sm:items-center sm:gap-3">
-              <span className="flex min-w-0 items-center gap-3">
-                {machine.image_url ? <ImageThumbnail src={machine.image_url} alt={machine.name} className="h-10 w-10" /> : null}
-                <span className="min-w-0"><strong className="block truncate text-sm text-ink">{machine.name}</strong><span className="text-xs text-muted">{machine.location || "No location"}</span></span>
-              </span>
-              <span className="text-sm text-muted">{machine.machine_type.name}</span>
-              <span><StatusBadge status={machine.status} /></span>
-              <span className="text-sm text-muted sm:text-right">{machine.usage_hours} h</span>
-            </button>
+      {groups.length ? (
+        <div className="grid gap-3">
+          {groups.map((group) => (
+            <CollapsibleSection key={group.id} title={group.name} icon={group.icon || null}
+              count={group.machines.length} open={!collapsed.has(group.id)}
+              onToggle={() => toggleGroup(group.id)}>
+              {/* The type column is gone: the section heading already says it. */}
+              <div className="hidden grid-cols-[minmax(0,2fr)_auto_auto] gap-3 border-b border-line px-3 py-2 text-xs font-semibold text-muted sm:grid">
+                <span>Name</span><span>Status</span><span className="text-right">Usage</span>
+              </div>
+              {group.machines.map((machine) => (
+                <button key={machine.id} type="button" onClick={() => setSelectedId(machine.id)}
+                  className="grid w-full gap-2 border-b border-line px-3 py-3 text-left last:border-b-0 hover:bg-surface sm:grid-cols-[minmax(0,2fr)_auto_auto] sm:items-center sm:gap-3">
+                  <span className="flex min-w-0 items-center gap-3">
+                    {machine.image_url ? <ImageThumbnail src={machine.image_url} alt={machine.name} className="h-10 w-10" /> : null}
+                    <span className="min-w-0"><strong className="block truncate text-sm text-ink">{machine.name}</strong><span className="text-xs text-muted">{machine.location || "No location"}</span></span>
+                  </span>
+                  <span><StatusBadge status={machine.status} /></span>
+                  <span className="text-sm text-muted sm:text-right">{machine.usage_hours} h</span>
+                </button>
+              ))}
+            </CollapsibleSection>
           ))}
         </div>
       ) : null}

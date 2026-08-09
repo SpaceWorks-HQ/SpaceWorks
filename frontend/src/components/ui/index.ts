@@ -1,6 +1,7 @@
 export { Badge } from "./Badge";
 export { BulkActionToolbar } from "./BulkActionToolbar";
 export { Card } from "./Card";
+export { CollapsibleSection } from "./CollapsibleSection";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { DataTable } from "./DataTable";
 export type { DataTableColumn } from "./DataTable";

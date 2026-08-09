@@ -12,6 +12,7 @@ import { AboutPage } from "./features/AboutPage";
 import { PublicBookingsPage } from "./features/bookings/PublicBookingsPage";
 import { PublicInventoryPage } from "./features/inventory/PublicInventoryPage";
 import { PublicEventsPage } from "./features/inventory/PublicEventsPage";
+import { PublicMachinesPage } from "./features/inventory/PublicMachinesPage";
 import { PublicSelfCheckoutPage } from "./features/inventory/PublicSelfCheckoutPage";
 import { usePublicMakerspaces } from "./features/inventory/usePublicInventory";
 import { PublicPrintRequestPage } from "./features/printing/PublicPrintRequestPage";
@@ -306,6 +307,7 @@ export default function App() {
         <Route path="/" element={<PublicInventoryPage />} />
         <Route path="/checkout" element={<PublicSelfCheckoutPage />} />
         <Route path="/events" element={<PublicEventsPage />} />
+        <Route path="/machines" element={<PublicMachinesPage />} />
         <Route path="/bookings" element={<PublicBookingsPage />} />
         <Route path="/print" element={<PublicPrintRequestPage />} />
         <Route path="/member" element={<MemberArea />} />
@@ -327,6 +329,7 @@ export default function App() {
       <Route path="/m/:slug" element={<PublicInventoryPage />} />
       <Route path="/m/:slug/checkout" element={<PublicSelfCheckoutPage />} />
       <Route path="/m/:slug/events" element={<PublicEventsPage />} />
+      <Route path="/m/:slug/machines" element={<PublicMachinesPage />} />
       <Route path="/m/:slug/bookings" element={<PublicBookingsPage />} />
       <Route path="/m/:slug/admin/*" element={<StaffApp />} />
       <Route path="/m/:slug/print" element={<PublicPrintRequestPage />} />
