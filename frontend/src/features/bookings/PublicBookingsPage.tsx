@@ -12,6 +12,7 @@ import { formatSlug } from "../inventory/PublicInventoryParts";
 import { useTenantBootstrap } from "../inventory/usePublicInventory";
 import { PublicBookingForm } from "./PublicBookingForm";
 import { usePublicSpaces, type PublicBookableSpace } from "./publicBookingsApi";
+import { SkipLink } from "../../components/SkipLink";
 
 const KIND_LABELS: Record<PublicBookableSpace["kind"], string> = {
   dev_room: "Development room",
@@ -38,6 +39,7 @@ export function PublicBookingsPage() {
 
   return (
     <main className="desk-shell flex min-h-screen flex-col">
+      <SkipLink />
       <header className="border-b border-line bg-panel">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4">
           <div>
@@ -52,7 +54,7 @@ export function PublicBookingsPage() {
           </div>
         </div>
       </header>
-      <section className="mx-auto w-full max-w-5xl flex-1 px-5 py-8">
+      <section className="mx-auto w-full max-w-5xl flex-1 px-5 py-8" id="main-content" tabIndex={-1}>
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-ink">Book a makerspace</h1>
           <p className="mt-2 text-sm text-muted">Choose a public space, check published bookings, and request a time.</p>

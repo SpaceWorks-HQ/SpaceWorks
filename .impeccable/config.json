@@ -1,0 +1,23 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "instrument sans",
+        "createdAt": "2026-08-09T18:28:31.410Z",
+        "reason": "Owner confirmed: self-hosted brand face at /fonts/InstrumentSans-Variable.woff2"
+      },
+      {
+        "rule": "codex-grid-background",
+        "value": "*",
+        "files": [
+          "frontend/src/index.css"
+        ],
+        "createdAt": "2026-08-09T18:28:39.951Z",
+        "reason": "Deliberate Blueprint theme: body grid at 0.045 ink alpha, paired with the blueprint-bg placeholder motif"
+      }
+    ]
+  }
+}

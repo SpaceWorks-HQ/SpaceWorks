@@ -23,6 +23,7 @@ import {
   type View,
 } from "./PublicInventoryParts";
 import { PublicRequestPanel } from "./PublicRequestPanel";
+import { SkipLink } from "../../components/SkipLink";
 import {
   usePublicCategories,
   usePublicInventory,
@@ -131,6 +132,7 @@ export function PublicInventoryPage() {
 
   return (
     <main className="desk-shell">
+      <SkipLink />
       <header className="border-b border-line bg-panel">
         <div className="mx-auto flex max-w-screen-2xl flex-col gap-2 px-5 py-4 sm:px-8">
           <p className="text-sm font-semibold tracking-wide text-accent-ink">
@@ -190,7 +192,7 @@ export function PublicInventoryPage() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[200px_minmax(0,1fr)_360px]">
+      <section className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[200px_minmax(0,1fr)_360px]" id="main-content" tabIndex={-1}>
         <CatalogSidebar
           categories={categories}
           view={view}

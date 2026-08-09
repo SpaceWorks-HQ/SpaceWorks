@@ -23,6 +23,7 @@ export default {
         muted: "rgb(var(--color-muted) / <alpha-value>)",
         line: "rgb(var(--color-line) / <alpha-value>)",
         outline: "rgb(var(--color-outline) / <alpha-value>)",
+        focus: "rgb(var(--color-focus) / <alpha-value>)",
         success: "rgb(var(--color-success) / <alpha-value>)",
         "success-ink": "rgb(var(--color-success-ink) / <alpha-value>)",
         danger: "rgb(var(--color-danger) / <alpha-value>)",

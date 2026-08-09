@@ -51,9 +51,16 @@
     --color-bg: 250 249 244;
     --color-surface: 239 238 233;
     --color-panel: 255 255 255;
-    --color-muted: 107 119 128;
+    /* Darkened from 107 119 128, which measured 4.35:1 on --color-bg and 3.95:1
+       on --color-surface — below the 4.5:1 AA floor for body text on the two
+       backgrounds it sits on most. This value clears 4.98:1 everywhere. */
+    --color-muted: 92 103 112;
     --color-line: 227 225 216;
     --color-outline: 196 193 182;
+    /* Focus indicator. Deliberately not the pastel accent: at the /40 alpha the
+       rings used to carry it, the indicator fell below the 3:1 that WCAG 2.2
+       SC 2.4.11 wants against adjacent colours. */
+    --color-focus: 12 74 110;
     --color-success: 116 221 156;
     --color-success-ink: 0 50 27;
     --color-warn: 252 223 70;
@@ -92,9 +99,11 @@
     --color-bg: 22 22 28;
     --color-surface: 38 40 51;
     --color-panel: 29 30 38;
+    /* Dark-mode muted already measured 5.58:1 at worst, so it is unchanged. */
     --color-muted: 154 160 173;
     --color-line: 51 52 63;
     --color-outline: 71 73 86;
+    --color-focus: 186 230 253;
     --color-success: 116 221 156;
     --color-success-ink: 116 221 156;
     --color-warn: 252 223 70;
@@ -219,6 +228,13 @@
     @apply bg-danger text-bg;
   }
 
+  .skip-link {
+    @apply sr-only;
+  }
+  .skip-link:focus-visible {
+    @apply not-sr-only fixed left-4 top-4 z-[100] rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold text-ink shadow-soft-lg outline-2 outline-offset-2 outline-focus;
+  }
+
   .desk-shell {
     @apply min-h-screen min-w-0 bg-bg text-ink;
     background: rgb(var(--color-bg));
@@ -229,19 +245,19 @@
   }
 
   .desk-input {
-    @apply rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink outline-none transition placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/25;
+    @apply min-h-11 rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink transition placeholder:text-muted focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus;
   }
 
   .desk-button {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm font-medium text-ink transition-all hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-panel;
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm font-medium text-ink transition-all hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-panel;
   }
 
   .desk-button-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-accent px-3 py-2 text-sm font-semibold text-on-accent shadow-soft transition-all hover:-translate-y-0.5 hover:bg-accent-bright hover:text-on-accent hover:shadow-soft-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-accent disabled:hover:shadow-soft;
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-accent px-3 py-2 text-sm font-semibold text-on-accent shadow-soft transition-all hover:-translate-y-0.5 hover:bg-accent-bright hover:text-on-accent hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-accent disabled:hover:shadow-soft;
   }
 
   .desk-nav-item {
-    @apply flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border-l border-transparent px-3 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:bg-accent/15 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30;
+    @apply min-h-11 flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border-l border-transparent px-3 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:bg-accent/15 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus;
   }
 
   .desk-nav-item-active {
@@ -249,7 +265,7 @@
   }
 
   .desk-tab {
-    @apply flex-1 rounded-lg border border-transparent px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply flex-1 rounded-lg border border-transparent px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .desk-tab-active {
@@ -257,7 +273,7 @@
   }
 
   .desk-actions button {
-    @apply inline-flex items-center justify-center rounded-lg border border-line px-2 py-1 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-lg border border-line px-2 py-1 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .desk-actions button:not([class*="bg-"]) {
@@ -288,6 +304,6 @@
   .desk-panel-body
     > div:not(.desk-actions)
     > button:not([class*="desk-"]):not([class*="text-"]):not([class*="bg-"]) {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-accent px-3 py-2 text-sm font-semibold text-on-accent shadow-soft transition-all hover:-translate-y-0.5 hover:bg-accent-bright hover:text-on-accent hover:shadow-soft-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-accent px-3 py-2 text-sm font-semibold text-on-accent shadow-soft transition-all hover:-translate-y-0.5 hover:bg-accent-bright hover:text-on-accent hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus;
   }
 }

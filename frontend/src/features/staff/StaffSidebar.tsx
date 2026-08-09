@@ -69,6 +69,10 @@ export function StaffSidebar({
         ) : (
           <select
             className="desk-input w-full"
+            // The visible context is the option text itself, so there is no visible
+            // label to point at; without this the control is announced as just
+            // "combobox" with no indication of what it switches.
+            aria-label="Active makerspace"
             value={selected ?? ""}
             onChange={(event) => setSelected(Number(event.target.value))}
           >
@@ -79,23 +83,28 @@ export function StaffSidebar({
             ))}
           </select>
         )}
-        <nav className="mt-4 space-y-3">
+        {/* Named landmark: a staff page carries more than one nav region, and
+            "navigation" repeated twice tells a screen-reader user nothing. */}
+        <nav className="mt-4 space-y-3" aria-label="Staff sections">
           {TAB_GROUPS.map((group) => {
             const tabs = group.tabs.filter((tab) => allowedTabs.includes(tab));
             if (tabs.length === 0) return null;
             const open = !collapsedGroups.has(group.label) || tabs.includes(activeTab);
+            const groupId = `staff-nav-group-${group.label.replace(/\W+/g, "-").toLowerCase()}`;
             return (
               <div key={group.label}>
                 <button
-                  className="flex w-full items-center justify-between border-b border-line px-1 pb-1 font-display text-sm font-bold tracking-tight text-ink transition hover:text-accent-ink"
+                  className="flex min-h-11 w-full items-center justify-between border-b border-line px-1 pb-1 font-display text-sm font-bold tracking-tight text-ink transition hover:text-accent-ink"
                   type="button"
+                  aria-expanded={open}
+                  aria-controls={groupId}
                   onClick={() => toggleGroup(group.label)}
                 >
                   <span className="min-w-0 truncate">{group.label}</span>
                   <span aria-hidden>{open ? "-" : "+"}</span>
                 </button>
                 {open ? (
-                  <div className="mt-1 grid gap-1">
+                  <div className="mt-1 grid gap-1" id={groupId}>
                     {tabs.map((item) => (
                       <Link
                         key={item}
@@ -111,7 +120,7 @@ export function StaffSidebar({
                       </Link>
                     ))}
                   </div>
-                ) : null}
+                ) : <div id={groupId} hidden />}
               </div>
             );
           })}

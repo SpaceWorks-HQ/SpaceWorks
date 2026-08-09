@@ -12,6 +12,7 @@ import { StructuredApiError, tenantPublicRequest } from "../../lib/api";
 import { useTenant, useTenantPath } from "../../lib/tenant";
 import { formatSlug } from "./PublicInventoryParts";
 import { useTenantBootstrap } from "./usePublicInventory";
+import { SkipLink } from "../../components/SkipLink";
 
 type PublicMachine = {
   name: string;
@@ -77,6 +78,7 @@ export function PublicMachinesPage() {
   const throttled = apiError?.status === 429;
 
   return <main className="desk-shell flex min-h-screen flex-col">
+    <SkipLink />
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4">
         <div><p className="text-xs font-semibold uppercase tracking-wide text-accent-ink">Our Machines</p>
@@ -85,7 +87,7 @@ export function PublicMachinesPage() {
         <div className="flex flex-wrap items-center gap-2"><SpaceWorksBadge /><Link className="desk-button" to={tenantPath()}>Inventory</Link><ThemeToggle /></div>
       </div>
     </header>
-    <section className="mx-auto w-full max-w-5xl flex-1 px-5 py-8">
+    <section className="mx-auto w-full max-w-5xl flex-1 px-5 py-8" id="main-content" tabIndex={-1}>
       <div className="mb-6"><h1 className="text-3xl font-bold text-ink">Machines</h1><p className="mt-2 text-sm text-muted">Equipment available in this makerspace, grouped by kind.</p></div>
       {machines.isLoading ? <div className="grid gap-4" aria-label="Loading machines">{[0, 1, 2].map((item) => <Skeleton key={item} className="h-40 w-full" />)}</div> : null}
       {machines.error ? <Card><h2 className="text-lg font-semibold text-ink">{throttled ? "Please slow down" : unavailable ? "Machines are not enabled" : missing ? "Makerspace not found" : "Machines are unavailable"}</h2>

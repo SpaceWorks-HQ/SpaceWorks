@@ -776,6 +776,30 @@ the client never hard-blocks check-in on a location error. Do **not** convert it
 without adding an unforgeable proximity factor (owner decision). Dormant/self-host safe: no geo config ⇒ no
 check and the `geofence_enabled` bootstrap flag is **omitted entirely** (byte-for-byte-unchanged invariant).
 
+**Accessibility floor (phase 22).** Four rules, each of which had a real counter-example in the tree:
+- **Text contrast is drift-guarded from the backend suite.** `tests/test_frontend_theme_contrast.py`
+  parses `frontend/src/index.css` and fails any text token below AA (4.5:1) on `bg`/`surface`/`panel`,
+  or `--color-focus` below 3:1. It lives in pytest, not vitest, because **vitest resolves CSS imports
+  to an empty string** under its default config — `?raw` included — so the check is impossible there;
+  `docker-compose.dev.yml` already mounts `./frontend:ro` into the backend for exactly this class of
+  guard (the `features.ts` mirror is the precedent). Parse with comments stripped: the theme's own
+  notes contain `{name}-ink`, whose brace ends a naive block scan early and hides every token after it.
+- **`focus:outline-none` is banned.** Tailwind applies it on `:focus`, which subsumes `:focus-visible`,
+  and `@layer components` outranks `@layer base` — so one `focus:outline-none` in a `.desk-*` class
+  silently defeats any global focus style. Components carry
+  `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus` instead, on a
+  dedicated `--color-focus` token rather than the pastel accent at `/40` alpha, which never reached 3:1.
+- **A skip link needs `tabIndex={-1}` on its target, and the target must always render.** Without the
+  tabindex the browser scrolls but leaves focus behind, so the next Tab returns to the top of the nav.
+  The target must also sit outside any conditional: the print page's first version put `#main-content`
+  inside `{enabled ? ... : null}`, so the link pointed at nothing while the module was loading or off.
+  The target is the **content region, not `<main>`** — these pages nest `<header>` inside `<main>`, so
+  focusing `<main>` skips nothing. `MemberArea` deliberately has no skip link: its shell has no nav.
+- **Collapsed content is unmounted, never `hidden`-but-present** (`CollapsibleSection`), or keyboard
+  users tab into controls they cannot see. Its count is one text node (`` `${n} items` ``) because the
+  accessible-name algorithm trims each node and joins with no separator — `{n}<span> items</span>`
+  is announced as "3items".
+
 **Console parity principle.** Every backend lifecycle capability reachable in the Django `/control/`
 admin must have a React staff-console surface — a capability with no console surface is a latent
 dead/broken feature for normal staff. New workflow actions ship their staff UI in the same batch.
@@ -785,6 +809,15 @@ dead/broken feature for normal staff. New workflow actions ship their staff UI i
 Each line names a shipped feature and, where useful, the load-bearing rule it introduced (folded into the
 invariants above). Use `git log --oneline`/`git blame` for the implementing commits and per-file history.
 
+- **Public imagery, machine grouping, accessibility** (2026-08-10, `dev`, local): `Event.image_key`
+  with presign/attach/clear mirroring the machine image flow, and `image_url` on the staff and public
+  serializers — the four-place registration this needed is written up under public images above;
+  machines grouped under their `MachineType` in the staff console plus a public `/machines` page,
+  display-only and reusing the existing public endpoint unchanged; and an accessibility floor
+  (contrast guard, real focus indicators, skip links, 44px targets, labelled sidebar landmarks).
+  **The pastel theme was kept**: only `--color-muted` failed AA, every other text token already
+  passed, so the visible change is one token in light mode. The blueprint grid and Instrument Sans
+  were confirmed intentional and waived in `.impeccable/config.json`.
 - **Notifications v2** (2026-08-09, `dev`, local): per-event recipient selection where no rows means
   today's behaviour (`9d8d5a7`); per-room chat destinations with typed credentials, union scoping,
   per-room log rows and a per-channel length table (`f7fd8b2`); editable email wording for the four

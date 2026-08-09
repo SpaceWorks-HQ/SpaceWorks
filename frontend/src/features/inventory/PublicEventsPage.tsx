@@ -13,6 +13,7 @@ import { useTenant, useTenantPath } from "../../lib/tenant";
 import { EventRegistrationForm } from "./EventRegistrationForm";
 import { formatSlug } from "./PublicInventoryParts";
 import { useTenantBootstrap } from "./usePublicInventory";
+import { SkipLink } from "../../components/SkipLink";
 
 type PublicEvent = {
   public_token: string;
@@ -58,6 +59,7 @@ export function PublicEventsPage() {
   const throttled = apiError?.status === 429;
 
   return <main className="desk-shell flex min-h-screen flex-col">
+    <SkipLink />
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4">
         <div><p className="text-xs font-semibold uppercase tracking-wide text-accent-ink">Public Events</p>
@@ -66,7 +68,7 @@ export function PublicEventsPage() {
         <div className="flex flex-wrap items-center gap-2"><SpaceWorksBadge /><Link className="desk-button" to={tenantPath()}>Inventory</Link><ThemeToggle /></div>
       </div>
     </header>
-    <section className="mx-auto w-full max-w-5xl flex-1 px-5 py-8">
+    <section className="mx-auto w-full max-w-5xl flex-1 px-5 py-8" id="main-content" tabIndex={-1}>
       <div className="mb-6"><h1 className="text-3xl font-bold text-ink">Upcoming events</h1><p className="mt-2 text-sm text-muted">Register for workshops, meetups, and community sessions.</p></div>
       {events.isLoading ? <div className="grid gap-4" aria-label="Loading events">{[0, 1, 2].map((item) => <Skeleton key={item} className="h-52 w-full" />)}</div> : null}
       {events.error ? <Card><h2 className="text-lg font-semibold text-ink">{throttled ? "Please slow down" : unavailable ? "Events are not enabled" : missing ? "Makerspace not found" : "Events are unavailable"}</h2>

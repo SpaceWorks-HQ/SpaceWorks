@@ -4,6 +4,7 @@ import { StaffHeader } from "./StaffHeader";
 import { StaffSidebar } from "./StaffSidebar";
 import { StaffTabContent } from "./StaffTabContent";
 import { EmptyState } from "../../components/ui/EmptyState";
+import { SkipLink } from "../../components/SkipLink";
 import { getStaffAccess, STAFF_TAB_KEYS, TAB_LABELS } from "./staffAccess";
 import {
   filterTabsByEnabledModules,
@@ -91,6 +92,7 @@ export function StaffWorkspace({
 
   return (
     <main className="desk-shell grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <SkipLink />
       <StaffSidebar
         activeMakerspace={activeMakerspace}
         activeTab={routeTabDenied ? "" : activeTab}
@@ -117,7 +119,7 @@ export function StaffWorkspace({
           user={user}
         />
 
-        <div className="min-w-0 p-5">
+        <div className="min-w-0 p-5" id="main-content" tabIndex={-1}>
           {routeTabDenied ? (
             <EmptyState
               title="Access denied"

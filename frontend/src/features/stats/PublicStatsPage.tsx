@@ -9,6 +9,7 @@ import { useTenant, useTenantPath } from "../../lib/tenant";
 import { formatSlug } from "../inventory/PublicInventoryParts";
 import { useTenantBootstrap } from "../inventory/usePublicInventory";
 import { usePublicStats, type PublicStatsResponse } from "./api";
+import { SkipLink } from "../../components/SkipLink";
 import {
   CurrentLoansSection,
   HardwareSection,
@@ -34,6 +35,7 @@ export function PublicStatsPage() {
 
   return (
     <main className="desk-shell">
+      <SkipLink />
       <header className="border-b border-line bg-panel">
         <div className="mx-auto flex max-w-screen-2xl flex-col gap-4 px-5 py-6 sm:px-8">
           <p className="text-sm font-semibold tracking-wide text-accent-ink">
@@ -64,7 +66,7 @@ export function PublicStatsPage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-screen-2xl space-y-5 px-5 py-6 sm:px-8">
+      <section className="mx-auto max-w-screen-2xl space-y-5 px-5 py-6 sm:px-8" id="main-content" tabIndex={-1}>
         {statsQuery.isLoading ? <LoadingState /> : null}
 
         {statsQuery.isError ? <ErrorState /> : null}
