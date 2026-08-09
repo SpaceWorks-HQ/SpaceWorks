@@ -128,3 +128,28 @@ describe("every tab is gated on the module that backs it", () => {
       .toContain("tobuy");
   });
 });
+
+
+describe("modules console tab", () => {
+  it("is superadmin-only, mirroring who owns enabled_modules on the backend", () => {
+    // A staff PATCH carrying enabled_modules is a hard 403; the console must not become
+    // the way around that.
+    expect(getStaffAccess([], true, false).allowedTabs).toContain("modules");
+    expect(getStaffAccess(["manage_makerspace"], false, false).allowedTabs).not.toContain("modules");
+  });
+
+  it("stays available in a single-tenant deployment", () => {
+    // Unlike `platform`: a single-tenant operator is exactly who needs to install modules,
+    // and /control/ is not proxied on the public frontend port for them to fall back to.
+    expect(getStaffAccess([], true, true).allowedTabs).toContain("modules");
+    expect(getStaffAccess([], true, true).allowedTabs).not.toContain("platform");
+  });
+
+  it("is never removed by a module gate", () => {
+    // The registry is core. A console that vanished with the modules it administers
+    // would be unusable exactly when an operator needed it.
+    const core = ["public_inventory", "request_workflow", "staff_admin", "scanner", "qr_management", "evidence_uploads"];
+    expect(filterTabsByEnabledModules(getStaffAccess([], true, false).allowedTabs, { enabled_modules: core }))
+      .toContain("modules");
+  });
+});

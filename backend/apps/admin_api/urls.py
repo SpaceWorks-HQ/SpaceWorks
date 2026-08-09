@@ -89,6 +89,11 @@ from apps.admin_api.views_notification_rules import NotificationRulesView
 from apps.admin_api.views_recipient_rules import NotificationRecipientRulesView
 from apps.admin_api.views_platform import PlatformEmailSettingsView
 from apps.admin_api.views_platform_social import PlatformSocialAuthSettingsView
+from apps.admin_api.views_modules import (
+    ModuleGroupListView,
+    ModuleInstallView,
+    ModuleUninstallView,
+)
 from apps.admin_api.views_platform_updates import (
     PlatformUpdateRequestView,
     PlatformUpdateSettingsView,
@@ -122,6 +127,24 @@ def _separable(app_label, *routes):
 
 
 urlpatterns = [
+    # Module install/uninstall. NOT wrapped in _separable: the registry is core, and a
+    # console that could not list modules on a deployment with one app tombstoned would
+    # be unable to show the operator what they had removed.
+    path(
+        "makerspace/<int:makerspace_id>/modules",
+        ModuleGroupListView.as_view(),
+        name="admin-module-groups",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/modules/install",
+        ModuleInstallView.as_view(),
+        name="admin-module-install",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/modules/uninstall",
+        ModuleUninstallView.as_view(),
+        name="admin-module-uninstall",
+    ),
     *_separable(
         "updates",
         path(

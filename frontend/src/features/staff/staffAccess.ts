@@ -1,7 +1,7 @@
 const ALL_TABS = [
   "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "bookings", "members", "tobuy", "transfers",
   "stocktake", "containers", "ledger", "reports", "accountability", "warranty", "bulk", "qr", "scanner", "api", "settings", "emailtemplates", "users", "platform", "audit",
-  "email-logs", "payments",
+  "email-logs", "payments", "modules",
 ] as const;
 
 export const STAFF_TAB_KEYS: readonly string[] = ALL_TABS;
@@ -38,6 +38,7 @@ export const TAB_LABELS: Record<string, string> = {
   api: "API access",
   platform: "Platform settings",
   payments: "Payments",
+  modules: "Modules",
 };
 
 export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
@@ -48,7 +49,7 @@ export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
   { label: "Bookings", tabs: ["bookings"] },
   { label: "Members", tabs: ["members"] },
   { label: "Insights", tabs: ["reports", "accountability", "warranty", "audit"] },
-  { label: "Admin", tabs: ["users", "settings", "emailtemplates", "email-logs", "api", "platform"] },
+  { label: "Admin", tabs: ["users", "settings", "emailtemplates", "email-logs", "api", "modules", "platform"] },
 ];
 
 // Permissions only. Module availability is decided in exactly one place --
@@ -106,6 +107,10 @@ export function getStaffAccess(actions: readonly string[], isSuperadmin: boolean
     if (tabName === "emailtemplates") return canEditInventory || canSeePrinting;
     if (tabName === "email-logs") return canManageMakerspace;
     if (tabName === "platform") return isSuperadmin && !singleTenantLocked;
+    // Superadmin-only, matching the backend: `enabled_modules` is superadmin-owned and a
+    // staff PATCH carrying it is a hard 403. Unlike `platform` this IS available in a
+    // single-tenant deployment -- that operator is exactly who needs to install modules.
+    if (tabName === "modules") return isSuperadmin;
     if (tabName === "machines") return canManageMachines;
     if (tabName === "events") return canManageEvents;
     if (tabName === "bookings") return canManageBookings;

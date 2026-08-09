@@ -37,6 +37,7 @@ const PlatformUpdatePanel = lazy(() => import("./PlatformUpdatePanel").then((m) 
 const PlatformStripeConnectPanel = lazy(() => import("./PlatformStripeConnectPanel").then((m) => ({ default: m.PlatformStripeConnectPanel })));
 const PlatformSocialAuthPanel = lazy(() => import("./PlatformSocialAuthPanel").then((m) => ({ default: m.PlatformSocialAuthPanel })));
 const MakerspaceSettingsPanel = lazy(() => import("./MakerspaceSettingsPanel").then((m) => ({ default: m.MakerspaceSettingsPanel })));
+const ModulesPanel = lazy(() => import("./ModulesPanel").then((m) => ({ default: m.ModulesPanel })));
 const PaymentsPanel = lazy(() => import("./PaymentsPanel").then((m) => ({ default: m.PaymentsPanel })));
 const HandoverConsole = lazy(() => import("./panels/machine/HandoverConsole").then((m) => ({ default: m.HandoverConsole })));
 
@@ -218,6 +219,9 @@ export function StaffTabContent({
       ) : null}
       {activeTab === "email-logs" && canManageMakerspace ? (
         <EmailLogPanel key={makerspaceKey} makerspace={activeMakerspace} />
+      ) : null}
+      {activeTab === "modules" && isSuperadmin ? (
+        <ModulesPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} />
       ) : null}
       {activeTab === "platform" ? (
         <>

@@ -202,6 +202,9 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/machine-types/{id}",
   "/api/v1/admin/makerspace/{makerspace_id}/machines",
   "/api/v1/admin/makerspace/{makerspace_id}/membership-invitations",
+  "/api/v1/admin/makerspace/{makerspace_id}/modules",
+  "/api/v1/admin/makerspace/{makerspace_id}/modules/install",
+  "/api/v1/admin/makerspace/{makerspace_id}/modules/uninstall",
   "/api/v1/admin/makerspace/{makerspace_id}/notification-destinations",
   "/api/v1/admin/makerspace/{makerspace_id}/notification-destinations/{destination_id}",
   "/api/v1/admin/makerspace/{makerspace_id}/notification-recipient-rules",
@@ -2335,6 +2338,10 @@ export type MobilePaymentIntentResponse = {
 };
 
 export type Mode087Enum = "preview" | "apply";
+
+export type ModuleAction = {
+  "key": string;
+};
 
 export type MostLentReport = {
   "rows": Array<Array<unknown>>;

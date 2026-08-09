@@ -24,11 +24,13 @@ from apps.separability.tombstones import SEPARABLE_APPS, tombstoned_app_labels
 
 # Separable apps that own no module key at all, so "is any module of theirs installed?"
 # cannot answer for them. Each needs its own question.
+# `payments` and `updates` were here until phase 3 gave them real module keys, so they
+# are now answered by the ordinary "is any module of theirs installed?" question. Leaving
+# them listed would have asked the operator to decide by hand about apps the registry can
+# already answer for -- and would have suggested tombstoning an app a tenant still runs.
 _KEYLESS_APPS = {
     "warranty": "warranty tracking (gated by core staff_admin, so it has no key of its own)",
     "presence": "geofenced check-in",
-    "payments": "online payments (Stripe)",
-    "updates": "the in-app software update control surface",
 }
 
 

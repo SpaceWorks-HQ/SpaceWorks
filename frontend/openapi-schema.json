@@ -11406,6 +11406,140 @@
                 }
             }
         },
+        "/api/v1/admin/makerspace/{makerspace_id}/modules": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_modules_retrieve",
+                "summary": "List module groups and their install state for a makerspace",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Platform"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Grouped module status."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/modules/install": {
+            "post": {
+                "operationId": "api_v1_admin_makerspace_modules_install_create",
+                "summary": "Install a module and everything it requires",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Platform"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ModuleAction"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ModuleAction"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ModuleAction"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Keys newly installed."
+                    },
+                    "400": {
+                        "description": "Unknown module, or not shipped by this deployment."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/modules/uninstall": {
+            "post": {
+                "operationId": "api_v1_admin_makerspace_modules_uninstall_create",
+                "description": "Clears the capability key only. Rows, uploads and history are retained and reinstalling restores every surface. Destroying the data is a separate, irreversible step (`purge_module_data`) that is deliberately CLI-only.",
+                "summary": "Uninstall a module, keeping its data",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Platform"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ModuleAction"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ModuleAction"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ModuleAction"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Keys uninstalled."
+                    },
+                    "400": {
+                        "description": "Core module, or required by an installed module."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspace/{makerspace_id}/notification-destinations": {
             "get": {
                 "operationId": "api_v1_admin_makerspace_notification_destinations_list",
@@ -34945,6 +35079,18 @@
                 ],
                 "type": "string",
                 "description": "* `preview` - Preview\n* `apply` - Apply"
+            },
+            "ModuleAction": {
+                "type": "object",
+                "description": "The one field either mutation takes.\n\nA real class rather than `inline_serializer`, which returns an *instance* and so\ncannot be called with `data=` at request time.",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "key"
+                ]
             },
             "MostLentReport": {
                 "type": "object",
