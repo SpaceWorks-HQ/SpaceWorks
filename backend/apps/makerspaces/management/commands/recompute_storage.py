@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
+from apps.bookings.models import BookableSpace
 from apps.events.models import Event
 from apps.evidence import storage as evidence_storage
 from apps.evidence.models import EvidencePhoto
@@ -73,4 +74,9 @@ class Command(BaseCommand):
         keys.update(InventoryProduct.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
         keys.update(Machine.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
         keys.update(Event.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
+        # BookableSpace images are charged on upload and collected by lifecycle purge,
+        # but were missing here, so the reconciler wrote a total that omitted them and
+        # silently lowered a space's recorded usage. apps/bookings/storage.py is a thin
+        # wrapper over public_image_storage, so these live in the same bucket.
+        keys.update(BookableSpace.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
         return {key for key in keys if key}

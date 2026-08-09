@@ -261,3 +261,18 @@ def test_recompute_storage_counts_event_images(monkeypatch):
     _, _, object_key = attach(client, event, monkeypatch)
 
     assert object_key in Command._public_image_keys(space)
+
+
+def test_recompute_storage_counts_bookable_space_images():
+    """Regression: space images are charged on upload and collected by the purge,
+    but the reconciler omitted them and silently lowered the recorded total."""
+    from apps.bookings.models import BookableSpace
+    from apps.makerspaces.management.commands.recompute_storage import Command
+
+    space = make_space()
+    object_key = f'spaces/{space.pk}/1/images/room.png'
+    BookableSpace.objects.create(
+        makerspace=space, name='Workshop Room', image_key=object_key,
+    )
+
+    assert object_key in Command._public_image_keys(space)
