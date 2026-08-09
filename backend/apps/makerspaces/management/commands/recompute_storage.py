@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
+from apps.events.models import Event
 from apps.evidence import storage as evidence_storage
 from apps.evidence.models import EvidencePhoto
 from apps.inventory import public_image_storage
@@ -71,4 +72,5 @@ class Command(BaseCommand):
         keys = {makerspace.logo_key, makerspace.cover_image_key}
         keys.update(InventoryProduct.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
         keys.update(Machine.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
+        keys.update(Event.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
         return {key for key in keys if key}

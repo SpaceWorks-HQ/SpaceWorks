@@ -84,12 +84,19 @@ The one deferred end-to-end user QA remains an owner-run release gate.
   order: the override supplies the infrastructure port remaps, and the dev layer must come last so its
   app-service commands, ports and bind mounts win. Every argument is forwarded verbatim, so it is a
   drop-in prefix for any compose subcommand (`./scripts/dev-docker.sh exec backend python manage.py …`).
-  Two traps this topology already hit: **the base file hands `backend`'s environment to
+  Three traps this topology already hit: **the base file hands `backend`'s environment to
   `migrate`/`worker`/`beat` through a YAML anchor**, so a patch to `backend` alone never reaches them —
   the override applies the MinIO host-port rewrite to all four (the Celery worker builds public image
   URLs into outbound mail). And **`tsc -b` must not emit `vite.config.js` next to `vite.config.ts`** —
   Vite resolves `.js` first, so a stale artifact silently shadows the real config; `tsconfig.node.json`
-  therefore emits into `node_modules/.tmp/`.
+  therefore emits into `node_modules/.tmp/`. And **the dev frontend must carry its own `image:` tag**
+  (`spaceworks-frontend-dev`): `frontend` is the only service overriding `build.target`, so without it
+  both topologies derive the same `spaceworks-frontend` name, whichever built last owns the tag, and a
+  later prod `docker compose up -d` **without `--build`** silently runs the dev image — `CMD` is
+  `npm run dev`, nginx never starts, `8080->80` points at a dead port, and the container sits
+  **unhealthy while its logs read a perfectly normal "VITE ready"**. The instant tell is the port: the
+  dev stage is `FROM deps` (no source), so without the dev layer's `./frontend:/app` mount there is no
+  `vite.config.ts` and Vite falls back to its default **:5173** instead of the configured **:5000**.
 - **Migration heads drift.** Specs quote stale migration numbers; every Codex prompt must
   `ls backend/apps/<app>/migrations/` and chain off the **actual** leaf, not the spec number. A new
   migration whose dep is a rewound app can break migration-executor tests (rewind the full graph
@@ -290,6 +297,24 @@ one `transaction.atomic()` suspends immutability triggers **transaction-scoped**
 - **Every append-only/immutability trigger is purge-aware**: DELETE allowed only under GUC
   `current_setting('app.allow_immutable_delete', true)='on'`; UPDATE always blocked (audit/0003 style).
   A new PROTECT-FK + immutable model must add itself to the purge graph **and** the drift-guard.
+
+**A new public image field must register in FOUR places, and three of them fail silently.**
+`Event.image_key` (phase 22) is the worked example. Adding the column and an upload view is the
+visible half; the half nothing will remind you about is that
+`inventory/public_image_storage.build_object_key` validates the **kind** against an allowlist (a
+missing kind is the only one that fails loudly — `ValueError: Invalid public image kind`), while
+`makerspaces/lifecycle._collect_public_image_keys` (makerspace purge),
+`module_purge_collectors` + `module_purge_plans.public_image_keys` (per-module purge) and
+`recompute_storage._public_image_keys` (the authoritative storage reconciler) each fail **open**:
+skip one and the objects simply outlive every row that could name them, or the reconciler silently
+writes a total that omits them. `public_image_key_in_use` also has to learn the new model, or two
+entities can claim one key and clearing either blanks the other. **Known gap: `BookableSpace`
+images are collected by `lifecycle` but NOT by `recompute_storage`**, so running the reconciler
+under-counts a space's booking images — pre-existing, unfixed, and the reason this list is written
+down. Storage accounting itself is a **no-op on self-host** (`limits.add_storage`/`free_storage`
+return early), so a test asserting `storage_bytes_used` must force managed mode with
+`monkeypatch.setattr(limits, 'is_self_host', lambda: False)` and wrap `on_commit` object deletes in
+`django_capture_on_commit_callbacks(execute=True)`.
 
 **Object storage.** Two buckets per env: a private evidence/docs bucket and a separate **public-read**
 image bucket (`PUBLIC_IMAGE_BUCKET`, served via `PUBLIC_IMAGE_BASE_URL`, kept distinct from the signing

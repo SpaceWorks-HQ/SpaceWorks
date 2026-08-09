@@ -4,6 +4,7 @@ from rest_framework import serializers
 from apps.events.capacity import availability_label
 from apps.events.models import Event, EventRegistration
 from apps.forms_schema.serializers import CustomFormSubmissionMixin
+from apps.inventory import public_image_storage
 
 
 PUBLIC_EVENT_FIELDS = (
@@ -17,6 +18,7 @@ PUBLIC_EVENT_FIELDS = (
     'custom_form',
     'capacity',
     'availability',
+    'image_url',
     'status',
 )
 
@@ -35,6 +37,7 @@ class PublicEventSerializer(serializers.Serializer):
     custom_form = serializers.JSONField(allow_null=True, read_only=True)
     capacity = serializers.IntegerField(min_value=0, read_only=True)
     availability = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
     status = serializers.ChoiceField(
         choices=[Event.Status.PUBLISHED],
         read_only=True,
@@ -48,6 +51,12 @@ class PublicEventSerializer(serializers.Serializer):
     )
     def get_availability(self, obj):
         return availability_label(obj)
+
+    # The object key itself stays server-side; the public payload carries only the
+    # resolved URL, exactly as PublicMachineSerializer does.
+    @extend_schema_field(serializers.URLField(allow_null=True))
+    def get_image_url(self, obj):
+        return public_image_storage.public_url(obj.image_key) or None
 
 
 class PublicEventRegistrationInputSerializer(

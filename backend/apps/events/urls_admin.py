@@ -19,6 +19,7 @@ from apps.events.views_admin import (
     EventRegistrationListView,
     EventRegistrationMarkAttendedView,
 )
+from apps.events.views_admin_image import EventImageView
 
 urlpatterns = [
     path(
@@ -45,6 +46,11 @@ urlpatterns = [
         'events/<int:pk>/complete/',
         EventCompleteView.as_view(),
         name='admin-event-complete',
+    ),
+    path(
+        'events/<int:pk>/image',
+        EventImageView.as_view(),
+        name='admin-event-image',
     ),
     path(
         'events/<int:pk>/registrations/',

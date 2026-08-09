@@ -28,6 +28,7 @@ from apps.makerspaces.module_purge_collectors import (
     bookings_public_images,
     discord_destinations_delete,
     events_delete,
+    events_public_images,
     mattermost_destinations_delete,
     machine_service_delete,
     machine_service_private_keys,
@@ -79,6 +80,7 @@ PLANS = (
         "events", "Events and their registrations.", events_delete,
         payment_subjects=("event_registration",),
         pii_labels=("events.EventRegistration",),
+        public_image_keys=events_public_images,
     ),
     ModulePurgePlan(
         "bookings", "Bookable spaces and their bookings.", bookings_delete,

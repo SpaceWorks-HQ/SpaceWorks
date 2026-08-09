@@ -45,7 +45,7 @@ def _public_client():
 
 
 def build_object_key(kind, makerspace_id, ext):
-    if kind not in {"items", "machine", "makerspace", "printers"}:
+    if kind not in {"event", "items", "machine", "makerspace", "printers"}:
         raise ValueError("Invalid public image kind.")
     return f"{kind}/{makerspace_id}/{uuid.uuid4().hex}{ext}"
 
@@ -179,9 +179,11 @@ def finalize_error_message(result):
 
 
 def public_image_key_in_use(
-    makerspace_id, object_key, *, product_id=None, machine_id=None, makerspace_field="",
+    makerspace_id, object_key, *, product_id=None, machine_id=None, event_id=None,
+    makerspace_field="",
 ):
     from django.db.models import Q
+    from apps.events.models import Event
     from apps.inventory.models import InventoryProduct
     from apps.machines.models import Machine
     from apps.makerspaces.models import Makerspace
@@ -195,6 +197,14 @@ def public_image_key_in_use(
     if machine_id is not None:
         machines = machines.exclude(pk=machine_id)
     if machines.exists():
+        return True
+    # Events share the bucket, so a key claimed by one must not be attachable to
+    # another: clearing the first object's image deletes the underlying object and
+    # would silently blank the second.
+    events = Event.objects.filter(makerspace_id=makerspace_id, image_key=object_key)
+    if event_id is not None:
+        events = events.exclude(pk=event_id)
+    if events.exists():
         return True
     makerspace_query = Makerspace.objects.filter(pk=makerspace_id)
     if makerspace_field == "logo_key":

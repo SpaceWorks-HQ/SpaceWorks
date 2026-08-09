@@ -19,6 +19,7 @@ export type StaffEvent = {
   capacity: number;
   payment_amount: string;
   is_public: boolean;
+  image_url: string | null;
   status: EventStatus;
   created_by_id: number | null;
   created_at: string;
@@ -94,7 +95,7 @@ export function useEventRegistrations(eventId: number, page = 1) {
   });
 }
 
-function useEventInvalidation(makerspaceId: number, eventId?: number) {
+export function useEventInvalidation(makerspaceId: number, eventId?: number) {
   const queryClient = useQueryClient();
   return async () => {
     await queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) });

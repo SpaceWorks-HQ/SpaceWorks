@@ -37,6 +37,14 @@ def bookings_delete(makerspace, cursor):
     return _counts(bookings=bookings, bookable_spaces=spaces)
 
 
+def events_public_images(makerspace):
+    from apps.events.models import Event
+
+    return list(
+        Event.objects.filter(makerspace=makerspace).values_list("image_key", flat=True)
+    )
+
+
 def bookings_public_images(makerspace):
     from apps.bookings.models import BookableSpace
 

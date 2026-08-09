@@ -56,6 +56,10 @@ class Event(models.Model):
         validators=[MinValueValidator(0)],
     )
     is_public = models.BooleanField(default=False)
+    # Public-bucket object key for the event cover image. Managed only by the
+    # dedicated image endpoints (never by the generic update path), so it is
+    # deliberately absent from services.EVENT_FIELDS.
+    image_key = models.CharField(max_length=300, blank=True, default="")
     status = models.CharField(
         max_length=16,
         choices=Status.choices,

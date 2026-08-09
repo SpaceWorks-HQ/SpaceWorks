@@ -93,6 +93,7 @@ export const openApiPaths = [
   "/api/v1/admin/events/{id}/",
   "/api/v1/admin/events/{id}/cancel/",
   "/api/v1/admin/events/{id}/complete/",
+  "/api/v1/admin/events/{id}/image",
   "/api/v1/admin/events/{id}/publish/",
   "/api/v1/admin/events/{id}/registrations/",
   "/api/v1/admin/evidence/{id}",
@@ -1228,6 +1229,7 @@ export type EventAdmin = {
   "capacity": number;
   "payment_amount": string;
   "is_public": boolean;
+  "image_url": string | null;
   "status": EventAdminStatusEnum;
   "created_by_id": number | null;
   "created_at": string;
@@ -3374,6 +3376,7 @@ export type PublicEvent = {
   "custom_form": unknown | null;
   "capacity": number;
   "availability": AvailabilityEnum;
+  "image_url": string | null;
   "status": PublicEventStatusEnum;
 };
 

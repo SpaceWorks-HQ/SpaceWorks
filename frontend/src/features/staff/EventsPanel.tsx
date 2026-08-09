@@ -3,10 +3,11 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ConfirmDialog, DetailDrawer, EmptyState, Skeleton, StatusBadge } from "../../components/ui";
 import { StructuredApiError } from "../../lib/api";
 import {
-  useCancelEvent, useCompleteEvent, useCreateEvent, useEvent, useEventRegistrations,
-  useEvents, useMarkEventAttended, usePublishEvent, useUpdateEvent,
+  useCancelEvent, useCompleteEvent, useCreateEvent, useEvent, useEventInvalidation,
+  useEventRegistrations, useEvents, useMarkEventAttended, usePublishEvent, useUpdateEvent,
   type EventPayload, type StaffEvent,
 } from "./eventsApi";
+import { ImageUploader } from "./ImageUploader";
 import { Panel } from "./panels/shared";
 import { PaymentReconcileActions } from "./PaymentReconcileActions";
 
@@ -154,6 +155,7 @@ function EventDrawer({ eventId, makerspaceId, onClose }: { eventId: number; make
   const cancel = useCancelEvent(makerspaceId, eventId);
   const complete = useCompleteEvent(makerspaceId, eventId);
   const attended = useMarkEventAttended(makerspaceId, eventId);
+  const invalidateEvent = useEventInvalidation(makerspaceId, eventId);
   useEffect(() => { if (event) setValues(valuesFor(event)); }, [event?.updated_at]);
   const lifecycle = confirm === "publish" ? publish : confirm === "cancel" ? cancel : complete;
   const readOnly = event?.status === "cancelled" || event?.status === "completed";
@@ -165,6 +167,7 @@ function EventDrawer({ eventId, makerspaceId, onClose }: { eventId: number; make
       {eventQuery.error ? <EmptyState title="Unable to load event" description={errorText(eventQuery.error)} /> : null}
       {event ? <div className="grid gap-5">
         <div className="flex flex-wrap items-center gap-2"><StatusBadge status={event.status} /><span className="text-sm text-muted">{event.capacity === 0 ? "Unlimited capacity" : `${event.capacity} places`}</span></div>
+        <ImageUploader endpoint={`/admin/events/${eventId}/image`} currentUrl={event.image_url} label="Event photo (shown publicly)" shape="wide" disabled={readOnly} onChanged={invalidateEvent} />
         <form onSubmit={(e) => { e.preventDefault(); update.mutate(payloadFor(values)); }}>
           <EventFields values={values} setValues={setValues} disabled={readOnly} />
           {!readOnly ? <button className="desk-button-primary mt-3" type="submit" disabled={update.isPending}>{update.isPending ? "Saving..." : "Save changes"}</button> : <p className="mt-3 text-sm text-muted">Terminal events are read-only.</p>}

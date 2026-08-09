@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from apps.events.models import Event, EventRegistration
 from apps.forms_schema.serializers import CustomFormSchemaField
+from apps.inventory import public_image_storage
 from apps.admin_api.serializers_payment_summary import PaymentSummaryMixin
 
 
@@ -55,6 +56,7 @@ class EventAdminSerializer(serializers.ModelSerializer):
     makerspace_id = serializers.IntegerField(read_only=True)
     created_by_id = serializers.IntegerField(allow_null=True, read_only=True)
     registration_counts = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -71,6 +73,7 @@ class EventAdminSerializer(serializers.ModelSerializer):
             'capacity',
             'payment_amount',
             'is_public',
+            'image_url',
             'status',
             'created_by_id',
             'created_at',
@@ -78,6 +81,12 @@ class EventAdminSerializer(serializers.ModelSerializer):
             'registration_counts',
         )
         read_only_fields = fields
+
+    # The raw object key is never exposed: staff and public both receive a resolved
+    # URL, matching PublicMachineSerializer.
+    @extend_schema_field(serializers.URLField(allow_null=True))
+    def get_image_url(self, obj):
+        return public_image_storage.public_url(obj.image_key) or None
 
     @extend_schema_field(EventRegistrationCountsSerializer)
     def get_registration_counts(self, obj):

@@ -23,6 +23,7 @@ type PublicEvent = {
   location: string;
   capacity: number | null;
   availability: "Available" | "Limited" | "Full";
+  image_url: string | null;
   status: "published";
 };
 
@@ -77,12 +78,17 @@ export function PublicEventsPage() {
         const unlimited = item.capacity === 0 || item.capacity === null;
         const waitlist = item.availability === "Full";
         const open = activeToken === item.public_token;
-        return <article key={item.public_token} className="desk-panel p-5">
+        return <article key={item.public_token} className="desk-panel overflow-hidden p-0">
+          {/* Decorative: the title beside it already names the event, so alt is empty
+              rather than a duplicate announcement for screen-reader users. */}
+          {item.image_url ? <img src={item.image_url} alt="" loading="lazy" className="h-48 w-full object-cover sm:h-56" /> : null}
+          <div className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h2 className="text-xl font-bold text-ink">{item.title}</h2><p className="mt-1 text-sm text-muted"><time dateTime={item.starts_at}>{eventTime(item)}</time></p>{item.location ? <p className="mt-1 text-sm text-muted">{item.location}</p> : null}</div><StatusBadge status={item.status} /></div>
           {item.description ? <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink">{item.description}</p> : null}
           <dl className="mt-4 flex flex-wrap gap-4 text-sm"><div><dt className="text-xs font-semibold uppercase text-muted">Capacity</dt><dd className="font-semibold text-ink">{unlimited ? "Unlimited" : item.capacity}</dd></div><div><dt className="text-xs font-semibold uppercase text-muted">Availability</dt><dd className="font-semibold text-ink">{item.availability}</dd></div></dl>
           <button className="desk-button-primary mt-4" type="button" aria-expanded={open} onClick={() => setActiveToken(open ? null : item.public_token)}>{open ? "Close form" : waitlist ? "Join waitlist" : "Register"}</button>
           {open ? <div className="mt-4"><EventRegistrationForm key={item.public_token} makerspaceSlug={makerspaceSlug} publicToken={item.public_token} waitlist={waitlist} /></div> : null}
+          </div>
         </article>;
       })}</div> : null}
     </section>
