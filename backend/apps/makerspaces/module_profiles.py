@@ -9,6 +9,8 @@ leaving the operator to discover the module system on their own.
 from apps.makerspaces.module_registry import MODULE_KEYS, core_module_keys, with_dependencies
 
 MINIMAL = "minimal"
+CLOUD = "cloud"
+FULL = "full"
 LENDING = "lending"
 WORKSHOP = "workshop"
 RECOMMENDED = "recommended"
@@ -46,8 +48,22 @@ _WORKSHOP_EXTRAS = frozenset({
     "notifications", "email", "updates",
 })
 
+# The two deployment-shaped profiles. `cloud` is the module set that works on a single
+# Django process with no worker, no beat and no MinIO: everything here is either
+# request-driven or reachable from `run_scheduled_tasks`. `full` is every module, which
+# is what a local server with the whole stack can carry.
+_CLOUD_EXTRAS = frozenset({
+    "guest_handover", "containers", "stock_transfers", "stocktake", "reports",
+    "asset_units", "bulk_import", "qr_print_batches",
+    "machines", "machine_service", "maintenance",
+    "events", "bookings", "membership", "accounts",
+    "notifications", "email", "payments",
+})
+
 PROFILES = {
     MINIMAL: "Core only -- the smallest coherent install.",
+    CLOUD: "A single Django process: no worker, no beat, object storage on R2.",
+    FULL: "Every module, for a local server running the whole stack.",
     LENDING: "A tool library: the hardware lending lifecycle, no machines.",
     WORKSHOP: "A machine shop: machines, the service queue and maintenance.",
     RECOMMENDED: "Core plus the inventory lifecycle, reports and machines.",
@@ -69,8 +85,10 @@ def profile_modules(name):
     """Module keys for a profile, dependency-closed and sorted."""
     if name not in PROFILES:
         raise ValueError(f"Unknown profile {name!r}. Choose one of: {', '.join(sorted(PROFILES))}.")
-    if name == EVERYTHING:
+    if name in (EVERYTHING, FULL):
         keys = set(MODULE_KEYS)
+    elif name == CLOUD:
+        keys = core_module_keys() | _CLOUD_EXTRAS
     elif name == RECOMMENDED:
         keys = core_module_keys() | _RECOMMENDED_EXTRAS
     elif name == LENDING:

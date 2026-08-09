@@ -1,0 +1,86 @@
+"""Run the periodic tasks a deployment without Celery beat would otherwise never run.
+
+**This is the one thing that stops working silently in cloud mode.** With no broker,
+`CELERY_TASK_ALWAYS_EAGER` makes `.delay()` run inline, so everything a request triggers
+still works and nothing looks broken -- but `CELERY_BEAT_SCHEDULE` is beat's business,
+and with no beat process nothing ever fires it. `send_return_reminders` is a duty-of-care
+message in the accountability flow: a member who has not returned hardware simply stops
+being reminded, and the first sign is a dispute months later.
+
+So this exists to be driven by whatever scheduler the host already has -- a platform cron
+entry, a Kubernetes CronJob, systemd timer:
+
+    */15 * * * *  python manage.py run_scheduled_tasks --due-only
+
+Each task declares its own cadence here, mirroring `CELERY_BEAT_SCHEDULE`, and
+`--due-only` makes the command idempotent under a coarser cron: a 15-minute cron running
+an hourly task fires it once an hour, not four times. State lives in `PeriodicTaskRun`
+rows rather than a file, because a cloud host's filesystem is not durable and two web
+dynos would not share one.
+
+Deliberately NOT an authenticated HTTP endpoint. A URL that runs jobs is a URL someone
+can find, and rate-limiting it correctly is more work than a cron entry.
+"""
+
+from django.core.management.base import BaseCommand
+from django.db import transaction
+from django.utils import timezone
+
+# (name, dotted task path, minimum minutes between runs). The cadences mirror
+# CELERY_BEAT_SCHEDULE; `tests/test_scheduled_tasks.py` fails if a beat entry has no
+# counterpart here, so a task added for the Celery deployment cannot silently go missing
+# from the beat-less one.
+SCHEDULED_TASKS = (
+    ("return-reminders", "apps.hardware_requests.tasks.send_return_reminders_task", 60),
+    ("purge-auth-challenges", "apps.accounts.tasks.purge_auth_challenges_task", 24 * 60),
+)
+
+
+def _import_task(dotted_path):
+    from importlib import import_module
+
+    module_path, _, attribute = dotted_path.rpartition(".")
+    return getattr(import_module(module_path), attribute)
+
+
+class Command(BaseCommand):
+    help = "Run periodic tasks on a deployment with no Celery beat process."
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--due-only",
+            action="store_true",
+            help="Skip tasks run more recently than their declared interval.",
+        )
+        parser.add_argument("--task", help="Run only this task name.")
+
+    def handle(self, *args, **options):
+        from apps.operations.models_scheduling import PeriodicTaskRun
+
+        only = options.get("task")
+        now = timezone.now()
+        for name, dotted_path, interval_minutes in SCHEDULED_TASKS:
+            if only and name != only:
+                continue
+            with transaction.atomic():
+                # Locked, so two cron entries or two dynos firing at the same minute run
+                # the task once between them rather than twice. The reminder mail is the
+                # reason this matters: sending it twice is worse than sending it late.
+                row, _ = PeriodicTaskRun.objects.select_for_update().get_or_create(name=name)
+                if options["due_only"] and not row.is_due(now, interval_minutes):
+                    self.stdout.write(f"skip {name} (last run {row.last_run_at:%Y-%m-%d %H:%M})")
+                    continue
+                try:
+                    # Called directly, not via .delay(): under eager mode they are the
+                    # same thing, and with a broker configured this command should still
+                    # do the work rather than queue it behind a worker that may not exist.
+                    _import_task(dotted_path)()
+                except Exception as exc:  # noqa: BLE001 - one failing task must not stop the rest
+                    row.last_error = str(exc)[:500]
+                    row.save(update_fields=["last_error"])
+                    self.stderr.write(self.style.ERROR(f"failed {name}: {exc}"))
+                    continue
+                row.last_run_at = now
+                row.last_error = ""
+                row.save(update_fields=["last_run_at", "last_error"])
+                self.stdout.write(self.style.SUCCESS(f"ran {name}"))

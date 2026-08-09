@@ -6,6 +6,10 @@ from apps.boxes.models import Box, QrCode
 from apps.inventory.models import InventoryAsset, InventoryProduct
 from apps.makerspaces.models import Makerspace
 
+# Re-exported so `apps.operations.models.PeriodicTaskRun` resolves and Django registers
+# the model, matching the barrel pattern the rest of this app uses.
+from apps.operations.models_scheduling import PeriodicTaskRun  # noqa: F401,E402
+
 
 class StockTransfer(models.Model):
     class Status(models.TextChoices):
