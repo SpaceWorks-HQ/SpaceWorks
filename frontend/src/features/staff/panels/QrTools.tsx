@@ -126,6 +126,11 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
       ),
   });
   const hasBatch = Boolean(activeBatchId);
+  // Both unit-QR endpoints (`assets/generate` and the per-asset reprint) are guarded by
+  // `asset_units` on the backend, so offering the controls without it produces a form
+  // whose only outcome is a 404. An empty list means "not loaded", never "none enabled".
+  const modules = makerspace.enabled_modules ?? [];
+  const assetUnitsEnabled = modules.length === 0 || modules.includes("asset_units");
   const batchItems = batch.data?.items ?? [];
   const count = Number(assetCount);
   const assetOptions = assets.data?.results ?? [];
@@ -169,7 +174,12 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
             ))}
           </select>
           {selectedProduct ? <p className="mt-2 font-mono text-xs uppercase text-muted">{selectedProduct.tracking_mode}</p> : null}
-          {selectedIsIndividual ? (
+          {selectedIsIndividual && !assetUnitsEnabled ? (
+            <p className="mt-2 text-sm text-muted">
+              Unit QR generation needs the Asset units module.
+            </p>
+          ) : null}
+          {selectedIsIndividual && assetUnitsEnabled ? (
             <div className="mt-2 grid gap-3">
               <div className="grid gap-2 sm:grid-cols-[110px_1fr_auto]">
                 <input className="desk-input" inputMode="numeric" value={assetCount} onChange={(event) => setAssetCount(event.target.value)} />
@@ -195,11 +205,12 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
               {assets.isError ? <ErrorText text={assets.error.message} /> : null}
               {!assets.isLoading && selectedProduct && !assetOptions.length ? <p className="text-sm text-muted">No individual units yet.</p> : null}
             </div>
-          ) : (
+          ) : null}
+          {!selectedIsIndividual ? (
             <button className="desk-button mt-2" type="button" disabled={!canAddItemQr || addProduct.isPending} onClick={() => addProduct.mutate()}>
               {addProduct.isPending ? "Adding..." : "Add/reprint item QR"}
             </button>
-          )}
+          ) : null}
           {addProduct.isError ? <ErrorText text={addProduct.error.message} /> : null}
           {reprintAsset.isError ? <ErrorText text={reprintAsset.error.message} /> : null}
           {generateAssets.isError ? <ErrorText text={generateAssets.error.message} /> : null}

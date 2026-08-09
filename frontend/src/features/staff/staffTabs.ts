@@ -2,9 +2,27 @@ import { featureEnabled } from "../../lib/features";
 import type { Makerspace } from "./panels/shared";
 import { readStorage, removeStorage, writeStorage } from "../../lib/safeStorage";
 
+// The single map from a staff tab to the module key(s) its backend surface is guarded by.
+// `getStaffAccess` decides permissions and nothing else -- a tab named in both places is
+// how one ends up gated in the sidebar but not on the route.
+//
+// A tab is listed only when a module can genuinely remove it. Three are deliberately
+// absent, each for a reason that looks like an oversight:
+//   * `members`    -- the panel mixes the never-gated staff roster and role assignment
+//                     with the membership-gated community queue. Gating the tab would let
+//                     a space lock itself out of its own administration (plan A7), so the
+//                     module is applied to the sections inside it instead.
+//   * `email-logs` -- a message blocked by the `email` module is recorded as a terminal
+//                     SKIPPED row precisely so the operator can see what the toggle
+//                     suppressed. Gating the log would hide the evidence it exists to show.
+//   * `emailtemplates` -- gated per stream by the server; the hardware and printing
+//                     streams are always present, so the tab always has content.
 const TAB_MODULES: Record<string, string[]> = {
   direct: ["public_inventory"],
+  notifications: ["notifications"],
   printing: ["printing"],
+  machines: ["machines"],
+  handover: ["machine_service"],
   events: ["events"],
   bookings: ["bookings"],
   tobuy: ["procurement"],
@@ -12,7 +30,12 @@ const TAB_MODULES: Record<string, string[]> = {
   stocktake: ["stocktake"],
   containers: ["containers"],
   bulk: ["bulk_import"],
-  qr: ["qr_management"],
+  // Not the core `qr_management`, which no operator can switch off and which therefore
+  // gated nothing. Every action in QrTools is batch-scoped -- `canAddItemQr`,
+  // `canReprintAsset` and `canGenerateAssets` all require a selected batch -- so without
+  // this module the tab is a form whose every submission 404s. Core QR issuance is still
+  // reachable from the scanner and inventory panels.
+  qr: ["qr_print_batches"],
   scanner: ["scanner"],
   reports: ["reports"],
   warranty: ["staff_admin"],

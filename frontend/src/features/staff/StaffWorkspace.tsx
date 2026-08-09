@@ -67,7 +67,7 @@ export function StaffWorkspace({
     defaultTab,
     handoutOnly,
     printingOnly,
-  } = getStaffAccess(actions, isSuperadmin, singleTenantLocked, activeMakerspace?.enabled_modules ?? []);
+  } = getStaffAccess(actions, isSuperadmin, singleTenantLocked);
   const visibleMakerspaces =
     singleTenantLocked && activeMakerspace
       ? [activeMakerspace]

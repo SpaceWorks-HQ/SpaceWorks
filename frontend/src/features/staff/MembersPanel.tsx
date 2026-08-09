@@ -19,7 +19,13 @@ type Role = { id: number; name: string };
 export const membershipErrorText = (error: unknown) =>
   error instanceof StructuredApiError ? error.detail ?? error.message : "Unable to update membership.";
 
-export function MembersPanel({ makerspaceId }: { makerspaceId: number }) {
+// `membership` gates the COMMUNITY side only. The staff roster, role assignment and
+// revoke are core RBAC state and are never gated -- gating them would let a makerspace
+// lock itself out of its own administration (plan A7). So the module hides exactly the
+// surfaces the backend refuses: the request queue, the waiver, and the verification /
+// referral capabilities. Invitation stays, because a STAFF invitation keeps working with
+// the module off (`invite_membership` discriminates on the role's granted actions).
+export function MembersPanel({ makerspaceId, membershipEnabled }: { makerspaceId: number; membershipEnabled: boolean }) {
   const client = useQueryClient();
   const key = ["members", makerspaceId];
   const roster = useQuery({
@@ -29,6 +35,7 @@ export function MembersPanel({ makerspaceId }: { makerspaceId: number }) {
   const requests = useQuery({
     queryKey: [...key, "requests"],
     queryFn: () => staffRequest<PaginatedMembershipRequestList>(`/admin/membership-requests?makerspace_id=${makerspaceId}`),
+    enabled: membershipEnabled,
   });
   const presence = useQuery({ queryKey: [...key, "presence"], queryFn: () => staffRequest<Presence[]>(`/admin/makerspace/${makerspaceId}/presence-sessions/current`) });
   const roles = useQuery({ queryKey: [...key, "roles"], queryFn: () => staffRequest<Role[]>(`/admin/makerspaces/${makerspaceId}/roles`) });
@@ -74,6 +81,7 @@ export function MembersPanel({ makerspaceId }: { makerspaceId: number }) {
         changingCapabilities={capabilities.isPending}
         changingVerification={verify.isPending}
         onChangeRole={(nextRoleId) => changeRole.mutate({ id: row.id, nextRoleId })}
+        membershipEnabled={membershipEnabled}
         onCapability={(next) => capabilities.mutate({ id: row.id, next })}
         onVerify={() => verify.mutate({ id: row.id, verified: !Boolean(row.verified_at) })}
         onRevoke={() => revoke.mutate(row.id)}
@@ -81,19 +89,20 @@ export function MembersPanel({ makerspaceId }: { makerspaceId: number }) {
       {roster.isLoading ? <p className="text-sm text-muted">Loading members…</p> : null}
       {roster.isError ? <p className="text-sm text-danger" role="alert">{membershipErrorText(roster.error)}</p> : null}
     </Panel>
-    <Panel title="Membership requests"><div className="mb-3 flex flex-wrap gap-2"><select className="desk-input" value={selectedRole ?? ""} onChange={(event) => setRoleId(Number(event.target.value))}>{roles.data?.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select><input className="desk-input" type="email" placeholder="Invite email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} /><button className="desk-button" disabled={!inviteEmail || !selectedRole || invite.isPending} onClick={() => invite.mutate()}>Invite</button></div>
-      {requestRows.map((row) => <div className="flex items-center justify-between gap-3 border-t border-line py-3" key={row.id}><span className="text-sm text-ink">{requestLabel(row)} · {row.kind} · {row.state}</span>{row.state === "requested" ? <div className="flex gap-2"><button className="desk-button-primary" disabled={!selectedRole || approve.isPending} onClick={() => approve.mutate(row.id)}>Approve</button><button className="desk-button" onClick={() => revokeRequest.mutate(row.id)} disabled={revokeRequest.isPending}>Revoke</button></div> : null}</div>)}
-      {requests.isLoading ? <p className="text-sm text-muted">Loading requests…</p> : null}</Panel>
+    <Panel title={membershipEnabled ? "Membership requests" : "Invitations"}><div className="mb-3 flex flex-wrap gap-2"><select className="desk-input" value={selectedRole ?? ""} onChange={(event) => setRoleId(Number(event.target.value))}>{roles.data?.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select><input className="desk-input" type="email" placeholder="Invite email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} /><button className="desk-button" disabled={!inviteEmail || !selectedRole || invite.isPending} onClick={() => invite.mutate()}>Invite</button></div>
+      {membershipEnabled ? requestRows.map((row) => <div className="flex items-center justify-between gap-3 border-t border-line py-3" key={row.id}><span className="text-sm text-ink">{requestLabel(row)} · {row.kind} · {row.state}</span>{row.state === "requested" ? <div className="flex gap-2"><button className="desk-button-primary" disabled={!selectedRole || approve.isPending} onClick={() => approve.mutate(row.id)}>Approve</button><button className="desk-button" onClick={() => revokeRequest.mutate(row.id)} disabled={revokeRequest.isPending}>Revoke</button></div> : null}</div>) : null}
+      {membershipEnabled && requests.isLoading ? <p className="text-sm text-muted">Loading requests…</p> : null}</Panel>
     <Panel title="Currently present">{presence.data?.length ? presence.data.map((row) => <p className="border-t border-line py-2 text-sm text-ink" key={`${row.display_name}-${row.started_at}`}>{row.display_name} <span className="text-muted">· {row.role_label} · until {new Date(row.expires_at).toLocaleTimeString()}</span></p>) : <p className="text-sm text-muted">No active member presence sessions.</p>}</Panel>
-    <Panel title="Current waiver"><div className="grid gap-2"><input className="desk-input" placeholder="Version" value={waiver.version} onChange={(event) => setWaiver({ ...waiver, version: event.target.value })} /><textarea className="desk-input min-h-28" placeholder="Waiver text" value={waiver.body} onChange={(event) => setWaiver({ ...waiver, body: event.target.value })} /><button className="desk-button-primary w-fit" disabled={!waiver.version || !waiver.body || publishWaiver.isPending} onClick={() => publishWaiver.mutate()}>Publish waiver</button></div></Panel>
+    {membershipEnabled ? <Panel title="Current waiver"><div className="grid gap-2"><input className="desk-input" placeholder="Version" value={waiver.version} onChange={(event) => setWaiver({ ...waiver, version: event.target.value })} /><textarea className="desk-input min-h-28" placeholder="Waiver text" value={waiver.body} onChange={(event) => setWaiver({ ...waiver, body: event.target.value })} /><button className="desk-button-primary w-fit" disabled={!waiver.version || !waiver.body || publishWaiver.isPending} onClick={() => publishWaiver.mutate()}>Publish waiver</button></div></Panel> : null}
     {error ? <p className="text-sm text-danger" role="alert">{membershipErrorText(error)}</p> : null}
   </div>;
 }
 
-function MemberRow({ makerspaceId, member, roles, changingRole, changingCapabilities, changingVerification, onChangeRole, onCapability, onVerify, onRevoke }: {
+function MemberRow({ makerspaceId, member, roles, membershipEnabled, changingRole, changingCapabilities, changingVerification, onChangeRole, onCapability, onVerify, onRevoke }: {
   makerspaceId: number;
   member: AdminMembership;
   roles: Role[];
+  membershipEnabled: boolean;
   changingRole: boolean;
   changingCapabilities: boolean;
   changingVerification: boolean;
@@ -107,8 +116,8 @@ function MemberRow({ makerspaceId, member, roles, changingRole, changingCapabili
   return <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line py-3">
     <div><p className="font-semibold text-ink">{displayName}</p><p className="text-xs text-muted">{member.assigned_role?.name ?? "Member"} · {member.status} · waiver {member.waiver_current ? "current" : "needed"}</p><PaymentReconcileActions makerspaceId={makerspaceId} payment={member.payment} invalidateKeys={[["members", makerspaceId]]} /></div>
     <div className="flex flex-wrap items-center gap-2">
-      <Badge tone={member.verified_at ? "success" : "neutral"}>{member.verified_at ? "Verified" : "Not verified"}</Badge>
-      {active ? <><label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={member.can_refer} disabled={changingCapabilities} onChange={(event) => onCapability({ can_refer: event.target.checked })} />Can refer</label><label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={member.can_verify} disabled={changingCapabilities} onChange={(event) => onCapability({ can_verify: event.target.checked })} />Can verify</label><button className="desk-button" type="button" disabled={changingVerification} onClick={onVerify}>{member.verified_at ? "Unverify" : "Verify"}</button><select className="desk-input" defaultValue={member.assigned_role?.id ?? ""} onChange={(event) => onChangeRole(Number(event.target.value))} disabled={changingRole}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select><button className="desk-button" type="button" onClick={onRevoke}>Revoke</button></> : null}
+      {membershipEnabled ? <Badge tone={member.verified_at ? "success" : "neutral"}>{member.verified_at ? "Verified" : "Not verified"}</Badge> : null}
+      {active ? <>{membershipEnabled ? <><label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={member.can_refer} disabled={changingCapabilities} onChange={(event) => onCapability({ can_refer: event.target.checked })} />Can refer</label><label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={member.can_verify} disabled={changingCapabilities} onChange={(event) => onCapability({ can_verify: event.target.checked })} />Can verify</label><button className="desk-button" type="button" disabled={changingVerification} onClick={onVerify}>{member.verified_at ? "Unverify" : "Verify"}</button></> : null}<select className="desk-input" defaultValue={member.assigned_role?.id ?? ""} onChange={(event) => onChangeRole(Number(event.target.value))} disabled={changingRole}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select><button className="desk-button" type="button" onClick={onRevoke}>Revoke</button></> : null}
     </div>
   </div>;
 }

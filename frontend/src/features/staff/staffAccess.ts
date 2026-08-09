@@ -51,7 +51,10 @@ export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
   { label: "Admin", tabs: ["users", "settings", "emailtemplates", "email-logs", "api", "platform"] },
 ];
 
-export function getStaffAccess(actions: readonly string[], isSuperadmin: boolean, singleTenantLocked: boolean, enabledModules: readonly string[] = []) {
+// Permissions only. Module availability is decided in exactly one place --
+// `filterTabsByEnabledModules` in staffTabs.ts -- because two maps naming the same tab
+// is how a tab ends up gated in the sidebar but not on the route, or vice versa.
+export function getStaffAccess(actions: readonly string[], isSuperadmin: boolean, singleTenantLocked: boolean) {
   const has = (action: string) => isSuperadmin || actions.includes(action);
   const canEditInventory = has("edit_inventory");
   const canViewInventory = has("view_inventory");
@@ -80,14 +83,14 @@ export function getStaffAccess(actions: readonly string[], isSuperadmin: boolean
   const baseTabs = handoutOnly ? (["requests", "direct", "handover"] as const) : ALL_TABS;
   const allowedTabs: readonly string[] = baseTabs.filter((tabName) => {
     if (tabName === "dashboard") return !handoutOnly && (isSuperadmin || canSeeDashboard);
-    if (tabName === "notifications") return !handoutOnly && enabledModules.includes("notifications");
+    if (tabName === "notifications") return !handoutOnly;
     if (tabName === "tobuy") return canUseToBuy;
     if (tabName === "needsfix") return canEditInventory;
     if (tabName === "categories") return canEditInventory;
     if (tabName === "bulk") return canEditInventory;
     if (tabName === "stocktake") return canEditInventory;
     if (tabName === "direct") return canIssueDirectLoan;
-    if (tabName === "handover") return enabledModules.includes("machine_service") && canCollectServiceRequests;
+    if (tabName === "handover") return canCollectServiceRequests;
     if (tabName === "inventory") return canViewInventory;
     if (tabName === "ledger") return canViewInventory;
     if (tabName === "transfers") return canEditInventory || isSuperadmin;
@@ -103,9 +106,9 @@ export function getStaffAccess(actions: readonly string[], isSuperadmin: boolean
     if (tabName === "emailtemplates") return canEditInventory || canSeePrinting;
     if (tabName === "email-logs") return canManageMakerspace;
     if (tabName === "platform") return isSuperadmin && !singleTenantLocked;
-    if (tabName === "machines") return enabledModules.includes("machines") && canManageMachines;
-    if (tabName === "events") return enabledModules.includes("events") && canManageEvents;
-    if (tabName === "bookings") return enabledModules.includes("bookings") && canManageBookings;
+    if (tabName === "machines") return canManageMachines;
+    if (tabName === "events") return canManageEvents;
+    if (tabName === "bookings") return canManageBookings;
     if (tabName === "members") return canManageMakerspace;
     if (tabName === "payments") return canManageMakerspace;
     if (tabName === "requests") return canSeeHardware || canSeePrinting;

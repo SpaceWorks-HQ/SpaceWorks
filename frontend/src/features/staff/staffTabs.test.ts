@@ -34,9 +34,7 @@ describe("tombstoned apps", () => {
 });
 
 describe("job handover", () => {
-  const space = { enabled_modules: ["machine_service", "machines"] };
-  const access = (actions: string[]) =>
-    getStaffAccess(actions, false, false, space.enabled_modules);
+  const access = (actions: string[]) => getStaffAccess(actions, false, false);
 
   it("gives a collect-only role the handover tab and nothing else", () => {
     const { allowedTabs, handoutOnly, defaultTab } = access(["collect_service_request"]);
@@ -67,7 +65,66 @@ describe("job handover", () => {
   });
 
   it("hides the tab when the deployment does not run machine service", () => {
-    expect(getStaffAccess(["collect_service_request"], false, false, []).allowedTabs)
-      .not.toContain("handover");
+    // Module availability is filterTabsByEnabledModules' job, not getStaffAccess'.
+    const { allowedTabs } = access(["collect_service_request"]);
+    const space = { enabled_modules: ["staff_admin"] };
+
+    expect(filterTabsByEnabledModules(allowedTabs, space)).not.toContain("handover");
+  });
+});
+
+describe("every tab is gated on the module that backs it", () => {
+  // A saved makerspace always carries the six core keys, because `_canonical_modules`
+  // adds them back on every write -- so "module off" is a non-empty list that omits it.
+  const CORE = ["public_inventory", "request_workflow", "staff_admin", "scanner", "qr_management", "evidence_uploads"];
+  const tabsFor = (modules: string[]) =>
+    filterTabsByEnabledModules(getStaffAccess([], true, false).allowedTabs, { enabled_modules: modules });
+
+  it.each([
+    ["tobuy", "procurement"],
+    ["transfers", "stock_transfers"],
+    ["stocktake", "stocktake"],
+    ["containers", "containers"],
+    ["bulk", "bulk_import"],
+    ["notifications", "notifications"],
+    ["machines", "machines"],
+    ["handover", "machine_service"],
+    ["events", "events"],
+    ["bookings", "bookings"],
+    ["reports", "reports"],
+  ])("hides %s when %s is uninstalled", (tab, module) => {
+    expect(tabsFor([...CORE, module])).toContain(tab);
+    expect(tabsFor(CORE)).not.toContain(tab);
+  });
+
+  it("gates QR tools on print batches, not on the core key it cannot switch off", () => {
+    // Every action in the panel requires a selected batch, so `qr_management` -- which is
+    // core and always on -- gated nothing at all.
+    expect(tabsFor(CORE)).not.toContain("qr");
+    expect(tabsFor([...CORE, "qr_print_batches"])).toContain("qr");
+  });
+
+  it("keeps core-backed tabs when every optional module is off", () => {
+    const tabs = tabsFor(CORE);
+
+    for (const tab of ["dashboard", "requests", "inventory", "ledger", "scanner", "settings", "users", "audit"]) {
+      expect(tabs).toContain(tab);
+    }
+  });
+
+  it("keeps members and the email log ungated", () => {
+    const tabs = tabsFor(CORE);
+
+    // Gating `members` would take the staff roster and role assignment with it, letting a
+    // space lock itself out of its own administration.
+    expect(tabs).toContain("members");
+    // A module-blocked message becomes a terminal SKIPPED row so the operator can see what
+    // the toggle suppressed; gating the log would hide exactly that evidence.
+    expect(tabs).toContain("email-logs");
+  });
+
+  it("treats an unloaded makerspace as unrestricted rather than blanking the console", () => {
+    expect(filterTabsByEnabledModules(getStaffAccess([], true, false).allowedTabs, undefined))
+      .toContain("tobuy");
   });
 });

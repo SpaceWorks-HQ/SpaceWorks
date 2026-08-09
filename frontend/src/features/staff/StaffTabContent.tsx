@@ -129,7 +129,13 @@ export function StaffTabContent({
       ) : null}
       {activeTab === "events" && canManageEvents ? <EventsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}
       {activeTab === "bookings" && canManageBookings ? <BookingsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}
-      {activeTab === "members" && canManageMakerspace ? <MembersPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}
+      {activeTab === "members" && canManageMakerspace ? (
+        <MembersPanel
+          key={makerspaceKey}
+          makerspaceId={activeMakerspace.id}
+          membershipEnabled={(activeMakerspace.enabled_modules ?? []).includes("membership")}
+        />
+      ) : null}
       {activeTab === "payments" && canManageMakerspace ? <PaymentsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}
       {activeTab === "tobuy" ? (
         <ProcurementPanel
