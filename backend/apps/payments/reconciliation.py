@@ -198,17 +198,28 @@ def _require_machine_scope(actor, payments):
 
 
 def _expire_checkout_best_effort(payment):
-    if not payment.stripe_checkout_session_id or payment.stripe_checkout_session_expired_at:
+    """Close a live hosted page when staff settle a charge another way.
+
+    Without this a member can still pay a link for a charge already marked offline or
+    waived, and the webhook then records `payment.paid_after_terminal` -- visible, but
+    the member is out of pocket. Best-effort by contract: the reconciliation that called
+    this must succeed regardless of what the vendor says.
+    """
+    order_id = payment.external_order_id or payment.stripe_checkout_session_id
+    if not order_id or payment.stripe_checkout_session_expired_at:
         return
     try:
         source = source_for_payment(payment)
         if source is None:
             raise stripe_client.PaymentsUnavailable(
-                "The payment's Stripe source is no longer configured."
+                "The payment's provider credentials are no longer configured."
             )
-        if stripe_client.expire_checkout_session(
-            source, payment.stripe_checkout_session_id
-        ):
+        if payment.provider != payment.Provider.STRIPE:
+            from apps.payments.providers import get_provider
+
+            get_provider(payment.provider).expire_checkout(source, order_id)
+            payment.stripe_checkout_session_expired_at = timezone.now()
+        elif stripe_client.expire_checkout_session(source, order_id):
             payment.stripe_checkout_session_expired_at = timezone.now()
     except Exception:
         logger.exception(

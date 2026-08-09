@@ -8,7 +8,7 @@ from drf_spectacular.views import (
 )
 
 from apps.admin_api.views_hosting import TlsCheckView
-from apps.payments.views import StripeWebhookView
+from apps.payments.views import RazorpayWebhookView, StripeWebhookView
 from apps.payments.views_connect import (
     StripeConnectCallbackView,
     StripeConnectWebhookView,
@@ -83,6 +83,11 @@ urlpatterns = [
             "api/v1/webhooks/stripe/<str:public_code>",
             StripeWebhookView.as_view(),
             name="stripe-webhook",
+        ),
+        path(
+            "api/v1/webhooks/razorpay/<str:public_code>",
+            RazorpayWebhookView.as_view(),
+            name="razorpay-webhook",
         ),
     ),
     path('api/v1/', include('apps.machines.urls')),

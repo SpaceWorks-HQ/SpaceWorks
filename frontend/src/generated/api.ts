@@ -394,6 +394,7 @@ export const openApiPaths = [
   "/api/v1/public/{makerspace_slug}/tools/checkout",
   "/api/v1/public/{makerspace_slug}/tools/evidence-url",
   "/api/v1/public/{makerspace_slug}/tools/return",
+  "/api/v1/webhooks/razorpay/{public_code}",
   "/api/v1/webhooks/stripe/connect",
   "/api/v1/webhooks/stripe/{public_code}"
 ] as const;

@@ -22,6 +22,16 @@ class Payment(models.Model):
         RAW = "raw", "Makerspace raw credentials"
         CONNECT = "connect", "Stripe Connect"
 
+    class Provider(models.TextChoices):
+        """Which vendor holds this charge.
+
+        Distinct from `stripe_provider`, which says how STRIPE credentials were
+        resolved (raw vs Connect) and is meaningless for any other vendor.
+        """
+
+        STRIPE = "stripe", "Stripe"
+        RAZORPAY = "razorpay", "Razorpay"
+
     class OnlineRail(models.TextChoices):
         CHECKOUT = 'checkout', 'Stripe Checkout'
         NATIVE_PAYMENT_INTENT = 'native_payment_intent', 'Native payment intent'
@@ -33,6 +43,16 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, validators=[currency_validator])
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    # Provider-agnostic columns (phase 4). The `stripe_*` columns below are retained as
+    # read-only historic, exactly as `MachineServiceRequest.payment_*` was when Payment
+    # took over: rows are immutable once terminal, so a migration may only ADD nullable
+    # columns and may never rewrite what is already there.
+    provider = models.CharField(
+        max_length=16, choices=Provider.choices, default=Provider.STRIPE
+    )
+    external_order_id = models.CharField(max_length=255, null=True, blank=True)
+    external_payment_id = models.CharField(max_length=255, null=True, blank=True)
+    checkout_url = models.URLField(blank=True, default="")
     stripe_provider = models.CharField(max_length=16, choices=StripeProvider.choices, default=StripeProvider.RAW)
     stripe_connected_account_id = models.CharField(max_length=255, null=True, blank=True)
     stripe_application_fee_amount = models.PositiveBigIntegerField(default=0)
@@ -53,6 +73,19 @@ class Payment(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["makerspace", "subject_type", "subject_id"], name="payment_one_per_subject"),
+            # Scoped BY PROVIDER: two vendors are free to mint the same opaque id, and a
+            # global unique index would make the second one unstorable. Partial, because
+            # NULL means "no checkout raised yet" and many rows sit in that state.
+            models.UniqueConstraint(
+                fields=["provider", "external_order_id"],
+                name="payment_external_order_once_per_provider",
+                condition=models.Q(external_order_id__isnull=False),
+            ),
+            models.UniqueConstraint(
+                fields=["provider", "external_payment_id"],
+                name="payment_external_payment_once_per_provider",
+                condition=models.Q(external_payment_id__isnull=False),
+            ),
             models.CheckConstraint(condition=models.Q(amount__gt=0), name="payment_amount_positive"),
         ]
         ordering = ["-created_at"]
@@ -106,7 +139,7 @@ class Payment(models.Model):
     def save(self, *args, **kwargs):
         if self.pk:
             original = type(self).objects.filter(pk=self.pk).values(
-                "status", "amount", "stripe_provider", "stripe_connected_account_id", "stripe_application_fee_amount", "online_rail"
+                "status", "amount", "provider", "stripe_provider", "stripe_connected_account_id", "stripe_application_fee_amount", "online_rail"
             ).first()
             if original and original["status"] != self.Status.PENDING and (
                 original["status"] != self.status or original["amount"] != self.amount
@@ -114,9 +147,12 @@ class Payment(models.Model):
                 raise ValidationError("Terminal payments are immutable.")
             if original and any(
                 original[field] != getattr(self, field)
-                for field in ("stripe_provider", "stripe_connected_account_id", "stripe_application_fee_amount")
+                for field in ("provider", "stripe_provider", "stripe_connected_account_id", "stripe_application_fee_amount")
             ):
-                raise ValidationError("Stripe provenance is immutable.")
+                # `provider` joins the provenance set: moving a charge between vendors
+                # would point the row at a merchant account that never took the money,
+                # and every settlement and refund path after it would be wrong.
+                raise ValidationError("Payment provenance is immutable.")
             if (
                 original
                 and original['online_rail'] is not None
@@ -128,9 +164,23 @@ class Payment(models.Model):
 
 
 class ProcessedStripeEvent(models.Model):
+    """Webhook idempotency, for every provider.
+
+    Kept under its original name and table: renaming a model whose rows are the only
+    defence against double-settling a real charge is a migration risk with no payoff.
+    The `provider` column is what generalises it -- two vendors can emit the same event
+    id, and without it the second one would be silently swallowed as a duplicate.
+    """
+
     makerspace = models.ForeignKey("makerspaces.Makerspace", on_delete=models.PROTECT, related_name="processed_stripe_events")
+    provider = models.CharField(max_length=16, default=Payment.Provider.STRIPE)
     stripe_event_id = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["makerspace", "stripe_event_id"], name="stripe_event_once_per_makerspace")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["makerspace", "provider", "stripe_event_id"],
+                name="webhook_event_once_per_makerspace_provider",
+            )
+        ]

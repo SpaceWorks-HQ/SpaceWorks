@@ -219,14 +219,78 @@ def _event_is_stale(event_created, account_assigned_at):
     return event_created < int(account_assigned_at.timestamp())
 
 
-def _record_once(makerspace, event_id):
+def _record_once(makerspace, event_id, provider=Payment.Provider.STRIPE):
+    """Claim an event id, scoped by provider.
+
+    Two vendors can mint the same event id; without the provider in the key the second
+    one would be swallowed as a duplicate and a real charge would never settle.
+    """
     try:
         ProcessedStripeEvent.objects.create(
-            makerspace=makerspace, stripe_event_id=event_id
+            makerspace=makerspace, provider=provider, stripe_event_id=event_id
         )
     except IntegrityError:
         return False
     return True
+
+
+def apply_razorpay_webhook_event(makerspace, event):
+    """Settle a VERIFIED Razorpay event. `event` is a providers.base.WebhookEvent.
+
+    Same discipline as the Stripe path, and for the same reasons:
+
+    * The row is found by the ids the provider echoed back, never by anything the payer
+      supplied, and is locked before it is read.
+    * Settlement happens **regardless of the live capability toggle**. A real charge must
+      never be stranded because someone unticked a feature between checkout and callback.
+    * A paid event for an already-terminal row is audited as `payment.paid_after_terminal`
+      rather than dropped or re-applied, so a double charge is visible instead of silent.
+    """
+    if not event.event_id or not event.is_paid:
+        # Non-payment events are not recorded: claiming their id would make a later
+        # genuine settlement carrying the same delivery id read as a duplicate.
+        return None
+    with transaction.atomic():
+        identifiers = Q()
+        if event.order_id:
+            identifiers |= Q(external_order_id=event.order_id)
+        if event.payment_id:
+            identifiers |= Q(external_payment_id=event.payment_id)
+        if not identifiers:
+            return None
+        payment = (
+            Payment.objects.select_for_update()
+            .filter(makerspace=makerspace, provider=Payment.Provider.RAZORPAY)
+            .filter(identifiers)
+            .first()
+        )
+        if payment is None:
+            return None
+        if not _record_once(makerspace, event.event_id, Payment.Provider.RAZORPAY):
+            return None
+        if payment.status != Payment.Status.PENDING:
+            audit.record(
+                None,
+                "payment.paid_after_terminal",
+                makerspace=makerspace,
+                target=payment,
+                meta={"provider": "razorpay", "event_id": event.event_id, "prior_status": payment.status},
+            )
+            return payment
+        payment.status = Payment.Status.PAID_ONLINE
+        fields = ["status", "updated_at"]
+        if event.payment_id and not payment.external_payment_id:
+            payment.external_payment_id = event.payment_id
+            fields.insert(1, "external_payment_id")
+        payment.save(update_fields=fields)
+        audit.record(
+            None,
+            "payment.paid_online",
+            makerspace=makerspace,
+            target=payment,
+            meta={"provider": "razorpay", "event_id": event.event_id},
+        )
+        return payment
 
 
 def _value(value, key):

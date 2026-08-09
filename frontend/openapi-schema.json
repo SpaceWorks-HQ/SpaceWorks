@@ -26832,6 +26832,37 @@
                 }
             }
         },
+        "/api/v1/webhooks/razorpay/{public_code}": {
+            "post": {
+                "operationId": "api_v1_webhooks_razorpay_create",
+                "description": "Verifies the X-Razorpay-Signature HMAC over request.body using the addressed makerspace's webhook secret before applying an idempotent event.",
+                "summary": "Receive a makerspace Razorpay webhook",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "public_code",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Payments"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Verified event acknowledged."
+                    },
+                    "400": {
+                        "description": "Invalid signature, payload, or configuration."
+                    },
+                    "404": {
+                        "description": "Makerspace was not found or is archived."
+                    }
+                }
+            }
+        },
         "/api/v1/webhooks/stripe/{public_code}": {
             "post": {
                 "operationId": "api_v1_webhooks_stripe_create",

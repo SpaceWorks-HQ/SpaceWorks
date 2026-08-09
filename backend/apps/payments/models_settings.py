@@ -27,6 +27,15 @@ class MakerspacePaymentSettings(models.Model):
     makerspace = models.OneToOneField(
         "makerspaces.Makerspace", on_delete=models.CASCADE, related_name="payment_settings"
     )
+    # Which vendor this makerspace charges through. Per-makerspace rather than global:
+    # a managed deployment can host an Indian space on Razorpay and a US one on Stripe,
+    # and a self-hoster in a country Stripe does not serve must not be blocked by a
+    # platform-wide choice.
+    provider = models.CharField(
+        max_length=16,
+        choices=[("stripe", "Stripe"), ("razorpay", "Razorpay")],
+        default="stripe",
+    )
     stripe_publishable_key = models.CharField(max_length=255, blank=True, default="")
     stripe_secret_key = models.TextField(blank=True, default="")
     stripe_webhook_secret = models.TextField(blank=True, default="")
@@ -47,6 +56,12 @@ class MakerspacePaymentSettings(models.Model):
     connect_payouts_enabled = models.BooleanField(default=False)
     connect_account_assigned_at = models.DateTimeField(null=True, blank=True)
     connect_status_updated_at = models.DateTimeField(default=timezone.now)
+    # Razorpay. `key_id` is public (it appears in the checkout page URL), so it is
+    # stored plainly like `stripe_publishable_key`; the other two are encrypted with
+    # API_CLIENT_ENC_KEY through the same `secrets` helpers as their Stripe twins.
+    razorpay_key_id = models.CharField(max_length=255, blank=True, default="")
+    razorpay_key_secret = models.TextField(blank=True, default="")
+    razorpay_webhook_secret = models.TextField(blank=True, default="")
 
     class Meta:
         verbose_name = "makerspace payment settings"
@@ -61,7 +76,39 @@ class MakerspacePaymentSettings(models.Model):
 
     @property
     def raw_credentials_configured(self):
+        """Whether the SELECTED provider holds every credential it needs.
+
+        Provider-aware: a space that has switched to Razorpay but still has old Stripe
+        keys on the row must not read as configured, or `online_payments_enabled` would
+        let it raise a checkout against a vendor it no longer uses.
+        """
+        if self.provider == "razorpay":
+            return bool(
+                self.razorpay_key_id
+                and self.razorpay_key_secret
+                and self.razorpay_webhook_secret
+            )
         return bool(self.stripe_secret_key and self.stripe_webhook_secret)
+
+    @property
+    def razorpay_key_secret_set(self):
+        return bool(self.razorpay_key_secret)
+
+    @property
+    def razorpay_webhook_secret_set(self):
+        return bool(self.razorpay_webhook_secret)
+
+    def set_razorpay_key_secret(self, raw):
+        self.razorpay_key_secret = encrypt_value(raw)
+
+    def get_razorpay_key_secret(self):
+        return decrypt_value(self.razorpay_key_secret)
+
+    def set_razorpay_webhook_secret(self, raw):
+        self.razorpay_webhook_secret = encrypt_value(raw)
+
+    def get_razorpay_webhook_secret(self):
+        return decrypt_value(self.razorpay_webhook_secret)
 
     @property
     def stripe_secret_key_set(self):
