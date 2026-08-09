@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 
 from django.conf import settings
 from django.core.exceptions import ValidationError

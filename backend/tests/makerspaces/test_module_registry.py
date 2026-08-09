@@ -67,10 +67,12 @@ def _guarded_module_keys():
     for path in APPS_DIR.rglob("*.py"):
         if "migrations" in path.parts:
             continue
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-        except SyntaxError:  # pragma: no cover - a broken file fails elsewhere
-            continue
+        # utf-8-sig, and a HARD failure on an unparseable file. Both matter: a leading
+        # UTF-8 BOM makes ast.parse raise SyntaxError, and skipping the file made this
+        # guard silently blind to every module gate inside it -- eighteen files in
+        # `apps/` carried one, so "no call site references this key" could mean the
+        # guard simply never read the file that does.
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Call):
                 name = getattr(node.func, "attr", None) or getattr(node.func, "id", None)
@@ -154,11 +156,21 @@ def test_modules_are_opt_in_and_a_new_makerspace_gets_core_only():
         "notifications", "email", "slack", "mattermost", "discord",
     }
 
-    assert set(DEFAULT_ENABLED_MODULES) == module_registry.core_module_keys()
+    # Four keys deliberately default ON, and are the only ones allowed to. They are not
+    # capabilities being offered -- they are switches placed in front of substrate that
+    # was previously unconditional, so defaulting them off would remove working surfaces
+    # from a makerspace that never asked for a change. Anything else defaulting on is
+    # drift and fails here.
+    DEFAULT_ON_KEYS = {"payments", "accounts", "mobile", "updates"}
+
+    assert set(DEFAULT_ENABLED_MODULES) == module_registry.core_module_keys() | DEFAULT_ON_KEYS
     assert default_enabled_modules() == DEFAULT_ENABLED_MODULES
+    assert {
+        definition.key for definition in module_registry.MODULES if definition.default_enabled
+    } == DEFAULT_ON_KEYS
     assert (
         set(profile_modules(EVERYTHING))
-        == set(LEGACY_DEFAULT_ENABLED_MODULES) | POST_LEGACY_KEYS
+        == set(LEGACY_DEFAULT_ENABLED_MODULES) | POST_LEGACY_KEYS | DEFAULT_ON_KEYS
     )
 
 
@@ -211,8 +223,10 @@ def test_core_modules_match_the_approved_split_and_are_always_installed():
 
 def test_registry_is_internally_consistent():
     # 24 at the registry's introduction, plus `email` (plan A5), plus the three
-    # per-channel notification keys `slack`/`mattermost`/`discord`.
-    assert len(module_registry.MODULES) == 28
+    # per-channel notification keys `slack`/`mattermost`/`discord`, plus the four
+    # phase-3 keys placed in front of previously ungated substrate: `payments`,
+    # `accounts`, `mobile` and `updates`.
+    assert len(module_registry.MODULES) == 32
     assert len(module_registry.BY_KEY) == len(module_registry.MODULES)
     for definition in module_registry.MODULES:
         assert definition.label and definition.description and definition.app_label
@@ -313,3 +327,39 @@ def test_group_lookup_tolerates_an_unknown_legacy_key():
     # would misrepresent a tenant's stored capability.
     assert module_registry.group_for("legacy_unknown_key") is None
     assert module_registry.group_for("events") == module_registry.GROUP_EVENTS
+
+
+def test_membership_and_mobile_require_member_accounts():
+    # Community membership presupposes a member account: join requests, waivers,
+    # referrals and verification are all things an account holds. A device grant is
+    # bound to a user for the same reason. Staff authentication is core RBAC and is
+    # deliberately NOT expressed here -- a space that could switch off its own staff
+    # logins could not be administered.
+    dependencies = module_registry.module_dependencies()
+
+    assert dependencies["membership"] == ("accounts",)
+    assert dependencies["mobile"] == ("accounts",)
+    assert "accounts" not in dependencies
+
+
+def test_events_and_bookings_do_not_require_member_accounts():
+    # The lean install is Inventory + Machines with the space's own login, and events,
+    # bookings and machine service must all keep working there. Only the community and
+    # native-device layers depend on member accounts.
+    dependencies = module_registry.module_dependencies()
+
+    for key in ("events", "bookings", "machines", "machine_service", "payments", "reports"):
+        assert "accounts" not in dependencies.get(key, ())
+
+
+def test_payments_features_require_both_the_domain_and_the_payments_module():
+    # Re-parenting the domain features onto `payments` outright would have lost a real
+    # constraint -- charging for bookings must still require the bookings module -- so
+    # `payments` is an added requirement rather than a replaced parent.
+    by_key = {definition.key: definition for definition in FEATURE_DEFINITIONS}
+
+    assert by_key["payments.bookings"].parent_module == "bookings"
+    for key in ("payments.machines", "payments.bookings", "payments.events", "payments.membership"):
+        assert "payments" in by_key[key].requires_modules
+    assert by_key["payments.enabled"].parent_module == "payments"
+    assert by_key["mobile.push"].parent_module == "mobile"

@@ -1,4 +1,4 @@
-﻿"""Fenced, authenticated rollback from scoped envelopes to legacy plaintext."""
+"""Fenced, authenticated rollback from scoped envelopes to legacy plaintext."""
 
 from uuid import UUID
 

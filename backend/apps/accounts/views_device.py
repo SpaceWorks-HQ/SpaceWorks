@@ -30,6 +30,21 @@ from apps.accounts.throttles import DeviceLoginThrottle, DeviceLoginUserThrottle
 from apps.hardware_requests.exceptions import ErrorSerializer
 
 
+def _require_mobile_module():
+    """Refuse a new device grant when the deployment does not run mobile apps.
+
+    Checked at grant CREATION only. Existing grants keep working and are revoked
+    deliberately, never as a side effect of a capability toggle -- an operator turning
+    the module off should stop new pairings, not silently brick every phone already in
+    a member's pocket. AuthenticationFailed rather than 404 so the native client's
+    existing failure path handles it.
+    """
+    from apps.makerspaces.deployment_modules import mobile_module_enabled
+
+    if not mobile_module_enabled():
+        raise AuthenticationFailed("Mobile device sessions are not enabled.")
+
+
 def _reject_browser_headers(request):
     if any(
         request.META.get(name)
@@ -131,6 +146,7 @@ class DeviceLoginView(APIView):
         if not user or user.access_status != User.AccessStatus.ACTIVE:
             _audit_login_failure(data, 'invalid_credentials')
             raise AuthenticationFailed("Invalid device credentials or attestation.")
+        _require_mobile_module()
         now = timezone.now()
         with transaction.atomic():
             grant = DeviceGrant.objects.create(

@@ -13,7 +13,7 @@ what makes uninstall safe enough to not need a destructive-confirmation prompt.
 from django.db import transaction
 
 from apps.audit import services as audit
-from apps.makerspaces.capabilities import validate_capabilities
+from apps.makerspaces.capabilities import prune_features, validate_capabilities
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.module_profiles import MINIMAL, profile_modules
 from apps.makerspaces.module_registry import (
@@ -123,17 +123,29 @@ def apply_profile(makerspace, profile, actor=None):
 
 def _apply(locked, modules, actor):
     before = sorted(set(locked.enabled_modules or []))
+    before_features = sorted(set(locked.enabled_features or []))
+    # Drop features whose modules are going away BEFORE validating, or the validation
+    # refuses the change outright -- see `prune_features` for why this is a removal
+    # rather than an error or a silent keep.
+    kept_features, dropped_features = prune_features(locked.enabled_features or [], modules)
     canonical_modules, canonical_features = validate_capabilities(
-        sorted(modules), locked.enabled_features or []
+        sorted(modules), kept_features
     )
     locked.enabled_modules = canonical_modules
     locked.enabled_features = canonical_features
     locked.save(update_fields=["enabled_modules", "enabled_features"])
-    if before != canonical_modules:
+    if before != canonical_modules or before_features != sorted(canonical_features):
         audit.record(
             actor,
             "makerspace.capabilities_changed",
             makerspace=locked,
             target=locked,
-            meta={"before": {"modules": before}, "after": {"modules": canonical_modules}},
+            meta={
+                "before": {"modules": before, "features": before_features},
+                "after": {"modules": canonical_modules, "features": sorted(canonical_features)},
+                # Named explicitly: a feature removed as a consequence of a module going
+                # away is the kind of change an operator will otherwise discover only
+                # when something stops charging.
+                "features_dropped_with_modules": dropped_features,
+            },
         )

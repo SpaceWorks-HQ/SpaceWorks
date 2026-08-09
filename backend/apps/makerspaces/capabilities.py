@@ -32,19 +32,22 @@ FEATURE_DEFINITIONS = (
     FeatureDefinition(
         "payments.machines", "machines", "Machine payments",
         "Charge for machine service requests via Stripe.",
-        requires_modules=("machine_service",),
+        requires_modules=("machine_service", "payments"),
     ),
     FeatureDefinition(
         "payments.bookings", "bookings", "Booking payments",
         "Charge for resource bookings via Stripe.",
+        requires_modules=("payments",),
     ),
     FeatureDefinition(
         "payments.events", "events", "Event payments",
         "Charge for event registrations via Stripe.",
+        requires_modules=("payments",),
     ),
     FeatureDefinition(
         "payments.membership", "membership", "Membership payments",
         "Charge membership dues via Stripe.",
+        requires_modules=("payments",),
     ),
     FeatureDefinition(
         "inventory.self_checkout", None, "Self checkout",
@@ -56,14 +59,18 @@ FEATURE_DEFINITIONS = (
     # ON must not make an unconfigured capability start working. They default ENABLED so
     # that adding them changes nothing for a makerspace that was already using the
     # capability; migration 0051 backfills the same keys onto rows that predate them.
+    # Parented to the `payments` MODULE (phase 3). The module removes the surfaces; this
+    # feature is the space manager's own kill switch in front of a module that is
+    # installed. Both are additive ANDs -- turning either ON still cannot make an
+    # unconfigured provider start charging.
     FeatureDefinition(
-        "payments.enabled", None, "Payments",
+        "payments.enabled", "payments", "Payments",
         "Master switch for online payments; each domain still needs its own "
-        "payments.* feature and configured Stripe credentials.",
+        "payments.* feature and configured credentials.",
         default_enabled=True,
     ),
     FeatureDefinition(
-        "mobile.push", None, "Native push",
+        "mobile.push", "mobile", "Native push",
         "Native push notifications to this makerspace's registered devices; still "
         "requires platform FCM/APNs credentials.",
         default_enabled=True,
@@ -85,6 +92,44 @@ FEATURE_MODULES = MODULE_KEYS
 def default_enabled_features():
     """Return the enabled-by-default features for a new makerspace."""
     return [definition.key for definition in FEATURE_DEFINITIONS if definition.default_enabled]
+
+
+def feature_required_modules(key):
+    """Every module a feature needs: its parent plus anything it declares."""
+    definition = FEATURES[key]
+    return tuple(
+        module
+        for module in (definition.parent_module, *definition.requires_modules)
+        if module is not None
+    )
+
+
+def prune_features(enabled_features, enabled_modules):
+    """Split features into those the module set supports and those it no longer does.
+
+    Removing a module has to remove the features that depend on it. Without this,
+    `uninstall_module("payments")` and applying the `minimal` profile both RAISE --
+    `payments.enabled` would still be set and would demand the very module being taken
+    away, so the operation is impossible rather than merely lossy.
+
+    Keeping the feature instead is not an option: the capability would read as ON while
+    every surface behind it was gone. The staff console already works this way (a
+    checkbox disabled by its parent module is omitted from the PATCH and clears the
+    capability), so this makes the service agree with the UI rather than fight it.
+
+    Returns ``(kept, dropped)``, both sorted in registry order, so the caller can audit
+    what it removed rather than dropping it silently.
+    """
+    modules = set(enabled_modules)
+    kept, dropped = [], []
+    for definition in FEATURE_DEFINITIONS:
+        if definition.key not in set(enabled_features):
+            continue
+        supported = all(
+            module in modules for module in feature_required_modules(definition.key)
+        )
+        (kept if supported else dropped).append(definition.key)
+    return kept, dropped
 
 
 def validate_capabilities(enabled_modules, enabled_features):

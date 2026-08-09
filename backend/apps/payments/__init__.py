@@ -1,1 +1,1 @@
-﻿# Payments foundation app.
+# Payments foundation app.

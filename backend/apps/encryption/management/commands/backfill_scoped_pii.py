@@ -1,4 +1,4 @@
-﻿"""Encrypt fixed scoped PII and synchronize H3 search artifacts atomically."""
+"""Encrypt fixed scoped PII and synchronize H3 search artifacts atomically."""
 
 from django.apps import apps
 from django.conf import settings

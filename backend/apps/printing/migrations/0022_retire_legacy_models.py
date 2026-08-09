@@ -1,4 +1,4 @@
-﻿from django.db import migrations
+from django.db import migrations
 
 
 LEGACY_MODELS_WITH_DIRECT_MAKERSPACE = (

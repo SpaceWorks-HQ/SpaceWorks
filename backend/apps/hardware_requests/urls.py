@@ -1,4 +1,4 @@
-﻿from django.urls import path
+from django.urls import path
 
 from apps.hardware_requests import cron_views, timeline_views, views
 

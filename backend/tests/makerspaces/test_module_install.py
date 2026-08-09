@@ -8,6 +8,7 @@ non-technical operator cannot reach it.
 from io import StringIO
 
 import pytest
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.management import CommandError, call_command
 
 from apps.audit.models import AuditLog
@@ -137,8 +138,41 @@ def test_core_modules_survive_an_attempt_to_save_without_them():
     # fails on a row that somehow lost one.
     space = make_space()
     space.enabled_modules = ["reports"]
+    # A DIRECT save still validates features strictly: narrowing modules here without
+    # also dropping the features that need them is a real inconsistency, and the
+    # `/control/` matrix shows the resulting error. Pruning happens in the service path
+    # (`module_install._apply`), which is what makes uninstall and profiles possible.
+    space.enabled_features = []
     space.clean()
     assert core_module_keys() <= set(space.enabled_modules)
+
+
+def test_narrowing_modules_directly_still_refuses_an_orphaned_feature():
+    # The other half of the rule above: a direct save that would leave a feature whose
+    # module is gone is rejected rather than silently clearing the capability.
+    space = make_space()
+    space.enabled_modules = ["reports"]
+    space.enabled_features = ["payments.enabled"]
+
+    with pytest.raises(DjangoValidationError, match="payments.enabled requires payments"):
+        space.clean()
+
+
+def test_uninstalling_a_module_drops_the_features_that_needed_it():
+    space = make_space()
+    apply_profile(space, EVERYTHING)
+    space.enabled_features = ["payments.enabled", "payments.bookings", "inventory.self_checkout"]
+    space.save(update_fields=["enabled_features"])
+
+    uninstall_module(space, "payments")
+    space.refresh_from_db()
+
+    # Without this the uninstall would be impossible, not merely lossy: the feature
+    # would still demand the module being removed.
+    assert "payments.enabled" not in space.enabled_features
+    assert "payments.bookings" not in space.enabled_features
+    # An unrelated feature is untouched.
+    assert "inventory.self_checkout" in space.enabled_features
 
 
 def test_uninstall_is_refused_while_a_dependent_module_is_installed():

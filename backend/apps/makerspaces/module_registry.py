@@ -38,6 +38,10 @@ GROUP_BOOKINGS = "bookings"
 GROUP_MEMBERSHIP = "membership"
 GROUP_NOTIFICATIONS = "notifications"
 GROUP_REPORTS = "reports"
+GROUP_PAYMENTS = "payments"
+GROUP_ACCOUNTS = "accounts"
+GROUP_MOBILE = "mobile"
+GROUP_UPDATES = "updates"
 
 
 @dataclass(frozen=True)
@@ -83,6 +87,25 @@ GROUPS = (
         "Analytics, the report registry and CSV/XLSX exports. Standalone rather than "
         "part of Inventory, because switching Inventory off would otherwise kill the "
         "machine and event reports too.",
+    ),
+    GroupDefinition(
+        GROUP_PAYMENTS, "Payments",
+        "Taking money online for machine jobs, bookings, event registrations and "
+        "membership dues.",
+    ),
+    GroupDefinition(
+        GROUP_ACCOUNTS, "Accounts",
+        "The member-facing identity ecosystem: self sign-up, social and phone login, "
+        "and the member area. Staff always sign in with a password regardless.",
+    ),
+    GroupDefinition(
+        GROUP_MOBILE, "Mobile apps",
+        "Attested device sessions, native push and the in-app payment sheet.",
+    ),
+    GroupDefinition(
+        GROUP_UPDATES, "Updates",
+        "In-app release control. A deployment updated by its own host tooling ships "
+        "none of it.",
     ),
 )
 
@@ -208,9 +231,13 @@ MODULES = (
         "maintenance", "Maintenance", "Maintenance schedules and work orders.",
         "maintenance", GUARD, group=GROUP_MACHINES, frontend_workflows=("maintenance",),
     ),
+    # Requires `accounts`: join requests, waivers, referrals and verification all
+    # presuppose a member account, so the community layer unlocks only once member
+    # accounts exist. Staff membership rows are core RBAC and are not this key.
     ModuleDefinition(
         "membership", "Membership", "Community membership, waivers and referrals.",
         "makerspaces", FEATURE_PARENT, group=GROUP_MEMBERSHIP,
+        requires_modules=("accounts",),
     ),
     # Enforced by apps/notifications, but historically absent from the defaults list --
     # which is why the /control/ matrix (choices = defaults + keys already on the row)
@@ -247,6 +274,38 @@ MODULES = (
     ModuleDefinition(
         "discord", "Discord", "Per-makerspace Discord incoming-webhook alerts.",
         "integrations", GUARD, group=GROUP_NOTIFICATIONS,
+    ),
+    # The four keys below all default ENABLED, which is the opposite of every other
+    # optional module. They are not new capabilities being offered -- they are switches
+    # placed in front of substrate that has always been unconditionally present, so
+    # defaulting them off would silently remove working surfaces. Migration 0057
+    # backfills them onto existing rows for the same reason (`enabled_features` and
+    # `enabled_modules` are stored per row, so a default alone reads as OFF for every
+    # makerspace that already exists).
+    ModuleDefinition(
+        "payments", "Payments", "Online payment for machine jobs, bookings, events and dues.",
+        "payments", GUARD, group=GROUP_PAYMENTS, default_enabled=True,
+    ),
+    # Member-facing identity only. Staff authentication is core RBAC and is NEVER gated:
+    # a space that could switch off its own staff logins could not be administered, the
+    # same reasoning that keeps the staff roster ungated by `membership` (plan A7).
+    ModuleDefinition(
+        "accounts", "Member accounts",
+        "Member self sign-up, social and phone login, and the member area. Staff sign-in "
+        "is core and unaffected.",
+        "accounts", GUARD, group=GROUP_ACCOUNTS, default_enabled=True,
+    ),
+    # Requires `accounts` because a device grant is bound to a user: without member
+    # accounts there is no identity for a phone to hold.
+    ModuleDefinition(
+        "mobile", "Mobile apps",
+        "Attested device sessions, native push and the in-app payment sheet.",
+        "accounts", GUARD, group=GROUP_MOBILE,
+        requires_modules=("accounts",), default_enabled=True,
+    ),
+    ModuleDefinition(
+        "updates", "Updates", "In-app platform release checks and controlled updates.",
+        "updates", GUARD, group=GROUP_UPDATES, default_enabled=True,
     ),
 )
 

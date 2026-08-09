@@ -1,4 +1,4 @@
-﻿"""Lazy Stripe integration helpers with no process-global credential mutation."""
+"""Lazy Stripe integration helpers with no process-global credential mutation."""
 
 from importlib import import_module
 

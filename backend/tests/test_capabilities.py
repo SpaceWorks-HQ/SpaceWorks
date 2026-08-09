@@ -60,9 +60,18 @@ def test_self_checkout_is_standalone_and_independent_of_public_inventory():
 
 
 def test_machine_payment_requires_machines_and_machine_service():
-    modules, features = validate_capabilities(["machines", "machine_service"], ["payments.machines"])
+    # `payments` joined the requirement in phase 3, so charging for machine jobs now
+    # needs both the domain that produces the charge and the module that takes money.
+    modules, features = validate_capabilities(
+        ["machines", "machine_service", "payments"], ["payments.machines"]
+    )
     assert features == ["payments.machines"]
-    assert modules == sorted(core_module_keys() | {"machine_service", "machines"})
+    assert modules == sorted(core_module_keys() | {"machine_service", "machines", "payments"})
+
+
+def test_a_payment_feature_without_the_payments_module_is_refused():
+    with pytest.raises(ValidationError, match="payments.machines requires payments"):
+        validate_capabilities(["machines", "machine_service"], ["payments.machines"])
 
 
 def test_effective_feature_requires_parent_and_typed_guard():
@@ -104,7 +113,7 @@ def test_feature_dependency_and_bootstrap_projection():
         slug="machines",
         public_code="ABCD",
         public_api_key="pk_test",
-        enabled_modules=["machines", "machine_service"],
+        enabled_modules=["machines", "machine_service", "payments"],
         enabled_features=["payments.machines"],
     )
     assert feature_enabled(makerspace, "payments.machines") is True
@@ -221,14 +230,26 @@ def test_membership_payment_uses_the_registered_membership_module():
     from apps.makerspaces.models import Makerspace
     from apps.makerspaces.platform import feature_enabled
 
+    # `membership` requires `accounts` from phase 3: the community layer presupposes a
+    # member account to attach to.
     makerspace = Makerspace(
-        name="No membership", slug="no-membership", enabled_modules=["membership"],
+        name="No membership", slug="no-membership",
+        enabled_modules=["membership", "accounts", "payments"],
         enabled_features=["payments.membership"],
     )
     assert feature_enabled(makerspace, "payments.membership") is True
-    modules, features = validate_capabilities(["membership"], ["payments.membership"])
+    modules, features = validate_capabilities(
+        ["membership", "accounts", "payments"], ["payments.membership"]
+    )
     assert features == ["payments.membership"]
-    assert modules == sorted(core_module_keys() | {"membership"})
+    assert modules == sorted(core_module_keys() | {"membership", "accounts", "payments"})
+
+
+def test_membership_without_member_accounts_is_refused():
+    # The lean install is Inventory + Machines with the space's own login; the community
+    # layer is what needs accounts, and asking for it without them is a contradiction.
+    with pytest.raises(ValidationError, match="requires member accounts"):
+        validate_capabilities(["membership"], [])
 
 
 def test_frontend_feature_definitions_match_the_backend():
