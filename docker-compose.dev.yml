@@ -62,6 +62,14 @@ services:
       - ./backend:/app
 
   frontend:
+    # Tag the dev target separately. Without this both topologies derive the same
+    # `spaceworks-frontend` name, so whichever built last owns it — and a later
+    # `docker compose up -d` (prod, no --build) silently runs this dev image:
+    # CMD is `npm run dev`, nginx never starts, 8080->80 points at a dead port and
+    # the container sits unhealthy while its logs read a perfectly normal
+    # "VITE ready". Frontend is the only service overriding build.target, so it is
+    # the only one that needs this.
+    image: spaceworks-frontend-dev
     build:
       target: dev
       # The VITE_* build args only feed the production `npm run build`; leaving
