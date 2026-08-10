@@ -15,7 +15,7 @@ from apps.integrations.smtp_validation import validate_smtp_settings
 from apps.integrations.webhook_validation import validate_webhook_url
 from apps.makerspaces import domain_verification, limits
 from apps.makerspaces.hosting import canonical_host
-from apps.makerspaces.capabilities import validate_capabilities
+from apps.makerspaces.capabilities import prune_features, validate_capabilities
 from apps.makerspaces.platform import available_modules
 from apps.separability.tombstones import unavailable_apps
 from apps.makerspaces.models import (
@@ -290,10 +290,29 @@ class MakerspaceSerializer(serializers.ModelSerializer):
         if effective_geofence_enabled and (effective_latitude is None or effective_longitude is None):
             raise serializers.ValidationError({"geofence_enabled": "Set both latitude and longitude before enabling the geofence."})
 
+        effective_modules = attrs.get(
+            "enabled_modules", self.instance.enabled_modules if self.instance else []
+        )
+        effective_features = attrs.get(
+            "enabled_features", self.instance.enabled_features if self.instance else []
+        )
+        if "enabled_features" not in attrs:
+            # The caller is not editing features, so a stored feature whose module is
+            # absent is not their conflict to answer for. Prune before validating, or an
+            # unrelated PATCH — a Space Manager toggling public stats — is rejected
+            # naming a feature the request never mentioned. `Makerspace.clean()` prunes
+            # on the way to the database, so the row is repaired by the save itself and
+            # nothing is written here that the caller did not send.
+            #
+            # Strictness is kept when the request DOES carry `enabled_features`: there
+            # the caller expressed the combination, and silently dropping part of it
+            # would clear a capability instead of reporting the conflict. That is the
+            # `/control/` matrix, which always posts both.
+            effective_features, _dropped = prune_features(effective_features, effective_modules)
         try:
             _, enabled_features = validate_capabilities(
-                attrs.get("enabled_modules", self.instance.enabled_modules if self.instance else []),
-                attrs.get("enabled_features", self.instance.enabled_features if self.instance else []),
+                effective_modules,
+                effective_features,
             )
         except DjangoValidationError as exc:
             raise serializers.ValidationError(exc.message_dict) from exc

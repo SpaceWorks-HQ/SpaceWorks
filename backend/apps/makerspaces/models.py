@@ -9,7 +9,11 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils.crypto import get_random_string
 
-from apps.makerspaces.capabilities import default_enabled_features, validate_capabilities
+from apps.makerspaces.capabilities import (
+    default_enabled_features,
+    prune_features,
+    validate_capabilities,
+)
 from apps.makerspaces.module_registry import default_enabled_module_keys
 from apps.makerspaces.secrets import decrypt_value, encrypt_value
 from apps.makerspaces.validators import (
@@ -260,8 +264,27 @@ class Makerspace(models.Model):
     def clean(self):
         if self.presence_preset_minutes:
             validate_presence_presets(self.presence_preset_minutes)
+        # Drop features whose module is not in this row's set BEFORE validating. The
+        # module set is authoritative — `_canonical_modules` already normalizes rather
+        # than rejects (it adds core keys back), and this is the same class of
+        # normalization on the other axis.
+        #
+        # Without it a row can be born invalid and then never saved again: creating a
+        # makerspace with a narrow `enabled_modules` still takes the FIELD default for
+        # `enabled_features`, which includes the default-on `payments.enabled` and
+        # `mobile.push`. Those demand modules the row does not have, so `clean()` raised
+        # on every subsequent save — including saves that touched neither field, such as
+        # a Space Manager toggling public stats.
+        #
+        # The user-facing strictness is unaffected: the `/control/` capability matrix and
+        # `module_install` call `validate_capabilities` directly before saving, so a
+        # conflict the operator actually expressed is still reported there rather than
+        # silently cleared.
+        kept, _dropped = prune_features(
+            self.enabled_features or [], self.enabled_modules or []
+        )
         self.enabled_modules, self.enabled_features = validate_capabilities(
-            self.enabled_modules or [], self.enabled_features or []
+            self.enabled_modules or [], kept
         )
         if self.hidden_from_central_directory and not self.frontend_domain:
             raise ValidationError(

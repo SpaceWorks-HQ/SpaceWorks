@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.management import CommandError, call_command
 
 from apps.audit.models import AuditLog
+from apps.makerspaces.capabilities import validate_capabilities
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.module_install import (
     ModuleInstallError,
@@ -138,24 +139,51 @@ def test_core_modules_survive_an_attempt_to_save_without_them():
     # fails on a row that somehow lost one.
     space = make_space()
     space.enabled_modules = ["reports"]
-    # A DIRECT save still validates features strictly: narrowing modules here without
-    # also dropping the features that need them is a real inconsistency, and the
-    # `/control/` matrix shows the resulting error. Pruning happens in the service path
-    # (`module_install._apply`), which is what makes uninstall and profiles possible.
     space.enabled_features = []
     space.clean()
     assert core_module_keys() <= set(space.enabled_modules)
 
 
-def test_narrowing_modules_directly_still_refuses_an_orphaned_feature():
-    # The other half of the rule above: a direct save that would leave a feature whose
-    # module is gone is rejected rather than silently clearing the capability.
+def test_clean_prunes_an_orphaned_feature_rather_than_refusing():
+    """`clean()` NORMALIZES; the explicit call sites are what validate.
+
+    This reverses the rule phase 3 shipped, and the reason is in the phase 11 report:
+    refusing here made a row unsaveable rather than merely lossy. A makerspace created
+    with a narrow `enabled_modules` still takes the FIELD default for
+    `enabled_features` — which includes the default-on `payments.enabled` and
+    `mobile.push` — so it was born inconsistent and then rejected every later save,
+    including ones touching neither field.
+
+    The operator-facing strictness did not move: `/control/`'s capability matrix and
+    `module_install` call `validate_capabilities` directly, so a conflict somebody
+    actually expressed is still reported instead of silently cleared.
+    """
     space = make_space()
     space.enabled_modules = ["reports"]
     space.enabled_features = ["payments.enabled"]
 
+    space.clean()
+
+    assert "payments.enabled" not in space.enabled_features
+
+
+def test_the_control_matrix_still_reports_an_orphaned_feature():
+    # The strict path, unchanged: this is what the /control/ capability matrix calls
+    # before saving, and it must name the conflict rather than quietly dropping it.
     with pytest.raises(DjangoValidationError, match="payments.enabled requires payments"):
-        space.clean()
+        validate_capabilities(["reports"], ["payments.enabled"])
+
+
+def test_a_narrowly_created_makerspace_can_still_be_saved():
+    # The regression this rule exists for, end to end.
+    space = Makerspace.objects.create(
+        name="narrow", slug="narrow-modules", enabled_modules=["reports"]
+    )
+    space.public_stats_enabled = True
+    space.full_clean()
+    space.save()
+    space.refresh_from_db()
+    assert space.public_stats_enabled is True
 
 
 def test_uninstalling_a_module_drops_the_features_that_needed_it():

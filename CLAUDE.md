@@ -664,6 +664,19 @@ starts empty everywhere, so its constraint always applies cleanly.
   plaintext unique index and a direct login lookup possible: scoped encryption is per-makerspace and
   `User` is platform-global, so it could never be scoped-encrypted.
 
+**`Makerspace.clean()` NORMALIZES capabilities; the explicit call sites VALIDATE.** `clean()` prunes
+features whose module is absent (and already adds core modules back rather than rejecting), because a
+row must never be unsaveable: `enabled_features` takes its field default independently of
+`enabled_modules`, so a makerspace created with a narrow module list is born holding the default-on
+`payments.enabled`/`mobile.push` without their modules — and a strict `clean()` then rejected **every
+later save, including ones touching neither field**. The operator-facing strictness lives at the two
+direct `validate_capabilities` call sites (`/control/`'s capability matrix, `module_install`), so a
+conflict somebody actually expressed is still reported instead of silently cleared, and
+`MakerspaceSerializer.validate` prunes **only when the request does not carry `enabled_features`** —
+if the caller sent features they expressed the combination; if they did not, it is not their conflict.
+This reverses a phase-3 rule; `tests/makerspaces/test_module_install.py` carries the reversal and the
+reasoning.
+
 **Account-less identity: `accounts` removes the ECOSYSTEM, never identity (module program phase 9).**
 `apps/accounts/member_identity.py` is the one seam every member-facing login surface asks, and it has
 two exemptions that are load-bearing:
