@@ -248,6 +248,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspaces/{makerspace_id}/spaces/",
   "/api/v1/admin/makerspaces/{makerspace_id}/uploads/evidence-url",
   "/api/v1/admin/makerspaces/{makerspace_id}/waiver",
+  "/api/v1/admin/makerspaces/{makerspace_id}/walk-in-members",
   "/api/v1/admin/membership-requests",
   "/api/v1/admin/membership-requests/{id}/approve",
   "/api/v1/admin/membership-requests/{id}/revoke",
@@ -3371,6 +3372,9 @@ export type PublicConfig = {
   "phone_login"?: {
   [key: string]: unknown;
 };
+  "member_accounts"?: {
+  [key: string]: unknown;
+};
 };
 
 export type PublicEvent = {
@@ -4597,6 +4601,12 @@ export type WaiverPublish = {
   "body"?: string;
   "version"?: string;
   "clear"?: boolean;
+};
+
+export type WalkInMemberCreate = {
+  "display_name": string;
+  "email"?: string;
+  "phone"?: string;
 };
 
 export type Warranty = {

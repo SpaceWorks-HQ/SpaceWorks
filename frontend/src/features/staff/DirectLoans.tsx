@@ -9,6 +9,7 @@ import { DirectLoanList, type DirectLoan } from "./DirectLoanList";
 import { invalidateInventoryViews } from "./queryInvalidation";
 import { DirectLoanReturnModal, type DirectLoanResolution } from "./DirectLoanReturnModal";
 import { Panel, type Makerspace, useStaffGet } from "./StaffPanels";
+import { WalkInMemberForm } from "./WalkInMemberForm";
 import { EvidenceUpload } from "./panels/EvidenceUpload";
 
 type ProductOption = {
@@ -24,6 +25,7 @@ type ProductOption = {
 type ContainerOption = { id: number; label: string };
 type ContainerResponse = ContainerOption[] | { results: ContainerOption[] };
 type DirectLoanMember = { user_id: number; display_name: string; username: string };
+type DirectLoanMemberResponse = DirectLoanMember[] | { results: DirectLoanMember[] };
 type LineDraft = { key: number; productId: string; quantity: string };
 type ScannedPayload = { payload: string; label: string };
 type ReturnLoanPayload = { loanId: number; evidenceId: number; notes: string; qrPayload: string; resolutions: DirectLoanResolution[] };
@@ -81,10 +83,16 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
     ["containers-all", makerspace.id],
     `/admin/makerspace/${makerspace.id}/containers?page_size=1000`,
   );
-  const members = useStaffGet<DirectLoanMember[]>(
+  // The endpoint is a DRF ListAPIView, so it answers with the paginated envelope, not a
+  // bare array — the same unwrap `containerOptions` below already does. Typing it as an
+  // array made `.map` a runtime TypeError that took the whole panel down with it.
+  const members = useStaffGet<DirectLoanMemberResponse>(
     ["direct-loan-members", makerspace.id],
-    `/admin/makerspace/${makerspace.id}/direct-loan-members`,
+    `/admin/makerspace/${makerspace.id}/direct-loan-members?page_size=1000`,
   );
+  const memberOptions = Array.isArray(members.data)
+    ? members.data
+    : members.data?.results ?? [];
   const containerOptions = Array.isArray(containers.data)
     ? containers.data
     : containers.data?.results ?? [];
@@ -250,13 +258,17 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
           onChange={(event) => setBorrowerId(event.target.value)}
         >
           <option value="">Select an active member</option>
-          {(members.data ?? []).map((member) => (
+          {memberOptions.map((member) => (
             <option key={member.user_id} value={member.user_id}>
               {member.display_name || member.username}
             </option>
           ))}
         </select>
         {members.error ? <p className="mt-2 text-sm text-danger">{members.error.message}</p> : null}
+        <WalkInMemberForm
+          makerspaceId={makerspace.id}
+          onCreated={(userId) => setBorrowerId(String(userId))}
+        />
         <label className="mt-4 block text-sm font-medium text-ink" htmlFor="direct-loan-container">Container (optional)</label>
         <div className="mt-1 flex flex-col gap-2 md:flex-row">
           <select

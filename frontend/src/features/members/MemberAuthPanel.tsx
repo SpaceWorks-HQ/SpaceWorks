@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
 import { publicV1Request, setAccessToken } from "../../lib/api";
@@ -13,6 +13,19 @@ export function MemberAuthPanel({ onAuthenticated }: { onAuthenticated: () => vo
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // `member_accounts` appears in the public config only when the deployment has
+  // switched member accounts off, so an absent key — and a failed request — mean on.
+  const [selfServeAccounts, setSelfServeAccounts] = useState(true);
+
+  useEffect(() => {
+    publicV1Request<{ member_accounts?: { enabled: boolean } }>("/config")
+      .then((result) => setSelfServeAccounts(result.member_accounts?.enabled !== false))
+      .catch(() => setSelfServeAccounts(true));
+  }, []);
+
+  useEffect(() => {
+    if (!selfServeAccounts) setMode("login");
+  }, [selfServeAccounts]);
 
   const submit = async () => {
     setPending(true);
@@ -74,9 +87,15 @@ export function MemberAuthPanel({ onAuthenticated }: { onAuthenticated: () => vo
         <button className="desk-button-primary mt-5 w-full" type="submit" disabled={pending}>
           {pending ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
         </button>
-        <button className="mt-3 w-full text-sm font-semibold text-accent-ink" type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }}>
-          {mode === "login" ? "Create a member account" : "Back to sign in"}
-        </button>
+        {selfServeAccounts ? (
+          <button className="mt-3 w-full text-sm font-semibold text-accent-ink" type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }}>
+            {mode === "login" ? "Create a member account" : "Back to sign in"}
+          </button>
+        ) : (
+          <p className="mt-3 text-center text-sm text-muted">
+            This space does not run self sign-up. Ask a staff member to add you.
+          </p>
+        )}
         <SocialSignInButtons
           surface="member"
           onSuccess={(result) => {

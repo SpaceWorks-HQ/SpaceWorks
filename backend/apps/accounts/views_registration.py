@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.accounts.member_identity import member_accounts_enabled
 from apps.accounts.serializers_registration import (
     EmailVerificationConfirmSerializer,
     MemberSignUpSerializer,
@@ -26,25 +27,6 @@ GenericAckSerializer = inline_serializer(
 )
 
 
-def _member_accounts_enabled():
-    """Whether this deployment offers member self sign-up.
-
-    Sign-up resolves before any makerspace is selected, so the `accounts` module is
-    read at deployment level -- see `makerspaces.deployment_modules`. Fails OPEN on a
-    lookup error, matching every other capability read on this path: a broken check
-    must not lock people out of registering.
-
-    STAFF sign-in is untouched by this. It is core RBAC, and a deployment that could
-    switch off its own staff logins could not be administered.
-    """
-    try:
-        from apps.makerspaces.deployment_modules import member_accounts_enabled
-
-        return member_accounts_enabled()
-    except Exception:  # pragma: no cover - defensive, mirrors the other capability reads
-        return True
-
-
 class MemberSignUpView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle, MemberSignUpEmailThrottle]
@@ -62,7 +44,7 @@ class MemberSignUpView(APIView):
     def post(self, request):
         if request.data.get("website"):
             return _generic_ack()
-        if not _member_accounts_enabled():
+        if not member_accounts_enabled():
             # The same generic ack the honeypot returns. A distinct error here would
             # tell an unauthenticated caller how this deployment is configured, and the
             # endpoint's whole contract is that it never discloses anything.

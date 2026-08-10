@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import audit_events
 from apps.accounts.auth_cookies import set_refresh_cookies
+from apps.accounts.member_identity import member_login_allowed
 from apps.accounts.models_oidc import provider_for_slug, provider_key, slug_from_provider_key
 from apps.accounts.models_social import SocialIdentity, SocialProvider, SocialSurface
 from apps.accounts.serializers import user_payload
@@ -89,6 +90,13 @@ class SocialLoginView(APIView):
         serializer = SocialLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        # A member-surface login through a built-in consumer provider is part of the
+        # member-account ecosystem, so it goes when `accounts` does. The STAFF surface
+        # and any configured OIDC provider are exempt -- see `member_identity` for why
+        # both exemptions are load-bearing. Answered before the nonce is consumed, so a
+        # gated attempt cannot burn a one-time nonce.
+        if not member_login_allowed(self.provider, surface=data["surface"]):
+            return _error("social_unavailable", 404)
         try:
             _settings, audience = provider_settings(self.provider, data["client_platform"])
             nonce_row = consume_social_nonce(request, raw=data["nonce"], provider=self.provider,

@@ -39,6 +39,19 @@ from apps.accounts.throttles import (
 SMS_UNAVAILABLE = {"detail": "Phone sign-in is not available on this deployment."}
 
 
+def _phone_login_available():
+    """Phone sign-in is a MEMBER credential, so it goes with the member ecosystem.
+
+    Answered before the number is even parsed. The response is the same 404 an
+    unconfigured deployment returns, and deliberately so: both are deployment state, not
+    account state, and the enumeration contract this endpoint keeps is about not
+    disclosing whether a *number* is known -- never about hiding how the box is set up.
+    """
+    from apps.accounts.member_identity import member_login_allowed
+
+    return member_login_allowed()
+
+
 class PhoneLoginStartView(APIView):
     """Request a login code for an already-verified number."""
 
@@ -59,6 +72,8 @@ class PhoneLoginStartView(APIView):
         },
     )
     def post(self, request):
+        if not _phone_login_available():
+            return Response(SMS_UNAVAILABLE, status=status.HTTP_404_NOT_FOUND)
         serializer = PhoneStartSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -90,6 +105,10 @@ class PhoneLoginConfirmView(APIView):
         },
     )
     def post(self, request):
+        # Re-checked here, not just on start: a code issued before the module was
+        # switched off must not still mint a session after it.
+        if not _phone_login_available():
+            return Response(SMS_UNAVAILABLE, status=status.HTTP_404_NOT_FOUND)
         serializer = PhoneConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data

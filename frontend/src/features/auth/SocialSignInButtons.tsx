@@ -19,6 +19,7 @@ export function SocialSignInButtons({
   const googleHost = useRef<HTMLDivElement>(null);
   const onSuccessRef = useRef(onSuccess);
   const [config, setConfig] = useState<SocialConfig>();
+  const [memberAccounts, setMemberAccounts] = useState(true);
   const [error, setError] = useState("");
   const [applePending, setApplePending] = useState(false);
 
@@ -27,8 +28,15 @@ export function SocialSignInButtons({
   }, [onSuccess]);
 
   useEffect(() => {
-    publicV1Request<{ social_auth?: SocialConfig }>("/config")
-      .then((result) => setConfig(result.social_auth ?? {}))
+    publicV1Request<{ social_auth?: SocialConfig; member_accounts?: { enabled: boolean } }>(
+      "/config",
+    )
+      .then((result) => {
+        setConfig(result.social_auth ?? {});
+        // Present only when member accounts are switched off, so an absent key means
+        // on — which is also what a failed request falls back to.
+        setMemberAccounts(result.member_accounts?.enabled !== false);
+      })
       .catch(() => setConfig({}));
   }, []);
 
@@ -47,6 +55,10 @@ export function SocialSignInButtons({
     });
   }, [config, surface]);
 
+  // The staff surface keeps these providers whatever `accounts` says — staff sign-in is
+  // core RBAC. On the member surface the endpoint behind them 404s, and a button that
+  // cannot service its click is worse than no button.
+  if (surface === "member" && !memberAccounts) return null;
   if (!config?.google?.enabled && !config?.apple?.enabled) return null;
 
   return (

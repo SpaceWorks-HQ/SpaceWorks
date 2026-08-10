@@ -52,4 +52,25 @@ describe("SocialSignInButtons", () => {
       ),
     );
   });
+
+  it("drops the member surface when the deployment runs no member accounts", async () => {
+    // The staff login screen reads the same endpoint and keeps its providers: staff
+    // sign-in is core RBAC and is never gated. Only the member surface 404s behind it.
+    publicV1Request.mockResolvedValue({
+      social_auth: { google: { enabled: true, web_client_id: "google-web-client" } },
+      member_accounts: { enabled: false },
+    });
+    mountGoogleButton.mockResolvedValue(undefined);
+
+    const { container } = render(
+      <SocialSignInButtons surface="member" onSuccess={vi.fn()} />,
+    );
+
+    await waitFor(() => expect(publicV1Request).toHaveBeenCalledWith("/config"));
+    expect(container).toBeEmptyDOMElement();
+    expect(mountGoogleButton).not.toHaveBeenCalled();
+
+    render(<SocialSignInButtons surface="staff" onSuccess={vi.fn()} />);
+    expect(await screen.findByLabelText("Social sign in")).toBeInTheDocument();
+  });
 });

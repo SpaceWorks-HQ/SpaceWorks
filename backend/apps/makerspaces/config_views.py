@@ -13,6 +13,7 @@ class PublicConfigSerializer(serializers.Serializer):
     public_image_max_bytes = serializers.IntegerField()
     social_auth = serializers.DictField(required=False)
     phone_login = serializers.DictField(required=False)
+    member_accounts = serializers.DictField(required=False)
 
 
 class PublicConfigView(APIView):
@@ -30,6 +31,9 @@ class PublicConfigView(APIView):
             "email_enabled": email_enabled(),
             "public_image_max_bytes": settings.PUBLIC_IMAGE_MAX_BYTES,
         }
+        from apps.accounts.member_identity import member_accounts_enabled
+
+        member_accounts = member_accounts_enabled()
         from apps.accounts.models_social import PlatformSocialAuthSettings
 
         social = PlatformSocialAuthSettings.objects.filter(pk=1).first()
@@ -64,6 +68,18 @@ class PublicConfigView(APIView):
         # screen that renders a phone tab it cannot service is worse than no tab.
         from apps.integrations.sms import sms_configured
 
-        if sms_configured():
+        if sms_configured() and member_accounts:
+            # Phone sign-in has no staff surface at all -- the refresh claim is a
+            # hardcoded "member" -- so with member accounts off there is nothing left
+            # for the tab to do, and the endpoint behind it 404s.
             payload["phone_login"] = {"enabled": True}
+        if not member_accounts:
+            # Emitted ONLY when disabled. `accounts` defaults on, so every existing
+            # deployment keeps a byte-for-byte identical payload, and the key's presence
+            # is itself the signal -- the same shape as `geofence_enabled`.
+            #
+            # This is discovery, not enforcement. `social_auth` still advertises the
+            # built-in providers because the STAFF login screen reads the same endpoint;
+            # what stops a member-surface login is the check in `SocialLoginView`.
+            payload["member_accounts"] = {"enabled": False}
         return Response(payload)

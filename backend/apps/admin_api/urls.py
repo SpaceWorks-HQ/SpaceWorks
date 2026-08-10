@@ -104,6 +104,7 @@ from apps.admin_api.views_memberships import (
     MembershipListCreateView,
     MembershipRoleAssignView,
 )
+from apps.admin_api.views_walk_in import WalkInMemberCreateView
 from apps.admin_api.views_member_memberships import (
     AdminInvitationView, AdminMembershipRequestListView, AdminMembershipRevokeM2View,
     AdminMembershipRoleM2View, AdminMembershipRosterView, AdminRequestApproveView,
@@ -283,6 +284,11 @@ urlpatterns = [
         "makerspaces/<int:makerspace_id>/memberships",
         MembershipListCreateView.as_view(),
         name="admin-membership-list-create",
+    ),
+    path(
+        "makerspaces/<int:makerspace_id>/walk-in-members",
+        WalkInMemberCreateView.as_view(),
+        name="admin-walk-in-member-create",
     ),
     path(
         "makerspaces/<int:makerspace_id>/memberships/<int:membership_id>/role",
