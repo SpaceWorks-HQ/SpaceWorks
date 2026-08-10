@@ -31,7 +31,10 @@ def register(
     assert_mapped_write_allowed(event.makerspace_id)
     if member is not None:
         name = member.display_name or member.get_full_name() or member.username
-        email = member.email
+        # Account first, caller's value as the fallback -- the same rule as `phone` just
+        # below, and for the same reason: a walk-in record may carry neither, and the
+        # registration model requires both.
+        email = member.email or email
         # The account wins, but a caller-supplied number is kept as the fallback: a
         # registration needs a contact number (`EventRegistration.phone` is non-blank),
         # and an account without one would otherwise be a dead end nobody at the desk

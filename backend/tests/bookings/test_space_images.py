@@ -55,7 +55,14 @@ def test_finalize_delete_accounting_and_compensation(
         'object_size',
         lambda key: 10 if key == old_key else 25,
     )
-    monkeypatch.setattr(storage, 'delete_object', deleted.append)
+    def record_delete(key):
+        # Must report True like the real `delete_object` now does: the quota is released
+        # only on a confirmed delete, so a double that returns None would make this test
+        # assert the failure path while looking like it asserted the success one.
+        deleted.append(key)
+        return True
+
+    monkeypatch.setattr(storage, 'delete_object', record_delete)
     with django_capture_on_commit_callbacks(execute=True):
         finalized = client.post(
             reverse('admin-bookable-space-image-finalize', kwargs={'pk': target.pk}),

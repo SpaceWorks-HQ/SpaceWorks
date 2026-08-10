@@ -10,9 +10,18 @@ from django import forms
 from rest_framework.test import APIClient
 
 from apps.accounts.admin_social import PlatformLoginMethodsForm
-from apps.accounts.models import PlatformLoginMethods, User
+from apps.accounts.models import DeviceGrant, PlatformLoginMethods, User
 from apps.accounts.models_social import SocialIdentity, SocialProvider
 from apps.makerspaces.models import Makerspace
+
+# Reused rather than re-mocked: these carry the provider-claim and nonce plumbing a real
+# social sign-in needs, and a second copy of a JWKS mock is a second place for it to rot.
+from tests.accounts.test_social_auth import (
+    configure_google,
+    login as social_login,
+    mock_claims,
+    nonce,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -22,6 +31,8 @@ SIGNUP_URL = "/api/v1/auth/member-sign-up"
 GOOGLE_URL = "/api/v1/auth/social/google"
 PHONE_START_URL = "/api/v1/auth/phone/login/start"
 PASSWORD = "Safe staff password 947!"
+# `attested_login` posts this exact password, so the device-login user must hold it.
+DEVICE_PASSWORD = "strong-device-password"
 
 ALL_ON = {
     "password_enabled": True,
@@ -157,6 +168,99 @@ def test_password_login_stays_available_while_only_registration_is_off():
     assert APIClient().post(
         LOGIN_URL, {"username": user.username, "password": PASSWORD}, format="json"
     ).status_code == 200
+
+
+# --- the two switches that did not switch (parallel-sweep P1s) --------------------
+#
+# Both were found by a review pass with an assigned identity lens rather than by the
+# nine diff-scoped rounds, because neither defect was in the diff. The shared lesson is
+# that a switch which does not switch is worse than no switch at all: the operator reads
+# the console, believes a door is shut, and stops thinking about it.
+
+
+def test_self_registration_off_also_blocks_social_account_creation(monkeypatch):
+    """`/auth/member-sign-up` was gated; the social provider path was not.
+
+    `resolve_social_identity` creates a brand-new active user when a subject matches no
+    identity and no verified local email, and the caller then issues JWTs. So with
+    self-registration off, anyone holding a Google account could still mint a local one
+    -- through a different endpoint than the one the switch names.
+    """
+    configure_google()
+    mock_claims(monkeypatch)
+    switches(self_registration_enabled=False)
+
+    response = social_login(APIClient(), nonce(APIClient()).data["nonce"])
+
+    assert response.status_code == 403
+    assert response.data["code"] == "registration_disabled"
+    assert not SocialIdentity.objects.exists()
+    assert not User.objects.filter(email="person@example.test").exists()
+
+
+def test_a_refused_social_registration_is_audited(monkeypatch):
+    """The nonce is consumed before resolution can refuse, so the refusal is a state
+    change and must leave a trace -- the same rule the phone confirm guard follows.
+    Returning a 403 does not make an already committed `consumed_at` read-only."""
+    from apps.audit.models import AuditLog
+
+    configure_google()
+    mock_claims(monkeypatch)
+    switches(self_registration_enabled=False)
+
+    refused = social_login(APIClient(), nonce(APIClient()).data["nonce"])
+
+    assert refused.status_code == 403
+    entry = AuditLog.objects.filter(action="auth.social_login_failed").first()
+    assert entry is not None, "a consumed nonce with no audit row is the defect"
+    assert entry.meta["reason"] == "registration_disabled"
+    # The address that was refused must not be written to an append-only log.
+    assert "person@example.test" not in str(entry.meta)
+
+
+def test_registration_off_still_lets_an_existing_identity_sign_in(monkeypatch):
+    """The gate must cover account CREATION only.
+
+    Signing in on an already-linked identity is not registration, and breaking it would
+    lock every existing social user out the moment an operator closed sign-ups.
+    """
+    configure_google()
+    mock_claims(monkeypatch)
+    existing = User.objects.create_user(
+        username="already-linked", email="person@example.test",
+        access_status=User.AccessStatus.ACTIVE,
+    )
+    SocialIdentity.objects.create(
+        user=existing, provider=SocialProvider.GOOGLE, provider_sub="google-sub"
+    )
+    switches(self_registration_enabled=False)
+
+    response = social_login(APIClient(), nonce(APIClient()).data["nonce"])
+
+    assert response.status_code == 200
+    assert response.data["outcome"] != "created"
+    assert SocialIdentity.objects.count() == 1
+
+
+def test_password_off_also_blocks_device_login(settings, monkeypatch):
+    """`DeviceLoginView` authenticated a username/password and minted a `DeviceGrant`.
+
+    That grant carries its own rotating refresh family, so a password accepted here
+    outlives the browser session the switch was believed to have closed. The refusal has
+    to land before `authenticate()` runs, and it reuses the generic credential error so
+    the endpoint discloses no more than it did before.
+    """
+    from tests.accounts.test_device_auth import attested_login
+
+    user = staff_user("device-switch")
+    user.set_password(DEVICE_PASSWORD)
+    user.save(update_fields=["password"])
+    switches(password_enabled=False)
+
+    response, _payload = attested_login(APIClient(), user, settings, monkeypatch)
+
+    assert response.status_code == 401
+    assert not DeviceGrant.objects.filter(user=user).exists()
 
 
 # --- the lockout guards -----------------------------------------------------------

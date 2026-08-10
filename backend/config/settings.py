@@ -1,5 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
+import sys
 
 from celery.schedules import crontab
 import environ
@@ -84,6 +85,14 @@ OTP_SMS_DAILY_CAP = env.int("OTP_SMS_DAILY_CAP", default=200)
 STORAGE_PRESIGN_METHOD = env("STORAGE_PRESIGN_METHOD", default="post")
 CRON_SECRET = env("CRON_SECRET", default="")
 ADMIN_SITE_NAME = env("ADMIN_SITE_NAME", default="Space Works")
+# Whether this deployment has a way into `/control/` that does not use a password.
+# There is no such route today -- social sign-in mints JWTs for the React console and
+# never a Django session -- so this stays False, and it is what keeps the
+# `password_enabled=False` switch from sealing the one page that can turn it back on.
+# See `config.admin_access.AdminSuperuserOnlyMiddleware._password_login_blocked`.
+# Declared here rather than read with a `getattr` default so that a reader can find it
+# and an operator building such a route has somewhere to flip.
+PLATFORM_ADMIN_SSO = env.bool("PLATFORM_ADMIN_SSO", default=False)
 
 INSTALLED_APPS = [
     "unfold",
@@ -359,6 +368,64 @@ CELERY_TASK_ALWAYS_EAGER = env.bool(
     "CELERY_TASK_ALWAYS_EAGER", default=(_celery_broker == "")
 )
 CELERY_BROKER_URL = _celery_broker or "redis://redis:6379/0"
+
+def cache_config(cache_url):
+    """Pick the cache backend, given whatever Redis URL was explicitly configured.
+
+    A per-process cache silently multiplies every DRF rate limit by the worker count and
+    loses its counters on each worker recycle. The fallback is therefore Django's
+    **DatabaseCache**, never LocMem: the brokerless cloud profile sets an empty
+    `CELERY_BROKER_URL` and still runs `gunicorn --workers 3 --max-requests 1000`, so a
+    per-process cache would put login, OTP, password-reset and the member image presign
+    caps at three times their configured rate and reset them regularly.
+
+    A function rather than an inline expression so the choice is testable against real
+    inputs instead of asserted on the live value -- the deployment running the tests is
+    not the deployment the rule is about.
+    """
+    if cache_url:
+        return {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": cache_url}
+    return {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "spaceworks_cache",
+        # MAX_ENTRIES is NOT optional here, and the default would have defeated the point
+        # of this whole branch. Django's DatabaseCache defaults to 300 entries and culls a
+        # third of them once exceeded. A throttle key is one row per (scope, identity), and
+        # this deployment has well over a dozen scoped throttles -- login, public request
+        # submit, social nonce and login, password reset, the two phone OTP budgets, public
+        # read, member image presign -- so 300 rows is roughly twenty callers before
+        # unexpired throttle histories start being evicted. Someone rotating identities
+        # could then push a live login or OTP counter out of the cache and reset their own
+        # cap, which is precisely the bypass DatabaseCache was chosen to prevent.
+        #
+        # Culling deletes EXPIRED rows first and only culls by count if still over, so a
+        # ceiling this high is effectively never reached: throttle entries expire on their
+        # own window, and the rows are tiny.
+        "OPTIONS": {"MAX_ENTRIES": 100_000},
+    }
+
+
+_cache_url = env("CACHE_URL", default="") or _celery_broker
+CACHES = {"default": cache_config(_cache_url)}
+
+# Under pytest, force LocMem. `DatabaseCache` would make the autouse `cache.clear()` in
+# `tests/conftest.py` a DATABASE operation, so every test without the `django_db` mark
+# fails with "Database access not allowed" -- 365 of them did. The multi-worker problem
+# `DatabaseCache` exists to solve cannot occur in a single-process test run, so LocMem is
+# both correct here and the only backend that keeps non-db tests db-free.
+#
+# Done here rather than with `override_settings(...).enable()` in `pytest_configure`:
+# that leaves a global override enabled for the whole session and broke the setup of
+# every `transaction=True` test in the suite. Settings are imported by pytest-django
+# after pytest itself, so this check is reliable.
+if "pytest" in sys.modules:  # pragma: no cover - exercised by running the suite at all
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "spaceworks-tests",
+        }
+    }
+
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="") or None
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_TASK_ACKS_LATE = True
@@ -496,6 +563,11 @@ REST_FRAMEWORK = {
         "client_trusted": env("THROTTLE_CLIENT_TRUSTED", default="600/min"),
         'booking_submit': env('THROTTLE_BOOKING_SUBMIT', default='10/hour'),
         "membership_request": env("THROTTLE_MEMBERSHIP_REQUEST", default="10/hour"),
+        # A presigned upload can be requested and never attached, stranding an object
+        # that no row names and no quota counts. Generous for the real workflow -- an
+        # avatar plus a handful of project images -- and a hard ceiling on how much one
+        # member can strand. See `makerspaces.throttles.MemberImagePresignThrottle`.
+        "member_image_presign": env("THROTTLE_MEMBER_IMAGE_PRESIGN", default="20/hour"),
     },
     # Proxy-aware client IP for throttling. Default None = DRF's legacy behavior
     # (REMOTE_ADDR, or the raw X-Forwarded-For string if present). Behind a CDN/reverse

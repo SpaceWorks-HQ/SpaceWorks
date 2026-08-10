@@ -140,6 +140,103 @@ docker compose exec backend python manage.py uninstall_module bookings
 
 Core modules cannot be uninstalled, nor can one another installed module depends on.
 
+### Deleting a module's data
+
+Uninstalling only hides. If you also want a module's rows *gone*, that is a separate, deliberate
+second step — so that no single command can both hide and destroy:
+
+```bash
+docker compose exec backend python manage.py purge_module_data bookings --list
+docker compose exec backend python manage.py purge_module_data bookings --makerspace my-space
+```
+
+- **The module must already be uninstalled.** Purging an installed module is refused.
+- **Superadmin only**, and it asks you to type the makerspace slug back before proceeding.
+- **It cannot be undone.** Uninstall is reversible; this is not.
+- Uploaded files are removed after the database work commits, and your storage quota is credited
+  back only for objects the bucket confirmed it deleted — a failed delete credits nothing, so the
+  counter can never drift below what you are actually storing.
+
+A module absent from the list either owns no data of its own or cannot be purged separately, and
+the command tells you which. `machines` is the notable second case: machine rows host warranty
+records, consumables and service history, so purge `machine_service` first.
+
+### Every module, by area
+
+The full list, so you can see exactly what a profile is turning on. **Core** is always present and
+cannot be removed. **Default** means it is on when you install without choosing a profile.
+
+| Area | Module | Core | Default | What it adds |
+|---|---|:--:|:--:|---|
+| **Inventory** | `public_inventory` | ● | ● | The public catalogue |
+| | `request_workflow` | ● | ● | Borrow requests and the state machine |
+| | `staff_admin` | ● | ● | The staff console |
+| | `evidence_uploads` | ● | ● | Issue/return photos |
+| | `qr_management` | ● | ● | QR codes for boxes, tools and assets |
+| | `scanner` | ● | ● | The camera scanner |
+| | `asset_units` | | | Individually tracked units of a product |
+| | `containers` | | | Boxes and storage containers |
+| | `bulk_import` | | | Spreadsheet import |
+| | `stock_transfers` | | | Moving stock, including between makerspaces |
+| | `qr_print_batches` | | | Printable QR sheets and ZIP export |
+| | `guest_handover` | | | Front-desk direct handouts |
+| | `procurement` | | | The "to buy" list |
+| **Stocktake** | `stocktake` | | | Scan-first stock counts and variance |
+| **Machines** | `machines` | | | The machine registry |
+| | `machine_service` | | | The service/job queue |
+| | `printing` | | | 3D printing on top of `machine_service` |
+| | `maintenance` | | | Scheduled and reactive maintenance |
+| **Events** | `events` | | | Scheduling and registrations |
+| **Bookings** | `bookings` | | | Resource booking and public self-booking |
+| **Membership** | `membership` | | | Join requests, waivers, referrals, maker profiles |
+| **Notifications** | `notifications` | | | The in-app inbox |
+| | `email` | | | Outbound email |
+| | `telegram` | | | Telegram alerts and accept/reject buttons |
+| | `slack` | | | Slack alerts |
+| | `mattermost` | | | Mattermost alerts |
+| | `discord` | | | Discord alerts |
+| **Reports** | `reports` | | | Analytics, the ledger and CSV/XLSX export |
+| **Payments** | `payments` | | ● | Taking money online (Stripe or Razorpay) |
+| **Accounts** | `accounts` | | ● | The member identity ecosystem — sign-up and member sign-in |
+| **Mobile apps** | `mobile` | | ● | Attested device sessions, native push, payment sheet |
+| **Updates** | `updates` | | ● | In-app release control |
+
+`membership` requires `accounts`; `mobile` requires `accounts`; `printing` requires
+`machine_service`. Installing one pulls in what it needs.
+
+### Features: the second level
+
+Some capabilities are narrower than a whole module, so they are **features** inside one. A feature
+is only effective when its parent module is on, and unlike modules these are editable by a **Space
+Manager** in the console rather than a superadmin.
+
+| Feature | Inside | Default | What it does |
+|---|---|:--:|---|
+| `payments.enabled` | `payments` | ● | Master switch for all online payments |
+| `payments.machines` | `machines` | | Charge for machine jobs |
+| `payments.bookings` | `bookings` | | Charge for bookings |
+| `payments.events` | `events` | | Charge for event registration |
+| `payments.membership` | `membership` | | Charge membership dues |
+| `mobile.push` | `mobile` | ● | Native push notifications |
+| `inventory.self_checkout` | — | ● | Member self-checkout and staff direct handouts |
+| `presence.geofence` | — | ● | Advisory location check at check-in (never blocks) |
+
+The four `payments.<area>` switches are **off by default and stay inert until you add credentials** —
+turning one on cannot start charging anyone by itself. `inventory.self_checkout` and
+`presence.geofence` belong to no module: they are standalone capabilities that apply whenever you
+enable them.
+
+### What you get if you choose nothing
+
+Installing without a profile gives you **10 modules**: the six core ones plus `accounts`, `payments`,
+`mobile` and `updates`. Those four are on by default because they gate behaviour that predates them
+as switches — turning them off is a deliberate act, not something an upgrade should do to you.
+
+Everything money-related is still dormant: `payments` being installed means the *surfaces* exist,
+and no charge can be created until a Space Manager enables a `payments.<area>` feature **and** valid
+Stripe or Razorpay credentials resolve. The same is true of push (needs FCM/APNs), every chat channel
+(needs a webhook) and every sign-in method beyond username/password.
+
 ### Notification channels are modules
 
 `email`, `telegram`, `slack`, `mattermost` and `discord` are each a module, so a space that lives in
@@ -174,6 +271,15 @@ People still get named, two ways:
 **`/control/` → Platform login methods** switches the four credential kinds independently: password,
 identity provider, phone code, and self sign-up. All four are on by default and switching one off
 never deletes anything, so turning it back on needs no re-entry.
+
+Each switch covers **every** way in of that kind, not just the obvious one. Turning passwords off
+also refuses a mobile app's device login, which would otherwise mint a long-lived session from the
+same password. Turning self sign-up off also stops an identity provider from creating a brand-new
+account — signing in on an already-linked account, and linking a provider to an account you already
+have, both keep working, because neither is a registration.
+
+Existing sessions are deliberately **not** revoked: a login-method switch is a policy change, not a
+revocation. Use the restrict/suspend flow to end someone's access.
 
 Two changes are refused rather than performed, because they cannot be undone from inside the app:
 switching off a method that is somebody's *only* credential (they have no password to reset, so
@@ -259,6 +365,37 @@ Space Works 0.5 is focused on reliable self-hosting and complete makerspace oper
 - automatic, backup-first updates from every successful `main` release;
 - stable public, member, staff, and superadmin workflows across the full module set;
 - continued accessibility, mobile, reporting, and operational resilience work.
+
+### Planned modules
+
+Not built yet. Listed here rather than in the module table because that table is generated from the
+module registry, and the registry only carries modules with real enforcement behind them.
+
+- **Hardware integration** — talking to the machines themselves rather than only recording them:
+  reading job state off a printer or CNC controller, driving label printers directly, and door or
+  access-control hardware for check-in. Today the machine service queue is operated by hand and
+  geofenced check-in is deliberately advisory; this is the module that would change that. It needs a
+  device-identity and trust story of its own, because a network device reporting job completion is
+  an unauthenticated actor asserting a state transition.
+- **Collaborative events across makerspaces.** Note first what already works: a **published public
+  event has no membership check at all**, so any signed-in person can register — including a member of
+  a different makerspace, or someone who is a member nowhere. Two spaces can co-host an open event
+  today. The event has one owning makerspace, and that settles everything awkward: the host's attendee
+  list under the host's encryption key, and the host's Stripe account taking any fee, exactly as a
+  registration from a non-member already works.
+
+  What is missing is the **members-only middle ground** — an event closed to the general public but
+  open to the members of *both* spaces. Today `is_public=False` closes self-registration to everyone
+  and only staff can add people one at a time. Missing with it is **discovery**: the event lists only
+  in the host's surfaces, so a collaborating space's members need a direct link.
+
+  Two decisions are settled for when it is built. The **host alone manages** the event — a
+  collaborating space's staff get no create, edit or attendee-list access, because `origin_scope`
+  hard-scopes a staff session to its own domain's makerspace and that guard is what prevents
+  cross-tenant session theft. And the event **lists in both spaces' member areas**, labelled with its
+  host, since a collaboration nobody can discover from their own space is only a shared link.
+- **Invitation requests** — letting a prospective member *ask* for an invitation, rather than only
+  being invited or applying to join.
 
 Current work and shipped changes are tracked in
 [GitHub issues](https://github.com/SpaceWorks-HQ/SpaceWorks/issues),

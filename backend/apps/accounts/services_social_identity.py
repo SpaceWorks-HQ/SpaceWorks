@@ -16,7 +16,7 @@ class SocialResolutionError(Exception):
 
 def resolve_social_identity(
     *, provider, claims, surface, apple_name="", explicit_user=None,
-    staff_validator=None, allow_auto_link=True
+    staff_validator=None, allow_auto_link=True, allow_user_creation=True
 ):
     """Resolve a provider subject to a local user.
 
@@ -51,13 +51,29 @@ def resolve_social_identity(
                 .first()
             )
         if matched is not None:
-            if not allow_auto_link or not verified or matched.email_verified_at is None:
+            # A walk-in is a person record staff typed at the counter, not an account, so
+            # an external credential must never come to own it -- the same rule the two
+            # password-reset paths enforce. Today `email_verified_at is None` already
+            # refuses it, but that is an accident of walk-ins having no way to verify an
+            # address rather than a statement about walk-ins; saying it directly means the
+            # rule holds even if that ever changes.
+            if (
+                not allow_auto_link
+                or not verified
+                or matched.email_verified_at is None
+                or matched.is_walk_in
+            ):
                 raise SocialResolutionError("account_link_required", 409)
             user = matched
             outcome = "auto_linked"
         elif surface == SocialSurface.STAFF:
             raise SocialResolutionError("staff_access_required", 403)
         else:
+            # The STAFF surface never creates accounts anyway, so this gate affects only
+            # the member surface. A switch that does not actually switch is worse than no
+            # switch: an operator believes this account-creation door is closed.
+            if not allow_user_creation:
+                raise SocialResolutionError("registration_disabled", 403)
             user = User(
                 username=_available_username(provider, subject),
                 email=email if verified else "",
@@ -85,7 +101,12 @@ def resolve_social_identity(
 
 
 def _explicit_link(identity, user, provider, subject):
-    User.objects.select_for_update().get(pk=user.pk)
+    user = User.objects.select_for_update().get(pk=user.pk)
+    # Migration 0015 cannot revoke an access token during its 15-minute lifetime.
+    # Keep this guard here, rather than at the caller branch, because every explicit
+    # social-identity link is created through this function.
+    if user.is_walk_in:
+        raise SocialResolutionError("walk_in_record", 403)
     if identity is not None:
         if identity.user_id != user.pk:
             raise SocialResolutionError("identity_conflict", 409)

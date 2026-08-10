@@ -178,13 +178,18 @@ def test_inventory_image_cross_tenant_product_is_not_found(monkeypatch):
     assert response.status_code == 404
 
 
-def test_inventory_image_delete_clears_key_and_audits(monkeypatch):
+def test_inventory_image_delete_clears_key_and_audits(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     delete = mock_public_storage(monkeypatch)
     makerspace = make_space("public-image-delete")
     user = make_member("public-image-delete-user", makerspace)
     product = make_product(makerspace, image_key=f"items/{makerspace.id}/old.png")
 
-    response = authenticated_client(user).delete(image_url(product))
+    # Retiring the object is deferred to on_commit so a rollback can never destroy a file
+    # whose row came back, and the quota is freed only once the delete is confirmed.
+    with django_capture_on_commit_callbacks(execute=True):
+        response = authenticated_client(user).delete(image_url(product))
 
     assert response.status_code == 200
     assert response.data["image_key"] == ""
@@ -253,14 +258,17 @@ def test_makerspace_image_cross_tenant_manager_is_not_found(monkeypatch):
     assert response.status_code == 404
 
 
-def test_makerspace_logo_delete_clears_key(monkeypatch):
+def test_makerspace_logo_delete_clears_key(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     delete = mock_public_storage(monkeypatch)
     makerspace = make_space("public-image-logo-delete")
     makerspace.logo_key = f"makerspace/{makerspace.id}/old.png"
     makerspace.save(update_fields=["logo_key"])
     user = make_member("public-image-logo-delete-user", makerspace)
 
-    response = authenticated_client(user).delete(logo_url(makerspace))
+    with django_capture_on_commit_callbacks(execute=True):
+        response = authenticated_client(user).delete(logo_url(makerspace))
 
     assert response.status_code == 200
     makerspace.refresh_from_db()

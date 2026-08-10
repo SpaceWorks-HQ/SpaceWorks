@@ -81,6 +81,9 @@ def _new_user(display_name, email, phone):
         phone=phone[:32],
         role=User.Role.REQUESTER,
         access_status=User.AccessStatus.ACTIVE,
+        # The unusable password alone does NOT make this permanent: forgot-password finds
+        # any active user by email and sets one. This flag is what both reset paths check.
+        is_walk_in=True,
     )
     user.set_unusable_password()
     user.save()

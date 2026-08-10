@@ -59,7 +59,6 @@ def maintenance_delete(makerspace, cursor):
         MaintenanceLogDocument,
         MaintenanceSchedule,
     )
-
     documents = MaintenanceLogDocument.objects.filter(
         log__machine__makerspace=makerspace
     ).delete()[0]
@@ -75,6 +74,27 @@ def maintenance_private_keys(makerspace, add):
         log__machine__makerspace=makerspace
     ).values_list("object_key", flat=True):
         add(key)
+
+
+def maintenance_private_key_sizes(makerspace):
+    """Charged bytes per document key, for release after a confirmed object delete.
+
+    `services_documents.upload_log_document` charges `limits.add_storage`, so purging the
+    module must give those bytes back -- but only for objects the bucket confirms are
+    gone. Freeing them alongside the row deletion looked safe because the size comes from
+    a column rather than an S3 HEAD, and it is not: the rows commit, the best-effort
+    object delete can then fail, and the makerspace ends up holding storage it is no
+    longer charged for.
+    """
+    from apps.maintenance.models import MaintenanceLogDocument
+
+    return {
+        key: size
+        for key, size in MaintenanceLogDocument.objects.filter(
+            log__machine__makerspace=makerspace
+        ).values_list("object_key", "size_bytes")
+        if key
+    }
 
 
 def procurement_delete(makerspace, cursor):
@@ -209,14 +229,12 @@ def machine_service_delete(makerspace, cursor):
         ServiceQueue,
         ServiceRequestFile,
     )
-    from apps.makerspaces import limits
 
-    charged_bytes = sum(
-        ServiceRequestFile.objects.filter(
-            makerspace=makerspace, service_request__isnull=False
-        ).values_list("size_bytes", flat=True)
-    )
-    limits.free_storage(makerspace, charged_bytes)
+    # Storage quota is NOT released here. It is released after the commit, and only for
+    # the object keys the bucket confirmed it deleted -- see the plan's
+    # `machine_service_private_key_sizes`. Freeing it inline meant the rows committed, the
+    # best-effort object delete could then fail, and the makerspace stopped being charged
+    # for storage it still held.
 
     # Append-only ledgers with both ORM and DB guards, so the deletes go through raw SQL
     # under the transaction-scoped bypass the caller opened. The id sets are resolved in
@@ -273,6 +291,26 @@ def machine_service_private_keys(makerspace, add):
     from apps.machines.service_lifecycle import collect_private_object_keys
 
     collect_private_object_keys(makerspace, add)
+
+
+def machine_service_private_key_sizes(makerspace):
+    """Charged bytes per attached service-file key, released after a confirmed delete.
+
+    `service_storage` charges `add_storage` at ATTACH time and writes `size_bytes` in the
+    same save, so `service_request__isnull=False` is exactly the charged set -- an
+    unattached upload was never counted and must free nothing even though the purge does
+    delete its row and its object. That asymmetry is why the sizes are declared separately
+    from `private_keys`, which collects every file key because every file row goes.
+    """
+    from apps.machines.models import ServiceRequestFile
+
+    return {
+        key: size
+        for key, size in ServiceRequestFile.objects.filter(
+            makerspace=makerspace, service_request__isnull=False
+        ).values_list("object_key", "size_bytes")
+        if key
+    }
 
 
 def stocktake_delete(makerspace, cursor):

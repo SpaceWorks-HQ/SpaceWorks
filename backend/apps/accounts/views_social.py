@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import audit_events
 from apps.accounts.auth_cookies import set_refresh_cookies
-from apps.accounts.login_methods import social_login_enabled
+from apps.accounts.login_methods import self_registration_enabled, social_login_enabled
 from apps.accounts.member_identity import member_login_allowed
 from apps.accounts.models_oidc import provider_for_slug, provider_key, slug_from_provider_key
 from apps.accounts.models_social import SocialIdentity, SocialProvider, SocialSurface
@@ -56,6 +56,7 @@ def _error(code, status_code):
         "last_credential": "Add another sign-in method before removing this one.",
         "identity_not_found": "That provider is not linked.",
         "access_denied": "Account access is restricted.",
+        "registration_disabled": "Account registration is not available.",
     }
     return Response({"detail": messages.get(code, messages["social_invalid"]), "code": code}, status=status_code)
 
@@ -116,6 +117,7 @@ class SocialLoginView(APIView):
             user, outcome = resolve_social_identity(provider=self.provider, claims=claims,
                 surface=data["surface"], apple_name=data.get("apple_name", ""),
                 staff_validator=validator if data["surface"] == SocialSurface.STAFF else None,
+                allow_user_creation=self_registration_enabled(),
                 # Only an OIDC provider can forbid auto-linking; the built-ins always
                 # verify email ownership, so `claims` carries no such key for them.
                 allow_auto_link=claims.get("allow_auto_link", True))
@@ -140,6 +142,11 @@ class SocialLoginView(APIView):
         except SocialProviderUnavailable:
             return _error("social_unavailable", 503)
         except SocialResolutionError as exc:
+            # The nonce is already consumed by the time resolution can refuse, so this is
+            # a state-changing path and has to leave a trace -- the same rule the phone
+            # `_confirm` guard follows. Returning an error does not make an already
+            # committed `consumed_at` read-only.
+            _audit_failure(self.provider, exc.code)
             return _error(exc.code, exc.status_code)
         audit_events.record_auth_event(user, "auth.social_login_succeeded", target=user,
             meta=social_audit_meta(self.provider, outcome, claims["sub"]))
@@ -201,6 +208,13 @@ class SocialProviderListLinkView(APIView):
         except SocialProviderUnavailable:
             return _error("social_unavailable", 503)
         except SocialResolutionError as exc:
+            # Same reasoning as the login view: the nonce was consumed before
+            # `_explicit_link` could refuse a walk-in record, so the refusal is recorded
+            # against a real actor rather than left as a silent 403.
+            audit_events.record_auth_event(
+                request.user, "auth.social_identity_link_failed", target=request.user,
+                meta={"provider": data["provider"], "reason": exc.code},
+            )
             return _error(exc.code, exc.status_code)
         identity = SocialIdentity.objects.get(user=request.user, provider=data["provider"])
         audit.record(request.user, "auth.social_identity_linked", target=request.user,

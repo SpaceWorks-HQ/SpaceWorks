@@ -25,6 +25,7 @@ from apps.inventory import public_image_storage
 from apps.makerspaces import profile_images, profile_services
 from apps.makerspaces.profile_serializers import ProfileReadSerializer
 from apps.makerspaces.profile_views import MemberProfileBaseView
+from apps.makerspaces.throttles import MemberImagePresignThrottle
 
 IMAGE_KIND = profile_images.IMAGE_KIND
 
@@ -38,6 +39,10 @@ class ProfileImageAttachRequestSerializer(PublicImageAttachRequestSerializer):
 
 
 class MemberProfileImageView(MemberProfileBaseView):
+    # The throttle is a no-op on PUT and DELETE by construction -- see the class -- so
+    # declaring it on the view budgets the presign alone.
+    throttle_classes = [MemberImagePresignThrottle]
+
     def _project(self, profile, project_id):
         if project_id is None:
             return None
@@ -56,6 +61,7 @@ class MemberProfileImageView(MemberProfileBaseView):
             201: PublicImageUploadResponseSerializer,
             400: OpenApiResponse(description="Invalid image upload request."),
             403: OpenApiResponse(description="An active membership is required."),
+            429: OpenApiResponse(description="Too many image upload requests."),
             503: OpenApiResponse(description="Public image storage is unavailable."),
         },
     )

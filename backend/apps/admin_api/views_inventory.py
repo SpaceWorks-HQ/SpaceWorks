@@ -34,7 +34,7 @@ from apps.evidence.responses import storage_unavailable_response
 from apps.evidence.storage import StorageUnavailable
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.guards import require_module
-from apps.makerspaces.limits import add_storage, free_storage
+from apps.makerspaces.limits import add_storage
 
 
 @extend_schema(tags=["Admin inventory"], summary="List or create inventory products")
@@ -214,7 +214,7 @@ class InventoryProductImageView(APIView):
             raise ValidationError({"object_key": "Image object key is outside this makerspace."})
         if not public_image_storage.is_safe_object_key(object_key):
             raise ValidationError({"object_key": "Invalid image object key."})
-        if public_image_storage.public_image_key_in_use(
+        if object_key and public_image_storage.public_image_key_in_use(
             product.makerspace_id,
             object_key,
             product_id=product.pk,
@@ -243,12 +243,22 @@ class InventoryProductImageView(APIView):
             raise ValidationError(
                 {"object_key": "Uploaded file is not a valid image."}
             )
+        product = InventoryProduct.objects.select_for_update().select_related(
+            "makerspace"
+        ).get(pk=product.pk)
+        if object_key and public_image_storage.public_image_key_in_use(
+            product.makerspace_id,
+            object_key,
+            product_id=product.pk,
+        ):
+            raise ValidationError({"object_key": "This image is already in use."})
         old_key = product.image_key
         if object_key != old_key:
-            add_storage(product.makerspace, public_image_storage.object_size(object_key))
+            add_storage(product.makerspace, result.size)
         if old_key and old_key != object_key:
-            free_storage(product.makerspace, public_image_storage.object_size(old_key))
-            public_image_storage.delete_object(old_key)
+            public_image_storage.release_public_image_on_commit(
+                product.makerspace, old_key
+            )
         product.image_key = object_key
         product.save(update_fields=["image_key", "updated_at"])
         audit.record(
@@ -269,10 +279,14 @@ class InventoryProductImageView(APIView):
     @transaction.atomic
     def delete(self, request, pk, *args, **kwargs):
         product = self._product(request, pk)
+        product = InventoryProduct.objects.select_for_update().select_related(
+            "makerspace"
+        ).get(pk=product.pk)
         old_key = product.image_key
         if old_key:
-            free_storage(product.makerspace, public_image_storage.object_size(old_key))
-            public_image_storage.delete_object(old_key)
+            public_image_storage.release_public_image_on_commit(
+                product.makerspace, old_key
+            )
         product.image_key = ""
         product.save(update_fields=["image_key", "updated_at"])
         audit.record(

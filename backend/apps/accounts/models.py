@@ -33,6 +33,13 @@ class User(AbstractUser):
     external_checkin_user_id = models.CharField(max_length=128, blank=True)
     telegram_user_id = models.CharField(max_length=64, blank=True)
     must_change_password = models.BooleanField(default=False)
+    # A staff-created person record, not an account. An unusable password alone is NOT
+    # enough to keep it that way: `ForgotPasswordView` finds any active user by email and
+    # `ResetPasswordConfirmView` calls `set_password`, so a walk-in given an email address
+    # could be turned into a real login by whoever receives that mailbox -- bypassing
+    # disabled self-registration entirely. This flag is the durable marker both paths
+    # check. See `makerspaces.walk_in_services`.
+    is_walk_in = models.BooleanField(default=False)
     role = models.CharField(
         max_length=32,
         choices=Role.choices,

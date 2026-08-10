@@ -7,6 +7,7 @@ blanks the other.
 """
 
 from django.db import transaction
+from rest_framework.exceptions import ValidationError
 
 from apps.audit import services as audit
 from apps.inventory import public_image_storage
@@ -15,15 +16,20 @@ from apps.makerspaces import limits
 IMAGE_KIND = "member"
 
 
-def _free_stored(makerspace, object_key):
-    # `object_size` returns None once the object is gone from the bucket. Freeing None
-    # would corrupt the counter, and the storage genuinely is no longer held.
-    size = public_image_storage.object_size(object_key)
-    if size is not None:
-        limits.free_storage(makerspace, size)
-
-
-def _swap(makerspace, holder, field, object_key):
+def _swap(
+    makerspace, holder, field, object_key, *, profile, profile_id=None, project_id=None,
+):
+    # HEADed before any lock is taken: an S3 round trip while a row lock is held turns a
+    # slow bucket into lock contention.
+    new_size = public_image_storage.object_size(object_key) if object_key else 0
+    # `member` is the ONE image kind with two holder tables -- an avatar on the profile
+    # and an image on each of its projects -- so a row lock on the holder alone cannot
+    # serialize a profile's claim against its own project's. Locking the PROFILE does,
+    # because every member-kind key belongs to exactly one profile. A tenant-wide lock
+    # would also work and is deliberately not taken: it would serialize every image
+    # upload in the space against every other, including on self-host where
+    # `limits.add_storage` takes no makerspace lock at all today.
+    profile = type(profile).objects.select_for_update().get(pk=profile.pk)
     # Re-read under a row lock inside the caller's transaction. The holder was fetched
     # before it, so two overlapping replacements would both see the same `old_key`:
     # each charges storage for its new object, each frees the same old one, the last
@@ -33,17 +39,17 @@ def _swap(makerspace, holder, field, object_key):
     old_key = getattr(holder, field)
     if object_key == old_key:
         return holder
+    if object_key and public_image_storage.public_image_key_in_use(
+        makerspace.pk,
+        object_key,
+        profile_id=profile_id,
+        project_id=project_id,
+    ):
+        raise ValidationError({"object_key": "This image is already in use."})
     if object_key:
-        limits.add_storage(
-            makerspace, public_image_storage.object_size(object_key) or 0
-        )
+        limits.add_storage(makerspace, new_size or 0)
     if old_key:
-        _free_stored(makerspace, old_key)
-        # Deleted after commit, not inline: a rollback below would restore the key while
-        # the object it names had already been destroyed.
-        transaction.on_commit(
-            lambda key=old_key: public_image_storage.delete_object(key)
-        )
+        public_image_storage.release_public_image_on_commit(makerspace, old_key)
     setattr(holder, field, object_key)
     holder.save(update_fields=[field, "updated_at"])
     return holder
@@ -52,7 +58,14 @@ def _swap(makerspace, holder, field, object_key):
 @transaction.atomic
 def set_avatar(profile, object_key):
     membership = profile.membership
-    result = _swap(membership.makerspace, profile, "avatar_key", object_key)
+    result = _swap(
+        membership.makerspace,
+        profile,
+        "avatar_key",
+        object_key,
+        profile=profile,
+        profile_id=profile.pk,
+    )
     _audit_image(membership, "avatar", None, object_key)
     return result
 
@@ -60,7 +73,14 @@ def set_avatar(profile, object_key):
 @transaction.atomic
 def set_project_image(profile, project, object_key):
     membership = profile.membership
-    result = _swap(membership.makerspace, project, "image_key", object_key)
+    result = _swap(
+        membership.makerspace,
+        project,
+        "image_key",
+        object_key,
+        profile=profile,
+        project_id=project.pk,
+    )
     _audit_image(membership, "project", project.pk, object_key)
     return result
 

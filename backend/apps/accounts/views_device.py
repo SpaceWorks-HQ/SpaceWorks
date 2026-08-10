@@ -15,6 +15,7 @@ from apps.accounts.attestation import (
     AttestationRejected, AttestationUnavailable, challenge_digest,
     create_challenge, verify_attestation,
 )
+from apps.accounts.login_methods import password_login_enabled
 from apps.accounts.models import User
 from apps.accounts.models_devices import DeviceAttestationChallenge, DeviceGrant
 from apps.accounts.serializers import user_payload
@@ -137,6 +138,11 @@ class DeviceLoginView(APIView):
         except AttestationRejected as exc:
             _audit_login_failure(data, 'attestation_rejected')
             raise AuthenticationFailed("Invalid device credentials or attestation.") from exc
+        # A switch that does not actually switch is worse than no switch: an operator
+        # believes the password door is closed. Refuse before any credential lookup.
+        if not password_login_enabled():
+            _audit_login_failure(data, 'password_login_disabled')
+            raise AuthenticationFailed("Invalid device credentials or attestation.")
         username = data["username"]
         if not User.objects.filter(username=username).exists():
             matches = User.objects.filter(email__iexact=username, is_active=True).exclude(email="")

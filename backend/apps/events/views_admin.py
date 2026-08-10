@@ -330,6 +330,7 @@ class EventRegistrationListView(APIView):
             event,
             member=membership.user,
             phone=serializer.validated_data.get('phone', ''),
+            email=serializer.validated_data.get('email', ''),
             custom_answers=serializer.validated_data.get('custom_answers'),
             actor=request.user,
             staff_registration=True,

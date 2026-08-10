@@ -85,13 +85,15 @@ class AdminSuperuserOnlyMiddleware:
     def __call__(self, request):
         if self._password_login_blocked(request):
             # `/control/login/` is Django's own AdminSite login, so `LoginView`'s check
-            # never sees it — without this, "password sign-in is off" would still leave a
-            # password door open on the control plane, which is the one surface that can
-            # turn the switch back on.
+            # never sees it. Refused BEFORE the form authenticates, so no session is
+            # minted; existing sessions are left alone, because a login-method switch is a
+            # policy change and not a revocation (phase 11 report, A2).
             #
-            # Refused BEFORE the form authenticates, so no session is minted. Existing
-            # sessions are deliberately left alone: a login-method switch is a policy
-            # change, not a revocation (see the phase 11 report, A2).
+            # This is enforced only while a superadmin can still get in another way -- see
+            # `_password_login_blocked`. Social sign-in issues JWTs for the React console
+            # and never creates a Django session, so blocking this unconditionally would
+            # make the one page that can re-enable passwords permanently unreachable the
+            # moment the last admin session expired.
             return HttpResponseForbidden(
                 "Password sign-in is not available on this deployment."
             )
@@ -110,13 +112,31 @@ class AdminSuperuserOnlyMiddleware:
         return path == self.admin_root or path.startswith(self.admin_prefix)
 
     def _password_login_blocked(self, request):
+        """Whether this control-plane login must be refused.
+
+        Two conditions, and the second is what stops the fix becoming the lockout:
+
+        1. Password sign-in is switched off. (`password_login_enabled` fails OPEN, like
+           every other capability read on an auth path.)
+        2. `/control/` is reachable without a password at all — i.e. this deployment has
+           a `PLATFORM_ADMIN_SSO` path. Today it does not: social sign-in mints JWTs for
+           the React console and never a Django session, so with no second route the
+           switch would seal the only page that can undo it. Until such a route exists,
+           the control plane keeps its password door and the switch governs the
+           application surfaces, which is what it is actually for.
+
+        The consequence is stated rather than hidden: with `password_enabled=False` a
+        superadmin can still sign in at `/control/`. That surface is superadmin-only,
+        rate-limited by django-axes, and deliberately not proxied on the public frontend
+        port, so it is the platform's break-glass entry — the same role Platform Email
+        plays for the superadmin-access toggle.
+        """
         if request.method != "POST" or request.path != self.admin_login_path:
+            return False
+        if not settings.PLATFORM_ADMIN_SSO:
             return False
         from apps.accounts.login_methods import password_login_enabled
 
-        # Fails OPEN inside `password_login_enabled`, matching every other capability
-        # read on an auth path: a broken lookup must not lock the superadmin out of the
-        # only console that can fix it.
         return not password_login_enabled()
 
     def _has_access(self, user):

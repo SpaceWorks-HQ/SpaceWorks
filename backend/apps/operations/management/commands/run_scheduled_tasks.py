@@ -33,6 +33,13 @@ from django.utils import timezone
 SCHEDULED_TASKS = (
     ("return-reminders", "apps.hardware_requests.tasks.send_return_reminders_task", 60),
     ("purge-auth-challenges", "apps.accounts.tasks.purge_auth_challenges_task", 24 * 60),
+    # Beat runs this at a fixed hour; the beat-less runner has no wall-clock schedule, so
+    # the cadence is expressed as the interval instead. Daily either way.
+    (
+        "refresh-github-contributions",
+        "apps.makerspaces.tasks.refresh_github_contributions_task",
+        24 * 60,
+    ),
 )
 
 
@@ -66,21 +73,30 @@ class Command(BaseCommand):
                 # Locked, so two cron entries or two dynos firing at the same minute run
                 # the task once between them rather than twice. The reminder mail is the
                 # reason this matters: sending it twice is worse than sending it late.
+                # Claiming first makes this AT-MOST-ONCE, deliberately: a missed run is
+                # preferable to sending the return reminder twice.
                 row, _ = PeriodicTaskRun.objects.select_for_update().get_or_create(name=name)
                 if options["due_only"] and not row.is_due(now, interval_minutes):
                     self.stdout.write(f"skip {name} (last run {row.last_run_at:%Y-%m-%d %H:%M})")
                     continue
-                try:
-                    # Called directly, not via .delay(): under eager mode they are the
-                    # same thing, and with a broker configured this command should still
-                    # do the work rather than queue it behind a worker that may not exist.
-                    _import_task(dotted_path)()
-                except Exception as exc:  # noqa: BLE001 - one failing task must not stop the rest
+                row.last_run_at = now
+                row.save(update_fields=["last_run_at"])
+
+            try:
+                # Called directly, not via .delay(): under eager mode they are the
+                # same thing, and with a broker configured this command should still
+                # do the work rather than queue it behind a worker that may not exist.
+                _import_task(dotted_path)()
+            except Exception as exc:  # noqa: BLE001 - one failing task must not stop the rest
+                with transaction.atomic():
+                    row = PeriodicTaskRun.objects.select_for_update().get(name=name)
                     row.last_error = str(exc)[:500]
                     row.save(update_fields=["last_error"])
-                    self.stderr.write(self.style.ERROR(f"failed {name}: {exc}"))
-                    continue
-                row.last_run_at = now
+                self.stderr.write(self.style.ERROR(f"failed {name}: {exc}"))
+                continue
+
+            with transaction.atomic():
+                row = PeriodicTaskRun.objects.select_for_update().get(name=name)
                 row.last_error = ""
-                row.save(update_fields=["last_run_at", "last_error"])
-                self.stdout.write(self.style.SUCCESS(f"ran {name}"))
+                row.save(update_fields=["last_error"])
+            self.stdout.write(self.style.SUCCESS(f"ran {name}"))

@@ -1,5 +1,6 @@
 import logging
 
+from django.db import transaction
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
@@ -15,7 +16,11 @@ def delete_to_buy_receipt_object(sender, instance, **kwargs):
 
     if not instance.object_key:
         return
-    try:
-        storage.delete_object(instance.object_key)
-    except Exception:  # pragma: no cover - delete_object is already best-effort
-        logger.exception("Failed to delete procurement receipt object %s.", instance.object_key)
+
+    def delete_after_commit(key):
+        try:
+            storage.delete_object(key)
+        except Exception:  # pragma: no cover - delete_object is already best-effort
+            logger.exception("Failed to delete procurement receipt object %s.", key)
+
+    transaction.on_commit(lambda key=instance.object_key: delete_after_commit(key))

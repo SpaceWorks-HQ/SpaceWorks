@@ -321,6 +321,49 @@ down. Storage accounting itself is a **no-op on self-host** (`limits.add_storage
 return early), so a test asserting `storage_bytes_used` must force managed mode with
 `monkeypatch.setattr(limits, 'is_self_host', lambda: False)` and wrap `on_commit` object deletes in
 `django_capture_on_commit_callbacks(execute=True)`.
+- **A purge that deletes image-holding rows must free the quota, and the accounting belongs
+  POST-COMMIT with the object deletion — never inside the purge transaction.**
+  `module_purge._delete_public_images_and_free_storage` is generic over the plan's `public_keys` and
+  handles each key in one loop: HEAD the size, delete the object, then free the quota **only when
+  deletion reports success**. `public_image_storage.delete_object` returns `True`/`False`; swallowing
+  its own `BotoCoreError`/`ClientError` without reporting failure once let the counter fall while the
+  object survived, permanently granting free storage. The HEAD still has to precede deletion or the
+  size is lost, but accounting must follow confirmed deletion. The whole loop runs after commit and
+  best-effort: inside `purge_module`'s `atomic()` those network calls would hold the makerspace
+  `select_for_update` lock and could roll back rows that were correctly deleted. An absent size or a
+  failed deletion frees nothing.
+- **External I/O must never run inside a transaction that holds a row lock.** HTTP and object-storage
+  calls have network-bounded latency and failure modes; putting them under `select_for_update()` turns
+  a slow dependency into lock contention and lets an unrelated transport failure roll back valid
+  database work. Scheduled work follows `run_scheduled_tasks`' **claim-then-work** shape: a short
+  transaction locks the `PeriodicTaskRun`, checks due-ness and stamps `last_run_at`, then the runner
+  executes after commit. The same rule was violated twice in one review session, so it is recorded
+  here as a general transaction boundary rather than left as two per-site fixes.
+- **A TEST THAT ASSERTS ON SOURCE TEXT PROVES NOTHING ABOUT BEHAVIOUR.** Prefer an observable: the
+  scheduler lock-boundary test records `transaction.get_connection().in_atomic_block` while the task
+  runs. When a test exists to prevent a specific regression, reintroduce that regression and verify
+  the test fails before trusting it.
+- **A presigned upload is a hole in all three row-walking mechanisms, and it is a PLATFORM property,
+  not a bug in any one endpoint.** `presigned_upload` hands out write access to a key before any row
+  claims it, and in POST mode (the default; MinIO) it targets the **final** key. An unattached upload
+  is therefore invisible to `limits.add_storage` (charged at attach), to `recompute_storage` (sums
+  rows) and to every purge collector (enumerates rows) simultaneously. `MemberImagePresignThrottle`
+  caps the one presign an ordinary member can reach — per **account**, POST-only, so a member who
+  spends their uploads does not lose the ability to *clear* an image, the one action that frees
+  storage. That bounds the damage; it does not eliminate orphans. **Eliminating them means either
+  presigning into the `staging/` prefix in POST mode too (so an unclaimed object never enters the
+  served namespace and a bucket lifecycle rule can expire it) or a sweeper for unclaimed keys** —
+  both touch every image path in the system and are their own phase. Do not add a new member-reachable
+  presign without a per-account cap.
+
+**Rate limits are global only when their cache is global.** `CACHES` must stay configured to use
+Django's `RedisCache` when `CACHE_URL` or an explicitly set `CELERY_BROKER_URL` supplies Redis; a
+per-process cache silently multiplies every DRF throttle by the Gunicorn worker count and loses its
+counters when a worker recycles. The fallback must be Django's shared `DatabaseCache`, never
+`LocMemCache`: the brokerless cloud profile sets `CELERY_BROKER_URL` empty but runs three Gunicorn
+workers by default with `--max-requests 1000`, so a per-process cache multiplies every rate limit and
+then resets its counters as workers recycle. The operations migration creates the cache table; no
+separate operator step is required.
 
 **Object storage.** Two buckets per env: a private evidence/docs bucket and a separate **public-read**
 image bucket (`PUBLIC_IMAGE_BUCKET`, served via `PUBLIC_IMAGE_BASE_URL`, kept distinct from the signing
@@ -376,11 +419,19 @@ issue photo to issue hardware. `tests/makerspaces/test_module_registry.py` is th
 AST-parses `apps/` and fails if a registered module has no real guard call site, if a guarded key is
 unregistered, if the derived lists change, or if a migration-referenced callable stops resolving.
 
-**Modules are OPT-IN.** `DEFAULT_ENABLED_MODULES` is now **core only** (6 keys) — a new makerspace
-installs core plus whatever profile the operator chose (`minimal` 6 / `workshop` 14 / `lending` 17 /
+**Modules are OPT-IN.** `DEFAULT_ENABLED_MODULES` resolves to **10 keys** — the 6 core ones plus
+`accounts`, `payments`, `mobile` and `updates`, which carry `default_enabled=True` because each was
+introduced as a *key over behaviour that already existed*, and an opt-in default would have switched
+that behaviour off for every deployment on upgrade (the `0050`/`0051` backfill reasoning, expressed
+in the registry instead of a migration). Everything else is off, and a new makerspace installs core
+plus whatever profile the operator chose (`minimal` 6 / `workshop` 14 / `lending` 17 /
 `recommended` 20 / `cloud` 24 / `everything` = `full` 32).
 `ModuleDefinition.default_enabled` defaults to **False** and core must not set it (core is on by
-definition; two sources for one fact is the drift the registry exists to remove). **Existing makerspaces
+definition; two sources for one fact is the drift the registry exists to remove) — so the four
+above are the only registry entries that set it, and `default_enabled_module_keys()` is the one
+place to ask rather than counting by hand. (This paragraph read "core only (6 keys)" until those
+four keys landed; it is the kind of count that goes stale silently, which is why the README table
+is generated from the registry rather than written out.) **Existing makerspaces
 are untouched** — a default change never rewrites stored JSON rows, and `_canonical_modules` preserves
 unknown keys. Because almost every backend test exercises a module's behaviour rather than the install
 default, `tests/conftest.py` has an autouse fixture that patches **only the `enabled_modules` field
@@ -704,6 +755,79 @@ screen reads the same endpoint.
   silently reactivate a deliberately revoked membership through the one form meant for strangers. The
   endpoint is gated on `ISSUE_DIRECT_LOAN`, because naming the stranger at the counter is the same
   front-desk act as handing them a tool.
+- **The unusable password is NOT the boundary — `User.is_walk_in` is** (`accounts/0014`).
+  `set_password` replaces an unusable password perfectly happily, so `ForgotPasswordView` finding the
+  record by the email staff typed at the counter, and `ResetPasswordConfirmView` setting a password on
+  it, is a complete path from person record to real login — past disabled self-registration, into a
+  membership somebody else created. The flag is checked on **both** paths (request *and* confirm, so a
+  link minted before the record was marked still fails), and both keep their generic response, because
+  refusing visibly would disclose which addresses belong to walk-ins. Generalise it: an unusable
+  password is a statement about the present, and every path that can *set* a password must know the
+  record is not supposed to have one. **That means EVERY path**: `admin_api.services_user_access.
+  reset_user_password` hands back a usable temporary password and is refused for a walk-in in the
+  **shared service**, because the REST endpoint and the Django admin action both call it and a check
+  in one leaves the other open. Migration `accounts/0015` backfills the marker from the **union** of
+  the append-only `member.walk_in_created` audit trail and usernames beginning `walkin_`, and revokes
+  any password/refresh token already acquired through the hole for both sets. The second signal is
+  load-bearing: audit rows are makerspace-scoped and die with a tenant purge, while the username lives
+  on the global `User` row and survives untouched. `walk_in_services._available_username()` assigns
+  every walk-in the `walkin_<name>_<random>` namespace; self-registration uses `member_<uuid>`, so the
+  two cannot collide. A marker that leaves the credential working changes nothing for exactly the
+  accounts it exists for. Enforcement lives at credential *creation*, never at login: after these
+  guards no application path can give a walk-in a password, so a login check would guard an
+  impossible state while blocking a superadmin who deliberately set one in `/control/`. **The
+  backfill must also clear what a working session was used to LINK** — `SocialIdentity` (whose
+  login path returns on an existing identity match *before* the auto-link guard), `phone_e164` +
+  `phone_verified_at` (a login identity resolved by number, which never reads the marker) and
+  `DeviceGrant` (its own rotating refresh family, so blacklisting today's tokens is not enough).
+  Revoking the password alone leaves three doors open. **And `_explicit_link` refuses a walk-in
+  outright** — the migration cannot reach a live *access* token for ~15 minutes, and that window is
+  long enough to link a fresh provider and undo the revocation. The guard sits inside
+  `_explicit_link` (after its `select_for_update`), because that function is where every explicit
+  link in the system is created.
+- **AN ACCEPTED RISK IS A CLAIM ABOUT THE CODE AND MUST BE VERIFIED LIKE ONE.** A6 was accepted on
+  the assertion that no durable signal identified a walk-in after tenant purge, even though the
+  function generating exactly that global-row signal had already been read in the same session.
+  Writing the dismissal into a report did not settle it; the next review correctly re-raised it.
+- **Phone linking is guarded too** — `services_phone.confirm_link` writes a verified `phone_e164`,
+  and a verified number IS a login identity resolved by number. The check sits inside its
+  `transaction.atomic()` on a `select_for_update` re-read (the caller's `user` came off a JWT and
+  may be stale) and uses the file's **deferred-raise** pattern, because raising inside the block
+  rolls back the `failed_attempts` increment and silently disables the attempt cap. `start_link` is
+  refused as well: it writes a challenge row and spends real SMS credit.
+- **A guard that runs after a challenge or token has been consumed is itself a state-changing path
+  and must emit an audit entry.** Phone `_confirm` persists `consumed_at` before the walk-in refusal,
+  so that branch records `member.phone_link_refused_walk_in`; returning an error does not make the
+  already-committed consumption read-only.
+- **THE COMPLETE LIST of guarded credential-writers for a walk-in** — forgot-password,
+  reset-password confirm, change-password, member sign-up, `admin_api` staff reset, social auto-link,
+  social explicit link, phone `start_link` + `confirm_link`, plus username-collision assertions in
+  `seed_demo` / `setup_instance`. The CLI checks protect data integrity rather than access control —
+  shell access already overrides the application. **Adding any new way to set or verify a credential
+  means adding it here.**
+- **Audited and deliberately NOT guarded: phone unlink only.** `views_phone.py` only clears a login
+  identity. A guard on that revocation path would make a walk-in's phone identity impossible to
+  remove, which is the opposite of the marker's purpose. Change-password now refuses explicitly even
+  though `check_password` already failed against an unusable password; member sign-up now returns
+  silently before stamping `email_verified_at` on a reused walk-in row, preserving the endpoint's
+  account-enumeration-safe response; and the two CLI commands now assert against collisions. The
+  social new-user branch creates a fresh account and therefore has no existing walk-in target.
+- **The meta-rule, learned across FIVE review rounds on this one seam:** when a marker means "this
+  record must never hold a credential", **enumerate every writer of a credential once, as a list,
+  and guard them together** — never close paths one at a time as a reviewer points at them. Each of
+  the seven above was found in a separate round, all the same mistake. Note that this rule was
+  already written here after round 5 and the *next* commit still guarded a single path: writing the
+  lesson down did not apply it, so the list above exists instead of the advice alone.
+- **A walk-in may carry neither an email nor a phone, and downstream models often require both.**
+  `EventRegistration` has two non-blank contact columns, so the members this seam made registrable
+  were exactly the ones that could not be registered. Each such surface needs a **caller-supplied
+  fallback** (`member.email or email`, `member.phone or phone` — account first, so the fallback can
+  never redirect a real member's mail) **and the matching console field**: a fallback the staffer
+  cannot type is the same as no fallback. **A conditional console field must key off
+  `StructuredApiError.body`, never `.message`** — the message is built from `Object.values(body)`
+  alone, so a DRF field error arrives as the bare `"This field cannot be blank."` with the field
+  name stripped. Matching the message for `/phone/i` looked right and never once fired, so the
+  prompt it gates had been dead since the day it shipped.
 - **Known gap: OIDC has no browser flow.** The backend accepts an ID token only, and no frontend renders
   configured providers, so on the web an accounts-off deployment today means staff-created walk-ins.
   Adding the browser flow (PKCE, redirect, discovery) is its own phase.
@@ -747,7 +871,11 @@ asked to have shown, so encrypting it buys nothing and drags in the envelope/dua
 - **GitHub is never fetched on a read path.** `refresh_github_contributions` (command + Celery) does it;
   a failure keeps the last known count and still stamps `github_synced_at` so a throttled API backs off.
   Unset `GITHUB_API_TOKEN` = dormant, count stays `None`, section omitted. Changing the handle clears the
-  cached count outright, or one account's total shows under another account's name.
+  cached count outright, or one account's total shows under another account's name. **The write-back
+  is filtered on the handle that was FETCHED, not just the pk**: a member can change their handle
+  while the HTTP call is in flight, and an unconditional `.update()` then lands the old account's
+  total under the new name. A count under the wrong name is a false claim about a person, not stale
+  data, so the raced write is dropped rather than applied.
 
 **Staff event registration is the SAME service, with exactly one relaxation (phase 13).**
 `services_registration.register(..., staff_registration=True)` relaxes only the `is_public` check —
@@ -762,11 +890,23 @@ dead end; the public path passes none and is unchanged. The picker hangs off the
 (`EventEligibleMemberListView`), inheriting `_manageable_event` rather than inventing a second answer to
 "who may see this makerspace's members", and excludes the already-registered.
 
-**A login-method switch must be enforced on `/control/` too.** `password_enabled` lives in
-`LoginView` (the JWT API) *and* in `AdminSuperuserOnlyMiddleware`, which refuses a POST to
-`admin:login` **before the form authenticates**, so no session is minted. Enforcing only the API
-left a password door on the one surface that can turn the switch back on. Existing sessions are
-deliberately not revoked: a login-method switch is a policy change, not a revocation.
+**A login-method switch is enforced on `/control/` too — but only while another way in exists.**
+`password_enabled` lives in `LoginView` (the JWT API) *and* in `AdminSuperuserOnlyMiddleware`, which
+refuses a POST to `admin:login` **before the form authenticates**, so no session is minted. Enforcing
+only the API left a password door on the one surface that can turn the switch back on. Existing
+sessions are deliberately not revoked: a login-method switch is a policy change, not a revocation.
+- **The middleware check ALSO requires `settings.PLATFORM_ADMIN_SSO`, and that is load-bearing.**
+  Social sign-in mints **JWTs for the React console and never a Django session**, so there is no
+  password-free route into `/control/` today — enforcing unconditionally sealed the only page that
+  can undo the switch, the moment the last admin session expired, with no application-level recovery.
+  The flag is declared in settings (default False) rather than read with a `getattr` default so it is
+  findable and an operator building such a route has somewhere to flip. **Do not "tighten" this back
+  to unconditional without first shipping the alternative route** — the accepted consequence (a
+  superadmin can still sign into `/control/` with a password) is written up as A5 in
+  `docs/module-program-security-report.md`, and the enforcement path is already tested.
+- **The rule this came from: a fix to an auth path needs its own "what is now unreachable?" check**,
+  not just "is the hole closed?". The original fix was correct about the hole and created a permanent
+  lockout that only the next review pass caught.
 
 **Member profile writes are audited WITHOUT their content.** `member.profile_updated` /
 `member.profile_image_updated` / `member.profile_image_cleared` record the fields touched, the

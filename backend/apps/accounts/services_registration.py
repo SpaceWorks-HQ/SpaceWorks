@@ -169,6 +169,11 @@ def register_member(display_name, email, phone, password):
         except IntegrityError:
             user = User.objects.filter(email__iexact=email).first()
 
+    # A walk-in is a person record, not an enrollable account. Silence is required
+    # here by the endpoint's account-enumeration contract.
+    if user is not None and user.is_walk_in:
+        return None
+
     audit_events.record_auth_event(
         user,
         "member.signup_requested",

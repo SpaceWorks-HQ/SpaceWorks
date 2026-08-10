@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
@@ -343,6 +344,12 @@ class ChangePasswordView(APIView):
         new_password = serializer.validated_data["new_password"]
         user = request.user
 
+        # Defence in depth: this becomes load-bearing the moment any path gives a
+        # walk-in a usable password.
+        if user.is_walk_in:
+            raise serializers.ValidationError(
+                {"current_password": "Current password is incorrect."}
+            )
         if not user.check_password(current_password):
             raise serializers.ValidationError(
                 {"current_password": "Current password is incorrect."}
@@ -356,9 +363,23 @@ class ChangePasswordView(APIView):
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"new_password": list(exc.messages)}) from exc
 
-        user.set_password(new_password)
-        user.must_change_password = False
-        user.save(update_fields=["password", "must_change_password"])
+        with transaction.atomic():
+            # Re-read under a row lock and repeat the guard next to the write, as every
+            # other credential writer on this seam does. The check above ran against
+            # `request.user`, built from a JWT that may predate migration 0015 marking
+            # this record: without the lock, a request that started while `is_walk_in`
+            # was still false waits here and then writes a fresh usable password AFTER
+            # the migration committed the unusable one, undoing the revocation for
+            # exactly the accounts it exists for.
+            locked = User.objects.select_for_update().get(pk=user.pk)
+            if locked.is_walk_in:
+                raise serializers.ValidationError(
+                    {"current_password": "Current password is incorrect."}
+                )
+            locked.set_password(new_password)
+            locked.must_change_password = False
+            locked.save(update_fields=["password", "must_change_password"])
+        user = locked
         blacklist_outstanding_tokens(user)
         audit.record(user, "user.password_changed", target=user)
         return Response({"detail": "Password updated."})
@@ -389,6 +410,12 @@ class ForgotPasswordView(APIView):
                     is_active=True,
                     access_status=User.AccessStatus.ACTIVE,
                 )
+                # A walk-in is a person record, not an account. Without this, whoever
+                # holds the mailbox staff typed at the counter could reset "their"
+                # password into existence and sign in -- turning a no-login record into a
+                # real account and walking straight past disabled self-registration.
+                # The response stays the same generic ack, so this discloses nothing.
+                .exclude(is_walk_in=True)
                 .exclude(email="")
                 .first()
             )
@@ -444,6 +471,11 @@ class ResetPasswordConfirmView(APIView):
             raise bad
         if not (user.is_active and user.access_status == User.AccessStatus.ACTIVE):
             raise bad
+        # Checked here as well as on the request side: a link issued before the record
+        # was marked, or minted any other way, must still not turn a person record into
+        # an account. Same generic error, so it discloses nothing.
+        if user.is_walk_in:
+            raise bad
         if not default_token_generator.check_token(user, data["token"]):
             raise bad
         try:
@@ -451,9 +483,15 @@ class ResetPasswordConfirmView(APIView):
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"new_password": list(exc.messages)}) from exc
 
-        user.set_password(data["new_password"])
-        user.must_change_password = False
-        user.save(update_fields=["password", "must_change_password"])
+        with transaction.atomic():
+            # Close the stale-read interleaving where the walk-in migration marks this
+            # user after the check above but before this password write.
+            user = User.objects.select_for_update().get(pk=user.pk)
+            if user.is_walk_in:
+                raise bad
+            user.set_password(data["new_password"])
+            user.must_change_password = False
+            user.save(update_fields=["password", "must_change_password"])
         blacklist_outstanding_tokens(user)
         audit.record(user, "user.password_reset_via_email", target=user)
         return Response({"detail": "Password updated."})

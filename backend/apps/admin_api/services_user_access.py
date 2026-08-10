@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils.crypto import get_random_string
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -24,6 +25,18 @@ def reset_user_password(actor, target_pk, password=None, data=None):
     target = _target_for_reset(actor, target_pk, is_superadmin)
     if target.is_superuser or target.role == User.Role.SUPERADMIN:
         raise PermissionDenied("Cannot reset a superadmin's password here.")
+    # A walk-in is a person record staff typed at the counter, not an account, and this
+    # service HANDS BACK a usable temporary password -- so without this it is a one-click
+    # way to turn one into a login, available to any space manager in the makerspace and
+    # strictly easier than the forgot-password route the `is_walk_in` flag was added to
+    # close. Refused in the shared service rather than the view, because the Django admin
+    # action calls it too and a check in one place would leave the other open. Turning a
+    # walk-in into an account is a `MANAGE_MAKERSPACE` decision about identity, not a
+    # password operation; the person should sign up and be invited.
+    if target.is_walk_in:
+        raise PermissionDenied(
+            "This is a walk-in record, not an account. It has no password to reset."
+        )
 
     break_glass_password_reset = False
     if is_superadmin:
@@ -38,9 +51,17 @@ def reset_user_password(actor, target_pk, password=None, data=None):
         password = serializer.validated_data.get("password")
 
     temporary_password = _validated_or_generated_password(password, target)
-    target.set_password(temporary_password)
-    target.must_change_password = True
-    target.save(update_fields=["password", "must_change_password"])
+    with transaction.atomic():
+        # Close the stale-read interleaving where the walk-in migration marks this
+        # user after the check above but before this password write.
+        target = User.objects.select_for_update().get(pk=target.pk)
+        if target.is_walk_in:
+            raise PermissionDenied(
+                "This is a walk-in record, not an account. It has no password to reset."
+            )
+        target.set_password(temporary_password)
+        target.must_change_password = True
+        target.save(update_fields=["password", "must_change_password"])
 
     from apps.accounts.services_tokens import blacklist_outstanding_tokens
 

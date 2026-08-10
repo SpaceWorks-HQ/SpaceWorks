@@ -150,6 +150,8 @@ def start_link(user, raw_phone):
     """Send a code to a number an authenticated user wants to attach."""
     if not sms_configured():
         raise SmsUnavailable
+    if User.objects.filter(pk=user.pk, is_walk_in=True).exists():
+        raise serializers.ValidationError({"detail": GENERIC_CONFIRM_ERROR})
     phone_e164 = normalize_or_none(raw_phone)
     if phone_e164 is None:
         from apps.accounts.phone_numbers import MESSAGE
@@ -187,17 +189,31 @@ def confirm_link(user, raw_phone, code):
     # code becomes guessable indefinitely. Same reason services_registration defers.
     failure = None
     with transaction.atomic():
+        locked_user = User.objects.select_for_update().get(pk=user.pk)
         challenge = _confirm(
             PhoneVerificationChallenge.objects.filter(
-                user=user, purpose=PhoneChallengePurpose.LINK
+                user=locked_user, purpose=PhoneChallengePurpose.LINK
             ),
             code,
             phone_e164,
             on_failure=lambda row: audit_events.record_auth_event(
-                user, "member.phone_link_failed", target=user, meta={}
+                locked_user,
+                "member.phone_link_failed",
+                target=locked_user,
+                meta={},
             ),
         )
         if challenge is None:
+            failure = {"detail": GENERIC_CONFIRM_ERROR}
+        # This is the fifth guarded credential-writer for walk-ins. confirm_link is
+        # the chokepoint because a verified phone is itself a login identity.
+        elif locked_user.is_walk_in:
+            audit_events.record_auth_event(
+                locked_user,
+                "member.phone_link_refused_walk_in",
+                target=locked_user,
+                meta={},
+            )
             failure = {"detail": GENERIC_CONFIRM_ERROR}
         # Re-check the collision under the transaction. start_link's check is a courtesy
         # to avoid a pointless text; THIS is the one that closes the race where two
@@ -207,35 +223,35 @@ def confirm_link(user, raw_phone, code):
         elif (
             User.objects.select_for_update()
             .filter(phone_e164=phone_e164, phone_verified_at__isnull=False)
-            .exclude(pk=user.pk)
+            .exclude(pk=locked_user.pk)
             .exists()
         ):
             failure = {"phone": ["That number is already linked to another account."]}
         else:
-            user.phone_e164 = phone_e164
+            locked_user.phone_e164 = phone_e164
             # Populate the free-text contact field only when the member has none, so
             # linking never overwrites a number they typed for staff to call.
             update_fields = ["phone_e164"]
-            if not user.phone:
-                user.phone = phone_e164
+            if not locked_user.phone:
+                locked_user.phone = phone_e164
                 update_fields.append("phone")
-            user.save(update_fields=update_fields)
+            locked_user.save(update_fields=update_fields)
             # Stamp verification through the queryset, NOT through save(). The model hook
             # clears phone_verified_at whenever phone_e164 changes -- unconditionally,
             # and that is the point: it stops an edited number from inheriting someone
             # else's verified status. So the stamp is written after, bypassing save().
             # Exactly what confirm_challenge does for email_verified_at.
-            User.objects.filter(pk=user.pk).update(phone_verified_at=now)
-            user.phone_verified_at = now
+            User.objects.filter(pk=locked_user.pk).update(phone_verified_at=now)
+            locked_user.phone_verified_at = now
             audit_events.record_auth_event(
-                user,
+                locked_user,
                 "member.phone_verified",
-                target=user,
+                target=locked_user,
                 meta={"phone_hash": audit_events.fingerprint(phone_e164)},
             )
     if failure is not None:
         raise serializers.ValidationError(failure)
-    return user
+    return locked_user
 
 
 def start_login(raw_phone):

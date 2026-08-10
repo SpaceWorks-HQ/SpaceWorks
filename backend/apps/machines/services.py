@@ -65,16 +65,22 @@ def machine_usage_total(machine):
 
 @transaction.atomic
 def update_image(machine, actor, object_key):
+    # No tenant-wide lock: a `machine/` key is pinned to that prefix by the attach view,
+    # so only another Machine can claim it and this row lock is what serializes that.
     machine = Machine.objects.select_for_update().select_related("makerspace").get(
         pk=machine.pk
     )
     old_key = machine.image_key
+    if object_key and object_key != old_key and public_image_storage.public_image_key_in_use(
+        machine.makerspace_id,
+        object_key,
+        machine_id=machine.pk,
+    ):
+        raise ValidationError({"object_key": "This image is already in use."})
     if old_key and old_key != object_key:
-        limits.free_storage(
-            machine.makerspace,
-            public_image_storage.object_size(old_key),
+        public_image_storage.release_public_image_on_commit(
+            machine.makerspace, old_key
         )
-        public_image_storage.delete_object(old_key)
     machine.image_key = object_key
     machine.save(update_fields=["image_key", "updated_at"])
     _audit(machine, actor, "machine.image_updated")
@@ -87,11 +93,9 @@ def remove_image(machine, actor):
         pk=machine.pk
     )
     if machine.image_key:
-        limits.free_storage(
-            machine.makerspace,
-            public_image_storage.object_size(machine.image_key),
+        public_image_storage.release_public_image_on_commit(
+            machine.makerspace, machine.image_key
         )
-        public_image_storage.delete_object(machine.image_key)
     machine.image_key = ""
     machine.save(update_fields=["image_key", "updated_at"])
     _audit(machine, actor, "machine.image_removed")

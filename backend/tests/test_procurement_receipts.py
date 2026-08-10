@@ -54,7 +54,9 @@ def mock_receipt_storage(monkeypatch, *, size=123, content_type="application/pdf
     return delete
 
 
-def test_receipt_presign_finalize_list_signed_url_delete(monkeypatch):
+def test_receipt_presign_finalize_list_signed_url_delete(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     delete = mock_receipt_storage(monkeypatch)
     makerspace = make_space("proc-receipts")
     manager = make_inventory_manager("proc-receipts-manager", makerspace)
@@ -72,7 +74,10 @@ def test_receipt_presign_finalize_list_signed_url_delete(monkeypatch):
     listed = client.get(receipt_list_url(item))
     signed = client.get(receipt_url(receipt))
     duplicate = client.post(receipt_list_url(item), {"object_key": object_key}, format="json")
-    deleted = client.delete(receipt_detail_url(receipt))
+    # The receipt object deletion is deferred to on_commit so a rollback can never destroy
+    # a file whose row came back; the callbacks must run for it to be observable here.
+    with django_capture_on_commit_callbacks(execute=True):
+        deleted = client.delete(receipt_detail_url(receipt))
 
     assert presign.status_code == 201
     assert object_key.startswith(f"procurement/{makerspace.id}/")

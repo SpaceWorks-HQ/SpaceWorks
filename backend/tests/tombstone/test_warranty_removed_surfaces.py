@@ -105,8 +105,14 @@ def test_warranty_rows_are_still_readable():
     assert Warranty.objects.get(pk=warranty.pk).vendor_name == "Acme"
 
 
-def test_deleting_a_document_still_removes_its_private_object(monkeypatch):
-    """Retention: without this receiver a purge leaves private bills in the bucket."""
+def test_deleting_a_document_still_removes_its_private_object(
+    monkeypatch, django_capture_on_commit_callbacks
+):
+    """Retention: without this receiver a purge leaves private bills in the bucket.
+
+    The receiver defers to `on_commit` so a rolled-back purge cannot destroy a file whose
+    row came back, which is why the callbacks have to be executed to observe the delete.
+    """
     from apps.warranty import storage
 
     deleted = []
@@ -120,7 +126,8 @@ def test_deleting_a_document_still_removes_its_private_object(monkeypatch):
         content_type="application/pdf",
         size_bytes=10,
     )
-    document.delete()
+    with django_capture_on_commit_callbacks(execute=True):
+        document.delete()
 
     assert deleted == ["warranty/1/bill.pdf"]
 

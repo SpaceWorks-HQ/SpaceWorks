@@ -42,8 +42,6 @@ def purge_module(makerspace, key, actor):
     """Delete one module's data for one makerspace. Returns the row counts."""
     plan = _resolve(makerspace, key, actor)
 
-    private_keys = _collect_private_keys(makerspace, plan)
-    public_keys = _collect_public_keys(makerspace, plan)
     meta = {
         "makerspace_id": makerspace.pk,
         "slug": makerspace.slug,
@@ -58,6 +56,14 @@ def purge_module(makerspace, key, actor):
             raise ValidationError(
                 f"{plan.key} was re-installed; uninstall it again before purging."
             )
+        # Collect under the makerspace lock to narrow the attach/delete race. This does
+        # not eliminate it under READ COMMITTED: a row another transaction commits
+        # between this SELECT and the DELETE is invisible to the former and visible to
+        # the latter, and attach paths take this lock only in managed mode because
+        # `limits.add_storage` returns early on self-host.
+        private_keys = _collect_private_keys(locked, plan)
+        private_sizes = _collect_private_key_sizes(locked, plan)
+        public_keys = _collect_public_keys(locked, plan)
         with connection.cursor() as cursor:
             if settings.MANAGED_POSTGRES:
                 cursor.execute("SET LOCAL app.allow_immutable_delete = 'on'")
@@ -72,8 +78,13 @@ def purge_module(makerspace, key, actor):
         target=None,
         meta={**meta, "counts": counts},
     )
-    _delete_private_keys(private_keys)
-    _delete_public_image_keys(public_keys)
+    # Both accounting paths run after commit and release quota only for objects the
+    # bucket confirmed are gone -- a failed delete must free nothing, or the makerspace
+    # stops being charged for storage it still holds.
+    _free_private_storage(makerspace, private_sizes, _delete_private_keys(private_keys))
+    # Storage HEADs cannot run inside the purge transaction: network failures must not
+    # roll back deleted rows or hold the makerspace lock across one round trip per key.
+    _delete_public_images_and_free_storage(makerspace, public_keys)
     return counts
 
 
@@ -143,29 +154,60 @@ def _collect_public_keys(makerspace, plan):
 
 
 def _delete_private_keys(keys):
+    """Best-effort delete of private objects; returns the keys the bucket confirmed gone.
+
+    The return value is what lets the caller release storage quota for those keys only.
+    A client that cannot even be constructed confirms nothing, so nothing is freed.
+    """
     if not keys:
-        return
+        return set()
     from apps.evidence import storage
 
     try:
         client = storage._client()
     except Exception:
         logger.exception("module_purge_storage_client_failed", extra={"keys": len(keys)})
-        return
+        return set()
+    deleted = set()
     for key in keys:
         try:
             client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=key)
         except Exception:
             logger.exception("module_purge_storage_delete_failed: %s", key)
+        else:
+            deleted.add(key)
+    return deleted
 
 
-def _delete_public_image_keys(keys):
+def _collect_private_key_sizes(makerspace, plan):
+    if plan.private_key_sizes is None:
+        return {}
+    return plan.private_key_sizes(makerspace)
+
+
+def _free_private_storage(makerspace, sizes, deleted_keys):
+    """Release charged bytes for private objects that were confirmed deleted."""
+    if not sizes or not deleted_keys:
+        return
+    freed = sum(
+        size for key, size in sizes.items() if size and key in deleted_keys
+    )
+    if not freed:
+        return
+    from apps.makerspaces import limits
+
+    try:
+        limits.free_storage(makerspace, freed)
+    except Exception:
+        logger.exception("module_purge_private_accounting_failed", extra={"bytes": freed})
+
+
+def _delete_public_images_and_free_storage(makerspace, keys):
     if not keys:
         return
     from apps.inventory import public_image_storage
 
+    # Freeing first when a best-effort delete silently failed makes the counter
+    # permanently wrong in the direction that grants free storage.
     for key in keys:
-        try:
-            public_image_storage.delete_object(key)
-        except Exception:
-            logger.exception("module_purge_public_image_delete_failed: %s", key)
+        public_image_storage.release_public_image(makerspace, key)

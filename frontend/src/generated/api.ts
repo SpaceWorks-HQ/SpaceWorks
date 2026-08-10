@@ -1333,6 +1333,7 @@ export type EventStaffRegistration = {
   "member_id": number;
   "custom_answers"?: unknown | null;
   "phone"?: string;
+  "email"?: string;
 };
 
 export type EventWrite = {

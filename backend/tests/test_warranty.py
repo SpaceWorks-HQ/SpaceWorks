@@ -220,7 +220,9 @@ def test_printer_warranty_upsert_read_update_and_audit():
     ]
 
 
-def test_machine_warranty_upsert_and_generic_document_endpoints(monkeypatch):
+def test_machine_warranty_upsert_and_generic_document_endpoints(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     delete = mock_warranty_storage(monkeypatch)
     makerspace = make_space("warranty-machine-upsert")
     user = make_member("warranty-machine-manager", makerspace)
@@ -263,9 +265,12 @@ def test_machine_warranty_upsert_and_generic_document_endpoints(monkeypatch):
     signed = client.get(
         reverse("admin-warranty-document-url", kwargs={"pk": document.id})
     )
-    deleted = client.delete(
-        reverse("admin-warranty-document-detail", kwargs={"pk": document.id})
-    )
+    # The object deletion is deferred to on_commit so a rollback can never destroy a file
+    # whose row came back, so the callbacks have to be executed for it to be observable.
+    with django_capture_on_commit_callbacks(execute=True):
+        deleted = client.delete(
+            reverse("admin-warranty-document-detail", kwargs={"pk": document.id})
+        )
 
     assert created.status_code == 200
     assert read.status_code == 200
@@ -399,7 +404,9 @@ def test_machine_warranty_operator_type_manager_tenant_and_module_contract():
     assert authenticated_client(operate).get(url).status_code == 403
 
 
-def test_warranty_documents_presign_finalize_url_delete_and_guards(monkeypatch):
+def test_warranty_documents_presign_finalize_url_delete_and_guards(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     delete = mock_warranty_storage(monkeypatch)
     makerspace = make_space("warranty-docs")
     other_space = make_space("warranty-docs-other")
@@ -451,7 +458,10 @@ def test_warranty_documents_presign_finalize_url_delete_and_guards(monkeypatch):
     cross_tenant = authenticated_client(other_member).get(
         reverse("admin-warranty-document-url", kwargs={"pk": document.id})
     )
-    deleted = client.delete(reverse("admin-warranty-document-detail", kwargs={"pk": document.id}))
+    with django_capture_on_commit_callbacks(execute=True):
+        deleted = client.delete(
+            reverse("admin-warranty-document-detail", kwargs={"pk": document.id})
+        )
 
     assert presign.status_code == 201
     assert object_key.startswith(f"warranty/{makerspace.id}/")
@@ -828,7 +838,9 @@ def test_warranty_document_keys_are_collected_for_makerspace_purge():
     assert document.object_key in keys
 
 
-def test_cascade_delete_of_host_removes_warranty_document_object(monkeypatch):
+def test_cascade_delete_of_host_removes_warranty_document_object(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     delete = Mock()
     monkeypatch.setattr("apps.warranty.storage.delete_object", delete)
     makerspace = make_space("warranty-cascade")
@@ -844,8 +856,10 @@ def test_cascade_delete_of_host_removes_warranty_document_object(monkeypatch):
     )
 
     # Deleting the host asset CASCADEs to Warranty -> WarrantyDocument; the post_delete
-    # signal must still clean up the private object even though no view ran.
-    asset.delete()
+    # signal must still clean up the private object even though no view ran. The signal
+    # defers the storage call to on_commit, so the callbacks are executed here.
+    with django_capture_on_commit_callbacks(execute=True):
+        asset.delete()
 
     assert not WarrantyDocument.objects.filter(object_key=object_key).exists()
     delete.assert_called_once_with(object_key)

@@ -7,6 +7,7 @@ import boto3
 from botocore.client import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
+from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
 from apps.evidence.storage import StorageUnavailable
@@ -62,7 +63,7 @@ def is_safe_object_key(object_key):
 
 def delete_object(object_key):
     if not object_key:
-        return
+        return True
     try:
         _client().delete_object(
             Bucket=settings.PUBLIC_IMAGE_BUCKET,
@@ -70,6 +71,60 @@ def delete_object(object_key):
         )
     except (BotoCoreError, ClientError):
         logger.exception("Failed to delete public image object %s.", object_key)
+        return False
+    return True
+
+
+def release_public_image(makerspace, object_key, storage=None):
+    """Delete a public image object and free its quota only if the delete succeeded.
+
+    The HEAD must precede the delete -- the size is unobtainable once the object is gone
+    -- but the quota must be released only once the delete reported success. Freeing on a
+    silent failure is the direction that permanently grants free storage, which is why
+    every step is best-effort and a failure frees nothing.
+
+    `storage` overrides the module the two calls resolve against. `apps.bookings.storage`
+    wraps this with its own implementations, and its service layer takes `storage` as an
+    injected dependency, so binding these to this module unconditionally would quietly
+    step around that seam.
+    """
+    from apps.makerspaces import limits
+
+    sizer = storage.object_size if storage is not None else object_size
+    deleter = storage.delete_object if storage is not None else delete_object
+
+    size = None
+    try:
+        size = sizer(object_key)
+    except Exception:
+        logger.exception("Failed to size public image object before release: %s", object_key)
+    try:
+        deleted = deleter(object_key)
+    except Exception:
+        logger.exception("Failed to delete public image object during release: %s", object_key)
+        return
+    # Strict: only an affirmative True frees the quota. A deleter that reports nothing
+    # cannot confirm anything, and treating silence as success is how a counter drifts
+    # downward into permanently free storage.
+    if not deleted or size is None:
+        return
+    try:
+        limits.free_storage(makerspace, size)
+    except Exception:
+        logger.exception("Failed to free public image storage quota: %s", object_key)
+
+
+def release_public_image_on_commit(makerspace, object_key, storage=None):
+    """Schedule release_public_image for after the current transaction commits."""
+    transaction.on_commit(
+        lambda key=object_key: release_public_image(makerspace, key, storage)
+    )
+
+
+def delete_public_image_on_commit(object_key):
+    """Defer a public-image delete to after commit, without touching the quota."""
+    transaction.on_commit(lambda key=object_key: delete_object(key))
+
 
 def put_bytes(object_key, data, content_type):
     try:

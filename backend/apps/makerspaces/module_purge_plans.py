@@ -31,8 +31,10 @@ from apps.makerspaces.module_purge_collectors import (
     events_public_images,
     mattermost_destinations_delete,
     machine_service_delete,
+    machine_service_private_key_sizes,
     machine_service_private_keys,
     maintenance_delete,
+    maintenance_private_key_sizes,
     maintenance_private_keys,
     membership_delete,
     membership_public_image_keys,
@@ -55,6 +57,13 @@ class ModulePurgePlan:
     payment_subjects: tuple[str, ...] = ()
     pii_labels: tuple[str, ...] = ()
     private_keys: Callable | None = None
+    # `{object_key: size_bytes}` for private objects whose bytes were charged to the
+    # makerspace's storage quota. Declared separately from `private_keys` so the quota is
+    # released only for keys whose deletion the bucket actually confirmed: a private
+    # delete is best-effort, and freeing bytes for an object that survived is the
+    # direction that permanently grants free storage. A module that charges nothing for
+    # its private objects leaves this None.
+    private_key_sizes: Callable | None = None
     public_image_keys: Callable | None = None
 
 
@@ -92,6 +101,7 @@ PLANS = (
     ModulePurgePlan(
         "maintenance", "Maintenance schedules, logs and log documents.", maintenance_delete,
         private_keys=maintenance_private_keys,
+        private_key_sizes=maintenance_private_key_sizes,
     ),
     ModulePurgePlan(
         "procurement", "To-buy items and their receipts.", procurement_delete,
@@ -118,6 +128,7 @@ PLANS = (
         payment_subjects=("machine_service_request",),
         pii_labels=("machines.MachineServiceRequest",),
         private_keys=machine_service_private_keys,
+        private_key_sizes=machine_service_private_key_sizes,
     ),
     # One plan per chat channel, not one for "chat": a tenant may purge Discord while
     # keeping the Slack rooms it still uses, and each key is uninstalled independently.

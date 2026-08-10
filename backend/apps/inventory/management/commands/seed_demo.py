@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from decimal import Decimal
 
 from apps.accounts.models import User
@@ -127,7 +127,11 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING(f"Demo password for all accounts: {password}"))
 
     def _user(self, username, email, password, role, **flags):
-        user, _ = User.objects.get_or_create(username=username, defaults={"email": email})
+        user, created = User.objects.get_or_create(username=username, defaults={"email": email})
+        # CLI access already overrides application rules; this assertion makes an
+        # improbable collision loud instead of silently changing a person record.
+        if not created and user.is_walk_in:
+            raise CommandError(f"Cannot seed {username!r}: the existing user is a walk-in.")
         user.email = email
         user.role = role
         user.access_status = User.AccessStatus.ACTIVE

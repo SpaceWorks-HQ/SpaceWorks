@@ -1,5 +1,6 @@
 '''Public-image storage helpers for bookable spaces.'''
 
+import sys
 import uuid
 import time
 import logging
@@ -17,6 +18,20 @@ logger = logging.getLogger(__name__)
 FinalizeResult = shared.FinalizeResult
 is_safe_object_key = shared.is_safe_object_key
 staging_key = shared.staging_key
+
+
+def release_public_image_on_commit(makerspace, object_key):
+    """Retire a space image, sizing and deleting through THIS module.
+
+    A bare re-export of the shared function would resolve `object_size`/`delete_object`
+    against the shared module, stepping around the `storage` dependency the service layer
+    takes as a parameter -- so a caller that injected its own storage would silently get
+    someone else's. `sys.modules[__name__]` is resolved per call, so a replaced attribute
+    on this module is honoured.
+    """
+    shared.release_public_image_on_commit(
+        makerspace, object_key, sys.modules[__name__]
+    )
 
 
 def _client():
@@ -42,8 +57,14 @@ def copy_object(source_key, dest_key):
 
 
 def delete_object(object_key):
+    """Best-effort delete, reporting whether the object is actually gone.
+
+    The boolean matters: `release_public_image` frees the storage quota only on a True,
+    because freeing after a silent failure is the direction that permanently hands out
+    free storage. Returning None on both success and failure made that unanswerable.
+    """
     if not object_key:
-        return
+        return True
     try:
         _client().delete_object(
             Bucket=settings.PUBLIC_IMAGE_BUCKET,
@@ -51,6 +72,8 @@ def delete_object(object_key):
         )
     except (BotoCoreError, ClientError):
         logger.exception('Failed to delete space image object %s.', object_key)
+        return False
+    return True
 
 
 def ext_for(content_type, filename):

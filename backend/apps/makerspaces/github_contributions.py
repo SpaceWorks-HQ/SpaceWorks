@@ -55,14 +55,23 @@ def refresh(profile):
     """Update one profile's count. Returns True when a fresh number was stored."""
     from apps.makerspaces.models import MemberProfile
 
-    total = fetch_total(profile.github_username)
+    login = profile.github_username
+    total = fetch_total(login)
     fields = {"github_synced_at": timezone.now()}
     if total is not None:
         fields["github_contributions"] = total
     # `.update()` rather than `save()`: this runs from a task, and a full save would
     # write back whatever the member edited between the read and now.
-    MemberProfile.objects.filter(pk=profile.pk).update(**fields)
-    return total is not None
+    #
+    # Filtered on the handle that was FETCHED, not just the pk. A member can change
+    # `github_username` while the request is in flight -- `save_profile` clears the cache
+    # for the new handle, and an unconditional update would then write the OLD account's
+    # total straight back onto it. A count under the wrong name is a false claim, not
+    # stale data, so the write is dropped rather than applied.
+    return bool(
+        MemberProfile.objects.filter(pk=profile.pk, github_username=login).update(**fields)
+        and total is not None
+    )
 
 
 def fetch_total(login):

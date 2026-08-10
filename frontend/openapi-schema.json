@@ -23678,6 +23678,9 @@
                     "403": {
                         "description": "An active membership is required."
                     },
+                    "429": {
+                        "description": "Too many image upload requests."
+                    },
                     "503": {
                         "description": "Public image storage is unavailable."
                     }
@@ -31501,6 +31504,19 @@
                         "type": "string",
                         "default": "",
                         "maxLength": 32
+                    },
+                    "email": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "email",
+                                "default": ""
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
                     }
                 },
                 "required": [

@@ -86,7 +86,7 @@ class PublicImageAdminMixin:
             setattr(obj, self.image_field, key)
             super().save_model(request, obj, form, change)
             if old_key and old_key != key:
-                public_image_storage.delete_object(old_key)
+                public_image_storage.delete_public_image_on_commit(old_key)
             audit.record(
                 request.user,
                 self.image_attach_action,
@@ -99,7 +99,7 @@ class PublicImageAdminMixin:
             setattr(obj, self.image_field, "")
             super().save_model(request, obj, form, change)
             if old_key:
-                public_image_storage.delete_object(old_key)
+                public_image_storage.delete_public_image_on_commit(old_key)
             audit.record(
                 request.user,
                 self.image_clear_action,

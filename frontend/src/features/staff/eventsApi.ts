@@ -195,6 +195,7 @@ export function useRegisterMemberForEvent(makerspaceId: number, eventId: number)
     mutationFn: (payload: {
       member_id: number;
       phone?: string;
+      email?: string;
       custom_answers?: Record<string, unknown>;
     }) =>
       staffRequest<EventRegistration>(

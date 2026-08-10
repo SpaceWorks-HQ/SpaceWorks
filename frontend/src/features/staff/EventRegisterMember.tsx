@@ -17,9 +17,12 @@ import { useEventEligibleMembers, useRegisterMemberForEvent, type StaffEvent } f
  * picker entry whose every use returns "already registered" is an error the interface
  * should not have offered.
  *
- * The phone field appears only after the server asks for one. A registration needs a
- * contact number and the member's account may carry none, so rather than demanding it
- * every time, the form asks exactly when it turns out to be missing.
+ * The phone and email fields appear only after the server asks for one. A registration
+ * needs both a contact number and an address, and a staff-created walk-in may carry
+ * neither, so rather than demanding them every time, the form asks exactly when one
+ * turns out to be missing. Without these the backend's fallbacks would be unreachable
+ * from the console, which is the same as not having them: the members this program made
+ * registrable are precisely the ones whose accounts are empty.
  */
 export function EventRegisterMember({
   makerspaceId,
@@ -35,6 +38,8 @@ export function EventRegisterMember({
   const [memberId, setMemberId] = useState("");
   const [phone, setPhone] = useState("");
   const [needsPhone, setNeedsPhone] = useState(false);
+  const [email, setEmail] = useState("");
+  const [needsEmail, setNeedsEmail] = useState(false);
   // Without this the console could never register anyone for an event whose form has a
   // required question: the backend validates answers on this path exactly as it does for
   // public self-registration, so a form with no way to answer it is a permanent 400.
@@ -60,6 +65,7 @@ export function EventRegisterMember({
       {
         member_id: Number(memberId),
         ...(phone.trim() ? { phone: phone.trim() } : {}),
+        ...(email.trim() ? { email: email.trim() } : {}),
         ...(customForm?.length ? { custom_answers: answers } : {}),
       },
       {
@@ -67,11 +73,24 @@ export function EventRegisterMember({
           setMemberId("");
           setPhone("");
           setNeedsPhone(false);
+          setEmail("");
+          setNeedsEmail(false);
           setAnswers({});
           setAnswerErrors({});
         },
         onError: (error) => {
-          setNeedsPhone(/phone/i.test(error instanceof Error ? error.message : ""));
+          // Read the FIELD-KEYED body, never the message. `StructuredApiError` builds
+          // its message from `Object.values(body)` alone, so a DRF field error arrives
+          // as the bare string "This field cannot be blank." — it contains neither
+          // "phone" nor "email", and matching on it never fires. That is why the phone
+          // prompt this mirrors had never once appeared.
+          //
+          // A record missing both fields is refused on one of them at a time, so these
+          // accumulate rather than replace each other — clearing the phone prompt when
+          // the next attempt fails on email would hide the answer just given.
+          if (!(error instanceof StructuredApiError)) return;
+          if (error.body.phone) setNeedsPhone(true);
+          if (error.body.email) setNeedsEmail(true);
         },
       },
     );
@@ -88,7 +107,15 @@ export function EventRegisterMember({
           className="desk-input w-full"
           value={memberId}
           disabled={members.isLoading}
-          onChange={(event) => setMemberId(event.target.value)}
+          onChange={(event) => {
+            setMemberId(event.target.value);
+            // A fallback contact belongs to one specific person and must never carry
+            // across to another.
+            setPhone("");
+            setNeedsPhone(false);
+            setEmail("");
+            setNeedsEmail(false);
+          }}
         >
           <option value="">
             {members.isLoading ? "Loading members…" : "Select a member"}
@@ -132,6 +159,23 @@ export function EventRegisterMember({
           />
           <p className="mt-1 text-xs text-muted">
             This member&apos;s account has no number on file.
+          </p>
+        </div>
+      ) : null}
+      {needsEmail ? (
+        <div className="mt-2">
+          <label className="block text-sm font-semibold text-ink" htmlFor="event-register-email">
+            Contact email
+          </label>
+          <input
+            id="event-register-email"
+            type="email"
+            className="desk-input mt-1 w-full"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <p className="mt-1 text-xs text-muted">
+            This member&apos;s account has no address on file.
           </p>
         </div>
       ) : null}

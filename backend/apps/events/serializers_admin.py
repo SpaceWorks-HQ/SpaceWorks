@@ -156,6 +156,10 @@ class EventStaffRegistrationSerializer(serializers.Serializer):
     # a contact number, so without this a member who never entered one could not be
     # registered by anybody — a dead end the person at the desk can simply ask about.
     phone = serializers.CharField(max_length=32, required=False, allow_blank=True, default='')
+    # Same fallback shape, for the same reason: `EventRegistration.email` is non-blank,
+    # and a walk-in may have been created with a name and nothing else. Without this,
+    # exactly the members this program made registrable could never be registered.
+    email = serializers.EmailField(required=False, allow_blank=True, default='')
 
 
 class EventEligibleMemberSerializer(serializers.Serializer):

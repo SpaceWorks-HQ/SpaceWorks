@@ -1,7 +1,7 @@
 import os
 
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils.text import slugify
 
 from apps.makerspaces.models import Makerspace
@@ -41,6 +41,10 @@ class Command(BaseCommand):
                 "is_superuser": True,
             },
         )
+        # CLI access already overrides application rules; this assertion makes an
+        # improbable collision loud instead of silently changing a person record.
+        if not created and user.is_walk_in:
+            raise CommandError(f"Cannot set up {username!r}: the existing user is a walk-in.")
         if created:
             user.set_password(password)
             user.must_change_password = not explicit_password

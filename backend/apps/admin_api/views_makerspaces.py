@@ -24,7 +24,7 @@ from apps.audit import services as audit
 from apps.evidence.responses import storage_unavailable_response
 from apps.evidence.storage import StorageUnavailable
 from apps.inventory import public_image_storage
-from apps.makerspaces.limits import add_storage, free_storage
+from apps.makerspaces.limits import add_storage
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.origin_scope import origin_scoped_makerspace_id
 
@@ -240,7 +240,7 @@ class MakerspaceImageView(APIView):
             raise ValidationError({"object_key": "Image object key is outside this makerspace."})
         if not public_image_storage.is_safe_object_key(object_key):
             raise ValidationError({"object_key": "Invalid image object key."})
-        if public_image_storage.public_image_key_in_use(
+        if object_key and public_image_storage.public_image_key_in_use(
             makerspace.id,
             object_key,
             makerspace_field=self.image_field,
@@ -269,12 +269,18 @@ class MakerspaceImageView(APIView):
             raise ValidationError(
                 {"object_key": "Uploaded file is not a valid image."}
             )
+        makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+        if object_key and public_image_storage.public_image_key_in_use(
+            makerspace.id,
+            object_key,
+            makerspace_field=self.image_field,
+        ):
+            raise ValidationError({"object_key": "This image is already in use."})
         old_key = getattr(makerspace, self.image_field)
         if object_key != old_key:
-            add_storage(makerspace, public_image_storage.object_size(object_key))
+            add_storage(makerspace, result.size)
         if old_key and old_key != object_key:
-            free_storage(makerspace, public_image_storage.object_size(old_key))
-            public_image_storage.delete_object(old_key)
+            public_image_storage.release_public_image_on_commit(makerspace, old_key)
         setattr(makerspace, self.image_field, object_key)
         makerspace.save(update_fields=[self.image_field, "updated_at"])
         audit.record(
@@ -293,10 +299,10 @@ class MakerspaceImageView(APIView):
     @transaction.atomic
     def delete(self, request, makerspace_id, *args, **kwargs):
         makerspace = self._makerspace(request, makerspace_id)
+        makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
         old_key = getattr(makerspace, self.image_field)
         if old_key:
-            free_storage(makerspace, public_image_storage.object_size(old_key))
-            public_image_storage.delete_object(old_key)
+            public_image_storage.release_public_image_on_commit(makerspace, old_key)
         setattr(makerspace, self.image_field, "")
         makerspace.save(update_fields=[self.image_field, "updated_at"])
         audit.record(
