@@ -120,6 +120,26 @@ function ProfileDetail({ profile }: { profile: MemberProfile }) {
           {profile.activity.events_attended} events attended here.
         </p>
       ) : null}
+      {profile.activity?.recent_attended_events?.length ? (
+        <div className="mt-3">
+          {/* "Recent" is load-bearing, not decoration: the backend caps this list, so a
+              heading reading "Events attended" would claim to be the full history. The
+              count above is the truthful total. */}
+          <h4 className="text-sm font-medium text-ink">Recently attended</h4>
+          <ul className="mt-1 space-y-1 text-sm text-muted">
+            {profile.activity.recent_attended_events.map((event) => (
+              <li key={event.id}>
+                {event.title} ·{" "}
+                {new Date(event.starts_at).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {profile.projects.length ? (
         <div className="mt-3 space-y-3">
           {profile.projects.map((project) => (

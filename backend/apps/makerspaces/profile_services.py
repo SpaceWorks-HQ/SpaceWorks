@@ -6,6 +6,8 @@ from apps.audit import services as audit
 from apps.inventory import public_image_storage
 from apps.makerspaces.models import MakerspaceMembership, MemberProfile, MemberProject
 
+RECENT_ATTENDED_EVENTS_LIMIT = 20
+
 
 def profile_for(membership):
     """The membership's profile row, created on demand.
@@ -29,6 +31,7 @@ def read_profile(membership, *, include_activity=True):
         "membership_id": membership.pk,
         "display_name": display_name_for(membership),
         "is_visible": profile.is_visible,
+        "show_attended_events": profile.show_attended_events,
         "headline": profile.headline,
         "institution": profile.institution,
         "bio": profile.bio,
@@ -66,11 +69,10 @@ def profile_activity(membership):
     activity = {}
     makerspace = membership.makerspace
     if module_enabled(makerspace, "events"):
+        from apps.events.member_history import registrations_for_space
         from apps.events.models import EventRegistration
 
-        registrations = EventRegistration.objects.filter(
-            event__makerspace=makerspace, member=membership.user
-        )
+        registrations = registrations_for_space(makerspace, membership.user)
         activity["events_attended"] = registrations.filter(
             status=EventRegistration.Status.ATTENDED
         ).count()
@@ -79,6 +81,34 @@ def profile_activity(membership):
         activity["events_registered"] = registrations.exclude(
             status=EventRegistration.Status.CANCELLED
         ).count()
+        # Read the consent flag straight from the row, deliberately NOT through
+        # `membership.profile` or `profile_for`. `get_or_create(membership=...)` populates
+        # the reverse one-to-one cache on the membership instance, and `save_profile`
+        # re-reads the row through a *separate* instance -- so anything saving twice on one
+        # membership object would then gate publication on a stale copy of the flag. A
+        # privacy gate must not depend on which instance happened to warm a cache. This
+        # also stops a read path from creating a row, which `profile_for` would.
+        show_attended_events = MemberProfile.objects.filter(
+            membership=membership
+        ).values_list("show_attended_events", flat=True).first()
+        if show_attended_events:
+            recent = (
+                registrations.filter(status=EventRegistration.Status.ATTENDED)
+                .select_related("event")
+                .only("event__id", "event__title", "event__starts_at")
+                # `-id` is a tiebreaker, not decoration: two events can share a
+                # `starts_at`, and without it the cap could include a different subset
+                # on each request. `member_activity_service` orders the same way.
+                .order_by("-event__starts_at", "-id")[:RECENT_ATTENDED_EVENTS_LIMIT]
+            )
+            activity["recent_attended_events"] = [
+                {
+                    "id": registration.event.id,
+                    "title": registration.event.title,
+                    "starts_at": registration.event.starts_at,
+                }
+                for registration in recent
+            ]
     return activity
 
 
@@ -89,11 +119,12 @@ def save_profile(membership, data):
         membership=membership
     ).first() or profile_for(membership)
     was_visible = profile.is_visible
+    attended_events_were_shown = profile.show_attended_events
     project_count_before = profile.projects.count()
     fields = []
     for field in (
-        "is_visible", "headline", "institution", "bio", "interests", "languages",
-        "education",
+        "is_visible", "show_attended_events", "headline", "institution", "bio",
+        "interests", "languages", "education",
     ):
         if field in data:
             setattr(profile, field, data[field])
@@ -112,20 +143,33 @@ def save_profile(membership, data):
         profile.save(update_fields=[*fields, "updated_at"])
     if "projects" in data:
         save_projects(profile, data["projects"])
-    _audit_profile_saved(membership, profile, was_visible, project_count_before, fields)
+    _audit_profile_saved(
+        membership,
+        profile,
+        was_visible,
+        attended_events_were_shown,
+        project_count_before,
+        fields,
+    )
     return profile
 
 
-def _audit_profile_saved(membership, profile, was_visible, project_count_before, fields):
+def _audit_profile_saved(
+    membership,
+    profile,
+    was_visible,
+    attended_events_were_shown,
+    project_count_before,
+    fields,
+):
     """Record that the profile changed, without copying its contents into the log.
 
     The audit log is append-only and makerspace-scoped, so it must say *what changed*
-    and by whom — but writing the bio and education text into it would copy member PII
-    into a store that is deliberately impossible to edit or delete. The meta therefore
-    names the fields touched and the visibility transition, which is the part with
-    consequences for anyone other than the author.
+    and by whom — but writing profile contents or derived event details into it would
+    copy member PII into a store that is deliberately impossible to edit or delete. The
+    meta therefore names the fields touched and the boolean publication transitions.
     """
-    profile.refresh_from_db(fields=["is_visible"])
+    profile.refresh_from_db(fields=["is_visible", "show_attended_events"])
     audit.record(
         membership.user,
         "member.profile_updated",
@@ -135,6 +179,10 @@ def _audit_profile_saved(membership, profile, was_visible, project_count_before,
             "fields": sorted(fields),
             "visibility_changed": was_visible != profile.is_visible,
             "is_visible": profile.is_visible,
+            "attended_events_shown": profile.show_attended_events,
+            "attended_events_changed": (
+                attended_events_were_shown != profile.show_attended_events
+            ),
             "projects_before": project_count_before,
             "projects_after": profile.projects.count(),
         },

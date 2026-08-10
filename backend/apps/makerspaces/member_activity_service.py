@@ -43,7 +43,7 @@ def member_activity(membership):
     if module_enabled(makerspace, "bookings"):
         payload["bookings"] = _bookings(makerspace.id, member, now)
     if module_enabled(makerspace, "events"):
-        payload["event_registrations"] = _event_registrations(makerspace.id, member)
+        payload["event_registrations"] = _event_registrations(makerspace, member)
     # runtime_active, not apps.is_installed: a tombstoned app stays in
     # INSTALLED_APPS (its migrations must remain applied), so is_installed answers
     # "are the tables there?" when this asks "are the surfaces live?".
@@ -82,7 +82,8 @@ def _bookings(makerspace_id, member, now):
     }
 
 
-def _event_registrations(makerspace_id, member):
+def _event_registrations(makerspace, member):
+    from apps.events.member_history import registrations_for_space
     from apps.events.models import EventRegistration
 
     waitlisted_before = EventRegistration.objects.filter(
@@ -91,9 +92,12 @@ def _event_registrations(makerspace_id, member):
         Q(created_at__lt=OuterRef("created_at"))
         | Q(created_at=OuterRef("created_at"), id__lte=OuterRef("id"))
     ).values("event_id").annotate(total=Count("id")).values("total")[:1]
-    rows = EventRegistration.objects.filter(
-        event__makerspace_id=makerspace_id, member=member,
-    ).select_related("event").annotate(
+    # Shares `registrations_for_space` with the profile surfaces deliberately. The
+    # waitlist-position subquery above is per-EVENT and stays local, but the question
+    # "which registrations does this member hold here" must have exactly one answer:
+    # when that predicate widens, a second copy here would make this endpoint and the
+    # profile disagree about the same member.
+    rows = registrations_for_space(makerspace, member).select_related("event").annotate(
         waitlist_position=Subquery(waitlisted_before, output_field=IntegerField())
     ).only("status", "created_at", "event__title", "event__starts_at", "event__ends_at")
     return [{

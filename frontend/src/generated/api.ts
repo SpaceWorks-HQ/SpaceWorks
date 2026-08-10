@@ -643,6 +643,12 @@ export type AssignOperator = {
   "access_level": string;
 };
 
+export type AttendedEvent = {
+  "id": number;
+  "title": string;
+  "starts_at": string;
+};
+
 export type AuditLog = {
   "id": number;
   "actor"?: number | null;
@@ -3346,6 +3352,12 @@ export type ProductQrHistory = {
   "scans": Array<QrHistoryItem>;
 };
 
+export type ProfileActivity = {
+  "events_attended"?: number;
+  "events_registered"?: number;
+  "recent_attended_events"?: Array<AttendedEvent>;
+};
+
 export type ProfileImageAttachRequest = {
   "object_key": string;
   "project_id"?: number;
@@ -3361,6 +3373,7 @@ export type ProfileRead = {
   "membership_id": number;
   "display_name": string;
   "is_visible": boolean;
+  "show_attended_events": boolean;
   "headline": string;
   "institution": string;
   "bio": string;
@@ -3371,11 +3384,12 @@ export type ProfileRead = {
   "github_username": string;
   "github_contributions": number | null;
   "projects": Array<ProjectRead>;
-  "activity": unknown;
+  "activity": ProfileActivity;
 };
 
 export type ProfileWrite = {
   "is_visible"?: boolean;
+  "show_attended_events"?: boolean;
   "headline"?: string;
   "institution"?: string;
   "bio"?: string;

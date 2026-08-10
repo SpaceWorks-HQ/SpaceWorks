@@ -12,10 +12,17 @@ export type MemberProject = {
   image_url: string | null;
 };
 
+export interface MemberProfileActivity {
+  events_attended?: number;
+  events_registered?: number;
+  recent_attended_events?: { id: number; title: string; starts_at: string }[];
+}
+
 export type MemberProfile = {
   membership_id: number;
   display_name: string;
   is_visible: boolean;
+  show_attended_events: boolean;
   headline: string;
   institution: string;
   bio: string;
@@ -26,7 +33,7 @@ export type MemberProfile = {
   github_username: string;
   github_contributions: number | null;
   projects: MemberProject[];
-  activity: Record<string, number>;
+  activity: MemberProfileActivity;
 };
 
 type ProjectDraft = {
@@ -89,6 +96,7 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
         method: "PUT",
         body: JSON.stringify({
           is_visible: draft?.is_visible ?? false,
+          show_attended_events: draft?.show_attended_events ?? false,
           headline: draft?.headline ?? "",
           institution: draft?.institution ?? "",
           bio: draft?.bio ?? "",
@@ -141,6 +149,15 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
           onChange={(event) => patch({ is_visible: event.target.checked })}
         />
         Show my profile in this makerspace&apos;s member directory
+      </label>
+      <label className="mt-2 flex items-center gap-2 text-sm text-ink">
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={draft.show_attended_events}
+          onChange={(event) => patch({ show_attended_events: event.target.checked })}
+        />
+        Also show the events I have attended on my profile
       </label>
 
       <div className="mt-4">

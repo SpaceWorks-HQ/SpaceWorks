@@ -28738,6 +28738,26 @@
                     "user_id"
                 ]
             },
+            "AttendedEvent": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "id",
+                    "starts_at",
+                    "title"
+                ]
+            },
             "AuditLog": {
                 "type": "object",
                 "properties": {
@@ -39717,6 +39737,23 @@
                     "scans"
                 ]
             },
+            "ProfileActivity": {
+                "type": "object",
+                "properties": {
+                    "events_attended": {
+                        "type": "integer"
+                    },
+                    "events_registered": {
+                        "type": "integer"
+                    },
+                    "recent_attended_events": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AttendedEvent"
+                        }
+                    }
+                }
+            },
             "ProfileImageAttachRequest": {
                 "type": "object",
                 "properties": {
@@ -39763,6 +39800,9 @@
                     "is_visible": {
                         "type": "boolean"
                     },
+                    "show_attended_events": {
+                        "type": "boolean"
+                    },
                     "headline": {
                         "type": "string"
                     },
@@ -39792,7 +39832,9 @@
                             "$ref": "#/components/schemas/ProjectRead"
                         }
                     },
-                    "activity": {}
+                    "activity": {
+                        "$ref": "#/components/schemas/ProfileActivity"
+                    }
                 },
                 "required": [
                     "activity",
@@ -39808,13 +39850,17 @@
                     "is_visible",
                     "languages",
                     "membership_id",
-                    "projects"
+                    "projects",
+                    "show_attended_events"
                 ]
             },
             "ProfileWrite": {
                 "type": "object",
                 "properties": {
                     "is_visible": {
+                        "type": "boolean"
+                    },
+                    "show_attended_events": {
                         "type": "boolean"
                     },
                     "headline": {

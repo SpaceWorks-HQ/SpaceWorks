@@ -34,6 +34,13 @@ class MemberProfile(models.Model):
         default=False,
         help_text="Whether other members of this makerspace can see this profile.",
     )
+    # CONSENT, not configurability: profile visibility publishes fields the member typed
+    # into the form, while attendance is separately derived information. Reusing
+    # is_visible would disclose it on already-visible profiles without a new member act.
+    show_attended_events = models.BooleanField(
+        default=False,
+        help_text="Whether to publish recently attended events on this member profile.",
+    )
     headline = models.CharField(max_length=200, blank=True, default="")
     institution = models.CharField(max_length=200, blank=True, default="")
     bio = models.TextField(blank=True, default="")

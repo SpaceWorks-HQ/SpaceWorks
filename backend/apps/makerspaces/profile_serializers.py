@@ -64,6 +64,7 @@ class ProjectWriteSerializer(serializers.Serializer):
 
 class ProfileWriteSerializer(serializers.Serializer):
     is_visible = serializers.BooleanField(required=False)
+    show_attended_events = serializers.BooleanField(required=False)
     headline = serializers.CharField(max_length=200, required=False, allow_blank=True)
     institution = serializers.CharField(max_length=200, required=False, allow_blank=True)
     bio = serializers.CharField(max_length=MAX_BIO, required=False, allow_blank=True)
@@ -90,10 +91,31 @@ class ProjectReadSerializer(serializers.Serializer):
     image_url = serializers.CharField(allow_null=True)
 
 
+class AttendedEventSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    starts_at = serializers.DateTimeField()
+
+
+class ProfileActivitySerializer(serializers.Serializer):
+    events_attended = serializers.IntegerField(required=False)
+    events_registered = serializers.IntegerField(required=False)
+    recent_attended_events = AttendedEventSerializer(many=True, required=False)
+
+    def to_representation(self, instance):
+        # Filtering against the source mapping makes omission explicit: module-disabled
+        # keys must stay absent rather than becoming null or an invented empty list.
+        representation = super().to_representation(instance)
+        return {
+            key: value for key, value in representation.items() if key in instance
+        }
+
+
 class ProfileReadSerializer(serializers.Serializer):
     membership_id = serializers.IntegerField()
     display_name = serializers.CharField()
     is_visible = serializers.BooleanField()
+    show_attended_events = serializers.BooleanField()
     headline = serializers.CharField()
     institution = serializers.CharField()
     bio = serializers.CharField()
@@ -104,7 +126,7 @@ class ProfileReadSerializer(serializers.Serializer):
     github_username = serializers.CharField()
     github_contributions = serializers.IntegerField(allow_null=True)
     projects = ProjectReadSerializer(many=True)
-    activity = serializers.JSONField()
+    activity = ProfileActivitySerializer()
 
 
 class DirectoryEntrySerializer(serializers.Serializer):
