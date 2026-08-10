@@ -79,6 +79,7 @@ MODEL_LOOKUPS = {
     'admin-event-cancel': ('events.Event', 'makerspace_id'),
     'admin-event-complete': ('events.Event', 'makerspace_id'),
     'admin-event-registration-list': ('events.Event', 'makerspace_id'),
+    'admin-event-check-in-resolve': ('events.Event', 'makerspace_id'),
     'admin-event-registration-mark-attended': ('events.EventRegistration', 'event__makerspace_id'),
     'admin-machine-operator-candidates': ('machines.Machine', 'makerspace_id'),
     'admin-machine-publicity': ('machines.Machine', 'makerspace_id'),

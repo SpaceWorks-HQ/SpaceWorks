@@ -93,6 +93,7 @@ export const openApiPaths = [
   "/api/v1/admin/event-registrations/{id}/mark-attended/",
   "/api/v1/admin/events/{id}/",
   "/api/v1/admin/events/{id}/cancel/",
+  "/api/v1/admin/events/{id}/check-in/resolve/",
   "/api/v1/admin/events/{id}/complete/",
   "/api/v1/admin/events/{id}/eligible-members/",
   "/api/v1/admin/events/{id}/image",
@@ -352,6 +353,7 @@ export const openApiPaths = [
   "/api/v1/member/makerspaces/{makerspace_id}/activity",
   "/api/v1/member/makerspaces/{makerspace_id}/directory",
   "/api/v1/member/makerspaces/{makerspace_id}/directory/{membership_id}",
+  "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/{id}/qr",
   "/api/v1/member/makerspaces/{makerspace_id}/payments",
   "/api/v1/member/makerspaces/{makerspace_id}/payments/{payment_id}/checkout",
   "/api/v1/member/makerspaces/{makerspace_id}/payments/{payment_id}/mobile-intent",
@@ -1295,6 +1297,17 @@ export type EventAttendanceRow = {
   "attendance_rate_percent": number | null;
 };
 
+export type EventCheckInResolveRequest = {
+  "checkin_token": string;
+};
+
+export type EventCheckInResolveResponse = {
+  "registration_id": number;
+  "name": string;
+  "status": string;
+  "payment_status": string | null;
+};
+
 export type EventEligibleMember = {
   "member_id": number;
   "display_name": string;
@@ -2236,6 +2249,8 @@ export type MemberActivityRow = {
 };
 
 export type MemberEventRegistrationActivity = {
+  "registration_id": number;
+  "checkin_token": string | null;
   "event_title": string;
   "starts_at": string;
   "ends_at": string;

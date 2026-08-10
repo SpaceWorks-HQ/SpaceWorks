@@ -7,6 +7,7 @@ import {
   useEventRegistrations, useEvents, useMarkEventAttended, usePublishEvent, useUpdateEvent,
   type EventPayload, type StaffEvent,
 } from "./eventsApi";
+import EventCheckInScanner from "./EventCheckInScanner";
 import { EventRegisterMember } from "./EventRegisterMember";
 import { ImageUploader } from "./ImageUploader";
 import { Panel } from "./panels/shared";
@@ -150,6 +151,7 @@ function EventDrawer({ eventId, makerspaceId, onClose }: { eventId: number; make
   const [values, setValues] = useState(emptyForm);
   const [page, setPage] = useState(1);
   const [confirm, setConfirm] = useState<Action | null>(null);
+  const [scanning, setScanning] = useState(false);
   const registrations = useEventRegistrations(eventId, page);
   const update = useUpdateEvent(makerspaceId, eventId);
   const publish = usePublishEvent(makerspaceId, eventId);
@@ -183,6 +185,14 @@ function EventDrawer({ eventId, makerspaceId, onClose }: { eventId: number; make
           {registrations.error ? <p className="text-sm text-danger">{errorText(registrations.error)}</p> : null}
           {registrations.data && !registrations.data.results.length ? <p className="text-sm text-muted">No registrations yet.</p> : null}
           <EventRegisterMember makerspaceId={makerspaceId} eventId={eventId} customForm={event.custom_form} disabled={event.status !== "published"} />
+          {/* Same condition as the per-row "Mark attended" button: attendance is only
+              meaningful once an event is published, and staff still check people in after
+              it completes. Unmounted when closed so the camera is released. */}
+          {event.status === "published" || event.status === "completed" ? (
+            scanning
+              ? <EventCheckInScanner makerspaceId={makerspaceId} eventId={eventId} onClose={() => setScanning(false)} />
+              : <button className="desk-button mt-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus" type="button" onClick={() => setScanning(true)}>Scan check-in</button>
+          ) : null}
           {registrations.data?.results.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Event registration contact details</caption><thead className="text-xs text-muted"><tr><th className="p-2">Name</th><th className="p-2">Contact</th><th className="p-2">Status</th><th className="p-2">Action</th></tr></thead><tbody>
             {registrations.data.results.map((row) => <tr key={row.id} className="border-t border-line"><td className="p-2">{row.name}<PaymentReconcileActions makerspaceId={makerspaceId} payment={row.payment} invalidateKeys={[["event", eventId, "registrations"], ["event", eventId], ["events", makerspaceId]]} /></td><td className="p-2"><a className="block hover:underline" href={`mailto:${row.email}`}>{row.email}</a><a className="block text-muted hover:underline" href={`tel:${row.phone}`}>{row.phone}</a></td><td className="p-2"><StatusBadge status={row.status} /></td><td className="p-2">{row.status === "registered" && (event.status === "published" || event.status === "completed") ? <button className="desk-button" type="button" disabled={attended.isPending} onClick={() => attended.mutate(row.id)}>Mark attended</button> : "—"}</td></tr>)}
           </tbody></table></div> : null}

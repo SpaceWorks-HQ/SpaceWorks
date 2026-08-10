@@ -289,10 +289,13 @@ export async function fetchMe(): Promise<StaffAuthUser> {
   return staffRequest<StaffAuthUser>("/auth/me");
 }
 
-export async function staffRequest<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
+/** The authenticated request, up to but not including reading the body.
+ *
+ * Extracted so a non-JSON response (an SVG, say) can reuse the refresh-and-retry
+ * behaviour rather than carrying a second copy of it. A duplicated refresh path is how one
+ * caller silently stops recovering from an expired token.
+ */
+async function staffFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const makeRequest = () =>
     fetch(`${API_V1_URL}${path}`, {
@@ -317,6 +320,30 @@ export async function staffRequest<T>(
       expireStaffAuthSession();
     }
   }
+  return response;
+}
+
+/** Fetch a binary/non-JSON authenticated resource as a Blob.
+ *
+ * `<img src>` cannot carry an Authorization header, so an authenticated image has to be
+ * fetched and handed to the DOM as an object URL. Callers must revoke that URL.
+ */
+export async function staffRequestBlob(
+  path: string,
+  options: RequestInit = {},
+): Promise<Blob> {
+  const response = await staffFetch(path, options);
+  if (!response.ok) {
+    throw apiError(response.status, await response.json().catch(() => ({})));
+  }
+  return await response.blob();
+}
+
+export async function staffRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const response = await staffFetch(path, options);
 
   if (!response.ok) {
     throw apiError(response.status, await response.json().catch(() => ({})));

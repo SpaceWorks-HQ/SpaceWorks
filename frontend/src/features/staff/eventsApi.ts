@@ -63,6 +63,7 @@ const EVENT_CANCEL_PATH: ApiPath = "/api/v1/admin/events/{id}/cancel/";
 const EVENT_COMPLETE_PATH: ApiPath = "/api/v1/admin/events/{id}/complete/";
 const EVENT_REGISTRATIONS_PATH: ApiPath = "/api/v1/admin/events/{id}/registrations/";
 const MARK_ATTENDED_PATH: ApiPath = "/api/v1/admin/event-registrations/{id}/mark-attended/";
+const CHECK_IN_RESOLVE_PATH: ApiPath = "/api/v1/admin/events/{id}/check-in/resolve/";
 
 function staffPath(path: ApiPath, replacements: Record<string, number>) {
   return Object.entries(replacements).reduce(
@@ -163,6 +164,27 @@ export function useMarkEventAttended(makerspaceId: number, eventId: number) {
       queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
     ]); },
+  });
+}
+
+export type EventCheckInResolution = {
+  registration_id: number;
+  name: string;
+  status: EventRegistrationStatus;
+  // Null when the event is free or no charge was raised. Shown to the staffer, never
+  // used to block: cash is taken at the door and reconciled later.
+  payment_status: string | null;
+};
+
+export function useResolveEventCheckIn(eventId: number) {
+  // No invalidation: resolving is read-only by design. It turns a scanned token into a
+  // name so the staffer can see who is in front of them; `useMarkEventAttended` is the
+  // separate, explicitly-confirmed mutation.
+  return useMutation({
+    mutationFn: (checkinToken: string) => staffRequest<EventCheckInResolution>(
+      staffPath(CHECK_IN_RESOLVE_PATH, { id: eventId }),
+      { method: "POST", body: JSON.stringify({ checkin_token: checkinToken }) },
+    ),
   });
 }
 

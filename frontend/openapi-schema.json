@@ -2026,6 +2026,92 @@
                 }
             }
         },
+        "/api/v1/admin/events/{id}/check-in/resolve/": {
+            "post": {
+                "operationId": "api_v1_admin_events_check_in_resolve_create",
+                "summary": "Resolve an event check-in token",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventCheckInResolveRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventCheckInResolveRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventCheckInResolveRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EventCheckInResolveResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event access denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Registration not found."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/events/{id}/complete/": {
             "post": {
                 "operationId": "api_v1_admin_events_complete_create",
@@ -23277,6 +23363,71 @@
                 }
             }
         },
+        "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/{id}/qr": {
+            "get": {
+                "operationId": "api_v1_member_makerspaces_event_registrations_qr_retrieve",
+                "summary": "Render the caller's event check-in QR code",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member activity"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "image/svg+xml": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": "Check-in QR code as SVG."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "An active membership is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Registration not found."
+                    }
+                }
+            }
+        },
         "/api/v1/member/makerspaces/{makerspace_id}/payments": {
             "get": {
                 "operationId": "api_v1_member_makerspaces_payments_list",
@@ -31343,6 +31494,41 @@
                     "waitlisted"
                 ]
             },
+            "EventCheckInResolveRequest": {
+                "type": "object",
+                "properties": {
+                    "checkin_token": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "checkin_token"
+                ]
+            },
+            "EventCheckInResolveResponse": {
+                "type": "object",
+                "properties": {
+                    "registration_id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "payment_status": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "name",
+                    "payment_status",
+                    "registration_id",
+                    "status"
+                ]
+            },
             "EventEligibleMember": {
                 "type": "object",
                 "description": "A picker row. Name and id only — a roster is not a contact export.",
@@ -35269,6 +35455,14 @@
             "MemberEventRegistrationActivity": {
                 "type": "object",
                 "properties": {
+                    "registration_id": {
+                        "type": "integer"
+                    },
+                    "checkin_token": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
                     "event_title": {
                         "type": "string"
                     },
@@ -35289,8 +35483,10 @@
                     }
                 },
                 "required": [
+                    "checkin_token",
                     "ends_at",
                     "event_title",
+                    "registration_id",
                     "starts_at",
                     "status",
                     "waitlist_position"

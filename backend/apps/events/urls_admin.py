@@ -21,6 +21,7 @@ from apps.events.views_admin import (
     EventRegistrationMarkAttendedView,
 )
 from apps.events.views_admin_image import EventImageView
+from apps.events.views_checkin import EventCheckInResolveView
 
 urlpatterns = [
     path(
@@ -57,6 +58,13 @@ urlpatterns = [
         'events/<int:pk>/registrations/',
         EventRegistrationListView.as_view(),
         name='admin-event-registration-list',
+    ),
+    # Keep the kwarg named `pk`: origin scope resolves MODEL_LOOKUPS from
+    # kwargs.get('pk'), so another name would deny every custom-domain request.
+    path(
+        'events/<int:pk>/check-in/resolve/',
+        EventCheckInResolveView.as_view(),
+        name='admin-event-check-in-resolve',
     ),
     path(
         'events/<int:pk>/eligible-members/',

@@ -99,8 +99,26 @@ def _event_registrations(makerspace, member):
     # profile disagree about the same member.
     rows = registrations_for_space(makerspace, member).select_related("event").annotate(
         waitlist_position=Subquery(waitlisted_before, output_field=IntegerField())
-    ).only("status", "created_at", "event__title", "event__starts_at", "event__ends_at")
+    ).only(
+        "id", "checkin_token", "status", "created_at", "event__title",
+        "event__starts_at", "event__ends_at", "event__status",
+    )
+    # Two halves of one question, and they must match `EventCheckInQrView`'s filter exactly:
+    # the REGISTRATION must be registered (a waitlisted row has nothing confirmable behind
+    # it) and the EVENT must still be checkable. `services.cancel()` changes only
+    # `Event.status` and leaves registrations REGISTERED, so gating on the registration
+    # alone would advertise an admission code for a cancelled event.
+    from apps.events.views_checkin import CHECKABLE_EVENT_STATUSES
+
+    def usable_token(row):
+        return (
+            row.status == EventRegistration.Status.REGISTERED
+            and row.event.status in CHECKABLE_EVENT_STATUSES
+        )
+
     return [{
+        "registration_id": row.id,
+        "checkin_token": str(row.checkin_token) if usable_token(row) else None,
         "event_title": row.event.title, "starts_at": row.event.starts_at,
         "ends_at": row.event.ends_at, "status": row.status,
         "waitlist_position": row.waitlist_position if row.status == EventRegistration.Status.WAITLISTED else None,

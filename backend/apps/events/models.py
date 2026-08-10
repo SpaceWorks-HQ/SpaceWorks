@@ -129,6 +129,10 @@ class EventRegistration(ScopedPiiModelMixin, models.Model):
         on_delete=models.CASCADE,
         related_name="registrations",
     )
+    # editable=False keeps this out of ModelForms and admin. Do not re-read it in
+    # save(): register() uses save(update_fields=...) on a hot path, and no application
+    # code assigns the token after creation.
+    checkin_token = models.UUIDField(default=uuid4, unique=True, editable=False)
     name = models.TextField()
     email = models.TextField()
     phone = models.TextField()

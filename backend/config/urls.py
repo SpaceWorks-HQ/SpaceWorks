@@ -122,6 +122,7 @@ urlpatterns = [
     *separable("maintenance", "api/v1/admin/", "apps.maintenance.urls"),
     *separable("presence", "api/v1/admin/", "apps.presence.urls_admin"),
     *separable("events", "api/v1/admin/", "apps.events.urls_admin"),
+    *separable("events", "api/v1/member/", "apps.events.urls_member"),
     *separable("bookings", "api/v1/admin/", "apps.bookings.urls_admin"),
     path("api/v1/admin/", include("apps.boxes.urls")),
     path("api/v1/admin/", include("apps.evidence.urls")),

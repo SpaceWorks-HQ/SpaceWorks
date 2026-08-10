@@ -29,6 +29,8 @@ class MemberPrintActivitySerializer(serializers.Serializer):
 
 
 class MemberEventRegistrationActivitySerializer(serializers.Serializer):
+    registration_id = serializers.IntegerField()
+    checkin_token = serializers.UUIDField(allow_null=True)
     event_title = serializers.CharField()
     starts_at = serializers.DateTimeField()
     ends_at = serializers.DateTimeField()

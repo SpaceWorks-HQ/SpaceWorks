@@ -557,6 +557,9 @@ REST_FRAMEWORK = {
         "request_status": env("THROTTLE_REQUEST_STATUS", default="60/min"),
         "public_read": env("THROTTLE_PUBLIC_READ", default="120/min"),
         "event_register": env("THROTTLE_EVENT_REGISTER", default="10/hour"),
+        "event_checkin_resolve": env(
+            "THROTTLE_EVENT_CHECKIN_RESOLVE", default="60/min"
+        ),
         "public_stats": env("THROTTLE_PUBLIC_STATS", default="30/min"),
         "client_public": env("THROTTLE_CLIENT_PUBLIC", default="30/min"),
         "client_standard": env("THROTTLE_CLIENT_STANDARD", default="120/min"),

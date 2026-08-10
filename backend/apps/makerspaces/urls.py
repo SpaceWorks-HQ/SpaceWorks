@@ -29,6 +29,10 @@ urlpatterns = [
     path("member/makerspaces/<int:makerspace_id>/waiver", MemberWaiverView.as_view(), name="member-waiver"),
     path("member/makerspaces/<int:makerspace_id>/waiver/accept", MemberWaiverAcceptView.as_view(), name="member-waiver-accept"),
     path("member/makerspaces/<int:makerspace_id>/activity", MemberActivityView.as_view(), name="member-activity"),
+    # The member check-in QR route is deliberately NOT here: it is an events surface and
+    # must be withdrawn by an events tombstone, so it lives in `apps/events/urls_member.py`
+    # and is spliced in by `config.urls.separable`. Declared here it would keep resolving,
+    # and stay in the OpenAPI schema, on a deployment that ships no events app.
     path("member/makerspaces/<int:makerspace_id>/payments", MemberPaymentHistoryView.as_view(), name="member-payment-history"),
     path("member/makerspaces/<int:makerspace_id>/payments/<int:payment_id>/checkout", MemberPaymentCheckoutView.as_view(), name="member-payment-checkout"),
     path(
