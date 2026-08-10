@@ -139,3 +139,27 @@ class EventRegistrationListResponseSerializer(serializers.Serializer):
     next = serializers.CharField(allow_null=True, required=False)
     previous = serializers.CharField(allow_null=True, required=False)
     results = EventRegistrationAdminSerializer(many=True)
+
+
+class EventStaffRegistrationSerializer(serializers.Serializer):
+    """Staff registering a member of this makerspace for an event.
+
+    `member_id` only. Contact details are copied off the account by the registration
+    service, so a staffer cannot record an attendee under a name and email that belong
+    to nobody — which is what makes the attendee list usable as an accountability record
+    rather than free text.
+    """
+
+    member_id = serializers.IntegerField()
+    custom_answers = serializers.JSONField(required=False, allow_null=True)
+    # Used only when the account carries no number of its own. A registration must have
+    # a contact number, so without this a member who never entered one could not be
+    # registered by anybody — a dead end the person at the desk can simply ask about.
+    phone = serializers.CharField(max_length=32, required=False, allow_blank=True, default='')
+
+
+class EventEligibleMemberSerializer(serializers.Serializer):
+    """A picker row. Name and id only — a roster is not a contact export."""
+
+    member_id = serializers.IntegerField()
+    display_name = serializers.CharField()

@@ -2072,6 +2072,46 @@
                 }
             }
         },
+        "/api/v1/admin/events/{id}/eligible-members/": {
+            "get": {
+                "operationId": "api_v1_admin_events_eligible_members_list",
+                "description": "The roster the staff registration picker reads.\n\nHung off the EVENT rather than the makerspace, so it inherits `_manageable_event`\nand introduces no new authority question: whoever may manage this event may see who\nthey can register for it. A separate makerspace-level member list would have needed\nits own permission answer, and the obvious candidates were all wrong — the\ndirect-loan roster is gated on `ISSUE_DIRECT_LOAN` plus a self-checkout feature an\nevents manager need not hold, and the full membership list is `MANAGE_MAKERSPACE`.\n\nAlready-registered members are excluded: offering someone the picker can only reject\nas a duplicate is an error the interface should not have made available.",
+                "summary": "List members who can be registered for an event",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/EventEligibleMember"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/admin/events/{id}/image": {
             "post": {
                 "operationId": "api_v1_admin_events_image_create",
@@ -2335,6 +2375,80 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_events_registrations_create",
+                "summary": "Register a member for an event",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventStaffRegistration"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventStaffRegistration"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventStaffRegistration"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EventRegistrationAdmin"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid registration."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event state or capacity conflict."
                     }
                 }
             }
@@ -31206,6 +31320,22 @@
                     "waitlisted"
                 ]
             },
+            "EventEligibleMember": {
+                "type": "object",
+                "description": "A picker row. Name and id only — a roster is not a contact export.",
+                "properties": {
+                    "member_id": {
+                        "type": "integer"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "display_name",
+                    "member_id"
+                ]
+            },
             "EventListResponse": {
                 "type": "object",
                 "properties": {
@@ -31355,6 +31485,26 @@
                 "required": [
                     "count",
                     "results"
+                ]
+            },
+            "EventStaffRegistration": {
+                "type": "object",
+                "description": "Staff registering a member of this makerspace for an event.\n\n`member_id` only. Contact details are copied off the account by the registration\nservice, so a staffer cannot record an attendee under a name and email that belong\nto nobody — which is what makes the attendee list usable as an accountability record\nrather than free text.",
+                "properties": {
+                    "member_id": {
+                        "type": "integer"
+                    },
+                    "custom_answers": {
+                        "nullable": true
+                    },
+                    "phone": {
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 32
+                    }
+                },
+                "required": [
+                    "member_id"
                 ]
             },
             "EventWrite": {

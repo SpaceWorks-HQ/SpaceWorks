@@ -94,6 +94,7 @@ export const openApiPaths = [
   "/api/v1/admin/events/{id}/",
   "/api/v1/admin/events/{id}/cancel/",
   "/api/v1/admin/events/{id}/complete/",
+  "/api/v1/admin/events/{id}/eligible-members/",
   "/api/v1/admin/events/{id}/image",
   "/api/v1/admin/events/{id}/publish/",
   "/api/v1/admin/events/{id}/registrations/",
@@ -1288,6 +1289,11 @@ export type EventAttendanceRow = {
   "attendance_rate_percent": number | null;
 };
 
+export type EventEligibleMember = {
+  "member_id": number;
+  "display_name": string;
+};
+
 export type EventListResponse = {
   "count": number;
   "next"?: string | null;
@@ -1321,6 +1327,12 @@ export type EventRegistrationListResponse = {
   "next"?: string | null;
   "previous"?: string | null;
   "results": Array<EventRegistrationAdmin>;
+};
+
+export type EventStaffRegistration = {
+  "member_id": number;
+  "custom_answers"?: unknown | null;
+  "phone"?: string;
 };
 
 export type EventWrite = {

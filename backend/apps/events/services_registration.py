@@ -14,15 +14,29 @@ from apps.forms_schema.validation import validate_answers
 @transaction.atomic
 def register(
     event, *, member=None, name=None, email=None, phone=None,
-    custom_answers=None, actor=None,
+    custom_answers=None, actor=None, staff_registration=False,
 ):
+    """Register someone for an event.
+
+    `staff_registration` relaxes exactly one condition: the `is_public` requirement.
+    That flag answers "does this event appear in the public catalogue", and a staff
+    member standing at the door is not the public — without the relaxation a
+    members-only event could not be registered for by anyone at all, which makes it a
+    calendar entry rather than an event. Every other rule (published, not ended,
+    capacity, duplicates, the custom form, the write fence) is identical, because this
+    is the same service and the state machine has one home.
+    """
     from apps.events.services import _audit, _locked_event, _refresh, _validate
 
     assert_mapped_write_allowed(event.makerspace_id)
     if member is not None:
         name = member.display_name or member.get_full_name() or member.username
         email = member.email
-        phone = member.phone
+        # The account wins, but a caller-supplied number is kept as the fallback: a
+        # registration needs a contact number (`EventRegistration.phone` is non-blank),
+        # and an account without one would otherwise be a dead end nobody at the desk
+        # could resolve. The public path passes none, so it is unchanged.
+        phone = member.phone or phone
     name = (name or "").strip()
     normalized_email = (email or "").strip().lower()
     phone = (phone or "").strip()
@@ -36,7 +50,11 @@ def register(
             makerspace_id=event.makerspace_id, event_id=event.pk,
         )
     locked = _locked_event(event.pk)
-    if not locked.is_public or locked.status != locked.Status.PUBLISHED or locked.ends_at < timezone.now():
+    if (
+        (not locked.is_public and not staff_registration)
+        or locked.status != locked.Status.PUBLISHED
+        or locked.ends_at < timezone.now()
+    ):
         raise EventInvalidTransition("This event is not open for registration.")
     custom_answers = validate_answers(locked.custom_form, custom_answers)
     status = fresh_registration_status(locked)

@@ -161,3 +161,45 @@ export function useMarkEventAttended(makerspaceId: number, eventId: number) {
     ]); },
   });
 }
+
+export type EventEligibleMember = { member_id: number; display_name: string };
+
+const ELIGIBLE_MEMBERS_PATH: ApiPath = "/api/v1/admin/events/{id}/eligible-members/";
+
+export function eligibleMemberKey(eventId: number) {
+  return ["event", eventId, "eligible-members"] as const;
+}
+
+/**
+ * The roster the staff registration picker reads. Hung off the event, so it inherits
+ * the event's own permission check rather than introducing a second answer to "who may
+ * see this makerspace's members".
+ */
+export function useEventEligibleMembers(eventId: number, enabled = true) {
+  return useQuery({
+    queryKey: eligibleMemberKey(eventId),
+    queryFn: () => staffRequest<EventEligibleMember[]>(
+      staffPath(ELIGIBLE_MEMBERS_PATH, { id: eventId }),
+    ),
+    enabled,
+  });
+}
+
+export function useRegisterMemberForEvent(makerspaceId: number, eventId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { member_id: number; phone?: string }) =>
+      staffRequest<EventRegistration>(
+        staffPath(EVENT_REGISTRATIONS_PATH, { id: eventId }),
+        { method: "POST", body: JSON.stringify(payload) },
+      ),
+    onSuccess: async () => { await Promise.all([
+      queryClient.invalidateQueries({ queryKey: eventKeys.registrations(eventId) }),
+      // The picker must forget the person it just registered, or they can be picked
+      // again and the second attempt only ever returns a duplicate error.
+      queryClient.invalidateQueries({ queryKey: eligibleMemberKey(eventId) }),
+      queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
+      queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
+    ]); },
+  });
+}

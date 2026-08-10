@@ -12,6 +12,7 @@ from django.urls import path
 
 from apps.events.views_admin import (
     EventCancelView,
+    EventEligibleMemberListView,
     EventCompleteView,
     EventDetailView,
     EventListCreateView,
@@ -56,6 +57,11 @@ urlpatterns = [
         'events/<int:pk>/registrations/',
         EventRegistrationListView.as_view(),
         name='admin-event-registration-list',
+    ),
+    path(
+        'events/<int:pk>/eligible-members/',
+        EventEligibleMemberListView.as_view(),
+        name='admin-event-eligible-members',
     ),
     path(
         'event-registrations/<int:pk>/mark-attended/',
