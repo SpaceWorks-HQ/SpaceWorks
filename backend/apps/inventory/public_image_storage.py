@@ -45,7 +45,7 @@ def _public_client():
 
 
 def build_object_key(kind, makerspace_id, ext):
-    if kind not in {"event", "items", "machine", "makerspace", "printers"}:
+    if kind not in {"event", "items", "machine", "makerspace", "member", "printers"}:
         raise ValueError("Invalid public image kind.")
     return f"{kind}/{makerspace_id}/{uuid.uuid4().hex}{ext}"
 
@@ -180,13 +180,13 @@ def finalize_error_message(result):
 
 def public_image_key_in_use(
     makerspace_id, object_key, *, product_id=None, machine_id=None, event_id=None,
-    makerspace_field="",
+    profile_id=None, project_id=None, makerspace_field="",
 ):
     from django.db.models import Q
     from apps.events.models import Event
     from apps.inventory.models import InventoryProduct
     from apps.machines.models import Machine
-    from apps.makerspaces.models import Makerspace
+    from apps.makerspaces.models import Makerspace, MemberProfile, MemberProject
 
     products = InventoryProduct.objects.filter(makerspace_id=makerspace_id, image_key=object_key)
     if product_id is not None:
@@ -205,6 +205,22 @@ def public_image_key_in_use(
     if event_id is not None:
         events = events.exclude(pk=event_id)
     if events.exists():
+        return True
+    # Member avatars and project images share the bucket too. Both are scoped through
+    # the membership, since the profile carries no makerspace column of its own.
+    profiles = MemberProfile.objects.filter(
+        membership__makerspace_id=makerspace_id, avatar_key=object_key
+    )
+    if profile_id is not None:
+        profiles = profiles.exclude(pk=profile_id)
+    if profiles.exists():
+        return True
+    projects = MemberProject.objects.filter(
+        profile__membership__makerspace_id=makerspace_id, image_key=object_key
+    )
+    if project_id is not None:
+        projects = projects.exclude(pk=project_id)
+    if projects.exists():
         return True
     makerspace_query = Makerspace.objects.filter(pk=makerspace_id)
     if makerspace_field == "logo_key":

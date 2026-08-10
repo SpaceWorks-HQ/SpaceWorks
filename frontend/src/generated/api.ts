@@ -38,6 +38,7 @@ export const openApiTags = [
   "Ledger",
   "Makerspaces",
   "Member activity",
+  "Member profile",
   "Memberships",
   "Native push",
   "Notifications",
@@ -348,9 +349,13 @@ export const openApiPaths = [
   "/api/v1/internal/cron/return-reminders",
   "/api/v1/internal/tls-check",
   "/api/v1/member/makerspaces/{makerspace_id}/activity",
+  "/api/v1/member/makerspaces/{makerspace_id}/directory",
+  "/api/v1/member/makerspaces/{makerspace_id}/directory/{membership_id}",
   "/api/v1/member/makerspaces/{makerspace_id}/payments",
   "/api/v1/member/makerspaces/{makerspace_id}/payments/{payment_id}/checkout",
   "/api/v1/member/makerspaces/{makerspace_id}/payments/{payment_id}/mobile-intent",
+  "/api/v1/member/makerspaces/{makerspace_id}/profile",
+  "/api/v1/member/makerspaces/{makerspace_id}/profile/image",
   "/api/v1/member/makerspaces/{makerspace_id}/referrals",
   "/api/v1/member/makerspaces/{makerspace_id}/waiver",
   "/api/v1/member/makerspaces/{makerspace_id}/waiver/accept",
@@ -1121,6 +1126,18 @@ export type DirectLoanUserAttribution = {
   "role": string;
 };
 
+export type Directory = {
+  "members": Array<DirectoryEntry>;
+  "hidden_count": number;
+};
+
+export type DirectoryEntry = {
+  "membership_id": number;
+  "display_name": string;
+  "headline": string;
+  "avatar_url": string | null;
+};
+
 export type DispositionEnum = "needs_fix" | "remove";
 
 export type DocTypeEnum = "manual" | "sop";
@@ -1148,6 +1165,12 @@ export type DomainVerificationResponse = {
   "expected_record": DomainVerificationRecord | null;
   "verified_at": string | null;
   "detail": string;
+};
+
+export type EducationEntry = {
+  "institution": string;
+  "qualification"?: string;
+  "year"?: string;
 };
 
 export type EmailLog = {
@@ -3308,6 +3331,66 @@ export type ProblemReportTriageResponse = {
 export type ProductQrHistory = {
   "product": number;
   "scans": Array<QrHistoryItem>;
+};
+
+export type ProfileImageAttachRequest = {
+  "object_key": string;
+  "project_id"?: number;
+};
+
+export type ProfileImageUploadRequest = {
+  "content_type": string;
+  "filename": string;
+  "project_id"?: number;
+};
+
+export type ProfileRead = {
+  "membership_id": number;
+  "display_name": string;
+  "is_visible": boolean;
+  "headline": string;
+  "institution": string;
+  "bio": string;
+  "avatar_url": string | null;
+  "interests": unknown;
+  "languages": unknown;
+  "education": unknown;
+  "github_username": string;
+  "github_contributions": number | null;
+  "projects": Array<ProjectRead>;
+  "activity": unknown;
+};
+
+export type ProfileWrite = {
+  "is_visible"?: boolean;
+  "headline"?: string;
+  "institution"?: string;
+  "bio"?: string;
+  "interests"?: Array<string>;
+  "languages"?: Array<string>;
+  "education"?: Array<EducationEntry>;
+  "github_username"?: string;
+  "projects"?: Array<ProjectWrite>;
+};
+
+export type ProjectLink = {
+  "label": string;
+  "url": string;
+};
+
+export type ProjectRead = {
+  "id": number;
+  "title": string;
+  "description": string;
+  "links": unknown;
+  "image_url": string | null;
+};
+
+export type ProjectWrite = {
+  "id"?: number;
+  "title": string;
+  "description"?: string;
+  "links"?: Array<ProjectLink>;
 };
 
 export type Provider760Enum = "google" | "apple";

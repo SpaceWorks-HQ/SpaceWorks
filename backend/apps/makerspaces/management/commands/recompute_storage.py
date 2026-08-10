@@ -9,7 +9,7 @@ from apps.inventory import public_image_storage
 from apps.inventory.models import InventoryProduct
 from apps.machines import storage as machine_storage
 from apps.machines.models import Machine, MachineDocument, ServiceRequestFile
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.models import Makerspace, MemberProfile, MemberProject
 from apps.procurement import storage as procurement_storage
 from apps.procurement.models import ToBuyReceipt
 from apps.warranty import storage as warranty_storage
@@ -79,4 +79,16 @@ class Command(BaseCommand):
         # silently lowered a space's recorded usage. apps/bookings/storage.py is a thin
         # wrapper over public_image_storage, so these live in the same bucket.
         keys.update(BookableSpace.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
+        # Member avatars and project images, reached through the membership: the profile
+        # carries no makerspace column, being hung off MakerspaceMembership.
+        keys.update(
+            MemberProfile.objects.filter(membership__makerspace=makerspace).values_list(
+                "avatar_key", flat=True
+            )
+        )
+        keys.update(
+            MemberProject.objects.filter(
+                profile__membership__makerspace=makerspace
+            ).values_list("image_key", flat=True)
+        )
         return {key for key in keys if key}

@@ -108,9 +108,22 @@ def _collect_public_image_keys(makerspace):
     from apps.inventory.models import InventoryProduct
     from apps.machines.models import Machine
 
+    from apps.makerspaces.models import MemberProfile, MemberProject
+
     keys = [makerspace.logo_key, makerspace.cover_image_key]
     for model in (BookableSpace, Event, InventoryProduct, Machine):
         keys.extend(model.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
+    # Member imagery is reached through the membership, not a makerspace column.
+    keys.extend(
+        MemberProfile.objects.filter(membership__makerspace=makerspace).values_list(
+            "avatar_key", flat=True
+        )
+    )
+    keys.extend(
+        MemberProject.objects.filter(
+            profile__membership__makerspace=makerspace
+        ).values_list("image_key", flat=True)
+    )
     return [key for key in dict.fromkeys(keys) if key]
 
 def _delete_object_graph(makerspace):

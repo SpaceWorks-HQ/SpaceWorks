@@ -137,8 +137,31 @@ def discord_destinations_delete(makerspace, cursor):
     return _chat_destinations_delete(makerspace, "discord")
 
 
+def membership_public_image_keys(makerspace):
+    """Avatars and project images, collected BEFORE the rows that name them go.
+
+    Without this the objects outlive every row that could name them: nothing else in the
+    system knows a `member/<id>/...` key exists once the profile is deleted, so they
+    would sit in the bucket forever and keep counting against the space's storage.
+    """
+    from apps.makerspaces.models import MemberProfile, MemberProject
+
+    keys = list(
+        MemberProfile.objects.filter(membership__makerspace=makerspace).values_list(
+            "avatar_key", flat=True
+        )
+    )
+    keys += list(
+        MemberProject.objects.filter(
+            profile__membership__makerspace=makerspace
+        ).values_list("image_key", flat=True)
+    )
+    return [key for key in dict.fromkeys(keys) if key]
+
+
 def membership_delete(makerspace, cursor):
     from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver, MembershipRequest
+    from apps.makerspaces.models import MemberProfile
 
     # `MakerspaceMembership` itself is core RBAC state and is NEVER deleted here -- the
     # module gates the community feature, not the roster (plan A7). But a membership
@@ -148,10 +171,15 @@ def membership_delete(makerspace, cursor):
     cleared = MakerspaceMembership.objects.filter(
         makerspace=makerspace, accepted_waiver__isnull=False
     ).update(accepted_waiver=None, waiver_accepted_at=None, waiver_version_accepted=None)
+    # Profiles go even though the membership stays: a profile is community content the
+    # module owns, not the RBAC state the module deliberately leaves behind. Projects
+    # cascade from the profile.
+    profiles = MemberProfile.objects.filter(membership__makerspace=makerspace).delete()[0]
     requests = MembershipRequest.objects.filter(makerspace=makerspace).delete()[0]
     waivers = MakerspaceWaiver.objects.filter(makerspace=makerspace).delete()[0]
     return _counts(
-        waiver_acceptances_cleared=cleared, membership_requests=requests, waivers=waivers
+        waiver_acceptances_cleared=cleared, member_profiles=profiles,
+        membership_requests=requests, waivers=waivers,
     )
 
 

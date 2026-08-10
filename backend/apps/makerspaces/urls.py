@@ -9,6 +9,12 @@ from apps.makerspaces.views_memberships import (
 )
 from apps.makerspaces.views_member_referrals import MemberReferralView
 from apps.makerspaces.member_activity_views import MemberActivityView
+from apps.makerspaces.profile_image_views import MemberProfileImageView
+from apps.makerspaces.profile_views import (
+    MemberDirectoryDetailView,
+    MemberDirectoryView,
+    MemberProfileView,
+)
 from apps.payments.views_member import MemberPaymentCheckoutView, MemberPaymentHistoryView
 from apps.payments.views_member_mobile import MemberMobilePaymentIntentView
 
@@ -31,4 +37,12 @@ urlpatterns = [
         name='member-payment-mobile-intent',
     ),
     path("member/makerspaces/<int:makerspace_id>/referrals", MemberReferralView.as_view(), name="member-referrals"),
+    path("member/makerspaces/<int:makerspace_id>/profile", MemberProfileView.as_view(), name="member-profile"),
+    path("member/makerspaces/<int:makerspace_id>/profile/image", MemberProfileImageView.as_view(), name="member-profile-image"),
+    path("member/makerspaces/<int:makerspace_id>/directory", MemberDirectoryView.as_view(), name="member-directory"),
+    path(
+        "member/makerspaces/<int:makerspace_id>/directory/<int:membership_id>",
+        MemberDirectoryDetailView.as_view(),
+        name="member-directory-detail",
+    ),
 ]

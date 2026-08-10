@@ -584,3 +584,9 @@ class SubdomainRequest(models.Model):
 
     def __str__(self):
         return f"{self.requested_label} ({self.status})"
+
+
+from apps.makerspaces.models_profiles import (  # noqa: E402,F401
+    MemberProfile,
+    MemberProject,
+)

@@ -23037,6 +23037,132 @@
                 }
             }
         },
+        "/api/v1/member/makerspaces/{makerspace_id}/directory": {
+            "get": {
+                "operationId": "api_v1_member_makerspaces_directory_retrieve",
+                "summary": "List members who published a profile",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Directory"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "An active membership is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/member/makerspaces/{makerspace_id}/directory/{membership_id}": {
+            "get": {
+                "operationId": "api_v1_member_makerspaces_directory_retrieve_2",
+                "summary": "Retrieve another member's published profile",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "membership_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProfileRead"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "An active membership is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    }
+                }
+            }
+        },
         "/api/v1/member/makerspaces/{makerspace_id}/payments": {
             "get": {
                 "operationId": "api_v1_member_makerspaces_payments_list",
@@ -23240,6 +23366,309 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/member/makerspaces/{makerspace_id}/profile": {
+            "get": {
+                "operationId": "api_v1_member_makerspaces_profile_retrieve",
+                "summary": "Retrieve the caller's own profile",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProfileRead"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "An active membership is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    }
+                }
+            },
+            "put": {
+                "operationId": "api_v1_member_makerspaces_profile_update",
+                "summary": "Update the caller's own profile",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProfileWrite"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProfileWrite"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProfileWrite"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProfileRead"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "An active membership is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/member/makerspaces/{makerspace_id}/profile/image": {
+            "post": {
+                "operationId": "api_v1_member_makerspaces_profile_image_create",
+                "summary": "Create a profile image upload URL",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProfileImageUploadRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProfileImageUploadRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProfileImageUploadRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicImageUploadResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid image upload request."
+                    },
+                    "403": {
+                        "description": "An active membership is required."
+                    },
+                    "503": {
+                        "description": "Public image storage is unavailable."
+                    }
+                }
+            },
+            "put": {
+                "operationId": "api_v1_member_makerspaces_profile_image_update",
+                "summary": "Attach an uploaded image to the profile or one of its projects",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProfileImageAttachRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProfileImageAttachRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProfileImageAttachRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProfileRead"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid image object key or size."
+                    },
+                    "403": {
+                        "description": "An active membership is required."
+                    },
+                    "503": {
+                        "description": "Public image storage is unavailable."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "api_v1_member_makerspaces_profile_image_destroy",
+                "summary": "Clear a profile or project image",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProfileRead"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Unknown project."
+                    },
+                    "403": {
+                        "description": "An active membership is required."
                     }
                 }
             }
@@ -30102,6 +30531,49 @@
                     "username"
                 ]
             },
+            "Directory": {
+                "type": "object",
+                "properties": {
+                    "members": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DirectoryEntry"
+                        }
+                    },
+                    "hidden_count": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "hidden_count",
+                    "members"
+                ]
+            },
+            "DirectoryEntry": {
+                "type": "object",
+                "description": "The listing row. Display name and avatar only -- never email, never phone.\n\nOtherwise \"see who else is here\" is an address harvest performed by anyone a space\nadmits, which is a different thing from what the member agreed to publish.",
+                "properties": {
+                    "membership_id": {
+                        "type": "integer"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "headline": {
+                        "type": "string"
+                    },
+                    "avatar_url": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "avatar_url",
+                    "display_name",
+                    "headline",
+                    "membership_id"
+                ]
+            },
             "DispositionEnum": {
                 "enum": [
                     "needs_fix",
@@ -30208,6 +30680,28 @@
                     "status",
                     "token",
                     "verified_at"
+                ]
+            },
+            "EducationEntry": {
+                "type": "object",
+                "properties": {
+                    "institution": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "qualification": {
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 200
+                    },
+                    "year": {
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 20
+                    }
+                },
+                "required": [
+                    "institution"
                 ]
             },
             "EmailLog": {
@@ -39055,6 +39549,233 @@
                 "required": [
                     "product",
                     "scans"
+                ]
+            },
+            "ProfileImageAttachRequest": {
+                "type": "object",
+                "properties": {
+                    "object_key": {
+                        "type": "string",
+                        "maxLength": 300
+                    },
+                    "project_id": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "object_key"
+                ]
+            },
+            "ProfileImageUploadRequest": {
+                "type": "object",
+                "properties": {
+                    "content_type": {
+                        "type": "string"
+                    },
+                    "filename": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "project_id": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "content_type",
+                    "filename"
+                ]
+            },
+            "ProfileRead": {
+                "type": "object",
+                "properties": {
+                    "membership_id": {
+                        "type": "integer"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "is_visible": {
+                        "type": "boolean"
+                    },
+                    "headline": {
+                        "type": "string"
+                    },
+                    "institution": {
+                        "type": "string"
+                    },
+                    "bio": {
+                        "type": "string"
+                    },
+                    "avatar_url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "interests": {},
+                    "languages": {},
+                    "education": {},
+                    "github_username": {
+                        "type": "string"
+                    },
+                    "github_contributions": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "projects": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProjectRead"
+                        }
+                    },
+                    "activity": {}
+                },
+                "required": [
+                    "activity",
+                    "avatar_url",
+                    "bio",
+                    "display_name",
+                    "education",
+                    "github_contributions",
+                    "github_username",
+                    "headline",
+                    "institution",
+                    "interests",
+                    "is_visible",
+                    "languages",
+                    "membership_id",
+                    "projects"
+                ]
+            },
+            "ProfileWrite": {
+                "type": "object",
+                "properties": {
+                    "is_visible": {
+                        "type": "boolean"
+                    },
+                    "headline": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "institution": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "bio": {
+                        "type": "string",
+                        "maxLength": 2000
+                    },
+                    "interests": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 60
+                        },
+                        "maxItems": 20
+                    },
+                    "languages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 60
+                        },
+                        "maxItems": 10
+                    },
+                    "education": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/EducationEntry"
+                        },
+                        "maxItems": 10
+                    },
+                    "github_username": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
+                    },
+                    "projects": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProjectWrite"
+                        },
+                        "maxItems": 20
+                    }
+                }
+            },
+            "ProjectLink": {
+                "type": "object",
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "maxLength": 60
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 500
+                    }
+                },
+                "required": [
+                    "label",
+                    "url"
+                ]
+            },
+            "ProjectRead": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "links": {},
+                    "image_url": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "description",
+                    "id",
+                    "image_url",
+                    "links",
+                    "title"
+                ]
+            },
+            "ProjectWrite": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "description": {
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 4000
+                    },
+                    "links": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProjectLink"
+                        },
+                        "maxItems": 10
+                    }
+                },
+                "required": [
+                    "title"
                 ]
             },
             "Provider760Enum": {

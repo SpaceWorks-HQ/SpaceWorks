@@ -12,6 +12,10 @@ from django.urls import reverse
 NESTED_MAKERSPACE_LOOKUPS = {
     "makerspaces.membershiprequest": "makerspace_id",
     "makerspaces.makerspacewaiver": "makerspace_id",
+    # Profiles hang off the membership, so the membership is the only end of the row
+    # that names a tenant.
+    "makerspaces.memberprofile": "membership__makerspace_id",
+    "makerspaces.memberproject": "profile__membership__makerspace_id",
     "maintenance.maintenanceschedule": "machine__makerspace_id",
     "maintenance.maintenancelog": "machine__makerspace_id",
     "maintenance.maintenancelogdocument": "log__machine__makerspace_id",

@@ -325,6 +325,11 @@ PRINT_ALLOWED_SCREENSHOT_MIME = [
     "application/pdf",
 ]
 
+# Read-only token for the GitHub GraphQL API, used only to cache a member's public
+# contribution total onto their maker profile. Unset means the feature is dormant: no
+# call is made and profiles simply omit the section. Never required.
+GITHUB_API_TOKEN = env("GITHUB_API_TOKEN", default="")
+
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
 TELEGRAM_API_URL = env("TELEGRAM_API_URL", default="https://api.telegram.org")
 # Secret passed to Telegram's setWebhook(secret_token=...); Telegram echoes it in

@@ -35,6 +35,7 @@ from apps.makerspaces.module_purge_collectors import (
     maintenance_delete,
     maintenance_private_keys,
     membership_delete,
+    membership_public_image_keys,
     notifications_delete,
     procurement_delete,
     procurement_private_keys,
@@ -103,7 +104,11 @@ PLANS = (
     # `MakerspaceMembership`, which survives this purge, so deleting them would
     # destroy financial history whose subject still exists.
     ModulePurgePlan(
-        "membership", "Join requests, waivers and waiver acceptances.", membership_delete,
+        "membership",
+        "Join requests, waivers, waiver acceptances and member profiles with their "
+        "projects and imagery. Memberships themselves stay — they are core RBAC state.",
+        membership_delete,
+        public_image_keys=membership_public_image_keys,
     ),
     ModulePurgePlan(
         "machine_service",
