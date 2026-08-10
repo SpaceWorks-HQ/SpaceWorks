@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiPath } from "../../generated/api";
 import { staffRequest } from "../../lib/api";
 import type { PaymentSummary } from "./PaymentReconcileActions";
+import type { CustomFormSchema } from "../forms/customFormTypes";
 
 export type EventStatus = "draft" | "published" | "cancelled" | "completed";
 export type EventRegistrationStatus = "registered" | "waitlisted" | "cancelled" | "attended";
@@ -21,6 +22,9 @@ export type StaffEvent = {
   is_public: boolean;
   image_url: string | null;
   status: EventStatus;
+  // Present on the admin serializer; needed by the staff registration form, which must
+  // collect the same answers public self-registration does.
+  custom_form: CustomFormSchema | null;
   created_by_id: number | null;
   created_at: string;
   updated_at: string;
@@ -188,7 +192,11 @@ export function useEventEligibleMembers(eventId: number, enabled = true) {
 export function useRegisterMemberForEvent(makerspaceId: number, eventId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { member_id: number; phone?: string }) =>
+    mutationFn: (payload: {
+      member_id: number;
+      phone?: string;
+      custom_answers?: Record<string, unknown>;
+    }) =>
       staffRequest<EventRegistration>(
         staffPath(EVENT_REGISTRATIONS_PATH, { id: eventId }),
         { method: "POST", body: JSON.stringify(payload) },

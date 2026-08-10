@@ -2,6 +2,7 @@
 
 from django.db import transaction
 
+from apps.audit import services as audit
 from apps.inventory import public_image_storage
 from apps.makerspaces.models import MakerspaceMembership, MemberProfile, MemberProject
 
@@ -87,6 +88,8 @@ def save_profile(membership, data):
     profile = MemberProfile.objects.select_for_update().filter(
         membership=membership
     ).first() or profile_for(membership)
+    was_visible = profile.is_visible
+    project_count_before = profile.projects.count()
     fields = []
     for field in (
         "is_visible", "headline", "institution", "bio", "interests", "languages",
@@ -109,7 +112,33 @@ def save_profile(membership, data):
         profile.save(update_fields=[*fields, "updated_at"])
     if "projects" in data:
         save_projects(profile, data["projects"])
+    _audit_profile_saved(membership, profile, was_visible, project_count_before, fields)
     return profile
+
+
+def _audit_profile_saved(membership, profile, was_visible, project_count_before, fields):
+    """Record that the profile changed, without copying its contents into the log.
+
+    The audit log is append-only and makerspace-scoped, so it must say *what changed*
+    and by whom — but writing the bio and education text into it would copy member PII
+    into a store that is deliberately impossible to edit or delete. The meta therefore
+    names the fields touched and the visibility transition, which is the part with
+    consequences for anyone other than the author.
+    """
+    profile.refresh_from_db(fields=["is_visible"])
+    audit.record(
+        membership.user,
+        "member.profile_updated",
+        makerspace=membership.makerspace,
+        target=membership,
+        meta={
+            "fields": sorted(fields),
+            "visibility_changed": was_visible != profile.is_visible,
+            "is_visible": profile.is_visible,
+            "projects_before": project_count_before,
+            "projects_after": profile.projects.count(),
+        },
+    )
 
 
 def save_projects(profile, rows):

@@ -8,6 +8,7 @@ blanks the other.
 
 from django.db import transaction
 
+from apps.audit import services as audit
 from apps.inventory import public_image_storage
 from apps.makerspaces import limits
 
@@ -23,6 +24,12 @@ def _free_stored(makerspace, object_key):
 
 
 def _swap(makerspace, holder, field, object_key):
+    # Re-read under a row lock inside the caller's transaction. The holder was fetched
+    # before it, so two overlapping replacements would both see the same `old_key`:
+    # each charges storage for its new object, each frees the same old one, the last
+    # save wins, and the loser's object is orphaned in the bucket with the counter left
+    # overcharged. This is `services_images._locked_event`'s reason, on the same shape.
+    holder = type(holder).objects.select_for_update().get(pk=holder.pk)
     old_key = getattr(holder, field)
     if object_key == old_key:
         return holder
@@ -44,12 +51,34 @@ def _swap(makerspace, holder, field, object_key):
 
 @transaction.atomic
 def set_avatar(profile, object_key):
-    return _swap(profile.membership.makerspace, profile, "avatar_key", object_key)
+    membership = profile.membership
+    result = _swap(membership.makerspace, profile, "avatar_key", object_key)
+    _audit_image(membership, "avatar", None, object_key)
+    return result
 
 
 @transaction.atomic
 def set_project_image(profile, project, object_key):
-    return _swap(profile.membership.makerspace, project, "image_key", object_key)
+    membership = profile.membership
+    result = _swap(membership.makerspace, project, "image_key", object_key)
+    _audit_image(membership, "project", project.pk, object_key)
+    return result
+
+
+def _audit_image(membership, kind, project_id, object_key):
+    """Attaching and clearing member imagery are state changes and are recorded.
+
+    The object key is deliberately NOT logged: it is an identifier for a public object,
+    and the audit log is append-only, so a key written here outlives the image and every
+    row that could name it. Whether one was attached or cleared is the fact worth having.
+    """
+    audit.record(
+        membership.user,
+        "member.profile_image_cleared" if not object_key else "member.profile_image_updated",
+        makerspace=membership.makerspace,
+        target=membership,
+        meta={"kind": kind, "project_id": project_id},
+    )
 
 
 def clear_project_image(profile, project):

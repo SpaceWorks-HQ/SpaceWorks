@@ -147,9 +147,14 @@ class MemberProfileImageView(MemberProfileBaseView):
         membership = self.membership(request, makerspace_id)
         profile = profile_services.profile_for(membership)
         raw_project_id = request.query_params.get("project_id")
-        project = self._project(
-            profile, int(raw_project_id) if (raw_project_id or "").isdigit() else None
-        )
+        project = None
+        if raw_project_id is not None:
+            # A malformed id must NOT degrade to "no project": that branch clears the
+            # avatar, so `?project_id=abc` would destroy a different image than the one
+            # the caller named. Present-but-unparseable is a 400.
+            if not raw_project_id.isdigit():
+                raise ValidationError({"project_id": "Invalid project id."})
+            project = self._project(profile, int(raw_project_id))
         if project is not None:
             profile_images.clear_project_image(profile, project)
         elif profile.avatar_key:

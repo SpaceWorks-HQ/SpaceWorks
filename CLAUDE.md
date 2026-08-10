@@ -762,6 +762,18 @@ dead end; the public path passes none and is unchanged. The picker hangs off the
 (`EventEligibleMemberListView`), inheriting `_manageable_event` rather than inventing a second answer to
 "who may see this makerspace's members", and excludes the already-registered.
 
+**A login-method switch must be enforced on `/control/` too.** `password_enabled` lives in
+`LoginView` (the JWT API) *and* in `AdminSuperuserOnlyMiddleware`, which refuses a POST to
+`admin:login` **before the form authenticates**, so no session is minted. Enforcing only the API
+left a password door on the one surface that can turn the switch back on. Existing sessions are
+deliberately not revoked: a login-method switch is a policy change, not a revocation.
+
+**Member profile writes are audited WITHOUT their content.** `member.profile_updated` /
+`member.profile_image_updated` / `member.profile_image_cleared` record the fields touched, the
+visibility transition and the project counts — never the bio, the education entries or the object
+key. The audit log is append-only, so anything written there is permanently undeletable member PII,
+and an object key logged there outlives the image and every row that could name it.
+
 **Notification channels are modules, one key each (phase 20).** `email`, `telegram`, `slack`,
 `mattermost` and `discord` each own a module key, so a space living in Discord ships no Slack
 surface. Each is an additive **AND** in front of the credential check that already existed:

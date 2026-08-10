@@ -55,6 +55,39 @@ neither phase named.
 
 ---
 
+## Found by the Codex Stage-4 review — all eight fixed
+
+Codex became usable again at the end of the program and reviewed the whole diff against
+`cfb2d74`. It raised one P1 and seven P2s. Every one was legitimate; none was disputed.
+
+### P1 — `/control/` login ignored the password switch *(fixed)*
+
+`password_enabled=False` was enforced in `LoginView`, which is the JWT API. `/control/login/`
+is Django's own `AdminSite` login and never consulted it, so a superadmin could still sign in
+with a password on the exact surface that can turn the switch back on — which made the whole
+policy advisory. `AdminSuperuserOnlyMiddleware` now refuses that POST **before the form
+authenticates**, so no session is minted. Existing sessions are untouched, matching A2.
+
+### The seven P2s *(all fixed)*
+
+| Finding | Why it mattered | Fix |
+|---|---|---|
+| Restricted/suspended members were registrable for events | The console became the way around an access restriction | `user__access_status=ACTIVE` on both the registration lookup and the picker |
+| A malformed `project_id` cleared the **avatar** | `?project_id=abc` fell through to the avatar branch and destroyed a different image | Present-but-unparseable is now a 400 |
+| Profile image swaps took no row lock | Two overlapping uploads both charge storage and free the same old key; one object is orphaned and the counter stays overcharged | `select_for_update()` reload inside the transaction, matching `services_images._locked_event` |
+| Profile mutations emitted no audit entry | Breaks the repo-wide append-only invariant | `member.profile_updated` / `member.profile_image_*`, with the **content deliberately excluded** — the log is append-only, so copying a bio into it would make member PII permanently undeletable |
+| An image refetch wiped unsaved profile edits | A member who wrote a bio then changed their avatar lost the bio silently | The form re-seeds only when not dirty; image URLs still merge through |
+| Staff registration could not answer a required custom form | Every console registration for such an event was a permanent 400 | The existing `CustomFormFields` renderer is wired in, with client-side and server-side errors shown per question |
+| The GitHub refresh had a command but no schedule | `GITHUB_API_TOKEN` set and the count still permanently `None` | `apps.makerspaces.tasks.refresh_github_contributions_task` + a daily `CELERY_BEAT_SCHEDULE` entry |
+
+Two of these are worth remembering beyond their fix. The audit gap and the image race are both
+cases where the new code followed the *shape* of an existing pattern (`services_images`) without
+carrying over the parts that were not visible in the shape — the lock and the audit call. And the
+custom-form gap is the cost of testing a new path against the events it happens to create: no test
+gave an event a required custom form, so the whole class stayed invisible.
+
+---
+
 ## Fixed during the build
 
 ### M1 — the direct-handout panel crashed on every load *(fixed)*

@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts import rbac
+from apps.accounts.models import User
 from apps.admin_api.permissions import IsActiveStaff
 from apps.events.serializers_admin import (
     EmptyActionSerializer,
@@ -319,6 +320,10 @@ class EventRegistrationListView(APIView):
                 user_id=serializer.validated_data['member_id'],
                 status='active',
                 user__is_active=True,
+                # Account standing, not just the membership row: a restricted or
+                # suspended account is blocked everywhere else and must be blocked here
+                # too, or the console becomes the way around an access restriction.
+                user__access_status=User.AccessStatus.ACTIVE,
             )
         )
         registration = services.register(
@@ -397,6 +402,7 @@ class EventEligibleMemberListView(APIView):
         ).values_list('member_id', flat=True)
         memberships = MakerspaceMembership.objects.select_related('user').filter(
             makerspace=event.makerspace, status='active', user__is_active=True,
+            user__access_status=User.AccessStatus.ACTIVE,
         ).exclude(user_id__in=[value for value in registered if value]).order_by(
             'user__display_name', 'user__username'
         )

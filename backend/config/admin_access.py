@@ -77,8 +77,24 @@ class AdminSuperuserOnlyMiddleware:
             prefix = "/control/"
         self.admin_prefix = prefix if prefix.endswith("/") else f"{prefix}/"
         self.admin_root = self.admin_prefix.rstrip("/")
+        try:
+            self.admin_login_path = reverse("admin:login")
+        except Exception:
+            self.admin_login_path = f"{self.admin_prefix}login/"
 
     def __call__(self, request):
+        if self._password_login_blocked(request):
+            # `/control/login/` is Django's own AdminSite login, so `LoginView`'s check
+            # never sees it — without this, "password sign-in is off" would still leave a
+            # password door open on the control plane, which is the one surface that can
+            # turn the switch back on.
+            #
+            # Refused BEFORE the form authenticates, so no session is minted. Existing
+            # sessions are deliberately left alone: a login-method switch is a policy
+            # change, not a revocation (see the phase 11 report, A2).
+            return HttpResponseForbidden(
+                "Password sign-in is not available on this deployment."
+            )
         if self._is_admin_path(request.path):
             user = getattr(request, "user", None)
             if getattr(user, "is_authenticated", False) and not self._has_access(user):
@@ -92,6 +108,16 @@ class AdminSuperuserOnlyMiddleware:
 
     def _is_admin_path(self, path):
         return path == self.admin_root or path.startswith(self.admin_prefix)
+
+    def _password_login_blocked(self, request):
+        if request.method != "POST" or request.path != self.admin_login_path:
+            return False
+        from apps.accounts.login_methods import password_login_enabled
+
+        # Fails OPEN inside `password_login_enabled`, matching every other capability
+        # read on an auth path: a broken lookup must not lock the superadmin out of the
+        # only console that can fix it.
+        return not password_login_enabled()
 
     def _has_access(self, user):
         from apps.accounts.models import User

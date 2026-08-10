@@ -58,16 +58,30 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
   const [interests, setInterests] = useState("");
   const [languages, setLanguages] = useState("");
   const [projects, setProjects] = useState<ProjectDraft[]>([]);
+  // Set by any edit, cleared by a successful save. Guards the re-seed effect below.
+  const [dirty, setDirty] = useState(false);
 
-  // Re-seed the form whenever the server sends a new snapshot, so an image upload (which
-  // refetches) does not leave the fields showing a stale copy of what was just saved.
+  // Seed once, then only re-seed when the form has no unsaved edits.
+  //
+  // An image upload invalidates this query, so a naive "re-seed on every snapshot" reset
+  // every field to the last saved copy — a member who wrote a bio and then changed their
+  // avatar lost the bio with no warning. Image URLs are the one thing that must still
+  // refresh after an upload, so they are merged in separately below.
   useEffect(() => {
-    if (!profile.data) return;
+    if (!profile.data || dirty) return;
     setDraft(profile.data);
     setInterests(tagsToText(profile.data.interests));
     setLanguages(tagsToText(profile.data.languages));
     setProjects(profile.data.projects.map((project) => ({ ...project })));
-  }, [profile.data]);
+  }, [profile.data, dirty]);
+
+  useEffect(() => {
+    if (!profile.data || !dirty) return;
+    // Dirty form: keep every edited field, but take the new image URLs, since those
+    // changed on the server and are not editable here.
+    const server = profile.data;
+    setDraft((current) => (current ? { ...current, avatar_url: server.avatar_url, projects: server.projects } : current));
+  }, [profile.data, dirty]);
 
   const save = useMutation({
     mutationFn: () =>
@@ -92,8 +106,10 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
             })),
         }),
       }),
-    onSuccess: () =>
-      client.invalidateQueries({ queryKey: ["member", "profile-page", makerspaceId] }),
+    onSuccess: () => {
+      setDirty(false);
+      return client.invalidateQueries({ queryKey: ["member", "profile-page", makerspaceId] });
+    },
   });
 
   if (profile.isLoading) {
@@ -101,7 +117,14 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
   }
   if (!draft) return null;
 
-  const patch = (changes: Partial<MemberProfile>) => setDraft({ ...draft, ...changes });
+  const patch = (changes: Partial<MemberProfile>) => {
+    setDirty(true);
+    setDraft({ ...draft, ...changes });
+  };
+  const editProjects = (next: ProjectDraft[]) => {
+    setDirty(true);
+    setProjects(next);
+  };
 
   return (
     <section className="desk-panel p-5">
@@ -161,7 +184,7 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
           id="profile-interests"
           className="desk-input mt-1 w-full"
           value={interests}
-          onChange={(event) => setInterests(event.target.value)}
+          onChange={(event) => { setDirty(true); setInterests(event.target.value); }}
         />
       </Field>
       <Field id="profile-languages" label="Languages" hint="Comma separated">
@@ -169,7 +192,7 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
           id="profile-languages"
           className="desk-input mt-1 w-full"
           value={languages}
-          onChange={(event) => setLanguages(event.target.value)}
+          onChange={(event) => { setDirty(true); setLanguages(event.target.value); }}
         />
       </Field>
       <Field id="profile-github" label="GitHub username">
@@ -197,10 +220,10 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
               draft.projects.find((row) => row.id === project.id)?.image_url ?? null
             }
             onChange={(next) =>
-              setProjects(projects.map((row, position) => (position === index ? next : row)))
+              editProjects(projects.map((row, position) => (position === index ? next : row)))
             }
             onRemove={() =>
-              setProjects(projects.filter((_, position) => position !== index))
+              editProjects(projects.filter((_, position) => position !== index))
             }
             onImageChanged={() =>
               client.invalidateQueries({ queryKey: ["member", "profile-page", makerspaceId] })
@@ -212,7 +235,7 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
         className="desk-button mt-3"
         type="button"
         onClick={() =>
-          setProjects([...projects, { title: "", description: "", links: [] }])
+          editProjects([...projects, { title: "", description: "", links: [] }])
         }
       >
         Add a project

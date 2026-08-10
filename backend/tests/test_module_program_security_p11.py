@@ -310,3 +310,124 @@ def test_uninstalling_membership_closes_the_profile_surfaces_but_keeps_the_data(
     assert client.get(f"/api/v1/member/makerspaces/{space.pk}/directory").status_code == 400
     # Uninstall hides; only a purge destroys.
     assert MemberProfile.objects.get(membership=membership).bio == "Kept"
+
+
+# --- fixes from the Codex Stage-4 review -------------------------------------------
+
+
+def test_the_control_plane_login_honours_the_password_switch():
+    """`/control/login/` is Django's AdminSite login, not the JWT one.
+
+    Gating only the API endpoint left a password door on the one surface that can turn
+    the switch back on, which makes the whole policy advisory.
+    """
+    User.objects.create_superuser(
+        username="root", email="root@example.test", password=PASSWORD
+    )
+    client = APIClient()
+    assert client.post(
+        "/control/login/", {"username": "root", "password": PASSWORD}
+    ).status_code in (200, 302)
+
+    PlatformLoginMethods.objects.update_or_create(
+        pk=1,
+        defaults={
+            "password_enabled": False, "social_enabled": True,
+            "phone_enabled": True, "self_registration_enabled": True,
+        },
+    )
+    refused = APIClient().post(
+        "/control/login/", {"username": "root", "password": PASSWORD}
+    )
+    # Refused before the form authenticates, so no session is minted at all.
+    assert refused.status_code == 403
+    assert "_auth_user_id" not in refused.client.session
+
+
+def test_a_malformed_project_id_does_not_delete_the_avatar():
+    space = make_space("image-malformed")
+    membership = member_of(space, "owner")
+    profile = profile_services.profile_for(membership)
+    MemberProfile.objects.filter(pk=profile.pk).update(
+        avatar_key=build_object_key("member", space.pk, ".png")
+    )
+
+    response = authed(membership.user).delete(
+        f"/api/v1/member/makerspaces/{space.pk}/profile/image?project_id=abc"
+    )
+    assert response.status_code == 400
+    profile.refresh_from_db()
+    assert profile.avatar_key, "the avatar must survive a malformed project id"
+
+
+def test_a_restricted_member_cannot_be_registered_for_an_event():
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.events.models import Event, EventRegistration
+
+    space = make_space("event-restricted")
+    manager_user = staffer(space, slug="space_manager", username="events-manager")
+    membership = member_of(space, "restricted")
+    membership.user.access_status = User.AccessStatus.RESTRICTED
+    membership.user.save(update_fields=["access_status"])
+    now = timezone.now()
+    event = Event.objects.create(
+        makerspace=space, title="Night", starts_at=now + timedelta(hours=1),
+        ends_at=now + timedelta(hours=2), is_public=True, status=Event.Status.PUBLISHED,
+    )
+    client = authed(manager_user)
+
+    assert client.post(
+        f"/api/v1/admin/events/{event.pk}/registrations/",
+        {"member_id": membership.user_id}, format="json",
+    ).status_code == 404
+    assert not EventRegistration.objects.exists()
+    # And the picker must not offer them either.
+    listed = client.get(f"/api/v1/admin/events/{event.pk}/eligible-members/").data
+    assert membership.user_id not in [row["member_id"] for row in listed]
+
+
+def test_profile_mutations_are_audited_without_copying_the_content():
+    from apps.audit.models import AuditLog
+
+    space = make_space("profile-audit")
+    membership = member_of(space, "author")
+    authed(membership.user).put(
+        f"/api/v1/member/makerspaces/{space.pk}/profile",
+        {"is_visible": True, "bio": "a private sentence"},
+        format="json",
+    )
+
+    entry = AuditLog.objects.filter(action="member.profile_updated").latest("id")
+    assert entry.makerspace_id == space.pk
+    assert entry.meta["visibility_changed"] is True
+    assert entry.meta["is_visible"] is True
+    # The log is append-only, so the bio must NOT be copied into it.
+    assert "a private sentence" not in str(entry.meta)
+
+
+def test_the_github_refresh_has_a_scheduled_task():
+    """A command nobody runs leaves every count permanently None."""
+    from django.conf import settings
+
+    tasks = {entry["task"] for entry in settings.CELERY_BEAT_SCHEDULE.values()}
+    assert "apps.makerspaces.tasks.refresh_github_contributions_task" in tasks
+
+
+def test_the_github_task_is_inert_without_a_token(settings, monkeypatch):
+    import urllib.request
+
+    from apps.makerspaces.tasks import refresh_github_contributions_task
+
+    settings.GITHUB_API_TOKEN = ""
+    space = make_space("github-task")
+    membership = member_of(space, "author")
+    profile_services.save_profile(membership, {"github_username": "octocat"})
+
+    def explode(*args, **kwargs):
+        raise AssertionError("an unconfigured deployment must make no outbound call")
+
+    monkeypatch.setattr(urllib.request, "urlopen", explode)
+    assert refresh_github_contributions_task() == {"configured": False}

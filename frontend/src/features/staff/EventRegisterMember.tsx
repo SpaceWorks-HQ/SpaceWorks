@@ -1,6 +1,13 @@
 import { useState } from "react";
 
-import { useEventEligibleMembers, useRegisterMemberForEvent } from "./eventsApi";
+import { CustomFormFields } from "../forms/CustomFormFields";
+import {
+  customAnswerErrors,
+  validateCustomAnswers,
+  type CustomAnswers,
+} from "../forms/customFormTypes";
+import { StructuredApiError } from "../../lib/api";
+import { useEventEligibleMembers, useRegisterMemberForEvent, type StaffEvent } from "./eventsApi";
 
 /**
  * Register a member for an event from the roster — the desk counterpart to public
@@ -17,28 +24,51 @@ import { useEventEligibleMembers, useRegisterMemberForEvent } from "./eventsApi"
 export function EventRegisterMember({
   makerspaceId,
   eventId,
+  customForm,
   disabled,
 }: {
   makerspaceId: number;
   eventId: number;
+  customForm: StaffEvent["custom_form"];
   disabled: boolean;
 }) {
   const [memberId, setMemberId] = useState("");
   const [phone, setPhone] = useState("");
   const [needsPhone, setNeedsPhone] = useState(false);
+  // Without this the console could never register anyone for an event whose form has a
+  // required question: the backend validates answers on this path exactly as it does for
+  // public self-registration, so a form with no way to answer it is a permanent 400.
+  const [answers, setAnswers] = useState<CustomAnswers>({});
+  const [answerErrors, setAnswerErrors] = useState<Record<string, string>>({});
   const members = useEventEligibleMembers(eventId, !disabled);
   const register = useRegisterMemberForEvent(makerspaceId, eventId);
 
   if (disabled) return null;
 
+  const serverAnswerErrors = customAnswerErrors(
+    register.error instanceof StructuredApiError
+      ? register.error.body.custom_answers
+      : undefined,
+  );
   const submit = () => {
+    // Validated here as well as on the server, so a missing required answer is shown
+    // beside the question rather than returned as a whole-form 400.
+    const nextErrors = validateCustomAnswers(customForm ?? [], answers);
+    setAnswerErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
     register.mutate(
-      { member_id: Number(memberId), ...(phone.trim() ? { phone: phone.trim() } : {}) },
+      {
+        member_id: Number(memberId),
+        ...(phone.trim() ? { phone: phone.trim() } : {}),
+        ...(customForm?.length ? { custom_answers: answers } : {}),
+      },
       {
         onSuccess: () => {
           setMemberId("");
           setPhone("");
           setNeedsPhone(false);
+          setAnswers({});
+          setAnswerErrors({});
         },
         onError: (error) => {
           setNeedsPhone(/phone/i.test(error instanceof Error ? error.message : ""));
@@ -78,6 +108,17 @@ export function EventRegisterMember({
           {register.isPending ? "Registering…" : "Register"}
         </button>
       </div>
+      {customForm?.length ? (
+        <div className="mt-3">
+          <CustomFormFields
+            schema={customForm}
+            answers={answers}
+            onChange={setAnswers}
+            errors={{ ...answerErrors, ...serverAnswerErrors }}
+            disabled={register.isPending}
+          />
+        </div>
+      ) : null}
       {needsPhone ? (
         <div className="mt-2">
           <label className="block text-sm font-semibold text-ink" htmlFor="event-register-phone">

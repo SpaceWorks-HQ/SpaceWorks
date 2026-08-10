@@ -378,6 +378,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.accounts.tasks.purge_auth_challenges_task",
         "schedule": crontab(hour=3, minute=30),
     },
+    # Maker-profile GitHub counts. Daily and off-peak: the cache interval is 24h, the
+    # data is a vanity number, and nothing is waiting on it. A deployment with no
+    # GITHUB_API_TOKEN makes no outbound call at all -- the task returns immediately.
+    "refresh-github-contributions": {
+        "task": "apps.makerspaces.tasks.refresh_github_contributions_task",
+        "schedule": crontab(hour=4, minute=15),
+    },
 }
 
 CORS_ALLOWED_ORIGINS = env.list(
