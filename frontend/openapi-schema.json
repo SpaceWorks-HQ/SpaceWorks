@@ -25696,7 +25696,7 @@
                                 }
                             }
                         },
-                        "description": "Active membership and presence are required."
+                        "description": "Active membership and current waiver acceptance are required."
                     },
                     "409": {
                         "content": {
