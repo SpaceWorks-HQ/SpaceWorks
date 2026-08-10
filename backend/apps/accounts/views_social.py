@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import audit_events
 from apps.accounts.auth_cookies import set_refresh_cookies
+from apps.accounts.login_methods import social_login_enabled
 from apps.accounts.member_identity import member_login_allowed
 from apps.accounts.models_oidc import provider_for_slug, provider_key, slug_from_provider_key
 from apps.accounts.models_social import SocialIdentity, SocialProvider, SocialSurface
@@ -96,6 +97,12 @@ class SocialLoginView(APIView):
         # both exemptions are load-bearing. Answered before the nonce is consumed, so a
         # gated attempt cannot burn a one-time nonce.
         if not member_login_allowed(self.provider, surface=data["surface"]):
+            return _error("social_unavailable", 404)
+        # The platform switch covers the built-ins and every configured OIDC provider
+        # alike -- they share this endpoint. Same 404 an unconfigured provider gets:
+        # both mean "this deployment does not offer that", and the caller has no use for
+        # the distinction.
+        if not social_login_enabled():
             return _error("social_unavailable", 404)
         try:
             _settings, audience = provider_settings(self.provider, data["client_platform"])

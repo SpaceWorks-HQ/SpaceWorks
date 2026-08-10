@@ -18,6 +18,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.accounts import audit_events
+from apps.accounts.login_methods import password_login_enabled
 from apps.accounts.auth_cookies import assert_csrf, clear_refresh_cookies, set_refresh_cookies
 from apps.accounts.models import User
 from apps.accounts.serializers import LoginSerializer, user_payload
@@ -118,6 +119,15 @@ class LoginView(TokenObtainPairView):
         examples=[LOGIN_EXAMPLE],
     )
     def post(self, request, *args, **kwargs):
+        # Answered before the credentials are even parsed. Password sign-in being off is
+        # deployment state, so it is a 403 rather than the 401 a wrong password gets --
+        # telling the caller "not this way" instead of "not you", which is the difference
+        # between a login screen that can explain itself and one that cannot.
+        if not password_login_enabled():
+            return Response(
+                {"detail": "Password sign-in is not available on this deployment."},
+                status=403,
+            )
         username = request.data.get("username", "")
         serializer = self.get_serializer(data=request.data)
         try:

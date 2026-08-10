@@ -13,14 +13,28 @@ export function MemberAuthPanel({ onAuthenticated }: { onAuthenticated: () => vo
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  // `member_accounts` appears in the public config only when the deployment has
-  // switched member accounts off, so an absent key — and a failed request — mean on.
+  // Each of these appears in the public config only when it has been switched off, so
+  // an absent key — and a failed request — mean available.
   const [selfServeAccounts, setSelfServeAccounts] = useState(true);
+  const [passwordLogin, setPasswordLogin] = useState(true);
 
   useEffect(() => {
-    publicV1Request<{ member_accounts?: { enabled: boolean } }>("/config")
-      .then((result) => setSelfServeAccounts(result.member_accounts?.enabled !== false))
-      .catch(() => setSelfServeAccounts(true));
+    publicV1Request<{
+      member_accounts?: { enabled: boolean };
+      self_registration?: { enabled: boolean };
+      password_login?: { enabled: boolean };
+    }>("/config")
+      .then((result) => {
+        setSelfServeAccounts(
+          result.member_accounts?.enabled !== false &&
+            result.self_registration?.enabled !== false,
+        );
+        setPasswordLogin(result.password_login?.enabled !== false);
+      })
+      .catch(() => {
+        setSelfServeAccounts(true);
+        setPasswordLogin(true);
+      });
   }, []);
 
   useEffect(() => {
@@ -66,9 +80,11 @@ export function MemberAuthPanel({ onAuthenticated }: { onAuthenticated: () => vo
           {mode === "login" ? "Member sign in" : "Create a member account"}
         </h1>
         <p className="mt-2 text-sm text-muted">
-          {mode === "login"
-            ? "Sign in to manage memberships, waivers, visits, and payments."
-            : "Use one global account across every makerspace you join."}
+          {mode === "signup"
+            ? "Use one global account across every makerspace you join."
+            : passwordLogin
+              ? "Sign in to manage memberships, waivers, visits, and payments."
+              : "This space signs members in through an identity provider."}
         </p>
         {mode === "signup" ? (
           <>
@@ -78,15 +94,23 @@ export function MemberAuthPanel({ onAuthenticated }: { onAuthenticated: () => vo
             <input id="member-phone" className="desk-input mt-1 w-full" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} />
           </>
         ) : null}
-        <label className={`${mode === "login" ? "mt-5" : "mt-3"} block text-sm font-semibold`} htmlFor="member-email">Email</label>
-        <input id="member-email" className="desk-input mt-1 w-full" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        <label className="mt-3 block text-sm font-semibold" htmlFor="member-password">Password</label>
-        <input id="member-password" className="desk-input mt-1 w-full" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} required />
+        {/* Sign-up still needs both fields: it sets the password it cannot be used with
+            yet, so the account stays recoverable if the switch is ever turned back on. */}
+        {passwordLogin || mode === "signup" ? (
+          <>
+            <label className={`${mode === "login" ? "mt-5" : "mt-3"} block text-sm font-semibold`} htmlFor="member-email">Email</label>
+            <input id="member-email" className="desk-input mt-1 w-full" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <label className="mt-3 block text-sm font-semibold" htmlFor="member-password">Password</label>
+            <input id="member-password" className="desk-input mt-1 w-full" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} required />
+          </>
+        ) : null}
         {notice ? <p className="mt-3 text-sm text-success-ink">{notice}</p> : null}
         {error ? <p className="mt-3 text-sm text-danger" role="alert">{error}</p> : null}
-        <button className="desk-button-primary mt-5 w-full" type="submit" disabled={pending}>
-          {pending ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-        </button>
+        {passwordLogin || mode === "signup" ? (
+          <button className="desk-button-primary mt-5 w-full" type="submit" disabled={pending}>
+            {pending ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
+          </button>
+        ) : null}
         {selfServeAccounts ? (
           <button className="mt-3 w-full text-sm font-semibold text-accent-ink" type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }}>
             {mode === "login" ? "Create a member account" : "Back to sign in"}

@@ -2,6 +2,11 @@ from django import forms
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
+from apps.accounts.login_methods import (
+    superadmins_without_social,
+    users_stranded_without_social,
+)
+from apps.accounts.models_login_methods import PlatformLoginMethods
 from apps.accounts.models_oidc import OidcProvider
 from apps.accounts.models_social import (
     PlatformSocialAuthSettings,
@@ -73,6 +78,73 @@ class PlatformSocialAuthSettingsAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
 
     def has_add_permission(self, request):
         return not PlatformSocialAuthSettings.objects.exists()
+
+
+class PlatformLoginMethodsForm(forms.ModelForm):
+    class Meta:
+        model = PlatformLoginMethods
+        fields = "__all__"
+
+    def clean(self):
+        """Refuse a switch-off that leaves somebody with no way in.
+
+        Turning a method OFF is the dangerous direction, and the accounts it strands are
+        precisely the ones forgot-password cannot recover — they have no usable password
+        to reset. Raised as a form error with the remedy attached rather than as a model
+        constraint, so the superadmin is told what to fix.
+        """
+        cleaned = super().clean()
+        password = cleaned.get("password_enabled", True)
+        social = cleaned.get("social_enabled", True)
+
+        if not social:
+            stranded = users_stranded_without_social()
+            if stranded:
+                raise forms.ValidationError(
+                    f"Disabling social sign-in would lock out {len(stranded)} account(s) "
+                    "whose only credential is an identity provider — they have no usable "
+                    "password, so a password reset cannot recover them. Set a password "
+                    "for those accounts first."
+                )
+        if not password:
+            if not social:
+                raise forms.ValidationError(
+                    "Password and social sign-in cannot both be off: phone sign-in issues "
+                    "member sessions only, so nobody could reach the staff console or "
+                    "this page again."
+                )
+            stranded = superadmins_without_social()
+            if stranded:
+                raise forms.ValidationError(
+                    f"Disabling password sign-in would lock out {len(stranded)} "
+                    "superadmin(s) who have no linked identity provider — and this page "
+                    "is the only place the switch can be turned back on. Link a provider "
+                    "to those accounts first."
+                )
+        return cleaned
+
+
+@admin.register(PlatformLoginMethods)
+class PlatformLoginMethodsAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    """Which ways in this deployment offers. Platform-scoped, never a tenant feature."""
+
+    form = PlatformLoginMethodsForm
+    list_display = (
+        "__str__", "password_enabled", "social_enabled", "phone_enabled",
+        "self_registration_enabled",
+    )
+
+    def has_add_permission(self, request):
+        return not PlatformLoginMethods.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        """Deleting the row would silently re-enable every method.
+
+        `load()` reads an absent row as "nothing configured", which is every switch on —
+        correct for a deployment that has never touched them, and a surprise for one that
+        deliberately turned two off.
+        """
+        return False
 
 
 @admin.register(SocialIdentity)

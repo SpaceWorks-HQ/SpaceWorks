@@ -40,16 +40,19 @@ SMS_UNAVAILABLE = {"detail": "Phone sign-in is not available on this deployment.
 
 
 def _phone_login_available():
-    """Phone sign-in is a MEMBER credential, so it goes with the member ecosystem.
+    """Phone sign-in needs both the member ecosystem and its own method switch.
+
+    Phone sign-in is a MEMBER credential, so it goes with the member ecosystem.
 
     Answered before the number is even parsed. The response is the same 404 an
     unconfigured deployment returns, and deliberately so: both are deployment state, not
     account state, and the enumeration contract this endpoint keeps is about not
     disclosing whether a *number* is known -- never about hiding how the box is set up.
     """
+    from apps.accounts.login_methods import phone_login_enabled
     from apps.accounts.member_identity import member_login_allowed
 
-    return member_login_allowed()
+    return member_login_allowed() and phone_login_enabled()
 
 
 class PhoneLoginStartView(APIView):

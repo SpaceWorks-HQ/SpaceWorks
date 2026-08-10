@@ -149,6 +149,7 @@ from apps.accounts.models_devices import (  # noqa: E402
     DeviceRefreshFamily,
     DeviceRefreshToken,
 )
+from apps.accounts.models_login_methods import PlatformLoginMethods  # noqa: E402
 from apps.accounts.models_phone import (  # noqa: E402
     PhoneChallengePurpose,
     PhoneVerificationChallenge,
@@ -174,6 +175,7 @@ __all__ = [
     'EmailVerificationChallenge',
     'PhoneChallengePurpose',
     'PhoneVerificationChallenge',
+    'PlatformLoginMethods',
     'PlatformSocialAuthSettings',
     'SocialClientPlatform',
     'SocialDelivery',

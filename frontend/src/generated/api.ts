@@ -3372,6 +3372,12 @@ export type PublicConfig = {
   "phone_login"?: {
   [key: string]: unknown;
 };
+  "password_login"?: {
+  [key: string]: unknown;
+};
+  "self_registration"?: {
+  [key: string]: unknown;
+};
   "member_accounts"?: {
   [key: string]: unknown;
 };

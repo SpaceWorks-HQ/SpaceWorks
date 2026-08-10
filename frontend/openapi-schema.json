@@ -39299,6 +39299,14 @@
                         "type": "object",
                         "additionalProperties": {}
                     },
+                    "password_login": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "self_registration": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
                     "member_accounts": {
                         "type": "object",
                         "additionalProperties": {}

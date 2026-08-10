@@ -26,15 +26,21 @@ export function LoginPanel({
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [emailEnabled, setEmailEnabled] = useState(false);
+  // Present in the config only when password sign-in has been switched off, so an
+  // absent key — and a failed request — mean it is available.
+  const [passwordLogin, setPasswordLogin] = useState(true);
   const [forgotPending, setForgotPending] = useState(false);
   const [forgotMessage, setForgotMessage] = useState("");
 
   useEffect(() => {
     let active = true;
-    publicV1Request<{ email_enabled: boolean }>("/config")
+    publicV1Request<{ email_enabled: boolean; password_login?: { enabled: boolean } }>(
+      "/config",
+    )
       .then((config) => {
         if (active) {
           setEmailEnabled(config.email_enabled === true);
+          setPasswordLogin(config.password_login?.enabled !== false);
         }
       })
       .catch(() => {
@@ -126,37 +132,45 @@ export function LoginPanel({
         </p>
         <h1 className="mt-2 text-2xl font-bold text-ink">Sign in</h1>
         <p className="mt-2 text-sm text-muted">
-          Use your staff account to manage requests, inventory, and handovers.
+          {passwordLogin
+            ? "Use your staff account to manage requests, inventory, and handovers."
+            : "This deployment signs staff in through an identity provider."}
         </p>
-        <label className="mt-5 block text-sm font-semibold">Username</label>
-        <input
-          className="desk-input mt-1 w-full"
-          name="username"
-          autoComplete="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <label className="mt-3 block text-sm font-semibold">Password</label>
-        <input
-          className="desk-input mt-1 w-full"
-          name="password"
-          autoComplete="current-password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        {passwordLogin ? (
+          <>
+            <label className="mt-5 block text-sm font-semibold">Username</label>
+            <input
+              className="desk-input mt-1 w-full"
+              name="username"
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <label className="mt-3 block text-sm font-semibold">Password</label>
+            <input
+              className="desk-input mt-1 w-full"
+              name="password"
+              autoComplete="current-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </>
+        ) : null}
         {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
-        <button
-          className="desk-button-primary mt-5 flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-          type="submit"
-          disabled={isPending}
-        >
-          {isPending ? (
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-bg/40 border-t-bg" />
-          ) : null}
-          {isPending ? "Signing in..." : "Sign in"}
-        </button>
-        {emailEnabled ? (
+        {passwordLogin ? (
+          <button
+            className="desk-button-primary mt-5 flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+            type="submit"
+            disabled={isPending}
+          >
+            {isPending ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-bg/40 border-t-bg" />
+            ) : null}
+            {isPending ? "Signing in..." : "Sign in"}
+          </button>
+        ) : null}
+        {emailEnabled && passwordLogin ? (
           <button
             className="mt-3 w-full text-sm font-semibold text-accent-ink hover:text-accent-ink/80"
             type="button"

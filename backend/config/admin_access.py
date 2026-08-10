@@ -39,6 +39,9 @@ NESTED_MAKERSPACE_LOOKUPS = {
 GLOBAL_ADMIN_MODELS = {
     "accounts.user",
     "accounts.platformsocialauthsettings",
+    # The login-method switches govern credentials, and credentials resolve before a
+    # makerspace is selected — the same reason social auth is platform-scoped.
+    "accounts.platformloginmethods",
     "accounts.socialidentity",
     # Platform-scoped for the same reason as the built-in providers: identity resolves
     # before a makerspace is selected, so an OIDC provider cannot belong to one.
