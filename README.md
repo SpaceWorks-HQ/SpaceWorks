@@ -46,14 +46,20 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
   (Celery) email, with a per-feature × per-channel matrix. Each channel is its own module.
 - **Modular by install** — turn whole modules on and off per makerspace; uninstalling hides surfaces
   and always keeps the data. See [Modules](#modules).
-- **Sign-in options** — username/password always; optionally Google, Apple, any OIDC provider
-  (Keycloak, Authentik, Azure AD, Okta), and **phone + SMS code** for members.
+- **Sign-in options** — username/password, Google, Apple, any OIDC provider (Keycloak, Authentik,
+  Azure AD, Okta), and **phone + SMS code** for members. Each is switchable, and a space can run with
+  **no member accounts at all**, on your own identity provider plus staff-created walk-in records.
+- **Maker profiles** — an opt-in per-makerspace profile with projects, interests, education and an
+  optional GitHub contribution count, plus a member directory that lists only the people who chose to
+  be listed.
 - **Traceable by design** — append-only audit log; immutable evidence photos and scan records.
 
 > **What works out of the box:** username/password. Google, Apple and OIDC need credentials you
 > create with that provider, and phone sign-in needs an SMS account — none of them can ship
 > preconfigured, because they are issued against *your* domain. `setup.sh` walks you through Google
-> and you can skip it; password login is unaffected either way.
+> and you can skip it; password login is unaffected either way. The GitHub contribution count on
+> maker profiles is the same shape: set `GITHUB_API_TOKEN` in `.env` to enable it, and leave it unset
+> for the section to simply never appear.
 
 ## Quick start
 
@@ -87,22 +93,41 @@ full stack automatically.
 
 ## Modules
 
-A makerspace only carries the parts it uses. Space Works ships **28 modules**; **6 are core** and
+A makerspace only carries the parts it uses. Space Works ships **32 modules**; **6 are core** and
 always on (the public catalogue, request workflow, staff admin, evidence uploads, QR management and
 the scanner). The rest are **opt-in**.
 
 Core is not negotiable because the hardware-handover rules depend on it: issuing a tool requires a box
 QR scan *and* a photo, so a machines-only workshop still carries the request/QR/evidence spine.
 
+You do not have to think in 32 switches. They are grouped into **twelve areas**, which is what the
+console shows you:
+
+| Area | Covers |
+|---|---|
+| **Inventory** *(always on)* | The catalogue, request workflow, QR/evidence spine, asset units, containers, transfers, QR print batches, front-desk handover and purchasing |
+| **Stocktake** | Scan-first stock counts and variance reporting |
+| **Machines** | Machine registry, the service/print queue, maintenance and warranty |
+| **Events** | Event scheduling and registrations |
+| **Bookings** | Resource booking and public self-booking |
+| **Membership** | Join requests, waivers, referrals, member activity, maker profiles and presence |
+| **Notifications** | The in-app inbox and every outbound channel |
+| **Reports** | Analytics, the report registry and CSV/XLSX exports |
+| **Payments** | Taking money online, through Stripe or Razorpay |
+| **Accounts** | The member-facing identity ecosystem — see below |
+| **Mobile apps** | Attested device sessions, native push and the in-app payment sheet |
+| **Updates** | In-app release control |
+
 **Pick a profile at install time** — `setup.sh` asks, or pass `--profile`:
 
 | Profile | Modules | For |
 |---|---|---|
 | `minimal` | 6 | Core only; nothing published publicly |
-| `workshop` | 13 | A machine shop: machines, service queue, maintenance |
-| `lending` | 15 | A tool library: the full lending lifecycle, no machines |
-| `recommended` | 18 | Core plus the inventory lifecycle, reports and machines |
-| `everything` | 28 | All modules |
+| `workshop` | 14 | A machine shop: machines, service queue, maintenance |
+| `lending` | 17 | A tool library: the full lending lifecycle, no machines |
+| `recommended` | 20 | Core plus the inventory lifecycle, reports and machines |
+| `cloud` | 24 | A managed box: everything a hosted deployment runs |
+| `everything` / `full` | 32 | All modules |
 
 **Change it later.** Uninstalling clears the capability and hides the surfaces; **your data is always
 retained** and reinstalling brings it back:
@@ -126,6 +151,34 @@ so re-enabling needs no re-entry.
 Chat channels are configured **per makerspace** (the space owns the channel and pays for it). Sign-in
 providers are the opposite — they resolve before a makerspace is chosen, so they are configured once
 for the whole deployment.
+
+### Running without member accounts
+
+Turning **Accounts** off removes the member-account *ecosystem*: nobody signs themselves up, and the
+member area, phone sign-in and the built-in Google/Apple buttons all go with it. It does **not** remove
+identity, and it never touches staff sign-in — a deployment that could switch off its own staff logins
+could not be administered.
+
+People still get named, two ways:
+
+- **Your own identity provider.** A configured OIDC provider (Keycloak, Authentik, Azure AD, Okta,
+  Google Workspace) keeps working, because it is your institution's directory rather than an account
+  ecosystem this deployment runs.
+- **Walk-ins.** Front-desk staff add someone at the counter from the handout screen. That creates a
+  person record — a name, optionally an email and phone — with **no password and no way to sign in**.
+  It is enough to issue them a tool, register them for an event or run a machine job for them, and it
+  keeps every handover attributable to a real person, which the hardware rules require.
+
+### Choosing which ways in you offer
+
+**`/control/` → Platform login methods** switches the four credential kinds independently: password,
+identity provider, phone code, and self sign-up. All four are on by default and switching one off
+never deletes anything, so turning it back on needs no re-entry.
+
+Two changes are refused rather than performed, because they cannot be undone from inside the app:
+switching off a method that is somebody's *only* credential (they have no password to reset, so
+forgot-password cannot rescue them), and switching off passwords while no superadmin has a linked
+provider — this page would then be unreachable.
 
 ### Rooms: sending different alerts to different places
 

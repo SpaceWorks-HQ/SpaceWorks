@@ -36,6 +36,12 @@ providers, **phone + SMS as a verified member login identity**, a guided-but-ski
 step, **one module key per notification channel (email/telegram/slack/mattermost/discord)**, and
 **Notifications v2** (per-event recipients, per-room chat destinations, editable FabLab email/chat
 wording, object-scoped recipient rules, and the staff API + console for all of it).
+Most recently the **module-architecture program**: operator-facing module groups, one module map for
+every staff tab, the `payments`/`accounts`/`mobile`/`updates` keys, Razorpay behind a provider seam, a
+superadmin modules console, cloud/full deploy profiles and a beat-less scheduler, the **account-less
+identity seam + staff-created walk-in members**, **four platform login-method switches**, **opt-in maker
+profiles and a member directory**, and **staff-side event registration**. Its remaining phase is a
+security and loophole audit.
 The one deferred end-to-end user QA remains an owner-run release gate.
 
 **Standing build conventions for this program:**
@@ -353,8 +359,8 @@ route through it. `/auth/me` + `/auth/login` carry typed effective `actions` per
 membership/role-assignment APIs enforce non-escalation (can't grant a role you don't hold; can't touch a
 MANAGE_MAKERSPACE target/role) with makerspace-first lock ordering.
 
-**`apps/makerspaces/module_registry.py` is the single source of truth for module keys.** All 24
-`ModuleDefinition`s live there (`key`, `label`, `description`, `app_label`, `enforcement`,
+**`apps/makerspaces/module_registry.py` is the single source of truth for module keys.** All 32
+`ModuleDefinition`s live there (`key`, `label`, `description`, `app_label`, `enforcement`, `group`,
 `requires_modules`, `default_enabled`, `is_core`, `frontend_exposed`, `frontend_workflows`), and the
 lists that used to be hand-kept in parallel now **derive** from it: `models.DEFAULT_ENABLED_MODULES`,
 `platform.MODULE_WORKFLOWS`, `capabilities.FEATURE_MODULES`, and the former hardcoded
@@ -371,7 +377,8 @@ AST-parses `apps/` and fails if a registered module has no real guard call site,
 unregistered, if the derived lists change, or if a migration-referenced callable stops resolving.
 
 **Modules are OPT-IN.** `DEFAULT_ENABLED_MODULES` is now **core only** (6 keys) — a new makerspace
-installs core plus whatever profile the operator chose (`minimal` 6 / `recommended` 17 / `everything` 24).
+installs core plus whatever profile the operator chose (`minimal` 6 / `workshop` 14 / `lending` 17 /
+`recommended` 20 / `cloud` 24 / `everything` = `full` 32).
 `ModuleDefinition.default_enabled` defaults to **False** and core must not set it (core is on by
 definition; two sources for one fact is the drift the registry exists to remove). **Existing makerspaces
 are untouched** — a default change never rewrites stored JSON rows, and `_canonical_modules` preserves
@@ -656,6 +663,91 @@ starts empty everywhere, so its constraint always applies cleanly.
 - **`accounts.User` is deliberately absent from the PII encryption registry**, which is what makes a
   plaintext unique index and a direct login lookup possible: scoped encryption is per-makerspace and
   `User` is platform-global, so it could never be scoped-encrypted.
+
+**Account-less identity: `accounts` removes the ECOSYSTEM, never identity (module program phase 9).**
+`apps/accounts/member_identity.py` is the one seam every member-facing login surface asks, and it has
+two exemptions that are load-bearing:
+- **Staff authentication is never gated.** Core RBAC — a deployment that could switch off its own staff
+  logins could not be administered (the A7 reasoning). The gate is therefore keyed on the login
+  *surface*, not merely on the provider.
+- **A configured `oidc:*` provider is never gated.** Those rows are the space's own directory and are
+  precisely the identity source an accounts-off install authenticates against; gating them would remove
+  the alternative at the moment it removes the default. `is_external_provider` reuses
+  `slug_from_provider_key`, so the namespace has one parser.
+Reads fail **OPEN** (a broken capability lookup must never lock people out), which is deliberately the
+opposite of the access rules — do not "fix" one to match the other. Gated on the member surface only:
+phone sign-in (checked on start **and** confirm, so a code issued before the switch cannot still mint a
+session), the built-in Google/Apple providers, and self sign-up. `/api/v1/config` emits
+`member_accounts` **only when off**, preserving the byte-for-byte payload; that key is discovery, and
+`SocialLoginView` is enforcement — `social_auth` still advertises the built-ins because the STAFF login
+screen reads the same endpoint.
+- **`makerspaces/walk_in_services.py` is the substitute, and is gated by NO module.** `membership`
+  requires `accounts`, so gating walk-ins by either would remove the substitute and the thing being
+  substituted together. It creates a real `User` with an **unusable password** — naming a person, not
+  provisioning a login — so every downstream PROTECT FK keeps working. Two rules: a typed number goes
+  to free-text `User.phone` and **never `phone_e164`** (a login identity under a partial unique
+  constraint, and a counter-typed number proves nothing), and a **known email is refused, never bound**
+  — attaching an existing account to a roster is a `MANAGE_MAKERSPACE` decision, and binding would
+  silently reactivate a deliberately revoked membership through the one form meant for strangers. The
+  endpoint is gated on `ISSUE_DIRECT_LOAN`, because naming the stranger at the counter is the same
+  front-desk act as handing them a tool.
+- **Known gap: OIDC has no browser flow.** The backend accepts an ID token only, and no frontend renders
+  configured providers, so on the web an accounts-off deployment today means staff-created walk-ins.
+  Adding the browser flow (PKCE, redirect, discovery) is its own phase.
+
+**Login methods are four independent platform switches (module program phase 10).**
+`accounts.PlatformLoginMethods` (`pk=1`, superadmin-only) governs password / social / phone /
+self-registration. Platform-scoped and never a tenant feature, for the reason that keeps social sign-in
+off the capability registry: each resolves before a makerspace is selected. All four default **on** and
+are additive `AND`s in front of the readiness each method already had, so switching one on can never
+make an unconfigured method work. `load()` deliberately does **not** `get_or_create` — this is read on
+every unauthenticated login attempt, and a read path that writes is a write per login attempt.
+- **The `social` switch covers the built-ins AND every OIDC provider**, because they share one endpoint,
+  one nonce contract and one config entry. Disabling one provider is what `is_enabled` is for.
+- **`login_methods.py` has two halves with opposite failure directions**: the reads fail OPEN, the
+  lockout guards refuse whenever they cannot prove the change is survivable. `users_stranded_without_social`
+  is the platform-wide twin of `social_lockout` (someone holding Google *and* Apple survives either being
+  cleared and is stranded by social being switched off), and `superadmins_without_social` is the floor
+  that keeps `/control/` reachable. Password + social both off is refused outright: **phone issues member
+  sessions only** (the refresh claim is a hardcoded `"member"`), so it can never rescue an administrator.
+
+**Maker profiles hang off `MakerspaceMembership`, and are deliberately NOT PII-encrypted (phase 12).**
+`User` is platform-global and scoped encryption is per-makerspace, which is why `accounts.User` is
+outside the PII registry — so a profile attached to the user could be scoped to nothing. Per-membership
+is also the truer model: what someone publishes to one space is not theirs to publish in another.
+`ScopedPiiModelMixin` is omitted on purpose (`separability.E001` only fires for models that take it, and
+its own hint names dropping the mixin as the right answer): every field is content the member wrote and
+asked to have shown, so encrypting it buys nothing and drags in the envelope/dual-read machinery.
+- **Visibility is opt-in and defaults off**, and no profile row is the same answer as an invisible one.
+  Directory rows carry display name, headline and avatar and **nothing else** — everyone who did not opt
+  in becomes part of `hidden_count`, so a space can show its size without naming anyone. One 404 covers
+  "no such member", "not a member here" and "has not published".
+- **`member` is a fifth public-image kind and needed all four registrations plus the collision check.**
+  `build_object_key`, `lifecycle._collect_public_image_keys`, `recompute_storage._public_image_keys`,
+  `module_purge_plans["membership"].public_image_keys` and `public_image_key_in_use` (new `profile_id` /
+  `project_id` exclusions). All but the first fail **open**. Profiles are reached through
+  `membership__makerspace`, since the row carries no makerspace column.
+- **Profiles go with a `membership` purge; the membership itself still does not** (plan A7 unchanged).
+- **Link URLs are restricted to http/https**, because they render as an `href` on a page other members
+  read — a stored `javascript:` URL is stored XSS and escaping the text does nothing for an href. Every
+  member-writable list is length-capped.
+- **GitHub is never fetched on a read path.** `refresh_github_contributions` (command + Celery) does it;
+  a failure keeps the last known count and still stamps `github_synced_at` so a throttled API backs off.
+  Unset `GITHUB_API_TOKEN` = dormant, count stays `None`, section omitted. Changing the handle clears the
+  cached count outright, or one account's total shows under another account's name.
+
+**Staff event registration is the SAME service, with exactly one relaxation (phase 13).**
+`services_registration.register(..., staff_registration=True)` relaxes only the `is_public` check —
+that flag means "listed in the public catalogue", and a staffer at the door is not the public, so
+without it a members-only event could not be registered for by anyone. Published, not-ended, capacity,
+waitlisting, duplicates, the custom form, the write fence and the charge are all unchanged, because the
+state machine has one home. The endpoint takes a `member_id` only: a person with no account is given a
+walk-in record first, so there is one identity path instead of the events surface minting
+half-identified attendees. `phone` is a **fallback used only when the account has none** (`member.phone
+or phone`) — `EventRegistration.phone` is non-blank, so an account without a number was previously a
+dead end; the public path passes none and is unchanged. The picker hangs off the EVENT
+(`EventEligibleMemberListView`), inheriting `_manageable_event` rather than inventing a second answer to
+"who may see this makerspace's members", and excludes the already-registered.
 
 **Notification channels are modules, one key each (phase 20).** `email`, `telegram`, `slack`,
 `mattermost` and `discord` each own a module key, so a space living in Discord ships no Slack

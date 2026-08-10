@@ -99,10 +99,13 @@ POST /api/v1/public/<makerspace_slug>/tools/evidence-url
 POST /api/v1/public/<makerspace_slug>/tools/checkout
 POST /api/v1/public/<makerspace_slug>/tools/return
 GET/POST /api/v1/admin/makerspace/<makerspace_id>/direct-loans
-POST /api/v1/admin/makerspace/<makerspace_id>/checkin/verify
+POST /api/v1/admin/makerspaces/<makerspace_id>/walk-in-members
 POST /api/v1/admin/direct-loans/<id>/return
 POST /api/v1/admin/qr/resolve
 ```
+
+The Check-In API client is retired; requester identity now comes from a member account, from the
+deployment's own OIDC provider, or from a staff-created walk-in record.
 
 The public tool and direct-loan issue paths require issue evidence. Return paths require return
 evidence plus notes/remarks before inventory availability is updated. QR resolve responses include
