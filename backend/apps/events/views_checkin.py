@@ -23,7 +23,7 @@ from apps.events.views_admin import _manageable_event
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.member_activity_service import active_membership
-from apps.makerspaces.models import MakerspaceWaiver
+from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
 from apps.payments.models import Payment
 from apps.presence.guard import MemberPresenceRequired
 
@@ -32,6 +32,34 @@ from apps.presence.guard import MemberPresenceRequired
 # by the QR route and the member-activity token so the two cannot disagree about whether a
 # code is usable.
 CHECKABLE_EVENT_STATUSES = (Event.Status.PUBLISHED, Event.Status.COMPLETED)
+
+
+def host_waiver_state(registration):
+    """Which waiver evidence exists for this registration, across BOTH locations.
+
+    A visitor's acceptance is stamped on the registration; a host member's lives on their
+    MakerspaceMembership. Reading only the first is why every host member was told to take
+    a waiver at the desk. Deliberately NOT compared against the waiver's current version:
+    a host revising its terms must not retroactively invalidate an acceptance somebody
+    already gave, the same rule the QR gate follows.
+    """
+    if not MakerspaceWaiver.objects.filter(
+        makerspace_id=registration.event.makerspace_id,
+        is_active=True,
+    ).exists():
+        return "not_required"
+
+    if registration.host_waiver_id:
+        return "on_file"
+
+    if registration.member_id and MakerspaceMembership.objects.filter(
+        user_id=registration.member_id,
+        makerspace_id=registration.event.makerspace_id,
+        accepted_waiver_id__isnull=False,
+    ).exists():
+        return "on_file"
+
+    return "missing"
 
 
 class EventCheckInResolveView(APIView):
@@ -56,10 +84,14 @@ class EventCheckInResolveView(APIView):
         except (KeyError, TypeError, ValueError, AttributeError):
             raise NotFound() from None
 
-        registration = EventRegistration.objects.filter(
-            event=event,
-            checkin_token=token,
-        ).first()
+        registration = (
+            EventRegistration.objects.filter(
+                event=event,
+                checkin_token=token,
+            )
+            .select_related("event")
+            .first()
+        )
         if registration is None:
             raise NotFound()
 
@@ -78,7 +110,14 @@ class EventCheckInResolveView(APIView):
             # Reported, never enforced. A visitor with nothing on file is exactly who the
             # host wants to hand a waiver to at the desk; refusing them entry is not this
             # endpoint's job, the same way it reports payment state without blocking.
-            "host_waiver_on_file": bool(registration.host_waiver_id),
+            "host_waiver_state": host_waiver_state(registration),
+            "event_status": registration.event.status,
+            # Mirrors mark_attended's own precondition so the scanner does not offer a
+            # button whose request can only return 409.
+            "confirmable": (
+                registration.status == EventRegistration.Status.REGISTERED
+                and registration.event.status in CHECKABLE_EVENT_STATUSES
+            ),
         }
         response = Response(EventCheckInResolveResponseSerializer(payload).data)
         response["Cache-Control"] = "private, no-store"

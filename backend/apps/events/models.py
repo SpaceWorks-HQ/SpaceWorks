@@ -208,6 +208,17 @@ class EventRegistration(ScopedPiiModelMixin, models.Model):
         on_delete=models.SET_NULL,
         related_name="event_registrations_via",
     )
+    # MONEY, not activity: NOT cleared by the collaborator's `events` purge. A waitlisted row
+    # is charged only at `_promote()`, so a purge in between would null the field above and
+    # route the charge to the host, which the visitor cannot reach -- and no `Payment` exists
+    # yet to carry it. Resurrects nothing: history/profile/QR read the field above, not this.
+    payment_via_makerspace = models.ForeignKey(
+        "makerspaces.Makerspace",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="event_registration_payment_routes",
+    )
     # The version and timestamp are accountability evidence about a real person's
     # agreement. SET_NULL would either violate all-or-none or silently erase that
     # evidence, so the waiver itself is PROTECTed.

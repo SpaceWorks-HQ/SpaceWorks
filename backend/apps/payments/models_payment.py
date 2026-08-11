@@ -40,6 +40,17 @@ class Payment(models.Model):
     subject_type = models.CharField(max_length=48, choices=SubjectType.choices)
     subject_id = models.PositiveBigIntegerField()
     member = models.ForeignKey("accounts.User", null=True, blank=True, on_delete=models.PROTECT, related_name="payments")
+    # Which makerspace's member area may surface this charge, beyond the owning space.
+    # A collaborative event is hosted by A, so the Payment is A's (ownership decides which
+    # Stripe account is charged), but the member reached it through B and has no membership
+    # at A. This column is deliberately NOT on EventRegistration: a purge clears that row's
+    # provenance (activity history is what a purge is for) and the host's own purge deletes
+    # the registration outright, either of which would strand a receipt or a payable debt.
+    # SET_NULL, not PROTECT: this is a routing hint, not ownership -- `makerspace` is that.
+    via_makerspace = models.ForeignKey(
+        "makerspaces.Makerspace", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="payments_via",
+    )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, validators=[currency_validator])
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
@@ -71,6 +82,12 @@ class Payment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        indexes = [
+            models.Index(
+                fields=["via_makerspace", "member"],
+                name="payment_via_makerspace_member_idx",
+            ),
+        ]
         constraints = [
             models.UniqueConstraint(fields=["makerspace", "subject_type", "subject_id"], name="payment_one_per_subject"),
             # Scoped BY PROVIDER: two vendors are free to mint the same opaque id, and a

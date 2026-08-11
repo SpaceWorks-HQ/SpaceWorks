@@ -182,9 +182,11 @@ export type EventCheckInResolution = {
   // Null when the event is free or no charge was raised. Shown to the staffer, never
   // used to block: cash is taken at the door and reconciled later.
   payment_status: string | null;
-  // Reported, never enforced -- a visitor with nothing on file is exactly who the host wants
-  // to hand a waiver to at the desk.
-  host_waiver_on_file: boolean;
+  // Reported, never enforced -- someone with missing evidence is exactly who the host wants
+  // to hand a waiver to at the desk; not_required means the host has no active waiver.
+  host_waiver_state: "not_required" | "on_file" | "missing";
+  event_status: string;
+  confirmable: boolean;
 };
 
 export function useResolveEventCheckIn(eventId: number) {

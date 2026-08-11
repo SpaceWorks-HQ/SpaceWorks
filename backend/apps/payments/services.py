@@ -31,7 +31,10 @@ class PaymentRailConflict(Exception):
     pass
 
 
-def create_payment(*, makerspace, subject_type, subject_id, member, amount, currency, created_by):
+def create_payment(
+    *, makerspace, subject_type, subject_id, member, amount, currency, created_by,
+    via_makerspace=None,
+):
     source = resolve_payment_source(makerspace)
     if source is None:
         raise stripe_client.PaymentsUnavailable(
@@ -45,6 +48,7 @@ def create_payment(*, makerspace, subject_type, subject_id, member, amount, curr
         subject_type=subject_type,
         subject_id=subject_id,
         member=member,
+        via_makerspace=via_makerspace,
         amount=amount,
         currency=currency.lower(),
         created_by=created_by,

@@ -18,6 +18,7 @@ from apps.events.serializers_collaborators import (
     CollaborativeEventSerializer,
 )
 from apps.events.serializers_public import PublicEventRegistrationResponseSerializer
+from apps.events.throttles import CollaborativeRegistrationThrottle
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.guards import require_module, require_module_locked
 from apps.makerspaces.member_activity_service import active_membership
@@ -162,6 +163,10 @@ def _stamp_host_waiver(registration, waiver, *, actor, via, event):
 
 class MemberCollaborativeEventRegistrationView(APIView):
     permission_classes = [IsAuthenticated]
+    # Scope selection lives in the throttle itself -- see CollaborativeRegistrationThrottle
+    # for why a repair retry must not share the create budget, and why a CANCELLED row is
+    # not a retry.
+    throttle_classes = [CollaborativeRegistrationThrottle]
 
     @extend_schema(
         tags=["Member events"],
@@ -171,6 +176,8 @@ class MemberCollaborativeEventRegistrationView(APIView):
             201: PublicEventRegistrationResponseSerializer,
             **MEMBER_EVENT_ERRORS,
             409: OpenApiResponse(ErrorSerializer, description="Event state conflict."),
+            # Registration only -- the list view carries no throttle.
+            429: OpenApiResponse(ErrorSerializer, description="Rate limit exceeded."),
         },
     )
     def post(self, request, makerspace_id, pk, *args, **kwargs):

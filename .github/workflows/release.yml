@@ -105,7 +105,10 @@ jobs:
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: v${{ needs.prepare.outputs.base }}
+          # Product name then version, e.g. "SpaceWorks 0.7.5". The immutable `tag_name`
+          # above keeps its full `v<base>-main.<run>.<sha>` form -- the title is what a
+          # human reads on the releases page, the tag is what a deployment pins to.
+          name: SpaceWorks ${{ needs.prepare.outputs.base }}
           generate_release_notes: true
           make_latest: false
           body: |

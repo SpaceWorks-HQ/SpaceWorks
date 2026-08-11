@@ -74,6 +74,55 @@ The one deferred end-to-end user QA remains an owner-run release gate.
   **neither** the host's module **nor** archival: a module toggle must never hide a receipt or block a
   pending charge, and the separability contract keeps historical payment subjects usable when
   tombstoned.
+- **PAYMENT ROUTING LIVES ON `Payment.via_makerspace`, NOT ON THE REGISTRATION'S PROVENANCE.**
+  One column cannot serve both: `module_purge_collectors.events_delete` must clear
+  `registered_via_makerspace` (destroying activity history is what a purge is *for*), and keying
+  payment visibility on that same column meant a collaborator's purge made a host-raised charge
+  invisible in the member's area while the host still 403s them — a receipt gone and a **pending
+  charge unpayable**. The routing therefore sits on the money record, which no purge touches:
+  stamped at creation by `service_payments._get_or_create` as
+  `registered_via_makerspace or event.makerspace`, read directly by `member_scope`'s second arm, and
+  **never cleared by any collector**. The `subject_type=EVENT_REGISTRATION` clause stays on that arm
+  so it can never widen to "every payment this user has anywhere". Two traps this hit: the backfill
+  (`payments/0011`) stamps **only where the registration's member matches the payment's member** —
+  `Payment.clean()` does not validate that, and the old subquery did, so stamping blindly would newly
+  expose one member's charge through another space; and a payment whose registration was already
+  deleted by an earlier purge is **unrecoverable and reported**, not silently skipped. The immutability
+  trigger permits the backfill because it raises only when `status` or `amount` change.
+- **A DELAYED charge needs routing preserved BEFORE the purge, which `Payment` cannot do.** A
+  waitlisted registration has no `Payment` at all — one is raised only when `_promote()` lifts it to
+  REGISTERED — so if the collaborator purges `events` in between, provenance is already NULL and the
+  charge falls back to the **host**, where the visiting member holds no membership: refused there,
+  filtered out at home, payable from neither. `EventRegistration.payment_via_makerspace` is the second
+  durable copy, written beside `registered_via_makerspace` at registration and **deliberately not
+  cleared** by `events_delete`; `_get_or_create` reads it first. Keeping it resurrects nothing —
+  member history, the maker profile and the QR lookup all read `registered_via_makerspace`, never
+  this column. **Both columns are scoped to the COLLABORATOR's purge, not the host's.** When the
+  *host* purges `events`, the plan's `payment_subjects=("event_registration",)` deletes every
+  host-owned event charge — visitors' included — before either column can route anything, and the
+  registration goes with it. That is deliberate: `module_purge._purge` deletes payments *before*
+  their subject precisely so none survives as a dangling generic reference. So a host purge still
+  destroys a visiting member's receipt and cancels their pending debt. **Open question, not a
+  settled rule** — preserving externally-routed payments there would mean accepting dangling
+  subjects, which is the trade the current code deliberately refuses.
+- **`create_for_registered_registration` SWALLOWS EVERY EXCEPTION**, so a signature mismatch against
+  `payments.services.create_payment` does not raise — it silently stops creating charges while
+  registration still returns 201. Any test covering event charging must drive the real path; one that
+  fabricates a `Payment` row proves nothing about the wiring. `create_payment`'s `via_makerspace`
+  keyword defaults to `None`, so bookings/membership/machine-service call sites are unaffected (their
+  charges are owned by the member's own space, which arm 1 already covers).
+- **The collaborative registration route shares the CREATE budget and splits the RETRY budget.**
+  `_collaborative_events()` deliberately includes the member's own space's events, so the same event
+  is reachable through both `MemberCollaborativeEventRegistrationView` and
+  `PublicEventRegistrationView`; throttling only one is a bypass. Both therefore use
+  `ClientTierRateThrottle` + scope `event_register` — **not** `MemberPrincipalRateThrottle`, whose
+  `member:<pk>` ident is a *different* DRF cache key and would hand out the limit twice, closing half
+  the bypass. But DRF checks throttles in `initial()`, before `post()`, so a blanket throttle 429s the
+  `DuplicateRegistration` retry that is a member's **only** way to repair a registration holding no
+  waiver acceptance — and since the bucket is shared, the public route could exhaust it and strand
+  them at the door. `check_throttles` therefore reassigns `self.throttle_scope` to
+  `event_registration_retry` when a registration already exists (`self.kwargs` is set by `dispatch()`
+  before `initial()`). Retries stay bounded; they are never blocked by the create budget.
 - **`checkin_token` is surfaced only while the registration is REGISTERED AND the event is still
   checkable.** `services.cancel()` changes only `Event.status` and leaves registrations REGISTERED, so
   gating on the registration alone hands out an admission code nothing can ever confirm. The QR route
@@ -105,6 +154,24 @@ The one deferred end-to-end user QA remains an owner-run release gate.
   the columns, so the append-only log is the surviving evidence, and the body would be undeletable
   member data. A registration with **no** acceptance yields no QR — but **not** gated on the *current*
   version, or revising a waiver strands a legitimate member at the door.
+- **Waiver evidence lives in TWO places, and reading one reports a falsehood about a real person.**
+  A visitor's acceptance is stamped on the `EventRegistration`; a **host member's lives on their
+  `MakerspaceMembership`**, because the registration path deliberately does not re-record an agreement
+  the member already gave their own space. The check-in resolve payload shipped as
+  `bool(registration.host_waiver_id)`, which is therefore **structurally false for every host member**
+  — the scanner told correctly-accepted members to "take one at the desk", and said the same when the
+  host had configured no waiver at all. `views_checkin.host_waiver_state()` is the one answer:
+  `not_required` when the host has no active waiver, `on_file` when either location holds an
+  acceptance, `missing` otherwise. Not compared against the *current* version, matching the QR gate.
+  **"Not a visitor" is NOT "not required"** — `views_admin`'s staff registration only checks that a
+  membership exists, never `require_active_member`, so a host member genuinely can hold a registration
+  with an active waiver and no acceptance anywhere. That contract had **no test at all** before
+  (nothing ever asserted on the field), which is how it shipped wrong.
+- **`confirmable` mirrors `mark_attended`'s own precondition** (`status == REGISTERED` **and**
+  `event.status in CHECKABLE_EVENT_STATUSES`) rather than inventing a second rule. Resolve accepts
+  waitlisted/cancelled/attended rows and previously omitted event status, so a registered row on a
+  **cancelled event** rendered a Confirm button whose request could only ever 409. Everything on this
+  screen stays reported-never-enforced: it is the button that is withheld, never the door.
 - **That `PROTECT` FK breaks BOTH purges if unhandled**: `membership_delete` must clear the
   registration's three fields alongside the membership's, and `lifecycle.purge` must clear them for
   registrations hosted **elsewhere** before its explicit
@@ -278,7 +345,10 @@ not module keys** (one app can own several keys — `printing`/`machines`/`machi
   has no urlconf to import.
 - **The tombstone suite is a separate pytest run** (`tests/tombstone/`), because import-time surfaces
   cannot be re-derived in-process and the all-active suite asserts the opposite for the same objects:
-  `TOMBSTONED_APPS=procurement pytest tests/tombstone`. A whole-tree run skips the directory; an
+  `TOMBSTONED_APPS=bookings,events,maintenance,notifications,payments,presence,procurement,updates,warranty
+  pytest tests/tombstone` — the conftest demands the **whole nine-app profile** and names the exact
+  string it wants, so a single app (this line said `procurement` alone until 2026-08-11) is a hard
+  `UsageError`, not a partial run. A whole-tree run skips the directory; an
   explicit run without the profile is a hard `UsageError`, never a green no-op. `TOMBSTONE_PROFILE_APPS`
   in its conftest must stay in step with `SEPARABLE_APPS`.
 

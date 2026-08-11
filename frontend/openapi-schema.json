@@ -2,7 +2,7 @@
     "openapi": "3.0.3",
     "info": {
         "title": "Space Works API",
-        "version": "0.1.0",
+        "version": "0.7.5",
         "description": "Multi-tenant makerspace hardware loan system.\n\nPublic flow: browse inventory, search with `q`, page with `page`, sign in as a member, submit a borrow request, then track it by public token.\n\nAdmin flow: authenticate with JWT, manage makerspaces, inventory, staff, QR labels, bulk imports, request review, issue, and return.\n\nAuthentication: staff/admin endpoints use `Authorization: Bearer <access>`. Public browser endpoints can use `X-Publishable-Key` when public key hardening is enabled."
     },
     "paths": {
@@ -23775,6 +23775,16 @@
                             }
                         },
                         "description": "Event state conflict."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rate limit exceeded."
                     }
                 }
             }
@@ -32182,12 +32192,20 @@
                         "type": "string",
                         "nullable": true
                     },
-                    "host_waiver_on_file": {
+                    "host_waiver_state": {
+                        "$ref": "#/components/schemas/HostWaiverStateEnum"
+                    },
+                    "event_status": {
+                        "type": "string"
+                    },
+                    "confirmable": {
                         "type": "boolean"
                     }
                 },
                 "required": [
-                    "host_waiver_on_file",
+                    "confirmable",
+                    "event_status",
+                    "host_waiver_state",
                     "name",
                     "payment_status",
                     "registration_id",
@@ -32922,6 +32940,15 @@
                     "id",
                     "version"
                 ]
+            },
+            "HostWaiverStateEnum": {
+                "enum": [
+                    "not_required",
+                    "on_file",
+                    "missing"
+                ],
+                "type": "string",
+                "description": "* `not_required` - not_required\n* `on_file` - on_file\n* `missing` - missing"
             },
             "HostingError": {
                 "type": "object",

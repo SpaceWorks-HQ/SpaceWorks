@@ -83,14 +83,18 @@ export default function EventCheckInScanner({
   // other status, so an allow-list keeps a cancelled or already-attended code from offering
   // a button that can only fail. Excluding one status at a time is how the cancelled case
   // slipped through and reported a false "already checked in" to someone at the door.
-  const confirmable = resolved?.status === "registered";
+  const confirmable = resolved?.status === "registered" && resolved.confirmable;
   const blockedReason = !resolved || confirmable
     ? null
     : resolved.status === "waitlisted"
       ? "Waitlisted registrations cannot be checked in until they are promoted."
       : resolved.status === "attended"
         ? "This registration is already checked in."
-        : "This registration was cancelled, so it cannot be checked in.";
+        : resolved.status === "cancelled"
+          ? "This registration was cancelled, so it cannot be checked in."
+          : resolved.event_status === "cancelled"
+            ? "This event was cancelled, so attendance cannot be confirmed."
+            : `Attendance cannot be confirmed while this event is ${resolved.event_status}.`;
 
   return (
     <section
@@ -117,14 +121,14 @@ export default function EventCheckInScanner({
             // someone entry to an event they registered for.
             <p className="mt-1 text-sm text-muted">Payment: {resolved.payment_status}</p>
           ) : null}
-          {resolved.host_waiver_on_file ? null : (
+          {resolved.host_waiver_state === "missing" ? (
             // Reported, not enforced. Someone standing at the door with nothing on file is
             // exactly who the host wants to hand a waiver to; refusing them entry is not
             // this screen's job, the same way payment state is shown without blocking.
             <p className="mt-1 text-sm text-muted">
               No host waiver on file — take one at the desk.
             </p>
-          )}
+          ) : null}
           {blockedReason ? (
             <p className="mt-2 text-sm text-danger">{blockedReason}</p>
           ) : null}

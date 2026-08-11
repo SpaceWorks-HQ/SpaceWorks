@@ -557,6 +557,9 @@ REST_FRAMEWORK = {
         "request_status": env("THROTTLE_REQUEST_STATUS", default="60/min"),
         "public_read": env("THROTTLE_PUBLIC_READ", default="120/min"),
         "event_register": env("THROTTLE_EVENT_REGISTER", default="10/hour"),
+        "event_registration_retry": env(
+            "THROTTLE_EVENT_REGISTRATION_RETRY", default="30/hour"
+        ),
         "event_checkin_resolve": env(
             "THROTTLE_EVENT_CHECKIN_RESOLVE", default="60/min"
         ),
@@ -685,7 +688,11 @@ SPECTACULAR_SETTINGS = {
         "Public browser endpoints can use `X-Publishable-Key` when public key "
         "hardening is enabled."
     ),
-    "VERSION": "0.1.0",
+    # Kept in step with the root `VERSION` file by
+    # `tests/test_version_consistency.py`. It cannot simply READ that file: the backend
+    # image is built with `context: ./backend`, so the repo root is outside the build
+    # context and the file does not exist inside the container.
+    "VERSION": "0.7.5",
     "ENUM_NAME_OVERRIDES": {
         "QrPrintBatchStatusEnum": [
             ("draft", "Draft"),

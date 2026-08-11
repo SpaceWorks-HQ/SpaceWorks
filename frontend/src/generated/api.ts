@@ -3,7 +3,7 @@
 
 export const openApiInfo = {
   "title": "Space Works API",
-  "version": "0.1.0"
+  "version": "0.7.5"
 } as const;
 
 export const openApiTags = [
@@ -1337,7 +1337,9 @@ export type EventCheckInResolveResponse = {
   "name": string;
   "status": string;
   "payment_status": string | null;
-  "host_waiver_on_file": boolean;
+  "host_waiver_state": HostWaiverStateEnum;
+  "event_status": string;
+  "confirmable": boolean;
 };
 
 export type EventCollaborationInbox = {
@@ -1522,6 +1524,8 @@ export type HostWaiver = {
   "version": string;
   "body": string;
 };
+
+export type HostWaiverStateEnum = "not_required" | "on_file" | "missing";
 
 export type IntegrationConfiguredHealth = {
   "status"?: Status83eEnum;

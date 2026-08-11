@@ -32,6 +32,9 @@ def events_delete(makerspace, cursor):
     from apps.events.models import Event, EventCollaborator, EventRegistration
 
     collaborations = EventCollaborator.objects.filter(makerspace=makerspace).delete()[0]
+    # Clearing activity provenance is the point. Payment routing is left intact in both places
+    # holding it (`Payment.via_makerspace`, and the registration's `payment_via_makerspace` for
+    # a charge raised later at promotion), so a receipt stays visible and a pending charge payable.
     provenance_cleared = EventRegistration.objects.filter(
         registered_via_makerspace=makerspace,
     ).exclude(event__makerspace=makerspace).update(registered_via_makerspace=None)

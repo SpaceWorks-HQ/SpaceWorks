@@ -93,12 +93,15 @@ def register(
     if existing and existing.status == EventRegistration.Status.CANCELLED:
         existing.member = member or existing.member
         existing.registered_via_makerspace = via_makerspace or locked.makerspace
+        # Written together, but they diverge later: a purge clears the provenance above and
+        # leaves this one, so a charge raised after that purge still reaches the member.
+        existing.payment_via_makerspace = via_makerspace or locked.makerspace
         existing.name, existing.email, existing.phone = name, normalized_email, phone
         existing.custom_answers, existing.status, existing.created_at = custom_answers, status, timezone.now()
         _validate(existing)
         existing.save(update_fields=[
-            "member", "registered_via_makerspace", "name", "email", "phone",
-            "custom_answers", "status", "created_at",
+            "member", "registered_via_makerspace", "payment_via_makerspace", "name",
+            "email", "phone", "custom_answers", "status", "created_at",
         ])
         return _record_registration(locked, actor, existing, status)
     if existing:
@@ -107,6 +110,7 @@ def register(
         event=locked, member=member, name=name, email=normalized_email,
         phone=phone, custom_answers=custom_answers, status=status,
         registered_via_makerspace=via_makerspace or locked.makerspace,
+        payment_via_makerspace=via_makerspace or locked.makerspace,
     )
     _validate(registration)
     registration.save()
