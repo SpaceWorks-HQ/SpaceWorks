@@ -4,7 +4,6 @@ from unittest.mock import Mock
 import pytest
 from django.contrib import admin
 from django.core.exceptions import ValidationError
-from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
@@ -149,16 +148,18 @@ def test_webhook_rejects_invalid_signature(monkeypatch):
     assert response.status_code == 400
 
 
-def test_webhook_rejects_unknown_or_archived_makerspace():
+def test_webhook_rejects_unknown_makerspace():
+    """Archived is NO LONGER refused, and that reversal is deliberate.
+
+    This test asserted an archived makerspace 404s too. That was written in C.2 (`92eda37`),
+    when the endpoint was **verify-only** -- it settled nothing, so refusing cost nothing.
+    Settlement arrived in C.3 and the filter was never revisited, which silently broke the
+    documented invariant that a real charge is never stranded: the provider had already taken
+    the member's money and the 404 only prevented RECORDING it. Settlement after archival is
+    now pinned in `tests/payments/test_archived_space_payments.py`.
+    """
     client = APIClient()
     assert client.post("/api/v1/webhooks/stripe/NOPE", b"{}", content_type="application/json").status_code == 404
-
-    archived = make_space("payment-webhook-archived")
-    archived.archived_at = timezone.now()
-    archived.save(update_fields=["archived_at", "updated_at"])
-    assert client.post(
-        f"/api/v1/webhooks/stripe/{archived.public_code}", b"{}", content_type="application/json"
-    ).status_code == 404
 
 
 def test_webhook_rejects_an_unconfigured_makerspace_without_creating_settings():

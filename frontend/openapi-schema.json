@@ -23548,6 +23548,46 @@
                 }
             }
         },
+        "/api/v1/member/archived-payments": {
+            "get": {
+                "operationId": "api_v1_member_archived_payments_list",
+                "description": "Lists archived makerspaces where the caller retains an active membership and has payment history available to read or settle.",
+                "summary": "Discover the caller's archived makerspace payments",
+                "tags": [
+                    "Payments"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ArchivedPaymentSummary"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/member/makerspaces/{makerspace_id}/activity": {
             "get": {
                 "operationId": "api_v1_member_makerspaces_activity_retrieve",
@@ -28347,7 +28387,7 @@
                         "description": "Invalid signature, payload, or configuration."
                     },
                     "404": {
-                        "description": "Makerspace was not found or is archived."
+                        "description": "Makerspace was not found."
                     }
                 }
             }
@@ -28378,7 +28418,7 @@
                         "description": "Invalid signature, payload, or configuration."
                     },
                     "404": {
-                        "description": "Makerspace was not found or is archived."
+                        "description": "Makerspace was not found."
                     }
                 }
             }
@@ -29296,6 +29336,47 @@
                 ],
                 "type": "string",
                 "description": "* `instant` - Instant confirmation\n* `approve` - Staff approval required"
+            },
+            "ArchivedPaymentMakerspace": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "slug"
+                ]
+            },
+            "ArchivedPaymentSummary": {
+                "type": "object",
+                "properties": {
+                    "makerspace": {
+                        "$ref": "#/components/schemas/ArchivedPaymentMakerspace"
+                    },
+                    "pending_count": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "total_count": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "makerspace",
+                    "pending_count",
+                    "total_count"
+                ]
             },
             "AssetChainGroup": {
                 "type": "object",

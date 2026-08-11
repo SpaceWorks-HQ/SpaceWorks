@@ -14,14 +14,29 @@ RECENT_LIMIT = 20
 ACTIVITY_LIMIT = 50
 
 
-def active_membership(user, makerspace_id):
+def active_member_memberships(user):
+    """Every active membership this identity may act through, archived spaces INCLUDED.
+
+    The single source of truth for "is this caller allowed to act as a member at all".
+    `apps.payments.member_access` builds its archived-tolerant surfaces on this rather than
+    restating the predicate, because two copies of a security check drift and the drift is
+    invisible until someone audits both. It lives here, not in payments: `apps.payments` is a
+    separable app that a deployment may tombstone, and this module must keep working without
+    it. Archival is deliberately NOT filtered here -- each caller applies its own rule.
+    """
     if not (
         user and user.is_authenticated and user.pk and user.is_active
         and user.access_status == User.AccessStatus.ACTIVE
     ):
-        return None
+        return MakerspaceMembership.objects.none()
     return MakerspaceMembership.objects.select_related("makerspace", "accepted_waiver").filter(
-        makerspace_id=makerspace_id, user=user, status="active",
+        user=user, status="active",
+    )
+
+
+def active_membership(user, makerspace_id):
+    return active_member_memberships(user).filter(
+        makerspace_id=makerspace_id,
         makerspace__archived_at__isnull=True,
     ).first()
 

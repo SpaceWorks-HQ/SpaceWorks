@@ -154,7 +154,26 @@ class MakerspaceAdmin(MakerspaceImageAdminMixin, MakerspaceCapabilityAdminMixin,
     def archive_makerspaces(self, request, queryset):
         from apps.makerspaces import lifecycle
 
-        for makerspace in list(queryset):
+        makerspaces = list(queryset)
+        if "confirm_archive" not in request.POST:
+            context = {
+                **self.admin_site.each_context(request),
+                "title": "Archive selected makerspaces",
+                "makerspaces": [
+                    {"object": makerspace, **lifecycle.archive_impact(makerspace)}
+                    for makerspace in makerspaces
+                ],
+                "opts": self.model._meta,
+                "action_name": "archive_makerspaces",
+                "action_checkbox_name": ACTION_CHECKBOX_NAME,
+            }
+            return TemplateResponse(
+                request,
+                "admin/makerspaces/archive_confirmation.html",
+                context,
+            )
+
+        for makerspace in makerspaces:
             try:
                 lifecycle.archive(makerspace, request.user)
             except ValidationError as err:

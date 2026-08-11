@@ -451,6 +451,89 @@ one `transaction.atomic()` suspends immutability triggers **transaction-scoped**
   `current_setting('app.allow_immutable_delete', true)='on'`; UPDATE always blocked (audit/0003 style).
   A new PROTECT-FK + immutable model must add itself to the purge graph **and** the drift-guard.
 
+**Archiving a makerspace must never strand its members' money (phase 1 of the five open items).**
+`Payment.makerspace` outlives archival and `member_payment_queryset` deliberately never filtered
+`archived_at`, but four separate gates defeated that intent. Fixing only the obvious one would have
+been **worse than doing nothing**, which is the lesson worth keeping here.
+- **THE PER-MAKERSPACE WEBHOOKS MUST SETTLE AFTER ARCHIVAL, and this was a live money-loss bug.**
+  `StripeWebhookView`/`RazorpayWebhookView` looked the tenant up with `archived_at__isnull=True` and
+  404'd. Since `MemberPaymentCheckoutView` has **no membership gate at all**, a member could already
+  reach checkout for an archived space, have Stripe take the money, and have the callback refused —
+  the charge stayed PENDING forever and the member was out of pocket. The 404 never prevented the
+  charge, only the **recording** of it, so it directly contradicted the documented "webhook always
+  settles / a real charge is never stranded" invariant. Archived is no longer refused: the public
+  code is **addressing**, the unchanged per-space signature secret is **authorization**, and a purged
+  row still 404s naturally because it is gone. Its origin is worth knowing before anyone
+  "restores" it: both the filter and the test asserting it landed in `92eda37`, whose webhook was
+  **verify-only** — it settled nothing, so refusing cost nothing. Settlement arrived in C.3 and
+  nobody revisited the filter.
+- **`member_activity_service.active_member_memberships(user)` is the ONE identity predicate**, and it
+  deliberately does not filter archival — each caller applies its own rule (`active_membership` adds
+  the archived filter, `payments.member_access` does not). It lives in `makerspaces`, not `payments`,
+  because `apps.payments` is separable and a tombstoned deployment must still resolve member identity.
+  An `include_archived=` flag was rejected: it would put a security-relevant relaxation in reach of
+  every caller. So was restating the predicate in `payments` — that shipped briefly and produced two
+  copies of the same five-part check in two apps, which is drift nobody notices until an audit.
+- **`member_payment_actor` is payments-only and must NEVER grow a waiver gate.** `active_membership`
+  never checked the waiver (that is `presence.guard.require_active_member`); adding one would let a
+  newly revised waiver block someone from **discharging an existing debt**, recreating the stranding.
+- **An API fix alone does not reach anybody.** `platform.resolve_frontend` and
+  `views_memberships.MyMembershipsView` both exclude archived, and `MemberArea`'s payments query is
+  gated on both, so the fixed endpoint had no route to it. The answer is the narrow
+  `GET /member/archived-payments` discovery endpoint plus a `/member/archived` page that depends on
+  **authentication only** — never on `bootstrapTenant` or `/memberships/me`. **Do NOT widen those two
+  instead**: they would resurrect the archived space across every unrelated feature.
+- **The discovery LINK must survive a failed bootstrap, and that is pinned by a test rather than by
+  reading.** `MemberArea` does not early-return when `bootstrapTenant` rejects — it renders an error
+  panel *inside* the shell — and the archived banner sits above every bootstrap-dependent section, so
+  central `/member` still offers the link to a member holding nothing but an archived space.
+  `MemberAreaArchivedLink.test.tsx` asserts exactly that (bootstrap rejects, `/memberships/me` returns
+  empty, link present), because the people this route exists for are precisely the people who would
+  otherwise have to guess its URL. **Residual limit, deliberate:** on the space's own archived custom
+  domain the API calls fail (an archived domain loses origin trust), so the banner does not render
+  there and the member must reach the central app. Closing that would mean re-granting origin trust to
+  archived domains, which is the isolation archival exists to create.
+- **A checkout must return the payer to the space that ROUTED the charge, not the one that owns it.**
+  `create_checkout` reads `payment.via_makerspace or payment.makerspace`: for a collaborative-event
+  charge, host A owns the row but member space B is the only member area the visitor can sign into,
+  so deriving the URL from A lands them where they hold no membership. `platform.member_payment_
+  return_url` then sends an ARCHIVED space to the central `/member/archived` instead of
+  `member_area_url`'s dead `/member` or `/m/<slug>/member`. Both the Stripe branch and the provider
+  seam read that one value, so every rail is fixed at once, and the two arms compose: host archived +
+  home live correctly returns to the live home rather than the recovery page, which deliberately
+  lists only archived spaces. The seam is monkeypatched **by name** in `test_connect.py` and
+  `test_machine_payments.py`. **Known limit:** a session created *before* archival keeps its original
+  return URL — the provider stores it and `MemberPaymentCheckoutView` hands back the saved
+  `stripe_checkout_url` when present.
+- **The bootstrap bypass must read the ROUTER's location, never `window.location`.** `App` short
+  circuits to `/member/archived` before the tenant "Loading site" / "Site unavailable" screens,
+  which is what an archived member has to get past. Reading `window.location.pathname` made that
+  branch non-reactive: a client-side `Link` updates router context without touching
+  `window.location`, so every **click** on the recovery CTA fell through to the central table and
+  rendered not-found, while a direct page load worked perfectly — which is exactly what made it easy
+  to miss. `useLocation()` fixes it. Pinning this needs a REAL `Link` under `MemoryRouter`; a stub
+  using `history.pushState` does change `window.location` and would pass against the broken code.
+- **`/member` must exist in BOTH route tables, and a component test cannot tell you it does.**
+  The central table defined only `/m/:slug/member`, so `/member` fell through to not-found — and the
+  member this recovery route exists for cannot supply a slug they can no longer discover. Rendering
+  `MemberArea` directly proves the link renders, never that anyone can reach it;
+  `App.centralMemberRoute.test.tsx` drives the real router instead. Same shape as the tombstone-suite
+  lesson: the test that passes is not always the test that matters.
+- **A 404 from the discovery endpoint means TOMBSTONED, and must be told apart from every other
+  error.** `payments` is separable, so on such a deployment the endpoint is spliced out; treating
+  that like a network failure renders a call-to-action whose destination immediately 404s. The
+  recovery page reads the same signal and renders as not-found. It cannot ask tenant bootstrap which
+  modules exist — not depending on bootstrap is the whole reason the route exists.
+- **`lifecycle.archive_impact()` reports, never blocks.** It counts pending charges the space
+  **owns** and pending collaborative-event charges merely **routed** through it (`via_makerspace`,
+  de-duplicated) — the second arm is easy to miss and is exactly the visiting-member money at risk.
+  `archive()` recomputes it under the row lock into the audit meta and still returns the makerspace
+  (seven call sites depend on that return). The count is **advisory**: payment creation does not
+  universally take that lock, so it cannot be frozen against concurrent inserts. "Never blocks" means
+  a non-zero count is not an error — not that database failures are swallowed. The admin action grew
+  a per-makerspace confirmation screen because it previously archived **immediately**, so there was
+  nowhere to show a count.
+
 **A new public image field must register in FOUR places, and three of them fail silently.**
 `Event.image_key` (phase 22) is the worked example. Adding the column and an upload view is the
 visible half; the half nothing will remind you about is that
@@ -671,10 +754,7 @@ things this required, and the first two are what made it safe rather than reckle
   subject, which is why the bug hid — three of the four subject types were fine.
 - **`lifecycle.purge` (whole makerspace) still deletes every payment** and is untouched, because
   `Payment.makerspace` is `PROTECT` — the rows cannot outlive their makerspace. Preservation is a
-  module-purge property only. **Known gap, unfixed:** archiving a makerspace 403s its own members out of
-  payment history and checkout (`active_membership` filters `archived_at`), even though
-  `member_payment_queryset` deliberately does not filter archival — the view gate defeats the query's
-  intent, so a pending charge is unpayable until someone unarchives.
+  module-purge property only. (The archive gap noted here is **fixed** — see the archive section below.)
 Still declared per plan: **`PiiBlindIndex` rows** (keyed HMACs of PII with
 **no FK** to the source row, so nothing cascades them — leaving them is a real leak). Encrypted envelopes
 live on the source row itself, so they go with it. **A per-module purge must respect the modules that are

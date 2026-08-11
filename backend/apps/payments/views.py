@@ -22,9 +22,13 @@ class StripeWebhookView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["Payments"], summary="Receive a makerspace Stripe webhook", description="Verifies the Stripe signature using request.body and the addressed makerspace's webhook secret before applying an idempotent event.", auth=[], request=None, responses={200: OpenApiResponse(description="Verified event acknowledged."), 400: OpenApiResponse(description="Invalid signature, payload, or configuration."), 404: OpenApiResponse(description="Makerspace was not found or is archived.")})
+    @extend_schema(tags=["Payments"], summary="Receive a makerspace Stripe webhook", description="Verifies the Stripe signature using request.body and the addressed makerspace's webhook secret before applying an idempotent event.", auth=[], request=None, responses={200: OpenApiResponse(description="Verified event acknowledged."), 400: OpenApiResponse(description="Invalid signature, payload, or configuration."), 404: OpenApiResponse(description="Makerspace was not found.")})
     def post(self, request, public_code):
-        makerspace = Makerspace.objects.filter(public_code__iexact=public_code, archived_at__isnull=True).first()
+        # The public code only addresses the tenant; its unchanged per-space secret
+        # authenticates the callback. An archived row must remain addressable because
+        # the provider has already taken the money and ProcessedStripeEvent keeps
+        # settlement idempotent, while a purged row still misses this lookup naturally.
+        makerspace = Makerspace.objects.filter(public_code__iexact=public_code).first()
         if makerspace is None:
             logger.warning("stripe_webhook_unknown_makerspace", extra={"public_code": public_code})
             return Response({"detail": "Makerspace not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -78,13 +82,15 @@ class RazorpayWebhookView(APIView):
         responses={
             200: OpenApiResponse(description="Verified event acknowledged."),
             400: OpenApiResponse(description="Invalid signature, payload, or configuration."),
-            404: OpenApiResponse(description="Makerspace was not found or is archived."),
+            404: OpenApiResponse(description="Makerspace was not found."),
         },
     )
     def post(self, request, public_code):
-        makerspace = Makerspace.objects.filter(
-            public_code__iexact=public_code, archived_at__isnull=True
-        ).first()
+        # The public code only addresses the tenant; its unchanged per-space secret
+        # authenticates the callback. An archived row must remain addressable because
+        # the provider has already taken the money and ProcessedStripeEvent keeps
+        # settlement idempotent, while a purged row still misses this lookup naturally.
+        makerspace = Makerspace.objects.filter(public_code__iexact=public_code).first()
         if makerspace is None:
             logger.warning("razorpay_webhook_unknown_makerspace", extra={"public_code": public_code})
             return Response({"detail": "Makerspace not found."}, status=status.HTTP_404_NOT_FOUND)

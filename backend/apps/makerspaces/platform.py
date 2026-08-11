@@ -51,6 +51,22 @@ def member_area_url(makerspace):
     return f"{base}/m/{makerspace.slug}/member" if base and makerspace.slug else ""
 
 
+def member_payment_return_url(makerspace):
+    """Where a payer lands after checkout, including when the makerspace is archived.
+
+    `member_area_url` sends them to the tenant's own member area, which for an ARCHIVED space
+    is a dead end: its custom domain has lost bootstrap and origin trust, and `/m/<slug>/member`
+    cannot resolve the tenant either. Returning someone there immediately after they paid
+    strands them on a 404 holding a charge they have just settled. The recovery route is
+    authentication-only and always lives on the central app, so it is reachable regardless of
+    what happened to the tenant's domain.
+    """
+    if makerspace.archived_at is not None:
+        base = (settings.PUBLIC_APP_BASE_URL or "http://localhost:5000").rstrip("/")
+        return f"{base}/member/archived" if base else ""
+    return member_area_url(makerspace)
+
+
 def staff_payment_settings_url(makerspace=None, *, outcome):
     """Return a trusted staff settings URL without accepting browser input."""
     verified_domain = (

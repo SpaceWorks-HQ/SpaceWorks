@@ -24,6 +24,18 @@ class CheckoutUrlSerializer(serializers.Serializer):
     checkout_url = serializers.URLField()
 
 
+class ArchivedPaymentMakerspaceSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    slug = serializers.SlugField()
+    name = serializers.CharField()
+
+
+class ArchivedPaymentSummarySerializer(serializers.Serializer):
+    makerspace = ArchivedPaymentMakerspaceSerializer()
+    pending_count = serializers.IntegerField(min_value=0)
+    total_count = serializers.IntegerField(min_value=1)
+
+
 class StaffPaymentSerializer(MemberPaymentSerializer):
     class Meta(MemberPaymentSerializer.Meta):
         fields = MemberPaymentSerializer.Meta.fields + ("amount", "currency")

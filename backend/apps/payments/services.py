@@ -4,7 +4,7 @@ import logging
 from decimal import Decimal, ROUND_HALF_UP
 from django.db import transaction
 from apps.audit import services as audit
-from apps.makerspaces.platform import member_area_url
+from apps.makerspaces.platform import member_payment_return_url
 from apps.payments import stripe_client
 from apps.payments.connect import refresh_connected_account, restrict_account_status
 from apps.payments.models import (
@@ -160,7 +160,16 @@ def _create_checkout_url_atomic(payment_id):
                 and refreshed.connect_charges_enabled
             ):
                 raise _ConnectAccountCannotCharge(refreshed.pk)
-        member_url = member_area_url(payment.makerspace)
+        # Return the payer to the space they reached the charge THROUGH, not the one that
+        # owns it. For a collaborative-event charge those differ: host A owns the payment,
+        # member space B routed it, and B is the only member area the visitor can actually
+        # sign into -- `via_makerspace` is exactly that routing record. Sending them to A
+        # lands them in a space where they hold no membership. Archived spaces then resolve
+        # to the central recovery route instead of a dead tenant domain. Both the Stripe
+        # branch below and the provider seam read this one value.
+        member_url = member_payment_return_url(
+            payment.via_makerspace or payment.makerspace
+        )
         if not member_url:
             logger.warning("payment_checkout_return_url_unavailable", extra={"payment_id": payment_id})
             raise stripe_client.PaymentsUnavailable("A payment return URL is not configured.")

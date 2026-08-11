@@ -10,6 +10,26 @@ from apps.audit import services as audit
 
 logger = logging.getLogger(__name__)
 
+
+def archive_impact(makerspace):
+    """Unsettled money that archiving this makerspace would make harder to reach."""
+    from apps.payments.models import Payment
+
+    owned_pending = Payment.objects.filter(
+        makerspace=makerspace,
+        status=Payment.Status.PENDING,
+    ).count()
+    routed_pending = Payment.objects.filter(
+        via_makerspace=makerspace,
+        status=Payment.Status.PENDING,
+    ).exclude(makerspace=makerspace).count()
+    return {
+        "owned_pending": owned_pending,
+        "routed_pending": routed_pending,
+        "total_pending": owned_pending + routed_pending,
+    }
+
+
 def archive(makerspace, actor):
     with transaction.atomic():
         locked = makerspace.__class__.objects.select_for_update().get(pk=makerspace.pk)
@@ -18,11 +38,20 @@ def archive(makerspace, actor):
         if locked.archived_at is not None:
             raise ValidationError("Makerspace is already archived.")
 
+        # This is an advisory snapshot: payment creation does not universally take
+        # this lock, so a concurrent insert can change the count before commit.
+        impact = archive_impact(locked)
         locked.archived_at = timezone.now()
         locked.archived_by = actor
         locked.public_inventory_enabled = False
         locked.save(update_fields=["archived_at", "archived_by", "public_inventory_enabled"])
-        audit.record(actor, "makerspace.archived", makerspace=locked, target=locked)
+        audit.record(
+            actor,
+            "makerspace.archived",
+            makerspace=locked,
+            target=locked,
+            meta=impact,
+        )
         return locked
 
 

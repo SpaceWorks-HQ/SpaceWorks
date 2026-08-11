@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
-import type { MembershipOutcome, MembershipPolicyEnum } from "../../generated/api";
+import type { ArchivedPaymentSummary, MembershipOutcome, MembershipPolicyEnum } from "../../generated/api";
 import { bootstrapTenant, fetchMe, refreshAccessToken, StructuredApiError, staffRequest } from "../../lib/api";
 import { MemberAuthPanel } from "./MemberAuthPanel";
 import { JoinMembershipCta } from "./JoinMembershipCta";
@@ -12,6 +12,7 @@ import { PartnerEvents } from "./PartnerEvents";
 import { MemberDirectory } from "./MemberDirectory";
 import { MemberProfilePanel } from "./MemberProfilePanel";
 import { MemberReferrals, type ClaimableInvitation } from "./MemberReferrals";
+import { MemberPaymentRows, type MemberPayment } from "./MemberPayments";
 
 type Membership = { makerspace: { slug: string; name: string }; membership_status: string; role: string; waiver_acceptance_required: boolean; can_refer: boolean; can_verify: boolean; verified_at: string | null; referrals_enabled: boolean };
 type Memberships = { memberships: Membership[]; requests: { makerspace: { slug: string; name: string }; state: string; kind: string }[] };
@@ -20,8 +21,6 @@ type Presence = { active: boolean; session: { expires_at: string } | null };
 type Invitations = { invitations: ClaimableInvitation[] };
 type ReferralOutcome = { state: "invited" };
 type ClaimOutcome = { id: number; outcome: "active" | "pending_approval" };
-type MemberPayment = { id: number; subject_label: string; status: string; checkout_url: string; created_at: string };
-
 function message(error: unknown) {
   if (error instanceof StructuredApiError && error.status === 401) return "Sign in to manage your membership.";
   return error instanceof Error ? error.message : "Unable to complete that action.";
@@ -48,6 +47,15 @@ export function MemberArea() {
   const presence = useQuery({ queryKey: ["member", resolvedSlug, "presence"], queryFn: () => staffRequest<Presence>(`/public/${resolvedSlug}/presence-sessions/current`), enabled: Boolean(resolvedSlug) && membership?.membership_status === "active", retry: false });
   const activity = useQuery({ queryKey: ["member", resolvedSlug, "activity"], queryFn: () => staffRequest<MemberActivity>(`/member/makerspaces/${makerspaceId}/activity`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
   const payments = useQuery({ queryKey: ["member", resolvedSlug, "payments"], queryFn: () => staffRequest<MemberPayment[]>(`/member/makerspaces/${makerspaceId}/payments`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
+  // Deliberately NOT gated on `memberships.data`. A member whose only makerspace is archived
+  // gets an empty `/memberships/me`, and a signed-out one gets a 401 -- gating on it meant the
+  // people this recovery route exists for were exactly the people who never saw the link.
+  const archivedPayments = useQuery({ queryKey: ["member", "archived-payments"], queryFn: () => staffRequest<ArchivedPaymentSummary[]>("/member/archived-payments"), retry: false });
+  // A 404 means the payments app is TOMBSTONED on this deployment, so the recovery route is
+  // genuinely gone -- advertising it would hand the member a link straight to a not-found
+  // page. Every other error (401 signed-out, network) still warrants the fallback.
+  const archivedRemoved = archivedPayments.error instanceof StructuredApiError && archivedPayments.error.status === 404;
+  const archivedUnknown = !archivedRemoved && (archivedPayments.isError || (bootstrap.isError && !archivedPayments.data?.length));
   const refresh = () => client.invalidateQueries({ queryKey: ["member"] });
   const request = useMutation({ mutationFn: () => staffRequest<MembershipOutcome>(`/public/${resolvedSlug}/membership-requests`, { method: "POST", body: JSON.stringify({}) }), onSuccess: refresh });
   const accept = useMutation({ mutationFn: () => staffRequest(`/member/makerspaces/${makerspaceId}/waiver/accept`, { method: "POST" }), onSuccess: refresh });
@@ -70,6 +78,8 @@ export function MemberArea() {
   if (showSignIn) return <MemberAuthPanel onAuthenticated={() => { setShowSignIn(false); void client.invalidateQueries({ queryKey: ["member"] }); }} />;
 
   return <main className="desk-shell mx-auto max-w-3xl space-y-5 px-5 py-8"><header><p className="text-xs font-semibold uppercase tracking-wide text-accent-ink">Member area</p><h1 className="mt-2 text-3xl font-bold text-ink">Your makerspace access</h1></header>
+    {archivedPayments.data?.length ? <section className="desk-panel p-5"><h2 className="font-semibold text-ink">Payments from closed makerspaces</h2><p className="mt-1 text-sm text-muted">Receipts and outstanding charges remain available after a makerspace closes.</p><Link className="desk-button-primary mt-4 inline-flex" to="/member/archived">View archived payments</Link></section> : null}
+    {archivedUnknown ? <section className="desk-panel p-5"><h2 className="font-semibold text-ink">Closed makerspace?</h2><p className="mt-1 text-sm text-muted">If a makerspace you belonged to has closed, its receipts and any outstanding charges are still reachable. You may need to sign in there.</p><Link className="desk-button mt-4 inline-flex" to="/member/archived">View archived payments</Link></section> : null}
     {bootstrap.isLoading ? <section className="desk-panel p-5 text-sm text-muted">Loading makerspace joining options…</section> : null}
     {bootstrap.isError ? <section className="desk-panel p-5"><p className="text-sm text-danger" role="alert">{message(bootstrap.error)}</p></section> : null}
     {policy && !membership && !requested && memberships.isLoading ? <section className="desk-panel p-5 text-sm text-muted">Checking your sign-in status…</section> : null}
@@ -80,7 +90,7 @@ export function MemberArea() {
       <section className="desk-panel p-5"><h2 className="font-semibold text-ink">Presence</h2><p className="mt-1 text-sm text-muted">{presence.data?.active ? `Active until ${new Date(presence.data.session?.expires_at ?? "").toLocaleTimeString()}` : "No active session."}</p><button className="desk-button-primary mt-4" disabled={start.isPending || end.isPending || (!presence.data?.active && !bootstrap.data)} onClick={() => presence.data?.active ? end.mutate() : start.mutate()}>{presence.data?.active ? "End presence" : "Start 2-hour presence"}</button></section>
       {activity.data ? <MemberActivityPanel activity={activity.data} makerspaceId={makerspaceId} /> : null}
       {membership?.membership_status === "active" ? <PartnerEvents makerspaceId={makerspaceId} slug={resolvedSlug} /> : null}
-      {membership.membership_status === "active" && makerspaceId >= 0 ? <><MemberProfilePanel makerspaceId={makerspaceId} /><MemberDirectory makerspaceId={makerspaceId} /></> : null}{payments.data?.length ? <section className="desk-panel p-5"><h2 className="font-semibold text-ink">Payments</h2><ul className="mt-3 space-y-2 text-sm text-muted">{payments.data.map((payment) => <li key={payment.id}><span className="font-medium text-ink">{payment.subject_label}</span> · {payment.status}{payment.checkout_url ? <> · <a className="text-accent-ink underline" href={payment.checkout_url}>Pay now</a></> : payment.status === "pending" ? <> · <button className="text-accent-ink underline" disabled={generatePaymentLink.isPending} onClick={() => generatePaymentLink.mutate(payment.id)}>Generate payment link</button></> : null}</li>)}</ul></section> : null}</> : null}
+      {membership.membership_status === "active" && makerspaceId >= 0 ? <><MemberProfilePanel makerspaceId={makerspaceId} /><MemberDirectory makerspaceId={makerspaceId} /></> : null}{payments.data?.length ? <section className="desk-panel p-5"><h2 className="font-semibold text-ink">Payments</h2><MemberPaymentRows payments={payments.data} checkoutPaymentId={generatePaymentLink.isPending ? generatePaymentLink.variables : undefined} onCheckout={(paymentId) => generatePaymentLink.mutate(paymentId)} /></section> : null}</> : null}
     {memberships.data && resolvedSlug && makerspaceId >= 0 ? <MemberReferrals
       canRefer={membership?.membership_status === "active" && membership.can_refer}
       referralsEnabled={membership?.membership_status === "active" && membership.referrals_enabled}

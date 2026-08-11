@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { MakerspaceBrand } from "./components/MakerspaceBrand";
 import { MakerspaceMapLink } from "./components/MakerspaceMapLink";
@@ -16,6 +16,7 @@ import { PublicMachinesPage } from "./features/inventory/PublicMachinesPage";
 import { PublicSelfCheckoutPage } from "./features/inventory/PublicSelfCheckoutPage";
 import { usePublicMakerspaces } from "./features/inventory/usePublicInventory";
 import { PublicPrintRequestPage } from "./features/printing/PublicPrintRequestPage";
+import { ArchivedPayments } from "./features/members/ArchivedPayments";
 import { MemberArea } from "./features/members/MemberArea";
 import { KioskPage, ScannerPage, SuperadminPage } from "./features/staff/PlatformApps";
 import { ResetPasswordPage } from "./features/staff/ResetPasswordPage";
@@ -275,6 +276,13 @@ function NotFoundPage() {
 
 export default function App() {
   const tenant = useTenant();
+  // Do not gate this payment-only recovery route on archived tenant bootstrap: the tenant
+  // screens below ("Loading site", "Site unavailable") are exactly what an archived member
+  // must get past. Read the ROUTER's location, not `window.location` -- a client-side `Link`
+  // updates router context without touching `window.location`, so a non-reactive read left
+  // this branch stale and sent every click on the recovery CTA to the not-found page.
+  const location = useLocation();
+  if (location.pathname === "/member/archived") return <Routes><Route path="/member/archived" element={<ArchivedPayments />} /></Routes>;
 
   if (tenant.mode === "single" && tenant.loading) {
     return (
@@ -334,6 +342,11 @@ export default function App() {
       <Route path="/m/:slug/admin/*" element={<StaffApp />} />
       <Route path="/m/:slug/print" element={<PublicPrintRequestPage />} />
       <Route path="/m/:slug/member" element={<MemberArea />} />
+      {/* The central member entry point. Without it `/member` 404s on a central deployment,
+          so a member whose only makerspace is ARCHIVED has nowhere to land: their tenant URL
+          no longer resolves and `/m/:slug/member` needs a slug they can no longer discover.
+          Tenant bootstrap fails here by design; MemberArea renders its recovery link anyway. */}
+      <Route path="/member" element={<MemberArea />} />
       <Route path="/m/:slug/stats" element={<PublicStatsPage />} />
       <Route path="/kiosk/:slug" element={<KioskPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />

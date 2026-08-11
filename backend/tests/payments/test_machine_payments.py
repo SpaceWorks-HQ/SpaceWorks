@@ -147,7 +147,7 @@ def test_member_can_generate_a_missing_checkout_url(monkeypatch):
     configured_settings(space)
     actor = make_member("c3-payment-regenerate-user", space)
     payment = payment_for(service_request(space, actor), actor)
-    monkeypatch.setattr("apps.payments.services.member_area_url", lambda _: "https://space.example/member")
+    monkeypatch.setattr("apps.payments.services.member_payment_return_url", lambda _: "https://space.example/member")
     monkeypatch.setattr("apps.payments.services.stripe_client.create_checkout_session", lambda *_args, **_kwargs: {"id": "cs_regenerated", "url": "https://checkout.stripe.test/cs_regenerated"})
     client = APIClient()
     client.force_authenticate(actor)
