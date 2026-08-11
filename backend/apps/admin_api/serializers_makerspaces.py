@@ -103,6 +103,7 @@ class MakerspaceSerializer(serializers.ModelSerializer):
             "geofence_enabled",
             "public_inventory_enabled",
             "public_stats_enabled",
+            "public_stats_show_holder_names",
             "public_print_status_lookup_policy",
             "membership_policy",
             "membership_dues_amount",

@@ -73,6 +73,7 @@ def make_space(slug="public-stats", *, printing=False):
         slug=slug,
         public_inventory_enabled=True,
         public_stats_enabled=True,
+        public_stats_show_holder_names=True,
         enabled_modules=modules,
     )
 

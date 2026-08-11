@@ -119,6 +119,7 @@ class Makerspace(models.Model):
     geofence_enabled = models.BooleanField(default=False)
     public_inventory_enabled = models.BooleanField(default=True)
     public_stats_enabled = models.BooleanField(default=False)
+    public_stats_show_holder_names = models.BooleanField(default=False)
     public_print_status_lookup_policy = models.CharField(
         max_length=32,
         choices=PublicPrintStatusLookupPolicy.choices,

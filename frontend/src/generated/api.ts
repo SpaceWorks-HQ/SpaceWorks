@@ -2225,6 +2225,7 @@ export type Makerspace = {
   "geofence_enabled"?: boolean;
   "public_inventory_enabled"?: boolean;
   "public_stats_enabled"?: boolean;
+  "public_stats_show_holder_names"?: boolean;
   "public_print_status_lookup_policy"?: PublicPrintStatusLookupPolicyEnum;
   "membership_policy"?: MembershipPolicyEnum;
   "membership_dues_amount"?: string;
@@ -3053,6 +3054,7 @@ export type PatchedMakerspace = {
   "geofence_enabled"?: boolean;
   "public_inventory_enabled"?: boolean;
   "public_stats_enabled"?: boolean;
+  "public_stats_show_holder_names"?: boolean;
   "public_print_status_lookup_policy"?: PublicPrintStatusLookupPolicyEnum;
   "membership_policy"?: MembershipPolicyEnum;
   "membership_dues_amount"?: string;

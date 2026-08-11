@@ -29,6 +29,7 @@ export type Makerspace = {
   staff_notifications_enabled?: boolean;
   booking_requester_notifications_enabled?: boolean;
   public_stats_enabled?: boolean;
+  public_stats_show_holder_names?: boolean;
   public_print_status_lookup_policy?: "token_only" | "email_unverified";
   membership_policy?: "request" | "open" | "invite_only";
   membership_dues_amount?: string;

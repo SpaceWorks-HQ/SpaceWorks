@@ -534,6 +534,32 @@ been **worse than doing nothing**, which is the lesson worth keeping here.
   a per-makerspace confirmation screen because it previously archived **immediately**, so there was
   nowhere to show a count.
 
+**Publishing a borrower's NAME is opt-in, and the guard must short-circuit (phase 2).**
+`inventory.public_stats_hardware.current_loans` served `holder_name` on the **unauthenticated**
+stats endpoint, resolving the free-text `requester_name`, then `requester_username`, then
+`get_full_name()` — a real person's name bound to a specific tool and a due date, readable by
+anyone. `Makerspace.public_stats_show_holder_names` now gates it, **default off**, and migration
+`makerspaces/0060` backfills **True unconditionally** for existing rows (the `0050`/`0056`
+precedent: an opt-in default silently removes behaviour a space relies on). Accepted consequence,
+written in the migration: a currently stats-disabled space will publish names if it enables stats
+later, unless its manager turns this off first.
+- **The OFF branch must not CALL `public_display_name` at all** — not call it and discard the
+  result. `HardwareRequest` is a `ScopedPiiModelMixin` and `requester_name` is encrypted **and
+  Bloom-indexed**, so reading it transparently decrypts; a names-disabled public request must not
+  depend on PII decryption or key availability for a value it throws away. A test spies on the
+  helper and asserts **zero calls**, because every output-only assertion passes against a
+  compute-then-replace implementation — verified by writing that regression and watching the four
+  output tests stay green while only the spy failed.
+- **`'Member'` is not anonymisation.** The row still carries exact `due` and `since` timestamps
+  with the item, so an observer who was in the space can still correlate. The toggle removes the
+  directly searchable identifier; coarsening dates or suppressing `current_loans` outright is a
+  broader policy decision that was **not** taken.
+- The view is mounted at **two** URL aliases (`/api/public/<slug>/stats/` and
+  `/api/v1/public/<slug>/stats/`) fed by one builder, so guarding the builder covers both. Neither
+  the machines nor printing stats builders carry requester identity — `current_loans` is the only
+  identity-bearing section. `/control/` gained `public_stats_enabled` too, which it had never
+  exposed: a privacy switch the superadmin cannot see is not a control plane.
+
 **A new public image field must register in FOUR places, and three of them fail silently.**
 `Event.image_key` (phase 22) is the worked example. Adding the column and an upload view is the
 visible half; the half nothing will remind you about is that

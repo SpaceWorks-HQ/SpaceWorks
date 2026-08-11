@@ -35920,6 +35920,9 @@
                     "public_stats_enabled": {
                         "type": "boolean"
                     },
+                    "public_stats_show_holder_names": {
+                        "type": "boolean"
+                    },
                     "public_print_status_lookup_policy": {
                         "$ref": "#/components/schemas/PublicPrintStatusLookupPolicyEnum"
                     },
@@ -39267,6 +39270,9 @@
                         "type": "boolean"
                     },
                     "public_stats_enabled": {
+                        "type": "boolean"
+                    },
+                    "public_stats_show_holder_names": {
                         "type": "boolean"
                     },
                     "public_print_status_lookup_policy": {
