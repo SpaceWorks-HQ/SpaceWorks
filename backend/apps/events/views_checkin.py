@@ -23,6 +23,7 @@ from apps.events.views_admin import _manageable_event
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.member_activity_service import active_membership
+from apps.makerspaces.models import MakerspaceWaiver
 from apps.payments.models import Payment
 from apps.presence.guard import MemberPresenceRequired
 
@@ -74,6 +75,10 @@ class EventCheckInResolveView(APIView):
             "name": registration.name,
             "status": registration.status,
             "payment_status": payment.status if payment is not None else None,
+            # Reported, never enforced. A visitor with nothing on file is exactly who the
+            # host wants to hand a waiver to at the desk; refusing them entry is not this
+            # endpoint's job, the same way it reports payment state without blocking.
+            "host_waiver_on_file": bool(registration.host_waiver_id),
         }
         response = Response(EventCheckInResolveResponseSerializer(payload).data)
         response["Cache-Control"] = "private, no-store"
@@ -126,6 +131,26 @@ class EventCheckInQrView(APIView):
             .first()
         )
         if registration is None:
+            raise NotFound()
+
+        # A collaborative registration must carry SOME recorded host-waiver acceptance before
+        # it yields an admission code. Provenance differing from the host is what marks a
+        # visitor; the host's own members carry their acceptance on their membership.
+        #
+        # Deliberately NOT gated on the CURRENT version. A host revising its waiver after
+        # someone registered would then silently void a legitimate member's code and turn them
+        # away at a door they signed up for, over text they never had the chance to read --
+        # the same failure the never-block rule prevents for payments. What this closes is the
+        # row with NO acceptance at all, and the member can repair it themselves by
+        # re-submitting registration, which stamps the current waiver.
+        if (
+            registration.registered_via_makerspace_id
+            and registration.registered_via_makerspace_id != registration.event.makerspace_id
+            and registration.host_waiver_id is None
+            and MakerspaceWaiver.objects.filter(
+                makerspace_id=registration.event.makerspace_id, is_active=True,
+            ).exists()
+        ):
             raise NotFound()
 
         title = registration.event.title

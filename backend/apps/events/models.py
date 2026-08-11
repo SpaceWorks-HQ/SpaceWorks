@@ -208,6 +208,20 @@ class EventRegistration(ScopedPiiModelMixin, models.Model):
         on_delete=models.SET_NULL,
         related_name="event_registrations_via",
     )
+    # The version and timestamp are accountability evidence about a real person's
+    # agreement. SET_NULL would either violate all-or-none or silently erase that
+    # evidence, so the waiver itself is PROTECTed.
+    host_waiver = models.ForeignKey(
+        "makerspaces.MakerspaceWaiver",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="accepted_by_event_registrations",
+    )
+    host_waiver_accepted_at = models.DateTimeField(null=True, blank=True)
+    host_waiver_version_accepted = models.CharField(
+        max_length=64, null=True, blank=True,
+    )
     email_exact_hash = models.BinaryField(max_length=32, null=True, editable=False)
     email_hash_generation = models.ForeignKey(
         "encryption.SearchKeyGeneration", on_delete=models.PROTECT,
@@ -241,6 +255,15 @@ class EventRegistration(ScopedPiiModelMixin, models.Model):
                 ),
                 name="uniq_active_event_registration_member",
             ),
+            models.CheckConstraint(
+                condition=(
+                    Q(host_waiver__isnull=True, host_waiver_accepted_at__isnull=True,
+                      host_waiver_version_accepted__isnull=True)
+                    | Q(host_waiver__isnull=False, host_waiver_accepted_at__isnull=False,
+                        host_waiver_version_accepted__isnull=False)
+                ),
+                name="event_registration_host_waiver_all_or_none",
+            ),
         ]
         indexes = [
             models.Index(
@@ -248,6 +271,16 @@ class EventRegistration(ScopedPiiModelMixin, models.Model):
                 name="eventreg_status_fifo_idx",
             ),
         ]
+
+    def clean(self):
+        super().clean()
+        if (
+            self.host_waiver_id and self.event_id
+            and self.host_waiver.makerspace_id != self.event.makerspace_id
+        ):
+            raise ValidationError(
+                {"host_waiver": "Waiver must belong to the event's host makerspace."}
+            )
 
     def save(self, *args, **kwargs):
         self.name = (self.name or "").strip()

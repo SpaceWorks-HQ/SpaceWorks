@@ -23705,17 +23705,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/PublicEventRegistrationInput"
+                                "$ref": "#/components/schemas/CollaborativeEventRegistrationInput"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/PublicEventRegistrationInput"
+                                "$ref": "#/components/schemas/CollaborativeEventRegistrationInput"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/PublicEventRegistrationInput"
+                                "$ref": "#/components/schemas/CollaborativeEventRegistrationInput"
                             }
                         }
                     }
@@ -30564,6 +30564,15 @@
                         "type": "string",
                         "readOnly": true,
                         "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "host_waiver": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/HostWaiver"
+                            }
+                        ],
+                        "nullable": true,
+                        "readOnly": true
                     }
                 },
                 "required": [
@@ -30574,6 +30583,7 @@
                     "ends_at",
                     "host_name",
                     "host_slug",
+                    "host_waiver",
                     "id",
                     "image_url",
                     "location",
@@ -30581,6 +30591,29 @@
                     "starts_at",
                     "title"
                 ]
+            },
+            "CollaborativeEventRegistrationInput": {
+                "type": "object",
+                "properties": {
+                    "custom_answers": {
+                        "writeOnly": true,
+                        "nullable": true
+                    },
+                    "host_waiver_id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "nullable": true
+                    },
+                    "host_waiver_version": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 64
+                    },
+                    "host_waiver_accepted": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                }
             },
             "ConditionEnum": {
                 "enum": [
@@ -32148,9 +32181,13 @@
                     "payment_status": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "host_waiver_on_file": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
+                    "host_waiver_on_file",
                     "name",
                     "payment_status",
                     "registration_id",
@@ -32862,6 +32899,28 @@
                 },
                 "required": [
                     "status"
+                ]
+            },
+            "HostWaiver": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "version": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "body": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "body",
+                    "id",
+                    "version"
                 ]
             },
             "HostingError": {

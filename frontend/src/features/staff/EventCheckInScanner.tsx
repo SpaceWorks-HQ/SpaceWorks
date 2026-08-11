@@ -117,6 +117,14 @@ export default function EventCheckInScanner({
             // someone entry to an event they registered for.
             <p className="mt-1 text-sm text-muted">Payment: {resolved.payment_status}</p>
           ) : null}
+          {resolved.host_waiver_on_file ? null : (
+            // Reported, not enforced. Someone standing at the door with nothing on file is
+            // exactly who the host wants to hand a waiver to; refusing them entry is not
+            // this screen's job, the same way payment state is shown without blocking.
+            <p className="mt-1 text-sm text-muted">
+              No host waiver on file — take one at the desk.
+            </p>
+          )}
           {blockedReason ? (
             <p className="mt-2 text-sm text-danger">{blockedReason}</p>
           ) : null}

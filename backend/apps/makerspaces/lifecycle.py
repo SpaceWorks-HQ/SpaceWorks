@@ -210,6 +210,12 @@ def _delete_object_graph(makerspace):
         AuditLog.objects.filter(makerspace=makerspace).delete()
         Payment.objects.filter(makerspace=makerspace).delete()
         ProcessedStripeEvent.objects.filter(makerspace=makerspace).delete()
+        # An elsewhere-hosted registration can reference this space's waiver. Clear all
+        # three evidence fields or PROTECT would raise ProtectedError in the final cascade.
+        EventRegistration.objects.filter(host_waiver__makerspace=makerspace).update(
+            host_waiver=None, host_waiver_accepted_at=None,
+            host_waiver_version_accepted=None,
+        )
         # Registrations otherwise survive until the final makerspace cascade. Delete
         # hosted rows explicitly so any PROTECT FK they gain cannot fail that cascade;
         # collaborator provenance must not remove another host's registration.

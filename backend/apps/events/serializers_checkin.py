@@ -10,3 +10,4 @@ class EventCheckInResolveResponseSerializer(serializers.Serializer):
     name = serializers.CharField()
     status = serializers.CharField()
     payment_status = serializers.CharField(allow_null=True)
+    host_waiver_on_file = serializers.BooleanField()

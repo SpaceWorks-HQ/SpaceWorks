@@ -921,6 +921,14 @@ export type CollaborativeEvent = {
   "image_url": string | null;
   "host_name": string;
   "host_slug": string;
+  "host_waiver": HostWaiver | null;
+};
+
+export type CollaborativeEventRegistrationInput = {
+  "custom_answers"?: unknown | null;
+  "host_waiver_id"?: number | null;
+  "host_waiver_version"?: string | null;
+  "host_waiver_accepted"?: boolean;
 };
 
 export type ConditionEnum = "available" | "damaged" | "lost" | "unknown";
@@ -1329,6 +1337,7 @@ export type EventCheckInResolveResponse = {
   "name": string;
   "status": string;
   "payment_status": string | null;
+  "host_waiver_on_file": boolean;
 };
 
 export type EventCollaborationInbox = {
@@ -1506,6 +1515,12 @@ export type Health = {
 
 export type HostingError = {
   "detail": string;
+};
+
+export type HostWaiver = {
+  "id": number;
+  "version": string;
+  "body": string;
 };
 
 export type IntegrationConfiguredHealth = {

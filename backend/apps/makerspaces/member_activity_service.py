@@ -101,7 +101,8 @@ def _event_registrations(makerspace, member):
         waitlist_position=Subquery(waitlisted_before, output_field=IntegerField())
     ).only(
         "id", "checkin_token", "status", "created_at", "event__title",
-        "event__starts_at", "event__ends_at", "event__status",
+        "event__starts_at", "event__ends_at", "event__status", "event__makerspace_id",
+        "registered_via_makerspace_id", "host_waiver_id",
     )
     # Two halves of one question, and they must match `EventCheckInQrView`'s filter exactly:
     # the REGISTRATION must be registered (a waitlisted row has nothing confirmable behind
@@ -110,7 +111,31 @@ def _event_registrations(makerspace, member):
     # alone would advertise an admission code for a cancelled event.
     from apps.events.views_checkin import CHECKABLE_EVENT_STATUSES
 
+    # Hosts whose active waiver a visiting registration must have accepted. Resolved once
+    # rather than per row.
+    from apps.makerspaces.models import MakerspaceWaiver
+
+    ordered = list(rows.order_by("-event__starts_at", "-id")[:ACTIVITY_LIMIT])
+    hosts_needing_waiver = set(
+        MakerspaceWaiver.objects.filter(
+            makerspace_id__in={row.event.makerspace_id for row in ordered},
+            is_active=True,
+        ).values_list("makerspace_id", flat=True)
+    )
+
     def usable_token(row):
+        # Must agree with `EventCheckInQrView`: a token advertised here whose QR route
+        # refuses is a code that scans to nothing.
+        visitor = (
+            row.registered_via_makerspace_id
+            and row.registered_via_makerspace_id != row.event.makerspace_id
+        )
+        if (
+            visitor
+            and row.host_waiver_id is None
+            and row.event.makerspace_id in hosts_needing_waiver
+        ):
+            return False
         return (
             row.status == EventRegistration.Status.REGISTERED
             and row.event.status in CHECKABLE_EVENT_STATUSES
@@ -122,7 +147,7 @@ def _event_registrations(makerspace, member):
         "event_title": row.event.title, "starts_at": row.event.starts_at,
         "ends_at": row.event.ends_at, "status": row.status,
         "waitlist_position": row.waitlist_position if row.status == EventRegistration.Status.WAITLISTED else None,
-    } for row in rows.order_by("-event__starts_at", "-id")[:ACTIVITY_LIMIT]]
+    } for row in ordered]
 
 
 def _machine_service_requests(makerspace_id, member):
