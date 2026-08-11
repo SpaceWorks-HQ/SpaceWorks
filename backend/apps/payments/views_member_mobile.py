@@ -8,6 +8,7 @@ from apps.accounts.views_device import IsDeviceAccessToken
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.origin_scope import require_native_selected_makerspace
 from apps.payments import stripe_client
+from apps.payments.member_scope import member_payment_queryset
 from apps.payments.models import Payment
 from apps.payments.serializers_mobile import MobilePaymentIntentResponseSerializer
 from apps.payments.services import PaymentRailConflict
@@ -32,10 +33,11 @@ class MemberMobilePaymentIntentView(APIView):
     )
     def post(self, request, makerspace_id, payment_id):
         require_native_selected_makerspace(request, makerspace_id)
-        payment = Payment.objects.filter(
+        # Same scope as the web surfaces: an event charge raised by a partner host is
+        # payable from the member area the member reached it through, or the charge exists
+        # with no way to settle it.
+        payment = member_payment_queryset(request.user, makerspace_id).filter(
             pk=payment_id,
-            makerspace_id=makerspace_id,
-            member=request.user,
             status=Payment.Status.PENDING,
         ).first()
         if payment is None:

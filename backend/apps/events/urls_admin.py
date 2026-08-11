@@ -22,6 +22,12 @@ from apps.events.views_admin import (
 )
 from apps.events.views_admin_image import EventImageView
 from apps.events.views_checkin import EventCheckInResolveView
+from apps.events.views_collaborators import (
+    EventCollaborationInboxView,
+    EventCollaborationRemoveView,
+    EventCollaborationRespondView,
+    EventCollaboratorListView,
+)
 
 urlpatterns = [
     path(
@@ -58,6 +64,26 @@ urlpatterns = [
         'events/<int:pk>/registrations/',
         EventRegistrationListView.as_view(),
         name='admin-event-registration-list',
+    ),
+    path(
+        'events/<int:pk>/collaborators/',
+        EventCollaboratorListView.as_view(),
+        name='admin-event-collaborators',
+    ),
+    path(
+        'event-collaborations/<int:pk>/remove/',
+        EventCollaborationRemoveView.as_view(),
+        name='admin-event-collaboration-remove',
+    ),
+    path(
+        'makerspaces/<int:makerspace_id>/event-collaborations/',
+        EventCollaborationInboxView.as_view(),
+        name='admin-event-collaboration-inbox',
+    ),
+    path(
+        'event-collaborations/<int:pk>/respond/',
+        EventCollaborationRespondView.as_view(),
+        name='admin-event-collaboration-respond',
     ),
     # Keep the kwarg named `pk`: origin scope resolves MODEL_LOOKUPS from
     # kwargs.get('pk'), so another name would deny every custom-domain request.

@@ -7,7 +7,9 @@ import {
   useEventRegistrations, useEvents, useMarkEventAttended, usePublishEvent, useUpdateEvent,
   type EventPayload, type StaffEvent,
 } from "./eventsApi";
+import { CollaborationInbox } from "./CollaborationInbox";
 import EventCheckInScanner from "./EventCheckInScanner";
+import { EventCollaborators } from "./EventCollaborators";
 import { EventRegisterMember } from "./EventRegisterMember";
 import { ImageUploader } from "./ImageUploader";
 import { Panel } from "./panels/shared";
@@ -111,6 +113,7 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
   return (
     <Panel title="Events">
       <p className="mb-4 text-sm text-muted">Create events, publish registrations, and record attendance.</p>
+      <CollaborationInbox makerspaceId={makerspaceId} />
       <form className="mb-5 rounded-xl border border-line bg-bg p-4" onSubmit={submit}>
         <h3 className="mb-3 font-semibold text-ink">Create draft event</h3>
         <EventFields values={values} setValues={setValues} />
@@ -198,6 +201,7 @@ function EventDrawer({ eventId, makerspaceId, onClose }: { eventId: number; make
           </tbody></table></div> : null}
           <div className="mt-3 flex items-center justify-between gap-2"><span className="text-xs text-muted">Page {page}</span><div className="flex gap-2"><button className="desk-button" type="button" disabled={!registrations.data?.previous} onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</button><button className="desk-button" type="button" disabled={!registrations.data?.next} onClick={() => setPage((p) => p + 1)}>Next</button></div></div>
         </section>
+        <EventCollaborators makerspaceId={makerspaceId} eventId={eventId} />
       </div> : null}
     </DetailDrawer>
     <ConfirmDialog open={confirm !== null} title={`${confirm ? confirm[0].toUpperCase() + confirm.slice(1) : "Change"} event`} message={`Are you sure you want to ${confirm ?? "change"} this event?`} confirmLabel={confirm ? confirm[0].toUpperCase() + confirm.slice(1) : "Confirm"} tone={confirm === "cancel" ? "danger" : "default"} pending={lifecycle.isPending} onCancel={() => setConfirm(null)} onConfirm={() => lifecycle.mutate(undefined, { onSuccess: () => setConfirm(null), onError: () => setConfirm(null) })} />

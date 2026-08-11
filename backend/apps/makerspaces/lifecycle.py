@@ -131,6 +131,7 @@ def _delete_object_graph(makerspace):
     from apps.audit.models import AuditLog
     from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
     from apps.evidence.models import EvidencePhoto
+    from apps.events.models import EventRegistration
     from apps.hardware_requests.models import HardwareRequest
     from apps.hardware_requests.models import PublicToolLoan, RequesterAccountability
     from apps.hardware_requests.models import ReturnEvent
@@ -209,6 +210,10 @@ def _delete_object_graph(makerspace):
         AuditLog.objects.filter(makerspace=makerspace).delete()
         Payment.objects.filter(makerspace=makerspace).delete()
         ProcessedStripeEvent.objects.filter(makerspace=makerspace).delete()
+        # Registrations otherwise survive until the final makerspace cascade. Delete
+        # hosted rows explicitly so any PROTECT FK they gain cannot fail that cascade;
+        # collaborator provenance must not remove another host's registration.
+        EventRegistration.objects.filter(event__makerspace=makerspace).delete()
         # Encryption key rows carry a PROTECT FK + a no-delete ORM guard/trigger, so
         # raw-delete them inside this authorized purge context (session_replication_role
         # =replica self-host, or app.allow_immutable_delete GUC managed) before the

@@ -16,25 +16,33 @@ Two rules every collector here obeys:
   scope would drag half the app graph into every `manage.py` invocation.
 """
 
-
-def _counts(**pairs):
-    return {name: value for name, value in pairs.items() if value}
+from apps.makerspaces.module_purge_collectors_single_model import (
+    _counts,
+    bookings_delete,
+    bookings_public_images,
+    machine_service_private_key_sizes,
+    machine_service_private_keys,
+    qr_print_batches_delete,
+    stock_transfers_delete,
+    stocktake_delete,
+)
 
 
 def events_delete(makerspace, cursor):
-    from apps.events.models import Event, EventRegistration
+    from apps.events.models import Event, EventCollaborator, EventRegistration
 
+    collaborations = EventCollaborator.objects.filter(makerspace=makerspace).delete()[0]
+    provenance_cleared = EventRegistration.objects.filter(
+        registered_via_makerspace=makerspace,
+    ).exclude(event__makerspace=makerspace).update(registered_via_makerspace=None)
     registrations = EventRegistration.objects.filter(event__makerspace=makerspace).delete()[0]
     events = Event.objects.filter(makerspace=makerspace).delete()[0]
-    return _counts(event_registrations=registrations, events=events)
-
-
-def bookings_delete(makerspace, cursor):
-    from apps.bookings.models import BookableSpace, Booking
-
-    bookings = Booking.objects.filter(space__makerspace=makerspace).delete()[0]
-    spaces = BookableSpace.objects.filter(makerspace=makerspace).delete()[0]
-    return _counts(bookings=bookings, bookable_spaces=spaces)
+    return _counts(
+        event_collaborations=collaborations,
+        event_registration_provenance_cleared=provenance_cleared,
+        event_registrations=registrations,
+        events=events,
+    )
 
 
 def events_public_images(makerspace):
@@ -42,14 +50,6 @@ def events_public_images(makerspace):
 
     return list(
         Event.objects.filter(makerspace=makerspace).values_list("image_key", flat=True)
-    )
-
-
-def bookings_public_images(makerspace):
-    from apps.bookings.models import BookableSpace
-
-    return list(
-        BookableSpace.objects.filter(makerspace=makerspace).values_list("image_key", flat=True)
     )
 
 
@@ -284,63 +284,4 @@ def machine_service_delete(makerspace, cursor):
     PrintingCutoverState.objects.filter(makerspace=makerspace).delete()
     return _counts(
         service_requests=requests, service_files=files, machine_usage_entries=usage_entries
-    )
-
-
-def machine_service_private_keys(makerspace, add):
-    from apps.machines.service_lifecycle import collect_private_object_keys
-
-    collect_private_object_keys(makerspace, add)
-
-
-def machine_service_private_key_sizes(makerspace):
-    """Charged bytes per attached service-file key, released after a confirmed delete.
-
-    `service_storage` charges `add_storage` at ATTACH time and writes `size_bytes` in the
-    same save, so `service_request__isnull=False` is exactly the charged set -- an
-    unattached upload was never counted and must free nothing even though the purge does
-    delete its row and its object. That asymmetry is why the sizes are declared separately
-    from `private_keys`, which collects every file key because every file row goes.
-    """
-    from apps.machines.models import ServiceRequestFile
-
-    return {
-        key: size
-        for key, size in ServiceRequestFile.objects.filter(
-            makerspace=makerspace, service_request__isnull=False
-        ).values_list("object_key", "size_bytes")
-        if key
-    }
-
-
-def stocktake_delete(makerspace, cursor):
-    from apps.operations.models import StocktakeSession
-
-    return _counts(
-        stocktake_sessions=StocktakeSession.objects.filter(makerspace=makerspace).delete()[0]
-    )
-
-
-def stock_transfers_delete(makerspace, cursor):
-    from django.db.models import Q
-
-    from apps.operations.models import StockTransfer
-
-    deleted = (
-        StockTransfer.objects.filter(
-            Q(makerspace=makerspace)
-            | Q(source_makerspace=makerspace)
-            | Q(destination_makerspace=makerspace)
-        )
-        .distinct()
-        .delete()[0]
-    )
-    return _counts(stock_transfers=deleted)
-
-
-def qr_print_batches_delete(makerspace, cursor):
-    from apps.operations.models import QrPrintBatch
-
-    return _counts(
-        qr_print_batches=QrPrintBatch.objects.filter(makerspace=makerspace).delete()[0]
     )

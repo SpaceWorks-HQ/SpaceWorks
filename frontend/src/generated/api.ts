@@ -38,6 +38,7 @@ export const openApiTags = [
   "Ledger",
   "Makerspaces",
   "Member activity",
+  "Member events",
   "Member profile",
   "Memberships",
   "Native push",
@@ -90,10 +91,13 @@ export const openApiPaths = [
   "/api/v1/admin/containers/{id}/history",
   "/api/v1/admin/containers/{id}/move",
   "/api/v1/admin/direct-loans/{id}/return",
+  "/api/v1/admin/event-collaborations/{id}/remove/",
+  "/api/v1/admin/event-collaborations/{id}/respond/",
   "/api/v1/admin/event-registrations/{id}/mark-attended/",
   "/api/v1/admin/events/{id}/",
   "/api/v1/admin/events/{id}/cancel/",
   "/api/v1/admin/events/{id}/check-in/resolve/",
+  "/api/v1/admin/events/{id}/collaborators/",
   "/api/v1/admin/events/{id}/complete/",
   "/api/v1/admin/events/{id}/eligible-members/",
   "/api/v1/admin/events/{id}/image",
@@ -236,6 +240,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/warranties",
   "/api/v1/admin/makerspaces",
   "/api/v1/admin/makerspaces/{id}",
+  "/api/v1/admin/makerspaces/{makerspace_id}/event-collaborations/",
   "/api/v1/admin/makerspaces/{makerspace_id}/events/",
   "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/consumable-pools",
   "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/requests",
@@ -351,6 +356,8 @@ export const openApiPaths = [
   "/api/v1/internal/cron/return-reminders",
   "/api/v1/internal/tls-check",
   "/api/v1/member/makerspaces/{makerspace_id}/activity",
+  "/api/v1/member/makerspaces/{makerspace_id}/collaborative-events/",
+  "/api/v1/member/makerspaces/{makerspace_id}/collaborative-events/{id}/register/",
   "/api/v1/member/makerspaces/{makerspace_id}/directory",
   "/api/v1/member/makerspaces/{makerspace_id}/directory/{membership_id}",
   "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/{id}/qr",
@@ -900,6 +907,22 @@ export type ClientPlatformEnum = "web" | "ios" | "android";
 
 export type ClientTypeEnum = "browser" | "server";
 
+export type CollaborativeEvent = {
+  "id": number;
+  "title": string;
+  "description": string;
+  "starts_at": string;
+  "ends_at": string;
+  "location": string;
+  "location_kind": LocationKindEnum;
+  "custom_form": unknown | null;
+  "capacity": number;
+  "availability": AvailabilityEnum;
+  "image_url": string | null;
+  "host_name": string;
+  "host_slug": string;
+};
+
 export type ConditionEnum = "available" | "damaged" | "lost" | "unknown";
 
 export type ConnectStatusEnum = "unconnected" | "pending" | "active" | "restricted" | "disconnected";
@@ -1306,6 +1329,40 @@ export type EventCheckInResolveResponse = {
   "name": string;
   "status": string;
   "payment_status": string | null;
+};
+
+export type EventCollaborationInbox = {
+  "id": number;
+  "event_id": number;
+  "event_title": string;
+  "starts_at": string;
+  "ends_at": string;
+  "host_name": string;
+  "host_slug": string;
+  "status": StatusB9dEnum;
+  "created_at": string;
+  "responded_at": string | null;
+};
+
+export type EventCollaborationRespond = {
+  "accept": boolean;
+};
+
+export type EventCollaborator = {
+  "id": number;
+  "event_id": number;
+  "makerspace_id": number;
+  "makerspace_name": string;
+  "makerspace_slug": string;
+  "status": StatusB9dEnum;
+  "invited_by_id": number | null;
+  "responded_by_id": number | null;
+  "created_at": string;
+  "responded_at": string | null;
+};
+
+export type EventCollaboratorReplace = {
+  "slugs": Array<string>;
 };
 
 export type EventEligibleMember = {
@@ -4391,6 +4448,8 @@ export type Status66aEnum = "pending" | "paid_online" | "paid_offline" | "waived
 export type Status83eEnum = "ok" | "warn" | "error" | "unknown";
 
 export type StatusA39Enum = "pending" | "verified" | "failed";
+
+export type StatusB9dEnum = "invited" | "accepted" | "declined";
 
 export type StatusE94Enum = "pending" | "approved" | "rejected";
 

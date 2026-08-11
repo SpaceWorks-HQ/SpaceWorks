@@ -1824,6 +1824,151 @@
                 }
             }
         },
+        "/api/v1/admin/event-collaborations/{id}/remove/": {
+            "post": {
+                "operationId": "api_v1_admin_event_collaborations_remove_create",
+                "summary": "Remove an event collaborator",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid collaboration request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event management access denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event collaboration not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/event-collaborations/{id}/respond/": {
+            "post": {
+                "operationId": "api_v1_admin_event_collaborations_respond_create",
+                "summary": "Accept or decline an event collaboration",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventCollaborationRespond"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventCollaborationRespond"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventCollaborationRespond"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EventCollaborator"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid collaboration request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event management access denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event collaboration not found."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/event-registrations/{id}/mark-attended/": {
             "post": {
                 "operationId": "api_v1_admin_event_registrations_mark_attended_create",
@@ -2108,6 +2253,162 @@
                             }
                         },
                         "description": "Request rate limit exceeded."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/events/{id}/collaborators/": {
+            "get": {
+                "operationId": "api_v1_admin_events_collaborators_list",
+                "summary": "List an event's collaborators",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/EventCollaborator"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid collaboration request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event management access denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event collaboration not found."
+                    }
+                }
+            },
+            "put": {
+                "operationId": "api_v1_admin_events_collaborators_update",
+                "summary": "Replace an event's collaborators",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventCollaboratorReplace"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventCollaboratorReplace"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventCollaboratorReplace"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/EventCollaborator"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid collaboration request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event management access denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event collaboration not found."
                     }
                 }
             }
@@ -14265,6 +14566,75 @@
                 }
             }
         },
+        "/api/v1/admin/makerspaces/{makerspace_id}/event-collaborations/": {
+            "get": {
+                "operationId": "api_v1_admin_makerspaces_event_collaborations_list",
+                "summary": "List collaboration invitations for a makerspace",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/EventCollaborationInbox"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid collaboration request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event management access denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event collaboration not found."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspaces/{makerspace_id}/events/": {
             "get": {
                 "operationId": "api_v1_admin_makerspaces_events_retrieve",
@@ -23237,6 +23607,178 @@
                 }
             }
         },
+        "/api/v1/member/makerspaces/{makerspace_id}/collaborative-events/": {
+            "get": {
+                "operationId": "api_v1_member_makerspaces_collaborative_events_list",
+                "summary": "List events hosted by accepted collaborators",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/CollaborativeEvent"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid event request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Active membership is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Collaborative event not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/member/makerspaces/{makerspace_id}/collaborative-events/{id}/register/": {
+            "post": {
+                "operationId": "api_v1_member_makerspaces_collaborative_events_register_create",
+                "summary": "Register for a collaborative event",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member events"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublicEventRegistrationInput"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublicEventRegistrationInput"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublicEventRegistrationInput"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicEventRegistrationResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid event request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Active membership is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Collaborative event not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event state conflict."
+                    }
+                }
+            }
+        },
         "/api/v1/member/makerspaces/{makerspace_id}/directory": {
             "get": {
                 "operationId": "api_v1_member_makerspaces_directory_retrieve",
@@ -29954,6 +30496,92 @@
                 "type": "string",
                 "description": "* `browser` - Browser\n* `server` - Server"
             },
+            "CollaborativeEvent": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "ends_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "location": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "location_kind": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/LocationKindEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "custom_form": {
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "capacity": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "readOnly": true
+                    },
+                    "availability": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AvailabilityEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "host_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "host_slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    }
+                },
+                "required": [
+                    "availability",
+                    "capacity",
+                    "custom_form",
+                    "description",
+                    "ends_at",
+                    "host_name",
+                    "host_slug",
+                    "id",
+                    "image_url",
+                    "location",
+                    "location_kind",
+                    "starts_at",
+                    "title"
+                ]
+            },
             "ConditionEnum": {
                 "enum": [
                     "available",
@@ -31527,6 +32155,166 @@
                     "payment_status",
                     "registration_id",
                     "status"
+                ]
+            },
+            "EventCollaborationInbox": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "event_id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "event_title": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "ends_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "host_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "host_slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/StatusB9dEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "responded_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "ends_at",
+                    "event_id",
+                    "event_title",
+                    "host_name",
+                    "host_slug",
+                    "id",
+                    "responded_at",
+                    "starts_at",
+                    "status"
+                ]
+            },
+            "EventCollaborationRespond": {
+                "type": "object",
+                "properties": {
+                    "accept": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "accept"
+                ]
+            },
+            "EventCollaborator": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "event_id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "makerspace_id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "makerspace_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "makerspace_slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/StatusB9dEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "invited_by_id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "responded_by_id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "responded_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "event_id",
+                    "id",
+                    "invited_by_id",
+                    "makerspace_id",
+                    "makerspace_name",
+                    "makerspace_slug",
+                    "responded_at",
+                    "responded_by_id",
+                    "status"
+                ]
+            },
+            "EventCollaboratorReplace": {
+                "type": "object",
+                "properties": {
+                    "slugs": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "pattern": "^[-a-zA-Z0-9_]+$"
+                        }
+                    }
+                },
+                "required": [
+                    "slugs"
                 ]
             },
             "EventEligibleMember": {
@@ -43815,6 +44603,15 @@
                 ],
                 "type": "string",
                 "description": "* `pending` - Pending\n* `verified` - Verified\n* `failed` - Failed"
+            },
+            "StatusB9dEnum": {
+                "enum": [
+                    "invited",
+                    "accepted",
+                    "declined"
+                ],
+                "type": "string",
+                "description": "* `invited` - Invited\n* `accepted` - Accepted\n* `declined` - Declined"
             },
             "StatusE94Enum": {
                 "enum": [

@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from apps.encryption.mappers import ScopedPiiModelMixin
@@ -117,6 +118,58 @@ class Event(models.Model):
         super().save(*args, **kwargs)
 
 
+# Collaboration is an invite-and-accept relationship rather than a bare M2M so a
+# space cannot unilaterally attach itself to another space's event. Hosts invite by
+# slug, which also avoids enumerating makerspaces they do not administer.
+class EventCollaborator(models.Model):
+    class Status(models.TextChoices):
+        INVITED = "invited", "Invited"
+        ACCEPTED = "accepted", "Accepted"
+        DECLINED = "declined", "Declined"
+
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="collaborators",
+    )
+    makerspace = models.ForeignKey(
+        "makerspaces.Makerspace",
+        on_delete=models.CASCADE,
+        related_name="event_collaborations",
+    )
+    status = models.CharField(
+        max_length=8,
+        choices=Status.choices,
+        default=Status.INVITED,
+    )
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    responded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = (("event", "makerspace"),)
+
+    def clean(self):
+        super().clean()
+        if self.event_id and self.makerspace_id == self.event.makerspace_id:
+            raise ValidationError(
+                {"makerspace": "An event's host makerspace cannot be a collaborator."}
+            )
+
+
 class EventRegistration(ScopedPiiModelMixin, models.Model):
     class Status(models.TextChoices):
         REGISTERED = "registered", "Registered"
@@ -142,6 +195,18 @@ class EventRegistration(ScopedPiiModelMixin, models.Model):
         null=True,
         blank=True,
         related_name="event_registrations",
+    )
+    # Accepted collaboration authorizes discovery and creation, while this durable
+    # provenance records where participation happened so member history and QR access
+    # survive removal of that collaboration. SET_NULL is intentional: this is routing
+    # convenience, not accountability evidence, and a purge should hide the activity
+    # from that space rather than be blocked.
+    registered_via_makerspace = models.ForeignKey(
+        "makerspaces.Makerspace",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="event_registrations_via",
     )
     email_exact_hash = models.BinaryField(max_length=32, null=True, editable=False)
     email_hash_generation = models.ForeignKey(

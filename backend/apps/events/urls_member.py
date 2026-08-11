@@ -11,8 +11,22 @@ urlconf in place instead, exactly as it does for the other two.
 from django.urls import path
 
 from apps.events.views_checkin import EventCheckInQrView
+from apps.events.views_member_events import (
+    MemberCollaborativeEventListView,
+    MemberCollaborativeEventRegistrationView,
+)
 
 urlpatterns = [
+    path(
+        'makerspaces/<int:makerspace_id>/collaborative-events/',
+        MemberCollaborativeEventListView.as_view(),
+        name='member-collaborative-events',
+    ),
+    path(
+        'makerspaces/<int:makerspace_id>/collaborative-events/<int:pk>/register/',
+        MemberCollaborativeEventRegistrationView.as_view(),
+        name='member-collaborative-event-register',
+    ),
     path(
         'makerspaces/<int:makerspace_id>/event-registrations/<int:pk>/qr',
         EventCheckInQrView.as_view(),

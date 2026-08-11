@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.member_activity_service import active_membership
+from apps.payments.member_scope import member_payment_queryset
 from apps.payments.models import Payment
 from apps.payments.serializers import MemberPaymentSerializer
 from apps.payments.serializers import CheckoutUrlSerializer
@@ -22,10 +23,7 @@ class MemberPaymentHistoryView(APIView):
         if active_membership(request.user, makerspace_id) is None:
             return Response({"detail": "An active membership is required."}, status=403)
         rows = list(
-            Payment.objects.filter(
-                makerspace_id=makerspace_id,
-                member=request.user,
-            ).order_by("-created_at")
+            member_payment_queryset(request.user, makerspace_id).order_by("-created_at")
         )
         return Response(
             MemberPaymentSerializer(
@@ -46,10 +44,8 @@ class MemberPaymentCheckoutView(APIView):
         responses={200: CheckoutUrlSerializer, 404: OpenApiResponse(ErrorSerializer), 503: OpenApiResponse(ErrorSerializer)},
     )
     def post(self, request, makerspace_id, payment_id):
-        payment = Payment.objects.filter(
+        payment = member_payment_queryset(request.user, makerspace_id).filter(
             pk=payment_id,
-            makerspace_id=makerspace_id,
-            member=request.user,
             status=Payment.Status.PENDING,
         ).first()
         if payment is None:

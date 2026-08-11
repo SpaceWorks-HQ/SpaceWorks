@@ -81,6 +81,17 @@ MODEL_LOOKUPS = {
     'admin-event-registration-list': ('events.Event', 'makerspace_id'),
     'admin-event-check-in-resolve': ('events.Event', 'makerspace_id'),
     'admin-event-registration-mark-attended': ('events.EventRegistration', 'event__makerspace_id'),
+    'admin-event-collaborators': ('events.Event', 'makerspace_id'),
+    # Respond belongs to the collaborator's domain; removal belongs to the host's.
+    # Resolving respond through the host would make the feature unreachable from the
+    # collaborator's custom domain, while resolving removal through the collaborator
+    # would give the host route the wrong origin scope.
+    'admin-event-collaboration-remove': (
+        'events.EventCollaborator', 'event__makerspace_id'
+    ),
+    'admin-event-collaboration-respond': (
+        'events.EventCollaborator', 'makerspace_id'
+    ),
     'admin-machine-operator-candidates': ('machines.Machine', 'makerspace_id'),
     'admin-machine-publicity': ('machines.Machine', 'makerspace_id'),
     'makerspace-verify-domain': ('makerspaces.Makerspace', 'id'),

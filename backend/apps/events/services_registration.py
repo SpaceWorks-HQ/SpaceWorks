@@ -7,24 +7,46 @@ from django.utils import timezone
 from apps.encryption.write_fence import assert_mapped_write_allowed
 from apps.events.capacity import fresh_registration_status
 from apps.events.exceptions import DuplicateRegistration, EventInvalidTransition
-from apps.events.models import EventRegistration
+from apps.events.models import EventCollaborator, EventRegistration
 from apps.forms_schema.validation import validate_answers
+from apps.makerspaces.guards import require_module_locked
+from apps.makerspaces.platform import module_enabled
+
+
+def collaborator_makerspace_ids(event):
+    """Return eligible accepted collaborator makerspace IDs for an event."""
+    collaborators = (
+        EventCollaborator.objects.filter(
+            event=event,
+            status=EventCollaborator.Status.ACCEPTED,
+            makerspace__archived_at__isnull=True,
+        )
+        # Model validation prevents this relation; excluding it here is the
+        # service-level defense because clean() is not invoked by every write path.
+        .exclude(makerspace_id=event.makerspace_id)
+        .select_related("makerspace")
+    )
+    return {
+        collaborator.makerspace_id
+        for collaborator in collaborators
+        if module_enabled(collaborator.makerspace, "events")
+    }
 
 
 @transaction.atomic
 def register(
     event, *, member=None, name=None, email=None, phone=None,
     custom_answers=None, actor=None, staff_registration=False,
+    via_makerspace=None, collaborative=False,
 ):
     """Register someone for an event.
 
-    `staff_registration` relaxes exactly one condition: the `is_public` requirement.
-    That flag answers "does this event appear in the public catalogue", and a staff
-    member standing at the door is not the public — without the relaxation a
-    members-only event could not be registered for by anyone at all, which makes it a
-    calendar entry rather than an event. Every other rule (published, not ended,
-    capacity, duplicates, the custom form, the write fence) is identical, because this
-    is the same service and the state machine has one home.
+    `staff_registration` and `collaborative` each relax exactly one condition: the
+    `is_public` requirement. That flag answers "does this event appear in the public
+    catalogue", while staff at the door and members of accepted collaborators are not
+    the public. Every other rule (published, not ended, capacity, duplicates, the
+    custom form, the write fence, and payment) is identical, because this is the same
+    service and the state machine has one home.
     """
     from apps.events.services import _audit, _locked_event, _refresh, _validate
 
@@ -53,8 +75,12 @@ def register(
             makerspace_id=event.makerspace_id, event_id=event.pk,
         )
     locked = _locked_event(event.pk)
+    # register() previously lacked this locked module check. Keep event-then-makerspace
+    # ordering: publish() takes the event lock first, so taking the makerspace first
+    # here would create a deadlock pair with it.
+    require_module_locked(locked.makerspace, "events")
     if (
-        (not locked.is_public and not staff_registration)
+        (not locked.is_public and not staff_registration and not collaborative)
         or locked.status != locked.Status.PUBLISHED
         or locked.ends_at < timezone.now()
     ):
@@ -66,16 +92,21 @@ def register(
     )
     if existing and existing.status == EventRegistration.Status.CANCELLED:
         existing.member = member or existing.member
+        existing.registered_via_makerspace = via_makerspace or locked.makerspace
         existing.name, existing.email, existing.phone = name, normalized_email, phone
         existing.custom_answers, existing.status, existing.created_at = custom_answers, status, timezone.now()
         _validate(existing)
-        existing.save(update_fields=["member", "name", "email", "phone", "custom_answers", "status", "created_at"])
+        existing.save(update_fields=[
+            "member", "registered_via_makerspace", "name", "email", "phone",
+            "custom_answers", "status", "created_at",
+        ])
         return _record_registration(locked, actor, existing, status)
     if existing:
         raise DuplicateRegistration("A registration already exists for this email.", fresh_status=status)
     registration = EventRegistration(
         event=locked, member=member, name=name, email=normalized_email,
         phone=phone, custom_answers=custom_answers, status=status,
+        registered_via_makerspace=via_makerspace or locked.makerspace,
     )
     _validate(registration)
     registration.save()
