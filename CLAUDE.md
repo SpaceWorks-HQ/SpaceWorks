@@ -40,9 +40,86 @@ Most recently the **module-architecture program**: operator-facing module groups
 every staff tab, the `payments`/`accounts`/`mobile`/`updates` keys, Razorpay behind a provider seam, a
 superadmin modules console, cloud/full deploy profiles and a beat-less scheduler, the **account-less
 identity seam + staff-created walk-in members**, **four platform login-method switches**, **opt-in maker
-profiles and a member directory**, and **staff-side event registration**. Its remaining phase is a
-security and loophole audit.
+profiles and a member directory**, and **staff-side event registration**. Its security and loophole
+audit is **done and pushed** (`a465a2d`).
+Then the **events program** (four phases, all on `dev`): presence split out of event registration,
+opt-in attended-events on the maker profile, QR event check-in, and cross-makerspace collaborative
+events with a host-waiver acceptance.
 The one deferred end-to-end user QA remains an owner-run release gate.
+
+## Events program invariants (four phases, `f16896f`..`dab0354`)
+
+- **Registering for an event does NOT require a `PresenceSession`; check-in does.**
+  `require_active_member` (identity + membership + waiver) was split out of
+  `require_active_member_presence`, and **only** `PublicEventRegistrationView` switched. The other
+  **nine invocations across six surfaces** — self-checkout ×3, direct handout, public request submit,
+  public booking, and the two machine-service surfaces — still require a session, because those are
+  hardware and facility acts where "is this member here right now" is the whole question. Signing up
+  is planning to attend; presence is proven later by the staff-scanned QR, which is stronger evidence
+  than a self-declared session.
+- **`events.member_history.registrations_for_space` is the ONE answer to "which registrations does
+  this member hold in this space"**, shared by the profile counts, the profile's recent-attended list,
+  member activity and the QR lookup. It filters on **durable provenance**
+  (`EventRegistration.registered_via_makerspace`, `SET_NULL`), **not** current collaboration: accepted
+  collaboration authorizes *discovery and creation*, provenance records *where participation
+  happened*, so an administrator editing a collaborator list cannot retroactively delete a member's
+  history or break a QR someone already holds. A **NULL provenance falls back to the host**, so the
+  read fails OPEN to pre-provenance behaviour and the backfill is tidiness rather than load-bearing.
+  History still stops at the **host's** archival or withdrawn `events` module.
+- **Presentation and PAYMENT are gated differently, and conflating them loses money.**
+  `payments.member_scope.member_payment_queryset` widens the three member payment surfaces (history,
+  web checkout, native intent) to an `EVENT_REGISTRATION` charge raised by another host when the
+  member's own registration names this space as provenance — otherwise a visitor's charge exists and
+  is undiscoverable, since the host 403s them and their own space filters it out. It is gated by
+  **neither** the host's module **nor** archival: a module toggle must never hide a receipt or block a
+  pending charge, and the separability contract keeps historical payment subjects usable when
+  tombstoned.
+- **`checkin_token` is surfaced only while the registration is REGISTERED AND the event is still
+  checkable.** `services.cancel()` changes only `Event.status` and leaves registrations REGISTERED, so
+  gating on the registration alone hands out an admission code nothing can ever confirm. The QR route
+  and `member_activity_service` must agree, or a token is advertised whose route refuses it.
+- **Resolve answers unknown, malformed and wrong-event tokens identically.** Distinguishing them makes
+  it an oracle for "this code is real but belongs elsewhere". **UUID4 entropy** is what makes
+  enumeration infeasible; authorization + event scoping + the uniform 404 stop a stolen token crossing
+  tenants; the staff-keyed throttle only bounds abuse. Resolve is **read-only** and confirm reuses the
+  existing pk-authorized `mark-attended`, so a scanned token never mutates anything.
+- **A route kwarg feeding `MODEL_LOOKUPS` MUST be named `pk`** — `origin_scope_routes` reads
+  `kwargs['pk']` and marks the request invalid when absent, so `<int:event_id>` is **denied on every
+  tenant custom domain despite being registered**.
+- **The collaboration API has TWO tenant scopes and needs four DISTINCT route names**, because
+  `origin_scope_routes` is keyed by route name, not HTTP method: host invite/list → `events.Event`,
+  host remove → `EventCollaborator.event__makerspace_id`, collaborator inbox → its `makerspace_id`
+  kwarg, accept/decline → `EventCollaborator.makerspace_id`. Registering accept against the host would
+  **403 it from the collaborator's own domain**, which is the entire feature.
+- **Lock order in `apps.events` is `event → makerspace(s)`**, matching shipped `publish()`,
+  `update_event()` and image attach. `require_module_locked` goes **after** `_locked_event` in
+  `register()` (before would deadlock against `publish`), two makerspaces lock in **sorted pk order**,
+  and `remove_collaborator` reads the event id **unlocked** first — a `select_for_update()
+  .select_related("event")` locks both rows in the wrong order.
+- **The host waiver lives on the `EventRegistration`, not a membership** (a visitor membership would
+  corrupt the host's member reporting, roster, quota and dues — `reports_members` counts every row).
+  Three fields under an all-or-none check constraint, `PROTECT`, with acceptance an **explicit API
+  field** — inferring it from a submitted id lets any caller manufacture evidence about a real person.
+  Re-read under the host lock so a superseded version is refused. Stamping is one helper shared by the
+  create and idempotent-retry paths. Audited with id + version, **never the body**: the purge clears
+  the columns, so the append-only log is the surviving evidence, and the body would be undeletable
+  member data. A registration with **no** acceptance yields no QR — but **not** gated on the *current*
+  version, or revising a waiver strands a legitimate member at the door.
+- **That `PROTECT` FK breaks BOTH purges if unhandled**: `membership_delete` must clear the
+  registration's three fields alongside the membership's, and `lifecycle.purge` must clear them for
+  registrations hosted **elsewhere** before its explicit
+  `EventRegistration.objects.filter(event__makerspace=makerspace).delete()` (placed after the
+  `ProcessedStripeEvent` delete, since Payment must precede its generic subject). Verified: removing
+  either clearing step raises `ProtectedError`.
+- **The member QR route lives in its own separable `events/urls_member.py`.** Declared alongside the
+  rest of the `member/` surface it kept resolving, and stayed in the OpenAPI schema, on a deployment
+  that ships no events app — caught by the tombstone suite.
+- **Purging `events` at a collaborator must clear `registered_via_makerspace` on registrations hosted
+  elsewhere**, or reinstalling resurrects supposedly purged activity and profile history.
+- **`MemberProfile.show_attended_events` is consent, not configurability.** `is_visible` publishes the
+  fields the member typed into the profile form; attendance is neither typed nor on that form. The
+  `activity` payload is now a typed nested serializer that **omits** absent keys — a zero says
+  "attended nothing", an absent key says "this space does not run events".
 
 **Standing build conventions for this program:**
 - **Parallel Codex via git worktree.** A second track runs in a sibling worktree

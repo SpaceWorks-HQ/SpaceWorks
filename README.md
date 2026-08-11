@@ -108,7 +108,7 @@ console shows you:
 | **Inventory** *(always on)* | The catalogue, request workflow, QR/evidence spine, asset units, containers, transfers, QR print batches, front-desk handover and purchasing |
 | **Stocktake** | Scan-first stock counts and variance reporting |
 | **Machines** | Machine registry, the service/print queue, maintenance and warranty |
-| **Events** | Event scheduling and registrations |
+| **Events** | Event scheduling and registrations, QR check-in at the door, and cross-makerspace collaborative events |
 | **Bookings** | Resource booking and public self-booking |
 | **Membership** | Join requests, waivers, referrals, member activity, maker profiles and presence |
 | **Notifications** | The in-app inbox and every outbound channel |
@@ -186,7 +186,7 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | | `machine_service` | | | The service/job queue |
 | | `printing` | | | 3D printing on top of `machine_service` |
 | | `maintenance` | | | Scheduled and reactive maintenance |
-| **Events** | `events` | | | Scheduling and registrations |
+| **Events** | `events` | | | Scheduling, registrations, QR check-in, collaborative events |
 | **Bookings** | `bookings` | | | Resource booking and public self-booking |
 | **Membership** | `membership` | | | Join requests, waivers, referrals, maker profiles |
 | **Notifications** | `notifications` | | | The in-app inbox |
@@ -377,23 +377,6 @@ module registry, and the registry only carries modules with real enforcement beh
   geofenced check-in is deliberately advisory; this is the module that would change that. It needs a
   device-identity and trust story of its own, because a network device reporting job completion is
   an unauthenticated actor asserting a state transition.
-- **Collaborative events across makerspaces.** Note first what already works: a **published public
-  event has no membership check at all**, so any signed-in person can register — including a member of
-  a different makerspace, or someone who is a member nowhere. Two spaces can co-host an open event
-  today. The event has one owning makerspace, and that settles everything awkward: the host's attendee
-  list under the host's encryption key, and the host's Stripe account taking any fee, exactly as a
-  registration from a non-member already works.
-
-  What is missing is the **members-only middle ground** — an event closed to the general public but
-  open to the members of *both* spaces. Today `is_public=False` closes self-registration to everyone
-  and only staff can add people one at a time. Missing with it is **discovery**: the event lists only
-  in the host's surfaces, so a collaborating space's members need a direct link.
-
-  Two decisions are settled for when it is built. The **host alone manages** the event — a
-  collaborating space's staff get no create, edit or attendee-list access, because `origin_scope`
-  hard-scopes a staff session to its own domain's makerspace and that guard is what prevents
-  cross-tenant session theft. And the event **lists in both spaces' member areas**, labelled with its
-  host, since a collaboration nobody can discover from their own space is only a shared link.
 - **Invitation requests** — letting a prospective member *ask* for an invitation, rather than only
   being invited or applying to join.
 
