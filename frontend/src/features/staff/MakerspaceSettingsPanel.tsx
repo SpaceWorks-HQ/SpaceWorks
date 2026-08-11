@@ -18,6 +18,7 @@ import { MakerspacePaymentSettings } from "./MakerspacePaymentSettings";
 import { MakerspacePublicStatsSettings } from "./MakerspacePublicStatsSettings";
 import { MakerspaceSubdomainSettings } from "./MakerspaceSubdomainSettings";
 import { MakerspaceWebhookSettings } from "./MakerspaceWebhookSettings";
+import { MakerspaceArchiveRequestPanel } from "./MakerspaceArchiveRequestPanel";
 import { NotificationDestinations } from "./NotificationDestinations";
 import { NotificationMuteMatrix } from "./NotificationMuteMatrix";
 import { NotificationRecipientPicker } from "./NotificationRecipientPicker";
@@ -26,9 +27,10 @@ import { Panel, type Makerspace, useStaffGet } from "./StaffPanels";
 type Props = {
   makerspace: Makerspace;
   isSuperadmin: boolean;
+  canManageMakerspace: boolean;
 };
 
-export function MakerspaceSettingsPanel({ makerspace, isSuperadmin }: Props) {
+export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMakerspace }: Props) {
   const queryClient = useQueryClient();
   const settings = useStaffGet<Makerspace>(
     ["makerspace-settings", makerspace.id],
@@ -221,6 +223,10 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin }: Props) {
           makerspace={makerspace}
           settings={settings.data}
           loading={settings.isLoading}
+        />
+        <MakerspaceArchiveRequestPanel
+          makerspaceId={makerspace.id}
+          canManageMakerspace={canManageMakerspace}
         />
         <div className="min-w-0 rounded-md border border-line bg-bg p-4">
           <h3 className="text-base font-semibold text-ink">Notification channels</h3>

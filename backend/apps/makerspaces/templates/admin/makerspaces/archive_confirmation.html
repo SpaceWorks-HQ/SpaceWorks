@@ -13,6 +13,10 @@
     These unsettled-charge counts are ADVISORY and may change before the archive runs.
     Archiving does NOT block on unsettled charges.
   </p>
+  <p>
+    If a makerspace has a pending archive request, direct archival will approve that
+    request automatically and notify its requester.
+  </p>
 
   <table>
     <thead>
@@ -22,6 +26,7 @@
         <th scope="col">Owned pending</th>
         <th scope="col">Routed pending</th>
         <th scope="col">Total pending</th>
+        <th scope="col">Pending archive request</th>
       </tr>
     </thead>
     <tbody>
@@ -32,6 +37,14 @@
           <td>{{ row.owned_pending }}</td>
           <td>{{ row.routed_pending }}</td>
           <td>{{ row.total_pending }}</td>
+          <td>
+            {% if row.pending_archive_request %}
+              <strong>Will be approved.</strong><br>
+              {{ row.pending_archive_request.reason|linebreaksbr }}
+            {% else %}
+              None
+            {% endif %}
+          </td>
         </tr>
       {% endfor %}
     </tbody>

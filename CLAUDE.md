@@ -534,6 +534,59 @@ been **worse than doing nothing**, which is the lesson worth keeping here.
   a per-makerspace confirmation screen because it previously archived **immediately**, so there was
   nowhere to show a count.
 
+**Archiving is TWO-KEY: a Space Manager requests, a superadmin confirms (phase 3).**
+`makerspaces.MakerspaceArchiveRequest` + `archive_requests.py` (the one workflow service; never
+mutate status outside it). Direct SM archive was rejected as a **self-lockout** — archiving
+removes the space from RBAC scope and `unarchive` is `/control/`-only, so the person who pressed
+the button loses the space and any way to undo it.
+- **THE HIDDEN-SPACE HOLE, and it is why this feature is safe.** A manager can set
+  `superadmin_access_enabled=False` themselves; a hidden space is excluded from `/control/`
+  querysets **and** `lifecycle.archive()` refuses it. So `file request → hide space` made the
+  request vanish from the superadmin's queue while rendering it unapprovable — a manager
+  escaping the exact oversight the design exists to impose. **Both directions are closed:**
+  creation refuses a hidden space, and disabling superadmin access refuses while a request is
+  pending. Do not remove either half.
+- **Authority is the `MANAGE_MAKERSPACE` ACTION, never `rbac.is_space_manager_identity`.** That
+  helper documents itself as deliberately not inferring identity from actions, so it refuses a
+  custom role granted the action — and editable custom roles are the Part L architecture this
+  project runs on. It was wrong in **two** places (view and service); fixing only the view left
+  the test still 403-ing, which is how the second one was found. Both gates must agree or one is
+  decorative.
+- **The requester must be emailed the outcome**, including auto-approval from a direct archive.
+  Once archived they lose RBAC scope, the console, the request history and their tenant domain,
+  so no in-app surface can ever tell them. Sends go through `transaction.on_commit`, catch and
+  log, and do **no SMTP work under the makerspace lock** — an SMTP failure must never roll back
+  an archive. Platform mail (`makerspace=None`), so no module toggle can mute it.
+- **A direct `/control/` archive AUTO-APPROVES any pending request atomically.** Leaving it
+  pending is false state that is invisible once archived and blocks a fresh request after an
+  unarchive.
+- **A COLLEAGUE's withdrawal notifies the requester; your own does not.** Because authority is
+  the action rather than "the person who filed it", any `MANAGE_MAKERSPACE` holder can withdraw
+  someone else's request — and without the mail that request simply vanishes with no trace the
+  requester can see. Withdrawing your own needs no mail: you just did it. This is the one
+  transition the design review got wrong ("withdrawal needs no email"), because it assumed the
+  actor and the requester are the same person.
+- **Approving from the request queue must show the same impact screen as the direct route.**
+  Approving *is* archiving; without it a superadmin could archive without ever seeing the
+  owned/routed pending charges — two ways to do one thing, one of them uninformed.
+- **Never copy `reason`/`resolution_note` into audit metadata** (append-only ⇒ undeletable), do
+  not put `reason` in the broad superadmin mail, and send `resolution_note` with
+  `persist_body=False`. The text is makerspace-scoped operational text like
+  `ApiKeyRequest.reason` — length-bounded, **not** `ScopedPiiModelMixin`.
+- Lock order is **`Makerspace` → `MakerspaceArchiveRequest`** on every transition. The partial
+  unique index (one PENDING per space) is the backstop, and its `IntegrityError` becomes a typed
+  409, not a 500. A **per-space one-hour cooldown** stops `request → withdraw → request` fanning
+  mail at every superadmin; it deliberately does **not** consume the OTP/SMS quotas, because a
+  governance-mail flood must never be able to suppress password-reset mail.
+- `makerspace` is **CASCADE** (the `SubdomainRequest` precedent); both user FKs are **SET_NULL**,
+  because durable attribution lives in the append-only audit log and PROTECT here would only
+  widen the user-deletion graph. No module key, purge plan, tombstone entry or PII registration:
+  `makerspaces` is core and archival is governance, not an optional feature.
+- **DRF field errors are not the `detail`/`code` shape.** A blank/overlong `reason` returns
+  `{"reason": [...]}`, so the 400 is documented with its own serializer (the
+  `ProvisionSubdomainValidationErrorSerializer` precedent) rather than the typed error schema a
+  generated client would destructure and find empty.
+
 **Publishing a borrower's NAME is opt-in, and the guard must short-circuit (phase 2).**
 `inventory.public_stats_hardware.current_loans` served `holder_name` on the **unauthenticated**
 stats endpoint, resolving the free-text `requester_name`, then `requester_username`, then

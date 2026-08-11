@@ -180,6 +180,8 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/analytics/top-borrowers",
   "/api/v1/admin/makerspace/{makerspace_id}/api-clients",
   "/api/v1/admin/makerspace/{makerspace_id}/api-settings",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-requests",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-requests/{id}/withdraw",
   "/api/v1/admin/makerspace/{makerspace_id}/categories",
   "/api/v1/admin/makerspace/{makerspace_id}/containers",
   "/api/v1/admin/makerspace/{makerspace_id}/cover",
@@ -622,6 +624,15 @@ export type ArchivedPaymentSummary = {
   "makerspace": ArchivedPaymentMakerspace;
   "pending_count": number;
   "total_count": number;
+};
+
+export type ArchiveRequestError = {
+  "detail": string;
+  "code"?: string;
+};
+
+export type ArchiveRequestValidationError = {
+  "reason"?: Array<string>;
 };
 
 export type AssetChainGroup = {
@@ -2281,6 +2292,22 @@ export type Makerspace = {
   "created_at": string;
   "updated_at": string;
 };
+
+export type MakerspaceArchiveRequest = {
+  "id": number;
+  "makerspace": number;
+  "requested_by": number | null;
+  "requested_by_username": string | null;
+  "requested_at": string;
+  "resolved_by": number | null;
+  "resolved_by_username": string | null;
+  "resolved_at": string | null;
+  "reason": string;
+  "resolution_note": string;
+  "status": MakerspaceArchiveRequestStatusEnum;
+};
+
+export type MakerspaceArchiveRequestStatusEnum = "pending" | "approved" | "declined" | "withdrawn";
 
 export type MakerspacePaymentSettings = {
   "default_currency"?: string;

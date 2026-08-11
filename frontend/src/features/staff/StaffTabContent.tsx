@@ -212,6 +212,7 @@ export function StaffTabContent({
           key={makerspaceKey}
           makerspace={activeMakerspace}
           isSuperadmin={isSuperadmin}
+          canManageMakerspace={canManageMakerspace}
         />
       ) : null}
       {activeTab === "emailtemplates" ? (

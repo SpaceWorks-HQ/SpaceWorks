@@ -25,7 +25,11 @@ from apps.hardware_requests.self_checkout_models import PublicToolLoan
 from apps.integrations.models import EmailTemplate
 from apps.inventory.models import Category, InventoryAsset, InventoryProduct
 from apps.makerspaces import lifecycle
-from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from apps.makerspaces.models import (
+    Makerspace,
+    MakerspaceArchiveRequest,
+    MakerspaceMembership,
+)
 from apps.machines.models import Machine, MachineConsumable, MachineDocument, MachineType
 from apps.maintenance.models import MaintenanceLog, MaintenanceLogDocument
 from apps.operations.models import (
@@ -138,6 +142,11 @@ def test_purge_rejected_unless_archived_enabled_and_superuser(monkeypatch):
 
 
 def populate_full_purge_graph(makerspace, survivor, actor):
+    MakerspaceArchiveRequest.objects.create(
+        makerspace=makerspace,
+        requested_by=actor,
+        reason="Comprehensive purge fixture",
+    )
     requester = make_user(f"requester-{makerspace.slug}")
     survivor_user = make_user(f"requester-{survivor.slug}")
 
@@ -456,6 +465,7 @@ def populate_full_purge_graph(makerspace, survivor, actor):
 
 
 def assert_purged_makerspace_graph(space_id):
+    assert MakerspaceArchiveRequest.objects.filter(makerspace_id=space_id).count() == 0
     assert Box.objects.filter(makerspace_id=space_id).count() == 0
     assert QrCode.objects.filter(makerspace_id=space_id).count() == 0
     assert QrScanEvent.objects.filter(makerspace_id=space_id).count() == 0

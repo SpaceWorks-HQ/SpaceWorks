@@ -8,7 +8,11 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.audit.models import AuditLog
 from apps.makerspaces import lifecycle
-from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from apps.makerspaces.models import (
+    Makerspace,
+    MakerspaceArchiveRequest,
+    MakerspaceMembership,
+)
 from apps.payments.models import Payment
 
 pytestmark = pytest.mark.django_db
@@ -164,6 +168,11 @@ def test_archive_admin_action_requires_confirmation_before_archiving():
     actor = make_superadmin()
     makerspace = make_space("archive-impact-admin")
     empty_makerspace = make_space("archive-impact-admin-empty")
+    pending = MakerspaceArchiveRequest.objects.create(
+        makerspace=makerspace,
+        requested_by=actor,
+        reason="The lease has ended and the workshop is closing.",
+    )
     make_membership_payment(makerspace, actor, "admin-owned")
     client = Client()
     client.force_login(actor)
@@ -209,6 +218,8 @@ def test_archive_admin_action_requires_confirmation_before_archiving():
     assert f'name="{ACTION_CHECKBOX_NAME}" value="{empty_makerspace.pk}"' in content
     assert "archive-impact-admin" in content
     assert "archive-impact-admin-empty" in content
+    assert "pending archive request" in content.lower()
+    assert "The lease has ended and the workshop is closing." in content
 
     confirmed = client.post(url, {**action_data, "confirm_archive": "1"})
 
@@ -217,3 +228,5 @@ def test_archive_admin_action_requires_confirmation_before_archiving():
     assert confirmed.status_code == 302
     assert makerspace.archived_at is not None
     assert empty_makerspace.archived_at is not None
+    pending.refresh_from_db()
+    assert pending.status == MakerspaceArchiveRequest.Status.APPROVED

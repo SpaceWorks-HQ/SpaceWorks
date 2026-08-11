@@ -20,6 +20,7 @@ from apps.makerspaces.platform import available_modules
 from apps.separability.tombstones import unavailable_apps
 from apps.makerspaces.models import (
     Makerspace,
+    MakerspaceArchiveRequest,
     default_branding_config,
     normalize_frontend_domain,
 )
@@ -481,6 +482,25 @@ class MakerspaceSerializer(serializers.ModelSerializer):
                         {
                             "superadmin_access_enabled": (
                                 "Only the makerspace admin can re-enable superadmin access."
+                            )
+                        }
+                    )
+                if new_flag is False and (
+                    MakerspaceArchiveRequest.objects.select_for_update()
+                    .filter(
+                        makerspace=locked,
+                        status=MakerspaceArchiveRequest.Status.PENDING,
+                    )
+                    .exists()
+                ):
+                    # A hidden space disappears from the control-plane request queue and
+                    # cannot be archived there. Requiring withdrawal first prevents a
+                    # manager from filing for oversight and then making it unreviewable.
+                    raise serializers.ValidationError(
+                        {
+                            "superadmin_access_enabled": (
+                                "Withdraw the pending archive request before disabling "
+                                "superadmin access."
                             )
                         }
                     )

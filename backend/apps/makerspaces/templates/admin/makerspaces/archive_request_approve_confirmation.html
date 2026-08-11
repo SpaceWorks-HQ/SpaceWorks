@@ -1,0 +1,48 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="{{ action_name }}">
+  <input type="hidden" name="confirm_archive_requests" value="1">
+  {% for row in requests %}
+    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ row.object.pk }}">
+  {% endfor %}
+
+  <p>
+    Approving ARCHIVES each makerspace below. The requester loses access to it and is notified
+    by email. These unsettled-charge counts are ADVISORY and may change before the archive
+    runs; archiving does NOT block on unsettled charges.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Makerspace</th>
+        <th scope="col">Slug</th>
+        <th scope="col">Requested by</th>
+        <th scope="col">Owned pending</th>
+        <th scope="col">Routed pending</th>
+        <th scope="col">Total pending</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in requests %}
+        <tr>
+          <td>{{ row.object.makerspace.name }}</td>
+          <td><code>{{ row.object.makerspace.slug }}</code></td>
+          <td>{{ row.object.requested_by|default:"(removed)" }}</td>
+          <td>{{ row.owned_pending }}</td>
+          <td>{{ row.routed_pending }}</td>
+          <td>{{ row.total_pending }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="submit-row">
+    <input type="submit" value="Approve and archive" class="default">
+    <a href=".">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -35,6 +35,10 @@ from apps.admin_api.views_makerspaces import (
     MakerspaceLogoImageView,
     ReturnPolicyView,
 )
+from apps.admin_api.views_archive_requests import (
+    MakerspaceArchiveRequestListCreateView,
+    MakerspaceArchiveRequestWithdrawView,
+)
 from apps.admin_api.views_user_access import (
     ResetUserPasswordView,
     RestoreUserAccessView,
@@ -76,6 +80,8 @@ __all__ = [
     "NeedsFixActionView",
     "MakerspaceDetailView",
     "MakerspaceListCreateView",
+    "MakerspaceArchiveRequestListCreateView",
+    "MakerspaceArchiveRequestWithdrawView",
     "MakerspaceVerifyDomainView",
     "MakerspaceLogoImageView",
     "MembershipRevokeView",

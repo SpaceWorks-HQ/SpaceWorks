@@ -94,6 +94,7 @@ UNFOLD = {
                 "separator": True,
                 "items": [
                     _item("Makerspaces", "store", "admin:makerspaces_makerspace_changelist"),
+                    _item("Archive requests", "archive", "admin:makerspaces_makerspacearchiverequest_changelist"),
                     _item("Inventory", "inventory_2", "admin:inventory_inventoryproduct_changelist"),
                     _item("Categories", "category", "admin:inventory_category_changelist"),
                     _item("Asset units", "qr_code_2", "admin:inventory_inventoryasset_changelist"),

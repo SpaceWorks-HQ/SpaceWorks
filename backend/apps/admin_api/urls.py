@@ -448,6 +448,16 @@ urlpatterns = [
     path("makerspaces", views.MakerspaceListCreateView.as_view(), name="admin-makerspaces"),
     path("makerspaces/<int:pk>", views.MakerspaceDetailView.as_view(), name="admin-makerspace"),
     path(
+        "makerspace/<int:makerspace_id>/archive-requests",
+        views.MakerspaceArchiveRequestListCreateView.as_view(),
+        name="admin-makerspace-archive-requests",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/archive-requests/<int:pk>/withdraw",
+        views.MakerspaceArchiveRequestWithdrawView.as_view(),
+        name="admin-makerspace-archive-request-withdraw",
+    ),
+    path(
         "makerspace/<int:makerspace_id>/provision-subdomain",
         MakerspaceProvisionSubdomainView.as_view(),
         name="admin-makerspace-provision-subdomain",

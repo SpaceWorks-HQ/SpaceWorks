@@ -9494,6 +9494,233 @@
                 }
             }
         },
+        "/api/v1/admin/makerspace/{makerspace_id}/archive-requests": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_archive_requests_list",
+                "summary": "List archive requests for a makerspace",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin makerspaces"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/MakerspaceArchiveRequest"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArchiveRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArchiveRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspace_archive_requests_create",
+                "summary": "Request makerspace archival",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin makerspaces"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MakerspaceArchiveRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MakerspaceArchiveRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MakerspaceArchiveRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MakerspaceArchiveRequest"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArchiveRequestValidationError"
+                                }
+                            }
+                        },
+                        "description": "The reason was blank or too long."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArchiveRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArchiveRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArchiveRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/archive-requests/{id}/withdraw": {
+            "post": {
+                "operationId": "api_v1_admin_makerspace_archive_requests_withdraw_create",
+                "summary": "Withdraw a pending makerspace archive request",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin makerspaces"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MakerspaceArchiveRequest"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArchiveRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArchiveRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArchiveRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspace/{makerspace_id}/categories": {
             "get": {
                 "operationId": "api_v1_admin_makerspace_categories_list",
@@ -29337,6 +29564,32 @@
                 "type": "string",
                 "description": "* `instant` - Instant confirmation\n* `approve` - Staff approval required"
             },
+            "ArchiveRequestError": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "ArchiveRequestValidationError": {
+                "type": "object",
+                "description": "DRF field-keyed errors, which are NOT the `detail`/`code` shape.\n\nA blank or overlong reason fails in `serializer.is_valid(raise_exception=True)` and comes\nback as `{\"reason\": [\"...\"]}`. Declaring every 400 as `ArchiveRequestError` published a\ncontract the endpoint does not honour, so a generated client would destructure `detail`\nand find nothing. Follows the `ProvisionSubdomainValidationErrorSerializer` precedent.",
+                "properties": {
+                    "reason": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
             "ArchivedPaymentMakerspace": {
                 "type": "object",
                 "properties": {
@@ -36173,6 +36426,90 @@
                     "unavailable_apps",
                     "updated_at"
                 ]
+            },
+            "MakerspaceArchiveRequest": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "makerspace": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "requested_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "requested_by_username": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "requested_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "resolved_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "resolved_by_username": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "resolved_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Do not include personal data. Maximum 2,000 characters.",
+                        "maxLength": 2000
+                    },
+                    "resolution_note": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/MakerspaceArchiveRequestStatusEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "makerspace",
+                    "reason",
+                    "requested_at",
+                    "requested_by",
+                    "requested_by_username",
+                    "resolution_note",
+                    "resolved_at",
+                    "resolved_by",
+                    "resolved_by_username",
+                    "status"
+                ]
+            },
+            "MakerspaceArchiveRequestStatusEnum": {
+                "enum": [
+                    "pending",
+                    "approved",
+                    "declined",
+                    "withdrawn"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `approved` - Approved\n* `declined` - Declined\n* `withdrawn` - Withdrawn"
             },
             "MakerspacePaymentSettings": {
                 "type": "object",

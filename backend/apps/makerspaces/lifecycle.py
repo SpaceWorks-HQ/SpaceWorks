@@ -31,28 +31,34 @@ def archive_impact(makerspace):
 
 
 def archive(makerspace, actor):
-    with transaction.atomic():
-        locked = makerspace.__class__.objects.select_for_update().get(pk=makerspace.pk)
-        if not locked.superadmin_access_enabled:
-            raise ValidationError("Cannot archive a hidden makerspace.")
-        if locked.archived_at is not None:
-            raise ValidationError("Makerspace is already archived.")
+    from apps.makerspaces.archive_requests import direct_archive
 
-        # This is an advisory snapshot: payment creation does not universally take
-        # this lock, so a concurrent insert can change the count before commit.
-        impact = archive_impact(locked)
-        locked.archived_at = timezone.now()
-        locked.archived_by = actor
-        locked.public_inventory_enabled = False
-        locked.save(update_fields=["archived_at", "archived_by", "public_inventory_enabled"])
-        audit.record(
-            actor,
-            "makerspace.archived",
-            makerspace=locked,
-            target=locked,
-            meta=impact,
-        )
-        return locked
+    return direct_archive(makerspace, actor)
+
+
+def _archive_locked(makerspace, actor, *, archived_at):
+    if not makerspace.superadmin_access_enabled:
+        raise ValidationError("Cannot archive a hidden makerspace.")
+    if makerspace.archived_at is not None:
+        raise ValidationError("Makerspace is already archived.")
+
+    # This is an advisory snapshot: payment creation does not universally take
+    # this lock, so a concurrent insert can change the count before commit.
+    impact = archive_impact(makerspace)
+    makerspace.archived_at = archived_at
+    makerspace.archived_by = actor
+    makerspace.public_inventory_enabled = False
+    makerspace.save(
+        update_fields=["archived_at", "archived_by", "public_inventory_enabled"]
+    )
+    audit.record(
+        actor,
+        "makerspace.archived",
+        makerspace=makerspace,
+        target=makerspace,
+        meta=impact,
+    )
+    return makerspace
 
 
 def unarchive(makerspace, actor):

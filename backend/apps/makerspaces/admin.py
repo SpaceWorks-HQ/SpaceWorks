@@ -7,8 +7,9 @@ from unfold.admin import ModelAdmin, TabularInline
 from apps.makerspaces.admin_capabilities import MakerspaceAdminForm, MakerspaceCapabilityAdminMixin
 from apps.makerspaces.admin_images import MakerspaceImageAdminMixin
 from apps.makerspaces.admin_subdomains import SubdomainRequestAdmin
+from apps.makerspaces.admin_archive_requests import MakerspaceArchiveRequestAdmin
 from apps.makerspaces.models import (
-    Makerspace, MakerspaceMembership, MakerspaceWaiver, MemberProfile, MemberProject,
+    Makerspace, MakerspaceArchiveRequest, MakerspaceMembership, MakerspaceWaiver, MemberProfile, MemberProject,
     MembershipRequest,
 )
 from config.admin_access import SuperuserOnlyModelAdmin
@@ -158,11 +159,22 @@ class MakerspaceAdmin(MakerspaceImageAdminMixin, MakerspaceCapabilityAdminMixin,
 
         makerspaces = list(queryset)
         if "confirm_archive" not in request.POST:
+            pending_by_makerspace = {
+                archive_request.makerspace_id: archive_request
+                for archive_request in MakerspaceArchiveRequest.objects.filter(
+                    makerspace__in=makerspaces,
+                    status=MakerspaceArchiveRequest.Status.PENDING,
+                ).select_related("requested_by")
+            }
             context = {
                 **self.admin_site.each_context(request),
                 "title": "Archive selected makerspaces",
                 "makerspaces": [
-                    {"object": makerspace, **lifecycle.archive_impact(makerspace)}
+                    {
+                        "object": makerspace,
+                        "pending_archive_request": pending_by_makerspace.get(makerspace.pk),
+                        **lifecycle.archive_impact(makerspace),
+                    }
                     for makerspace in makerspaces
                 ],
                 "opts": self.model._meta,
