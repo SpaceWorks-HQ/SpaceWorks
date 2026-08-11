@@ -4,13 +4,10 @@ Per-app purge is NEW semantics and deliberately narrower than `lifecycle.purge()
 which deletes an entire archived makerspace. Here the makerspace survives; only one
 module's rows, its private object-storage keys and its blind-index entries go.
 
-Each plan declares four things the service needs and cannot infer:
+Each plan declares three things the service needs and cannot infer:
 
 * `delete` -- rows in dependency order, run inside the authorized purge context
   (immutability triggers bypassed for DELETE only).
-* `payment_subjects` -- which `Payment.SubjectType` rows this module owns. Payments
-  are immutable and generic-keyed, so they must be deleted *before* their subjects
-  or they become dangling references to a vanished row.
 * `pii_labels` -- registry model labels whose `PiiBlindIndex` rows must go too.
   Blind-index rows carry keyed HMACs of PII and have **no FK** to the source row, so
   nothing deletes them for us; leaving them behind is a genuine PII leak.
@@ -54,7 +51,12 @@ class ModulePurgePlan:
     key: str
     summary: str
     delete: Callable
-    payment_subjects: tuple[str, ...] = ()
+    # There is deliberately NO `payment_subjects`. A `Payment` is payments-module data, and
+    # its subject going away is not grounds to destroy the financial record -- the same
+    # reasoning that already retained membership dues. No module purge deletes a payment;
+    # the whole-makerspace `lifecycle.purge` still does, because `Payment.makerspace` is
+    # PROTECT and the rows cannot outlive their makerspace. Surviving payments keep a
+    # snapshotted `subject_label` so a receipt stays readable once its subject is gone.
     pii_labels: tuple[str, ...] = ()
     private_keys: Callable | None = None
     # `{object_key: size_bytes}` for private objects whose bytes were charged to the
@@ -88,13 +90,11 @@ NOT_SEPARABLE = {
 PLANS = (
     ModulePurgePlan(
         "events", "Events and their registrations.", events_delete,
-        payment_subjects=("event_registration",),
         pii_labels=("events.EventRegistration",),
         public_image_keys=events_public_images,
     ),
     ModulePurgePlan(
         "bookings", "Bookable spaces and their bookings.", bookings_delete,
-        payment_subjects=("booking",),
         pii_labels=("bookings.Booking",),
         public_image_keys=bookings_public_images,
     ),
@@ -110,9 +110,8 @@ PLANS = (
     ModulePurgePlan(
         "notifications", "In-app notification rows.", notifications_delete,
     ),
-    # Membership dues Payments are deliberately NOT listed: their subject is
-    # `MakerspaceMembership`, which survives this purge, so deleting them would
-    # destroy financial history whose subject still exists.
+    # No plan lists payments any more -- see ModulePurgePlan above. Membership dues were
+    # always the exception; they are now simply the rule.
     ModulePurgePlan(
         "membership",
         "Join requests, waivers, waiver acceptances and member profiles with their "
@@ -125,7 +124,6 @@ PLANS = (
         "Service requests, queues, uploads, consumption ledgers and the usage entries "
         "they produced. Consumable pools stay (they belong to `machines`).",
         machine_service_delete,
-        payment_subjects=("machine_service_request",),
         pii_labels=("machines.MachineServiceRequest",),
         private_keys=machine_service_private_keys,
         private_key_sizes=machine_service_private_key_sizes,

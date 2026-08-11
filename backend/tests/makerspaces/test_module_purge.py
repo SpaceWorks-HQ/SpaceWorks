@@ -92,17 +92,18 @@ def test_unknown_module_is_rejected():
 # --- what actually gets deleted ----------------------------------------------
 
 
-def test_purging_events_removes_events_registrations_and_their_payments():
+def test_purging_events_removes_events_and_registrations_but_keeps_the_payment():
     makerspace = space("purge-events", "events")
     actor = superadmin("events-admin")
     event = an_event(makerspace)
     registration = EventRegistration.objects.create(
         event=event, name="Ada", email="ada@example.test", phone="+10000000000"
     )
-    Payment.objects.create(
+    payment = Payment.objects.create(
         makerspace=makerspace, subject_type=Payment.SubjectType.EVENT_REGISTRATION,
         subject_id=registration.pk, amount=10, currency="usd",
         status=Payment.Status.PENDING, created_by=actor,
+        subject_label="Open Night",
     )
     uninstall_module(makerspace, "events")
 
@@ -110,10 +111,15 @@ def test_purging_events_removes_events_registrations_and_their_payments():
 
     assert not Event.objects.filter(makerspace=makerspace).exists()
     assert not EventRegistration.objects.filter(event__makerspace=makerspace).exists()
-    # Payments are immutable and reference their subject generically -- nothing else
-    # would have removed them, so they would have survived as dangling rows.
-    assert not Payment.objects.filter(makerspace=makerspace).exists()
-    assert counts["payments"] == 1
+    # REVERSED DELIBERATELY. This used to assert the payment was destroyed with its
+    # subject, on the reasoning that it would otherwise dangle. Switching a module off and
+    # purging its rows is not a reason to destroy the record of money that really changed
+    # hands: a receipt must stay visible and a pending charge must stay payable. The
+    # dangling reference is handled instead -- `subject_label` is snapshotted at creation
+    # and `Payment.clean()` tolerates a missing subject on an otherwise-unchanged row.
+    payment.refresh_from_db()
+    assert payment.status == Payment.Status.PENDING, "status must not be reset"
+    assert "payments" not in counts, "no plan reports a payment delete any more"
 
 
 def test_purging_one_module_leaves_another_modules_payments_intact():

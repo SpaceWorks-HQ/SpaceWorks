@@ -94,7 +94,21 @@ class MachineServiceRequestSerializer(serializers.ModelSerializer):
         ).first()
         return StaffPaymentSerializer(
             payment,
-            context={"payment_subject_labels": {obj.pk: obj.title}},
+            # Keyed `(subject_type, subject_id)` and valued `(label, makerspace_id,
+            # member_id)` to match what `resolve_subject_labels` returns. A bare `obj.pk`
+            # key never matched, so this surface had always silently fallen back to the
+            # generic display -- and now that machine-service deliberately snapshots no
+            # `subject_label` (the title is member-typed free text), this is the only place
+            # left that names the job. Staff already read the title on this same row.
+            context={
+                "payment_subject_labels": {
+                    (Payment.SubjectType.MACHINE_SERVICE_REQUEST, obj.pk): (
+                        obj.title,
+                        obj.makerspace_id,
+                        None,
+                    )
+                }
+            },
         ).data if payment else None
 
 

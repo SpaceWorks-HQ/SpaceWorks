@@ -109,16 +109,13 @@ def _resolve(makerspace, key, actor):
 
 def _purge(makerspace, plan, cursor):
     counts = {}
-    # Payments are immutable and reference their subject generically, so they must go
-    # before the rows they point at or they survive as dangling references.
-    if plan.payment_subjects:
-        from apps.payments.models import Payment
-
-        deleted = Payment.objects.filter(
-            makerspace=makerspace, subject_type__in=plan.payment_subjects
-        ).delete()[0]
-        if deleted:
-            counts["payments"] = deleted
+    # Payments are deliberately NOT deleted here, by any plan. Switching a module off and
+    # then purging its rows is not a reason to destroy the financial record of money that
+    # really changed hands -- a receipt must stay visible and a pending charge payable. They
+    # do become generic-keyed references to a vanished subject, which is why `Payment`
+    # snapshots `subject_label` at creation and `clean()` tolerates a missing subject on an
+    # otherwise-unchanged row. The whole-makerspace `lifecycle.purge` still deletes them:
+    # `Payment.makerspace` is PROTECT, so they cannot outlive their makerspace.
     # Blind-index rows have no FK to their source row, so nothing else deletes them.
     # They hold keyed HMACs of PII: leaving them behind is a real leak, not untidiness.
     if plan.pii_labels:

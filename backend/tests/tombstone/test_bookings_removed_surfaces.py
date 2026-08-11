@@ -138,7 +138,7 @@ def test_a_historic_booking_payment_is_still_nameable():
     reconciliation still has to say what it was for.
     """
     from apps.payments.models import Payment
-    from apps.payments.subjects import resolve_subject_labels
+    from apps.payments.subjects import resolve_subject_labels, subject_label
     from tests.return_helpers import make_user
 
     space, booking = _seed("retained-bookings-payment")
@@ -151,9 +151,13 @@ def test_a_historic_booking_payment_is_still_nameable():
         created_by=make_user("bookings-tombstone-cashier"),
     )
 
+    # Asserted through `subject_label`, not the raw map. The map is an internal cache whose
+    # entries now carry the owning makerspace/member ids so a live lookup cannot hand one
+    # tenant's title to another; what this test is named for is whether the charge can still
+    # be NAMED, which is exactly the question that helper answers.
     labels = resolve_subject_labels([payment])
 
-    assert labels[(Payment.SubjectType.BOOKING, booking.pk)] == space.name
+    assert subject_label(payment, labels) == space.name
 
 
 def test_the_booking_model_is_still_a_scoped_pii_model():

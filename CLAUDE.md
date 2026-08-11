@@ -633,10 +633,49 @@ immutability triggers transaction-scoped the same two ways the makerspace purge 
 `MANAGED_POSTGRES`), with object-storage keys collected **before** the delete and removed **after** the
 commit, best-effort. `module_purge_plans.py` is the per-module declaration; a module absent from it either
 owns no data or is listed in `NOT_SEPARABLE` with the reason (core modules, and `machines`, whose rows
-host warranty, consumables and service history). Two deletions nothing else performs and that a plan must
-declare: **`Payment` rows** (immutable and generic-keyed, so they must go **before** their subject or
-survive as dangling references — and only the subject types this module owns, since a whole-tenant delete
-would destroy another installed module's charges), and **`PiiBlindIndex` rows** (keyed HMACs of PII with
+host warranty, consumables and service history). **NO MODULE PURGE DELETES A `Payment` — reversed
+deliberately on 2026-08-11, and `payment_subjects` is gone from `ModulePurgePlan` entirely.** Switching a
+module off and purging its rows is not grounds to destroy the record of money that really changed hands: a
+receipt must stay visible and a pending charge payable, which is the same reasoning that always retained
+membership dues. A `Payment` is **payments**-module data; its subject vanishing is not its business. Three
+things this required, and the first two are what made it safe rather than reckless:
+- **`Payment.clean()` had to learn to tolerate a missing subject**, because `save()` calls `full_clean()`
+  unconditionally. Without it, every WRITE path broke once the subject went: hosted checkout created the
+  provider session then failed persisting its URL, mobile intent 503'd, offline reconcile/waive raised an
+  untranslated `ValidationError`, and **webhook settlement 500'd and rolled back its idempotency row**, so
+  a charge that really settled at Stripe could never be recorded. `_subject_identity_unchanged()` gates it
+  and is deliberately narrow — a **saved** row still naming the same makerspace, subject and member.
+  Skipping merely because `pk` exists would let an existing payment be repointed at a foreign subject, and
+  a **new** payment still requires a real same-tenant subject.
+- **`Payment.subject_label` is snapshotted at creation** and read **FIRST**, before any live lookup
+  (`payments/subjects.py`). Snapshot-first is not an optimisation: event titles and space names stay
+  editable after a charge exists, so live-first silently rewrites what a paid receipt appears to have been
+  for. The live fallback exists only for legacy blanks and now carries the owning makerspace/member ids,
+  because it was keyed on **global subject pk with no ownership check at all**. It must never return an
+  empty string — Stripe rejects a blank `product_data.name`, and this value feeds the checkout line item.
+  The column is financial metadata and **must never carry PII**: titles and space names, never a person's
+  name, contact details or custom-form answers.
+- **KEEPING A CHARGE PAYABLE MEANS KEEPING IT SETTLEABLE, and machine scoping broke the second
+  half.** `reconciliation._require_machine_scope` compared the *scoped* service-request ids against
+  every machine-service `subject_id`, so once the request was purged the sets could never be equal
+  and **both mark-offline and waive 403'd for every actor** — the pending charge was stranded
+  forever: unwaivable, and unrecordable if the member paid cash at the desk. Preserving a payment to
+  keep it payable while making it impossible to settle is the same failure wearing the opposite mask.
+  The comparison is now against the ids that still **exist**, and the orphans are gated separately.
+  Failing **open** to every `MANAGE_MACHINES` holder was rejected: machine scoping is documented as
+  failing closed and that would silently widen a role narrowed to one team. An orphan names no
+  machine, type or team, so there is nothing left for scoping to answer — it is actionable only by
+  the actors that mechanism **already exempts** (space manager, superadmin, null-`assigned_role`
+  legacy fallback), all of whom are unscoped everywhere else. **Only machine-service was affected**:
+  the booking/event/membership arm scopes `Payment` rows by makerspace and never dereferences the
+  subject, which is why the bug hid — three of the four subject types were fine.
+- **`lifecycle.purge` (whole makerspace) still deletes every payment** and is untouched, because
+  `Payment.makerspace` is `PROTECT` — the rows cannot outlive their makerspace. Preservation is a
+  module-purge property only. **Known gap, unfixed:** archiving a makerspace 403s its own members out of
+  payment history and checkout (`active_membership` filters `archived_at`), even though
+  `member_payment_queryset` deliberately does not filter archival — the view gate defeats the query's
+  intent, so a pending charge is unpayable until someone unarchives.
+Still declared per plan: **`PiiBlindIndex` rows** (keyed HMACs of PII with
 **no FK** to the source row, so nothing cascades them — leaving them is a real leak). Encrypted envelopes
 live on the source row itself, so they go with it. **A per-module purge must respect the modules that are
 still installed**, which is why `_machine_service_delete` is not `service_lifecycle.delete_for_makerspace`:

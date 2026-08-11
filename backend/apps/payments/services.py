@@ -3,6 +3,7 @@
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 from django.db import transaction
+from apps.audit import services as audit
 from apps.makerspaces.platform import member_area_url
 from apps.payments import stripe_client
 from apps.payments.connect import refresh_connected_account, restrict_account_status
@@ -33,7 +34,7 @@ class PaymentRailConflict(Exception):
 
 def create_payment(
     *, makerspace, subject_type, subject_id, member, amount, currency, created_by,
-    via_makerspace=None,
+    via_makerspace=None, subject_label="",
 ):
     source = resolve_payment_source(makerspace)
     if source is None:
@@ -43,12 +44,13 @@ def create_payment(
     provider = source.provider
     connected_account_id = source.connected_account_id
     fee_amount = _application_fee_amount(amount, source.application_fee_bps)
-    return Payment.objects.create(
+    payment = Payment.objects.create(
         makerspace=makerspace,
         subject_type=subject_type,
         subject_id=subject_id,
         member=member,
         via_makerspace=via_makerspace,
+        subject_label=(subject_label or "")[:255],
         amount=amount,
         currency=currency.lower(),
         created_by=created_by,
@@ -61,6 +63,23 @@ def create_payment(
         stripe_connected_account_id=connected_account_id,
         stripe_application_fee_amount=fee_amount,
     )
+    # Raising a charge is when a member incurs a debt; the log previously recorded
+    # only its settlement.
+    audit.record(
+        created_by,
+        "payment.created",
+        makerspace=makerspace,
+        target=payment,
+        meta={
+            "payment_id": payment.pk,
+            "subject_type": subject_type,
+            "subject_id": subject_id,
+            "amount": str(amount),
+            "currency": payment.currency,
+            "via_makerspace_id": via_makerspace.pk if via_makerspace else None,
+        },
+    )
+    return payment
 
 
 def create_checkout(payment):

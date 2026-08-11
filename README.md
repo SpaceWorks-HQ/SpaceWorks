@@ -153,6 +153,11 @@ docker compose exec backend python manage.py purge_module_data bookings --makers
 - **The module must already be uninstalled.** Purging an installed module is refused.
 - **Superadmin only**, and it asks you to type the makerspace slug back before proceeding.
 - **It cannot be undone.** Uninstall is reversible; this is not.
+- **Payment records are kept.** Switching a module off and deleting its rows is not a reason to
+  destroy the record of money that really changed hands, so receipts stay visible and a pending
+  charge stays payable and can still be marked paid or waived. Each charge keeps the description it
+  was raised under, so it still reads sensibly once the booking or event behind it is gone. Deleting
+  a whole makerspace is the exception — there, its payments go with it.
 - Uploaded files are removed after the database work commits, and your storage quota is credited
   back only for objects the bucket confirmed it deleted — a failed delete credits nothing, so the
   counter can never drift below what you are actually storing.

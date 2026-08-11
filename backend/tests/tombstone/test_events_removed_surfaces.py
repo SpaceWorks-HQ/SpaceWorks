@@ -140,7 +140,7 @@ def test_a_historic_event_registration_payment_is_still_nameable():
     from django.utils import timezone
 
     from apps.payments.models import Payment
-    from apps.payments.subjects import resolve_subject_labels
+    from apps.payments.subjects import resolve_subject_labels, subject_label
     from tests.return_helpers import make_space, make_user
 
     space = make_space("retained-events-payment")
@@ -162,9 +162,12 @@ def test_a_historic_event_registration_payment_is_still_nameable():
         created_by=make_user("events-tombstone-cashier"),
     )
 
+    # Asserted through `subject_label`, not the raw map -- see the twin in
+    # `test_bookings_removed_surfaces.py`. The map entry now carries the owning
+    # makerspace/member ids so a live lookup cannot hand one tenant's title to another.
     labels = resolve_subject_labels([payment])
 
-    assert labels[(Payment.SubjectType.EVENT_REGISTRATION, registration.pk)] == "Laser cutter induction"
+    assert subject_label(payment, labels) == "Laser cutter induction"
 
 
 def test_the_registration_model_is_still_a_scoped_pii_model():

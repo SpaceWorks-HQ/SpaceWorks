@@ -35,7 +35,21 @@ def create_for_completed_request(service_request, actor):
             if amount <= 0:
                 return None
             currency = MakerspacePaymentSettings.for_makerspace(service_request.makerspace).default_currency
-            payment = create_payment(makerspace=service_request.makerspace, subject_type=Payment.SubjectType.MACHINE_SERVICE_REQUEST, subject_id=service_request.pk, member=service_request.member or service_request.requester, amount=amount, currency=currency, created_by=actor)
+            payment = create_payment(
+                makerspace=service_request.makerspace,
+                subject_type=Payment.SubjectType.MACHINE_SERVICE_REQUEST,
+                subject_id=service_request.pk,
+                member=service_request.member or service_request.requester,
+                amount=amount,
+                currency=currency,
+                created_by=actor,
+                # NO subject_label. `title` is free text a public member types, so it can
+                # contain their name, email or phone -- and a snapshot outlives the
+                # `machine_service` purge that exists to destroy exactly that. Leaving it
+                # blank keeps the live lookup (which still shows the title while the request
+                # exists) and degrades to the generic display once the request is gone.
+                # The other three subjects snapshot staff-authored or literal text instead.
+            )
     except Exception:
         return None
     try:

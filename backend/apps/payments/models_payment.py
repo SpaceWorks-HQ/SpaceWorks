@@ -51,6 +51,11 @@ class Payment(models.Model):
         "makerspaces.Makerspace", null=True, blank=True,
         on_delete=models.SET_NULL, related_name="payments_via",
     )
+    # Snapshotted at creation so a receipt stays readable after its subject row is purged.
+    # Same idiom as `destination_label` on notification delivery logs. Financial metadata,
+    # so it must never carry PII -- callers pass an event title, a space name or a service
+    # title, never a person's name, contact details or custom-form answers.
+    subject_label = models.CharField(max_length=255, blank=True, default="")
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, validators=[currency_validator])
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
@@ -107,36 +112,64 @@ class Payment(models.Model):
         ]
         ordering = ["-created_at"]
 
+    def _subject_identity_unchanged(self):
+        """True when this is a saved row still pointing at the same subject and member.
+
+        A missing subject is legitimate for a payment whose subject was purged, but only if
+        nothing about who owes what has been edited. Skipping validation merely because `pk`
+        exists would be too broad -- it would let an existing row be repointed at a foreign
+        subject. New rows always validate.
+        """
+        if self._state.adding or not self.pk:
+            return False
+        return (
+            type(self)
+            .objects.filter(
+                pk=self.pk,
+                makerspace_id=self.makerspace_id,
+                subject_type=self.subject_type,
+                subject_id=self.subject_id,
+                member_id=self.member_id,
+            )
+            .exists()
+        )
+
     def clean(self):
         self.currency = (self.currency or "").lower()
         currency_validator(self.currency)
+        subject_identity_unchanged = self._subject_identity_unchanged()
         if self.subject_type == self.SubjectType.MACHINE_SERVICE_REQUEST and self.subject_id:
             from apps.machines.models import MachineServiceRequest
 
-            if not MachineServiceRequest.objects.filter(pk=self.subject_id, makerspace_id=self.makerspace_id).exists():
+            if not subject_identity_unchanged and not MachineServiceRequest.objects.filter(
+                pk=self.subject_id,
+                makerspace_id=self.makerspace_id,
+            ).exists():
                 raise ValidationError({"subject_id": "Payment subject must belong to the payment makerspace."})
         if self.subject_type == self.SubjectType.BOOKING and self.subject_id:
             from apps.bookings.models import Booking
 
-            booking_exists = Booking.objects.filter(
-                pk=self.subject_id,
-                space__makerspace_id=self.makerspace_id,
-            ).exists()
-            if not booking_exists:
-                raise ValidationError(
-                    {"subject_id": "Payment subject must belong to the payment makerspace."}
-                )
+            if not subject_identity_unchanged:
+                booking_exists = Booking.objects.filter(
+                    pk=self.subject_id,
+                    space__makerspace_id=self.makerspace_id,
+                ).exists()
+                if not booking_exists:
+                    raise ValidationError(
+                        {"subject_id": "Payment subject must belong to the payment makerspace."}
+                    )
         if self.subject_type == self.SubjectType.EVENT_REGISTRATION and self.subject_id:
             from apps.events.models import EventRegistration
 
-            registration_exists = EventRegistration.objects.filter(
-                pk=self.subject_id,
-                event__makerspace_id=self.makerspace_id,
-            ).exists()
-            if not registration_exists:
-                raise ValidationError(
-                    {"subject_id": "Payment subject must belong to the payment makerspace."}
-                )
+            if not subject_identity_unchanged:
+                registration_exists = EventRegistration.objects.filter(
+                    pk=self.subject_id,
+                    event__makerspace_id=self.makerspace_id,
+                ).exists()
+                if not registration_exists:
+                    raise ValidationError(
+                        {"subject_id": "Payment subject must belong to the payment makerspace."}
+                    )
         if self.subject_type == self.SubjectType.MAKERSPACE_MEMBERSHIP and self.subject_id:
             from apps.makerspaces.models import MakerspaceMembership
 
@@ -144,11 +177,11 @@ class Payment(models.Model):
                 pk=self.subject_id,
                 makerspace_id=self.makerspace_id,
             ).only("user_id").first()
-            if membership is None:
+            if membership is None and not subject_identity_unchanged:
                 raise ValidationError(
                     {"subject_id": "Payment subject must belong to the payment makerspace."}
                 )
-            if self.member_id != membership.user_id:
+            if membership is not None and self.member_id != membership.user_id:
                 raise ValidationError(
                     {"member": "Payment member must be the membership user."}
                 )

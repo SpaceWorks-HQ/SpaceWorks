@@ -222,8 +222,8 @@ def machine_service_delete(makerspace, cursor):
     # differ in more than scope: there the whole makerspace goes, so it can delete every
     # Payment, every usage entry and every consumable pool. Here `machines` is still
     # installed, so this must delete only what `machine_service` owns:
-    #   * Payments of THIS module's subject type (handled by the caller) -- deleting all
-    #     of them would destroy booking and event-registration charges.
+    #   * Payments are not deleted at all any more, by this or any other plan -- see
+    #     `module_purge._purge`. Service-request charges outlive their request.
     #   * Consumable POOLS stay. They are gated by `require_module(..., "machines")`
     #     (`views_machine_consumables.py`), are created from procurement, and surviving
     #     manual usage entries PROTECT-reference them.
