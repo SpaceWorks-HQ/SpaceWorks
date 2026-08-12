@@ -87,6 +87,12 @@ FEATURE_DEFINITIONS = (
         "Let machine-scoped maintainers manage maintenance alert recipients for "
         "their own machines.",
         default_enabled=False,
+        # It delegates MAINTENANCE alerts, narrowed by MACHINE scope, so it cannot function
+        # without either module. Declaring only `notifications` let capability validation
+        # accept an unusable combination, and -- worse -- uninstalling `maintenance` or
+        # `machines` did not prune the enabled feature, so reinstalling silently
+        # reactivated delegated access without anybody opting in again.
+        requires_modules=("maintenance", "machines"),
     ),
 )
 FEATURES = {definition.key: definition for definition in FEATURE_DEFINITIONS}

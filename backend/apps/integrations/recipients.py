@@ -122,16 +122,32 @@ def has_selection(makerspace, feature, event, scope=None) -> bool:
         return False
 
 
-def requester_selected(makerspace, feature, event) -> bool:
+def requester_selected(makerspace, feature, event, scope=None) -> bool:
     """Whether the subject of the notification was ticked.
 
     Only meaningful once a selection exists; with no selection the caller's existing
     requester behaviour stands unchanged.
+
+    Scoped exactly like :func:`has_selection`: a requester row narrowed to the lasers says
+    nothing about a printer alert, and reading its bare existence as "ticked" made a
+    delegated laser rule speak for every other team's subjects. Rows that do not cover the
+    subject are ignored rather than answered, so an uncovered alert falls back to the
+    caller's own requester behaviour instead of inheriting someone else's narrowing.
     """
-    rows = selection_rows(makerspace, feature, event)
-    if not rows:
+    try:
+        return any(
+            row.kind == NotificationRecipientKind.REQUESTER and _rule_covers(row, scope)
+            for row in selection_rows(makerspace, feature, event)
+        )
+    except Exception:
+        # Fails OPEN to the caller's existing behaviour, matching every other capability
+        # lookup here: a broken coverage check must never silently mute an alert.
+        logger.warning(
+            "notification_requester_coverage_check_failed",
+            extra={"makerspace_id": getattr(makerspace, "pk", None), "feature": feature},
+            exc_info=True,
+        )
         return False
-    return any(row.kind == NotificationRecipientKind.REQUESTER for row in rows)
 
 
 def _eligible_memberships(makerspace):

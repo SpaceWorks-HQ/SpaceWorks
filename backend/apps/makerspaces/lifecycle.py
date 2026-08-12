@@ -112,6 +112,7 @@ def _audit_meta(makerspace):
 
 
 def _collect_storage_keys(makerspace):
+    from apps.admin_api.models import BulkImportJob
     from apps.evidence.models import EvidencePhoto
     from apps.maintenance.models import MaintenanceLogDocument
     from apps.machines.models import MachineDocument
@@ -133,6 +134,16 @@ def _collect_storage_keys(makerspace):
     ):
         for key in model.objects.filter(**lookup).values_list("object_key", flat=True):
             add(key)
+    # `BulkImportJob.upload` is a FileField on the default storage, which is S3 -- so its
+    # name IS a key in the same private bucket as the rows above. The job rows themselves go
+    # with the makerspace through CASCADE, and nothing else names the file, so without this
+    # the uploads outlive every record that could identify them. No current path writes one
+    # (`views_bulk.py` parses the file and stores `rows` instead), so this is legacy data
+    # only -- which is exactly why it had no collector and would never have grown one.
+    for name in BulkImportJob.objects.filter(makerspace=makerspace).values_list(
+        "upload", flat=True
+    ):
+        add(name)
     collect_private_object_keys(makerspace, add)
     return keys
 

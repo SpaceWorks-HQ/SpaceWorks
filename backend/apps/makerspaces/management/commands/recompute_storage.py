@@ -9,6 +9,8 @@ from apps.inventory import public_image_storage
 from apps.inventory.models import InventoryProduct
 from apps.machines import storage as machine_storage
 from apps.machines.models import Machine, MachineDocument, ServiceRequestFile
+from apps.maintenance import storage as maintenance_storage
+from apps.maintenance.models import MaintenanceLogDocument
 from apps.makerspaces.models import Makerspace, MemberProfile, MemberProject
 from apps.procurement import storage as procurement_storage
 from apps.procurement.models import ToBuyReceipt
@@ -47,6 +49,13 @@ class Command(BaseCommand):
                     "machine_documents": self._sum(((key, None) for key in MachineDocument.objects.filter(machine__makerspace=makerspace).values_list("object_key", flat=True)), machine_storage.object_size),
                     "warranty_documents": self._sum(((key, None) for key in WarrantyDocument.objects.filter(warranty__makerspace=makerspace).values_list("object_key", flat=True)), warranty_storage.object_size),
                     "procurement_receipts": self._sum(((key, None) for key in ToBuyReceipt.objects.filter(to_buy_item__makerspace=makerspace).values_list("object_key", flat=True)), procurement_storage.object_size),
+                    # Charged on upload by `maintenance/services_documents.py` and collected by
+                    # both the makerspace purge and the `maintenance` module purge plan, but
+                    # absent here -- so this command, which is the AUTHORITATIVE reconciler,
+                    # wrote a total omitting every maintenance document and silently lowered a
+                    # space's recorded usage. Reached through the log's machine; the rows carry
+                    # `size_bytes`, so a HEAD that cannot see the object falls back to it.
+                    "maintenance_documents": self._sum(MaintenanceLogDocument.objects.filter(log__machine__makerspace=makerspace).values_list("object_key", "size_bytes"), maintenance_storage.object_size, True),
                 }
             except StorageReadError as exc:
                 self.stdout.write(self.style.WARNING(f"{makerspace.slug}: usage left unchanged due to storage read error for {exc}."))

@@ -1,5 +1,7 @@
 """Staff CRUD for per-event notification recipient selection."""
 
+from types import SimpleNamespace
+
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -10,7 +12,10 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
-from apps.admin_api.recipient_rule_access import payload as rules_payload
+from apps.admin_api.recipient_rule_access import (
+    _manageable_identity,
+    payload as rules_payload,
+)
 from apps.admin_api.recipient_rule_common import (
     RuleValidationError,
     reach_for,
@@ -88,14 +93,47 @@ class NotificationRecipientRulesView(APIView):
         if event not in notification_catalog.FEATURE_EVENTS.get(feature, ()):
             return self._error(f"Unknown event '{event}' for feature '{feature}'.")
 
-        try:
-            prepared = prepare_rules(
+        # A mutable holder so `keep_row` below sees the reach `revalidate` resolved under
+        # the lock, not the one captured at closure-creation time.
+        keep = SimpleNamespace(
+            reach=reach,
+            # The SAME identity gate the read uses. Without it the write partition is
+            # scope-only, so a space manager's laser-scoped rule naming another role would
+            # be hidden from the delegate by `payload` and still DELETED by their save --
+            # the read/write disagreement, one level worse for being invisible.
+            manageable=_manageable_identity(makerspace, request.user) if delegated else None,
+        )
+
+        def resolve(current_reach):
+            return prepare_rules(
                 makerspace,
                 serializer.validated_data["rules"],
                 delegated=delegated,
-                reach=reach,
+                reach=current_reach,
                 actor=request.user,
             )
+
+        def revalidate():
+            """Re-resolve the delegate's authority under the makerspace lock.
+
+            `_access` and `prepare_rules` both ran before the lock, so a space manager
+            could have narrowed this role's machine scope in between; without this the
+            request would write using reach the actor no longer holds.
+            """
+            if not delegated:
+                return resolve(reach)
+            _, still_delegated, fresh_reach = _access(request, makerspace_id)
+            if not still_delegated or fresh_reach is None:
+                raise PermissionDenied(
+                    "Your recipient-management access changed while saving."
+                )
+            keep.reach = fresh_reach
+            return resolve(fresh_reach)
+
+        try:
+            # Validated once up front so a bad payload is a 400 before any lock is taken,
+            # then again under the lock by `revalidate`.
+            prepared = resolve(reach)
             # A predicate, not a precomputed id list: the service resolves the partition
             # under the makerspace lock, so a concurrent PUT cannot leave this one
             # deleting a set that no longer describes the table. A Space Manager owns
@@ -106,11 +144,19 @@ class NotificationRecipientRulesView(APIView):
                 event=event,
                 rules=prepared,
                 keep_row=(
-                    (lambda row: not row_fully_reachable(row, reach))
+                    # Reads `keep.reach`, which `revalidate` refreshes under the lock, so
+                    # the preserved partition is decided by current authority rather than
+                    # by what the view saw before waiting.
+                    (
+                        lambda row: not row_fully_reachable(
+                            row, keep.reach, manageable_identity=keep.manageable
+                        )
+                    )
                     if delegated
                     else (lambda row: False)
                 ),
                 actor=request.user,
+                revalidate=revalidate,
             )
         except RuleValidationError as exc:
             body = {"detail": exc.detail}

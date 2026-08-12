@@ -50,19 +50,29 @@ def rows_for(makerspace, *, feature=None, event=None):
     )
 
 
-def row_fully_reachable(row, reach):
+def row_fully_reachable(row, reach, *, manageable_identity=None):
     """Whether the actor's reach covers EVERY target this row names.
 
     A row with **no** scope links returns False: it is a space-wide policy, which a
     delegated actor must never be able to delete or overwrite. Any category link also
     returns False, because `manage_scope_for` grants no category reach and there is
     therefore nothing to check it against -- fail closed.
+
+    **Scope reach is not sufficient on its own.** A Space Manager may legitimately write a
+    laser-scoped rule naming a role or member the delegate cannot manage; returning it as
+    editable made the read disagree with the write, because `prepare_rules` accepts only
+    the delegate's own role and its holders. The delegate then could not round-trip their
+    own PUT without deleting the manager's policy. `manageable_identity` closes that: a row
+    is editable only when its scope is reachable AND its identity is one this actor may
+    write, so anything else is preserved as an identity-free marker instead.
     """
     types = [link.machine_type for link in row.machine_type_scopes.all()]
     type_ids = {machine_type.pk for machine_type in types}
     machines = [link.machine for link in row.machine_scopes.all()]
     category_ids = {link.category_id for link in row.category_scopes.all()}
     if not (type_ids or machines or category_ids):
+        return False
+    if manageable_identity is not None and not manageable_identity(row):
         return False
     return (
         not category_ids

@@ -63,7 +63,12 @@ class MachineListCreateView(APIView):
                     Sum('usage_entries__hours'),
                     Decimal('0'),
                 )
-            ),
+            )
+            # `Machine` declares no `Meta.ordering`, so this paginated list had no ORDER BY
+            # at all: Postgres may return rows in any order per page, which lets a row
+            # repeat on one page and vanish from another. `pk` is the tiebreaker -- ordering
+            # by name alone is still unstable wherever two machines share one.
+            .order_by('machine_type__name', 'name', 'pk'),
         )
         paginator = _MachinePagination()
         page = paginator.paginate_queryset(queryset, request, view=self)

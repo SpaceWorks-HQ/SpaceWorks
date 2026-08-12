@@ -7,7 +7,9 @@ from apps.integrations.models_recipients import NotificationRecipient
 
 
 @transaction.atomic
-def replace_recipient_rules(*, makerspace, feature, event, rules, keep_row, actor):
+def replace_recipient_rules(
+    *, makerspace, feature, event, rules, keep_row, actor, revalidate=None
+):
     """Replace exactly the caller-owned partition and preserve every other row.
 
     The partition is resolved **inside** this transaction, under the makerspace row lock,
@@ -26,6 +28,15 @@ def replace_recipient_rules(*, makerspace, feature, event, rules, keep_row, acto
     from apps.makerspaces.models import Makerspace
 
     Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+
+    # Authorization, the delegate's reach and the resolved scope targets were all computed
+    # in the view, BEFORE this lock. A space manager narrowing that role's machine scope
+    # can commit while this PUT waits here, and the request would then delete and insert
+    # using reach the actor no longer has. `revalidate` re-resolves it under the lock and
+    # raises; the same reason `require_module_locked` re-checks a module here rather than
+    # trusting the view's read.
+    if revalidate is not None:
+        rules = revalidate()
 
     existing = NotificationRecipient.objects.filter(
         makerspace=makerspace, feature=feature, event=event

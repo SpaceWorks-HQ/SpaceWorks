@@ -112,6 +112,18 @@ def prepare_rules(makerspace, rules, *, delegated, reach, actor=None):
                 raise RuleValidationError(
                     "Requester and all-member rows carry no role or user."
                 )
+            # KNOWN LIMIT, deliberately not closed here.
+            # `uniq_notification_recipient_special` is (makerspace, feature, event, kind),
+            # so only ONE requester/members row can exist per event and scope links cannot
+            # distinguish two. If a second team selects the same kind while the first
+            # team's row is preserved as unreachable, the insert trips that constraint and
+            # surfaces as a misleading "a Space Manager-managed policy already uses one of
+            # these recipients". Refusing the kind outright was tried and reverted: it
+            # removes a capability the design intends (a per-team "notify the requester for
+            # laser alerts" policy is legitimate, and these kinds name no identity, so a
+            # shared row leaks nothing). The real fix is to MERGE a delegate's scope links
+            # into the existing row -- with the trap that removing the last link must delete
+            # the row rather than leave it linkless, since no links means EVERYTHING.
             key = (kind, None)
         if key in seen:
             raise RuleValidationError("Duplicate recipient in selection.")

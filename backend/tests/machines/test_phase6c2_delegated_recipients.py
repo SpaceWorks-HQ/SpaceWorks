@@ -288,9 +288,12 @@ def test_the_partition_is_resolved_inside_the_write_transaction():
     seen = []
     original = views_recipient_rules.row_fully_reachable
 
-    def spy(row, reach):
+    # `**kwargs` so the spy tracks `row_fully_reachable`'s signature: it gained a
+    # `manageable_identity` keyword, and a fixed (row, reach) spy raises TypeError rather
+    # than reporting what this test is actually about.
+    def spy(row, reach, **kwargs):
         seen.append(transaction.get_connection().in_atomic_block)
-        return original(row, reach)
+        return original(row, reach, **kwargs)
 
     views_recipient_rules.row_fully_reachable = spy
     try:

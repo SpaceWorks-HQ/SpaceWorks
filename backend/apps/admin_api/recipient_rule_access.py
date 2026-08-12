@@ -11,6 +11,7 @@ from apps.admin_api.recipient_rule_common import (
 )
 from apps.integrations import notification_catalog, recipients as recipient_selection
 from apps.integrations.notification_enums import NotificationFeature
+from apps.integrations.models_recipients import NotificationRecipientKind
 from apps.machines.models import Machine, MachineType
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceRole
 
@@ -45,6 +46,40 @@ def _features(makerspace, delegated):
         for feature in offered
         if recipient_selection.feature_available(makerspace, feature)
     ]
+
+
+def _manageable_identity(makerspace, actor):
+    """Predicate for "may this delegate write a row naming this identity".
+
+    Built from the same two facts `_identity_options` offers a delegate -- their own
+    assigned role, and the members holding it -- so the editable set and the picker cannot
+    drift apart. `members`/`requester` rows are never manageable by a delegate: those are
+    space-wide audiences, and `uniq_notification_recipient_special` allows exactly one row
+    per (makerspace, feature, event, kind), so a second team's scoped copy cannot exist at
+    all -- see `replace_recipient_rules`.
+    """
+    membership = (
+        MakerspaceMembership.objects.filter(
+            makerspace=makerspace, user=actor, status="active"
+        )
+        .select_related("assigned_role")
+        .first()
+    )
+    role_id = membership.assigned_role_id if membership else None
+    member_ids = (
+        {row.user_id for row in memberships_for(makerspace, assigned_role_id=role_id)}
+        if role_id
+        else set()
+    )
+
+    def manageable(row):
+        if row.kind == NotificationRecipientKind.ROLE:
+            return role_id is not None and row.role_id == role_id
+        if row.kind == NotificationRecipientKind.USER:
+            return row.user_id in member_ids
+        return False
+
+    return manageable
 
 
 def _identity_options(makerspace, actor, delegated):
@@ -110,8 +145,15 @@ def payload(makerspace, actor, *, delegated, reach=None):
         ).order_by("feature", "event", "id")
     )
     if delegated:
-        visible = [row for row in rows if row_fully_reachable(row, reach)]
-        hidden = [row for row in rows if not row_fully_reachable(row, reach)]
+        # The identity gate must match `prepare_rules` exactly, or a row is offered for
+        # editing that the very next PUT refuses -- see `row_fully_reachable`.
+        manageable = _manageable_identity(makerspace, actor)
+        editable = [
+            row_fully_reachable(row, reach, manageable_identity=manageable)
+            for row in rows
+        ]
+        visible = [row for row, ok in zip(rows, editable) if ok]
+        hidden = [row for row, ok in zip(rows, editable) if not ok]
     else:
         visible, hidden = rows, []
     marker_counts = Counter((row.feature, row.event) for row in hidden)
