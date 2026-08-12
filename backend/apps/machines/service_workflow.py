@@ -7,6 +7,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.makerspaces import limits
 from apps.makerspaces.platform import module_enabled
+from apps.machines import role_scope
 from apps.machines.models import Machine, MachineServiceRequest, ServiceBucket, ServiceQueue, get_or_create_default_bucket
 from apps.machines.service_consumption import debit_consumptions
 from apps.machines.service_emails import notify_service_status
@@ -96,7 +97,7 @@ def reject(service_request, actor, *, reason):
         return locked
 
 
-def start(service_request, actor, *, machine_id=None, estimated_minutes=None, consumable_pool_id=None, planned_grams=None, planned_quantity=None):
+def start(service_request, actor, machine_scope, *, machine_id=None, estimated_minutes=None, consumable_pool_id=None, planned_grams=None, planned_quantity=None):
     with transaction.atomic():
         _assert_request_write_allowed(service_request)
         locked = _locked_request(service_request)
@@ -106,15 +107,24 @@ def start(service_request, actor, *, machine_id=None, estimated_minutes=None, co
         if locked.queue_id:
             queue = ServiceQueue.objects.select_for_update().select_related("makerspace", "machine_type").get(pk=locked.queue_id)
             locked.queue = queue
+        candidate_scope = role_scope.scope_q_for(
+            machine_scope,
+            machine_id_paths=("pk",),
+            type_id_paths=("machine_type_id",),
+        )
         if machine_id is None and queue and queue.allocation_policy == ServiceQueue.AllocationPolicy.FIRST_IDLE:
             machine = Machine.objects.select_for_update().select_related("makerspace", "machine_type").filter(
+                candidate_scope,
                 makerspace_id=locked.makerspace_id, machine_type_id=queue.machine_type_id,
                 is_active=True, status=Machine.Status.IDLE,
             ).order_by("id").first()
         elif machine_id is None:
             raise ServiceMachineUnavailable("A machine is required to start service.")
         else:
-            machine = Machine.objects.select_for_update().select_related("makerspace", "machine_type").filter(pk=machine_id).first()
+            machine = Machine.objects.select_for_update().select_related("makerspace", "machine_type").filter(
+                candidate_scope,
+                pk=machine_id,
+            ).first()
         if machine is None or machine.makerspace_id != locked.makerspace_id:
             raise ServiceMachineUnavailable("Machine is not available for this service request.")
         if locked.queue_id and machine.machine_type_id != queue.machine_type_id:

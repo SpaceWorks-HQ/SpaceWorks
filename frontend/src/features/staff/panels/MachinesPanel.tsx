@@ -47,6 +47,10 @@ export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineType
     const extra = [...byType.keys()].filter((id) => !ordered.includes(id));
     return [...ordered, ...extra].map((id) => ({ id, ...byType.get(id)! }));
   }, [rows, types]);
+  // Visibility and creation authority are different questions: a role linked to one
+  // individual machine can see its type but may not add another machine of that kind,
+  // so offering every visible type here is offering an action that can only 403.
+  const creatableTypes = useMemo(() => types.filter((type) => type.can_create_machine), [types]);
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
   const toggleGroup = (id: number) => setCollapsed((current) => {
     const next = new Set(current);
@@ -90,7 +94,7 @@ export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineType
         </div>
       </div>
       <MachineTypesPanel makerspaceId={makerspaceId} canConfigureMachineTypes={canConfigureMachineTypes} />
-      {canManage ? (
+      {canManage && creatableTypes.length ? (
         <form className="mb-4 grid gap-3 rounded-xl border border-line bg-bg p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end"
           onSubmit={(event) => { event.preventDefault(); create.mutate(); }}>
           <label className="grid gap-1 text-xs font-semibold text-muted">
@@ -101,7 +105,7 @@ export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineType
             Machine type
             <select className="desk-input" value={machineTypeId} onChange={(event) => setMachineTypeId(event.target.value)} required>
               <option value="">Select a type</option>
-              {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+              {creatableTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
             </select>
           </label>
           <button className="desk-button-primary" type="submit" disabled={create.isPending || !name.trim() || !machineTypeId}>

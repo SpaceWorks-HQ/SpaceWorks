@@ -623,10 +623,14 @@ missing kind is the only one that fails loudly — `ValueError: Invalid public i
 `recompute_storage._public_image_keys` (the authoritative storage reconciler) each fail **open**:
 skip one and the objects simply outlive every row that could name them, or the reconciler silently
 writes a total that omits them. `public_image_key_in_use` also has to learn the new model, or two
-entities can claim one key and clearing either blanks the other. **Known gap: `BookableSpace`
-images are collected by `lifecycle` but NOT by `recompute_storage`**, so running the reconciler
-under-counts a space's booking images — pre-existing, unfixed, and the reason this list is written
-down. Storage accounting itself is a **no-op on self-host** (`limits.add_storage`/`free_storage`
+entities can claim one key and clearing either blanks the other. The `BookableSpace` gap this
+paragraph used to name is **FIXED** — `recompute_storage._public_image_keys` now includes it, with
+a comment recording why. **The surviving instance of the same bug is `MaintenanceLogDocument`**: it
+is charged to quota on upload (`maintenance/services_documents.py`), collected by the makerspace
+purge **and** by its module purge plan, but is **absent from `recompute_storage`**, so the
+authoritative reconciler writes a total omitting every maintenance document and silently lowers a
+space's recorded usage. This list exists because that failure mode keeps recurring in the one
+mechanism that fails silently. Storage accounting itself is a **no-op on self-host** (`limits.add_storage`/`free_storage`
 return early), so a test asserting `storage_bytes_used` must force managed mode with
 `monkeypatch.setattr(limits, 'is_self_host', lambda: False)` and wrap `on_commit` object deletes in
 `django_capture_on_commit_callbacks(execute=True)`.
@@ -1648,7 +1652,9 @@ Host fallback (faster `pytest` / one-off `manage.py`; needs `backend/.venv` + `n
 - `backend/tests/` — pytest behavior tests (external behavior, not implementation).
 - `frontend/src/features/inventory/` — public catalog/detail/self-checkout + `ProductCard`/
   `AvailabilityBadge`. `frontend/src/features/staff/` — staff console panels (grouped nav via
-  `StaffApp.tsx` `TAB_GROUPS`; capabilities from action-based `staffAccess.ts`; payment reconciliation and
+  `staffAccess.ts` `TAB_GROUPS` (sidebar grouping AND permission derivation — **not** `StaffApp.tsx`,
+  which this said until 2026-08-12; module gating and routing are the separate `staffTabs.ts`);
+  capabilities from action-based `staffAccess.ts`; payment reconciliation and
   platform credential panels). `frontend/src/features/auth/` + `members/MemberAuthPanel.tsx` provide the
   provider-config-driven social/member auth surfaces. `frontend/src/features/
   printing|bookings|forms|...` — feature slices. `frontend/src/lib/`, `components/ui/`, `types/`,
@@ -1771,6 +1777,33 @@ Every domain entity is scoped to a `makerspace_id`. A makerspace owns its invent
     check and the list filter **must stay in step** — disagreeing is how a row lists and then 403s
     on click, which is why `capabilities_for_machines`' `_type_mgr` carries the same check.
   - **Tier 3 (per-machine operators) is untouched** — an operator row already names one machine.
+  - **FIVE SERVICE SURFACES BYPASSED THE SCOPE ENTIRELY until Phase 5 (2026-08-12).** Each resolved
+    a machine (or a service request) by **makerspace alone**, so a laser-scoped maintainer reached
+    every printer: typed manual-usage **GET** and **POST** (`views_machine_service_printer`), the
+    optional `service_request_id` on that POST (scoped machine, unscoped request — attach a laser
+    job's usage to a printer), **pool creation**'s bound `machine_id`, and **staff service-request
+    submission** (`views_machine_service`), where an out-of-scope maintainer created a request that
+    fired notifications, audit and quota and which they then could not see.
+  - **`service_workflow.start()` takes a REQUIRED resolved machine scope, and the scope constrains
+    the CANDIDATE QUERYSET, not the winner.** `FIRST_IDLE` picks the first idle machine before any
+    scope consideration, so checking the chosen machine afterwards **rejects an authorized start**
+    whenever an unauthorized machine sorts earlier — the failure is a wrong outcome, not a 403,
+    which is why the regression test asserts on `assigned_machine_id` rather than status. The
+    argument is **required** so a future call site cannot silently revert to unscoped behaviour; the
+    view resolves the actor's scope and passes it, keeping general RBAC out of the workflow kernel,
+    and trusted kernel tests pass `role_scope.EXEMPT` explicitly.
+  - **The machine-type list is scoped, and VISIBILITY IS NOT CREATION AUTHORITY.** It previously
+    returned every global and tenant type once the actor could see any machine, so per-type sections
+    would render headings a role cannot reach. "Reachable" is the union of linked types (**including
+    types with zero machines**), types of individually linked machines, types reached through direct
+    type-manager authority, and explicit operator machines; a **shared machine-less pool does NOT
+    make a type reachable**. `can_create_machine` needs a **type** link — a per-machine link exposes
+    the type without authorizing another machine of that kind — and the console must filter its
+    creation selector by it, or it offers an action that can only 403. The field lives on a
+    **dedicated** `serializers_machine_types.MachineTypeAccessSerializer`, never on the shared
+    `MachineTypeSerializer`, which is nested inside machine responses and reused by create/update
+    where the actor context is absent; for the same reason the frontend `MachineType.can_create_machine`
+    is **optional** — nested copies genuinely lack it, and absent correctly reads as no authority.
   - **The makerspace-level surfaces AND it in too** (Phase 3), or the narrowing would have been
     cosmetic: the queue, the detail view, service files, consumable pools, machine payments,
     publicity and the machine-service report were each gated on `MANAGE_MACHINES` alone, so a

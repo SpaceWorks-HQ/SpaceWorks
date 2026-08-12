@@ -6,6 +6,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
+from apps.machines import role_scope
 from apps.machines.metering import MeteringUnit, validate_type_config
 from apps.machines.models import Machine, MachineServiceRequest, MachineType
 from apps.machines.service_consumable_pools import create_pool, reconcile_request, reserve_for_request
@@ -80,7 +81,7 @@ def test_workflow_reconciles_generic_reservations_in_quantity_space(terminal):
 
     reserve_for_request(request, actor, pool=pool, planned_quantity="20", machine=machine)
     accept(request, actor)
-    start(request, actor, machine_id=machine.pk)
+    start(request, actor, role_scope.EXEMPT, machine_id=machine.pk)
     if terminal == "complete":
         complete(request, actor, actual_minutes=1, consumptions=[])
     else:
@@ -129,7 +130,7 @@ def test_staff_workflow_reconciles_generic_partial_failure_and_explicit_completi
 
     failed = submit(machine, requester, actor=actor, requester_name="R", contact_email="r@test", contact_phone="1", title="Partial resin job")
     accept(failed, actor)
-    start(failed, actor, machine_id=machine.pk, consumable_pool_id=pool.pk, planned_quantity="100")
+    start(failed, actor, role_scope.EXEMPT, machine_id=machine.pk, consumable_pool_id=pool.pk, planned_quantity="100")
     pool.refresh_from_db()
     assert pool.remaining_grams == Decimal("0.00")
     fail(failed, actor, reason="Stopped halfway", percent_complete=50, actual_minutes=1, consumptions=[])
@@ -139,7 +140,7 @@ def test_staff_workflow_reconciles_generic_partial_failure_and_explicit_completi
 
     completed = submit(machine, requester, actor=actor, requester_name="R", contact_email="r@test", contact_phone="1", title="Measured resin job")
     accept(completed, actor)
-    start(completed, actor, machine_id=machine.pk, consumable_pool_id=pool.pk, planned_quantity="20")
+    start(completed, actor, role_scope.EXEMPT, machine_id=machine.pk, consumable_pool_id=pool.pk, planned_quantity="20")
     complete(completed, actor, actual_minutes=1, consumptions=[], actual_quantity="12")
     completed.refresh_from_db()
     pool.refresh_from_db()

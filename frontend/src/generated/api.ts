@@ -2059,6 +2059,18 @@ export type MachineType = {
   "makerspace": number | null;
 };
 
+export type MachineTypeAccess = {
+  "id": number;
+  "slug": string;
+  "name": string;
+  "icon": string;
+  "is_builtin": boolean;
+  "managing_action": string;
+  "capability_config": unknown;
+  "makerspace": number | null;
+  "can_create_machine": boolean;
+};
+
 export type MachineTypeCreate = {
   "slug": string;
   "name": string;

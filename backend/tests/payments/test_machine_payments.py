@@ -4,6 +4,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import InternalError, transaction
 
+from apps.machines import role_scope
 from apps.machines.models import Machine, MachineServiceRequest, MachineType, MakerspaceMachineTypePricing
 from apps.machines.service_workflow import accept, complete, start, submit
 from apps.payments.models import Payment
@@ -103,7 +104,7 @@ def test_completion_creates_payment_and_checkout_failure_never_blocks(monkeypatc
     )
     monkeypatch.setattr("apps.machines.service_payments.create_checkout", lambda payment: (_ for _ in ()).throw(RuntimeError("stripe unavailable")))
     accept(row, actor)
-    start(row, actor, machine_id=row.assigned_machine_id)
+    start(row, actor, role_scope.EXEMPT, machine_id=row.assigned_machine_id)
     assert complete(row, actor, actual_minutes=1, consumptions=[]).status == MachineServiceRequest.Status.COMPLETED
     payment = Payment.objects.get(subject_id=row.pk)
     assert (payment.amount, payment.currency) == (Decimal("3.00"), "usd")

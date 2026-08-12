@@ -11797,7 +11797,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/MachineType"
+                                        "$ref": "#/components/schemas/MachineTypeAccess"
                                     }
                                 }
                             }
@@ -35459,6 +35459,59 @@
                 "required": [
                     "capability_config",
                     "id",
+                    "makerspace",
+                    "managing_action",
+                    "name",
+                    "slug"
+                ]
+            },
+            "MachineTypeAccess": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "icon": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "is_builtin": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "managing_action": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "capability_config": {
+                        "readOnly": true
+                    },
+                    "makerspace": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "can_create_machine": {
+                        "type": "boolean",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "can_create_machine",
+                    "capability_config",
+                    "icon",
+                    "id",
+                    "is_builtin",
                     "makerspace",
                     "managing_action",
                     "name",

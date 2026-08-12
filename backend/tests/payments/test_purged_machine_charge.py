@@ -15,6 +15,7 @@ from decimal import Decimal
 
 import pytest
 
+from apps.machines import role_scope
 from apps.machines.models import (
     Machine,
     MachineServiceRequest,
@@ -72,7 +73,7 @@ def test_a_machine_service_charge_snapshots_no_member_typed_text():
     )
 
     accept(row, actor)
-    start(row, actor, machine_id=row.assigned_machine_id)
+    start(row, actor, role_scope.EXEMPT, machine_id=row.assigned_machine_id)
     assert complete(row, actor, actual_minutes=1, consumptions=[]).status == (
         MachineServiceRequest.Status.COMPLETED
     )

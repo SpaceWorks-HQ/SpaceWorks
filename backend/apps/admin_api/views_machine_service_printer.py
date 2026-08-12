@@ -83,7 +83,13 @@ class MachineServicePrinterPoolListCreateView(APIView):
         data = serializer.validated_data
         machine = None
         if data.get("machine_id"):
-            machine = get_object_or_404(Machine.objects.select_related("machine_type").filter(makerspace=space), pk=data["machine_id"])
+            machine = get_object_or_404(
+                Machine.objects.select_related("machine_type").filter(
+                    role_scope.scoped_q(request.user, [space.pk]),
+                    makerspace=space,
+                ),
+                pk=data["machine_id"],
+            )
         row = create_pool(space, request.user, machine=machine, **{key: value for key, value in data.items() if key != "machine_id"})
         return Response(PrinterPoolSerializer(row).data, status=status.HTTP_201_CREATED)
 
@@ -114,7 +120,17 @@ class MachineServiceTypedManualUsageView(APIView):
     @extend_schema(tags=["Admin machine service"], responses={200: TypedManualUsageResponseSerializer(many=True)})
     def get(self, request, makerspace_id):
         space = _space(request.user, makerspace_id)
-        rows = MachineUsageEntry.objects.filter(machine__makerspace=space, source=MachineUsageEntry.Source.TYPED_MANUAL)
+        rows = MachineUsageEntry.objects.filter(
+            role_scope.scoped_related_q(
+                request.user,
+                [space.pk],
+                makerspace_field="machine__makerspace_id",
+                machine_id_paths=("machine_id",),
+                type_id_paths=("machine__machine_type_id",),
+            ),
+            machine__makerspace=space,
+            source=MachineUsageEntry.Source.TYPED_MANUAL,
+        )
         machine_type = request.query_params.get("machine_type", PRINTER_SLUG)
         rows = rows.filter(machine__machine_type__slug=machine_type)
         return Response(TypedManualUsageResponseSerializer(rows, many=True).data)
@@ -125,12 +141,38 @@ class MachineServiceTypedManualUsageView(APIView):
         serializer = TypedManualUsageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        machine = get_object_or_404(Machine.objects.select_related("machine_type").filter(makerspace=space), pk=data.pop("machine_id"))
+        machine = get_object_or_404(
+            Machine.objects.select_related("machine_type").filter(
+                role_scope.scoped_q(request.user, [space.pk]),
+                makerspace=space,
+            ),
+            pk=data.pop("machine_id"),
+        )
         pool_id, request_id = data.pop("consumable_pool_id", None), data.pop("service_request_id", None)
         pool = get_object_or_404(
             scoped_pools(request.user, MachineConsumablePool.objects.filter(makerspace=space)),
             pk=pool_id,
         ) if pool_id else None
-        service_request = get_object_or_404(MachineServiceRequest.objects.filter(makerspace=space), pk=request_id) if request_id else None
+        service_request = None
+        if request_id:
+            compatible = (
+                Q(assigned_machine_id=machine.pk)
+                | Q(assigned_machine__isnull=True, bucket__machine_id=machine.pk)
+                | Q(
+                    assigned_machine__isnull=True,
+                    queue__machine_type_id=machine.machine_type_id,
+                )
+            )
+            service_request = get_object_or_404(
+                role_scope.scoped_service_requests(
+                    request.user,
+                    MachineServiceRequest.objects.filter(
+                        compatible,
+                        makerspace=space,
+                    ),
+                    [space.pk],
+                ),
+                pk=request_id,
+            )
         row = log_typed_manual_usage(machine, request.user, pool=pool, service_request=service_request, **data)
         return Response(TypedManualUsageResponseSerializer(row).data, status=status.HTTP_201_CREATED)

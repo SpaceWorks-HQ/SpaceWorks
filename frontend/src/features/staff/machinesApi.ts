@@ -14,6 +14,11 @@ export type MachineType = {
   is_builtin: boolean;
   managing_action: string;
   makerspace: number | null;
+  // Present only on the machine-type LIST response, which is the one serializer that
+  // resolves it against an actor. The same type is nested inside machine rows, where
+  // there is no actor context and the field is genuinely absent -- so it is optional,
+  // and an absent value correctly reads as "no creation authority proven".
+  can_create_machine?: boolean;
   capability_config?: MachineTypeCapabilityConfig;
 };
 

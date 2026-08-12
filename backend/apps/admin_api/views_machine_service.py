@@ -196,7 +196,13 @@ class MachineServiceRequestListCreateView(APIView):
                 makerspace=makerspace, user_id=data["requester_id"], user__is_active=True
             )
         )
-        machine = get_object_or_404(Machine.objects.filter(makerspace=makerspace), pk=data["machine_id"])
+        machine = get_object_or_404(
+            Machine.objects.filter(
+                role_scope.scoped_q(request.user, [makerspace.pk]),
+                makerspace=makerspace,
+            ),
+            pk=data["machine_id"],
+        )
         requester = member.user
         row = service_workflow.submit(
             machine, requester, actor=request.user,
@@ -243,7 +249,12 @@ class _MachineServiceActionView(APIView):
         elif self.operation == "reject":
             row = service_workflow.reject(row, request.user, **data)
         elif self.operation == "start":
-            row = service_workflow.start(row, request.user, **data)
+            machine_scope = role_scope.manage_scope_for(
+                request.user, row.makerspace_id
+            )
+            row = service_workflow.start(
+                row, request.user, machine_scope, **data
+            )
         elif self.operation == "complete":
             row = service_workflow.complete(row, request.user, **data)
         elif self.operation == "fail":

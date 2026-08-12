@@ -8,7 +8,7 @@ from django.test import override_settings
 
 from apps.audit.models import AuditLog
 from apps.inventory import availability
-from apps.machines import service_workflow
+from apps.machines import role_scope, service_workflow
 from apps.machines.models import (
     Machine,
     MachineConsumable,
@@ -47,7 +47,12 @@ def request(space, *, target=None, actor=None):
 def in_progress(space, *, actor=None, target=None):
     row = request(space, target=target, actor=actor)
     accept(row, actor)
-    return start(row, actor, machine_id=(target or row.bucket.machine).pk)
+    return start(
+        row,
+        actor,
+        role_scope.EXEMPT,
+        machine_id=(target or row.bucket.machine).pk,
+    )
 
 
 def test_allowed_edges_are_audited_and_notified_after_commit(monkeypatch):
@@ -63,7 +68,7 @@ def test_allowed_edges_are_audited_and_notified_after_commit(monkeypatch):
     callbacks.pop()()
     assert notices == ["submitted"]
     accept(row, actor, estimated_minutes=12, note="Reviewed")
-    start(row, actor, machine_id=row.bucket.machine_id)
+    start(row, actor, role_scope.EXEMPT, machine_id=row.bucket.machine_id)
     complete(row, actor, actual_minutes=10, consumptions=[])
     collect(row, actor)
     for callback in callbacks:
@@ -99,7 +104,7 @@ def test_reject_and_fail_edges_record_required_data():
     (MachineServiceRequest.Status.COMPLETED, lambda row, actor: reject(row, actor, reason="late")),
     (MachineServiceRequest.Status.REJECTED, lambda row, actor: accept(row, actor)),
     (MachineServiceRequest.Status.FAILED, lambda row, actor: collect(row, actor)),
-    (MachineServiceRequest.Status.COLLECTED, lambda row, actor: start(row, actor, machine_id=row.bucket.machine_id)),
+    (MachineServiceRequest.Status.COLLECTED, lambda row, actor: start(row, actor, role_scope.EXEMPT, machine_id=row.bucket.machine_id)),
 ])
 def test_forbidden_edges_raise_typed_error(status, operation):
     space, actor = make_space(f"service-bad-{status}"), make_user(f"service-manager-{status}")
@@ -109,7 +114,7 @@ def test_forbidden_edges_raise_typed_error(status, operation):
         accept(row, actor)
     if status in {MachineServiceRequest.Status.IN_PROGRESS, MachineServiceRequest.Status.COMPLETED,
                   MachineServiceRequest.Status.COLLECTED}:
-        start(row, actor, machine_id=row.bucket.machine_id)
+        start(row, actor, role_scope.EXEMPT, machine_id=row.bucket.machine_id)
     if status in {MachineServiceRequest.Status.COMPLETED, MachineServiceRequest.Status.COLLECTED}:
         complete(row, actor, actual_minutes=0, consumptions=[])
     if status == MachineServiceRequest.Status.COLLECTED:
@@ -117,7 +122,7 @@ def test_forbidden_edges_raise_typed_error(status, operation):
     if status == MachineServiceRequest.Status.REJECTED:
         reject(row, actor, reason="No")
     if status == MachineServiceRequest.Status.FAILED:
-        accept(row, actor); start(row, actor, machine_id=row.bucket.machine_id)
+        accept(row, actor); start(row, actor, role_scope.EXEMPT, machine_id=row.bucket.machine_id)
         fail(row, actor, reason="No", percent_complete=0, actual_minutes=0, consumptions=[])
     with pytest.raises(ServiceInvalidTransition):
         operation(row, actor)
@@ -249,10 +254,10 @@ def test_submit_and_start_refuse_unavailable_machines(changes):
     target.status = Machine.Status.RUNNING
     target.save(update_fields=["status"])
     with pytest.raises(ServiceMachineUnavailable):
-        start(row, None, machine_id=target.pk)
+        start(row, None, role_scope.EXEMPT, machine_id=target.pk)
     other = machine(make_space("service-other-tenant"), "Other")
     with pytest.raises(ServiceMachineUnavailable):
-        start(row, None, machine_id=other.pk)
+        start(row, None, role_scope.EXEMPT, machine_id=other.pk)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -265,7 +270,12 @@ def test_contended_start_has_one_winner():
         try:
             local = MachineServiceRequest.objects.get(pk=row.pk)
             local_actor = type(actor).objects.get(pk=actor.pk)
-            start(local, local_actor, machine_id=row.bucket.machine_id)
+            start(
+                local,
+                local_actor,
+                role_scope.EXEMPT,
+                machine_id=row.bucket.machine_id,
+            )
             return "won"
         except ServiceInvalidTransition:
             return "lost"

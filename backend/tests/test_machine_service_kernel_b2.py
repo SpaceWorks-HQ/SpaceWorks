@@ -6,6 +6,7 @@ import pytest
 from django.db import connection, transaction
 
 from apps.audit.models import AuditLog
+from apps.machines import role_scope
 from apps.machines.models import (
     Machine,
     MachineConsumableAdjustment,
@@ -64,10 +65,10 @@ def test_pooled_allocation_locks_same_tenant_compatible_idle_machine_and_capacit
     accept(request, make_user("kernel-allocation-manager"))
     wrong_type, foreign, compatible = machine(space, suffix="wrong", type_row=other_kind), machine(other, suffix="foreign"), machine(space, suffix="right", type_row=kind)
     with pytest.raises(ServiceMachineUnavailable):
-        start(request, make_user("kernel-allocation-start"), machine_id=wrong_type.id)
+        start(request, make_user("kernel-allocation-start"), role_scope.EXEMPT, machine_id=wrong_type.id)
     with pytest.raises(ServiceMachineUnavailable):
-        start(request, make_user("kernel-allocation-start-two"), machine_id=foreign.id)
-    started = start(request, make_user("kernel-allocation-start-three"), machine_id=compatible.id)
+        start(request, make_user("kernel-allocation-start-two"), role_scope.EXEMPT, machine_id=foreign.id)
+    started = start(request, make_user("kernel-allocation-start-three"), role_scope.EXEMPT, machine_id=compatible.id)
     assert started.assigned_machine_id == compatible.id
     compatible.refresh_from_db()
     assert compatible.status == Machine.Status.RUNNING
@@ -83,7 +84,7 @@ def test_first_idle_queue_allocates_without_a_machine_id_and_correction_is_typed
     target = machine(space, suffix="automatic", type_row=kind)
     request, actor = pooled_request(queue), make_user("kernel-first-idle-actor")
     accept(request, actor)
-    assert start(request, actor, machine_id=None).assigned_machine_id == target.id
+    assert start(request, actor, role_scope.EXEMPT, machine_id=None).assigned_machine_id == target.id
     pool = create_pool(space, actor, material="PLA", initial_grams="1", machine=target)
     from rest_framework.exceptions import ValidationError
     with pytest.raises(ValidationError):
@@ -121,7 +122,7 @@ def test_payment_hook_reprint_provenance_and_registry_seam():
     actor = make_user("kernel-payment-actor")
     request = submit(target, make_user("kernel-payment-requester"), actor=actor, requester_name="R", contact_email="r@test", contact_phone="1", title="Paid job")
     accept(request, actor)
-    start(request, actor, machine_id=target.id)
+    start(request, actor, role_scope.EXEMPT, machine_id=target.id)
     from apps.machines.service_workflow import complete, create_reprint
     complete(request, actor, actual_minutes=1, consumptions=[])
     collect(request, actor)
