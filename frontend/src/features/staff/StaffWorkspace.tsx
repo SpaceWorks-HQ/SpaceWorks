@@ -160,6 +160,7 @@ export function StaffWorkspace({
               canManageEvents={canManageEvents}
               canManageBookings={canManageBookings}
               canManageMachines={canManageMachines}
+              isMachineOnly={isMachineOnly}
               canConfigureMachineTypes={canConfigureMachineTypes}
               canSeeHardware={canSeeHardware}
               canSeePrinting={canSeePrinting}

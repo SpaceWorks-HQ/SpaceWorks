@@ -81,6 +81,13 @@ FEATURE_DEFINITIONS = (
         "geofence to be configured. Never an access gate.",
         default_enabled=True,
     ),
+    FeatureDefinition(
+        "notifications.delegated_recipients", "notifications",
+        "Delegated maintenance recipients",
+        "Let machine-scoped maintainers manage maintenance alert recipients for "
+        "their own machines.",
+        default_enabled=False,
+    ),
 )
 FEATURES = {definition.key: definition for definition in FEATURE_DEFINITIONS}
 # A feature's parent/required modules are validated against the module registry

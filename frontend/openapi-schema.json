@@ -12469,7 +12469,7 @@
         "/api/v1/admin/makerspace/{makerspace_id}/notification-recipient-rules": {
             "get": {
                 "operationId": "api_v1_admin_makerspace_notification_recipient_rules_retrieve",
-                "summary": "Read or replace per-event notification recipients",
+                "summary": "Read or replace notification recipients",
                 "parameters": [
                     {
                         "in": "path",
@@ -12490,14 +12490,20 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Recipient selection."
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecipientRulesResponse"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             },
             "put": {
                 "operationId": "api_v1_admin_makerspace_notification_recipient_rules_update",
-                "description": "Replace the whole selection for ONE (feature, event).\n\nReplace rather than merge, for the same reason the machine-scope editor does:\nwith a merge there is no way to untick the last recipient, and an empty list has\nto mean \"nobody selected\" rather than \"no change\". Deleting every rule for a\n(feature, event) returns it to the action-based default (D3).",
-                "summary": "Read or replace per-event notification recipients",
+                "summary": "Read or replace notification recipients",
                 "parameters": [
                     {
                         "in": "path",
@@ -12538,10 +12544,20 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Recipient selection."
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecipientRulesResponse"
+                                }
+                            }
+                        },
+                        "description": ""
                     },
                     "400": {
                         "description": "Invalid recipient rule."
+                    },
+                    "403": {
+                        "description": "Recipient-rule permission required."
                     }
                 }
             }
@@ -33288,7 +33304,7 @@
                     "maintenance_total_cost"
                 ]
             },
-            "FeatureD07Enum": {
+            "FeatureEnum": {
                 "enum": [
                     "hardware_requests",
                     "printing",
@@ -34226,6 +34242,16 @@
                 ],
                 "type": "string",
                 "description": "* `dev_room` - Development room\n* `bench` - Bench\n* `meeting` - Meeting room\n* `other` - Other"
+            },
+            "KindE56Enum": {
+                "enum": [
+                    "role",
+                    "requester",
+                    "members",
+                    "user"
+                ],
+                "type": "string",
+                "description": "* `role` - Role\n* `requester` - Requester\n* `members` - All members\n* `user` - Named user"
             },
             "LedgerResponse": {
                 "type": "object",
@@ -36741,6 +36767,26 @@
                     "stripe_webhook_secret_set"
                 ]
             },
+            "ManagedPolicyMarker": {
+                "type": "object",
+                "properties": {
+                    "feature": {
+                        "type": "string"
+                    },
+                    "event": {
+                        "type": "string"
+                    },
+                    "count": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "count",
+                    "event",
+                    "feature"
+                ]
+            },
             "Measurement883Enum": {
                 "enum": [
                     "count",
@@ -38044,7 +38090,7 @@
                 "type": "object",
                 "properties": {
                     "feature": {
-                        "$ref": "#/components/schemas/FeatureD07Enum"
+                        "$ref": "#/components/schemas/FeatureEnum"
                     },
                     "channel": {
                         "$ref": "#/components/schemas/ChannelCbbEnum"
@@ -38075,7 +38121,7 @@
                 "type": "object",
                 "properties": {
                     "feature": {
-                        "$ref": "#/components/schemas/FeatureD07Enum"
+                        "$ref": "#/components/schemas/FeatureEnum"
                     },
                     "channel": {
                         "$ref": "#/components/schemas/ChannelCbbEnum"
@@ -43834,11 +43880,76 @@
                     "total_quantity"
                 ]
             },
+            "RecipientFeature": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "events": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "events",
+                    "key"
+                ]
+            },
+            "RecipientMember": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "username": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "email"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "email",
+                    "id",
+                    "username"
+                ]
+            },
+            "RecipientRole": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "slug"
+                ]
+            },
             "RecipientRule": {
                 "type": "object",
                 "properties": {
                     "kind": {
-                        "$ref": "#/components/schemas/RecipientRuleKindEnum"
+                        "$ref": "#/components/schemas/KindE56Enum"
                     },
                     "role_id": {
                         "type": "integer",
@@ -43856,21 +43967,46 @@
                     "kind"
                 ]
             },
-            "RecipientRuleKindEnum": {
-                "enum": [
-                    "role",
-                    "requester",
-                    "members",
-                    "user"
-                ],
-                "type": "string",
-                "description": "* `role` - Role\n* `requester` - Requester\n* `members` - All members\n* `user` - Named user"
+            "RecipientRuleOutput": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "$ref": "#/components/schemas/KindE56Enum"
+                    },
+                    "role_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "user_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "scope": {
+                        "$ref": "#/components/schemas/RecipientScope"
+                    },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "feature": {
+                        "type": "string"
+                    },
+                    "event": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "event",
+                    "feature",
+                    "id",
+                    "kind"
+                ]
             },
             "RecipientRulesPut": {
                 "type": "object",
                 "properties": {
                     "feature": {
-                        "$ref": "#/components/schemas/RecipientRulesPutFeatureEnum"
+                        "type": "string",
+                        "maxLength": 32
                     },
                     "event": {
                         "type": "string",
@@ -43889,15 +44025,55 @@
                     "rules"
                 ]
             },
-            "RecipientRulesPutFeatureEnum": {
-                "enum": [
-                    "bookings",
-                    "events",
-                    "maintenance",
-                    "members"
-                ],
-                "type": "string",
-                "description": "* `bookings` - bookings\n* `events` - events\n* `maintenance` - maintenance\n* `members` - members"
+            "RecipientRulesResponse": {
+                "type": "object",
+                "properties": {
+                    "delegated": {
+                        "type": "boolean"
+                    },
+                    "features": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RecipientFeature"
+                        }
+                    },
+                    "roles": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RecipientRole"
+                        }
+                    },
+                    "members": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RecipientMember"
+                        }
+                    },
+                    "rules": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RecipientRuleOutput"
+                        }
+                    },
+                    "managed_policy_markers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ManagedPolicyMarker"
+                        }
+                    },
+                    "scope_options": {
+                        "$ref": "#/components/schemas/RecipientScopeOptions"
+                    }
+                },
+                "required": [
+                    "delegated",
+                    "features",
+                    "managed_policy_markers",
+                    "members",
+                    "roles",
+                    "rules",
+                    "scope_options"
+                ]
             },
             "RecipientScope": {
                 "type": "object",
@@ -43921,6 +44097,49 @@
                         }
                     }
                 }
+            },
+            "RecipientScopeOption": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name"
+                ]
+            },
+            "RecipientScopeOptions": {
+                "type": "object",
+                "properties": {
+                    "machine_types": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RecipientScopeOption"
+                        }
+                    },
+                    "machines": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RecipientScopeOption"
+                        }
+                    },
+                    "categories": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RecipientScopeOption"
+                        }
+                    }
+                },
+                "required": [
+                    "categories",
+                    "machine_types",
+                    "machines"
+                ]
             },
             "ReferralCreate": {
                 "type": "object",

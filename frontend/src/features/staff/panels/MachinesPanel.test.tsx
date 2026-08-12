@@ -74,7 +74,7 @@ function renderPanel(setup: Setup = {}, props: Partial<React.ComponentProps<type
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MachinesPanel makerspaceId={1} canManage canConfigureMachineTypes={false} maintenanceEnabled={false} machineServiceEnabled printingEnabled {...props} />
+      <MachinesPanel makerspaceId={1} canManage canConfigureMachineTypes={false} maintenanceEnabled={false} machineServiceEnabled printingEnabled delegatedRecipientRulesEnabled={false} {...props} />
     </QueryClientProvider>,
   );
 }
@@ -82,6 +82,27 @@ function renderPanel(setup: Setup = {}, props: Partial<React.ComponentProps<type
 beforeEach(() => staffRequest.mockReset());
 
 describe("MachinesPanel type sections", () => {
+  it("shows delegated maintenance recipients only when the switch is enabled", () => {
+    const { rerender } = renderPanel({}, { maintenanceEnabled: true });
+    expect(screen.queryByRole("heading", { name: "Who gets notified" })).not.toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <MachinesPanel
+          makerspaceId={1}
+          canManage
+          canConfigureMachineTypes={false}
+          maintenanceEnabled
+          machineServiceEnabled
+          printingEnabled
+          delegatedRecipientRulesEnabled
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Who gets notified" })).toBeVisible();
+  });
+
   it("renders a zero-machine reachable type and its service queue", async () => {
     renderPanel({ requests: { laser: [{ id: 10, title: "Cut acrylic", status: "pending", planned_quantity: "20", actual_consumed_quantity: "0" }] } });
 

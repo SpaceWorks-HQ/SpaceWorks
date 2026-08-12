@@ -7,9 +7,9 @@ uses which:
   (`EmailNotificationMute`, default-on, uncheck to mute). Not migrated: those are the
   alerts a space cannot afford to lose, and a backfill that got them wrong would fail
   silently.
-* **events / bookings / maintenance / members** use explicit per-event selection, where
-  **no rows means today's behaviour** — every membership holding the feature's action.
-  Rows become authoritative only once one exists.
+* **events / bookings / maintenance / members** use explicit per-event selection. A row
+  becomes authoritative only when it covers the alert subject; otherwise today's
+  action-based recipient default applies.
 
 Everything fails **open** to the action-based default. A broken selection lookup must not
 silence a makerspace's alerts; over-notifying is recoverable, missing a maintenance
@@ -24,6 +24,7 @@ from apps.integrations.models_recipients import (
     NotificationRecipient,
     NotificationRecipientKind,
 )
+from apps.integrations.recipient_scope_matching import rule_covers as _rule_covers
 
 logger = logging.getLogger(__name__)
 
@@ -99,8 +100,26 @@ def selection_rows(makerspace, feature, event):
         return []
 
 
-def has_selection(makerspace, feature, event) -> bool:
-    return bool(selection_rows(makerspace, feature, event))
+def has_selection(makerspace, feature, event, scope=None) -> bool:
+    """Whether an explicit selection is authoritative for this alert subject.
+
+    A row narrowed to lasers says nothing about a printer alert. Treating its mere
+    existence as authoritative would make ``selected_*`` return nobody and silently
+    suppress the printer warning. A selection takes over only when at least one row
+    covers the subject; otherwise callers retain the action-based default.
+    """
+    try:
+        return any(
+            _rule_covers(row, scope)
+            for row in selection_rows(makerspace, feature, event)
+        )
+    except Exception:
+        logger.warning(
+            "notification_recipient_coverage_check_failed",
+            extra={"makerspace_id": getattr(makerspace, "pk", None), "feature": feature},
+            exc_info=True,
+        )
+        return False
 
 
 def requester_selected(makerspace, feature, event) -> bool:
@@ -140,30 +159,6 @@ def _eligible_memberships(makerspace):
     )
 
 
-def _rule_covers(row, scope) -> bool:
-    """Whether a recipient row's own narrowing admits this alert's subject.
-
-    No links means everything — the same default as a chat destination and the OPPOSITE
-    of role machine-scope, which fails closed. The asymmetry is deliberate: an unscoped
-    *role* must reach nothing (that is an access decision), while an unscoped *rule* is
-    simply an operator who did not narrow it.
-    """
-    machine_ids = {link.machine_id for link in row.machine_scopes.all()}
-    type_ids = {link.machine_type_id for link in row.machine_type_scopes.all()}
-    category_ids = {link.category_id for link in row.category_scopes.all()}
-    if not (machine_ids or type_ids or category_ids):
-        return True
-    if scope is None:
-        # The rule asked for specific subjects and this alert names none, so it cannot
-        # be one of them.
-        return False
-    return (
-        (scope.machine_id is not None and scope.machine_id in machine_ids)
-        or (scope.machine_type_id is not None and scope.machine_type_id in type_ids)
-        or (scope.category_id is not None and scope.category_id in category_ids)
-    )
-
-
 def _role_scope_admits(membership_scopes, membership, scope) -> bool:
     """Whether the recipient's ROLE could reach this alert's machine at all.
 
@@ -185,6 +180,47 @@ def _role_scope_admits(membership_scopes, membership, scope) -> bool:
     return scope.machine_id in machine_ids or scope.machine_type_id in type_ids
 
 
+def reach_filter_for(memberships, scope):
+    """A predicate saying whether each membership's machine reach admits this alert.
+
+    Used by the ACTION-BASED FALLBACK, not by an explicit selection. The fallback sends to
+    every membership holding the feature's action, which predates machine scoping and is
+    makerspace-wide -- so once an alert names a machine, it would mail a laser-only
+    maintainer the printer's maintenance detail for a machine they cannot even open in the
+    console. Scoping the fallback keeps it consistent with the rest of the program.
+
+    **A ROLE WITH NO LINKS STILL RECEIVES THE FALLBACK, and that asymmetry is the whole
+    point.** For ACCESS, no links means reach nothing — machine scoping fails closed. Here
+    it must mean the opposite: a role that was never given links has not been narrowed, it
+    has simply never been configured, and treating that as "reaches no machine" would mute
+    a space's maintenance mail the moment an alert named a machine. That is precisely the
+    failure this module forbids, so the filter only ever removes a membership whose role
+    holds links that genuinely exclude the subject.
+
+    Exempt actors (a space manager, a null-`assigned_role` legacy membership) always admit,
+    so a machine nobody is scoped to still reaches whoever administers the space. Alerts
+    naming no machine admit everyone, leaving every non-machine feature untouched.
+    """
+    from apps.machines import role_scope as machine_role_scope
+
+    memberships = list(memberships)
+    if scope is None or getattr(scope, "machine_id", None) is None:
+        return lambda membership: True
+    scopes = machine_role_scope.manage_scopes_for_memberships(memberships)
+
+    def admits(membership):
+        resolved = scopes.get(membership.pk, machine_role_scope.EXEMPT)
+        if resolved is machine_role_scope.EXEMPT:
+            return True
+        type_ids, machine_ids = resolved
+        if not (type_ids or machine_ids):
+            # Unconfigured, not narrowed -- fail open.
+            return True
+        return scope.machine_id in machine_ids or scope.machine_type_id in type_ids
+
+    return admits
+
+
 def _selected_memberships(makerspace, rows, scope=None):
     """Memberships matched by a selection, in a stable order.
 
@@ -198,6 +234,8 @@ def _selected_memberships(makerspace, rows, scope=None):
     Composition is `role_scope AND (rule_scope OR all)` (D9) — narrowing only, never
     widening, so a recipient can never be alerted about a machine they would 403 on.
     """
+    # Coverage first, precedence second -- see the comment in the loop below.
+    rows = [row for row in rows if _rule_covers(row, scope)]
     role_rows = {row.role_id: row for row in rows if row.role_id}
     user_rows = {row.user_id: row for row in rows if row.user_id}
     member_rows = [row for row in rows if row.kind == NotificationRecipientKind.MEMBERS]
@@ -209,6 +247,16 @@ def _selected_memberships(makerspace, rows, scope=None):
         # One row is responsible for each membership's inclusion, and it is the one whose
         # narrowing applies. Members-wide is checked first so a broad tick is not
         # accidentally narrowed by an unrelated per-role rule.
+        #
+        # Precedence is applied ONLY among rows that already cover this subject, because
+        # the rows were filtered above. Choosing a row first and testing coverage after
+        # let a broad-but-irrelevant row shadow a narrow relevant one: a members row
+        # scoped to the printers would be picked for a laser alert, fail coverage, and
+        # skip the membership entirely -- so the laser-scoped role row that *does* cover
+        # it was never consulted and the alert reached nobody. That is the same
+        # suppression `has_selection` was fixed for, one level further down, and 6c2 makes
+        # the combination ordinary: a delegated laser rule sits beside a preserved
+        # space-wide members rule by design.
         row = None
         if member_rows:
             row = member_rows[0]
@@ -217,8 +265,6 @@ def _selected_memberships(makerspace, rows, scope=None):
         elif membership.user_id in user_rows:
             row = user_rows[membership.user_id]
         if row is None:
-            continue
-        if not _rule_covers(row, scope):
             continue
         candidates.append((membership, row))
 

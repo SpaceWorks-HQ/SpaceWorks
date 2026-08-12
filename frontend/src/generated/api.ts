@@ -1522,7 +1522,7 @@ export type FabLabHealthRow = {
   "maintenance_overdue_schedules": number | null;
 };
 
-export type FeatureD07Enum = "hardware_requests" | "printing" | "events" | "bookings" | "maintenance" | "members";
+export type FeatureEnum = "hardware_requests" | "printing" | "events" | "bookings" | "maintenance" | "members";
 
 export type ForgotPasswordRequest = {
   "email": string;
@@ -1764,6 +1764,8 @@ export type KeyCbbEnum = "email" | "telegram" | "slack" | "mattermost" | "discor
 export type KeyD07Enum = "hardware_requests" | "printing" | "events" | "bookings" | "maintenance" | "members";
 
 export type Kind3bfEnum = "dev_room" | "bench" | "meeting" | "other";
+
+export type KindE56Enum = "role" | "requester" | "members" | "user";
 
 export type LedgerResponse = {
   "count": number;
@@ -2341,6 +2343,12 @@ export type MakerspacePaymentSettings = {
   "effective_mode": string;
 };
 
+export type ManagedPolicyMarker = {
+  "feature": string;
+  "event": string;
+  "count": number;
+};
+
 export type Measurement883Enum = "count" | "grams";
 
 export type MemberAccountability = {
@@ -2669,7 +2677,7 @@ export type NotificationMarkAllRead = {
 };
 
 export type NotificationPreferenceCell = {
-  "feature": FeatureD07Enum;
+  "feature": FeatureEnum;
   "channel": ChannelCbbEnum;
   "enabled": boolean;
   "source": NotificationPreferenceCellSourceEnum;
@@ -2678,7 +2686,7 @@ export type NotificationPreferenceCell = {
 export type NotificationPreferenceCellSourceEnum = "default" | "override";
 
 export type NotificationPreferenceChange = {
-  "feature": FeatureD07Enum;
+  "feature": FeatureEnum;
   "channel": ChannelCbbEnum;
   "enabled": boolean;
 };
@@ -4128,27 +4136,71 @@ export type RecentlyAddedReportRow = {
   "total_quantity": number;
 };
 
+export type RecipientFeature = {
+  "key": string;
+  "events": Array<string>;
+};
+
+export type RecipientMember = {
+  "id": number;
+  "username": string;
+  "email": string;
+};
+
+export type RecipientRole = {
+  "id": number;
+  "name": string;
+  "slug": string;
+};
+
 export type RecipientRule = {
-  "kind": RecipientRuleKindEnum;
+  "kind": KindE56Enum;
   "role_id"?: number | null;
   "user_id"?: number | null;
   "scope"?: RecipientScope;
 };
 
-export type RecipientRuleKindEnum = "role" | "requester" | "members" | "user";
+export type RecipientRuleOutput = {
+  "kind": KindE56Enum;
+  "role_id"?: number | null;
+  "user_id"?: number | null;
+  "scope"?: RecipientScope;
+  "id": number;
+  "feature": string;
+  "event": string;
+};
 
 export type RecipientRulesPut = {
-  "feature": RecipientRulesPutFeatureEnum;
+  "feature": string;
   "event": string;
   "rules": Array<RecipientRule>;
 };
 
-export type RecipientRulesPutFeatureEnum = "bookings" | "events" | "maintenance" | "members";
+export type RecipientRulesResponse = {
+  "delegated": boolean;
+  "features": Array<RecipientFeature>;
+  "roles": Array<RecipientRole>;
+  "members": Array<RecipientMember>;
+  "rules": Array<RecipientRuleOutput>;
+  "managed_policy_markers": Array<ManagedPolicyMarker>;
+  "scope_options": RecipientScopeOptions;
+};
 
 export type RecipientScope = {
   "machine_type_ids"?: Array<number>;
   "machine_ids"?: Array<number>;
   "category_ids"?: Array<number>;
+};
+
+export type RecipientScopeOption = {
+  "id": number;
+  "name": string;
+};
+
+export type RecipientScopeOptions = {
+  "machine_types": Array<RecipientScopeOption>;
+  "machines": Array<RecipientScopeOption>;
+  "categories": Array<RecipientScopeOption>;
 };
 
 export type ReferralCreate = {

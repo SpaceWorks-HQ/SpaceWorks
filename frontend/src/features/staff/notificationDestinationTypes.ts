@@ -30,10 +30,17 @@ export type RecipientRule = {
 };
 
 export type RecipientRulesResponse = {
+  delegated: boolean;
   features: { key: string; events: string[] }[];
   roles: { id: number; name: string; slug: string }[];
   members: { id: number; username: string; email: string }[];
   rules: RecipientRule[];
+  managed_policy_markers: { feature: string; event: string; count: number }[];
+  scope_options: {
+    machine_types: { id: number; name: string }[];
+    machines: { id: number; name: string }[];
+    categories: { id: number; name: string }[];
+  };
 };
 
 export const EMPTY_SCOPE: DestinationScope = {

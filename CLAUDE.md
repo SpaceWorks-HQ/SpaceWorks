@@ -1956,6 +1956,58 @@ heading per type; `SharedConsumablesSection` owns unbound pools. Load-bearing de
   rows at all — only a pointer to Machines. Hardware API authorization is **untouched**; a
   deep-linked or stored route normalises to the actor's first allowed tab rather than rendering a
   dead-tab denial.
+- **A NARROWED RECIPIENT RULE MUST NOT SUPPRESS THE DEFAULT FOR SUBJECTS IT DOES NOT COVER
+  (phase 6c2).** This was a live bug, not a consequence of the delegation feature.
+  `staff_emails_for_feature` and `staff_user_ids_for_feature` asked
+  `has_selection(makerspace, feature, event)`, which **ignored `scope`** — so once any row existed
+  for a (feature, event) the selection became authoritative, and if every row was scoped to the
+  lasers while the alert was about a printer, `selected_*` matched nothing and **the printer
+  warning reached nobody**. `has_selection` now takes `scope` and is True only when at least one
+  row **covers** the subject (`recipient_scope_matching.rule_covers`), so an uncovered subject falls
+  through to the action-based default. That restores the module's governing rule: everything here
+  fails **OPEN** — over-notifying is recoverable, a missed maintenance warning is not.
+- **PRECEDENCE APPLIES ONLY AMONG ROWS THAT COVER THE SUBJECT (phase 6c2).**
+  `_selected_memberships` chose one responsible row per membership — members-wide first, then
+  role, then user — and tested `rule_covers` **after**. So a members row scoped to the printers
+  was picked for a laser alert, failed coverage, and skipped the membership, meaning the
+  laser-scoped role row that *did* cover it was never consulted and **the alert reached nobody**.
+  That is the same suppression `has_selection` was fixed for, one level further down, and 6c2 makes
+  the pairing ordinary: a delegated laser rule sits beside a preserved space-wide members rule by
+  design. Rows are filtered by coverage **before** precedence is applied.
+- **THE ACTION-BASED FALLBACK IS SCOPED TOO, BUT NO LINKS MEANS UNCONFIGURED, NOT "REACHES
+  NOTHING" (phase 6c2).** Once `has_selection` learned to fall through per subject, the fallback
+  became reachable for an alert naming a machine — and it predates machine scoping, so it would
+  mail every `MANAGE_MACHINES` holder the printer's maintenance detail, including a laser-only
+  maintainer who cannot open that machine in the console. `recipients.reach_filter_for` narrows it.
+  **The asymmetry with access is deliberate and must not be "fixed":** for access, a
+  machine-managing role with no links reaches nothing (fail closed); here the same state means the
+  role was never configured, and treating it as "reaches no machine" would mute a space's
+  maintenance mail the instant an alert named a machine. The filter therefore removes a membership
+  only when its role holds links that genuinely exclude the subject. Exempt actors always admit,
+  so a machine nobody is scoped to still reaches whoever administers the space, and alerts naming
+  no machine admit everyone — leaving every non-machine feature untouched.
+- **Delegated recipient rules: a maintainer edits their own partition and nothing else
+  (phase 6c2).** Behind the `notifications.delegated_recipients` feature (SM-writable,
+  **default OFF**, and OFF means *invisible* — today's 403, not a greyed editor). Authority is
+  `feature_enabled(...) AND role_scope.is_machine_only(...)`, and **maintenance only**;
+  `MANAGE_MAKERSPACE` keeps full authority over every feature.
+  - **`PUT` deletes by an explicit id list, and for a delegated actor that list is only the rows
+    ENTIRELY within their reach.** A full replace would have destroyed space-wide and other-team
+    rows the actor cannot even see. `row_fully_reachable` returns **False for a row with no scope
+    links** — that is what preserves a space-wide policy — and False for any category link, since
+    `manage_scope_for` grants no category reach (fail closed).
+  - **A rule with no scope links means "everything", so a delegated actor may never write one**, or
+    a narrow grant authors space-wide policy. A multi-type rule needs **full** coverage to edit, or
+    one team silently narrows another's.
+  - **Identities are validated, not merely offered.** The picker shows a delegated actor their own
+    role and the teammates holding it; the API refuses anything else. Accepting identities the
+    editor never presents is the inverse of a list that 403s on click — it would let a narrow grant
+    point alerts at an arbitrary colleague or a role it does not hold.
+  - **Hidden policies surface as an identity-free marker** (`{feature, event, count}`) — never full
+    rows (which expose recipient identities and role configuration to a narrow grant) and never
+    silence (which makes the operator reason wrongly about fallback).
+  - **Chat destinations and `receives_notifications` stay Space-Manager-only** and were deliberately
+    not widened.
 - **`role_scope.is_machine_only` is the ONE answer to "is this actor a per-type maintainer and
   nothing else" (phase 6c1).** Shared by the dashboard's non-machine counters and the in-app
   notification inbox, because two copies would drift and the failure is silent — a surface that

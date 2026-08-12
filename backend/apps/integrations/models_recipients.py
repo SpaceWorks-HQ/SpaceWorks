@@ -8,10 +8,10 @@ so a custom role holding `manage_events` already receives event alerts. What was
   applied to the hardware and printing streams, so those four were all-or-nothing;
 * recipients that are not staff at all — the whole member body, or a named individual.
 
-**Absence of rows means today's behaviour, not "nobody".** That is the load-bearing rule:
-bookings email and telegram are ON by default in `DEFAULT_CHANNEL_STATE`, so a strict
-default-nobody would have silently stopped booking alerts that are flowing right now.
-Rows are authoritative only once at least one exists for a (feature, event).
+**No row covering the alert subject means today's behaviour, not "nobody".** That is the
+load-bearing rule: bookings email and telegram are ON by default, so a strict
+default-nobody would silently stop live alerts. A scoped row is authoritative only for
+subjects it covers; unrelated alerts retain the action-based default.
 
 `role` is a real FK, so a renamed role keeps its rules and a deleted role takes its rules
 with it — the reason a slug string was rejected. Cross-tenant safety does not rest on the

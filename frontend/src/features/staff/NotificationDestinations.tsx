@@ -326,10 +326,12 @@ function DestinationForm({
 export function ScopePicker({
   onChange,
   options,
+  scopeRequired = false,
   scope,
 }: {
   onChange: (scope: DestinationScope) => void;
   options: ScopeOptions;
+  scopeRequired?: boolean;
   scope: DestinationScope;
 }) {
   const groups = [
@@ -343,7 +345,9 @@ export function ScopePicker({
   return (
     <fieldset className="grid gap-2">
       <legend className="text-sm text-muted">
-        Limit to (leave everything unticked to receive all alerts)
+        {scopeRequired
+          ? "Required: choose at least one machine or machine type"
+          : "Limit to (leave everything unticked to receive all alerts)"}
       </legend>
       <div className="grid gap-3 sm:grid-cols-3">
         {groups.map((group) => (
@@ -379,13 +383,14 @@ export function ScopePicker({
  * Scope targets a room or rule can name. Each list is optional — a makerspace with no
  * machines simply gets no machine column rather than an empty picker.
  */
-export function useScopeOptions(makerspaceId: number): ScopeOptions {
+export function useScopeOptions(makerspaceId: number, enabled = true): ScopeOptions {
   const machineTypes = useQuery({
     queryKey: ["machine-types", makerspaceId, "scope"],
     queryFn: () =>
       staffRequest<{ id: number; name: string }[]>(
         `/admin/makerspace/${makerspaceId}/machine-types`,
       ).catch(() => []),
+    enabled,
   });
   const machines = useQuery({
     queryKey: ["machines", makerspaceId, "scope"],
@@ -393,6 +398,7 @@ export function useScopeOptions(makerspaceId: number): ScopeOptions {
       staffRequest<{ results?: { id: number; name: string }[] } | { id: number; name: string }[]>(
         `/admin/makerspace/${makerspaceId}/machines`,
       ).catch(() => []),
+    enabled,
   });
   const categories = useQuery({
     queryKey: ["categories", makerspaceId, "scope"],
@@ -400,6 +406,7 @@ export function useScopeOptions(makerspaceId: number): ScopeOptions {
       staffRequest<{ results?: { id: number; name: string }[] } | { id: number; name: string }[]>(
         `/admin/makerspace/${makerspaceId}/categories`,
       ).catch(() => []),
+    enabled,
   });
 
   return {

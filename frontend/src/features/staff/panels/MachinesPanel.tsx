@@ -10,6 +10,7 @@ import { SharedConsumablesSection } from "./machine/SharedConsumablesSection";
 import { poolPath, poolQueryKey } from "./machine/servicePools";
 import { useServiceDrafts } from "./machine/serviceDrafts";
 import { MachineTypesPanel } from "./MachineTypesPanel";
+import { NotificationRecipientPicker } from "../NotificationRecipientPicker";
 import { Panel, useStaffGet } from "./shared";
 
 type StatusFilter = "all" | MachineStatus;
@@ -21,11 +22,12 @@ type Props = {
   maintenanceEnabled: boolean;
   machineServiceEnabled: boolean;
   printingEnabled: boolean;
+  delegatedRecipientRulesEnabled: boolean;
 };
 
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
-export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineTypes, maintenanceEnabled, machineServiceEnabled, printingEnabled }: Props) {
+export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineTypes, maintenanceEnabled, machineServiceEnabled, printingEnabled, delegatedRecipientRulesEnabled }: Props) {
   const queryClient = useQueryClient();
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -134,6 +136,10 @@ export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineType
       </div>
 
       <MachineTypesPanel makerspaceId={makerspaceId} canConfigureMachineTypes={canConfigureMachineTypes} />
+
+      {maintenanceEnabled && delegatedRecipientRulesEnabled ? (
+        <NotificationRecipientPicker delegated makerspaceId={makerspaceId} />
+      ) : null}
 
       {canManage && creatableTypes.length > 0 ? (
         <form className="mb-4 grid gap-3 rounded-xl border border-line bg-bg p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}>

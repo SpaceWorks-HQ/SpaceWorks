@@ -32,11 +32,11 @@ def staff_emails_for_feature(makerspace, feature, event=None, scope=None) -> lis
         if not getattr(makerspace, "staff_notifications_enabled", True):
             return []
 
-        # An explicit per-event selection is authoritative once one row exists; with no
-        # rows this falls straight through to the action-based resolution below, which is
+        # An explicit per-event selection is authoritative once one row covers this
+        # alert's subject; otherwise this falls through to action-based resolution, which is
         # what keeps today's behaviour intact (bookings email is ON by default, so a
         # "default nobody" reading would have silently stopped live booking mail).
-        if recipient_selection.has_selection(makerspace, feature, event):
+        if recipient_selection.has_selection(makerspace, feature, event, scope):
             return recipient_selection.selected_emails(
                 makerspace, feature, event, scope
             )
@@ -74,8 +74,13 @@ def staff_emails_for_feature(makerspace, feature, event=None, scope=None) -> lis
 
         seen = set()
         recipients = []
+        # The fallback predates machine scoping and is makerspace-wide, so an alert naming
+        # a machine must not mail a maintainer whose role cannot reach it.
+        admits = recipient_selection.reach_filter_for(memberships, scope)
         for membership in memberships:
             if required_action not in rbac.actions_for_membership(membership):
+                continue
+            if not admits(membership):
                 continue
             if mutable_event and notification_rules.role_muted(
                 makerspace, stream, event, membership.role
@@ -123,7 +128,7 @@ def staff_user_ids_for_feature(makerspace, feature, event=None, scope=None) -> l
             return []
         # Push is filtered by the same selection as email (D8): it is the mobile form of
         # the member's own message, not a separate audience.
-        if recipient_selection.has_selection(makerspace, feature, event):
+        if recipient_selection.has_selection(makerspace, feature, event, scope):
             return recipient_selection.selected_user_ids(
                 makerspace, feature, event, scope
             )
@@ -139,8 +144,11 @@ def staff_user_ids_for_feature(makerspace, feature, event=None, scope=None) -> l
             user__role=User.Role.SUPERADMIN
         ).select_related("assigned_role").order_by("id")
         result = []
+        admits = recipient_selection.reach_filter_for(memberships, scope)
         for membership in memberships:
             if required_action not in rbac.actions_for_membership(membership):
+                continue
+            if not admits(membership):
                 continue
             if mutable and notification_rules.role_muted(
                 makerspace, stream, event, membership.role

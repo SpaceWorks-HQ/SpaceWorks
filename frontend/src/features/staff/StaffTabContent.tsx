@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 
 import { Skeleton } from "../../components/ui";
 import type { StaffAuthUser } from "../../lib/api";
+import { featureEnabled } from "../../lib/features";
 import { Panel, type Makerspace } from "./panels/shared";
 import { StaffPanelErrorBoundary } from "./StaffPanelErrorBoundary";
 
@@ -58,6 +59,7 @@ export function StaffTabContent({
   canManageQr,
   canManageMakerspace,
   canManageMachines,
+  isMachineOnly,
   canConfigureMachineTypes,
   canManageEvents,
   canManageBookings,
@@ -81,6 +83,7 @@ export function StaffTabContent({
   canManageQr: boolean;
   canManageMakerspace: boolean;
   canManageMachines: boolean;
+  isMachineOnly: boolean;
   canConfigureMachineTypes: boolean;
   canManageEvents: boolean;
   canManageBookings: boolean;
@@ -128,6 +131,14 @@ export function StaffTabContent({
           maintenanceEnabled={activeMakerspace.enabled_modules?.includes("maintenance") ?? false}
           machineServiceEnabled={activeMakerspace.enabled_modules?.includes("machine_service") ?? false}
           printingEnabled={activeMakerspace.enabled_modules?.includes("printing") ?? false}
+          delegatedRecipientRulesEnabled={
+            isMachineOnly &&
+            (activeMakerspace.enabled_modules ?? []).includes("notifications") &&
+            featureEnabled(
+              activeMakerspace.enabled_features ?? [],
+              "notifications.delegated_recipients",
+            )
+          }
         />
       ) : null}
       {activeTab === "events" && canManageEvents ? <EventsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}

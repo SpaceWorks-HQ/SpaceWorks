@@ -35,6 +35,15 @@ def test_feature_defaults_are_dormant_except_legacy_compatible_self_checkout():
     )
 
 
+def test_delegated_notification_recipients_default_off_and_match_the_frontend():
+    from apps.makerspaces.capabilities import FEATURES
+
+    definition = FEATURES["notifications.delegated_recipients"]
+    assert definition.parent_module == "notifications"
+    assert definition.default_enabled is False
+    assert definition.key not in default_enabled_features()
+
+
 def test_self_checkout_is_standalone_and_independent_of_public_inventory():
     # Regression: self-checkout / direct handouts previously gated on the standalone
     # `self_checkout` module and NEVER required a public catalogue. A private makerspace
