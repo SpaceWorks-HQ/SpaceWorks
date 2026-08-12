@@ -2008,6 +2008,45 @@ heading per type; `SharedConsumablesSection` owns unbound pools. Load-bearing de
     silence (which makes the operator reason wrongly about fallback).
   - **Chat destinations and `receives_notifications` stay Space-Manager-only** and were deliberately
     not widened.
+  - **A `requester`/`members` row is SHARED, and is merged rather than replaced.**
+    `uniq_notification_recipient_special` is `(makerspace, feature, event, kind)`, so exactly one
+    such row can exist per event — two teams wanting "notify the requester for MY machines" are
+    describing one row, and delete-then-insert cannot express that (the second team's insert tripped
+    the constraint and surfaced as a misleading "a Space Manager-managed policy already uses one of
+    these recipients"). `recipient_rule_merge` therefore strips only the links inside the delegate's
+    reach and adds their submission back. Refusing the two kinds outright was tried and reverted: it
+    removes a capability the design intends, and a pre-existing test asserts a delegate CAN write a
+    scoped `requester` rule.
+    - **`_manageable_identity` returns True for these two kinds**, reversing the original rule.
+      They name no identity at all, so scope is the only question — and refusing them meant a
+      delegate could not round-trip their own save. **The accepted consequence is that SCOPE IS
+      OWNERSHIP here: `created_by` is never consulted, so a delegate may delete a Space Manager's
+      special row lying entirely inside their reach.** That is already the contract for a `role`
+      row naming their own role, and the schema carries no per-link contributor provenance to
+      express anything finer. Pinned by a test rather than left implicit.
+    - **A partially-overlapping row is PROJECTED, not hidden.** `payload` would otherwise omit it
+      and the delegate's successful save would read back as absent — the same "looks dropped"
+      defect the merge exists to remove. `project_special_row` emits their own links only, with
+      **`id: None`** (PUT is not id-addressed, nothing reads it, and the real key would disclose a
+      row they do not own), and the row is *still* counted in `managed_policy_markers`. The
+      projection and the merge **share `owned_links`**, or an untouched form silently changes
+      policy on save.
+    - **A link-less row is refused with a 400, never narrowed or silently no-oped.** No links means
+      EVERYTHING, so adding the delegate's links would shrink somebody else's space-wide policy.
+      Omitting the kind leaves it untouched.
+    - **Delete-on-last-link is UNREACHABLE by construction** (a preserved row always keeps an
+      out-of-reach, cross-tenant or category link) and is kept only as a fail-safe, because a
+      linkless leftover would silently promote a narrow rule to space-wide. It counts remaining
+      links **through the link models, never `row.machine_type_scopes.count()`** — the service hands
+      these rows over `prefetch_related`, and a populated related manager answers `.count()` from
+      that stale cache, reporting one link for a row that has none. Driven by a direct unit test,
+      since no API path reaches it.
+    - The marker copy names **no author**: with a shared row the hidden remainder may be another
+      maintainer's links, so "a Space Manager-managed policy" would often be false.
+  - **`revalidate` refreshes the identity gate as well as the reach**, and the success response
+    serializes with `keep.reach` — both were resolved before the makerspace lock, so a concurrent
+    role reassignment or scope narrowing left the write and the reply using authority the actor no
+    longer held.
 - **`role_scope.is_machine_only` is the ONE answer to "is this actor a per-type maintainer and
   nothing else" (phase 6c1).** Shared by the dashboard's non-machine counters and the in-app
   notification inbox, because two copies would drift and the failure is silent — a surface that

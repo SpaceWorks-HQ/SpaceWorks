@@ -27,7 +27,13 @@ class RecipientRulesPutSerializer(serializers.Serializer):
 
 
 class RecipientRuleOutputSerializer(RecipientRuleSerializer):
-    id = serializers.IntegerField()
+    # Nullable because a delegated actor's payload can include a REDACTED PROJECTION of a
+    # shared requester/members row -- their own scope links inside a row they do not own.
+    # `project_special_row` withholds the real primary key there: PUT is not id-addressed,
+    # so it confers nothing, and returning it would disclose a row belonging to someone
+    # else. A generated client must therefore expect `id: null`, which is exactly what a
+    # projection is: a rule with no addressable row of its own.
+    id = serializers.IntegerField(allow_null=True)
     feature = serializers.CharField()
     event = serializers.CharField()
 

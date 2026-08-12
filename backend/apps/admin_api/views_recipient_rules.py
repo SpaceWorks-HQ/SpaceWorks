@@ -21,6 +21,7 @@ from apps.admin_api.recipient_rule_common import (
     reach_for,
     row_fully_reachable,
 )
+from apps.admin_api.recipient_rule_merge import merge_preserved_for
 from apps.admin_api.recipient_rule_validation import prepare_rules
 from apps.admin_api.recipient_rule_serializers import (
     RecipientRulesPutSerializer,
@@ -128,6 +129,11 @@ class NotificationRecipientRulesView(APIView):
                     "Your recipient-management access changed while saving."
                 )
             keep.reach = fresh_reach
+            # The identity gate is resolved from the actor's ASSIGNED ROLE, which a
+            # concurrent membership edit can change just as a scope edit changes reach.
+            # Refreshing only `reach` left `keep_row` deciding the preserved partition with
+            # a stale answer to "whose rows are these".
+            keep.manageable = _manageable_identity(makerspace, request.user)
             return resolve(fresh_reach)
 
         try:
@@ -157,6 +163,17 @@ class NotificationRecipientRulesView(APIView):
                 ),
                 actor=request.user,
                 revalidate=revalidate,
+                # Built lazily from `keep.reach` for the same reason `keep_row` reads it:
+                # `revalidate` refreshes that attribute under the makerspace lock, and the
+                # merge must strip and re-add links using the authority the actor holds
+                # NOW, not the authority they held when the request arrived.
+                merge_preserved=(
+                    (lambda kept, prepared_rules: merge_preserved_for(keep.reach)(
+                        kept, prepared_rules
+                    ))
+                    if delegated
+                    else None
+                ),
             )
         except RuleValidationError as exc:
             body = {"detail": exc.detail}
@@ -170,9 +187,12 @@ class NotificationRecipientRulesView(APIView):
                 "A Space Manager-managed policy already uses one of these recipients."
             )
 
+        # `keep.reach`, not `reach`: `revalidate` may have re-resolved the actor's authority
+        # under the lock, and answering with the pre-lock view would show the caller a
+        # partition that no longer describes what was just written.
         return Response(
             rules_payload(
-                makerspace, request.user, delegated=delegated, reach=reach
+                makerspace, request.user, delegated=delegated, reach=keep.reach
             )
         )
 

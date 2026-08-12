@@ -80,8 +80,12 @@ export function EventRecipients({
       ) : null}
       {marker ? (
         <p className="text-sm text-muted">
-          A Space Manager-managed policy also applies to this event. Its recipients and
-          scope are hidden; your changes will not replace it.
+          {/* Deliberately names no author. A hidden remainder used to be a Space
+              Manager's row by construction; a shared requester/members row can now hold
+              another maintainer's links too, so claiming a manager wrote it would be a
+              statement about a colleague that is often false. */}
+          Another policy also applies to this event, scoped outside your machines. Its
+          recipients and scope are hidden; your changes will not replace it.
         </p>
       ) : null}
 

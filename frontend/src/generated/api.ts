@@ -4177,7 +4177,7 @@ export type RecipientRuleOutput = {
   "role_id"?: number | null;
   "user_id"?: number | null;
   "scope"?: RecipientScope;
-  "id": number;
+  "id": number | null;
   "feature": string;
   "event": string;
 };

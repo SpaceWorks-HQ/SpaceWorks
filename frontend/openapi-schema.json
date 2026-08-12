@@ -44244,7 +44244,8 @@
                         "$ref": "#/components/schemas/RecipientScope"
                     },
                     "id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                     },
                     "feature": {
                         "type": "string"

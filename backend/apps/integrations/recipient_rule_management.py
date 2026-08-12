@@ -8,7 +8,15 @@ from apps.integrations.models_recipients import NotificationRecipient
 
 @transaction.atomic
 def replace_recipient_rules(
-    *, makerspace, feature, event, rules, keep_row, actor, revalidate=None
+    *,
+    makerspace,
+    feature,
+    event,
+    rules,
+    keep_row,
+    actor,
+    revalidate=None,
+    merge_preserved=None,
 ):
     """Replace exactly the caller-owned partition and preserve every other row.
 
@@ -45,10 +53,22 @@ def replace_recipient_rules(
         "machine_type_scopes__machine_type",
         "category_scopes",
     )
-    doomed = [row.pk for row in existing if not keep_row(row)]
-    NotificationRecipient.objects.filter(pk__in=doomed).delete()
+    kept, doomed = [], []
+    for row in existing:
+        (kept if keep_row(row) else doomed).append(row)
+    NotificationRecipient.objects.filter(pk__in=[row.pk for row in doomed]).delete()
+
+    # Some rows cannot be expressed by delete-then-insert, because a uniqueness constraint
+    # allows only ONE of them per event and two callers legitimately share it. The caller
+    # hands down a callback that edits such a preserved row in place and reports which rule
+    # keys it has already expressed; those are then skipped below rather than inserted into
+    # a collision. This module stays generic -- it does not learn what "shared" or "reach"
+    # mean, so `apps.integrations` gains no dependency on `apps.admin_api`.
+    handled = merge_preserved(kept, rules) if merge_preserved is not None else set()
 
     for rule in rules:
+        if rule["kind"] in handled:
+            continue
         row = NotificationRecipient.objects.create(
             makerspace=makerspace,
             feature=feature,
@@ -75,5 +95,9 @@ def replace_recipient_rules(
             "feature": feature,
             "event": event,
             "kinds": [rule["kind"] for rule in rules],
+            # A merge edits a row the actor does not own, which a plain "replace" entry
+            # would not distinguish from having created one. The log is append-only, so it
+            # is the surviving evidence of who narrowed a shared policy.
+            **({"merged": sorted(handled)} if handled else {}),
         },
     )
