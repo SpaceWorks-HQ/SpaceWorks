@@ -88,7 +88,7 @@ export function BorrowRequestCard({
         </button>
         {submitError ? <Notice tone="danger" text={submitError} /> : null}
         {submitted ? (
-          <div className="rounded-xl border border-tone-mint bg-tone-mint px-3 py-2 text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]">
+          <div className="rounded-xl border border-success bg-success px-3 py-2 text-on-success dark:bg-[#06281a] dark:text-[#74dd9c]">
             <p className="text-sm font-semibold">Request submitted</p>
             <p className="mt-1 text-xs">
               Check this page with your email to follow the request.

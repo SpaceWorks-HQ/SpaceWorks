@@ -8,10 +8,10 @@ export type StatTone = "blue" | "yellow" | "mint" | "pink";
 // across the reskin. Each stat box picks one so the grid reads as a colourful
 // palette rather than a wall of identical surface tiles.
 export const STAT_TONE_CLASS: Record<StatTone, string> = {
-  blue: "border-tone-blue bg-tone-blue text-tone-blue-ink dark:bg-[#0b2a38] dark:text-[#7dd3fc]",
-  yellow: "border-tone-yellow bg-tone-yellow text-tone-yellow-ink dark:bg-[#332b00] dark:text-[#fcdf46]",
-  mint: "border-tone-mint bg-tone-mint text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]",
-  pink: "border-tone-pink bg-tone-pink text-tone-pink-ink dark:bg-[#3a1326] dark:text-[#f9a8d4]",
+  blue: "border-accent bg-accent text-on-accent dark:bg-[#0b2a38] dark:text-[#7dd3fc]",
+  yellow: "border-warn bg-warn text-on-warn dark:bg-[#332b00] dark:text-[#fcdf46]",
+  mint: "border-success bg-success text-on-success dark:bg-[#06281a] dark:text-[#74dd9c]",
+  pink: "border-secondary bg-secondary text-on-secondary dark:bg-[#3a1326] dark:text-[#f9a8d4]",
 };
 
 export function StatTile({

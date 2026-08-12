@@ -14,7 +14,7 @@ type PublicToolScanPanelProps = {
 
 function LoanResult({ loan }: { loan: PublicToolLoan }) {
   return (
-    <div className="rounded-xl border border-tone-mint bg-tone-mint px-3 py-2 text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]">
+    <div className="rounded-xl border border-success bg-success px-3 py-2 text-on-success dark:bg-[#06281a] dark:text-[#74dd9c]">
       <p className="text-sm font-semibold capitalize">
         {loan.status.replace(/_/g, " ")}: {loan.items.map((item) => item.product_name).join(", ") || "Tool loan"}
       </p>
@@ -100,7 +100,7 @@ export function PublicToolScanPanel({ makerspaceSlug }: PublicToolScanPanelProps
         Scan QR with camera
       </button>
       {scannedToken ? (
-        <p className="mt-2 inline-flex items-center gap-2 rounded-lg border border-tone-mint bg-tone-mint px-3 py-1 text-sm font-semibold text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]">
+        <p className="mt-2 inline-flex items-center gap-2 rounded-lg border border-success bg-success px-3 py-1 text-sm font-semibold text-on-success dark:bg-[#06281a] dark:text-[#74dd9c]">
           Scanned OK
           <button
             type="button"

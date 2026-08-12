@@ -63,7 +63,7 @@ export function StaffSidebar({
       </div>
       <div className="p-4">
         {singleTenantLocked ? (
-          <div className="break-words rounded-lg border border-line bg-tone-blue px-3 py-2 text-sm font-semibold text-tone-blue-ink dark:bg-[#0b2a38] dark:text-[#7dd3fc]">
+          <div className="break-words rounded-lg border border-line bg-accent px-3 py-2 text-sm font-semibold text-on-accent dark:bg-[#0b2a38] dark:text-[#7dd3fc]">
             {activeMakerspace?.name ?? "Configured makerspace"}
           </div>
         ) : (

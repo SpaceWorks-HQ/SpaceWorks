@@ -69,14 +69,6 @@
     --color-info-ink: 0 55 74;
     --color-danger: 164 36 59;
     --color-danger-ink: 90 22 32;
-    --color-tone-blue: 125 211 252;
-    --color-tone-blue-ink: 0 55 74;
-    --color-tone-yellow: 252 223 70;
-    --color-tone-yellow-ink: 61 52 0;
-    --color-tone-mint: 116 221 156;
-    --color-tone-mint-ink: 0 50 27;
-    --color-tone-pink: 249 168 212;
-    --color-tone-pink-ink: 90 22 51;
     --shadow-color: 31 46 53;
   }
 
@@ -112,14 +104,6 @@
     --color-info-ink: 125 211 252;
     --color-danger: 244 114 127;
     --color-danger-ink: 90 22 32;
-    --color-tone-blue: 125 211 252;
-    --color-tone-blue-ink: 0 55 74;
-    --color-tone-yellow: 252 223 70;
-    --color-tone-yellow-ink: 61 52 0;
-    --color-tone-mint: 116 221 156;
-    --color-tone-mint-ink: 0 50 27;
-    --color-tone-pink: 249 168 212;
-    --color-tone-pink-ink: 90 22 51;
     --shadow-color: 0 0 0;
   }
 
@@ -200,6 +184,28 @@
   .brutal-hover:hover {
     box-shadow: 0 8px 22px rgb(var(--shadow-color) / 0.12);
     transform: translateY(-2px);
+  }
+
+  /* --- type scale -------------------------------------------------------------------
+     The base layer already maps every h1-h6 to Clash Display, and 107 of ~224 components
+     use real heading elements -- so the display face was never "unused", it was SUPPRESSED
+     by the size and colour those headings carried (`Panel` rendered its h2 as
+     `text-sm font-semibold text-muted`). These four classes are the scale at which it
+     reads, and they keep the decision in one place instead of in 200 class strings.
+
+     `.eyebrow` is the JetBrains Mono voice for labels, units and column headers. `font-mono`
+     was already healthy in 28 files; this names the pattern so it stops being ad hoc. */
+  .title-page {
+    @apply text-2xl font-semibold tracking-tight text-ink;
+  }
+  .title-panel {
+    @apply text-lg font-semibold tracking-tight text-ink;
+  }
+  .title-section {
+    @apply text-base font-semibold text-ink;
+  }
+  .eyebrow {
+    @apply font-mono text-[11px] font-semibold uppercase tracking-wide text-muted;
   }
 
   .chip {

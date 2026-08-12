@@ -28,7 +28,7 @@ function formatStatus(status: string) {
 
 function ResultCard({ result }: { result: PublicToolLoanResult }) {
   return (
-    <div className="rounded-xl border border-tone-mint bg-tone-mint px-3 py-3 text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]">
+    <div className="rounded-xl border border-success bg-success px-3 py-3 text-on-success dark:bg-[#06281a] dark:text-[#74dd9c]">
       <p className="text-xs font-semibold tracking-wide">
         {formatStatus(result.status)}
       </p>
@@ -38,7 +38,7 @@ function ResultCard({ result }: { result: PublicToolLoanResult }) {
       <div className="mt-3 space-y-2">
         {result.items.map((item) => (
           <div
-            className="flex items-center justify-between gap-3 rounded-lg border border-tone-mint-ink/20 bg-panel/80 px-3 py-2 text-sm"
+            className="flex items-center justify-between gap-3 rounded-lg border border-on-success/20 bg-panel/80 px-3 py-2 text-sm"
             key={item.product_name}
           >
             <span>{item.product_name}</span>

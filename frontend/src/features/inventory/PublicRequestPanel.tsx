@@ -55,13 +55,13 @@ export function PublicRequestPanel({
   const tabTone: Record<ActiveTab, { active: string; idle: string }> = {
     borrow: {
       active:
-        "border-tone-blue bg-tone-blue text-tone-blue-ink dark:bg-[#0b2a38] dark:text-[#7dd3fc]",
-      idle: "hover:bg-tone-blue/40 hover:text-tone-blue-ink",
+        "border-accent bg-accent text-on-accent dark:bg-[#0b2a38] dark:text-[#7dd3fc]",
+      idle: "hover:bg-accent/40 hover:text-on-accent",
     },
     scan: {
       active:
-        "border-tone-mint bg-tone-mint text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]",
-      idle: "hover:bg-tone-mint/40 hover:text-tone-mint-ink",
+        "border-success bg-success text-on-success dark:bg-[#06281a] dark:text-[#74dd9c]",
+      idle: "hover:bg-success/40 hover:text-on-success",
     },
   };
 

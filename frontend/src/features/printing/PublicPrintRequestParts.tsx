@@ -21,11 +21,11 @@ const steps = [
 ];
 
 const STEP_TONE_CLASSES = [
-  "border-tone-blue bg-tone-blue text-tone-blue-ink",
-  "border-tone-yellow bg-tone-yellow text-tone-yellow-ink",
-  "border-tone-pink bg-tone-pink text-tone-pink-ink",
-  "border-tone-mint bg-tone-mint text-tone-mint-ink",
-  "border-tone-mint bg-tone-mint text-tone-mint-ink",
+  "border-accent bg-accent text-on-accent",
+  "border-warn bg-warn text-on-warn",
+  "border-secondary bg-secondary text-on-secondary",
+  "border-success bg-success text-on-success",
+  "border-success bg-success text-on-success",
 ] as const;
 
 export function TextInput({
@@ -216,7 +216,7 @@ export function StatusStepper({ status }: { status: PrintStatus }) {
         </div>
       ) : null}
       {timeLeft ? (
-        <p className="rounded-lg border border-tone-blue bg-tone-blue px-3 py-2 text-center text-sm font-semibold text-tone-blue-ink dark:bg-[#0b2a38] dark:text-[#7dd3fc]">
+        <p className="rounded-lg border border-accent bg-accent px-3 py-2 text-center text-sm font-semibold text-on-accent dark:bg-[#0b2a38] dark:text-[#7dd3fc]">
           {timeLeft}
         </p>
       ) : null}

@@ -212,10 +212,10 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
     { key: "lost_quantity", header: "Lost", sortable: true },
     { key: "actions", header: "", render: (product) => (
       <div className="desk-actions ml-auto grid w-max grid-cols-2 gap-2">
-        <button className="desk-button w-full bg-tone-blue text-tone-blue-ink" type="button" onClick={() => openEdit(product)}>Edit</button>
-        {!product.is_archived ? <button className="desk-button w-full bg-tone-yellow text-tone-yellow-ink" type="button" disabled={product.tracking_mode === "individual" ? product.available_quantity + product.damaged_quantity <= 0 : product.available_quantity <= 0} onClick={() => openFix(product)}>To Fix</button> : null}
-        {product.is_archived ? <button className="desk-button w-full bg-tone-mint text-tone-mint-ink" type="button" disabled={unarchive.isPending} onClick={() => unarchive.mutate(product)}>Back to inventory</button> : <button className="desk-button w-full bg-tone-mint text-tone-mint-ink" type="button" onClick={() => setArchiveTarget(product)}>Archive</button>}
-        {canUseToBuy ? <button className="desk-button w-full bg-tone-pink text-tone-pink-ink" type="button" onClick={() => openToBuy(product)}>To Buy</button> : null}
+        <button className="desk-button w-full bg-accent text-on-accent" type="button" onClick={() => openEdit(product)}>Edit</button>
+        {!product.is_archived ? <button className="desk-button w-full bg-warn text-on-warn" type="button" disabled={product.tracking_mode === "individual" ? product.available_quantity + product.damaged_quantity <= 0 : product.available_quantity <= 0} onClick={() => openFix(product)}>To Fix</button> : null}
+        {product.is_archived ? <button className="desk-button w-full bg-success text-on-success" type="button" disabled={unarchive.isPending} onClick={() => unarchive.mutate(product)}>Back to inventory</button> : <button className="desk-button w-full bg-success text-on-success" type="button" onClick={() => setArchiveTarget(product)}>Archive</button>}
+        {canUseToBuy ? <button className="desk-button w-full bg-secondary text-on-secondary" type="button" onClick={() => openToBuy(product)}>To Buy</button> : null}
       </div>
     ) },
   ];

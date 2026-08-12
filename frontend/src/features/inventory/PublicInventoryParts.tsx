@@ -65,7 +65,7 @@ export function CatalogSidebar({
   const countClass = (active: boolean) =>
     active
       ? "ml-2 text-xs text-on-accent/80"
-      : "ml-2 rounded-full bg-tone-yellow px-1.5 text-xs text-tone-yellow-ink dark:bg-[#332b00] dark:text-[#fcdf46]";
+      : "ml-2 rounded-full bg-warn px-1.5 text-xs text-on-warn dark:bg-[#332b00] dark:text-[#fcdf46]";
 
   return (
     <Card

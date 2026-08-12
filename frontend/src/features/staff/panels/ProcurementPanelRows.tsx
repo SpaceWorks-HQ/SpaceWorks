@@ -95,7 +95,7 @@ export function ProcurementRow({ item, makerspaceSlug, updatePending, deletePend
       <td className="px-3 py-2 text-xs text-muted"><MoveState item={item} makerspaceSlug={makerspaceSlug} /></td>
       <td className="px-3 py-2 text-right">
         <div className="flex flex-col gap-2">
-          {item.status === "received" && !item.moved_to_inventory_at ? <button type="button" className="desk-button bg-tone-mint text-tone-mint-ink" onClick={onMove}>Move</button> : null}
+          {item.status === "received" && !item.moved_to_inventory_at ? <button type="button" className="desk-button bg-success text-on-success" onClick={onMove}>Move</button> : null}
           <button type="button" className="desk-button" disabled={updatePending || !isDraftChanged(item, draft)} onClick={() => onSave(draft)}>Save</button>
           <button type="button" className="desk-button" disabled={deletePending} onClick={onDelete}>Delete</button>
         </div>

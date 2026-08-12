@@ -1382,6 +1382,29 @@ the client never hard-blocks check-in on a location error. Do **not** convert it
 without adding an unforgeable proximity factor (owner decision). Dormant/self-host safe: no geo config ⇒ no
 check and the `geofence_enabled` bootstrap flag is **omitted entirely** (byte-for-byte-unchanged invariant).
 
+**One colour vocabulary, and `tone-*` is GONE.** The four pastels used to exist twice under two
+names — `--color-accent` == `--color-tone-blue`, `secondary` == `tone-pink`, `success` == `tone-mint`,
+`warn` == `tone-yellow` — both wired through `tailwind.config.ts` and both in active use, so which
+name a component reached for was historical accident. The semantic vocabulary won (`bg-success` says
+why the colour is there; `bg-tone-mint` does not) and the `tone-*` tokens are deleted from
+`index.css` and the config.
+- **THE MIGRATION WAS NOT A RENAME, and treating it as one breaks dark mode.** Only the FILLS were
+  byte-identical. `tone-*-ink` stays **fixed dark** in dark mode, exactly like `on-*`, while
+  `{name}-ink` goes **light**. So all 39 `tone-*-ink` call sites map to **`on-*`**; mapping them to
+  `-ink` puts light text on a light pastel fill. Fills map straight across.
+- **Colour is surface-coded**: `accent` = interaction, primary actions, active nav and staff chrome;
+  `secondary` (pink) = every stranger-facing surface (public catalogue, member area, auth, kiosk);
+  `success`/`warn` keep their status meaning; `danger` is unchanged and is the only non-pastel.
+- **The display face was never unused — it was suppressed.** `@layer base` already maps every
+  `h1`–`h6` to Clash Display and 107 of ~224 components use real headings; `Panel` simply rendered
+  its `h2` as `text-sm font-semibold text-muted`. The scale lives in `@layer components` as
+  `.title-page` / `.title-panel` / `.title-section` / `.eyebrow` (the JetBrains Mono voice for
+  labels, units and column headers) so the decision sits in one place rather than in 200 class
+  strings.
+- `tests/test_frontend_theme_contrast.py` now also guards `success-ink`, `warn-ink` and `info-ink`.
+  They were omitted while the palette was effectively one colour and those inks only ever appeared
+  inside solid pastel fills, where the fixed `on-*` tokens apply instead.
+
 **Accessibility floor (phase 22).** Four rules, each of which had a real counter-example in the tree:
 - **Text contrast is drift-guarded from the backend suite.** `tests/test_frontend_theme_contrast.py`
   parses `frontend/src/index.css` and fails any text token below AA (4.5:1) on `bg`/`surface`/`panel`,

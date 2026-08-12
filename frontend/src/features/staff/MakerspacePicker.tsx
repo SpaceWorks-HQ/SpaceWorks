@@ -43,7 +43,7 @@ export function MakerspacePicker({
         {loading ? (
           <p className="text-sm text-muted">Loading makerspaces…</p>
         ) : !makerspaces.length ? (
-          <div className="desk-panel bg-tone-yellow p-6 text-tone-yellow-ink dark:bg-[#332b00] dark:text-[#fcdf46]">
+          <div className="desk-panel bg-warn p-6 text-on-warn dark:bg-[#332b00] dark:text-[#fcdf46]">
             <p className="text-sm">No makerspaces exist yet. Create one from the Django control plane.</p>
           </div>
         ) : (

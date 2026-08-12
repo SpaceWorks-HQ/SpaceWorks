@@ -24,7 +24,21 @@ AA_BODY_TEXT = 4.5
 NON_TEXT = 3.0
 
 BACKGROUNDS = ("bg", "surface", "panel")
-TEXT_TOKENS = ("ink", "muted", "accent-ink", "secondary-ink", "danger")
+# Every token that can style STANDALONE text on one of the three backgrounds. The three
+# status inks were missing while the palette was effectively one colour and they only ever
+# appeared inside solid pastel fills (where the fixed `on-*` tokens apply instead). The
+# surface-coded palette gives them real standalone work, so an unguarded one could drift
+# below AA exactly the way `--color-muted` silently had before this test existed.
+TEXT_TOKENS = (
+    "ink",
+    "muted",
+    "accent-ink",
+    "secondary-ink",
+    "success-ink",
+    "warn-ink",
+    "info-ink",
+    "danger",
+)
 SCOPES = (("light", ":root {"), ("dark", ":root.dark {"))
 
 

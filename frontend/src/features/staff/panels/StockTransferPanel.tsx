@@ -174,7 +174,7 @@ export function StockTransferPanel({
     <Panel title="Stock transfers">
       <div className="grid gap-4">
         {!canCreate ? (
-          <p className="rounded-md border border-line bg-tone-yellow px-3 py-2 text-sm text-tone-yellow-ink dark:bg-[#332b00] dark:text-[#fcdf46]">
+          <p className="rounded-md border border-line bg-warn px-3 py-2 text-sm text-on-warn dark:bg-[#332b00] dark:text-[#fcdf46]">
             Transfers are managed by inventory staff. This view is read-only.
           </p>
         ) : (

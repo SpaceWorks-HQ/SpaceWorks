@@ -1,10 +1,10 @@
 const STAGES = ["Requested", "Approved", "Collected", "Returned"] as const;
 
 const STEP_TONE_CLASSES = [
-  "border-tone-blue bg-tone-blue text-tone-blue-ink",
-  "border-tone-yellow bg-tone-yellow text-tone-yellow-ink",
-  "border-tone-pink bg-tone-pink text-tone-pink-ink",
-  "border-tone-mint bg-tone-mint text-tone-mint-ink",
+  "border-accent bg-accent text-on-accent",
+  "border-warn bg-warn text-on-warn",
+  "border-secondary bg-secondary text-on-secondary",
+  "border-success bg-success text-on-success",
 ] as const;
 
 function statusStageIndex(status: string): number {

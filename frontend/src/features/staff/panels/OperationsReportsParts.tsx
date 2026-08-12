@@ -76,10 +76,10 @@ function ReportSkeleton() {
 // Pastel fill + matching ink (with dark-mode deep-tint) so each report stat box
 // carries a palette colour, cycled by position across the grid.
 const STAT_TONE_CYCLE = [
-  "border-tone-blue bg-tone-blue text-tone-blue-ink dark:bg-[#0b2a38] dark:text-[#7dd3fc]",
-  "border-tone-yellow bg-tone-yellow text-tone-yellow-ink dark:bg-[#332b00] dark:text-[#fcdf46]",
-  "border-tone-mint bg-tone-mint text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]",
-  "border-tone-pink bg-tone-pink text-tone-pink-ink dark:bg-[#3a1326] dark:text-[#f9a8d4]",
+  "border-accent bg-accent text-on-accent dark:bg-[#0b2a38] dark:text-[#7dd3fc]",
+  "border-warn bg-warn text-on-warn dark:bg-[#332b00] dark:text-[#fcdf46]",
+  "border-success bg-success text-on-success dark:bg-[#06281a] dark:text-[#74dd9c]",
+  "border-secondary bg-secondary text-on-secondary dark:bg-[#3a1326] dark:text-[#f9a8d4]",
 ];
 
 export function StatCards({ stats }: { stats: [string, number | undefined][] }) {
