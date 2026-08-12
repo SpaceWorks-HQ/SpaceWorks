@@ -313,6 +313,9 @@ class DailyNotificationCounter(models.Model):
 
 
 from apps.integrations.models_chat_templates import ChatTemplate  # noqa: E402
+from apps.integrations.models_machine_templates import (  # noqa: E402
+    MachineTypeEmailTemplate,
+)
 from apps.integrations.models_destinations import (  # noqa: E402
     DestinationCategoryScope,
     DestinationMachineScope,
@@ -346,6 +349,7 @@ __all__ = [
     'EmailLog',
     'EmailNotificationMute',
     'EmailTemplate',
+    'MachineTypeEmailTemplate',
     'NonEmailNotificationChannel',
     'NotificationChannel',
     'NotificationDeliveryLog',

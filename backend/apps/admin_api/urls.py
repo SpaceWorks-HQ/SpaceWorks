@@ -8,6 +8,8 @@ from apps.admin_api.views_email_templates import (
     EmailTemplateListView,
     EmailTemplatePreviewView,
     EmailTemplateResetView,
+    MachineTypeEmailTemplateDetailView,
+    MachineTypeEmailTemplateResetView,
 )
 from apps.admin_api.views_email_logs import EmailLogListView, EmailLogRetryView
 from apps.admin_api.views_integration_health import IntegrationHealthView
@@ -622,6 +624,16 @@ urlpatterns = [
         "makerspace/<int:makerspace_id>/email-templates/<str:stream>/<str:audience>/<str:key>/reset",
         EmailTemplateResetView.as_view(),
         name="admin-email-template-reset",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/email-templates/<str:stream>/<str:audience>/<str:key>/types/<int:machine_type_id>/reset",
+        MachineTypeEmailTemplateResetView.as_view(),
+        name="admin-machine-type-email-template-reset",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/email-templates/<str:stream>/<str:audience>/<str:key>/types/<int:machine_type_id>",
+        MachineTypeEmailTemplateDetailView.as_view(),
+        name="admin-machine-type-email-template-detail",
     ),
     path(
         "makerspace/<int:makerspace_id>/email-templates/<str:stream>/<str:audience>/<str:key>",

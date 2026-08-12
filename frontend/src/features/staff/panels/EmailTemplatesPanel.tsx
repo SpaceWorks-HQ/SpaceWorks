@@ -25,17 +25,33 @@ export function EmailTemplatesPanel({ makerspace }: { makerspace: Makerspace }) 
       setSelected(null);
       return;
     }
-    const visible = selected
-      ? rows.some(
+    const current = selected
+      ? rows.find(
           (row) =>
             row.stream === selected.stream &&
             row.audience === selected.audience &&
             row.key === selected.key,
         )
-      : false;
-    if (!visible) {
+      : undefined;
+    if (!current || !selected || !selectedAxisIsVisible(current, selected)) {
       const first = rows[0];
-      setSelected({ stream: first.stream, audience: first.audience, key: first.key });
+      setSelected(selectTemplate(first));
+      return;
+    }
+    const currentType = selected.machineType
+      ? current.overridable_types.find((item) => item.id === selected.machineType?.id) ?? null
+      : null;
+    if (
+      selected.canEditSpaceDefault !== current.can_edit_space_default ||
+      selected.overridableTypes !== current.overridable_types ||
+      selected.machineType !== currentType
+    ) {
+      setSelected({
+        ...selected,
+        machineType: currentType,
+        canEditSpaceDefault: current.can_edit_space_default,
+        overridableTypes: current.overridable_types,
+      });
     }
   }, [rows, selected]);
 
@@ -55,7 +71,11 @@ export function EmailTemplatesPanel({ makerspace }: { makerspace: Makerspace }) 
             <TemplateList groups={grouped} selected={selected} onSelect={setSelected} />
           </div>
           {selected ? (
-            <EmailTemplateEditor makerspaceId={makerspace.id} selected={selected} />
+            <EmailTemplateEditor
+              makerspaceId={makerspace.id}
+              selected={selected}
+              onSelectMachineType={(machineType) => setSelected({ ...selected, machineType })}
+            />
           ) : null}
         </div>
       )}
@@ -116,15 +136,11 @@ function TemplateButton({
       }`}
       type="button"
       onClick={() =>
-        onSelect({
-          stream: template.stream,
-          audience: template.audience,
-          key: template.key,
-        })
+        onSelect(selectTemplate(template))
       }
     >
       <span className="min-w-0 truncate font-semibold">{template.label}</span>
-      {template.is_overridden ? <Badge tone="warn">Edited</Badge> : null}
+      {template.is_overridden || template.overridable_types.some((item) => item.is_overridden) ? <Badge tone="warn">Edited</Badge> : null}
     </button>
   );
 }
@@ -149,6 +165,22 @@ function isSelected(selected: SelectedTemplate | null, template: TemplateSummary
     selected.audience === template.audience &&
     selected.key === template.key
   );
+}
+
+function selectTemplate(template: TemplateSummary): SelectedTemplate {
+  return {
+    stream: template.stream,
+    audience: template.audience,
+    key: template.key,
+    machineType: template.can_edit_space_default ? null : template.overridable_types[0] ?? null,
+    canEditSpaceDefault: template.can_edit_space_default,
+    overridableTypes: template.overridable_types,
+  };
+}
+
+function selectedAxisIsVisible(template: TemplateSummary, selected: SelectedTemplate) {
+  if (selected.machineType === null) return template.can_edit_space_default;
+  return template.overridable_types.some((item) => item.id === selected.machineType?.id);
 }
 
 function formatLabel(value: string) {

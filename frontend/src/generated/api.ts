@@ -194,6 +194,8 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/email-templates/preview",
   "/api/v1/admin/makerspace/{makerspace_id}/email-templates/{stream}/{audience}/{key}",
   "/api/v1/admin/makerspace/{makerspace_id}/email-templates/{stream}/{audience}/{key}/reset",
+  "/api/v1/admin/makerspace/{makerspace_id}/email-templates/{stream}/{audience}/{key}/types/{machine_type_id}",
+  "/api/v1/admin/makerspace/{makerspace_id}/email-templates/{stream}/{audience}/{key}/types/{machine_type_id}/reset",
   "/api/v1/admin/makerspace/{makerspace_id}/integration-health",
   "/api/v1/admin/makerspace/{makerspace_id}/inventory",
   "/api/v1/admin/makerspace/{makerspace_id}/inventory/export",
@@ -1264,7 +1266,7 @@ export type EmailTemplateDetail = {
   "label": string;
   "description": string;
   "fields": Array<{
-  [key: string]: string;
+  [key: string]: unknown;
 }>;
   "subject": string;
   "text_body": string;
@@ -1283,12 +1285,15 @@ export type EmailTemplateListItem = {
   "label": string;
   "is_active": boolean;
   "is_overridden": boolean;
+  "can_edit_space_default": boolean;
+  "overridable_types": Array<MachineTypeOption>;
 };
 
 export type EmailTemplatePreviewRequest = {
   "stream": string;
   "audience": string;
   "key": string;
+  "machine_type_id"?: number;
   "subject": string;
   "text_body": string;
   "html_body": string;
@@ -2082,6 +2087,13 @@ export type MachineTypeCreate = {
   "name": string;
   "icon"?: string;
   "capability_config"?: unknown;
+};
+
+export type MachineTypeOption = {
+  "id": number;
+  "name": string;
+  "is_active": boolean;
+  "is_overridden": boolean;
 };
 
 export type MachineTypePricing = {

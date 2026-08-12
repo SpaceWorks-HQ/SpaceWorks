@@ -14,9 +14,12 @@ logger = logging.getLogger(__name__)
 REQUESTER_EVENTS = frozenset({"submitted", "accepted", "started", "rejected", "completed"})
 
 
+def _request_machine_type(request):
+    return request.queue.machine_type if request.queue_id else request.bucket.machine.machine_type
+
+
 def _is_printer_request(request):
-    machine_type = request.queue.machine_type if request.queue_id else request.bucket.machine.machine_type
-    return is_printer_type(machine_type)
+    return is_printer_type(_request_machine_type(request))
 
 
 def _projection(request):
@@ -41,11 +44,25 @@ def _requester_render(event, request):
     base = getattr(settings, "PUBLIC_APP_BASE_URL", "") or ""
     status_url = f"{base}/m/{request.makerspace.slug}/print?token={request.public_token}" if base else ""
     row = _projection(request)
-    return recipient, render(request.makerspace, "printing", "requester", event, printing_context(row, status_url, request.public_token))
+    return recipient, render(
+        request.makerspace,
+        "printing",
+        "requester",
+        event,
+        printing_context(row, status_url, request.public_token),
+        machine_type=_request_machine_type(request),
+    )
 
 
 def _staff_render(event, request):
-    return render(request.makerspace, "printing", "staff", event, printing_context(_projection(request), "", ""))
+    return render(
+        request.makerspace,
+        "printing",
+        "staff",
+        event,
+        printing_context(_projection(request), "", ""),
+        machine_type=_request_machine_type(request),
+    )
 
 
 def _staff_body(event, request):

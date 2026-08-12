@@ -4,7 +4,7 @@ from django.template import Context, Template
 from django.utils import timezone
 
 from apps.integrations.email_templates_registry import bag, get_entry
-from apps.integrations.models import EmailTemplate
+from apps.integrations.models import EmailTemplate, MachineTypeEmailTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -93,10 +93,40 @@ def printing_context(print_request, status_url, public_token):
     }
 
 
-def render(makerspace, stream, audience, key, context):
+def render(makerspace, stream, audience, key, context, *, machine_type=None):
     # is_active=False means "use the built-in default for this event" (the original
     # HardwareEmailTemplate semantic), NOT "suppress the email" — lifecycle notifications
     # always send, so a toggled-off custom row falls through to the registry default below.
+    if machine_type is not None:
+        override = MachineTypeEmailTemplate.objects.filter(
+            makerspace=makerspace,
+            machine_type=machine_type,
+            stream=stream,
+            audience=audience,
+            key=key,
+            is_active=True,
+        ).first()
+        if override is not None:
+            try:
+                return _render_strings(
+                    override.subject,
+                    override.text_body,
+                    override.html_body,
+                    context,
+                )
+            except Exception:
+                logger.warning(
+                    "email_template_render_failed",
+                    extra={
+                        "makerspace_id": makerspace.pk,
+                        "machine_type_id": machine_type.pk,
+                        "stream": stream,
+                        "audience": audience,
+                        "key": key,
+                    },
+                    exc_info=True,
+                )
+
     row = EmailTemplate.objects.filter(
         makerspace=makerspace,
         stream=stream,

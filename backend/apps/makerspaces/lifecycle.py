@@ -171,7 +171,7 @@ def _delete_object_graph(makerspace):
     from apps.hardware_requests.models import PublicToolLoan, RequesterAccountability
     from apps.hardware_requests.models import ReturnEvent
     from apps.hardware_requests.asset_link_models import HardwareRequestItemAsset
-    from apps.integrations.models import EmailTemplate
+    from apps.integrations.models import EmailTemplate, MachineTypeEmailTemplate
     from apps.inventory.models import Category, InventoryAsset, InventoryProduct
     from apps.makerspaces.models import MakerspaceMembership
     from apps.operations.models import InventoryAdjustment, QrPrintBatch
@@ -239,6 +239,7 @@ def _delete_object_graph(makerspace):
         Box.objects.filter(makerspace=makerspace).delete()
 
         EmailTemplate.objects.filter(makerspace=makerspace).delete()
+        MachineTypeEmailTemplate.objects.filter(makerspace=makerspace).delete()
         ApiClient.objects.filter(makerspace=makerspace).delete()
         ApiKeyRequest.objects.filter(makerspace=makerspace).delete()
         MakerspaceMembership.objects.filter(makerspace=makerspace).delete()

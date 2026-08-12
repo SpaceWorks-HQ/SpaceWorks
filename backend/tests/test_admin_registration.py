@@ -11,7 +11,7 @@ from apps.audit.models import AuditLog
 from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
 from apps.evidence.models import EvidencePhoto
 from apps.hardware_requests.models import HardwareRequest, HardwareRequestItemAsset, PublicToolLoan, RequesterAccountability, ReturnEvent
-from apps.integrations.models import EmailTemplate
+from apps.integrations.models import EmailTemplate, MachineTypeEmailTemplate
 from apps.inventory.models import Category, InventoryAsset, InventoryProduct
 from apps.makerspaces.models import Makerspace, MakerspaceArchiveRequest, MakerspaceMembership
 from apps.notifications.models import Notification
@@ -20,7 +20,7 @@ from apps.procurement.models import ToBuyItem
 
 
 def test_core_models_are_registered_in_django_admin():
-    registered_models = {Makerspace, MakerspaceArchiveRequest, MakerspaceMembership, Category, InventoryProduct, InventoryAsset, Box, BoxScan, QrCode, QrScanEvent, HardwareRequest, EmailTemplate, PublicToolLoan, ReturnEvent, RequesterAccountability, HardwareRequestItemAsset, StockTransfer, StocktakeSession, InventoryAdjustment, QrPrintBatch, ApiClient, ApiKeyRequest, AuditLog, EvidencePhoto, ToBuyItem, User}
+    registered_models = {Makerspace, MakerspaceArchiveRequest, MakerspaceMembership, Category, InventoryProduct, InventoryAsset, Box, BoxScan, QrCode, QrScanEvent, HardwareRequest, EmailTemplate, MachineTypeEmailTemplate, PublicToolLoan, ReturnEvent, RequesterAccountability, HardwareRequestItemAsset, StockTransfer, StocktakeSession, InventoryAdjustment, QrPrintBatch, ApiClient, ApiKeyRequest, AuditLog, EvidencePhoto, ToBuyItem, User}
     assert registered_models <= set(admin.site._registry)
 
 

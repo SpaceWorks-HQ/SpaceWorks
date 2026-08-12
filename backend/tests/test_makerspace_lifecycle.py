@@ -22,7 +22,7 @@ from apps.hardware_requests.asset_link_models import HardwareRequestItemAsset
 from apps.hardware_requests.models import HardwareRequest, HardwareRequestItem
 from apps.hardware_requests.return_models import RequesterAccountability, ReturnEvent
 from apps.hardware_requests.self_checkout_models import PublicToolLoan
-from apps.integrations.models import EmailTemplate
+from apps.integrations.models import EmailTemplate, MachineTypeEmailTemplate
 from apps.inventory.models import Category, InventoryAsset, InventoryProduct
 from apps.makerspaces import lifecycle
 from apps.makerspaces.models import (
@@ -396,6 +396,15 @@ def populate_full_purge_graph(makerspace, survivor, actor):
         slug=f"maintenance-{makerspace.id}",
         name="Maintenance Machine",
     )
+    MachineTypeEmailTemplate.objects.create(
+        makerspace=makerspace,
+        machine_type=machine_type,
+        stream="maintenance",
+        audience="staff",
+        key="logged",
+        subject="Machine serviced",
+        text_body="Serviced.",
+    )
     machine = Machine.objects.create(
         makerspace=makerspace,
         machine_type=machine_type,
@@ -496,6 +505,7 @@ def assert_purged_makerspace_graph(space_id):
     assert ApiClient.objects.filter(makerspace_id=space_id).count() == 0
     assert ApiKeyRequest.objects.filter(makerspace_id=space_id).count() == 0
     assert EmailTemplate.objects.filter(makerspace_id=space_id).count() == 0
+    assert MachineTypeEmailTemplate.objects.filter(makerspace_id=space_id).count() == 0
     assert MakerspaceMembership.objects.filter(makerspace_id=space_id).count() == 0
     assert AuditLog.objects.filter(makerspace_id=space_id).count() == 0
     assert Payment.objects.filter(makerspace_id=space_id).count() == 0

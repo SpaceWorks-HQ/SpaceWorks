@@ -1,7 +1,7 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
-from apps.integrations.models import EmailTemplate
+from apps.integrations.models import EmailTemplate, MachineTypeEmailTemplate
 from apps.integrations.models_chat_templates import ChatTemplate
 from config.admin_access import SuperuserOnlyModelAdmin
 
@@ -22,6 +22,42 @@ class EmailTemplateAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
     fields = (
         "makerspace",
+        "stream",
+        "audience",
+        "key",
+        "subject",
+        "text_body",
+        "html_body",
+        "is_active",
+        "created_at",
+        "updated_at",
+    )
+
+
+@admin.register(MachineTypeEmailTemplate)
+class MachineTypeEmailTemplateAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    list_display = (
+        "makerspace",
+        "machine_type",
+        "stream",
+        "audience",
+        "key",
+        "is_active",
+        "updated_at",
+    )
+    list_filter = ("stream", "audience", "key", "is_active", "makerspace")
+    search_fields = (
+        "subject",
+        "text_body",
+        "html_body",
+        "makerspace__name",
+        "machine_type__name",
+    )
+    autocomplete_fields = ("makerspace", "machine_type")
+    readonly_fields = ("created_at", "updated_at")
+    fields = (
+        "makerspace",
+        "machine_type",
         "stream",
         "audience",
         "key",

@@ -21,13 +21,15 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
         log = None
         if is_schedule:
             schedule = MaintenanceSchedule.objects.select_related(
-                "machine__makerspace"
+                "machine__makerspace", "machine__machine_type"
             ).get(pk=object_id)
             machine = schedule.machine
             if log_id is not None:
                 log = MaintenanceLog.objects.get(pk=log_id, machine=machine)
         else:
-            log = MaintenanceLog.objects.select_related("machine__makerspace").get(
+            log = MaintenanceLog.objects.select_related(
+                "machine__makerspace", "machine__machine_type"
+            ).get(
                 pk=object_id
             )
             machine = log.machine
@@ -42,7 +44,14 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
         # scoped to the laser (or to every 3D printer) matches on it, and a recipient rule
         # narrowed the same way filters who is mailed.
         scope = NotificationScope(machine=machine)
-        staff = render(makerspace, "maintenance", "staff", event_name, context)
+        staff = render(
+            makerspace,
+            "maintenance",
+            "staff",
+            event_name,
+            context,
+            machine_type=machine.machine_type,
+        )
         emails = tuple(
             EmailDelivery(
                 to_email=recipient,
@@ -55,6 +64,8 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
                 makerspace, "maintenance", event=event_name, scope=scope
             )
         )
+        # This text is also the no-ChatTemplate chat fallback and the native-push body.
+        # A maintenance type override intentionally gives all three channels one wording.
         return LifecyclePayload(
             text=staff["text_body"],
             emails=emails,
