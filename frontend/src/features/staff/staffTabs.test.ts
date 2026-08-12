@@ -64,6 +64,14 @@ describe("job handover", () => {
     expect(access(["manage_machines"]).allowedTabs).toContain("handover");
   });
 
+  it("does not show the hardware Requests tab to a machine-only role", () => {
+    const machineOnly = access(["manage_machines"]);
+
+    expect(machineOnly.canSeeHardware).toBe(false);
+    expect(machineOnly.allowedTabs).not.toContain("requests");
+    expect(machineOnly.defaultTab).toBe("dashboard");
+  });
+
   it("hides the tab when the deployment does not run machine service", () => {
     // Module availability is filterTabsByEnabledModules' job, not getStaffAccess'.
     const { allowedTabs } = access(["collect_service_request"]);

@@ -86,7 +86,10 @@ export function StaffWorkspace({
     ? staffTabPath(activeTab, guestOnly, activeMakerspace?.slug, singleTenantLocked)
     : staffTabPath(defaultTab, guestOnly, activeMakerspace?.slug, singleTenantLocked);
 
-  if (!routeTabDenied && location.pathname !== activeTabPath) {
+  // Requests contains hardware rows only. A machine-only actor following an old saved
+  // or deep-linked route should land on their first allowed tab, not a dead-tab denial.
+  const normalizeDeniedRequest = routeTabDenied && routeTab === "requests";
+  if ((!routeTabDenied || normalizeDeniedRequest) && location.pathname !== activeTabPath) {
     return <Navigate replace to={activeTabPath} />;
   }
 

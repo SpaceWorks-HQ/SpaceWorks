@@ -122,6 +122,19 @@ def test_the_service_queue_hides_the_other_team_s_jobs(lab):
     assert printer_job.pk not in listed
 
 
+def test_the_warranty_report_hides_the_other_team_s_machine_rows(lab):
+    """Regression: the existing report keeps its machine-access partition."""
+    response = client_for(lab["laser_mgr"]).get(
+        reverse("admin-makerspace-warranties", args=[lab["space"].pk])
+    )
+
+    assert response.status_code == 200
+    rows = response.json()["results"]
+    assert {(row["host_kind"], row["host_id"]) for row in rows} == {
+        ("machine", lab["laser"].pk)
+    }
+
+
 def test_a_service_request_detail_is_404_for_the_other_team(lab):
     printer_job = make_request_on(lab, lab["printer"])
 

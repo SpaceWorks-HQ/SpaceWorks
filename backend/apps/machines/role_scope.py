@@ -216,6 +216,25 @@ def grants_directly(actor, makerspace_id, action):
         # Authority does not come from a role row, so no role can qualify it. Tier 1
         # already treats them as EXEMPT; agreeing here keeps the two consistent.
         return not rbac.superadmin_hidden_block_applies(actor, makerspace_id, action)
+    return role_grants_directly(actor, makerspace_id, action)
+
+
+def role_grants_directly(actor, makerspace_id, action):
+    """Whether the actor's assigned ROLE stores ``action`` outright.
+
+    Deliberately blind to superadmin status, which is the whole difference from
+    :func:`grants_directly`. That function short-circuits on ``_is_superadmin`` before it
+    ever reads a role, which is right for tier-2 type authority (it does not come from a
+    role row) and wrong for any caller asking "did this role grant this?".
+
+    The machine-service read partition needs the second form. A global superadmin who is
+    ALSO given an explicit machine-scoped membership in a hard-hidden space is reduced to
+    that role's actions by design, and holds ``COLLECT_SERVICE_REQUEST`` only by
+    implication from ``MANAGE_MACHINES``; asking ``grants_directly`` there answers yes and
+    hands them the makerspace-wide completed partition their machine links exist to deny.
+    """
+    if actor is None or not getattr(actor, "is_authenticated", False):
+        return False
     membership = actor.makerspace_memberships.select_related("assigned_role").filter(
         status="active", makerspace_id=makerspace_id
     ).first()

@@ -31311,6 +31311,9 @@
             "Dashboard": {
                 "type": "object",
                 "properties": {
+                    "scope_mode": {
+                        "$ref": "#/components/schemas/ScopeModeEnum"
+                    },
                     "overdue_loans": {
                         "type": "integer",
                         "default": 0
@@ -31363,7 +31366,10 @@
                         "type": "integer",
                         "default": 0
                     }
-                }
+                },
+                "required": [
+                    "scope_mode"
+                ]
             },
             "DeliveryEnum": {
                 "enum": [
@@ -44411,6 +44417,14 @@
                     "machine_ids",
                     "machine_type_ids"
                 ]
+            },
+            "ScopeModeEnum": {
+                "enum": [
+                    "machine",
+                    "full"
+                ],
+                "type": "string",
+                "description": "* `machine` - machine\n* `full` - full"
             },
             "ServiceAccept": {
                 "type": "object",

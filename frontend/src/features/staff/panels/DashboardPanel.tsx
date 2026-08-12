@@ -1,6 +1,7 @@
 import { Panel, useStaffGet, type Makerspace } from "./shared";
 
 type DashboardCounts = {
+  scope_mode: "machine" | "full";
   overdue_loans?: number;
   pending_requests?: number;
   awaiting_issue?: number;
@@ -12,11 +13,12 @@ type DashboardCounts = {
   failed_emails?: number;
   stocktakes_awaiting_approval?: number;
   warranty_expiring?: number;
+  maintenance_overdue?: number;
   pending_payments?: number;
 };
 
 type Tile = {
-  key: keyof DashboardCounts;
+  key: Exclude<keyof DashboardCounts, "scope_mode">;
   label: string;
   actionNeeded: boolean;
 };
@@ -33,8 +35,17 @@ const TILES: Tile[] = [
   { key: "failed_emails", label: "Failed emails", actionNeeded: true },
   { key: "stocktakes_awaiting_approval", label: "Stocktakes awaiting approval", actionNeeded: true },
   { key: "warranty_expiring", label: "Warranties expiring", actionNeeded: true },
+  { key: "maintenance_overdue", label: "Maintenance overdue", actionNeeded: true },
   { key: "pending_payments", label: "Pending payments", actionNeeded: true },
 ];
+
+const MACHINE_TILE_KEYS = new Set<Tile["key"]>([
+  "pending_prints",
+  "active_prints",
+  "prints_awaiting_collection",
+  "warranty_expiring",
+  "maintenance_overdue",
+]);
 
 export function DashboardPanel({ makerspace, canManageMakerspace }: { makerspace: Makerspace; canManageMakerspace: boolean }) {
   const dashboard = useStaffGet<DashboardCounts>(
@@ -47,7 +58,10 @@ export function DashboardPanel({ makerspace, canManageMakerspace }: { makerspace
       {dashboard.isLoading ? <p className="mb-3 text-sm text-muted">Loading dashboard...</p> : null}
       {dashboard.error ? <p className="mb-3 text-sm text-danger">{dashboard.error.message}</p> : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {TILES.filter((tile) => tile.key !== "pending_payments" || canManageMakerspace).map((tile) => {
+        {TILES.filter((tile) => (
+          (dashboard.data?.scope_mode !== "machine" || MACHINE_TILE_KEYS.has(tile.key))
+          && (tile.key !== "pending_payments" || canManageMakerspace)
+        )).map((tile) => {
           const value = dashboard.data?.[tile.key] ?? 0;
           const needsAttention = tile.actionNeeded && value > 0;
           return (

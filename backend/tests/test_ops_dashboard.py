@@ -32,7 +32,12 @@ def test_space_manager_gets_dashboard_with_all_count_keys():
 
     assert response.status_code == 200
     assert set(response.data) == set(views_dashboard.DashboardSerializer().fields)
-    assert all(isinstance(value, int) for value in response.data.values())
+    assert response.data["scope_mode"] == "full"
+    assert all(
+        isinstance(value, int)
+        for key, value in response.data.items()
+        if key != "scope_mode"
+    )
 
 
 def test_pending_payments_are_manager_only_and_ignore_dates_or_modules():

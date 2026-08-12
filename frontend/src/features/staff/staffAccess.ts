@@ -116,7 +116,7 @@ export function getStaffAccess(actions: readonly string[], isSuperadmin: boolean
     if (tabName === "bookings") return canManageBookings;
     if (tabName === "members") return canManageMakerspace;
     if (tabName === "payments") return canManageMakerspace;
-    if (tabName === "requests") return canSeeHardware || canSeePrinting;
+    if (tabName === "requests") return canSeeHardware;
     return true;
   });
   return {

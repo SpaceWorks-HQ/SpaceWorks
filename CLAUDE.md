@@ -1898,6 +1898,64 @@ heading per type; `SharedConsumablesSection` owns unbound pools. Load-bearing de
     renders an empty list and 403s on every action is worse than no tab. Resolution always ANDs the
     makerspace, so a link written across tenants is **inert, not a leak**.
 - **`COLLECT_SERVICE_REQUEST` splits job handover out of `MANAGE_MACHINES`.** Collecting a finished machine job is a front-desk act; `MANAGE_MACHINES` is the whole machine lifecycle, so requiring it to hand someone their print forced a front-desk role to also be able to retire a printer. `IMPLIED_ACTIONS[MANAGE_MACHINES]` now includes it, which is why the split needed **no migration and caused no regression** — every Space Manager and Machine Manager already holds `MANAGE_MACHINES`. `_manageable_request(actor, pk, action)` in `views_machine_service` takes the required action per operation: **only** collect passes the narrow one; accept/reject/start/complete/fail/reprint/create keep `MANAGE_MACHINES`. A collect-only actor's queryset is narrowed to `COMPLETED` rows (`_collect_only`), so the queue, drafts and in-progress work stay invisible — the list and detail reads are allowed on the narrow action precisely so the narrowed view has something to show. The action was deliberately **not** granted to anyone by migration: widening real permissions on deployments that never asked is not a migration's job.
+- **Collection is CUMULATIVE with machine scope, and the two partitions must stay separate
+  (phase 6a).** A role holding scoped `MANAGE_MACHINES` **and** a **directly** granted
+  `COLLECT_SERVICE_REQUEST` previously got neither the union nor front-desk breadth, because the
+  code recognised only makerspaces that were collect-*only*. The contract is now
+  `machine-scoped rows (all statuses) UNION makerspace-wide COMPLETED rows where collect is
+  granted DIRECTLY`, split across **two** querysets in `views_machine_service_common.py`:
+  `_read_or_collect_queryset` (list, detail, collect) and `_manage_queryset` (every lifecycle
+  mutation, plus service files). Adding the union to one shared queryset would have let an
+  out-of-scope completed job reach `reprint` and any future completed-state action. An
+  **implied** collect grant must never activate the second arm.
+  - **`role_grants_directly` exists because `grants_directly` short-circuits on superadmin.**
+    That short-circuit is right for tier-2 type authority (it does not come from a role row) and
+    wrong for "did this role grant this?". A global superadmin who *also* holds an explicit
+    machine-scoped membership in a **hard-hidden** space is reduced to that role's authority by
+    design, and `superadmin_hidden_block_applies` resolves through `actions_for_membership`,
+    which **expands implied actions** — so `MANAGE_MACHINES` implying collect made the union fire
+    for a role that never stored it. The role-only variant reads `granted_actions` directly.
+  - **`_machine_partition_q` resolves exemption with `role_scope.manage_scope_for`, NOT with
+    `makerspaces_for_action(...) is rbac.ALL`.** Those disagree for exactly that same hidden-space
+    superadmin, who still answers `ALL` at the action level — so the `ALL` shortcut (inherited from
+    the pre-6a `_narrow_to_machine_scope`) handed them every row and their machine links did
+    nothing. `manage_scopes_for` already answers correctly for both shapes: EXEMPT when a
+    superadmin has no membership there, the role's links when they do.
+  - **AN EMPTY `Q()` IS THE IDENTITY FOR `filter` AND AN ANNIHILATOR FOR `|`.** Django's
+    `Q._combine` short-circuits a falsy operand, so `Q() | Q(status=COMPLETED)` returns
+    `Q(status=COMPLETED)` — not "everything OR completed". Representing "unrestricted" as `Q()`
+    therefore **inverted** the union for unrestricted actors, narrowing them to COMPLETED rows and
+    hiding the whole live queue (a superadmin's detail view 404'd on every pending job).
+    Unrestricted is now `None` and callers branch on it. `scope_q_for` may still return `Q()`
+    because every one of its callers only ever passes it to `.filter()`.
+- **The dashboard narrows machine counters and OMITS non-machine ones — two INDEPENDENT
+  decisions (phase 6a).** `build_dashboard` takes `machine_scope` (narrows machine-derived
+  counters) and `machine_only` (whether the non-machine counters appear at all). Conflating them
+  was wrong, because roles here are **editable and action-based**: a custom role can hold
+  `VIEW_INVENTORY` *and* a scoped `MANAGE_MACHINES`, and treating "has a machine scope" as "is a
+  maintainer" silently removed hardware and stock counts that role is independently authorized
+  for. Machine scoping must narrow machine data without revoking another granted action.
+  - **The response carries a server-derived `scope_mode: "machine" | "full"`.** `DashboardPanel`
+    renders an absent field as `0`, so omission alone silently reads as "nothing to do". The
+    frontend must **not** infer exemption from effective actions — that cannot express a
+    null-`assigned_role` legacy membership, which is exempt.
+  - **Printing is identified by the GLOBAL built-in printer type ID, never the slug.** Slug
+    uniqueness is scoped (`uniq_global_machinetype_slug` / `uniq_lab_machinetype_slug`), so a
+    makerspace may legally own a local type slugged `3d_printer`; filtering by slug counts its
+    jobs as prints. Mirrors `printer_capabilities.is_printer_type`.
+  - **`prints_awaiting_collection` follows COLLECTION authority, not machine scope**, or the tile
+    disagrees with the Handover queue it links to — a job actionable there and invisible here. It
+    is built as a **separate queryset** rather than by OR-ing the scope clause, precisely because
+    of the empty-`Q` collapse above.
+  - **Asset warranties are inventory data.** A machine-only maintainer sees only their own
+    machines' warranty rows; a mixed role also keeps asset rows, which machine scoping has nothing
+    to say about. Maintenance schedules are always scoped, since a schedule names a machine and
+    there is no non-machine remainder.
+- **The hardware `requests` tab is hidden when `canSeeHardware` is false.** It previously also
+  passed for `canSeePrinting`, so a machine-only role got a tab whose panel renders no hardware
+  rows at all — only a pointer to Machines. Hardware API authorization is **untouched**; a
+  deep-linked or stored route normalises to the actor's first allowed tab rather than rendering a
+  dead-tab denial.
 - Public request submission requires an **authenticated member** (`RequestSubmitView` → `IsAuthenticated`), and request lookup is scoped to that verified identity — it never matches free-text contact fields (no enumeration by known email/phone). The anti-enumeration invariant is unchanged; since the Check-In retirement (`73a480c`) it is enforced by member auth rather than an external verify call.
 - Inventory Managers can run the full hardware lifecycle but **cannot** manage printing, staff, or makerspace settings.
 - Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks active status.

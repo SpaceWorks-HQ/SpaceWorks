@@ -1048,6 +1048,7 @@ export type DamagedMissingReportRow = {
 };
 
 export type Dashboard = {
+  "scope_mode": ScopeModeEnum;
   "overdue_loans"?: number;
   "pending_requests"?: number;
   "awaiting_issue"?: number;
@@ -4301,6 +4302,8 @@ export type RoleMachineScopeWrite = {
   "machine_type_ids": Array<number>;
   "machine_ids": Array<number>;
 };
+
+export type ScopeModeEnum = "machine" | "full";
 
 export type ServiceAccept = {
   "estimated_minutes"?: number;
