@@ -119,31 +119,95 @@ export function staffBasePath(guestOnly: boolean) {
   return guestOnly ? "/guest-admin" : "/admin";
 }
 
+// Tabs allowed to carry a subpath. Everything else NORMALISES trailing segments away, and
+// that behaviour is deliberate: a stale deep link to `/admin/inventory/whatever` should land
+// on the inventory tab, not 404. Relaxing it globally would change how every existing
+// bookmark resolves, so the exception is opt-in and currently holds exactly one tab.
+const TABS_WITH_SUBPATHS = new Set(["machines"]);
+
 export function staffTabPath(
   tab: string,
   guestOnly: boolean,
   makerspaceSlug?: string | null,
   singleTenantLocked = false,
+  subPath = "",
 ) {
   const pagePath = tabToPath(tab);
+  const suffix = subPath && TABS_WITH_SUBPATHS.has(tab) ? `/${subPath}` : "";
   if (makerspaceSlug && !singleTenantLocked) {
-    return `/m/${makerspaceSlug}/admin/${pagePath}`;
+    return `/m/${makerspaceSlug}/admin/${pagePath}${suffix}`;
   }
-  return `${staffBasePath(guestOnly)}/${pagePath}`;
+  return `${staffBasePath(guestOnly)}/${pagePath}${suffix}`;
 }
 
 export function staffPathState(pathname: string, guestOnly: boolean) {
-  const scoped = /^\/m\/([^/]+)\/admin(?:\/([^/]+))?/.exec(pathname);
+  const scoped = /^\/m\/([^/]+)\/admin(?:\/([^/]+))?(?:\/(.*))?$/.exec(pathname);
   if (scoped) {
-    return { makerspaceSlug: scoped[1], tab: pathToTab(scoped[2] ?? "") };
+    return {
+      makerspaceSlug: scoped[1],
+      tab: pathToTab(scoped[2] ?? ""),
+      subPath: trimSlashes(scoped[3] ?? ""),
+    };
   }
 
   const basePath = staffBasePath(guestOnly);
   if (!pathname.startsWith(basePath)) {
-    return { makerspaceSlug: "", tab: "" };
+    return { makerspaceSlug: "", tab: "", subPath: "" };
   }
   const relative = pathname.slice(basePath.length).replace(/^\/+/, "");
-  return { makerspaceSlug: "", tab: pathToTab(relative.split("/")[0] ?? "") };
+  const [first, ...rest] = relative.split("/");
+  return {
+    makerspaceSlug: "",
+    tab: pathToTab(first ?? ""),
+    subPath: trimSlashes(rest.join("/")),
+  };
+}
+
+export function staffSubPathFromPath(pathname: string, guestOnly: boolean) {
+  return staffPathState(pathname, guestOnly).subPath;
+}
+
+/** Which subpath survives `StaffWorkspace`'s canonicalization of the URL.
+ *
+ * Extracted so the rule is testable. `StaffWorkspace` rewrites the location to the
+ * canonical path for the active tab, and while that path was built without the subpath a
+ * per-type deep link could never survive its first render: `/admin/machines/12-laser` and
+ * `/admin/machines` differ, so the redirect fired on every load and stripped the segment.
+ *
+ * The subpath is kept ONLY when the route already resolved to the tab being rendered.
+ * Otherwise the requested tab was denied, unavailable or absent, the actor is being sent
+ * somewhere else, and carrying a machine-type segment onto a different tab would be
+ * meaningless at best.
+ */
+export function keptStaffSubPath(routeTab: string, activeTab: string, routeSubPath: string) {
+  return routeTab && routeTab === activeTab ? routeSubPath : "";
+}
+
+function trimSlashes(value: string) {
+  return value.replace(/^\/+|\/+$/g, "");
+}
+
+// --- machine-type subpages -------------------------------------------------------------
+//
+// THE ID IS AUTHORITATIVE AND THE SLUG IS DECORATION. Machine-type slug uniqueness is only
+// SCOPED -- `uniq_global_machinetype_slug` among globals, `uniq_lab_machinetype_slug` per
+// makerspace -- so a makerspace may legally own a local type slugged `3d_printer` while the
+// global built-in of that slug also exists, and both appear in one console. Three shipped
+// surfaces have already served one type's jobs under another by keying on the slug. The
+// slug rides along only so the URL is readable.
+
+export function machineTypeSegment(machineType: { id: number; slug?: string | null }) {
+  const slug = (machineType.slug ?? "").trim();
+  return slug ? `${machineType.id}-${slug}` : String(machineType.id);
+}
+
+export function parseMachineTypeSegment(segment: string): number | null {
+  // Leading integer only. A malformed segment is `null` -- "no type selected", i.e. the
+  // index -- and never a silent fall-through to some default type.
+  const match = /^(\d+)/.exec(segment.trim());
+  if (!match) return null;
+  const id = Number(match[1]);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
 export function staffMakerspaceSlugFromPath(pathname: string, guestOnly: boolean) {

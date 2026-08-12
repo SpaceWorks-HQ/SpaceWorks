@@ -66,6 +66,7 @@ export function StaffTabContent({
   canSeeHardware,
   canSeePrinting,
   canViewAudit,
+  singleTenantLocked = false,
 }: {
   activeMakerspace?: Makerspace;
   activeTab: string;
@@ -90,6 +91,9 @@ export function StaffTabContent({
   canSeeHardware: boolean;
   canSeePrinting: boolean;
   canViewAudit: boolean;
+  // Needed by the machines tab alone, to build its per-machine-type subpage links in the
+  // same shape `staffTabPath` produces for every other route.
+  singleTenantLocked?: boolean;
 }) {
   if (!activeMakerspace) {
     return <Panel title="No makerspace">Assign a makerspace to this account.</Panel>;
@@ -131,6 +135,9 @@ export function StaffTabContent({
           maintenanceEnabled={activeMakerspace.enabled_modules?.includes("maintenance") ?? false}
           machineServiceEnabled={activeMakerspace.enabled_modules?.includes("machine_service") ?? false}
           printingEnabled={activeMakerspace.enabled_modules?.includes("printing") ?? false}
+          guestOnly={guestOnly}
+          makerspaceSlug={activeMakerspace.slug}
+          singleTenantLocked={singleTenantLocked}
           delegatedRecipientRulesEnabled={
             isMachineOnly &&
             (activeMakerspace.enabled_modules ?? []).includes("notifications") &&

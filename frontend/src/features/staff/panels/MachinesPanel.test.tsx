@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PrinterPool } from "../../../generated/api";
@@ -45,9 +46,11 @@ type Setup = {
   machines?: Machine[];
   pools?: PrinterPool[];
   requests?: Record<string, unknown[]>;
+  /** Extra pages keyed by `?page=N`, for the paginated-fleet test. */
+  machinePages?: Record<string, { count: number; next: string | null; results: Machine[] }>;
 };
 
-function renderPanel(setup: Setup = {}, props: Partial<React.ComponentProps<typeof MachinesPanel>> = {}) {
+function mockApi(setup: Setup) {
   const types = setup.types ?? [laserType];
   const rows = setup.machines ?? [];
   const pools = setup.pools ?? [];
@@ -55,11 +58,17 @@ function renderPanel(setup: Setup = {}, props: Partial<React.ComponentProps<type
   staffRequest.mockImplementation(async (path: string) => {
     if (!path) return [];
     if (path.endsWith("/machine-types")) return types;
-    if (path.endsWith("/machines")) return { count: rows.length, results: rows };
+    if (path.includes("/machines?page=")) {
+      const page = new URLSearchParams(path.split("?")[1]).get("page") ?? "";
+      return setup.machinePages?.[page] ?? { count: rows.length, next: null, results: [] };
+    }
+    if (path.endsWith("/machines")) {
+      return setup.machinePages?.["1"] ?? { count: rows.length, next: null, results: rows };
+    }
     if (path.includes("machine-service-report")) return { printer_metrics: [] };
     if (path.includes("machine-service/requests")) {
-      // The consoles now filter by the stable machine-type ID (a slug is not unique across
-      // the global/tenant split), so resolve it back to the slug the fixtures are keyed by.
+      // The consoles filter by the stable machine-type ID (a slug is not unique across the
+      // global/tenant split), so resolve it back to the slug the fixtures are keyed by.
       const params = new URLSearchParams(path.split("?")[1]);
       const typeId = Number(params.get("machine_type_id"));
       const slug = types.find((type) => type.id === typeId)?.slug
@@ -71,36 +80,49 @@ function renderPanel(setup: Setup = {}, props: Partial<React.ComponentProps<type
     if (path.endsWith("machine-service/consumable-pools")) return pools;
     return [];
   });
+}
+
+function renderPanel(
+  setup: Setup = {},
+  props: Partial<React.ComponentProps<typeof MachinesPanel>> = {},
+  route = "/admin/machines",
+) {
+  mockApi(setup);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // A REAL router, not a location stub: the panel resolves its selected machine type from
+  // the URL and navigates with `<Link>`/`<Navigate>`, and a stub that only fakes
+  // `window.location` passes against code that never reads router context at all.
   return render(
-    <QueryClientProvider client={client}>
-      <MachinesPanel makerspaceId={1} canManage canConfigureMachineTypes={false} maintenanceEnabled={false} machineServiceEnabled printingEnabled delegatedRecipientRulesEnabled={false} {...props} />
-    </QueryClientProvider>,
+    <MemoryRouter initialEntries={[route]}>
+      <QueryClientProvider client={client}>
+        <MachinesPanel makerspaceId={1} canManage canConfigureMachineTypes={false} maintenanceEnabled={false} machineServiceEnabled printingEnabled delegatedRecipientRulesEnabled={false} {...props} />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 
 beforeEach(() => staffRequest.mockReset());
 
-describe("MachinesPanel type sections", () => {
-  it("shows delegated maintenance recipients only when the switch is enabled", () => {
-    const { rerender } = renderPanel({}, { maintenanceEnabled: true });
+describe("MachinesPanel index and per-type subpages", () => {
+  it("shows delegated maintenance recipients only when the switch is enabled", async () => {
+    renderPanel({}, { maintenanceEnabled: true });
     expect(screen.queryByRole("heading", { name: "Who gets notified" })).not.toBeInTheDocument();
 
-    rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <MachinesPanel
-          makerspaceId={1}
-          canManage
-          canConfigureMachineTypes={false}
-          maintenanceEnabled
-          machineServiceEnabled
-          printingEnabled
-          delegatedRecipientRulesEnabled
-        />
-      </QueryClientProvider>,
-    );
+    renderPanel({}, { maintenanceEnabled: true, delegatedRecipientRulesEnabled: true });
 
-    expect(screen.getByRole("heading", { name: "Who gets notified" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Who gets notified" })).toBeVisible();
+  });
+
+  // A single reachable type renders ITS PAGE inline at the index URL rather than redirecting.
+  // An unconditional redirect would make the index unreachable, and with it machine creation,
+  // machine-type configuration, shared pools and the delegated recipient picker -- all of
+  // which the scoped maintainer with one type is exactly the actor who needs them.
+  it("renders the sole reachable type inline without hiding the index controls", async () => {
+    renderPanel({ types: [laserType] });
+
+    expect(await screen.findByText("No machines are registered for this type.")).toBeVisible();
+    expect(screen.getByLabelText("Machine type")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Shared consumables/ })).toBeInTheDocument();
   });
 
   it("renders a zero-machine reachable type and its service queue", async () => {
@@ -122,7 +144,7 @@ describe("MachinesPanel type sections", () => {
 
   it("shows shared pools only in the Shared consumables section", async () => {
     renderPanel({ pools: [pool(1, "Shared acrylic", null)] });
-    await screen.findByRole("button", { name: /Laser cutters.*0 items/ });
+    await screen.findByText("No machines are registered for this type.");
     expect(screen.queryByText(/Shared acrylic/, { selector: "span" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Shared consumables.*1 item\b/ }));
@@ -130,15 +152,20 @@ describe("MachinesPanel type sections", () => {
     expect(screen.getAllByText(/Shared acrylic/, { selector: "span" })).toHaveLength(1);
   });
 
-  it("shows a bound pool only under its machine's type", async () => {
-    const printer = machine(2, "Printer One", printerType);
-    renderPanel({ types: [laserType, printerType], machines: [machine(1, "Laser One"), printer], pools: [pool(2, "Printer PLA", 2, "grams")] });
-    await screen.findByRole("button", { name: /Laser One/ });
+  it("shows a bound pool only on its machine's type page", async () => {
+    const setup: Setup = {
+      types: [laserType, printerType],
+      machines: [machine(1, "Laser One"), machine(2, "Printer One", printerType)],
+      pools: [pool(2, "Printer PLA", 2, "grams")],
+    };
+    renderPanel(setup, {}, "/admin/machines/1-laser");
+    await screen.findByText("Laser One", { selector: "strong" });
     expect(screen.queryByText(/Printer PLA/, { selector: "span" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /3D printers.*1 item\b/ }));
+    renderPanel(setup, {}, "/admin/machines/2-3d_printer");
 
-    expect(screen.getAllByText(/Printer PLA/, { selector: "span" })).toHaveLength(1);
+    expect(await screen.findByText("Printer One", { selector: "strong" })).toBeVisible();
+    expect(screen.getAllByText(/Printer PLA/, { selector: "span" }).length).toBeGreaterThan(0);
   });
 
   it("offers shared pools plus only the selected machine's bound pool", async () => {
@@ -170,7 +197,7 @@ describe("MachinesPanel type sections", () => {
 
   it("hides machine creation when no type grants creation authority", async () => {
     renderPanel({ types: [{ ...laserType, can_create_machine: false }, { ...printerType, can_create_machine: undefined }] });
-    await screen.findByRole("button", { name: /Laser cutters/ });
+    await screen.findByRole("link", { name: /Laser cutters/ });
 
     expect(screen.queryByLabelText("Machine type")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "New machine" })).not.toBeInTheDocument();
@@ -178,7 +205,7 @@ describe("MachinesPanel type sections", () => {
 
   it("mounts no service requests when machine_service is disabled", async () => {
     renderPanel({ types: [printerType, laserType] }, { machineServiceEnabled: false });
-    await screen.findByRole("button", { name: /3D printers/ });
+    await screen.findByRole("link", { name: /3D printers/ });
 
     await waitFor(() => expect(staffRequest.mock.calls.filter(([path]) => path)).toHaveLength(2));
     const paths = staffRequest.mock.calls.map(([path]) => String(path));
@@ -187,8 +214,8 @@ describe("MachinesPanel type sections", () => {
     expect(paths.filter((path) => path.includes("machine-service-report"))).toEqual([]);
   });
 
-  it("fetches pools once and service data only for the initially open type", async () => {
-    renderPanel({ types: [laserType, printerType] });
+  it("fetches pools once and service data only for the open type", async () => {
+    renderPanel({ types: [laserType, printerType] }, {}, "/admin/machines/1-laser");
     await screen.findByText("Service queue");
     await waitFor(() => expect(staffRequest.mock.calls.some(([path]) => String(path).includes("typed-manual-usage"))).toBe(true));
     const paths = staffRequest.mock.calls.map(([path]) => String(path));
@@ -199,44 +226,84 @@ describe("MachinesPanel type sections", () => {
     expect(paths.some((path) => path.includes("machine-service-report"))).toBe(false);
   });
 
-  it("preserves a service action draft across collapse and reopen", async () => {
-    renderPanel({ requests: { laser: [{ id: 10, title: "Cut acrylic", status: "in_progress", planned_quantity: "20", actual_consumed_quantity: "0" }] } });
+  // Drafts used to survive section COLLAPSE; with subpages the equivalent risk is
+  // navigation. `useServiceDrafts` therefore lives in the container that stays mounted,
+  // not in the type page which unmounts on every move.
+  it("preserves a service action draft across navigation to the index and back", async () => {
+    renderPanel(
+      { types: [laserType, printerType], requests: { laser: [{ id: 10, title: "Cut acrylic", status: "in_progress", planned_quantity: "20", actual_consumed_quantity: "0" }] } },
+      {},
+      "/admin/machines/1-laser",
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Complete" }));
-    const actualMinutes = screen.getByLabelText("Actual minutes");
-    fireEvent.change(actualMinutes, { target: { value: "37" } });
-    const sectionButton = screen.getByRole("button", { name: /Laser cutters.*0 items/ });
+    fireEvent.change(screen.getByLabelText("Actual minutes"), { target: { value: "37" } });
 
-    fireEvent.click(sectionButton);
+    fireEvent.click(screen.getByRole("link", { name: /All machine types/ }));
     expect(screen.queryByLabelText("Actual minutes")).not.toBeInTheDocument();
-    fireEvent.click(sectionButton);
+    fireEvent.click(await screen.findByRole("link", { name: /Laser cutters/ }));
 
-    expect(screen.getByLabelText("Actual minutes")).toHaveValue("37");
+    expect(await screen.findByLabelText("Actual minutes")).toHaveValue("37");
   });
 
   // A makerspace may legally create a LOCAL type slugged `3d_printer`. Backend printer
   // semantics require the GLOBAL type (`printer_capabilities.is_printer_type`), so matching
-  // the slug alone mounts the printer console for a generic service and makes two sections
-  // query the same slug, duplicating and mixing their jobs.
+  // the slug alone mounts the printer console for a generic service.
   it("does not treat a makerspace-local type slugged 3d_printer as the built-in printer", async () => {
     const impostor: MachineType = { ...printerType, id: 3, makerspace: 1, name: "Shop printers", is_builtin: false };
     renderPanel({ types: [impostor], machines: [machine(1, "Shop A", impostor)] });
 
-    // Wait for the generic console to actually mount before asserting on absence -- checking
-    // network calls straight after the heading appears races the console's own queries, and
-    // passes even when the printer console IS wrongly mounted.
     expect(await screen.findByText("Service queue")).toBeVisible();
     expect(screen.queryByText("3D-printer queue")).not.toBeInTheDocument();
     expect(screen.queryByText("Printer reports")).not.toBeInTheDocument();
   });
 
   // The machine and machine-type requests are independent. If the type response omits a type
-  // whose machines loaded fine, those machines must still appear -- the grouping this replaced
-  // appended unknown types rather than dropping them.
+  // whose machines loaded fine, those machines must still appear -- and the type must still be
+  // navigable, because the machines list is server-scoped too.
   it("still renders machines whose type is missing from the machine-type response", async () => {
     renderPanel({ types: [], machines: [machine(1, "Orphaned laser")] });
 
-    await screen.findByRole("button", { name: /Laser cutters/ });
-    // `strong` is the machine row; the name also appears in a service form's machine selector.
-    expect(screen.getByText("Orphaned laser", { selector: "strong" })).toBeInTheDocument();
+    expect(await screen.findByText("Orphaned laser", { selector: "strong" })).toBeInTheDocument();
+  });
+
+  // THE ID IS AUTHORITATIVE, THE SLUG IS DECORATION. Slug uniqueness is only scoped, so a
+  // makerspace-local type may carry a global built-in's slug; resolving by slug has already
+  // served one type's jobs under another on three shipped surfaces.
+  it("selects the machine type by id even when the slug in the URL names another type", async () => {
+    renderPanel(
+      { types: [laserType, printerType], machines: [machine(1, "Laser One")] },
+      {},
+      "/admin/machines/1-3d_printer",
+    );
+
+    expect(await screen.findByText("Laser One", { selector: "strong" })).toBeVisible();
+    expect(screen.queryByText("Printer reports")).not.toBeInTheDocument();
+  });
+
+  it("normalises an unreachable machine type back to the index", async () => {
+    renderPanel({ types: [laserType, printerType] }, {}, "/admin/machines/999-ghost");
+
+    // The index, not a denial page: a stale deep link is a bad bookmark, not an attempt to
+    // reach something forbidden.
+    expect(await screen.findByRole("link", { name: /Laser cutters/ })).toBeVisible();
+    expect(await screen.findByRole("link", { name: /3D printers/ })).toBeVisible();
+  });
+
+  // Counts and status roll-ups are stated as fact on the index cards, so the fleet has to be
+  // read in full. The backend pages at 200; consuming only the first page would print a
+  // wrong number rather than an obviously truncated list.
+  it("counts machines across every page of the fleet", async () => {
+    const first = [machine(1, "Laser One"), machine(2, "Laser Two")];
+    const second = [machine(3, "Laser Three", laserType, "running")];
+    renderPanel({
+      types: [laserType, printerType],
+      machinePages: {
+        "1": { count: 3, next: "http://api.example/admin/makerspace/1/machines?page=2", results: first },
+        "2": { count: 3, next: null, results: second },
+      },
+    });
+
+    expect(await screen.findByText("3 machines")).toBeVisible();
+    expect(screen.getByText("1 running")).toBeVisible();
   });
 });

@@ -9,6 +9,8 @@ import { getStaffAccess, STAFF_TAB_KEYS, TAB_LABELS } from "./staffAccess";
 import {
   filterTabsByEnabledModules,
   readStoredStaffTab,
+  keptStaffSubPath,
+  staffSubPathFromPath,
   staffTabPath,
   tabFromStaffPath,
 } from "./staffTabs";
@@ -84,8 +86,18 @@ export function StaffWorkspace({
     : moduleAllowedTabs.includes(defaultTab)
       ? defaultTab
       : moduleAllowedTabs[0] ?? defaultTab;
+  // Without this the redirect below strips `/admin/machines/12-laser` back to
+  // `/admin/machines` on every load, because the two strings differ -- so a per-type deep
+  // link could never survive its first render. The rule lives in `keptStaffSubPath` so it
+  // is testable on its own; rendering this whole workspace to assert one path string is
+  // how that regression stays uncaught.
+  const keptSubPath = keptStaffSubPath(
+    routeTab,
+    activeTab,
+    staffSubPathFromPath(location.pathname, guestOnly),
+  );
   const activeTabPath = activeTab
-    ? staffTabPath(activeTab, guestOnly, activeMakerspace?.slug, singleTenantLocked)
+    ? staffTabPath(activeTab, guestOnly, activeMakerspace?.slug, singleTenantLocked, keptSubPath)
     : staffTabPath(defaultTab, guestOnly, activeMakerspace?.slug, singleTenantLocked);
 
   // Tabs OMITTED by design rather than genuinely forbidden: `requests` holds hardware rows
@@ -165,6 +177,7 @@ export function StaffWorkspace({
               canSeeHardware={canSeeHardware}
               canSeePrinting={canSeePrinting}
               canViewAudit={canViewAudit}
+              singleTenantLocked={singleTenantLocked}
             />
           )}
         </div>

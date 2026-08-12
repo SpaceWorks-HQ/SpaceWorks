@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { EmptyState } from "../../../components/ui";
 import type { PrinterPool } from "../../../generated/api";
 import { collectionResults, createMachine, getMachines, getMachineTypes, isBuiltinPrinterType, machineKeys, type MachineStatus, type MachineType } from "../machinesApi";
+import { machineTypeSegment, parseMachineTypeSegment, staffSubPathFromPath, staffTabPath } from "../staffTabs";
 import { MachineDrawer } from "./machine/MachineDrawer";
-import { MachineTypeSection } from "./machine/MachineTypeSection";
+import { MachineTypeCards } from "./machine/MachineTypeCards";
+import { MachineTypePage } from "./machine/MachineTypePage";
 import { SharedConsumablesSection } from "./machine/SharedConsumablesSection";
 import { poolPath, poolQueryKey } from "./machine/servicePools";
 import { useServiceDrafts } from "./machine/serviceDrafts";
@@ -23,21 +25,37 @@ type Props = {
   machineServiceEnabled: boolean;
   printingEnabled: boolean;
   delegatedRecipientRulesEnabled: boolean;
+  guestOnly?: boolean;
+  makerspaceSlug?: string | null;
+  singleTenantLocked?: boolean;
 };
 
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
-export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineTypes, maintenanceEnabled, machineServiceEnabled, printingEnabled, delegatedRecipientRulesEnabled }: Props) {
+export function MachinesPanel({
+  makerspaceId,
+  canManage,
+  canConfigureMachineTypes,
+  maintenanceEnabled,
+  machineServiceEnabled,
+  printingEnabled,
+  delegatedRecipientRulesEnabled,
+  guestOnly = false,
+  makerspaceSlug = null,
+  singleTenantLocked = false,
+}: Props) {
   const queryClient = useQueryClient();
-  const [typeFilter, setTypeFilter] = useState("all");
+  const location = useLocation();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sharedOpen, setSharedOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [machineTypeId, setMachineTypeId] = useState("");
   const [model, setModel] = useState("");
-  const [openTypeIds, setOpenTypeIds] = useState<ReadonlySet<number>>(new Set());
-  const [sharedOpen, setSharedOpen] = useState(false);
-  const initialSectionOpened = useRef(false);
+  // Lives HERE, in the container that survives index-to-type navigation, not in
+  // `MachineTypePage`. Only one type is mounted at a time now, so a hook inside the page
+  // would discard a half-typed service form on every navigation -- the drafts previously
+  // survived section collapse for exactly that reason.
   const { draftFor, setDraft } = useServiceDrafts();
 
   const machines = useQuery({ queryKey: machineKeys.list(makerspaceId), queryFn: () => getMachines(makerspaceId) });
@@ -51,12 +69,14 @@ export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineType
   const allMachines = machines.data?.results ?? [];
   const pools = poolQuery.data ?? [];
   const sharedPools = useMemo(() => pools.filter((pool) => pool.machine_id === null), [pools]);
+
   // The machine and machine-type requests are independent, so the type response can fail, go
-  // stale, or omit a type while machines of it loaded fine. Building sections from `types` alone
-  // then makes those machines VANISH -- the grouping this replaced deliberately appended such
-  // types rather than dropping them. Nested `machine.machine_type` is the fallback, display-only:
-  // it carries no `can_create_machine`, which correctly reads as no creation authority.
-  const sectionTypes = useMemo(() => {
+  // stale, or omit a type while machines of it loaded fine. Building the index from `types`
+  // alone then makes those machines VANISH. Nested `machine.machine_type` is the fallback and
+  // is display-only: it carries no `can_create_machine`, which correctly reads as no creation
+  // authority. It is still NAVIGABLE -- the machines list is server-scoped too, so a machine
+  // the server returned implies a type this actor may open.
+  const reachableTypes = useMemo(() => {
     const known = new Set(types.map((type) => type.id));
     const extras: MachineType[] = [];
     for (const machine of allMachines) {
@@ -66,30 +86,33 @@ export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineType
     }
     return [...types, ...extras];
   }, [allMachines, types]);
-  const visibleTypes = useMemo(
-    () => sectionTypes.filter((type) => typeFilter === "all" || type.id === Number(typeFilter)),
-    [sectionTypes, typeFilter],
-  );
   const creatableTypes = useMemo(() => types.filter((type) => type.can_create_machine === true), [types]);
 
-  useEffect(() => {
-    if (initialSectionOpened.current || machineTypes.data === undefined) return;
-    initialSectionOpened.current = true;
-    if (visibleTypes[0]) setOpenTypeIds(new Set([visibleTypes[0].id]));
-    else if (canManage && machineServiceEnabled) setSharedOpen(true);
-  }, [canManage, machineServiceEnabled, machineTypes.data, visibleTypes]);
+  const hrefFor = (machineType: MachineType) =>
+    staffTabPath("machines", guestOnly, makerspaceSlug, singleTenantLocked, machineTypeSegment(machineType));
+  const indexHref = staffTabPath("machines", guestOnly, makerspaceSlug, singleTenantLocked);
 
-  const toggleType = (id: number) => setOpenTypeIds((current) => {
-    const next = new Set(current);
-    if (!next.delete(id)) next.add(id);
-    return next;
-  });
-  // The retired printer roster was the ONLY surface that recorded a printer's model, and
-  // `run_machine_model` plus the printer reports read it -- dropping the field would leave it
-  // permanently blank for every newly created printer. It is printer-specific, so it is offered
-  // only when the chosen type is one, and sent only when non-empty.
-  const selectedType = creatableTypes.find((type) => type.id === Number(machineTypeId));
-  const wantsModel = isBuiltinPrinterType(selectedType);
+  const requestedTypeId = parseMachineTypeSegment(staffSubPathFromPath(location.pathname, guestOnly));
+  // Both server-scoped sources must have SETTLED SUCCESSFULLY before an id can be called
+  // unreachable. Judging on the type query alone would bounce a type known only through the
+  // nested fallback; judging while either is loading would bounce every direct link on first
+  // paint; judging after a failure would turn a network blip into what looks like a revoked
+  // permission.
+  const sourcesSettled =
+    !machineTypes.isLoading && !machineTypes.isError && !machines.isLoading && !machines.isError;
+  const selectedType = reachableTypes.find((type) => type.id === requestedTypeId) ?? null;
+  const unknownType = requestedTypeId !== null && sourcesSettled && !selectedType;
+
+  // NO auto-redirect when a single type is reachable. Redirecting would make this index --
+  // and with it machine creation, machine-type configuration, shared consumable pools and
+  // the delegated recipient picker -- permanently unreachable for exactly the scoped
+  // maintainer those controls are meant for. A single-type actor gets that type's page
+  // rendered inline below instead, which lands them on their machines without hiding
+  // anything, and removes the redirect loop and the flash-redirect at the same time.
+  const soleType = reachableTypes.length === 1 ? reachableTypes[0] : null;
+  const shownType = selectedType ?? (requestedTypeId === null ? soleType : null);
+
+  const wantsModel = isBuiltinPrinterType(creatableTypes.find((type) => type.id === Number(machineTypeId)));
   const create = useMutation({
     mutationFn: () => createMachine(makerspaceId, {
       name: name.trim(),
@@ -109,22 +132,53 @@ export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineType
     },
   });
 
+  // Normalise an unknown or unreachable type id back to the index -- the console's existing
+  // behaviour for a stale deep link, rather than a dead denial page. `replace` so the bad
+  // URL does not sit in history waiting for the back button.
+  if (unknownType) {
+    return <Navigate replace to={indexHref} />;
+  }
+
+  // A deep link whose type is known only through the nested machines fallback resolves once
+  // the machines query lands. Rendering the index in the meantime would flash the card grid
+  // in front of someone who asked for one specific type, so hold with a skeleton instead --
+  // an honest "still resolving", which is also what stops the redirect above from firing
+  // early.
+  if (requestedTypeId !== null && !selectedType && !sourcesSettled) {
+    return (
+      <Panel title="Machines">
+        <div className="h-40 animate-pulse rounded-xl border border-line bg-surface" aria-label="Loading machine type" />
+      </Panel>
+    );
+  }
+
+  const typeMachines = shownType
+    ? allMachines.filter((machine) => machine.machine_type.id === shownType.id)
+    : [];
+  const machineIds = new Set(typeMachines.map((machine) => machine.id));
+  const boundPools = pools.filter((pool) => pool.machine_id !== null && machineIds.has(pool.machine_id));
+  const onTypePage = shownType !== null && selectedType !== null;
+
   return (
-    <Panel title="Machines">
+    <Panel title={shownType ? shownType.name : "Machines"}>
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-sm text-muted">Manage shared equipment, operators, usage, documents, and operating status.</p>
-          {machines.data ? <p className="mt-1 text-xs text-muted">{machines.data.count} machines total</p> : null}
+        <div className="min-w-0">
+          {onTypePage ? (
+            <Link className={`mb-1 inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-accent-ink hover:underline ${focusRing}`} to={indexHref}>
+              ← All machine types
+            </Link>
+          ) : null}
+          <p className="text-sm text-muted">
+            {shownType
+              ? `Machines, consumables and the service queue for ${shownType.name}.`
+              : "Manage shared equipment, operators, usage, documents, and operating status."}
+          </p>
+          {machines.data && !shownType ? (
+            <p className="mt-1 font-mono text-xs text-muted">{machines.data.count} machines total</p>
+          ) : null}
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <label className="grid gap-1 text-xs font-semibold text-muted sm:w-48">
-            Type
-            <select className={`desk-input ${focusRing}`} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-              <option value="all">All types</option>
-              {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
-            </select>
-          </label>
-          <label className="grid gap-1 text-xs font-semibold text-muted sm:w-44">
+        {shownType ? (
+          <label className="grid gap-1 font-mono text-[11px] uppercase tracking-wide text-muted sm:w-44">
             Status
             <select className={`desk-input ${focusRing}`} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
               <option value="all">All statuses</option>
@@ -132,38 +186,8 @@ export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineType
               <option value="maintenance">Maintenance</option><option value="offline">Offline</option>
             </select>
           </label>
-        </div>
+        ) : null}
       </div>
-
-      <MachineTypesPanel makerspaceId={makerspaceId} canConfigureMachineTypes={canConfigureMachineTypes} />
-
-      {maintenanceEnabled && delegatedRecipientRulesEnabled ? (
-        <NotificationRecipientPicker delegated makerspaceId={makerspaceId} />
-      ) : null}
-
-      {canManage && creatableTypes.length > 0 ? (
-        <form className="mb-4 grid gap-3 rounded-xl border border-line bg-bg p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}>
-          <label className="grid gap-1 text-xs font-semibold text-muted">
-            Machine name
-            <input className={`desk-input ${focusRing}`} value={name} onChange={(event) => setName(event.target.value)} required />
-          </label>
-          <label className="grid gap-1 text-xs font-semibold text-muted">
-            Machine type
-            <select className={`desk-input ${focusRing}`} value={machineTypeId} onChange={(event) => setMachineTypeId(event.target.value)} required>
-              <option value="">Select a type</option>
-              {creatableTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
-            </select>
-          </label>
-          {wantsModel ? (
-            <label className="grid gap-1 text-xs font-semibold text-muted md:col-span-2">
-              Printer model
-              <input className={`desk-input ${focusRing}`} value={model} onChange={(event) => setModel(event.target.value)} placeholder="e.g. Prusa MK4" />
-            </label>
-          ) : null}
-          <button className={`desk-button-primary ${focusRing}`} type="submit" disabled={create.isPending || !name.trim() || !machineTypeId}>{create.isPending ? "Creating..." : "New machine"}</button>
-          {create.error instanceof Error ? <p className="text-sm text-danger md:col-span-3">{create.error.message}</p> : null}
-        </form>
-      ) : null}
 
       {machineTypes.error instanceof Error ? <p className="mb-3 text-sm text-danger">{machineTypes.error.message}</p> : null}
       {machines.error instanceof Error ? <p className="mb-3 text-sm text-danger">{machines.error.message}</p> : null}
@@ -174,40 +198,79 @@ export function MachinesPanel({ makerspaceId, canManage, canConfigureMachineType
       {poolQuery.error instanceof Error ? (
         <p className="mb-3 text-sm text-danger">Consumable pools could not be loaded: {poolQuery.error.message}</p>
       ) : null}
-      {!machineTypes.isLoading && !machineTypes.error && !visibleTypes.length ? (
-        <EmptyState title="No machine types available" description={typeFilter === "all" ? "No reachable machine types are configured." : "The selected machine type is no longer available."} />
-      ) : null}
 
-      <div className="grid gap-3">
-        {visibleTypes.map((machineType) => {
-          const typeMachines = allMachines.filter((machine) => machine.machine_type.id === machineType.id);
-          const visibleMachines = typeMachines.filter((machine) => statusFilter === "all" || machine.status === statusFilter);
-          const machineIds = new Set(typeMachines.map((machine) => machine.id));
-          const boundPools = pools.filter((pool) => pool.machine_id !== null && machineIds.has(pool.machine_id));
-          return (
-            <MachineTypeSection
-              key={machineType.id}
-              makerspaceId={makerspaceId}
-              canManage={canManage}
-              machineServiceEnabled={machineServiceEnabled}
-              printingEnabled={printingEnabled}
-              machineType={machineType}
-              allMachines={typeMachines}
-              visibleMachines={visibleMachines}
-              boundPools={boundPools}
-              formPools={[...sharedPools, ...boundPools]}
-              machinesLoading={machines.isLoading}
-              machinesFailed={machines.isError}
-              open={openTypeIds.has(machineType.id)}
-              onToggle={() => toggleType(machineType.id)}
-              onSelectMachine={setSelectedId}
-              draft={draftFor(machineType.id)}
-              setDraft={(update) => setDraft(machineType.id, update)}
-            />
-          );
-        })}
-        {canManage && machineServiceEnabled ? <SharedConsumablesSection makerspaceId={makerspaceId} pools={sharedPools} poolError={poolQuery.error} open={sharedOpen} onToggle={() => setSharedOpen((current) => !current)} /> : null}
-      </div>
+      {shownType ? (
+        <MachineTypePage
+          makerspaceId={makerspaceId}
+          canManage={canManage}
+          machineServiceEnabled={machineServiceEnabled}
+          printingEnabled={printingEnabled}
+          machineType={shownType}
+          allMachines={typeMachines}
+          visibleMachines={typeMachines.filter((machine) => statusFilter === "all" || machine.status === statusFilter)}
+          boundPools={boundPools}
+          formPools={[...sharedPools, ...boundPools]}
+          machinesLoading={machines.isLoading}
+          machinesFailed={machines.isError}
+          onSelectMachine={setSelectedId}
+          draft={draftFor(shownType.id)}
+          setDraft={(update) => setDraft(shownType.id, update)}
+        />
+      ) : (
+        <MachineTypeCards
+          machineTypes={reachableTypes}
+          machines={allMachines}
+          machinesLoading={machines.isLoading}
+          machinesFailed={machines.isError}
+          typesLoading={machineTypes.isLoading}
+          typesFailed={machineTypes.isError}
+          hrefFor={hrefFor}
+        />
+      )}
+
+      {/* The settings block. Rendered on the index AND beneath a sole type's page, which is
+          what makes "land straight on my type" safe: none of these controls can become
+          unreachable for an actor who only ever has one type. */}
+      {!onTypePage ? (
+        <div className="mt-4 grid gap-4 border-t border-line pt-4">
+          <MachineTypesPanel makerspaceId={makerspaceId} canConfigureMachineTypes={canConfigureMachineTypes} />
+
+          {maintenanceEnabled && delegatedRecipientRulesEnabled ? (
+            <NotificationRecipientPicker delegated makerspaceId={makerspaceId} />
+          ) : null}
+
+          {canManage && creatableTypes.length > 0 ? (
+            <form className="grid gap-3 rounded-xl border border-line bg-bg p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}>
+              <label className="grid gap-1 font-mono text-[11px] uppercase tracking-wide text-muted">
+                Machine name
+                <input className={`desk-input ${focusRing}`} value={name} onChange={(event) => setName(event.target.value)} required />
+              </label>
+              <label className="grid gap-1 font-mono text-[11px] uppercase tracking-wide text-muted">
+                Machine type
+                <select className={`desk-input ${focusRing}`} value={machineTypeId} onChange={(event) => setMachineTypeId(event.target.value)} required>
+                  <option value="">Select a type</option>
+                  {creatableTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+                </select>
+              </label>
+              {/* The retired printer roster was the ONLY surface that recorded a printer's model,
+                  and `run_machine_model` plus the printer reports read it -- dropping the field
+                  would leave it permanently blank for every newly created printer. */}
+              {wantsModel ? (
+                <label className="grid gap-1 font-mono text-[11px] uppercase tracking-wide text-muted md:col-span-2">
+                  Printer model
+                  <input className={`desk-input ${focusRing}`} value={model} onChange={(event) => setModel(event.target.value)} placeholder="e.g. Prusa MK4" />
+                </label>
+              ) : null}
+              <button className={`desk-button-primary ${focusRing}`} type="submit" disabled={create.isPending || !name.trim() || !machineTypeId}>{create.isPending ? "Creating..." : "New machine"}</button>
+              {create.error instanceof Error ? <p className="text-sm text-danger md:col-span-3">{create.error.message}</p> : null}
+            </form>
+          ) : null}
+
+          {canManage && machineServiceEnabled ? (
+            <SharedConsumablesSection makerspaceId={makerspaceId} pools={sharedPools} poolError={poolQuery.error} open={sharedOpen} onToggle={() => setSharedOpen((current) => !current)} />
+          ) : null}
+        </div>
+      ) : null}
 
       {selectedId !== null ? <MachineDrawer key={selectedId} machineId={selectedId} makerspaceId={makerspaceId} canManageMachines={canManage} maintenanceEnabled={maintenanceEnabled} onClose={() => setSelectedId(null)} /> : null}
     </Panel>

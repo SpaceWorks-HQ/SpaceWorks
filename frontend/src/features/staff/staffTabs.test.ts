@@ -1,15 +1,75 @@
 import { describe, expect, it } from "vitest";
 import { getStaffAccess, TAB_LABELS } from "./staffAccess";
-import { filterTabsByEnabledModules, staffPathState, tabFromStaffPath } from "./staffTabs";
+import {
+  filterTabsByEnabledModules,
+  keptStaffSubPath,
+  machineTypeSegment,
+  parseMachineTypeSegment,
+  staffPathState,
+  staffTabPath,
+  tabFromStaffPath,
+} from "./staffTabs";
 
 describe("staff printing route alias", () => {
   it("maps the legacy deep link to Machines", () => {
     expect(tabFromStaffPath("/admin/printing", false)).toBe("machines");
-    expect(staffPathState("/m/forge/admin/printing", false)).toEqual({ makerspaceSlug: "forge", tab: "machines" });
+    expect(staffPathState("/m/forge/admin/printing", false)).toEqual({ makerspaceSlug: "forge", tab: "machines", subPath: "" });
   });
 
   it("uses a generic label for the multi-integration platform tab", () => {
     expect(TAB_LABELS.platform).toBe("Platform settings");
+  });
+});
+
+describe("machine-type subpaths", () => {
+  it("reads the subpath from both the scoped and unscoped route shapes", () => {
+    expect(staffPathState("/admin/machines/12-laser", false).subPath).toBe("12-laser");
+    expect(staffPathState("/m/forge/admin/machines/12-laser", false)).toEqual({
+      makerspaceSlug: "forge", tab: "machines", subPath: "12-laser",
+    });
+  });
+
+  it("builds a subpath only for tabs that carry one", () => {
+    expect(staffTabPath("machines", false, null, false, "12-laser")).toBe("/admin/machines/12-laser");
+    expect(staffTabPath("machines", false, "forge", false, "12-laser")).toBe("/m/forge/admin/machines/12-laser");
+    // Every other tab still NORMALISES trailing segments away, so a stale deep link lands
+    // on the tab rather than 404ing. Relaxing that globally would change how existing
+    // bookmarks resolve, so the exception is opt-in.
+    expect(staffTabPath("inventory", false, null, false, "12-laser")).toBe("/admin/inventory");
+  });
+
+  it("keeps the id authoritative and treats the slug as decoration", () => {
+    // Slug uniqueness is only SCOPED, so a makerspace-local type may legally carry a global
+    // built-in's slug. Resolving by slug has already served one type's jobs under another.
+    expect(parseMachineTypeSegment("12-laser")).toBe(12);
+    expect(parseMachineTypeSegment("12-3d_printer")).toBe(12);
+    expect(parseMachineTypeSegment("12")).toBe(12);
+    expect(machineTypeSegment({ id: 12, slug: "laser" })).toBe("12-laser");
+    expect(machineTypeSegment({ id: 12, slug: "" })).toBe("12");
+  });
+
+  // THE REGRESSION THIS EXISTS FOR: StaffWorkspace canonicalizes the URL to the active
+  // tab's path, so before the subpath was threaded through, `/admin/machines/12-laser` was
+  // rewritten to `/admin/machines` on first render and no per-type link could ever survive.
+  // The panel's own tests mount a MemoryRouter directly at the deep link and so would stay
+  // green with this reverted.
+  it("keeps a subpath through canonicalization only for the tab that resolved it", () => {
+    expect(keptStaffSubPath("machines", "machines", "12-laser")).toBe("12-laser");
+    expect(staffTabPath("machines", false, null, false, keptStaffSubPath("machines", "machines", "12-laser")))
+      .toBe("/admin/machines/12-laser");
+
+    // Requested tab was denied or unavailable and the actor is being sent elsewhere: the
+    // machine-type segment must not ride along onto a different tab.
+    expect(keptStaffSubPath("machines", "dashboard", "12-laser")).toBe("");
+    // No route tab at all (a stored tab, or the bare console root).
+    expect(keptStaffSubPath("", "machines", "12-laser")).toBe("");
+  });
+
+  it("reads a malformed segment as no selection rather than a default type", () => {
+    expect(parseMachineTypeSegment("laser")).toBeNull();
+    expect(parseMachineTypeSegment("")).toBeNull();
+    expect(parseMachineTypeSegment("0-laser")).toBeNull();
+    expect(parseMachineTypeSegment("-3")).toBeNull();
   });
 });
 

@@ -1796,10 +1796,41 @@ Every domain entity is scoped to a `makerspace_id`. A makerspace owns its invent
     transport cannot catch this — the existing report test answered regardless of query string, so
     the regression test asserts on the **request URL**.
 
-**Staff Machines console is organised as machine type → everything of that type.**
-`MachinesPanel` owns the queries (machines, types, and ONE canonical pool query), filters,
-open-section state, the create form and the drawer; `MachineTypeSection` renders one collapsible
-heading per type; `SharedConsumablesSection` owns unbound pools. Load-bearing details:
+**Staff Machines console is organised as machine type → everything of that type, on PER-TYPE
+SUBPAGES.** `MachinesPanel` is the container: it owns the queries (machines, types, and ONE
+canonical pool query), the status filter, the service drafts, the create form and the drawer, and
+routes between an index of type cards (`MachineTypeCards`) and one type's page (`MachineTypePage`,
+which replaced the collapsible `MachineTypeSection`); `SharedConsumablesSection` owns unbound pools.
+- **The URL is `/admin/machines/<id>-<slug>` and THE ID IS AUTHORITATIVE.** Machine-type slug
+  uniqueness is only *scoped* (`uniq_global_machinetype_slug` / `uniq_lab_machinetype_slug`), so a
+  makerspace may legally own a local type carrying a global built-in's slug and both appear in one
+  console — three shipped surfaces have already served one type's jobs under another by keying on
+  the slug. `parseMachineTypeSegment` reads the leading integer; a malformed segment is "no
+  selection" (the index), never a silent fall-through to a default type.
+- **`StaffWorkspace` canonicalizes the URL to the active tab's path, so the subpath had to be
+  threaded through it** (`keptStaffSubPath`) — otherwise the redirect fires on every load and strips
+  the segment, and no per-type link can survive its first render. Subpaths are opt-in per tab
+  (`TABS_WITH_SUBPATHS`): every other tab still normalises trailing junk away, and relaxing that
+  globally would change how existing bookmarks resolve. The rule is extracted from the component
+  precisely so a test can hold it — the panel's own tests mount a router at the deep link and stay
+  green with it reverted.
+- **A single reachable type renders its page INLINE at the index URL; it does NOT redirect.**
+  Redirecting would make the index — and with it machine creation, machine-type configuration,
+  shared pools and the delegated recipient picker — permanently unreachable for exactly the scoped
+  maintainer those controls exist for. Rendering inline also removes the redirect loop, the
+  flash-redirect and the one-versus-many decision during loading.
+- **An unknown or unreachable id normalises to the index, and only once BOTH server-scoped sources
+  have settled successfully.** Judging on the types query alone contradicts the navigable nested
+  fallback; judging while loading bounces every direct link; judging after a failure turns a network
+  blip into an apparent permission revocation.
+- **The machines query walks EVERY page** (`?page=N`, never DRF's absolute `next`, which
+  `staffRequest` would prefix with the API base into a malformed URL). The cards state a count and a
+  status roll-up as fact, so a first-page-only read prints a wrong number rather than an obviously
+  truncated list.
+- **`useServiceDrafts` lives in the container, not the page.** Only one type is mounted at a time
+  now, so a hook inside the page would discard a half-typed service form on every navigation.
+
+Load-bearing details that carried over unchanged:
 - **Three DISTINCT pool concepts.** *Type display* pools are bound to a machine of that type;
   *shared display* pools (`machine_id === null`) appear ONLY in the Shared section, ending the
   duplication where a shared pool rendered under every compatible type; *form-usable* pools are
@@ -1807,14 +1838,16 @@ heading per type; `SharedConsumablesSection` owns unbound pools. Load-bearing de
   offered every pool bound anywhere in the type while the backend rejected them. Pool **creation**
   lives in the Shared section only, because both former create forms omitted `machine_id` and
   could therefore only ever produce shared pools.
-- **Sections derive from TYPES, never from status-filtered machine rows** — a status filter
+- **Pages derive from TYPES, never from status-filtered machine rows** — a status filter
   matching nothing must still render that type's queue, manual usage and bound pools. But the
   type list is **merged with the nested `machine.machine_type`** as a display-only fallback: the
-  two requests are independent, so building sections from the types response alone makes machines
-  **vanish** whenever it fails or goes stale. The fallback grants no creation authority, because
-  nested copies carry no `can_create_machine`.
-- **Drafts persist across COLLAPSE but must reset after a completed ACTION.** Collapsed content is
-  unmounted (accessibility), so drafts are lifted into `useServiceDrafts` keyed by machine-type id;
+  two requests are independent, so building the index from the types response alone makes machines
+  **vanish** whenever it fails or goes stale. Those fallback types **are navigable** (the machines
+  list is server-scoped too, so a machine the server returned implies a reachable type) but grant no
+  creation authority, because nested copies carry no `can_create_machine`. The governing rule is
+  "navigate from server-scoped responses only, never from inferred action strings".
+- **Drafts must reset after a completed ACTION.** Drafts live in `useServiceDrafts` keyed by
+  machine-type id;
   clearing only `action` on success left the previous job's machine, pool and grams in the form, so
   confirming a prefilled value could **reserve or reconcile the wrong consumable amount**.
   `clearedActionDraft` resets the values with it.
