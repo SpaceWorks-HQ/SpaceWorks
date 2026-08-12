@@ -1094,7 +1094,9 @@ def test_machine_serializer_exposes_only_lightweight_warranty_status():
         assert field not in covered.data
 
 
-def test_machine_image_presign_finalize_delete_and_audit(monkeypatch, settings):
+def test_machine_image_presign_finalize_delete_and_audit(
+    monkeypatch, settings, django_capture_on_commit_callbacks
+):
     settings.PUBLIC_IMAGE_BASE_URL = "http://cdn.test/public-images"
     delete_object = mock_machine_image_storage(monkeypatch)
     makerspace = enable_machines(make_space("machines-image-flow"))
@@ -1120,7 +1122,12 @@ def test_machine_image_presign_finalize_delete_and_audit(monkeypatch, settings):
     assert machine.image_key == object_key
     assert AuditLog.objects.filter(action="machine.image_updated").exists()
 
-    removed = client.delete(url)
+    # `remove_image` releases the object through `release_public_image_on_commit`, so the
+    # S3 delete is deliberately deferred past the transaction -- external I/O must never
+    # run while a row lock is held. Under `django_db` nothing commits, so the callback has
+    # to be executed explicitly or the assertion below can never fire.
+    with django_capture_on_commit_callbacks(execute=True):
+        removed = client.delete(url)
 
     assert removed.status_code == 200
     assert "image_key" not in removed.data

@@ -76,20 +76,63 @@ class User(AbstractUser):
             ),
         ]
 
+    # The two identity columns whose stored value must be known before a save can tell
+    # whether they changed. Snapshotting is deliberately split from reading them.
+    _IDENTITY_SNAPSHOT_FIELDS = ("email", "phone_e164")
+
     @classmethod
     def from_db(cls, db, field_names, values):
         instance = super().from_db(db, field_names, values)
-        instance._loaded_email = instance.email
-        instance._loaded_phone_e164 = instance.phone_e164
+        # Snapshot ONLY the columns this query actually loaded. Reading `instance.email`
+        # unconditionally forces a deferred load, and because `refresh_from_db` issues
+        # its own `.only(<field>)` query, the instance it builds re-enters `from_db`
+        # with the OTHER identity column deferred -- so the two snapshots load each
+        # other forever. Any `.only()`/`.defer()` query on User omitting either column
+        # raised RecursionError, which is what broke `/analytics/top-borrowers`.
+        loaded = dict(zip(field_names, values))
+        for field in cls._IDENTITY_SNAPSHOT_FIELDS:
+            if field in loaded:
+                setattr(instance, f"_loaded_{field}", loaded[field])
         return instance
+
+    def _identity_baseline(self):
+        """Stored values of the identity columns, for a row loaded without them.
+
+        A deferred load leaves no snapshot, and treating a missing baseline as "nothing
+        changed" would keep a verified stamp on an edited address or number -- the exact
+        bypass the guards in `save` exist to prevent. Costs one query, and only when a
+        deferred instance is being saved; a fully-loaded instance already has both.
+        """
+        baseline = {
+            field: getattr(self, f"_loaded_{field}", None)
+            for field in self._IDENTITY_SNAPSHOT_FIELDS
+        }
+        if all(value is not None for value in baseline.values()):
+            return baseline
+        if not self.pk or self._state.adding:
+            # Nothing stored yet, so no change to detect and no stamp to protect.
+            return baseline
+        stored = (
+            type(self)
+            ._base_manager.filter(pk=self.pk)
+            .values(*self._IDENTITY_SNAPSHOT_FIELDS)
+            .first()
+        )
+        if stored is None:
+            return baseline
+        return {
+            field: stored[field] if value is None else value
+            for field, value in baseline.items()
+        }
 
     def save(self, *args, **kwargs):
         # Changing a verified email must re-require verification: an admin/self email
         # edit clears email_verified_at (outstanding challenges reference the old email
         # snapshot and can no longer match the new current email, so they lapse).
+        baseline = self._identity_baseline()
         cleared = []
-        if getattr(self, "_loaded_email", None) is not None and _normalized_email(
-            self._loaded_email
+        if baseline["email"] is not None and _normalized_email(
+            baseline["email"]
         ) != _normalized_email(self.email):
             self.email_verified_at = None
             cleared.append("email_verified_at")
@@ -98,9 +141,10 @@ class User(AbstractUser):
         # verified stamp would let whoever holds the NEW number sign in as this user
         # without ever proving they hold it. /control/ can edit this field, so the guard
         # cannot live only in the linking service.
-        if getattr(
-            self, "_loaded_phone_e164", None
-        ) is not None and self._loaded_phone_e164 != self.phone_e164:
+        if (
+            baseline["phone_e164"] is not None
+            and baseline["phone_e164"] != self.phone_e164
+        ):
             self.phone_verified_at = None
             cleared.append("phone_verified_at")
         update_fields = kwargs.get("update_fields")
@@ -109,8 +153,12 @@ class User(AbstractUser):
                 name for name in cleared if name not in update_fields
             ]
         super().save(*args, **kwargs)
-        self._loaded_email = self.email
-        self._loaded_phone_e164 = self.phone_e164
+        # Re-snapshot only what is actually present: assigning from a deferred field here
+        # would force the same load `from_db` must avoid.
+        deferred = self.get_deferred_fields()
+        for field in self._IDENTITY_SNAPSHOT_FIELDS:
+            if field not in deferred:
+                setattr(self, f"_loaded_{field}", getattr(self, field))
 
 
 class EmailVerificationChallenge(models.Model):
