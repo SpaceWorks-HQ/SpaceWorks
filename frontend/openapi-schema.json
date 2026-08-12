@@ -15081,6 +15081,13 @@
                         }
                     },
                     {
+                        "in": "query",
+                        "name": "machine_type_id",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
                         "in": "path",
                         "name": "makerspace_id",
                         "schema": {
@@ -15244,6 +15251,20 @@
             "get": {
                 "operationId": "api_v1_admin_makerspaces_machine_service_typed_manual_usage_list",
                 "parameters": [
+                    {
+                        "in": "query",
+                        "name": "machine_type",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "machine_type_id",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
                     {
                         "in": "path",
                         "name": "makerspace_id",

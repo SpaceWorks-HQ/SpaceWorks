@@ -40,7 +40,7 @@ export function CollapsibleSection({
           aria-expanded={open}
           aria-controls={regionId}
           // min-h-11 is the ~44px minimum touch target.
-          className="flex min-h-11 w-full items-center gap-3 bg-surface px-3 py-2 text-left hover:bg-bg"
+          className="flex min-h-11 w-full items-center gap-3 bg-surface px-3 py-2 text-left hover:bg-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           <span
             aria-hidden="true"
@@ -55,7 +55,9 @@ export function CollapsibleSection({
               <span aria-hidden="true">{count}</span>
               {/* One text node, not `{count} items`: the accessible-name algorithm
                   trims each node and joins with no separator, so a split phrase is
-                  announced as "3items". */}
+                  announced as "3items". The visible glyph stays the bare number and
+                  is aria-hidden, so the announced name comes from this node alone --
+                  which is also the only place plurals can be got right. */}
               <span className="sr-only">{`${count} ${count === 1 ? "item" : "items"}`}</span>
             </span>
           ) : null}
@@ -63,6 +65,10 @@ export function CollapsibleSection({
       </h3>
       {/* Unmounted rather than hidden: a collapsed section's contents must not be
           reachable by Tab, and hidden-but-present rows are a classic focus trap. */}
+      {/* The empty div is NOT dead weight: the toggle carries `aria-controls={regionId}`,
+          and dropping the element entirely leaves that pointing at an id that does not
+          exist, which is an ARIA violation. Children are still unmounted while collapsed --
+          that is what keeps them off the Tab order. */}
       {open ? <div id={regionId}>{children}</div> : <div id={regionId} hidden />}
     </section>
   );

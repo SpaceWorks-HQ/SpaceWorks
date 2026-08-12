@@ -22,6 +22,15 @@ export type MachineType = {
   capability_config?: MachineTypeCapabilityConfig;
 };
 
+// Mirrors backend `printer_capabilities.is_printer_type`: the built-in printer is the GLOBAL
+// type, not merely one slugged `3d_printer`. A makerspace may legally create a local type with
+// that slug, and matching on the slug alone would mount the printer console for it -- applying
+// printer-only fields to a generic service and querying the same slug from two sections, which
+// duplicates and mixes their jobs.
+export function isBuiltinPrinterType(machineType: Pick<MachineType, "slug" | "makerspace"> | undefined) {
+  return !!machineType && machineType.makerspace === null && machineType.slug === "3d_printer";
+}
+
 export type MeteringUnit = "weight" | "volume" | "length" | "count" | "minutes";
 export type MachineTypeCapabilityConfig = {
   metering_unit: MeteringUnit;

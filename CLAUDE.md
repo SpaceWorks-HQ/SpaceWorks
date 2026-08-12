@@ -1777,6 +1777,57 @@ Every domain entity is scoped to a `makerspace_id`. A makerspace owns its invent
     check and the list filter **must stay in step** — disagreeing is how a row lists and then 403s
     on click, which is why `capabilities_for_machines`' `_type_mgr` carries the same check.
   - **Tier 3 (per-machine operators) is untouched** — an operator row already names one machine.
+  - **A MACHINE-TYPE SLUG IS NOT UNIQUE, and three surfaces assumed it was.** Uniqueness is
+    *scoped* (`uniq_global_machinetype_slug` among globals, `uniq_lab_machinetype_slug` per
+    makerspace), so a makerspace may legally create a local type carrying a built-in's slug — and
+    a global type must be `is_builtin` (`machinetype_builtin_is_global`). Filtering service data
+    by slug therefore returned **both** types' rows, so one type's jobs appeared under another and
+    a manager could accept or reject from the wrong section. The staff queue and typed manual
+    usage now accept **`machine_type_id`**, which takes precedence; the slug parameter stays for
+    existing callers, and a malformed id is a **400 via `_query_int`, never a silent fall-through**
+    to the printer default. The frontend `isBuiltinPrinterType` mirrors
+    `printer_capabilities.is_printer_type` (`makerspace === null && slug === "3d_printer"`) —
+    matching the bare slug mounted the printer console for a generic service.
+  - **The machine-service REPORT still discriminates on the SLUG, and switching it to the id is a
+    crash.** `MakerspaceMachineServiceReportView` branches on `machine_type` to decide whether to
+    emit `printer_metrics`; sending an id returns the generic report, and `PrinterServiceConsole`
+    dereferences `printer_metrics`, taking the **whole Machines panel** into its error boundary.
+    Requests and manual usage use the id; the report keeps the slug. A test that stubs the
+    transport cannot catch this — the existing report test answered regardless of query string, so
+    the regression test asserts on the **request URL**.
+
+**Staff Machines console is organised as machine type → everything of that type.**
+`MachinesPanel` owns the queries (machines, types, and ONE canonical pool query), filters,
+open-section state, the create form and the drawer; `MachineTypeSection` renders one collapsible
+heading per type; `SharedConsumablesSection` owns unbound pools. Load-bearing details:
+- **Three DISTINCT pool concepts.** *Type display* pools are bound to a machine of that type;
+  *shared display* pools (`machine_id === null`) appear ONLY in the Shared section, ending the
+  duplication where a shared pool rendered under every compatible type; *form-usable* pools are
+  shared pools **plus pools bound to the machine selected in that form** — the UI previously
+  offered every pool bound anywhere in the type while the backend rejected them. Pool **creation**
+  lives in the Shared section only, because both former create forms omitted `machine_id` and
+  could therefore only ever produce shared pools.
+- **Sections derive from TYPES, never from status-filtered machine rows** — a status filter
+  matching nothing must still render that type's queue, manual usage and bound pools. But the
+  type list is **merged with the nested `machine.machine_type`** as a display-only fallback: the
+  two requests are independent, so building sections from the types response alone makes machines
+  **vanish** whenever it fails or goes stale. The fallback grants no creation authority, because
+  nested copies carry no `can_create_machine`.
+- **Drafts persist across COLLAPSE but must reset after a completed ACTION.** Collapsed content is
+  unmounted (accessibility), so drafts are lifted into `useServiceDrafts` keyed by machine-type id;
+  clearing only `action` on success left the previous job's machine, pool and grams in the form, so
+  confirming a prefilled value could **reserve or reconcile the wrong consumable amount**.
+  `clearedActionDraft` resets the values with it.
+- **Service transitions must invalidate `machineKeys.list`**, not just service queries: they change
+  the assigned machine's status and usage hours, and the integrated row would otherwise stay stale.
+- **Two service implementations, never three** — `MachineServiceConsole` takes a fixed
+  `machineType` prop; the printer console keeps its genuine differences (planned/actual grams,
+  reprint, printer reports) and **lost its duplicate roster/create panel**, which meant restoring
+  `type_payload.model` to the shared create form and the machine row: that roster was the only
+  place a printer model was ever written *or* displayed, and `run_machine_model` reads it.
+- Pool load failure renders at **panel level**, because pools feed every type's forms while the
+  Shared section may be collapsed; and the empty-machine copy requires a **successful** load, or a
+  failed request tells the operator no machines are registered.
   - **FIVE SERVICE SURFACES BYPASSED THE SCOPE ENTIRELY until Phase 5 (2026-08-12).** Each resolved
     a machine (or a service request) by **makerspace alone**, so a laser-scoped maintainer reached
     every printer: typed manual-usage **GET** and **POST** (`views_machine_service_printer`), the

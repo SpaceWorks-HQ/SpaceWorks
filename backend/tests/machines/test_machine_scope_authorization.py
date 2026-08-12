@@ -282,3 +282,39 @@ def test_first_idle_skips_earlier_unauthorized_machine(scoped_lab):
     assert request.assigned_machine_id == authorized.pk
     assert scoped_lab["laser"].status == Machine.Status.IDLE
     assert authorized.status == Machine.Status.RUNNING
+
+
+def test_service_requests_filter_by_machine_type_id_not_slug(scoped_lab):
+    """A slug is not unique across the global/tenant split.
+
+    A makerspace may create a local type whose slug equals a global built-in's. Filtering
+    service data by slug then returns BOTH types' rows, so the console shows one type's jobs
+    under another and a manager can accept or reject from the wrong section.
+    """
+    space = scoped_lab["space"]
+    # Slug uniqueness is SCOPED (`uniq_global_machinetype_slug` / `uniq_lab_machinetype_slug`),
+    # so a makerspace-local type may legally carry a global built-in's slug. A global type must
+    # also be `is_builtin` per `machinetype_builtin_is_global`.
+    global_type = MachineType.objects.create(
+        makerspace=None, slug="shared-slug", name="Global", is_builtin=True
+    )
+    local_type = MachineType.objects.create(makerspace=space, slug="shared-slug", name="Local")
+    global_machine = Machine.objects.create(makerspace=space, machine_type=global_type, name="G")
+    local_machine = Machine.objects.create(makerspace=space, machine_type=local_type, name="L")
+    _service_request(space, global_machine)
+    _service_request(space, local_machine)
+    manager = _manager(space, "collision-manager", machine_type=global_type)
+    RoleMachineTypeScope.objects.create(
+        role=manager.makerspace_memberships.get().assigned_role, machine_type=local_type
+    )
+
+    url = reverse("admin-machine-service-request-list-create", args=[space.pk])
+    response = _client(manager).get(f"{url}?machine_type_id={global_type.pk}")
+
+    assert response.status_code == 200
+    returned = {row["id"] for row in response.json()}
+    only_global = {
+        row.pk
+        for row in MachineServiceRequest.objects.filter(assigned_machine=global_machine)
+    }
+    assert returned == only_global

@@ -126,6 +126,8 @@ export function StaffTabContent({
           canManage={canManageMachines}
           canConfigureMachineTypes={canConfigureMachineTypes}
           maintenanceEnabled={activeMakerspace.enabled_modules?.includes("maintenance") ?? false}
+          machineServiceEnabled={activeMakerspace.enabled_modules?.includes("machine_service") ?? false}
+          printingEnabled={activeMakerspace.enabled_modules?.includes("printing") ?? false}
         />
       ) : null}
       {activeTab === "events" && canManageEvents ? <EventsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}

@@ -37,6 +37,7 @@ SERVICE_FILTERS = [
     OpenApiParameter("bucket", int, OpenApiParameter.QUERY),
     OpenApiParameter("queue", int, OpenApiParameter.QUERY),
     OpenApiParameter("machine_type", str, OpenApiParameter.QUERY),
+    OpenApiParameter("machine_type_id", int, OpenApiParameter.QUERY),
 ]
 
 
@@ -168,7 +169,14 @@ class MachineServiceRequestListCreateView(APIView):
         for name, field in (("machine", "bucket__machine_id"), ("bucket", "bucket_id"), ("queue", "queue_id")):
             if value := _query_int(request, name):
                 rows = rows.filter(**{field: value})
-        if machine_type := request.query_params.get("machine_type"):
+        # `machine_type_id` is preferred and takes precedence: a slug is NOT unique across the
+        # global/tenant split, so a makerspace-local type sharing a built-in's slug makes both
+        # types select each other's rows -- and the console would then let a manager accept or
+        # reject one type's request from the other type's section. The slug parameter stays for
+        # existing callers.
+        if machine_type_id := _query_int(request, "machine_type_id"):
+            rows = rows.filter(Q(queue__machine_type_id=machine_type_id) | Q(bucket__machine__machine_type_id=machine_type_id))
+        elif machine_type := request.query_params.get("machine_type"):
             rows = rows.filter(Q(queue__machine_type__slug=machine_type) | Q(bucket__machine__machine_type__slug=machine_type))
         rows = list(rows.order_by("-created_at"))
         payments = Payment.objects.filter(

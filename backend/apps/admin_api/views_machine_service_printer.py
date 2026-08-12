@@ -2,7 +2,7 @@
 
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -14,6 +14,7 @@ from apps.admin_api.serializers_machine_service_printer import (
     PrinterPoolCorrectionSerializer, PrinterPoolCreateSerializer, PrinterPoolSerializer,
     TypedManualUsageResponseSerializer, TypedManualUsageSerializer,
 )
+from apps.admin_api.views_machine_service import _query_int
 from apps.machines import role_scope
 from apps.machines.models import Machine, MachineConsumablePool, MachineServiceRequest, MachineUsageEntry
 from apps.machines.printer_capabilities import PRINTER_SLUG
@@ -117,7 +118,14 @@ class MachineServicePrinterPoolAdjustmentView(APIView):
 class MachineServiceTypedManualUsageView(APIView):
     permission_classes = [IsActiveStaff]
 
-    @extend_schema(tags=["Admin machine service"], responses={200: TypedManualUsageResponseSerializer(many=True)})
+    @extend_schema(
+        tags=["Admin machine service"],
+        parameters=[
+            OpenApiParameter("machine_type", str, OpenApiParameter.QUERY),
+            OpenApiParameter("machine_type_id", int, OpenApiParameter.QUERY),
+        ],
+        responses={200: TypedManualUsageResponseSerializer(many=True)},
+    )
     def get(self, request, makerspace_id):
         space = _space(request.user, makerspace_id)
         rows = MachineUsageEntry.objects.filter(
@@ -131,8 +139,15 @@ class MachineServiceTypedManualUsageView(APIView):
             machine__makerspace=space,
             source=MachineUsageEntry.Source.TYPED_MANUAL,
         )
-        machine_type = request.query_params.get("machine_type", PRINTER_SLUG)
-        rows = rows.filter(machine__machine_type__slug=machine_type)
+        # Prefer the stable id: a slug is not unique across the global/tenant split, so two
+        # types sharing one would return each other's usage entries. A malformed value is a
+        # 400, never a silent fall-through to the printer default -- returning unrelated data
+        # for a bad filter is worse than refusing it.
+        if (machine_type_id := _query_int(request, "machine_type_id")) is not None:
+            rows = rows.filter(machine__machine_type_id=machine_type_id)
+        else:
+            machine_type = request.query_params.get("machine_type", PRINTER_SLUG)
+            rows = rows.filter(machine__machine_type__slug=machine_type)
         return Response(TypedManualUsageResponseSerializer(rows, many=True).data)
 
     @extend_schema(tags=["Admin machine service"], request=TypedManualUsageSerializer, responses={201: TypedManualUsageResponseSerializer})
