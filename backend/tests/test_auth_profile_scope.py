@@ -61,6 +61,8 @@ def test_user_payload_scopes_memberships_to_branded_staff_origin_and_excludes_ar
                 "role_slug": MakerspaceMembership.Role.SPACE_MANAGER,
                 "actions": sorted(rbac.effective_actions(user, space_a.id)),
                 "can_configure_machine_types": True,
+                # A space manager is scope-EXEMPT, so the console keeps every surface.
+                "is_machine_only": False,
                 "can_refer": True,
                 "can_verify": False,
                 "verified_at": None,

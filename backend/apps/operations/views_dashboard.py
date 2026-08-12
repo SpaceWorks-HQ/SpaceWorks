@@ -83,16 +83,9 @@ class DashboardView(APIView):
             if manages_machines
             else role_scope.EXEMPT
         )
-        # "Machine-only" is about the OTHER actions, not about machines: an actor keeps
-        # the non-machine tiles whenever they independently hold the authority those
-        # tiles report. The dashboard gate itself admits VIEW_INVENTORY,
-        # MANAGE_PRINTING or MANAGE_MAKERSPACE, and MANAGE_MACHINES implies
-        # MANAGE_PRINTING -- so a pure maintainer is exactly the actor admitted by the
-        # implied grant alone.
-        machine_only = machine_scope is not role_scope.EXEMPT and not (
-            rbac.can(request.user, rbac.Action.VIEW_INVENTORY, makerspace.id)
-            or rbac.can(request.user, rbac.Action.MANAGE_MAKERSPACE, makerspace.id)
-        )
+        # Shared with the notification inbox, which hides for exactly this actor -- see
+        # `role_scope.is_machine_only` for why holding MANAGE_MACHINES is not the question.
+        machine_only = role_scope.is_machine_only(request.user, makerspace.id)
         return Response(
             build_dashboard(
                 makerspace,

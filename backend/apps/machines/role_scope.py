@@ -119,6 +119,43 @@ def manage_scope_for(actor, makerspace_id):
     return manage_scopes_for(actor, [makerspace_id]).get(makerspace_id, NOTHING)
 
 
+def is_machine_only(actor, makerspace_id):
+    """Whether the actor's authority here is machine-scoped and NOTHING else.
+
+    The one answer shared by the surfaces that must disappear for a per-type maintainer but
+    stay for anyone holding broader authority: the dashboard's non-machine counters and the
+    in-app notification inbox. Written once because two copies of this predicate would
+    drift, and the failure mode is silent — a surface that keeps appearing for the very role
+    it was supposed to hide from.
+
+    Three conditions, and the middle one is why `MANAGE_MACHINES` alone is not the question:
+
+    1. Holds ``MANAGE_MACHINES`` — otherwise machine scoping has nothing to say about them.
+    2. Resolves to a **non-EXEMPT** scope, so a space manager, a superadmin without a
+       membership, and a null-`assigned_role` legacy Machine Manager are all excluded.
+    3. Holds neither ``VIEW_INVENTORY`` nor ``MANAGE_MAKERSPACE``, and does not **store**
+       ``MANAGE_PRINTING``. Roles here are editable and action-based, so a custom role can
+       carry inventory or printing duties *and* a scoped machine grant; narrowing a surface
+       it is independently authorized for would revoke that grant rather than scope machine
+       data.
+
+    The printing arm must read the **stored** grant via :func:`role_grants_directly`, never
+    ``rbac.can``: ``MANAGE_MACHINES`` implies ``MANAGE_PRINTING``, so asking `can` would make
+    this answer always False and the whole predicate inert. Same distinction, and the same
+    reason, as `procurement.access.machine_type_scope`.
+    """
+    if not rbac.can(actor, Action.MANAGE_MACHINES, makerspace_id):
+        return False
+    if manage_scope_for(actor, makerspace_id) is EXEMPT:
+        return False
+    if role_grants_directly(actor, makerspace_id, Action.MANAGE_PRINTING):
+        return False
+    return not (
+        rbac.can(actor, Action.VIEW_INVENTORY, makerspace_id)
+        or rbac.can(actor, Action.MANAGE_MAKERSPACE, makerspace_id)
+    )
+
+
 def manage_scopes_for_memberships(memberships):
     """Map membership id -> EXEMPT or ``(type_ids, machine_ids)``.
 

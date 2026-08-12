@@ -29951,6 +29951,12 @@
                             "type": "string"
                         }
                     },
+                    "can_configure_machine_types": {
+                        "type": "boolean"
+                    },
+                    "is_machine_only": {
+                        "type": "boolean"
+                    },
                     "can_refer": {
                         "type": "boolean"
                     },
@@ -29968,9 +29974,11 @@
                 },
                 "required": [
                     "actions",
+                    "can_configure_machine_types",
                     "can_refer",
                     "can_verify",
                     "id",
+                    "is_machine_only",
                     "referrals_enabled",
                     "role",
                     "role_id",

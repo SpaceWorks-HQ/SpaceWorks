@@ -702,6 +702,8 @@ export type AuthMembership = {
   "role_name": string;
   "role_slug": string;
   "actions": Array<string>;
+  "can_configure_machine_types": boolean;
+  "is_machine_only": boolean;
   "can_refer": boolean;
   "can_verify": boolean;
   "verified_at": string | null;

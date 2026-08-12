@@ -307,6 +307,7 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
       activeMakerspace={activeMakerspace}
       actions={activeActions}
       canConfigureMachineTypes={activeMembership?.can_configure_machine_types ?? isSuperadmin}
+      isMachineOnly={activeMembership?.is_machine_only ?? false}
       collapsedGroups={collapsedGroups}
       guestOnly={guestOnly}
       isSuperadmin={isSuperadmin}

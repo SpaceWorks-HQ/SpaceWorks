@@ -42,6 +42,12 @@ AuthMembershipSerializer = inline_serializer(
         "role_name": serializers.CharField(),
         "role_slug": serializers.CharField(),
         "actions": serializers.ListField(child=serializers.CharField()),
+        # Both of these are emitted by `user_payload` and were previously undocumented, so
+        # a generated client could not discover them. `can_configure_machine_types` was
+        # already missing before `is_machine_only` was added; fixed together rather than
+        # leaving a known-wrong schema beside a new field.
+        "can_configure_machine_types": serializers.BooleanField(),
+        "is_machine_only": serializers.BooleanField(),
         "can_refer": serializers.BooleanField(),
         "can_verify": serializers.BooleanField(),
         "verified_at": serializers.DateTimeField(allow_null=True),

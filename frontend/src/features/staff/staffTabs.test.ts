@@ -64,6 +64,20 @@ describe("job handover", () => {
     expect(access(["manage_machines"]).allowedTabs).toContain("handover");
   });
 
+  it("omits the Notifications tab for a server-flagged machine-only role", () => {
+    // The badge lives inside that link, so omitting the tab also stops its polling.
+    // Read from the server: the flag is the fourth argument, never derived from actions.
+    const flagged = getStaffAccess(["manage_machines"], false, false, true);
+    const notFlagged = getStaffAccess(["manage_machines"], false, false, false);
+
+    expect(flagged.allowedTabs).not.toContain("notifications");
+    expect(notFlagged.allowedTabs).toContain("notifications");
+    // Default is permissive, so a caller that has not loaded the flag yet keeps the tab
+    // rather than flickering it away.
+    expect(getStaffAccess(["manage_machines"], false, false).allowedTabs)
+      .toContain("notifications");
+  });
+
   it("does not show the hardware Requests tab to a machine-only role", () => {
     const machineOnly = access(["manage_machines"]);
 

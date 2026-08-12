@@ -47,6 +47,49 @@ def user_payload(user, request=None):
             )
         return m.role == "space_manager"
 
+    # Resolved in ONE batch (two link queries total) rather than per membership: the
+    # per-actor `role_scope.manage_scope_for` would put an N+1 behind /auth/me and
+    # /auth/login, which is the query budget the block above exists to protect.
+    from apps.machines import role_scope
+
+    memberships = list(memberships)
+    machine_scopes = role_scope.manage_scopes_for_memberships(memberships)
+
+    def _is_machine_only(m):
+        """The console's copy of `role_scope.is_machine_only`, batched.
+
+        Kept in step with that function deliberately: it decides whether the Notifications
+        tab and its unread badge render, and the backend refuses the inbox for exactly this
+        actor. A tab that renders and then 403s on every request is worse than no tab.
+        """
+        if is_superadmin and not rbac._id_in(m.makerspace_id, hidden_ids):
+            return False
+        actions = set(_membership_actions(m))
+        if rbac.Action.MANAGE_MACHINES not in actions:
+            return False
+        if machine_scopes.get(m.pk, role_scope.NOTHING) is role_scope.EXEMPT:
+            return False
+        # STORED, not effective: `actions` is the expanded set, in which MANAGE_MACHINES
+        # always implies MANAGE_PRINTING -- testing it there would make this always False.
+        # Read off the role row, matching `role_scope.is_machine_only`'s printing arm.
+        if _stores_printing(m):
+            return False
+        return not (
+            rbac.Action.VIEW_INVENTORY in actions
+            or rbac.Action.MANAGE_MAKERSPACE in actions
+        )
+
+    def _stores_printing(m):
+        if m.assigned_role_id is None:
+            return rbac.Action.MANAGE_PRINTING in rbac._MEMBERSHIP_ROLE_ACTIONS.get(
+                m.role, ()
+            )
+        role = m.assigned_role
+        if role is None or role.makerspace_id != m.makerspace_id:
+            return False
+        granted = role.granted_actions if isinstance(role.granted_actions, list) else []
+        return rbac.Action.MANAGE_PRINTING in granted
+
     return {
         "id": user.id,
         "username": user.username,
@@ -75,6 +118,7 @@ def user_payload(user, request=None):
                 ),
                 "actions": _membership_actions(m),
                 "can_configure_machine_types": _can_configure_machine_types(m),
+                "is_machine_only": _is_machine_only(m),
                 "can_refer": m.can_refer,
                 "can_verify": m.can_verify,
                 "verified_at": m.verified_at,

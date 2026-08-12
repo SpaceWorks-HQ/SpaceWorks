@@ -55,7 +55,19 @@ export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
 // Permissions only. Module availability is decided in exactly one place --
 // `filterTabsByEnabledModules` in staffTabs.ts -- because two maps naming the same tab
 // is how a tab ends up gated in the sidebar but not on the route, or vice versa.
-export function getStaffAccess(actions: readonly string[], isSuperadmin: boolean, singleTenantLocked: boolean) {
+/**
+ * `isMachineOnly` is SERVER-derived (`is_machine_only` on the membership) and must not be
+ * re-derived from `actions`: a null-`assigned_role` legacy membership is scope-exempt and
+ * cannot be expressed here, and holding `manage_machines` is a different question from
+ * being narrowed by machine scope. The backend refuses the notification inbox for exactly
+ * this actor, so a locally-guessed value would render a tab that 403s on every request.
+ */
+export function getStaffAccess(
+  actions: readonly string[],
+  isSuperadmin: boolean,
+  singleTenantLocked: boolean,
+  isMachineOnly = false,
+) {
   const has = (action: string) => isSuperadmin || actions.includes(action);
   const canEditInventory = has("edit_inventory");
   const canViewInventory = has("view_inventory");
@@ -84,7 +96,10 @@ export function getStaffAccess(actions: readonly string[], isSuperadmin: boolean
   const baseTabs = handoutOnly ? (["requests", "direct", "handover"] as const) : ALL_TABS;
   const allowedTabs: readonly string[] = baseTabs.filter((tabName) => {
     if (tabName === "dashboard") return !handoutOnly && (isSuperadmin || canSeeDashboard);
-    if (tabName === "notifications") return !handoutOnly;
+    // The inbox has no machine provenance and its read state is makerspace-wide, so the
+    // backend withholds it from a per-type maintainer entirely. Omit the tab rather than
+    // render one that 403s — the same reason a tombstoned app's sidebar entry is dropped.
+    if (tabName === "notifications") return !handoutOnly && !isMachineOnly;
     if (tabName === "tobuy") return canUseToBuy;
     if (tabName === "needsfix") return canEditInventory;
     if (tabName === "categories") return canEditInventory;

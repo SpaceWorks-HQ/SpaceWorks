@@ -18,6 +18,7 @@ import type { Makerspace } from "./panels/shared";
 export function StaffWorkspace({
   activeMakerspace,
   actions,
+  isMachineOnly,
   canConfigureMachineTypes,
   collapsedGroups,
   guestOnly,
@@ -34,6 +35,7 @@ export function StaffWorkspace({
 }: {
   activeMakerspace?: Makerspace;
   actions: readonly string[];
+  isMachineOnly: boolean;
   canConfigureMachineTypes: boolean;
   collapsedGroups: Set<string>;
   guestOnly: boolean;
@@ -67,7 +69,7 @@ export function StaffWorkspace({
     defaultTab,
     handoutOnly,
     printingOnly,
-  } = getStaffAccess(actions, isSuperadmin, singleTenantLocked);
+  } = getStaffAccess(actions, isSuperadmin, singleTenantLocked, isMachineOnly);
   const visibleMakerspaces =
     singleTenantLocked && activeMakerspace
       ? [activeMakerspace]
@@ -86,10 +88,15 @@ export function StaffWorkspace({
     ? staffTabPath(activeTab, guestOnly, activeMakerspace?.slug, singleTenantLocked)
     : staffTabPath(defaultTab, guestOnly, activeMakerspace?.slug, singleTenantLocked);
 
-  // Requests contains hardware rows only. A machine-only actor following an old saved
-  // or deep-linked route should land on their first allowed tab, not a dead-tab denial.
-  const normalizeDeniedRequest = routeTabDenied && routeTab === "requests";
-  if ((!routeTabDenied || normalizeDeniedRequest) && location.pathname !== activeTabPath) {
+  // Tabs OMITTED by design rather than genuinely forbidden: `requests` holds hardware rows
+  // a machine-only actor never has, and `notifications` is withheld from that same actor
+  // because the inbox cannot be machine-scoped. Both are absent from the sidebar, so a
+  // stored or deep-linked route to one is a stale bookmark, not an attempt to reach
+  // something restricted — it should land on the actor's first allowed tab rather than an
+  // access-denied page. Genuinely denied tabs still render the denial.
+  const normalizedDeniedTabs = new Set(["requests", "notifications"]);
+  const normalizeDenied = routeTabDenied && !!routeTab && normalizedDeniedTabs.has(routeTab);
+  if ((!routeTabDenied || normalizeDenied) && location.pathname !== activeTabPath) {
     return <Navigate replace to={activeTabPath} />;
   }
 

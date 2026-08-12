@@ -57,6 +57,9 @@ def test_seeded_default_role_includes_metadata_and_effective_actions():
         "role_slug": membership.assigned_role.slug,
         "actions": sorted(rbac.effective_actions(user, makerspace.id)),
         "can_configure_machine_types": False,
+        # An Inventory Manager holds no MANAGE_MACHINES, so machine scoping has nothing to
+        # say about it and every console surface stays.
+        "is_machine_only": False,
         "can_refer": True,
         "can_verify": False,
         "verified_at": None,

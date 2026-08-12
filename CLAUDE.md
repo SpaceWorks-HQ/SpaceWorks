@@ -1956,6 +1956,41 @@ heading per type; `SharedConsumablesSection` owns unbound pools. Load-bearing de
   rows at all — only a pointer to Machines. Hardware API authorization is **untouched**; a
   deep-linked or stored route normalises to the actor's first allowed tab rather than rendering a
   dead-tab denial.
+- **`role_scope.is_machine_only` is the ONE answer to "is this actor a per-type maintainer and
+  nothing else" (phase 6c1).** Shared by the dashboard's non-machine counters and the in-app
+  notification inbox, because two copies would drift and the failure is silent — a surface that
+  keeps appearing for the very role it was meant to hide from. Three conditions: holds
+  `MANAGE_MACHINES`; resolves to a **non-EXEMPT** scope (so space managers, membership-less
+  superadmins and null-`assigned_role` legacy Machine Managers are excluded); and holds neither
+  `VIEW_INVENTORY` nor `MANAGE_MAKERSPACE`. `MANAGE_PRINTING` deliberately does not count —
+  `MANAGE_MACHINES` implies it, so asking `rbac.can` would make the answer always False and the
+  whole predicate inert. A role that **stores** `manage_printing` is exempt, read through
+  `role_grants_directly` — same distinction, and the same reason, as
+  `procurement.access.machine_type_scope`. The batched copy in `accounts/serializers.py` must read
+  the stored grant too: its `actions` set is the *expanded* one, where the implication is always
+  present.
+  - **`AuthMembershipSerializer` in `accounts/views.py` is the documented contract for this
+    payload, and it is easy to forget.** `user_payload` emits the dict; the inline serializer is
+    what reaches `openapi-schema.json` and `api.ts`. Adding a key to the dict alone leaves a
+    generated client unable to discover it — and a schema-sync check still passes, because nothing
+    told spectacular the field exists. `can_configure_machine_types` had been undocumented that way
+    since it shipped. **Two exact-payload tests pin this dict** (`tests/accounts/test_auth_payload_l4.py`
+    and `tests/test_auth_profile_scope.py`); both must be updated, and they exist to catch exactly
+    this drift.
+  - **The inbox is withheld, not scoped.** A `Notification` carries no machine provenance and its
+    `read_at` is makerspace-wide, so one team's acknowledgement silences the row for everyone.
+    Accepted cost: a scoped maintainer gets no in-app alerts and relies on email/chat, where
+    per-event recipient rules already narrow by machine. Adding provenance plus a per-recipient
+    read state is the alternative and is its own phase. All four endpoints share
+    `_makerspace_for_manager`, so the denial is one check rather than four.
+  - **The console reads `is_machine_only` off the membership** (`/auth/me` + `/auth/login`, beside
+    `can_configure_machine_types`) and passes it into `getStaffAccess`; it must not be re-derived
+    from effective actions, for the same reason as `scope_mode` and `machine_type_required`. It is
+    resolved with the **batch** `manage_scopes_for_memberships` — the per-actor call would put an
+    N+1 behind both endpoints, which is the query budget that payload is written to protect. The
+    tab is **omitted**, not permission-hidden, and the unread badge lives inside that link so it
+    stops polling with it. The flag defaults permissive so a caller that has not loaded it yet does
+    not flicker the tab away.
 - **`ToBuyItem.machine_type` narrows procurement, and `NULL` means LEGACY — never "shared"
   (phase 6b).** `MANAGE_MACHINES` implies `MANAGE_PRINTING`, and `procurement/access.py` keys the
   PRINTING stream off that action, so a laser-scoped role read **every** printing To Buy row in the
