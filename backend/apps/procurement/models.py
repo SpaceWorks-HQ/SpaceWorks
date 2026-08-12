@@ -28,6 +28,13 @@ class ToBuyItem(models.Model):
         on_delete=models.CASCADE,
         related_name="to_buy_items",
     )
+    machine_type = models.ForeignKey(
+        "machines.MachineType",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="to_buy_items",
+    )
     kind = models.CharField(max_length=16, choices=Kind.choices)
     name = models.CharField(max_length=200)
     quantity = models.PositiveIntegerField(default=1)
@@ -129,4 +136,3 @@ class ToBuyReceipt(models.Model):
 
     def __str__(self):
         return f"Receipt for {self.to_buy_item}"
-

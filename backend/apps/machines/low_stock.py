@@ -26,7 +26,9 @@ def maybe_flag_low_stock(actor, pool):
             return None
         from apps.machines.models import MachineConsumablePool
         with transaction.atomic():
-            locked = MachineConsumablePool.objects.select_for_update(of=("self",)).get(pk=pool.pk)
+            locked = MachineConsumablePool.objects.select_for_update(of=("self",)).select_related(
+                "machine"
+            ).get(pk=pool.pk)
             threshold = locked.low_threshold_grams
             if threshold is None or threshold <= 0 or not locked.is_active or locked.remaining_grams > threshold:
                 return None
@@ -39,7 +41,18 @@ def maybe_flag_low_stock(actor, pool):
             if ToBuyItem.objects.filter(source_pool=locked, kind=ToBuyItem.Kind.PRINTING, status__in=OPEN_STATUSES).exists():
                 return None
             created_by = actor if getattr(actor, "is_authenticated", False) else None
-            item = ToBuyItem.objects.create(makerspace=locked.makerspace, kind=ToBuyItem.Kind.PRINTING, name=name, quantity=1, source_pool=locked, created_by=created_by, status=ToBuyItem.Status.REQUESTED)
+            item = ToBuyItem.objects.create(
+                makerspace=locked.makerspace,
+                kind=ToBuyItem.Kind.PRINTING,
+                machine_type_id=(
+                    locked.machine.machine_type_id if locked.machine_id is not None else None
+                ),
+                name=name,
+                quantity=1,
+                source_pool=locked,
+                created_by=created_by,
+                status=ToBuyItem.Status.REQUESTED,
+            )
             audit.record(created_by, "procurement.low_stock_flagged", makerspace=locked.makerspace, target=item, meta={"pool_id": locked.pk, "remaining": str(locked.remaining_grams), "threshold": str(threshold), "to_buy_item_id": item.pk})
             return item
     except Exception:

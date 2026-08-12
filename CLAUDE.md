@@ -1956,6 +1956,69 @@ heading per type; `SharedConsumablesSection` owns unbound pools. Load-bearing de
   rows at all — only a pointer to Machines. Hardware API authorization is **untouched**; a
   deep-linked or stored route normalises to the actor's first allowed tab rather than rendering a
   dead-tab denial.
+- **`ToBuyItem.machine_type` narrows procurement, and `NULL` means LEGACY — never "shared"
+  (phase 6b).** `MANAGE_MACHINES` implies `MANAGE_PRINTING`, and `procurement/access.py` keys the
+  PRINTING stream off that action, so a laser-scoped role read **every** printing To Buy row in the
+  space: `vendor_name`, `actual_unit_cost`, `purchaser`, `link` and every attached receipt.
+  - **A NULL row is visible only to scope-exempt actors**, under an explicit "Unassigned" heading.
+    Reading NULL as "shared" would have exposed every pre-migration row to every maintainer — the
+    exact leak the phase exists to close. Migration `procurement/0007` therefore infers a type
+    **only from durable provenance**, in order: `resulting_machine`, then a **machine-bound**
+    `source_pool`, then a machine-bound `resulting_pool`. Everything else stays NULL. Never guess
+    from `name`, `kind` or the creator's role: a wrong stamp hides a row from the Space Manager who
+    created it, which is worse than leaving it unassigned.
+  - **`access.machine_type_scope` returns `None` for "not narrowed" and an EMPTY SET for "narrowed
+    and reaches nothing".** Callers must test `is None`; conflating them makes a role with no links
+    fail *open*. Three exits, in this order: no `MANAGE_MACHINES`; scope-EXEMPT; or the role
+    **stores** `MANAGE_PRINTING`. The last one matters because only the *implied* grant is the leak
+    — a role whose `granted_actions` really lists `manage_printing` was given that stream
+    deliberately, and revoking it because the role also gained machine duties is the mixed-role
+    mistake from the dashboard. EXEMPT is checked first, or a legacy null-role membership's frozen
+    action set would answer that question instead. Read with `role_grants_directly`.
+  - **Use the linked TYPE ids only, never types derived from per-machine links.** A machine link
+    granted one machine, not authority to procure for its whole kind; a role holding only machine
+    links reaches no To Buy rows at all.
+  - **`kind` stays server-derived and orthogonal**, and the narrowing applies to PRINTING rows only
+    — hardware rows survive for a role that independently holds `EDIT_INVENTORY`.
+  - **Scoping the list is not enough; `procurement/access.py` is stream-based, so the object
+    endpoints were the real hole.** One `scope_items` helper feeds list, detail get/patch/delete,
+    export, both move endpoints and `resolve_item` — and `resolve_receipt` delegates to
+    `resolve_item`, so the receipt-pk paths (url, delete) are scoped transitively rather than by a
+    second copy of the rule.
+  - **`machine_type_required` is SERVER-derived** (`access.machine_type_is_required`, the same
+    predicate `validate_machine_type` enforces) and shipped on the options endpoint. The console
+    originally inferred it from effective actions plus `role_id !== null`, which is the mistake
+    `scope_mode` exists to prevent: a null-`assigned_role` legacy membership is exempt and cannot be
+    expressed client-side, and "holds `manage_machines`" is a different question from "is narrowed"
+    (a `MANAGE_MAKERSPACE` role holds it and is exempt). It defaults to `false` while the query is
+    in flight, so the form never demands a value before the options that satisfy it exist.
+  - **`select_for_update()` cannot be combined with `select_related()` on a NULLABLE FK.** Postgres
+    rejects it outright — *"FOR UPDATE cannot be applied to the nullable side of an outer join"* —
+    so `move_to_printing` must not select-related `machine_type`; it lazy-loads in one extra query,
+    free next to the writes that transaction already performs. `makerspace` is non-nullable, so its
+    INNER JOIN is fine to lock against.
+  - **The type cannot be retagged away from durable provenance.** Because `scope_items` treats the
+    column as an authorization label, relabelling a row that came from a real machine (or clearing
+    it to the exempt-only NULL bucket) hides it from the team owning that machine and shows it to
+    another, while contradicting the asset it names. Only a scope-exempt actor can reach that PATCH,
+    so this is an **integrity** rule, not an escalation one. `validate_machine_type_provenance`
+    refuses a mismatch; re-asserting what provenance already implies is a no-op and rows with no
+    provenance stay freely taggable, so nothing is trapped — a mislabelled row is fixed by
+    correcting the provenance, not the label.
+  - **A BARREL SPLIT MUST NOT MAKE SUBMODULES IMPORT EACH OTHER.** Extracting the export view into
+    `views_items_export.py` while leaving the shared constants in `views_items.py` created a real
+    cycle — `views_items_export` imported `views_items`, which imported `ToBuyExportView` back at
+    the **bottom of the file** — so importing the export module *first* raised
+    `ImportError: cannot import name ... from partially initialized module`. It stayed hidden
+    because the urlconf always imported `views_items` first. Shared constants and query helpers
+    live in a neutral `views_common.py`; submodules depend on it and never on each other, and
+    `views.py` is the only thing that names the public surface. Verified by importing **each**
+    submodule first in its own process, which is the check that fails when this regresses.
+  - **A migration test must pin every app whose historical model it instantiates.**
+    `MigrationExecutor.project_state(targets)` replays only the named targets and their
+    dependencies, so `makerspaces` left unpinned yields a historical `Makerspace` behind the real
+    table; Django applies field defaults in Python rather than DDL, so the INSERT omits newer
+    columns and Postgres rejects the NOT NULL. Rewind the full graph forward in `finally`.
 - Public request submission requires an **authenticated member** (`RequestSubmitView` → `IsAuthenticated`), and request lookup is scoped to that verified identity — it never matches free-text contact fields (no enumeration by known email/phone). The anti-enumeration invariant is unchanged; since the Check-In retirement (`73a480c`) it is enforced by member auth rather than an external verify call.
 - Inventory Managers can run the full hardware lifecycle but **cannot** manage printing, staff, or makerspace settings.
 - Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks active status.

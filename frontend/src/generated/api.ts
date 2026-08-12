@@ -383,6 +383,7 @@ export const openApiPaths = [
   "/api/v1/payments/connect/callback",
   "/api/v1/procurement/makerspace/{makerspace_id}/to-buy",
   "/api/v1/procurement/makerspace/{makerspace_id}/to-buy/export",
+  "/api/v1/procurement/makerspace/{makerspace_id}/to-buy/machine-types",
   "/api/v1/procurement/to-buy/receipts/{id}",
   "/api/v1/procurement/to-buy/receipts/{id}/url",
   "/api/v1/procurement/to-buy/{id}",
@@ -3257,6 +3258,8 @@ export type PatchedToBuyItem = {
   "id"?: number;
   "makerspace"?: number;
   "kind"?: ToBuyItemKindEnum;
+  "machine_type"?: number | null;
+  "machine_type_name"?: string | null;
   "name"?: string;
   "quantity"?: number;
   "link"?: string;
@@ -4735,6 +4738,8 @@ export type ToBuyItem = {
   "id": number;
   "makerspace": number;
   "kind": ToBuyItemKindEnum;
+  "machine_type"?: number | null;
+  "machine_type_name": string | null;
   "name": string;
   "quantity"?: number;
   "link"?: string;
@@ -4761,6 +4766,16 @@ export type ToBuyItem = {
 export type ToBuyItemKindEnum = "hardware" | "printing";
 
 export type ToBuyItemStatusEnum = "requested" | "approved" | "ordered" | "received" | "cancelled";
+
+export type ToBuyMachineType = {
+  "id": number;
+  "name": string;
+};
+
+export type ToBuyMachineTypeOptions = {
+  "machine_type_required": boolean;
+  "results": Array<ToBuyMachineType>;
+};
 
 export type ToBuyReceipt = {
   "id": number;

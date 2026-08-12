@@ -25869,6 +25869,73 @@
                 }
             }
         },
+        "/api/v1/procurement/makerspace/{makerspace_id}/to-buy/machine-types": {
+            "get": {
+                "operationId": "api_v1_procurement_makerspace_to_buy_machine_types_retrieve",
+                "summary": "List machine types available for a new to-buy item",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "kind",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "hardware",
+                                "printing"
+                            ]
+                        },
+                        "description": "Stream to add to. Honored only for makerspace admins/superadmin; other roles are auto-tagged by role."
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Procurement"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ToBuyMachineTypeOptions"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Invalid request."
+                    },
+                    "401": {
+                        "description": "Authentication credentials were not provided."
+                    },
+                    "403": {
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "description": "Not found."
+                    }
+                }
+            }
+        },
         "/api/v1/procurement/to-buy/{id}": {
             "get": {
                 "operationId": "api_v1_procurement_to_buy_retrieve",
@@ -40294,6 +40361,15 @@
                         ],
                         "readOnly": true
                     },
+                    "machine_type": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "machine_type_name": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
                     "name": {
                         "type": "string",
                         "maxLength": 200
@@ -45984,6 +46060,15 @@
                         ],
                         "readOnly": true
                     },
+                    "machine_type": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "machine_type_name": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
                     "name": {
                         "type": "string",
                         "maxLength": 200
@@ -46104,6 +46189,7 @@
                     "created_by_username",
                     "id",
                     "kind",
+                    "machine_type_name",
                     "makerspace",
                     "moved_to_inventory_at",
                     "name",
@@ -46137,6 +46223,42 @@
                 ],
                 "type": "string",
                 "description": "* `requested` - Requested\n* `approved` - Approved\n* `ordered` - Ordered\n* `received` - Received\n* `cancelled` - Cancelled"
+            },
+            "ToBuyMachineType": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "name"
+                ]
+            },
+            "ToBuyMachineTypeOptions": {
+                "type": "object",
+                "description": "Options plus a SERVER-derived answer to \"must the caller pick one?\".\n\nThe console must not infer this from effective actions. A null-`assigned_role`\nlegacy membership is scope-exempt and cannot be expressed that way, and \"holds\nMANAGE_MACHINES\" is not the same question as \"is narrowed by machine scope\" -- a role\nholding MANAGE_MAKERSPACE holds both and is exempt. Deriving it here keeps one answer\non the server, the same reason the dashboard carries `scope_mode`.",
+                "properties": {
+                    "machine_type_required": {
+                        "type": "boolean"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ToBuyMachineType"
+                        }
+                    }
+                },
+                "required": [
+                    "machine_type_required",
+                    "results"
+                ]
             },
             "ToBuyReceipt": {
                 "type": "object",

@@ -11,6 +11,7 @@ class ToBuyItemAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         "name",
         "makerspace",
         "kind",
+        "machine_type",
         "quantity",
         "status",
         "vendor_name",
@@ -18,12 +19,13 @@ class ToBuyItemAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         "created_by",
         "created_at",
     )
-    list_filter = ("kind", "status", "makerspace")
+    list_filter = ("kind", "status", "machine_type", "makerspace")
     search_fields = ("name", "link", "vendor_name", "makerspace__name", "makerspace__slug")
     readonly_fields = ("created_by", "purchaser", "ordered_at", "received_at", "created_at", "updated_at")
     fields = (
         "makerspace",
         "kind",
+        "machine_type",
         "name",
         "quantity",
         "link",

@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 from rest_framework.exceptions import ValidationError
 
-from apps.machines.models import Machine, MachineConsumablePool
+from apps.machines.models import Machine, MachineConsumablePool, MachineType
 from apps.procurement.models import ToBuyItem
 from apps.procurement.services import move_to_printing
 from tests.return_helpers import make_space, make_user
@@ -70,3 +70,56 @@ def test_kernel_procurement_move_validates_pool_material_and_weights():
     assert negative_initial.value.detail == {
         "initial_weight_grams": "Must be zero or greater.",
     }
+
+
+def test_typed_procurement_cannot_create_another_machine_type():
+    makerspace = make_space("b7a-procurement-type-safety")
+    actor = make_user("b7a-procurement-type-safety-actor")
+    laser_type = MachineType.objects.create(
+        makerspace=makerspace, slug="procured-laser", name="Procured laser"
+    )
+    item = _received_item(makerspace, "Typed laser")
+    item.machine_type = laser_type
+    item.save(update_fields=["machine_type"])
+
+    with pytest.raises(ValidationError) as mismatch:
+        move_to_printing(
+            actor,
+            item,
+            target="printer",
+            data={"name": "Wrong type", "model": "MK4"},
+        )
+
+    item.refresh_from_db()
+    assert "machine_type" in mismatch.value.detail
+    assert item.moved_to_inventory_at is None
+    assert item.resulting_machine_id is None
+    assert not Machine.objects.filter(makerspace=makerspace, name="Wrong type").exists()
+
+    printer_type = MachineType.objects.create(
+        makerspace=makerspace, slug="3d_printer", name="Local printer"
+    )
+    printer = Machine.objects.create(
+        makerspace=makerspace, machine_type=printer_type, name="Other type printer"
+    )
+    pool_item = _received_item(makerspace, "Typed coolant")
+    pool_item.machine_type = laser_type
+    pool_item.save(update_fields=["machine_type"])
+
+    with pytest.raises(ValidationError) as pool_mismatch:
+        move_to_printing(
+            actor,
+            pool_item,
+            target="spool",
+            data={
+                "printer": printer.pk,
+                "material": "PLA",
+                "initial_weight_grams": "100.00",
+            },
+        )
+
+    pool_item.refresh_from_db()
+    assert "machine_type" in pool_mismatch.value.detail
+    assert pool_item.moved_to_inventory_at is None
+    assert pool_item.resulting_pool_id is None
+    assert not MachineConsumablePool.objects.filter(machine=printer).exists()

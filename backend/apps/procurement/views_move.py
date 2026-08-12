@@ -1,11 +1,9 @@
-from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.makerspaces.guards import require_module
 from apps.procurement import access, services
@@ -15,7 +13,7 @@ from apps.procurement.serializers import (
     MoveToPrintingRequestSerializer,
     ToBuyItemSerializer,
 )
-from apps.procurement.views_items import (
+from apps.procurement.views_common import (
     MODULE_KEY,
     PROCUREMENT_ERROR_RESPONSES,
     receipt_queryset_related,
@@ -26,20 +24,16 @@ class ToBuyMoveBaseView(APIView):
     permission_classes = [IsActiveStaff]
 
     def get_item(self, pk):
-        scope = rbac.makerspaces_for_actions(
+        makerspace_id = ToBuyItem.objects.filter(pk=pk).values_list(
+            "makerspace_id", flat=True
+        ).first()
+        queryset = access.scope_items(
+            receipt_queryset_related(ToBuyItem.objects.select_related("makerspace")),
             self.request.user,
-            rbac.Action.EDIT_INVENTORY,
-            rbac.Action.MANAGE_PRINTING,
-        )
-        queryset = receipt_queryset_related(
-            ToBuyItem.objects.select_related("makerspace")
-        )
-        if scope is not rbac.ALL:
-            queryset = queryset.filter(makerspace_id__in=scope or [])
+            makerspace_id,
+        ) if makerspace_id is not None else ToBuyItem.objects.none()
         item = get_object_or_404(queryset, pk=pk)
         require_module(item.makerspace, MODULE_KEY)
-        if item.kind not in access.viewable_kinds(self.request.user, item.makerspace_id):
-            raise Http404()
         if not access.can_manage_kind(self.request.user, item.makerspace_id, item.kind):
             raise PermissionDenied()
         return item
@@ -97,4 +91,3 @@ class ToBuyMoveToPrintingView(ToBuyMoveBaseView):
         target = data.pop("target")
         services.move_to_printing(request.user, item, target=target, data=data)
         return self.serialize_item(pk)
-

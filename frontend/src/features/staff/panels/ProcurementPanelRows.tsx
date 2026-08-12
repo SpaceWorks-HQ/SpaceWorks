@@ -9,6 +9,8 @@ export type ToBuyStatus = "requested" | "approved" | "ordered" | "received" | "c
 export type ToBuyItem = {
   id: number;
   kind: Kind;
+  machine_type: number | null;
+  machine_type_name: string | null;
   name: string;
   quantity: number;
   link: string;
@@ -35,6 +37,28 @@ export type RowDraft = {
 };
 
 export const statusOptions: ToBuyStatus[] = ["requested", "approved", "ordered", "received", "cancelled"];
+
+export type ProcurementGroup = {
+  key: string;
+  label: string;
+  rows: ToBuyItem[];
+};
+
+export function groupProcurementRows(rows: ToBuyItem[]): ProcurementGroup[] {
+  const groups = new Map<string, ProcurementGroup>();
+  for (const item of rows) {
+    const key = item.machine_type === null ? "unassigned" : `type-${item.machine_type}`;
+    const label = item.machine_type_name ?? "Unassigned";
+    const group = groups.get(key) ?? { key, label, rows: [] };
+    group.rows.push(item);
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((left, right) => {
+    if (left.key === "unassigned") return 1;
+    if (right.key === "unassigned") return -1;
+    return left.label.localeCompare(right.label);
+  });
+}
 
 export function ProcurementRow({ item, makerspaceSlug, updatePending, deletePending, onSave, onDelete, onMove, onReceiptsChanged }: {
   item: ToBuyItem;

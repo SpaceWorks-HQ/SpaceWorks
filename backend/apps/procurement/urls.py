@@ -4,6 +4,7 @@ from apps.procurement.views import (
     ToBuyDetailView,
     ToBuyExportView,
     ToBuyListCreateView,
+    ToBuyMachineTypeOptionsView,
     ToBuyMoveToInventoryView,
     ToBuyMoveToPrintingView,
     ToBuyReceiptDeleteView,
@@ -24,6 +25,11 @@ urlpatterns = [
         "makerspace/<int:makerspace_id>/to-buy/export",
         ToBuyExportView.as_view(),
         name="to-buy-export",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/to-buy/machine-types",
+        ToBuyMachineTypeOptionsView.as_view(),
+        name="to-buy-machine-type-options",
     ),
     path(
         "to-buy/<int:pk>/receipts/presign",
@@ -57,4 +63,3 @@ urlpatterns = [
     ),
     path("to-buy/<int:pk>", ToBuyDetailView.as_view(), name="to-buy-detail"),
 ]
-
