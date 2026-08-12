@@ -90,7 +90,7 @@ export function ModulesPanel({ makerspaceId }: { makerspaceId: number }) {
                 <button
                   type="button"
                   aria-expanded={open}
-                  className="flex w-full flex-wrap items-center justify-between gap-3 p-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  className="desk-button-ghost h-auto w-full flex-wrap justify-between p-3 text-left"
                   onClick={() => setOpenGroup(open ? null : group.key)}
                 >
                   <span>

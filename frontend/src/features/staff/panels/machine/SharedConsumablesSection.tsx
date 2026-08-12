@@ -42,7 +42,7 @@ export function SharedConsumablesSection({ makerspaceId, pools, poolError, open,
     <CollapsibleSection title="Shared consumables" count={pools.length} open={open} onToggle={onToggle}>
       <div className="grid gap-4 p-3">
         <section>
-          <h4 className="mb-2 text-sm font-semibold text-muted">Create shared pool</h4>
+          <h4 className="title-section mb-2">Create shared pool</h4>
           <div className="grid gap-2 md:grid-cols-6">
             <input aria-label="Material" className={`desk-input ${focusRing}`} placeholder="Material" value={pool.material} onChange={(event) => setPool({ ...pool, material: event.target.value })} />
             <input aria-label="Colour" className={`desk-input ${focusRing}`} placeholder="Colour" value={pool.color} onChange={(event) => setPool({ ...pool, color: event.target.value })} />
@@ -54,12 +54,12 @@ export function SharedConsumablesSection({ makerspaceId, pools, poolError, open,
               <option value="count">Count</option>
             </select>
             <input aria-label="Initial quantity" className={`desk-input ${focusRing}`} type="number" min="0" placeholder="Initial quantity" value={pool.quantity} onChange={(event) => setPool({ ...pool, quantity: event.target.value })} />
-            <button className={focusRing} disabled={!pool.material.trim() || !pool.quantity || createPool.isPending} onClick={() => createPool.mutate()}>Add pool</button>
+            <button className="desk-button-primary" disabled={!pool.material.trim() || !pool.quantity || createPool.isPending} onClick={() => createPool.mutate()}>Add pool</button>
           </div>
           {pool.unit === "grams" ? <input aria-label="Low threshold grams" className={`desk-input ${focusRing} mt-2 md:max-w-xs`} type="number" min="0" placeholder="Low threshold grams (optional)" value={pool.low_threshold_grams} onChange={(event) => setPool({ ...pool, low_threshold_grams: event.target.value })} /> : null}
         </section>
         <section>
-          <h4 className="mb-2 text-sm font-semibold text-muted">Shared pool stock</h4>
+          <h4 className="title-section mb-2">Shared pool stock</h4>
           <ConsumablePoolList makerspaceId={makerspaceId} pools={pools} />
         </section>
         <ErrorBlock error={poolError ?? createPool.error} />
@@ -89,7 +89,7 @@ export function ConsumablePoolList({ makerspaceId, pools }: { makerspaceId: numb
         {pools.map((pool) => (
           <div className="flex items-center justify-between rounded-md border border-line p-2" key={pool.id}>
             <span>{poolLabel(pool)} · {pool.remaining_grams} {pool.unit ?? "grams"}</span>
-            <button className={focusRing} disabled={adjustPool.isPending} onClick={() => adjust(pool)}>Adjust</button>
+            <button className="desk-button-primary" disabled={adjustPool.isPending} onClick={() => adjust(pool)}>Adjust</button>
           </div>
         ))}
         {!pools.length ? <p className="text-sm text-muted">No consumable pools.</p> : null}

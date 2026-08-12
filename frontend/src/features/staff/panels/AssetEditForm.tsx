@@ -67,16 +67,16 @@ export function AssetEditForm({
       }}
     >
       <div className="grid gap-2 sm:grid-cols-2">
-        <label className="grid gap-1 text-xs text-muted">
+        <label className="eyebrow grid gap-1">
           <span>Asset tag</span>
           <input className="desk-input" value={assetTag} onChange={(e) => setAssetTag(e.target.value)} required />
         </label>
-        <label className="grid gap-1 text-xs text-muted">
+        <label className="eyebrow grid gap-1">
           <span>Serial number</span>
           <input className="desk-input" value={serial} onChange={(e) => setSerial(e.target.value)} />
         </label>
       </div>
-      <label className="grid gap-1 text-xs text-muted">
+      <label className="eyebrow grid gap-1">
         <span>Container</span>
         <select className="desk-input" value={boxId} onChange={(e) => setBoxId(e.target.value)}>
           <option value="">No container</option>
@@ -85,17 +85,17 @@ export function AssetEditForm({
           ))}
         </select>
       </label>
-      <label className="grid gap-1 text-xs text-muted">
+      <label className="eyebrow grid gap-1">
         <span>Notes</span>
         <textarea className="desk-input min-h-16 w-full" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
-      <label className="flex items-center gap-2 text-xs text-ink">
+      <label className="eyebrow flex items-center gap-2">
         <input type="checkbox" checked={publicEnabled} onChange={(e) => setPublicEnabled(e.target.checked)} />
         <span>Enabled for public self-checkout</span>
       </label>
       {save.error ? <p className="text-xs text-danger">{save.error.message}</p> : null}
       <div className="desk-actions flex flex-wrap justify-end gap-2">
-        <button className="desk-button" type="button" disabled={save.isPending} onClick={onCancel}>Cancel</button>
+        <button className="desk-button-ghost" type="button" disabled={save.isPending} onClick={onCancel}>Cancel</button>
         <button className="desk-button-primary" type="submit" disabled={save.isPending || !assetTag.trim()}>
           {save.isPending ? "Saving..." : "Save"}
         </button>

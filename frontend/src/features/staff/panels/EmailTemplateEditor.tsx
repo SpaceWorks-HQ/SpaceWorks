@@ -168,25 +168,25 @@ export function EmailTemplateEditor({
         save.mutate();
       }}>
         <TemplateHeader detail={detail.data} active={draft.is_active} typeOverride={Boolean(selected.machineType)} onActive={(is_active) => setDraft({ ...draft, is_active })} />
-        <label className="grid gap-2 text-sm font-semibold text-ink">
+        <label className="eyebrow grid gap-2">
           <span>Subject</span>
           <input ref={subjectRef} className="desk-input" value={draft.subject} onFocus={() => setLastFocused("subject")} onChange={(event) => setDraft({ ...draft, subject: event.target.value })} />
         </label>
         <MergeFields detail={detail.data} onInsert={insertField} />
-        <label className="grid gap-2 text-sm font-semibold text-ink">
+        <label className="eyebrow grid gap-2">
           <span>Plain text body</span>
           <textarea ref={textRef} className="desk-input min-h-48 font-mono text-xs" value={draft.text_body} onFocus={() => setLastFocused("text_body")} onChange={(event) => setDraft({ ...draft, text_body: event.target.value })} />
         </label>
-        <label className="grid gap-2 text-sm font-semibold text-ink">
+        <label className="eyebrow grid gap-2">
           <span>HTML body</span>
           <textarea ref={htmlRef} className="desk-input min-h-56 font-mono text-xs" value={draft.html_body} onFocus={() => setLastFocused("html_body")} onChange={(event) => setDraft({ ...draft, html_body: event.target.value })} />
         </label>
         <div className="desk-actions flex flex-wrap items-center gap-2">
           <button className="desk-button-primary" type="submit" disabled={save.isPending}>{save.isPending ? "Saving..." : "Save"}</button>
-          <button className="desk-button" type="button" disabled={reset.isPending} onClick={() => window.confirm(selected.machineType ? "Reset this override to the space default?" : "Reset this email template to the built-in default?") && reset.mutate()}>
+          <button className="desk-button-danger" type="button" disabled={reset.isPending} onClick={() => window.confirm(selected.machineType ? "Reset this override to the space default?" : "Reset this email template to the built-in default?") && reset.mutate()}>
             {reset.isPending ? "Resetting..." : selected.machineType ? "Fall back to space default" : "Reset to built-in default"}
           </button>
-          <button className="desk-button" type="button" onClick={() => setShowDefaults((open) => !open)}>{showDefaults ? "Hide default" : "View default"}</button>
+          <button className="desk-button-ghost" type="button" onClick={() => setShowDefaults((open) => !open)}>{showDefaults ? "Hide default" : "View default"}</button>
         </div>
         {save.error ? <p className="text-sm text-danger">{save.error.message}</p> : null}
         {reset.error ? <p className="text-sm text-danger">{reset.error.message}</p> : null}
@@ -202,7 +202,7 @@ function TemplateHeader({ detail, active, typeOverride, onActive }: { detail: Te
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="grid gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-base font-semibold text-ink">{detail.label}</h3>
+          <h3 className="title-section">{detail.label}</h3>
           <Badge tone={active ? "success" : "neutral"}>{active ? "Custom" : "Default"}</Badge>
           {detail.is_overridden ? <Badge tone="warn">Edited</Badge> : null}
         </div>
@@ -222,10 +222,10 @@ function TemplateHeader({ detail, active, typeOverride, onActive }: { detail: Te
 function MergeFields({ detail, onInsert }: { detail: TemplateDetail; onInsert: (name: string) => void }) {
   return (
     <div className="grid gap-2">
-      <p className="text-sm font-semibold text-ink">Merge fields</p>
+      <h3 className="title-section">Merge fields</h3>
       <div className="flex flex-wrap gap-2">
         {detail.fields.map((field) => (
-          <button key={field.name} className="rounded-lg border border-line bg-surface px-2 py-1 font-mono text-xs text-ink hover:border-accent hover:text-accent-ink" title={field.description} type="button" onClick={() => onInsert(field.name)}>
+          <button key={field.name} className="desk-button-ghost font-mono text-xs" title={field.description} type="button" onClick={() => onInsert(field.name)}>
             {field.name}
           </button>
         ))}
@@ -237,7 +237,7 @@ function MergeFields({ detail, onInsert }: { detail: TemplateDetail; onInsert: (
 function DefaultReference({ detail, typeOverride }: { detail: TemplateDetail; typeOverride: boolean }) {
   return (
     <div className="grid gap-3 rounded-md border border-line bg-bg p-4">
-      <h3 className="text-base font-semibold text-ink">{typeOverride ? "Space default reference" : "Built-in default reference"}</h3>
+      <h3 className="title-section">{typeOverride ? "Space default reference" : "Built-in default reference"}</h3>
       <ReferenceBlock title="Subject" value={detail.default_subject} />
       <ReferenceBlock title="Plain text" value={detail.default_text} tall />
     </div>
@@ -247,7 +247,7 @@ function DefaultReference({ detail, typeOverride }: { detail: TemplateDetail; ty
 function ReferenceBlock({ title, value, tall = false }: { title: string; value: string; tall?: boolean }) {
   return (
     <div className="grid gap-2">
-      <p className="text-sm font-semibold text-ink">{title}</p>
+      <h4 className="title-section">{title}</h4>
       <pre className={`${tall ? "max-h-64 whitespace-pre-wrap" : ""} overflow-auto rounded-md border border-line bg-surface p-3 text-xs text-muted`}>{value || "-"}</pre>
     </div>
   );
@@ -257,7 +257,7 @@ function PreviewPane({ preview, loading, error }: { preview?: Preview; loading: 
   return (
     <div className="grid gap-3 rounded-md border border-line bg-bg p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-semibold text-ink">Preview</h3>
+        <h3 className="title-section">Preview</h3>
         {loading ? <span className="text-xs text-muted">Rendering...</span> : null}
       </div>
       {error ? <p className="text-sm text-danger">{error.message}</p> : null}
@@ -265,7 +265,7 @@ function PreviewPane({ preview, loading, error }: { preview?: Preview; loading: 
       <ReferenceBlock title="Plain text" value={preview?.text_body ?? ""} tall />
       {preview?.html_body ? (
         <div className="grid gap-2">
-          <p className="text-sm font-semibold text-ink">HTML</p>
+          <h4 className="title-section">HTML</h4>
           <iframe className="h-96 w-full rounded-md border border-line bg-white" sandbox="" srcDoc={preview.html_body} title="Rendered email HTML preview" />
         </div>
       ) : null}

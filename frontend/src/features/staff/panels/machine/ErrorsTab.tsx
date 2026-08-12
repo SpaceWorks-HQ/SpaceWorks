@@ -25,7 +25,7 @@ export function ErrorsTab({ machineId, canOperate }: { machineId: number; canOpe
 
   return (
     <section>
-      <h3 className="mb-3 text-sm font-semibold text-ink">Error logs</h3>
+      <h3 className="title-section mb-3">Error logs</h3>
       {logs.isLoading ? <p className="text-sm text-muted">Loading error logs...</p> : null}
       {logs.error instanceof Error ? <p className="text-sm text-danger">{logs.error.message}</p> : null}
       {!logs.isLoading && !logs.error && !items.length ? (
@@ -36,7 +36,7 @@ export function ErrorsTab({ machineId, canOperate }: { machineId: number; canOpe
           <div key={entry.id} className="rounded-md border border-line bg-bg p-2 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <strong className="text-ink">{entry.severity}</strong>
-              <span className="text-xs text-muted">{formatDate(entry.created_at)}</span>
+              <span className="font-mono text-xs text-muted">{formatDate(entry.created_at)}</span>
             </div>
             <p className="mt-1 whitespace-pre-wrap break-words text-muted">{entry.message}</p>
             {entry.logged_by_username ? (
@@ -47,11 +47,11 @@ export function ErrorsTab({ machineId, canOperate }: { machineId: number; canOpe
       </div>
       {canOperate ? (
         <form className="mt-3 grid gap-2" onSubmit={(event) => { event.preventDefault(); add.mutate(); }}>
-          <label className="grid gap-1 text-xs font-semibold text-muted">Severity
+          <label className="eyebrow grid gap-1">Severity
             <input className="desk-input" maxLength={16} value={severity}
               onChange={(event) => setSeverity(event.target.value)} required />
           </label>
-          <label className="grid gap-1 text-xs font-semibold text-muted">Message
+          <label className="eyebrow grid gap-1">Message
             <textarea className="desk-input min-h-20" value={message}
               onChange={(event) => setMessage(event.target.value)} required />
           </label>

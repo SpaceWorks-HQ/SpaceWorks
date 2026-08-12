@@ -63,7 +63,7 @@ export function NotificationInbox({ makerspace }: { makerspace: Makerspace }) {
   return (
     <Panel title="Notifications">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <label className="inline-flex items-center gap-2 text-sm text-muted">
+        <label className="eyebrow inline-flex items-center gap-2">
           <input
             type="checkbox"
             checked={unreadOnly}
@@ -72,7 +72,7 @@ export function NotificationInbox({ makerspace }: { makerspace: Makerspace }) {
           Unread only
         </label>
         <button
-          className="desk-button"
+          className="desk-button-success"
           disabled={markAllRead.isPending || notifications.data?.count === 0}
           onClick={() => markAllRead.mutate()}
         >
@@ -98,9 +98,9 @@ export function NotificationInbox({ makerspace }: { makerspace: Makerspace }) {
                       {notification.level}
                     </span>
                     {notification.event ? <span className="text-xs text-muted">{notification.event}</span> : null}
-                    <span className="text-xs text-muted">{formatRelativeTime(notification.created_at)}</span>
+                    <span className="font-mono text-xs text-muted">{formatRelativeTime(notification.created_at)}</span>
                   </div>
-                  <h3 className="break-words text-sm font-semibold text-ink">{notification.title}</h3>
+                  <h3 className="title-section break-words">{notification.title}</h3>
                   {notification.body ? (
                     <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-muted">
                       {notification.body}
@@ -114,7 +114,7 @@ export function NotificationInbox({ makerspace }: { makerspace: Makerspace }) {
                 </div>
                 {unread ? (
                   <button
-                    className="desk-button shrink-0"
+                    className="desk-button-success shrink-0"
                     disabled={markRead.isPending}
                     onClick={() => markRead.mutate(notification.id)}
                   >
@@ -131,7 +131,7 @@ export function NotificationInbox({ makerspace }: { makerspace: Makerspace }) {
       </div>
       <div className="mt-3 flex items-center justify-between gap-3 text-sm">
         <button
-          className="desk-button"
+          className="desk-button-ghost"
           disabled={!notifications.data?.previous}
           onClick={() => setPage((current) => Math.max(1, current - 1))}
         >
@@ -141,7 +141,7 @@ export function NotificationInbox({ makerspace }: { makerspace: Makerspace }) {
           Page {page}{" - "}{notifications.data?.count ?? 0} total
         </span>
         <button
-          className="desk-button"
+          className="desk-button-ghost"
           disabled={!notifications.data?.next}
           onClick={() => setPage((current) => current + 1)}
         >

@@ -145,24 +145,24 @@ export function Categories({ makerspace }: { makerspace: Makerspace }) {
         editingId === category.id ? (
           <div className="desk-actions flex flex-wrap gap-2">
             <button
-              className="desk-button"
+              className="desk-button-primary"
               type="button"
               disabled={!editForm.name.trim() || update.isPending}
               onClick={() => update.mutate(category)}
             >
               Save
             </button>
-            <button className="desk-button" type="button" onClick={() => setEditingId(null)}>
+            <button className="desk-button-ghost" type="button" onClick={() => setEditingId(null)}>
               Cancel
             </button>
           </div>
         ) : (
           <div className="desk-actions flex flex-wrap gap-2">
-            <button className="desk-button" type="button" onClick={() => startEdit(category)}>
+            <button className="desk-button-ghost" type="button" onClick={() => startEdit(category)}>
               Edit
             </button>
             <button
-              className="desk-button"
+              className="desk-button-danger"
               type="button"
               disabled={remove.isPending}
               onClick={() => setDeleteTarget(category)}
@@ -202,7 +202,7 @@ export function Categories({ makerspace }: { makerspace: Makerspace }) {
             value={form.icon}
             onChange={(event) => setForm((current) => ({ ...current, icon: event.target.value }))}
           />
-          <button className="desk-button" type="button" disabled={!form.name.trim() || create.isPending} onClick={() => create.mutate()}>
+          <button className="desk-button-primary" type="button" disabled={!form.name.trim() || create.isPending} onClick={() => create.mutate()}>
             Add category
           </button>
         </div>
@@ -242,4 +242,3 @@ export function Categories({ makerspace }: { makerspace: Makerspace }) {
     </Panel>
   );
 }
-

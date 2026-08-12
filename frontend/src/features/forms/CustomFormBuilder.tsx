@@ -9,6 +9,18 @@ import {
   type CustomQuestionType,
 } from "./customFormTypes";
 
+const QUESTION_TONES = [
+  "border-accent bg-accent/15",
+  "border-secondary bg-secondary/15",
+  "border-success bg-success/15",
+  "border-warn bg-warn/15",
+] as const;
+
+function questionTone(id: string) {
+  const total = [...id].reduce((sum, character) => sum + character.codePointAt(0)!, 0);
+  return QUESTION_TONES[total % QUESTION_TONES.length];
+}
+
 function questionId() {
   return "q_" + crypto.randomUUID().replace(/-/g, "_");
 }
@@ -37,8 +49,8 @@ export function CustomFormBuilder({ value, onChange, disabled = false }: {
   return (
     <fieldset className="grid gap-3" disabled={disabled}>
       <div>
-        <legend className="text-sm font-semibold text-ink">Custom questions</legend>
-        <p className="mt-1 text-xs text-muted">Answers are visible only to authorized staff.</p>
+        <legend className="title-panel">Custom questions</legend>
+        <p className="eyebrow mt-1">Answers are visible only to authorized staff.</p>
       </div>
       {questions.map((question, index) => (
         <QuestionEditor
@@ -56,7 +68,7 @@ export function CustomFormBuilder({ value, onChange, disabled = false }: {
           No custom questions. The standard contact fields will still be collected.
         </p>
       ) : null}
-      <button className="desk-button w-fit" type="button" disabled={questions.length >= 50} onClick={() => onChange([...questions, newQuestion()])}>
+      <button className="desk-button-ghost w-fit" type="button" disabled={questions.length >= 50} onClick={() => onChange([...questions, newQuestion()])}>
         Add question
       </button>
     </fieldset>
@@ -87,20 +99,20 @@ function QuestionEditor({ question, index, count, onChange, onMove, onRemove }: 
   };
 
   return (
-    <div className="rounded-xl border border-line bg-bg p-3">
+    <div className={`rounded-xl border ${questionTone(question.id)} p-3`}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="font-mono text-xs font-semibold text-muted">Question {index + 1}</span>
+        <span className="eyebrow">Question <span className="font-mono">{index + 1}</span></span>
         <div className="ml-auto flex gap-2">
-          <button className="desk-button px-2 py-1" type="button" disabled={index === 0} onClick={() => onMove(-1)} aria-label={"Move question " + (index + 1) + " up"}>Up</button>
-          <button className="desk-button px-2 py-1" type="button" disabled={index === count - 1} onClick={() => onMove(1)} aria-label={"Move question " + (index + 1) + " down"}>Down</button>
-          <button className="desk-button px-2 py-1 text-danger" type="button" onClick={onRemove}>Remove</button>
+          <button className="desk-button-ghost" type="button" disabled={index === 0} onClick={() => onMove(-1)} aria-label={"Move question " + (index + 1) + " up"}>Up</button>
+          <button className="desk-button-ghost" type="button" disabled={index === count - 1} onClick={() => onMove(1)} aria-label={"Move question " + (index + 1) + " down"}>Down</button>
+          <button className="desk-button-danger" type="button" onClick={onRemove}>Remove</button>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
-        <label className="grid gap-1 text-sm font-semibold text-ink">Label
+        <label className="grid gap-1 text-ink"><span className="eyebrow">Label</span>
           <input className="desk-input" required maxLength={200} value={question.label} onChange={(event) => onChange({ ...question, label: event.target.value })} />
         </label>
-        <label className="grid gap-1 text-sm font-semibold text-ink">Answer type
+        <label className="grid gap-1 text-ink"><span className="eyebrow">Answer type</span>
           <select className="desk-input" value={question.type} onChange={changeType}>
             {CUSTOM_QUESTION_TYPES.map((type) => <option key={type} value={type}>{QUESTION_TYPE_LABELS[type]}</option>)}
           </select>
@@ -121,14 +133,14 @@ function OptionsEditor({ question, onChange }: {
 }) {
   return (
     <div className="mt-3 grid gap-2">
-      <p className="text-xs font-semibold text-muted">Choices</p>
+      <h3 className="title-section">Choices</h3>
       {question.options.map((option, index) => (
         <div className="flex gap-2" key={question.id + "-option-" + index}>
           <input className="desk-input min-w-0 flex-1" aria-label={"Choice " + (index + 1)} required maxLength={200} value={option} onChange={(event) => onChange({ ...question, options: question.options.map((item, itemIndex) => itemIndex === index ? event.target.value : item) })} />
-          <button className="desk-button text-danger" type="button" disabled={question.options.length === 1} onClick={() => onChange({ ...question, options: question.options.filter((_, itemIndex) => itemIndex !== index) })}>Remove</button>
+          <button className="desk-button-danger" type="button" disabled={question.options.length === 1} onClick={() => onChange({ ...question, options: question.options.filter((_, itemIndex) => itemIndex !== index) })}>Remove</button>
         </div>
       ))}
-      <button className="desk-button w-fit" type="button" disabled={question.options.length >= 50} onClick={() => onChange({ ...question, options: [...question.options, ""] })}>Add choice</button>
+      <button className="desk-button-ghost w-fit" type="button" disabled={question.options.length >= 50} onClick={() => onChange({ ...question, options: [...question.options, ""] })}>Add choice</button>
     </div>
   );
 }

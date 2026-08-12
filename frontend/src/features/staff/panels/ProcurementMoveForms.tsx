@@ -101,11 +101,11 @@ export function PrintingMoveForm({ form, setForm, printers }: { form: PrintingFo
 }
 
 function Segmented<T extends string>({ values, value, label, onChange }: { values: T[]; value: T; label: (value: T) => string; onChange: (value: T) => void }) {
-  return <div className="inline-flex w-max rounded-md border border-line bg-surface p-1">{values.map((item) => <button key={item} type="button" className={`rounded px-3 py-1 text-sm ${value === item ? "bg-bg font-semibold text-ink shadow-sm" : "text-muted"}`} onClick={() => onChange(item)}>{label(item)}</button>)}</div>;
+  return <div className="inline-flex w-max rounded-md border border-line bg-surface p-1">{values.map((item) => <button key={item} type="button" className={value === item ? "desk-button-primary" : "desk-button-ghost"} onClick={() => onChange(item)}>{label(item)}</button>)}</div>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="grid gap-1"><span className="text-xs font-medium text-muted">{label}</span>{children}</label>;
+  return <label className="grid gap-1"><span className="eyebrow">{label}</span>{children}</label>;
 }
 
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {

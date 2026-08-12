@@ -68,10 +68,10 @@ export function WarrantyPanel({
       <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm text-muted">Warranty coverage for {scopeLabel} in {makerspace.name}.</p>
-          {warranties.data ? <p className="mt-1 text-xs text-muted">{warranties.data.count} hosts total</p> : null}
+          {warranties.data ? <p className="mt-1 font-mono text-xs text-muted">{warranties.data.count} hosts total</p> : null}
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-muted sm:w-48">
+          <label className="eyebrow grid gap-1 sm:w-48">
             Status
             <select className="desk-input" value={status} onChange={(event) => updateStatus(event.target.value as StatusFilter)}>
               <option value="all">All</option>
@@ -81,7 +81,7 @@ export function WarrantyPanel({
               <option value="unknown">Uncovered / no warranty</option>
             </select>
           </label>
-          <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-muted sm:w-44">
+          <label className="eyebrow grid gap-1 sm:w-44">
             Expires before
             <input className="desk-input" type="date" value={expiresBefore} onChange={(event) => updateExpiresBefore(event.target.value)} />
           </label>
@@ -106,7 +106,7 @@ export function WarrantyPanel({
       {visibleRows.length ? (
         <div className="overflow-x-auto rounded-md border border-line">
           <table className="min-w-[820px] divide-y divide-line text-left text-sm">
-            <thead className="bg-bg text-xs font-semibold uppercase text-muted">
+            <thead className="eyebrow bg-bg">
               <tr>
                 <th className="px-3 py-2">Host</th>
                 <th className="px-3 py-2">Vendor</th>
@@ -141,7 +141,7 @@ export function WarrantyPanel({
                       <td className="whitespace-nowrap px-3 py-2 text-right align-top text-muted">{row.document_count}</td>
                       <td className="whitespace-nowrap px-3 py-2 text-right align-top">
                         {manageable ? (
-                          <button className="desk-button" type="button" onClick={() => setExpanded(isOpen ? null : rowKey)}>
+                          <button className="desk-button-ghost" type="button" onClick={() => setExpanded(isOpen ? null : rowKey)}>
                             {isOpen ? "Close" : "Manage"}
                           </button>
                         ) : <span className="text-xs text-muted">-</span>}
@@ -163,11 +163,11 @@ export function WarrantyPanel({
       ) : null}
 
       <div className="mt-3 flex items-center justify-between gap-3 text-sm">
-        <button className="desk-button" type="button" disabled={!warranties.data?.previous} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+        <button className="desk-button-ghost" type="button" disabled={!warranties.data?.previous} onClick={() => setPage((current) => Math.max(1, current - 1))}>
           Previous
         </button>
-        <span className="text-muted">Page {page} of {totalPages}</span>
-        <button className="desk-button" type="button" disabled={!warranties.data?.next} onClick={() => setPage((current) => current + 1)}>
+        <span className="font-mono text-muted">Page {page} of {totalPages}</span>
+        <button className="desk-button-ghost" type="button" disabled={!warranties.data?.next} onClick={() => setPage((current) => current + 1)}>
           Next
         </button>
       </div>
@@ -179,7 +179,7 @@ function WarrantyTableSkeleton() {
   return (
     <div className="overflow-x-auto rounded-md border border-line" aria-hidden="true">
       <table className="min-w-[820px] divide-y divide-line text-left text-sm">
-        <thead className="bg-bg text-xs font-semibold uppercase text-muted">
+        <thead className="eyebrow bg-bg">
           <tr>
             {["Host", "Vendor", "Purchased", "Expires", "Status", "Docs", "Manage"].map((label) => (
               <th key={label} className="px-3 py-2">{label}</th>

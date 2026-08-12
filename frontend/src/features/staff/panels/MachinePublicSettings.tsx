@@ -53,7 +53,7 @@ export function MachinePublicSettings({ machine, makerspaceId }: {
 
   return (
     <section className={'border-t border-line pt-4'}>
-      <h3 className={'text-sm font-semibold text-ink'}>Public listing</h3>
+      <h3 className="title-section">Public listing</h3>
       <label className={'mt-3 flex items-start gap-3 rounded-xl border border-line bg-bg p-3'}>
         <input
           type={'checkbox'}
@@ -72,7 +72,7 @@ export function MachinePublicSettings({ machine, makerspaceId }: {
         <p className={'mt-2 text-sm text-danger'}>{publicity.error.message}</p>
       ) : null}
       <div className={'mt-4 rounded-xl border border-line bg-surface p-3'}>
-        <h4 className={'mb-3 text-sm font-semibold text-ink'}>What&apos;s shown publicly</h4>
+        <h4 className="title-section mb-3">What&apos;s shown publicly</h4>
         {preview.isLoading ? <p className={'text-sm text-muted'}>Loading preview...</p> : null}
         {preview.error instanceof Error ? (
           <p className={'text-sm text-danger'}>{preview.error.message}</p>

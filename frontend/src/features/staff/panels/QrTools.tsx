@@ -150,7 +150,7 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
         <div className="rounded-md border border-line bg-surface p-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Makerspace</p>
+              <p className="eyebrow">Makerspace</p>
               <p className="font-semibold text-ink">{makerspace.name}</p>
             </div>
             <button className="desk-button-primary" type="button" onClick={() => setBatchModalOpen(true)}>
@@ -184,7 +184,7 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
               <div className="grid gap-2 sm:grid-cols-[110px_1fr_auto]">
                 <input className="desk-input" inputMode="numeric" value={assetCount} onChange={(event) => setAssetCount(event.target.value)} />
                 <input className="desk-input" value={assetPrefix} placeholder="Label prefix" onChange={(event) => setAssetPrefix(event.target.value)} />
-                <button className="desk-button" type="button" disabled={!canGenerateAssets || generateAssets.isPending} onClick={() => generateAssets.mutate()}>
+                <button className="desk-button-primary" type="button" disabled={!canGenerateAssets || generateAssets.isPending} onClick={() => generateAssets.mutate()}>
                   {generateAssets.isPending ? "Generating..." : "Generate missing/new unit QRs"}
                 </button>
               </div>
@@ -197,7 +197,7 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
                     </option>
                   ))}
                 </select>
-                <button className="desk-button" type="button" disabled={!canReprintAsset || reprintAsset.isPending} onClick={() => reprintAsset.mutate()}>
+                <button className="desk-button-primary" type="button" disabled={!canReprintAsset || reprintAsset.isPending} onClick={() => reprintAsset.mutate()}>
                   {reprintAsset.isPending ? "Adding..." : "Reprint unit QR"}
                 </button>
               </div>
@@ -207,7 +207,7 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
             </div>
           ) : null}
           {!selectedIsIndividual ? (
-            <button className="desk-button mt-2" type="button" disabled={!canAddItemQr || addProduct.isPending} onClick={() => addProduct.mutate()}>
+            <button className="desk-button-primary mt-2" type="button" disabled={!canAddItemQr || addProduct.isPending} onClick={() => addProduct.mutate()}>
               {addProduct.isPending ? "Adding..." : "Add/reprint item QR"}
             </button>
           ) : null}
@@ -219,7 +219,7 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
         <div className="rounded-md border border-line bg-surface p-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-semibold text-ink">{batch.data?.title ?? "Working batch"}</h3>
+              <h3 className="title-section">{batch.data?.title ?? "Working batch"}</h3>
               <p className="text-sm text-muted">{batchItems.length} QR labels accumulated</p>
             </div>
             <button className="desk-button-primary" type="button" disabled={!batchItems.length || downloadZip.isPending} onClick={() => downloadZip.mutate()}>
@@ -251,7 +251,7 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
 }
 
 function ActionBox({ children, title }: { children: React.ReactNode; title: string }) {
-  return <section className="rounded-md border border-line bg-surface p-3"><h3 className="mb-2 font-semibold text-ink">{title}</h3>{children}</section>;
+  return <section className="rounded-md border border-line bg-surface p-3"><h3 className="title-section mb-2">{title}</h3>{children}</section>;
 }
 
 function ErrorText({ text }: { text: string }) {
@@ -261,7 +261,7 @@ function ErrorText({ text }: { text: string }) {
 function ModalActions(props: { pending: boolean; disabled: boolean; submitLabel: string; onCancel: () => void; onSubmit: () => void }) {
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      <button className="desk-button" type="button" disabled={props.pending} onClick={props.onCancel}>Cancel</button>
+      <button className="desk-button-ghost" type="button" disabled={props.pending} onClick={props.onCancel}>Cancel</button>
       <button className="desk-button-primary" type="button" disabled={props.pending || props.disabled} onClick={props.onSubmit}>
         {props.pending ? "Saving..." : props.submitLabel}
       </button>

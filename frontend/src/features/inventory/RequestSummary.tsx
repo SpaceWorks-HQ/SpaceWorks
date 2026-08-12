@@ -10,8 +10,8 @@ export function RequestSummary({ request }: { request: PublicRequestStatus }) {
       <StatusStepper status={request.status} />
       <div className="flex items-start justify-between gap-3">
         <div className="mt-3">
-          <p className="text-xs tracking-wide opacity-80">Status</p>
-          <p className="mt-1 text-base font-semibold">
+          <p className="eyebrow text-secondary-ink">Status</p>
+          <p className="mt-1 font-mono text-base font-semibold">
             {statusStageLabel(request.status)}
           </p>
         </div>
@@ -31,7 +31,7 @@ export function RequestSummary({ request }: { request: PublicRequestStatus }) {
             key={`${request.public_token ?? request.created_at}-${item.product_name}`}
           >
             <span>{item.product_name}</span>
-            <span>x{item.requested_quantity}</span>
+            <span className="font-mono">x{item.requested_quantity}</span>
           </div>
         ))}
       </div>

@@ -174,7 +174,7 @@ export function StockTransferPanel({
     <Panel title="Stock transfers">
       <div className="grid gap-4">
         {!canCreate ? (
-          <p className="rounded-md border border-line bg-warn px-3 py-2 text-sm text-on-warn dark:bg-[#332b00] dark:text-[#fcdf46]">
+          <p className="rounded-md border border-line bg-warn px-3 py-2 text-sm text-on-warn dark:bg-warn/15 dark:text-warn-ink">
             Transfers are managed by inventory staff. This view is read-only.
           </p>
         ) : (
@@ -221,8 +221,8 @@ export function StockTransferPanel({
 
             <div className="mt-4">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-ink">Transfer lines</h3>
-                <button className="desk-button" type="button" onClick={addLine}>Add line</button>
+                <h3 className="title-section">Transfer lines</h3>
+                <button className="desk-button-ghost" type="button" onClick={addLine}>Add line</button>
               </div>
               <div className="grid gap-2">
                 {lineRows.map((line) => (
@@ -232,7 +232,7 @@ export function StockTransferPanel({
                       {products.data?.results?.map((product) => <option key={product.id} value={product.id}>{product.name} ({product.available_quantity} available)</option>)}
                     </select>
                     <input className="desk-input" min={1} inputMode="numeric" type="number" value={line.quantity} onChange={(event) => updateLine(line.key, { quantity: event.target.value })} />
-                    <button className="desk-button" type="button" onClick={() => removeLine(line.key)}>Remove</button>
+                    <button className="desk-button-danger" type="button" onClick={() => removeLine(line.key)}>Remove</button>
                   </div>
                 ))}
               </div>
@@ -275,10 +275,9 @@ export function StockTransferPanel({
 }
 
 function Field({ children, className = "", label }: { children: React.ReactNode; className?: string; label: string }) {
-  return <label className={`block text-sm font-semibold text-ink ${className}`}><span className="mb-1 block">{label}</span>{children}</label>;
+  return <label className={`block ${className}`}><span className="eyebrow mb-1 block">{label}</span>{children}</label>;
 }
 
 function labelForContainer(container: Container) {
   return [container.code, container.label, container.location].filter(Boolean).join(" - ");
 }
-

@@ -76,7 +76,7 @@ export function MemberAuthPanel({ onAuthenticated }: { onAuthenticated: () => vo
         onSubmit={(event) => { event.preventDefault(); void submit(); }}
       >
         <SpaceWorksBadge className="mb-5" />
-        <h1 className="text-2xl font-bold text-ink">
+        <h1 className="title-page">
           {mode === "login" ? "Member sign in" : "Create a member account"}
         </h1>
         <p className="mt-2 text-sm text-muted">
@@ -88,9 +88,9 @@ export function MemberAuthPanel({ onAuthenticated }: { onAuthenticated: () => vo
         </p>
         {mode === "signup" ? (
           <>
-            <label className="mt-5 block text-sm font-semibold" htmlFor="member-name">Name</label>
+            <label className="eyebrow mt-5 block" htmlFor="member-name">Name</label>
             <input id="member-name" className="desk-input mt-1 w-full" autoComplete="name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} required />
-            <label className="mt-3 block text-sm font-semibold" htmlFor="member-phone">Phone <span className="font-normal text-muted">(optional)</span></label>
+            <label className="eyebrow mt-3 block" htmlFor="member-phone">Phone <span className="normal-case tracking-normal text-muted">(optional)</span></label>
             <input id="member-phone" className="desk-input mt-1 w-full" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} />
           </>
         ) : null}
@@ -98,21 +98,21 @@ export function MemberAuthPanel({ onAuthenticated }: { onAuthenticated: () => vo
             yet, so the account stays recoverable if the switch is ever turned back on. */}
         {passwordLogin || mode === "signup" ? (
           <>
-            <label className={`${mode === "login" ? "mt-5" : "mt-3"} block text-sm font-semibold`} htmlFor="member-email">Email</label>
+            <label className={`${mode === "login" ? "mt-5" : "mt-3"} eyebrow block`} htmlFor="member-email">Email</label>
             <input id="member-email" className="desk-input mt-1 w-full" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-            <label className="mt-3 block text-sm font-semibold" htmlFor="member-password">Password</label>
+            <label className="eyebrow mt-3 block" htmlFor="member-password">Password</label>
             <input id="member-password" className="desk-input mt-1 w-full" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} required />
           </>
         ) : null}
         {notice ? <p className="mt-3 text-sm text-success-ink">{notice}</p> : null}
         {error ? <p className="mt-3 text-sm text-danger" role="alert">{error}</p> : null}
         {passwordLogin || mode === "signup" ? (
-          <button className="desk-button-primary mt-5 w-full" type="submit" disabled={pending}>
+          <button className="desk-button-secondary mt-5 w-full" type="submit" disabled={pending}>
             {pending ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
           </button>
         ) : null}
         {selfServeAccounts ? (
-          <button className="mt-3 w-full text-sm font-semibold text-accent-ink" type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }}>
+          <button className="desk-button-ghost mt-3 w-full" type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }}>
             {mode === "login" ? "Create a member account" : "Back to sign in"}
           </button>
         ) : (

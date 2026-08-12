@@ -96,7 +96,7 @@ function TemplateList({
     <div className="grid gap-4">
       {groups.map((stream) => (
         <div key={stream.stream} className="grid gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+          <h3 className="eyebrow">
             {formatLabel(stream.stream)}
           </h3>
           {stream.audiences.map((audience) => (
@@ -131,9 +131,7 @@ function TemplateButton({
 }) {
   return (
     <button
-      className={`flex min-w-0 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm ${
-        selected ? "border-accent bg-surface text-accent-ink" : "border-line bg-bg text-ink hover:border-accent"
-      }`}
+      className={`${selected ? "desk-button-primary" : "desk-button-ghost"} min-w-0 justify-between text-left`}
       type="button"
       onClick={() =>
         onSelect(selectTemplate(template))

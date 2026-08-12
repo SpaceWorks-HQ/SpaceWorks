@@ -6,7 +6,7 @@ import { CustomFormFields } from "../forms/CustomFormFields";
 import type { CustomAnswers, CustomFormSchema } from "../forms/customFormTypes";
 import { staffRequest } from "../../lib/api";
 
-const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
+const EVENT_TONES = ["border-accent", "border-secondary", "border-success", "border-warn"] as const;
 
 /** Events hosted by makerspaces that have accepted a collaboration with this one.
  *
@@ -76,7 +76,7 @@ export function PartnerEvents({
 
   return (
     <section className="desk-panel p-5" aria-labelledby="partner-events-title">
-      <h2 id="partner-events-title" className="font-semibold text-ink">
+      <h2 id="partner-events-title" className="title-panel">
         Events at partner makerspaces
       </h2>
       <p className="mt-1 text-sm text-muted">
@@ -105,17 +105,17 @@ export function PartnerEvents({
             && acceptedWaiver.version === waiver?.version
           );
           return (
-            <li key={event.id} className="border-t border-line pt-3 first:border-0 first:pt-0">
+            <li key={event.id} className={`border-l-2 ${EVENT_TONES[event.id % EVENT_TONES.length]} py-2 pl-3`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span>
-                  <span className="font-medium text-ink">{event.title}</span>
-                  <span className="block text-muted">
-                    Hosted by {event.host_name} · {new Date(event.starts_at).toLocaleString()}
-                  </span>
-                </span>
+                <div>
+                  <h3 className="title-section">{event.title}</h3>
+                  <p className="eyebrow mt-1">
+                    Hosted by {event.host_name} · <span className="font-mono">{new Date(event.starts_at).toLocaleString()}</span>
+                  </p>
+                </div>
                 <button
                   type="button"
-                  className={`desk-button ${FOCUS}`}
+                  className="desk-button-secondary"
                   disabled={register.isPending || (open && blocked)}
                   onClick={() => {
                     if (mustExpand && !open) {
@@ -140,9 +140,9 @@ export function PartnerEvents({
                   into fields for an event they are not registering for. */}
               {open && waiver ? (
                 <div className="mt-3">
-                  <p className="text-sm font-medium text-ink">
+                  <h4 className="title-section">
                     {event.host_name}&apos;s waiver (version {waiver.version})
-                  </p>
+                  </h4>
                   <div className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-md border border-line bg-bg p-2 text-sm text-muted">
                     {waiver.body}
                   </div>

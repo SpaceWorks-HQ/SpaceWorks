@@ -81,20 +81,20 @@ export function PublicMachinesPage() {
     <SkipLink />
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4">
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-accent-ink">Our Machines</p>
+        <div><p className="eyebrow text-secondary-ink">Our Machines</p>
           <MakerspaceBrand name={displayName} logoUrl={bootstrap?.makerspace.logo_url} size="lg" />
         </div>
         <div className="flex flex-wrap items-center gap-2"><SpaceWorksBadge /><Link className="desk-button" to={tenantPath()}>Inventory</Link><ThemeToggle /></div>
       </div>
     </header>
     <section className="mx-auto w-full max-w-5xl flex-1 px-5 py-8" id="main-content" tabIndex={-1}>
-      <div className="mb-6"><h1 className="text-3xl font-bold text-ink">Machines</h1><p className="mt-2 text-sm text-muted">Equipment available in this makerspace, grouped by kind.</p></div>
+      <div className="mb-6"><h1 className="title-page">Machines</h1><p className="mt-2 text-sm text-muted">Equipment available in this makerspace, grouped by kind.</p></div>
       {machines.isLoading ? <div className="grid gap-4" aria-label="Loading machines">{[0, 1, 2].map((item) => <Skeleton key={item} className="h-40 w-full" />)}</div> : null}
-      {machines.error ? <Card><h2 className="text-lg font-semibold text-ink">{throttled ? "Please slow down" : unavailable ? "Machines are not enabled" : missing ? "Makerspace not found" : "Machines are unavailable"}</h2>
+      {machines.error ? <Card><h2 className="title-panel">{throttled ? "Please slow down" : unavailable ? "Machines are not enabled" : missing ? "Makerspace not found" : "Machines are unavailable"}</h2>
         <p className="mt-2 text-sm text-muted">{throttled ? "Too many requests were made. Wait a moment and retry." : apiError?.detail ?? machines.error.message}</p>
         {!missing && !unavailable ? <button className="desk-button mt-4" type="button" onClick={() => machines.refetch()}>Retry</button> : null}
       </Card> : null}
-      {machines.data && !groups.length ? <EmptyState title="No machines listed" description="This makerspace has not published any machines yet." /> : null}
+      {machines.data && !groups.length ? <div className="[&>div]:border-secondary"><EmptyState title="No machines listed" description="This makerspace has not published any machines yet." /></div> : null}
       {groups.length ? <div className="grid gap-4">{groups.map((group) => (
         <CollapsibleSection key={group.name} title={group.name} icon={group.icon || null}
           count={group.machines.length} open={!collapsed.has(group.name)}
@@ -105,10 +105,10 @@ export function PublicMachinesPage() {
                 {/* Decorative: the machine name is rendered right below it. */}
                 {machine.image_url ? <img src={machine.image_url} alt="" loading="lazy" className="h-36 w-full object-cover" /> : null}
                 <div className="grid gap-2 p-3">
-                  <strong className="truncate text-sm text-ink">{machine.name}</strong>
+                  <h3 className="title-section truncate">{machine.name}</h3>
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge status={machine.status} />
-                    <span className="text-xs text-muted">{machine.usage_hours} h logged</span>
+                    <span className="eyebrow">{machine.usage_hours} h logged</span>
                   </div>
                 </div>
               </li>

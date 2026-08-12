@@ -100,7 +100,7 @@ export function WarrantySection({ hostKind, hostId, disabled = false }: Warranty
   return (
     <section className="min-w-0 rounded-md border border-line bg-bg p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Warranty</h4>
+        <h4 className="title-section">Warranty</h4>
         <WarrantyStatusBadge status={current?.status ?? "unknown"} />
       </div>
 
@@ -146,20 +146,20 @@ export function WarrantySection({ hostKind, hostId, disabled = false }: Warranty
       ) : null}
 
       <div className="mt-3 border-t border-line pt-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Documents</p>
+        <h5 className="title-section">Documents</h5>
         {documents.length ? (
           <div className="mt-2 grid gap-2">
             {documents.map((document) => (
               <div key={document.id} className="flex min-w-0 flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-2 py-1.5 text-xs">
                 <span className="min-w-0 flex-1 break-words text-ink">{document.original_filename}</span>
-                <span className="text-muted">{formatBytes(document.size_bytes)}</span>
+                <span className="font-mono text-muted">{formatBytes(document.size_bytes)}</span>
                 <button type="button" className="desk-button text-xs" onClick={() => openDocument(document.id)}>
                   View
                 </button>
                 {!disabled ? (
                   <button
                     type="button"
-                    className="desk-button text-xs text-danger"
+                    className="desk-button-danger text-xs"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate(document.id)}
                   >

@@ -105,7 +105,7 @@ export function LoginPanel({
             {forgotPending ? "Sending..." : "Send reset link"}
           </button>
           <button
-            className="mt-3 w-full text-sm font-semibold text-accent-ink hover:text-accent-ink/80"
+            className="desk-button-ghost mt-3 w-full"
             type="button"
             onClick={() => setMode("login")}
           >
@@ -172,7 +172,7 @@ export function LoginPanel({
         ) : null}
         {emailEnabled && passwordLogin ? (
           <button
-            className="mt-3 w-full text-sm font-semibold text-accent-ink hover:text-accent-ink/80"
+            className="desk-button-ghost mt-3 w-full"
             type="button"
             onClick={() => setMode("forgot")}
           >

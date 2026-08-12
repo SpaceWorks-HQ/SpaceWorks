@@ -180,14 +180,14 @@ export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }:
       <div className="grid gap-4">
         <div className="flex flex-wrap items-center gap-3">
           {makerspaces.length > 1 ? (
-            <label className="text-sm text-muted">
+            <label className="eyebrow">
               Makerspace{" "}
               <select className="desk-input" value={msId} onChange={(event) => { setMsId(Number(event.target.value)); setRoleFilter("all"); }}>
                 {makerspaces.map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
               </select>
             </label>
           ) : null}
-          <label className="text-sm text-muted">
+          <label className="eyebrow">
             Role{" "}
             <select className="desk-input" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
               <option value="all">All roles</option>

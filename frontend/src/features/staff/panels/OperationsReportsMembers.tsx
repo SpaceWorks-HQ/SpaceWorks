@@ -24,7 +24,7 @@ export function OperationsReportsMembers(props: Props) {
           <div className="mt-4 space-y-4">
             {rows.map((row) => (
               <section key={row.makerspace_id ?? row.makerspace_name} className="rounded-md border border-line p-4">
-                <h3 className="text-sm font-semibold text-ink">{row.makerspace_name}</h3>
+                <h3 className="title-section">{row.makerspace_name}</h3>
                 <MemberActivityMetrics row={row} />
               </section>
             ))}

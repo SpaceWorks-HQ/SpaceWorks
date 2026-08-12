@@ -42,7 +42,7 @@ export function PrintingSection({ printing }: { printing: PublicStatsPrinting })
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-md border border-line bg-panel p-3">
-          <h3 className="text-sm font-semibold text-ink">Busiest printer</h3>
+          <h3 className="title-section">Busiest printer</h3>
           {printing.busiest_printer ? (
             <div className="mt-3 flex items-center gap-3 text-sm">
               <ImageThumbnail
@@ -55,11 +55,11 @@ export function PrintingSection({ printing }: { printing: PublicStatsPrinting })
                   {printing.busiest_printer.name}
                 </p>
                 {printing.busiest_printer.model ? (
-                  <p className="break-words text-xs text-muted">
+                  <p className="eyebrow break-words">
                     {printing.busiest_printer.model}
                   </p>
                 ) : null}
-                <p className="text-muted">
+                <p className="font-mono text-muted">
                   {formatNumber(printing.busiest_printer.hours)} hours /{" "}
                   {printing.busiest_printer.completed} completed
                 </p>
@@ -71,7 +71,7 @@ export function PrintingSection({ printing }: { printing: PublicStatsPrinting })
         </div>
 
         <div className="rounded-md border border-line bg-panel p-3">
-          <h3 className="text-sm font-semibold text-ink">Queue</h3>
+          <h3 className="title-section">Queue</h3>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="status-box status-box-active">
               {printing.jobs.queue.pending} pending
@@ -87,7 +87,7 @@ export function PrintingSection({ printing }: { printing: PublicStatsPrinting })
         </div>
 
         <div className="rounded-md border border-line bg-panel p-3">
-          <h3 className="text-sm font-semibold text-ink">By brand</h3>
+          <h3 className="title-section">By brand</h3>
           <CompactList
             empty="No filament records."
             rows={printing.by_brand.map((row) => ({
@@ -99,7 +99,7 @@ export function PrintingSection({ printing }: { printing: PublicStatsPrinting })
       </div>
 
       <div className="rounded-md border border-line bg-panel p-3">
-        <h3 className="mb-3 text-sm font-semibold text-ink">Filament trend</h3>
+        <h3 className="title-section mb-3">Filament trend</h3>
         <BarChart
           rows={printing.filament_trend.map((row) => ({
             label: row.period,
@@ -110,18 +110,18 @@ export function PrintingSection({ printing }: { printing: PublicStatsPrinting })
       </div>
 
       <div className="rounded-md border border-line bg-panel p-3">
-        <h3 className="text-sm font-semibold text-ink">Per printer</h3>
+        <h3 className="title-section">Per printer</h3>
         {printing.per_printer.length ? (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-muted">
-                  <th className="py-2 pr-3 font-semibold">Printer</th>
-                  <th className="px-3 py-2 text-right font-semibold">
+                  <th className="eyebrow py-2 pr-3">Printer</th>
+                  <th className="eyebrow px-3 py-2 text-right">
                     Completed jobs
                   </th>
-                  <th className="px-3 py-2 text-right font-semibold">Hours</th>
-                  <th className="py-2 pl-3 text-right font-semibold">
+                  <th className="eyebrow px-3 py-2 text-right">Hours</th>
+                  <th className="eyebrow py-2 pl-3 text-right">
                     Filament (g)
                   </th>
                 </tr>
@@ -138,16 +138,16 @@ export function PrintingSection({ printing }: { printing: PublicStatsPrinting })
                         <span className="min-w-0 break-words">
                           {row.name}
                           {row.model ? (
-                            <span className="block text-xs text-muted">{row.model}</span>
+                            <span className="eyebrow block">{row.model}</span>
                           ) : null}
                         </span>
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-right text-ink">{row.jobs}</td>
-                    <td className="px-3 py-2 text-right text-ink">
+                    <td className="px-3 py-2 text-right font-mono text-ink">{row.jobs}</td>
+                    <td className="px-3 py-2 text-right font-mono text-ink">
                       {formatNumber(row.hours)}
                     </td>
-                    <td className="py-2 pl-3 text-right text-ink">
+                    <td className="py-2 pl-3 text-right font-mono text-ink">
                       {formatNumber(row.grams)}
                     </td>
                   </tr>
@@ -182,7 +182,7 @@ export function HardwareSection({ hardware }: { hardware: PublicStatsHardware })
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-md border border-line bg-panel p-3">
-          <h3 className="text-sm font-semibold text-ink">Most popular</h3>
+          <h3 className="title-section">Most popular</h3>
           <CompactList
             empty="No lending history yet."
             rows={hardware.most_popular.map((row) => ({
@@ -192,7 +192,7 @@ export function HardwareSection({ hardware }: { hardware: PublicStatsHardware })
           />
         </div>
         <div className="rounded-md border border-line bg-panel p-3">
-          <h3 className="text-sm font-semibold text-ink">Tools out</h3>
+          <h3 className="title-section">Tools out</h3>
           <CompactList
             empty="No tools are out."
             rows={hardware.tools_out.map((row) => ({
@@ -202,7 +202,7 @@ export function HardwareSection({ hardware }: { hardware: PublicStatsHardware })
           />
         </div>
         <div className="rounded-md border border-line bg-panel p-3">
-          <h3 className="text-sm font-semibold text-ink">Recently added</h3>
+          <h3 className="title-section">Recently added</h3>
           <CompactList
             empty="No new public gear this month."
             rows={hardware.recently_added.map((row) => ({
@@ -230,7 +230,7 @@ export function CurrentLoansSection({
               className="rounded-md border border-line bg-panel p-3"
               key={`${loan.item_name}-${loan.holder_name}-${index}`}
             >
-              <h3 className="truncate text-base font-semibold text-ink">
+              <h3 className="title-section truncate">
                 {loan.item_name}
               </h3>
               <p className="mt-2 text-sm text-muted">

@@ -65,7 +65,7 @@ export function ConsumablesTab({ machineId, canEdit, canOperate }: {
 
   return (
     <section className="grid gap-3">
-      <h3 className="text-sm font-semibold text-ink">Consumables</h3>
+      <h3 className="title-section">Consumables</h3>
       {consumables.isLoading ? <p className="text-sm text-muted">Loading consumables...</p> : null}
       {consumables.error instanceof Error ? <p className="text-sm text-danger">{consumables.error.message}</p> : null}
       {!consumables.isLoading && !consumables.error && !items.length ? (
@@ -82,7 +82,7 @@ export function ConsumablesTab({ machineId, canEdit, canOperate }: {
         <form className="grid gap-2 rounded-md border border-line bg-bg p-3"
           onSubmit={(event) => { event.preventDefault(); link.mutate(); }}>
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="grid gap-1 text-xs font-semibold text-muted">Measurement
+            <label className="eyebrow grid gap-1">Measurement
               <select className="desk-input" value={measurement}
                 onChange={(event) => setMeasurement(event.target.value as ConsumableMeasurement)}>
                 <option value="count">Count (inventory)</option>
@@ -90,30 +90,30 @@ export function ConsumablesTab({ machineId, canEdit, canOperate }: {
               </select>
             </label>
             {measurement === "count" ? (
-              <label className="grid gap-1 text-xs font-semibold text-muted">Inventory product
+              <label className="eyebrow grid gap-1">Inventory product
                 <select className="desk-input" value={productId} onChange={(event) => setProductId(event.target.value)} required>
                   <option value="">Select a product</option>
                   {eligible.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.available} available)</option>)}
                 </select>
               </label>
             ) : (
-              <label className="grid gap-1 text-xs font-semibold text-muted">Label
+              <label className="eyebrow grid gap-1">Label
                 <input className="desk-input" maxLength={200} value={label}
                   onChange={(event) => setLabel(event.target.value)} required />
               </label>
             )}
             {measurement === "grams" ? (
-              <label className="grid gap-1 text-xs font-semibold text-muted">Starting grams
+              <label className="eyebrow grid gap-1">Starting grams
                 <input className="desk-input" type="number" min="0" step="0.01" value={remaining}
                   onChange={(event) => setRemaining(event.target.value)} />
               </label>
             ) : null}
-            <label className="grid gap-1 text-xs font-semibold text-muted">Low threshold ({measurement})
+            <label className="eyebrow grid gap-1">Low threshold ({measurement})
               <input className="desk-input" type="number" min="0" step={measurement === "count" ? "1" : "0.01"}
                 value={lowThreshold} onChange={(event) => setLowThreshold(event.target.value)} />
             </label>
           </div>
-          <label className="grid gap-1 text-xs font-semibold text-muted">Note
+          <label className="eyebrow grid gap-1">Note
             <input className="desk-input" maxLength={255} value={note} onChange={(event) => setNote(event.target.value)} />
           </label>
           <button className="desk-button-primary justify-self-start" type="submit"
@@ -150,14 +150,14 @@ function ConsumableRow({ item, machineId, canOperate, canEdit, removing, onRemov
     <div className="rounded-md border border-line bg-bg p-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <strong className="text-ink">{item.product_name ?? item.label}</strong>
-        <span className="text-muted">{item.measurement === "count" ? `${item.available ?? 0} available` : `${item.remaining ?? "0.00"} g remaining`}</span>
+        <span className="font-mono text-muted">{item.measurement === "count" ? `${item.available ?? 0} available` : `${item.remaining ?? "0.00"} g remaining`}</span>
         {isLow ? <span className="rounded-md bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn-ink">Low</span> : null}
-        {canEdit ? <button className="desk-button ml-auto" type="button" disabled={removing} onClick={onRemove}>Unlink</button> : null}
+        {canEdit ? <button className="desk-button-danger ml-auto" type="button" disabled={removing} onClick={onRemove}>Unlink</button> : null}
       </div>
       {item.note ? <p className="mt-1 text-muted">{item.note}</p> : null}
       {canOperate ? (
         <form className="mt-2 flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); log.mutate(); }}>
-          <label className="grid gap-1 text-xs font-semibold text-muted">Use ({item.measurement})
+          <label className="eyebrow grid gap-1">Use ({item.measurement})
             <input className="desk-input w-32" type="number" min={item.measurement === "count" ? "1" : "0.01"}
               step={item.measurement === "count" ? "1" : "0.01"} value={quantity}
               onChange={(event) => setQuantity(event.target.value)} required />

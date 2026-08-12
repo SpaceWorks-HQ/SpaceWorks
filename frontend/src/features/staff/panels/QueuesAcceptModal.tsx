@@ -38,8 +38,8 @@ export function AcceptRequestModal({
       title={row ? `Accept request #${row.id}` : "Accept request"}
       footer={
         <div className="desk-actions flex flex-wrap justify-end gap-2">
-          <button className="desk-button" type="button" disabled={pending} onClick={onClose}>Cancel</button>
-          <button className="desk-button-primary" type="submit" form="accept-request-form" disabled={!canSubmit}>
+          <button className="desk-button-ghost" type="button" disabled={pending} onClick={onClose}>Cancel</button>
+          <button className="desk-button-success" type="submit" form="accept-request-form" disabled={!canSubmit}>
             {pending ? "Accepting..." : "Accept"}
           </button>
         </div>

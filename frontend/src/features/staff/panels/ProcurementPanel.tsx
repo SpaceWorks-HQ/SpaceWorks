@@ -135,7 +135,7 @@ export function ProcurementPanel({
         <input className="desk-input" type="number" min={0} step="0.01" placeholder="Est. unit cost" value={form.estimated_unit_cost} onChange={(e) => setForm({ ...form, estimated_unit_cost: e.target.value })} />
         <input className="desk-input" placeholder="Vendor" value={form.vendor_name} onChange={(e) => setForm({ ...form, vendor_name: e.target.value })} />
         <input className="desk-input" type="number" min={0} step="0.01" placeholder="Actual unit cost" value={form.actual_unit_cost} onChange={(e) => setForm({ ...form, actual_unit_cost: e.target.value })} />
-        <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-muted">
+        <label className="eyebrow grid gap-1">
           Machine type
           <select
             className="desk-input"
@@ -162,7 +162,7 @@ export function ProcurementPanel({
           <Metric label="Visible estimated total" value={formatAmount(visibleEstimatedTotal)} />
           <Metric label="Open budget" value={formatAmount(openBudget)} />
           <Metric label="Received actual total" value={formatAmount(receivedTotal)} />
-          <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-muted">
+          <label className="eyebrow grid gap-1">
             Status
             <select className="desk-input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
               <option value="all">All</option>
@@ -171,8 +171,8 @@ export function ProcurementPanel({
           </label>
         </div>
         <div className="flex flex-wrap gap-2 justify-self-start lg:justify-self-end">
-          <button className="desk-button" type="button" disabled={exportToBuy.isPending} onClick={() => exportToBuy.mutate("csv")}>Export CSV</button>
-          <button className="desk-button" type="button" disabled={exportToBuy.isPending} onClick={() => exportToBuy.mutate("xlsx")}>Export XLSX</button>
+          <button className="desk-button-ghost" type="button" disabled={exportToBuy.isPending} onClick={() => exportToBuy.mutate("csv")}>Export CSV</button>
+          <button className="desk-button-ghost" type="button" disabled={exportToBuy.isPending} onClick={() => exportToBuy.mutate("xlsx")}>Export XLSX</button>
         </div>
       </div>
       <ProcurementTable rows={rows} items={items} update={update} remove={remove} invalidate={invalidate} makerspaceSlug={makerspace.slug} onMove={setMoveTarget} />
@@ -189,8 +189,8 @@ function ProcurementTable({ rows, items, update, remove, invalidate, makerspaceS
   return (
     <div className="mt-3 max-h-[32rem] overflow-x-auto overflow-y-auto rounded-md border border-line">
       <table className="min-w-[1180px] divide-y divide-line text-left text-sm">
-        <thead className="sticky top-0 bg-surface text-xs uppercase tracking-wide text-muted">
-          <tr>{["kind", "item", "qty", "link", "est.", "vendor", "actual", "purchaser", "ordered", "received", "receipts", "status", "moved", ""].map((header) => <th key={header} className="whitespace-nowrap px-3 py-2 font-semibold">{header}</th>)}</tr>
+        <thead className="eyebrow sticky top-0 bg-surface">
+          <tr>{["kind", "item", "qty", "link", "est.", "vendor", "actual", "purchaser", "ordered", "received", "receipts", "status", "moved", ""].map((header) => <th key={header} className="whitespace-nowrap px-3 py-2">{header}</th>)}</tr>
         </thead>
         <tbody className="divide-y divide-line bg-bg text-ink">
           {groupProcurementRows(rows).map((group) => (
@@ -213,7 +213,7 @@ function ProcurementTable({ rows, items, update, remove, invalidate, makerspaceS
 
 function GroupedRows({ label, rows, makerspaceSlug, update, remove, invalidate, onMove }: { label: string; rows: ToBuyItem[]; makerspaceSlug: string; update: UseMutationResult<unknown, Error, UpdateVariables>; remove: UseMutationResult<unknown, Error, number>; invalidate: () => void; onMove: (item: ToBuyItem) => void }) {
   return <>
-    <tr className="bg-surface"><th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted" colSpan={14}>{label}</th></tr>
+    <tr className="bg-surface"><th className="eyebrow px-3 py-2" colSpan={14}>{label}</th></tr>
     {rows.map((item) => <ProcurementRow key={item.id} item={item} makerspaceSlug={makerspaceSlug} updatePending={update.isPending} deletePending={remove.isPending} onSave={(draft) => update.mutate({ id: item.id, payload: { status: draft.status, vendor_name: draft.vendor_name, actual_unit_cost: draft.actual_unit_cost ? Number(draft.actual_unit_cost) : null } })} onDelete={() => remove.mutate(item.id)} onMove={() => onMove(item)} onReceiptsChanged={invalidate} />)}
   </>;
 }
@@ -236,5 +236,10 @@ function formatAmount(value: number) {
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-md border border-line bg-bg px-3 py-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p><p className="mt-1 text-lg font-semibold text-ink">{value}</p></div>;
+  const tones: Record<string, string> = {
+    "Visible estimated total": "border-accent bg-accent/15",
+    "Open budget": "border-warn bg-warn/15",
+    "Received actual total": "border-success bg-success/15",
+  };
+  return <div className={`rounded-md border px-3 py-2 ${tones[label] ?? "border-secondary bg-secondary/15"}`}><p className="eyebrow">{label}</p><p className="mt-1 font-mono text-lg font-semibold text-ink">{value}</p></div>;
 }

@@ -49,8 +49,8 @@ export function RoleManager({ msId, actorActions, isSuperadmin, onRolesChanged }
               {role.is_protected ? <span className="rounded bg-surface px-2 py-0.5 text-xs text-muted">Protected</span> : null}
               <span className="text-muted">{role.member_count} members</span>
               <span className="min-w-48 flex-1 text-xs text-muted">{role.granted_actions.map((action) => labels.get(action) ?? action).join(", ") || "No capabilities"}</span>
-              <button className="desk-button" type="button" onClick={() => { setDeleteError(""); setEditing(role); }}>Edit</button>
-              <button className="desk-button text-danger" type="button" disabled={role.is_protected || role.member_count > 0 || remove.isPending} onClick={() => { if (window.confirm(`Delete ${role.name}?`)) remove.mutate(role); }}>Delete</button>
+              <button className="desk-button-ghost" type="button" onClick={() => { setDeleteError(""); setEditing(role); }}>Edit</button>
+              <button className="desk-button-danger" type="button" disabled={role.is_protected || role.member_count > 0 || remove.isPending} onClick={() => { if (window.confirm(`Delete ${role.name}?`)) remove.mutate(role); }}>Delete</button>
             </div>
           ))}
         </div>

@@ -240,7 +240,7 @@ export function ResetPasswordModal({
                 {result.temporary_password}
               </code>
               <button
-                className="desk-button"
+                className="desk-button-ghost"
                 type="button"
                 onClick={() => {
                   void navigator.clipboard.writeText(result.temporary_password).then(() => setCopied(true));
@@ -278,8 +278,8 @@ export function ResetPasswordModal({
 
 function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: ReactNode }) {
   return (
-    <label className="grid gap-1 font-semibold text-ink">
-      <span>{label}</span>
+    <label className="grid gap-1">
+      <span className="eyebrow">{label}</span>
       {children}
       {hint ? <span className="text-xs font-normal text-muted">{hint}</span> : null}
       {error ? <span className="text-xs font-normal text-danger">{error}</span> : null}
@@ -302,7 +302,7 @@ function ModalActions({
 }) {
   return (
     <div className="desk-actions flex flex-wrap justify-end gap-2">
-      <button className="desk-button" type="button" disabled={pending} onClick={onClose}>Cancel</button>
+      <button className="desk-button-ghost" type="button" disabled={pending} onClick={onClose}>Cancel</button>
       <button className="desk-button-primary" type="button" disabled={disabled} onClick={onSubmit}>{submitLabel}</button>
     </div>
   );

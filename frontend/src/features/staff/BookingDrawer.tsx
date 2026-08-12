@@ -78,10 +78,10 @@ export function BookingDrawer({ makerspaceId, spaceId, onClose }: {
               submitLabel="Save changes"
               disabled={!space.is_active}
             />
-            {space.is_active ? <button className="desk-button w-fit text-danger" type="button" onClick={() => setConfirmDeactivate(true)}>Deactivate space</button> : <p className="text-sm text-muted">This space is inactive and read-only.</p>}
+            {space.is_active ? <button className="desk-button-danger w-fit" type="button" onClick={() => setConfirmDeactivate(true)}>Deactivate space</button> : <p className="text-sm text-muted">This space is inactive and read-only.</p>}
             <section aria-labelledby="space-bookings-title">
               <div className="mb-3">
-                <h3 id="space-bookings-title" className="font-semibold text-ink">Bookings ({bookings.data?.count ?? 0})</h3>
+                <h3 id="space-bookings-title" className="title-section">Bookings <span className="font-mono">({bookings.data?.count ?? 0})</span></h3>
                 <p className="mt-1 text-xs text-muted">Contact details and custom answers are staff-only.</p>
               </div>
               <div className="mb-3 grid gap-2 sm:grid-cols-3">
@@ -111,7 +111,7 @@ export function BookingDrawer({ makerspaceId, spaceId, onClose }: {
                   {bookings.data.results.map((booking) => (
                     <article className="rounded-xl border border-line bg-bg p-3" key={booking.id}>
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div><h4 className="font-semibold text-ink">{booking.name}</h4><p className="mt-1 text-xs text-muted">{bookingTime(booking)}</p></div>
+                        <div><h4 className="title-section">{booking.name}</h4><p className="mt-1 font-mono text-xs text-muted">{bookingTime(booking)}</p></div>
                         <StatusBadge status={booking.status} />
                       </div>
                       <div className="mt-2 text-sm"><a className="block break-all hover:underline" href={"mailto:" + booking.email}>{booking.email}</a><a className="block text-muted hover:underline" href={"tel:" + booking.phone}>{booking.phone}</a></div>
@@ -132,7 +132,7 @@ export function BookingDrawer({ makerspaceId, spaceId, onClose }: {
                   ))}
                 </div>
               ) : null}
-              {bookings.data ? <div className="mt-3 flex items-center justify-between gap-2"><span className="text-xs text-muted">Page {page}</span><div className="flex gap-2"><button className="desk-button" type="button" disabled={!bookings.data.previous} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button><button className="desk-button" type="button" disabled={!bookings.data.next} onClick={() => setPage((value) => value + 1)}>Next</button></div></div> : null}
+              {bookings.data ? <div className="mt-3 flex items-center justify-between gap-2"><span className="font-mono text-xs text-muted">Page {page}</span><div className="flex gap-2"><button className="desk-button" type="button" disabled={!bookings.data.previous} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button><button className="desk-button" type="button" disabled={!bookings.data.next} onClick={() => setPage((value) => value + 1)}>Next</button></div></div> : null}
             </section>
             {actionError ? <p className="text-sm text-danger" role="alert">{errorText(actionError)}</p> : null}
           </div>
@@ -157,9 +157,9 @@ function BookingActions({ booking, onAction }: { booking: Booking; onAction: (ac
   const ended = new Date(booking.ends_at) <= new Date();
   return (
     <div className="mt-3 flex flex-wrap gap-2">
-      {booking.status === "pending" ? <><button className="desk-button" type="button" onClick={() => onAction("approve")}>Approve</button><button className="desk-button text-danger" type="button" onClick={() => onAction("reject")}>Reject</button></> : null}
-      {booking.status === "confirmed" ? <button className="desk-button text-danger" type="button" onClick={() => onAction("cancel")}>Cancel</button> : null}
-      {booking.status === "confirmed" && ended ? <><button className="desk-button" type="button" onClick={() => onAction("complete")}>Complete</button><button className="desk-button" type="button" onClick={() => onAction("no-show")}>No-show</button></> : null}
+      {booking.status === "pending" ? <><button className="desk-button-success" type="button" onClick={() => onAction("approve")}>Approve</button><button className="desk-button-danger" type="button" onClick={() => onAction("reject")}>Reject</button></> : null}
+      {booking.status === "confirmed" ? <button className="desk-button-danger" type="button" onClick={() => onAction("cancel")}>Cancel</button> : null}
+      {booking.status === "confirmed" && ended ? <><button className="desk-button-success" type="button" onClick={() => onAction("complete")}>Complete</button><button className="desk-button-warn" type="button" onClick={() => onAction("no-show")}>No-show</button></> : null}
     </div>
   );
 }

@@ -28,13 +28,13 @@ export function MakerspacePicker({
         <div className="mb-6 flex items-center justify-between">
           <div>
             <SpaceWorksBadge className="mb-3" />
-            <p className="text-xs font-semibold tracking-wide text-accent-ink">Super Admin</p>
-            <h1 className="text-2xl font-bold text-ink">Choose a makerspace to operate</h1>
+            <p className="eyebrow text-accent-ink">Super Admin</p>
+            <h1 className="title-page">Choose a makerspace to operate</h1>
             <p className="mt-1 text-sm text-muted">Signed in as {username}. Pick a makerspace to manage its operations.</p>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <button className="desk-button" type="button" onClick={onSignOut}>
+            <button className="desk-button-ghost" type="button" onClick={onSignOut}>
               Sign out
             </button>
           </div>
@@ -43,7 +43,7 @@ export function MakerspacePicker({
         {loading ? (
           <p className="text-sm text-muted">Loading makerspaces…</p>
         ) : !makerspaces.length ? (
-          <div className="desk-panel bg-warn p-6 text-on-warn dark:bg-[#332b00] dark:text-[#fcdf46]">
+          <div className="desk-panel bg-warn p-6 text-on-warn dark:bg-warn/15 dark:text-warn-ink">
             <p className="text-sm">No makerspaces exist yet. Create one from the Django control plane.</p>
           </div>
         ) : (
@@ -53,18 +53,18 @@ export function MakerspacePicker({
                 key={makerspace.id}
                 type="button"
                 onClick={() => onSelect(makerspace.id)}
-                className="desk-panel flex flex-col items-start gap-1 p-4 text-left transition hover:border-accent"
+                className="desk-button h-auto w-full flex-col items-start gap-1 p-4 text-left hover:border-accent"
               >
-                <span className="text-xs font-semibold uppercase tracking-wide text-accent-ink">
+                <span className="eyebrow text-accent-ink">
                   {makerspace.public_code ?? makerspace.slug}
                 </span>
-                <span className="text-lg font-semibold text-ink">{makerspace.name}</span>
+                <span className="title-panel text-left">{makerspace.name}</span>
                 {makerspace.superadmin_access_enabled === false ? (
                   <span className="mt-1">
                     <Badge tone="warn">Superadmin access: Off</Badge>
                   </span>
                 ) : null}
-                <span className="mt-2 text-xs text-muted">Operate this makerspace →</span>
+                <span className="eyebrow mt-2 text-left normal-case">Operate this makerspace →</span>
               </button>
             ))}
           </div>

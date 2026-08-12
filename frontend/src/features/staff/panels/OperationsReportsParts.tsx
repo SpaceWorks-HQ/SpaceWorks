@@ -73,25 +73,58 @@ function ReportSkeleton() {
   );
 }
 
-// Pastel fill + matching ink (with dark-mode deep-tint) so each report stat box
-// carries a palette colour, cycled by position across the grid.
-const STAT_TONE_CYCLE = [
-  "border-accent bg-accent text-on-accent dark:bg-[#0b2a38] dark:text-[#7dd3fc]",
-  "border-warn bg-warn text-on-warn dark:bg-[#332b00] dark:text-[#fcdf46]",
-  "border-success bg-success text-on-success dark:bg-[#06281a] dark:text-[#74dd9c]",
-  "border-secondary bg-secondary text-on-secondary dark:bg-[#3a1326] dark:text-[#f9a8d4]",
-];
+// Report meanings keep the same tone wherever they appear; this avoids assigning
+// colour from response order, which can change as optional metrics come and go.
+const STAT_TONES: Record<string, string> = {
+  "Active members (current)": "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  "Pending requests (current)": "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+  "Open invitations (current)": "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+  "Verified members (current)": "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink",
+  "Activations (current timestamp in range)": "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  "Revocations (current timestamp in range)": "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+  "Active referral joins decided in range": "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+  "Logs": "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink",
+  "Recorded cost": "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+  "Overdue schedules (snapshot)": "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+  "Active schedules (snapshot)": "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  "Usage hours": "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink",
+  "Usage entries": "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+  "Machines": "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+  "Active": "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  "Submitted": "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink",
+  "Completed": "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  "Failed": "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+  "In progress": "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+  "Events": "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink",
+  "Events in period": "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink",
+  "Registrations": "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+  "Confirmed": "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+  "Attended": "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  "Reserved hours": "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink",
+  "Completed hours": "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  "Upcoming": "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+  "Upcoming bookings": "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+  "No-shows": "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+  "Maintenance logs": "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  "Products": "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink",
+  "Assets": "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+  "Active loans": "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+  "Available": "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  "Issued": "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink",
+  "Damaged": "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+  "Missing": "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+};
 
 export function StatCards({ stats }: { stats: [string, number | undefined][] }) {
   return (
     <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {stats.map(([label, value], index) => (
+      {stats.map(([label, value]) => (
         <div
           key={label}
-          className={`rounded-md border p-3 ${STAT_TONE_CYCLE[index % STAT_TONE_CYCLE.length]}`}
+          className={`rounded-md border p-3 ${STAT_TONES[label] ?? "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink"}`}
         >
-          <p className="text-2xl font-bold">{formatNumber(value ?? 0)}</p>
-          <p className="text-xs opacity-70">{label}</p>
+          <p className="font-mono text-2xl font-bold">{formatNumber(value ?? 0)}</p>
+          <p className="eyebrow opacity-70">{label}</p>
         </div>
       ))}
     </div>
@@ -114,7 +147,7 @@ export function BarChart({ rows, valueLabel }: { rows: ChartRow[]; valueLabel?: 
             <div className="h-3 overflow-hidden rounded border border-line bg-bg">
               <div className="h-full rounded" style={{ width, backgroundColor: REPORT_CHART_COLORS[index % REPORT_CHART_COLORS.length] }} aria-hidden="true" />
             </div>
-            <span className="min-w-14 text-right text-xs text-muted">
+            <span className="min-w-14 text-right font-mono text-xs text-muted">
               {formatNumber(row.value)} {valueLabel ?? ""}
             </span>
           </div>
@@ -127,11 +160,11 @@ export function BarChart({ rows, valueLabel }: { rows: ChartRow[]; valueLabel?: 
 // Fixed categorical palette aligned to the pastel reskin. Kept dependency-free
 // per repo convention - no chart library.
 export const REPORT_CHART_COLORS = [
-  "#0284c7",
-  "#a16207",
-  "#15803d",
-  "#be185d",
-  "#a4243b",
+  "rgb(var(--color-accent))",
+  "rgb(var(--color-warn))",
+  "rgb(var(--color-success))",
+  "rgb(var(--color-secondary))",
+  "rgb(var(--color-danger))",
 ];
 
 export function PieChart({ rows, valueLabel }: { rows: ChartRow[]; valueLabel?: string }) {
@@ -189,7 +222,7 @@ export function PieChart({ rows, valueLabel }: { rows: ChartRow[]; valueLabel?: 
             <span className="truncate text-ink" title={segment.label}>
               {segment.label}
             </span>
-            <span className="ml-auto whitespace-nowrap text-xs text-muted">
+            <span className="ml-auto whitespace-nowrap font-mono text-xs text-muted">
               {formatNumber(segment.value)}
               {valueLabel ?? ""} - {segment.pct.toFixed(0)}%
             </span>
@@ -236,7 +269,7 @@ export function PerMakerspaceTables({
     <div className="space-y-4">
       {groups.map((group) => (
         <div key={group.key}>
-          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">{nameOf(Number(group.key))}</h4>
+          <h4 className="eyebrow mb-1">{nameOf(Number(group.key))}</h4>
           <ReportTable data={{ rows: [subHeader, ...group.rows.map((row) => row.filter((_, i) => i !== idx))] }} />
         </div>
       ))}
@@ -252,10 +285,10 @@ export function ReportTable({ data }: { data?: ReportRows }) {
   return (
     <div className="mt-4 max-h-80 overflow-x-auto overflow-y-auto rounded-md border border-line">
       <table className="w-full divide-y divide-line text-left text-sm">
-        <thead className="sticky top-0 bg-surface text-xs uppercase tracking-wide text-muted">
+        <thead className="eyebrow sticky top-0 bg-surface">
           <tr>
             {tableHeaders.map((header) => (
-              <th key={header} className="whitespace-nowrap px-3 py-2 font-semibold">
+              <th key={header} className="whitespace-nowrap px-3 py-2">
                 {header.replace(/_/g, " ")}
               </th>
             ))}
@@ -265,7 +298,7 @@ export function ReportTable({ data }: { data?: ReportRows }) {
           {rows.map((row, rowIndex) => (
             <tr key={rowIndex}>
               {tableHeaders.map((header, cellIndex) => (
-                <td key={`${header}-${cellIndex}`} className="whitespace-nowrap px-3 py-2 text-sm">
+                <td key={`${header}-${cellIndex}`} className="whitespace-nowrap px-3 py-2 font-mono text-sm">
                   {formatCell(row[cellIndex])}
                 </td>
               ))}

@@ -82,9 +82,9 @@ export function PrintDetailsForm({
 }: PrintDetailsFormProps) {
   return (
     <Card>
-      <p className="text-xs font-semibold tracking-wide text-accent-ink">
+      <h2 className="title-panel text-secondary-ink">
         Print Details
-      </p>
+      </h2>
       <form className="mt-4 space-y-4" onSubmit={onSubmit}>
         {/* Honeypot: hidden from humans; bots that autofill it trigger the server decoy. */}
         <input
@@ -115,7 +115,7 @@ export function PrintDetailsForm({
           />
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+              <span className="eyebrow mb-1 block">
                 Filament / material
               </span>
               <select
@@ -146,11 +146,11 @@ export function PrintDetailsForm({
               ) : null}
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+              <span className="eyebrow mb-1 block">
                 Quantity
               </span>
               <input
-                className="desk-input w-full"
+                className="desk-input w-full font-mono"
                 min={1}
                 type="number"
                 value={form.quantity}
@@ -160,11 +160,11 @@ export function PrintDetailsForm({
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+              <span className="eyebrow mb-1 block">
                 Estimated filament (g) &mdash; optional
               </span>
               <input
-                className="desk-input w-full"
+                className="desk-input w-full font-mono"
                 min={0}
                 step="0.01"
                 type="number"

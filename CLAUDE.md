@@ -1404,6 +1404,27 @@ why the colour is there; `bg-tone-mint` does not) and the `tone-*` tokens are de
 - `tests/test_frontend_theme_contrast.py` now also guards `success-ink`, `warn-ink` and `info-ink`.
   They were omitted while the palette was effectively one colour and those inks only ever appeared
   inside solid pastel fills, where the fixed `on-*` tokens apply instead.
+- **Buttons are a CLOSED FAMILY in `@layer components`**, not per-component class strings:
+  `desk-button` (neutral), `-primary` (staff main action, accent), `-secondary` (public/member main
+  action, pink), `-success`, `-warn`, `-danger` (destructive) and `-ghost` (quiet tertiary). ~349
+  call sites now use them. Each carries `min-h-11` and the same `focus-visible` ring, so adopting
+  one fixes the touch target and the keyboard focus at the same time — which is most of why the
+  family exists rather than being a palette convenience.
+- **Colour VARIES but is never RANDOM.** A repeating set (tiles, cards, sections) distributes the
+  four tones so a screen shows the whole system, but the tone is a **stable** property of the thing
+  — hand-assigned by meaning (`DashboardPanel.TILES`) or derived from identity
+  (`MemberDirectory.identityTone`, a character-sum hash). Never `Math.random()`, never
+  index-by-render-order, and never over something already semantically coloured: a colour that
+  changes between renders is noise, and one that contradicts `success`/`warn`/`danger` is a lie.
+- **A tone is NEVER expressed as `border-l-4` on a card.** A side-tab accent stripe is the most
+  recognisable generated-UI tell and the design detector fails on it. It was reached for twice —
+  once on the dashboard tiles, once across the member area (18 occurrences) — so the rule is written
+  into `docs/superpowers/specs/2026-08-13-design-language-brief.md`. Carry the tone in the heading
+  ink, the number itself, a badge, a `/15` tint, or a 1px full border.
+- **The dashboard tile bug worth remembering:** `status-box-danger` is `bg-danger text-bg`, and the
+  tile then added `text-danger` to the number and left the label `text-muted` — dark red on red and
+  grey on red. The count was invisible and the label unreadable. **On a filled tile every text
+  colour must come from the fixed `on-*` set** (or `text-bg` for `danger`, the one non-pastel).
 
 **Accessibility floor (phase 22).** Four rules, each of which had a real counter-example in the tree:
 - **Text contrast is drift-guarded from the backend suite.** `tests/test_frontend_theme_contrast.py`

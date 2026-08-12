@@ -21,11 +21,11 @@ const steps = [
 ];
 
 const STEP_TONE_CLASSES = [
-  "border-accent bg-accent text-on-accent",
-  "border-warn bg-warn text-on-warn",
-  "border-secondary bg-secondary text-on-secondary",
-  "border-success bg-success text-on-success",
-  "border-success bg-success text-on-success",
+  "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink",
+  "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+  "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+  "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
 ] as const;
 
 export function TextInput({
@@ -37,7 +37,7 @@ export function TextInput({
 }: TextInputProps) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+      <span className="eyebrow mb-1 block">
         {label}
       </span>
       <input
@@ -58,7 +58,7 @@ export function TextArea({
 }: TextInputProps) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+      <span className="eyebrow mb-1 block">
         {label}
       </span>
       <textarea
@@ -90,7 +90,7 @@ export function FilePicker({
   return (
     <div>
       <label className="block">
-        <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+        <span className="eyebrow mb-1 block">
           {label}
         </span>
         <input
@@ -112,7 +112,7 @@ export function FilePicker({
             >
               <span className="min-w-0 truncate text-ink">{file.name}</span>
               <button
-                className="text-xs font-semibold text-danger"
+                className="min-h-11 px-2 text-xs font-semibold text-danger"
                 type="button"
                 onClick={() =>
                   setFiles((current) =>
@@ -207,22 +207,22 @@ export function StatusStepper({ status }: { status: PrintStatus }) {
           aria-live="polite"
           className="rounded-xl border border-line bg-panel px-3 py-2 text-center shadow-soft"
         >
-          <p className="text-sm font-semibold text-ink">
+          <p className="font-mono text-sm font-semibold text-ink">
             #{status.queue_position} in the queue
           </p>
-          <p className="mt-1 text-xs text-muted">
+          <p className="eyebrow mt-1">
             {queuePositionDetail(status)}
           </p>
         </div>
       ) : null}
       {timeLeft ? (
-        <p className="rounded-lg border border-accent bg-accent px-3 py-2 text-center text-sm font-semibold text-on-accent dark:bg-[#0b2a38] dark:text-[#7dd3fc]">
+        <p className="rounded-lg border border-accent bg-accent px-3 py-2 text-center font-mono text-sm font-semibold text-on-accent dark:bg-accent/15 dark:text-accent-ink">
           {timeLeft}
         </p>
       ) : null}
       <p className="text-sm text-muted">
         Current status:{" "}
-        <span className="font-semibold capitalize text-ink">
+        <span className="font-mono font-semibold capitalize text-ink">
           {status.status.replace("_", " ")}
         </span>
       </p>
@@ -258,8 +258,8 @@ export function StatusResult({
   return status ? (
     <div className="space-y-3">
       <div>
-        <h2 className="break-words text-lg font-semibold text-ink">{status.title}</h2>
-        <p className="mt-1 text-xs text-muted">
+        <h3 className="title-section break-words">{status.title}</h3>
+        <p className="eyebrow mt-1">
           Created {new Date(status.created_at).toLocaleString()}
         </p>
       </div>

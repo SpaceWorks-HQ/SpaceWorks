@@ -125,15 +125,15 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
                 {data.repeat_offenders.map((row) => (
                   <tr key={row.requester_id} className="border-t border-line">
                     <td className="p-2 font-medium text-ink">{row.username}</td>
-                    <td className="p-2">{row.damaged}</td>
-                    <td className="p-2">{row.missing}</td>
-                    <td className="p-2">{row.total_issues} ({row.total_quantity} units)</td>
+                    <td className="p-2 font-mono">{row.damaged}</td>
+                    <td className="p-2 font-mono">{row.missing}</td>
+                    <td className="p-2 font-mono">{row.total_issues} ({row.total_quantity} units)</td>
                     <td className="p-2 capitalize">{row.access_status}</td>
                     {isSuperadmin ? (
                       <td className="p-2">
                         {row.access_status === "active" ? (
                           <button
-                            className="desk-button"
+                            className="desk-button-danger"
                             type="button"
                             disabled={restrict.isPending}
                             onClick={() => {
@@ -144,7 +144,7 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
                             Restrict
                           </button>
                         ) : (
-                          <button className="desk-button" type="button" disabled={restore.isPending} onClick={() => restore.mutate(row.requester_id)}>
+                          <button className="desk-button-success" type="button" disabled={restore.isPending} onClick={() => restore.mutate(row.requester_id)}>
                             Restore
                           </button>
                         )}
@@ -171,7 +171,7 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
                   {row.restriction_reason ? <p className="text-xs text-muted">{row.restriction_reason}</p> : null}
                 </div>
                 {isSuperadmin ? (
-                  <button className="desk-button" type="button" disabled={restore.isPending} onClick={() => restore.mutate(row.requester_id)}>
+                  <button className="desk-button-success" type="button" disabled={restore.isPending} onClick={() => restore.mutate(row.requester_id)}>
                     Restore access
                   </button>
                 ) : null}
@@ -208,7 +208,7 @@ function ProblemReportCard({ row, makerspace, onTriaged }: { row: ProblemReport;
     <div className="grid gap-3 rounded-md border border-line bg-surface p-3 text-sm">
       <div className="min-w-0">
         <p className="font-medium text-ink">{row.label || "(tool)"}</p>
-        <p className="text-xs text-muted">{row.requester_username} | {new Date(row.created_at).toLocaleString()}</p>
+        <p className="font-mono text-xs text-muted">{row.requester_username} | {new Date(row.created_at).toLocaleString()}</p>
         <p className="mt-1 break-words text-ink">{row.note}</p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -222,7 +222,7 @@ function ProblemReportCard({ row, makerspace, onTriaged }: { row: ProblemReport;
       {actionable ? (
         <div className="grid gap-2 sm:grid-cols-2">
           {row.items.map((item) => (
-            <label key={item.id} className="grid gap-1 text-xs text-muted">
+            <label key={item.id} className="eyebrow grid gap-1">
               <span>{item.product_name} ({item.issued_quantity})</span>
               <input
                 className="desk-input"
@@ -240,7 +240,7 @@ function ProblemReportCard({ row, makerspace, onTriaged }: { row: ProblemReport;
       <textarea className="desk-input min-h-20" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Triage note" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         {triage.error ? <p className="text-sm text-danger">{(triage.error as Error).message}</p> : <span />}
-        <button className="desk-button" type="button" disabled={triage.isPending || (actionable && resolutions.length === 0)} onClick={() => triage.mutate()}>
+        <button className="desk-button-primary" type="button" disabled={triage.isPending || (actionable && resolutions.length === 0)} onClick={() => triage.mutate()}>
           Save triage
         </button>
       </div>

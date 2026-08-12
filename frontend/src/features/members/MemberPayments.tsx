@@ -20,7 +20,7 @@ export function MemberPaymentRows({
           {payment.checkout_url ? (
             <>
               {" · "}
-              <a className="text-accent-ink underline" href={payment.checkout_url}>
+              <a className="desk-button-secondary ml-1" href={payment.checkout_url}>
                 Pay now
               </a>
             </>
@@ -28,7 +28,7 @@ export function MemberPaymentRows({
             <>
               {" · "}
               <button
-                className="text-accent-ink underline"
+                className="desk-button-ghost ml-1"
                 disabled={checkoutPaymentId !== undefined}
                 onClick={() => onCheckout(payment.id)}
                 type="button"

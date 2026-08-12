@@ -31,7 +31,7 @@ export class StaffPanelErrorBoundary extends Component<Props, State> {
 
     return (
       <section className="desk-panel p-6" role="alert">
-        <h2 className="text-lg font-semibold text-ink">This page could not be displayed</h2>
+        <h2 className="title-panel">This page could not be displayed</h2>
         <p className="mt-2 text-sm text-muted">
           The rest of Space Works is still available. Reload this page to try again.
         </p>

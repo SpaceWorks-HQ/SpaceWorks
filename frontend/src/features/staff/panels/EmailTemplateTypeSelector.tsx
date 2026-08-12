@@ -20,7 +20,7 @@ export function EmailTemplateTypeSelector({
 }) {
   return (
     <div className="grid gap-2 rounded-md border border-line bg-bg p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted">Machine type</p>
+      <p className="eyebrow">Machine type</p>
       <div className="flex flex-wrap gap-2">
         {canEditSpaceDefault ? (
           <AxisButton selected={selectedTypeId === null} label="Space default" onClick={() => onSelect(null)} />
@@ -52,9 +52,7 @@ function AxisButton({
 }) {
   return (
     <button
-      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
-        selected ? "border-accent bg-surface text-accent-ink" : "border-line bg-bg text-ink hover:border-accent"
-      }`}
+      className={selected ? "desk-button-primary" : "desk-button-ghost"}
       type="button"
       onClick={onClick}
     >

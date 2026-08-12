@@ -63,12 +63,12 @@ export function SocialSignInButtons({
 
   return (
     <section className="mt-5 border-t border-line pt-5" aria-label="Social sign in">
-      <p className="mb-3 text-center text-sm text-muted">Or continue with</p>
+      <p className="eyebrow mb-3 text-center">Or continue with</p>
       <div className="flex flex-col items-center gap-3">
         {config.google?.enabled ? <div ref={googleHost} className="min-h-10 w-full text-center" /> : null}
         {config.apple?.enabled ? (
           <button
-            className="desk-button w-full max-w-[360px] bg-ink text-bg"
+            className="desk-button-secondary w-full max-w-[360px]"
             type="button"
             disabled={applePending}
             onClick={async () => {

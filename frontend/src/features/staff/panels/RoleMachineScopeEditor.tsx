@@ -47,7 +47,7 @@ export function RoleMachineScopeEditor({ msId, roleId }: { msId: number; roleId:
   if (!scope.data.scoping_applies) {
     return (
       <section className="grid gap-2 rounded-md border border-line p-3">
-        <h3 className="font-semibold text-ink">Machine scope</h3>
+        <h3 className="title-section">Machine scope</h3>
         <p className="text-xs text-muted">
           This role either administers the whole makerspace or grants no machine capability,
           so it is not limited to particular machines.
@@ -67,7 +67,7 @@ export function RoleMachineScopeEditor({ msId, roleId }: { msId: number; roleId:
   return (
     <section className="grid gap-3 rounded-md border border-line p-3">
       <div className="grid gap-1">
-        <h3 className="font-semibold text-ink">Machine scope</h3>
+        <h3 className="title-section">Machine scope</h3>
         <p className="text-xs text-muted">
           This role can only manage the machine types and machines ticked here. Ticking a
           type also covers machines of that type added later.
@@ -95,7 +95,7 @@ export function RoleMachineScopeEditor({ msId, roleId }: { msId: number; roleId:
       <div className="flex items-center justify-end gap-2">
         {saved && !save.isPending ? <span className="text-xs text-muted">Saved</span> : null}
         {save.error ? <span className="text-xs text-danger">{save.error.message}</span> : null}
-        <button className="desk-button" type="button" disabled={save.isPending} onClick={() => save.mutate()}>
+        <button className="desk-button-primary" type="button" disabled={save.isPending} onClick={() => save.mutate()}>
           {save.isPending ? "Saving..." : "Save machine scope"}
         </button>
       </div>
@@ -113,14 +113,14 @@ function OptionList({ title, options, selected, onToggle, describe }: {
   if (!options.length) {
     return (
       <div className="grid gap-1">
-        <span className="text-xs font-semibold text-ink">{title}</span>
+        <h4 className="title-section">{title}</h4>
         <span className="text-xs text-muted">None available.</span>
       </div>
     );
   }
   return (
     <div className="grid gap-1">
-      <span className="text-xs font-semibold text-ink">{title}</span>
+      <h4 className="title-section">{title}</h4>
       <div className="grid gap-1 sm:grid-cols-2">
         {options.map((option) => {
           const note = describe(option);

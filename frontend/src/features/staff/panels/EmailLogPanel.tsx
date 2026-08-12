@@ -75,7 +75,7 @@ export function EmailLogPanel({ makerspace }: { makerspace: Makerspace }) {
       {retry.error ? <p className="mb-3 text-sm text-danger">{retry.error.message}</p> : null}
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-line text-xs uppercase text-muted">
+          <thead className="eyebrow border-b border-line">
             <tr>
               <th className="px-2 py-2">Created</th>
               <th className="px-2 py-2">To</th>
@@ -107,7 +107,7 @@ export function EmailLogPanel({ makerspace }: { makerspace: Makerspace }) {
                 <td className="whitespace-nowrap px-2 py-2">
                   {log.status === "failed" || log.status === "sending" ? (
                     <button
-                      className="desk-button"
+                      className="desk-button-primary"
                       disabled={retry.isPending}
                       onClick={() => retry.mutate(log.id)}
                     >
@@ -125,7 +125,7 @@ export function EmailLogPanel({ makerspace }: { makerspace: Makerspace }) {
       </div>
       <div className="mt-3 flex items-center justify-between gap-3 text-sm">
         <button
-          className="desk-button"
+          className="desk-button-ghost"
           disabled={!logs.data?.previous}
           onClick={() => setPage((current) => Math.max(1, current - 1))}
         >
@@ -135,7 +135,7 @@ export function EmailLogPanel({ makerspace }: { makerspace: Makerspace }) {
           Page {page}{" - "}{logs.data?.count ?? 0} total
         </span>
         <button
-          className="desk-button"
+          className="desk-button-ghost"
           disabled={!logs.data?.next}
           onClick={() => setPage((current) => current + 1)}
         >

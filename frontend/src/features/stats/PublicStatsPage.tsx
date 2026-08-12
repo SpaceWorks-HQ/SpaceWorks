@@ -38,16 +38,18 @@ export function PublicStatsPage() {
       <SkipLink />
       <header className="border-b border-line bg-panel">
         <div className="mx-auto flex max-w-screen-2xl flex-col gap-4 px-5 py-6 sm:px-8">
-          <p className="text-sm font-semibold tracking-wide text-accent-ink">
+          <p className="eyebrow text-secondary-ink">
             Public Stats
           </p>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="min-w-0">
-              <MakerspaceBrand
-                name={displayName}
-                logoUrl={bootstrap?.makerspace.logo_url}
-                size="lg"
-              />
+              <h1 className="title-page">
+                <MakerspaceBrand
+                  name={displayName}
+                  logoUrl={bootstrap?.makerspace.logo_url}
+                  size="lg"
+                />
+              </h1>
               <p className="mt-2 text-sm text-muted">
                 Live community activity from the public catalog.
               </p>
@@ -97,8 +99,8 @@ function LoadingState() {
 
 function ErrorState() {
   return (
-    <Card className="mx-auto max-w-lg text-center">
-      <h1 className="text-xl font-semibold text-ink">Stats not available</h1>
+    <Card className="mx-auto max-w-lg border-secondary text-center">
+      <h2 className="title-panel">Stats not available</h2>
       <p className="mt-2 text-sm leading-6 text-muted">
         This makerspace has its public stats page turned off, or it may not exist.
       </p>
@@ -108,10 +110,10 @@ function ErrorState() {
 
 function EmptyState() {
   return (
-    <Card className="mx-auto max-w-lg text-center">
-      <h1 className="text-xl font-semibold text-ink">
+    <Card className="mx-auto max-w-lg border-secondary text-center">
+      <h2 className="title-panel">
         No public activity yet.
-      </h1>
+      </h2>
       <p className="mt-2 text-sm leading-6 text-muted">
         Stats will appear after this makerspace publishes tools or records public
         loans and print activity.

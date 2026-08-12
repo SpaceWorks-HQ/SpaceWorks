@@ -30,13 +30,13 @@ export function RequestList({ rows, actions, canViewAudit = false }: { rows: Har
       {rows.map((row) => (
         <article key={row.id} className="min-w-0 border-b border-line bg-surface/50 p-3 last:border-b-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="min-w-0 break-words font-semibold text-ink">#{row.id} {row.requester_display || row.requester_username}</h3>
+            <h3 className="title-section min-w-0 break-words"><span className="font-mono">#{row.id}</span> {row.requester_display || row.requester_username}</h3>
             <span className={`status-box ${statusBadgeClassName(row.status)}`}>
               {statusStageLabel(row.status)}
             </span>
             <div className="desk-actions ml-0 flex w-full flex-wrap gap-2 text-sm sm:ml-auto sm:w-auto">
               {actions(row)}
-              {canViewAudit ? <button type="button" onClick={() => setTimelineId((current) => (current === row.id ? null : row.id))}>{timelineId === row.id ? "Hide timeline" : "View timeline"}</button> : null}
+              {canViewAudit ? <button className="desk-button-ghost" type="button" onClick={() => setTimelineId((current) => (current === row.id ? null : row.id))}>{timelineId === row.id ? "Hide timeline" : "View timeline"}</button> : null}
             </div>
           </div>
           <div className="mt-3 max-w-md">
@@ -70,10 +70,10 @@ export function RequestList({ rows, actions, canViewAudit = false }: { rows: Har
           {row.issue_evidence_id || (row.return_evidence_ids?.length ?? 0) > 0 ? (
             <div className="desk-actions mt-2 flex flex-wrap gap-2 text-xs">
               {row.issue_evidence_id ? (
-                <button type="button" onClick={() => openEvidence(row.issue_evidence_id as number)}>View issue photo</button>
+                <button className="desk-button-ghost" type="button" onClick={() => openEvidence(row.issue_evidence_id as number)}>View issue photo</button>
               ) : null}
               {(row.return_evidence_ids ?? []).map((id, index) => (
-                <button key={id} type="button" onClick={() => openEvidence(id)}>
+                <button className="desk-button-ghost" key={id} type="button" onClick={() => openEvidence(id)}>
                   View return photo{(row.return_evidence_ids?.length ?? 0) > 1 ? ` ${index + 1}` : ""}
                 </button>
               ))}
@@ -131,7 +131,5 @@ function statusBadgeClassName(status: string) {
       return "";
   }
 }
-
-
 
 

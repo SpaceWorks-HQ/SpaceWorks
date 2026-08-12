@@ -125,8 +125,8 @@ export function Ledger({ makerspace, isSuperadmin }: { makerspace: Makerspace; i
             <input type="checkbox" checked={overdueOnly} onChange={(event) => setOverdueOnly(event.target.checked)} />
             Overdue
           </label>
-          <button className="desk-button" type="button" onClick={() => exportLedger("csv")}>Export CSV</button>
-          <button className="desk-button" type="button" onClick={() => exportLedger("xlsx")}>Export XLSX</button>
+          <button className="desk-button-ghost" type="button" onClick={() => exportLedger("csv")}>Export CSV</button>
+          <button className="desk-button-ghost" type="button" onClick={() => exportLedger("xlsx")}>Export XLSX</button>
         </div>
 
         {ledger.isLoading ? <LedgerSkeleton aggregate={aggregate} /> : null}
@@ -138,7 +138,7 @@ export function Ledger({ makerspace, isSuperadmin }: { makerspace: Makerspace; i
         {rows.length ? (
           <div className="overflow-x-auto rounded-md border border-line">
             <table className="min-w-[760px] divide-y divide-line text-left text-sm">
-              <thead className="bg-bg text-xs font-semibold uppercase text-muted">
+              <thead className="eyebrow bg-bg">
                 <tr>
                   <SortableHeader label="Item" sortKey="item_name" sort={sort} onSort={setSortKey} />
                   <SortableHeader label="Holder" sortKey="holder" sort={sort} onSort={setSortKey} />
@@ -160,7 +160,7 @@ export function Ledger({ makerspace, isSuperadmin }: { makerspace: Makerspace; i
                         <UnitLines row={row} />
                       </td>
                       <td className="px-3 py-2 align-top text-ink"><span className="block max-w-48 break-words">{row.holder}</span></td>
-                      <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-ink">{row.quantity}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right font-mono font-semibold text-ink">{row.quantity}</td>
                       <td className="whitespace-nowrap px-3 py-2 text-muted">{formatDate(row.since)}</td>
                       <td className={`whitespace-nowrap px-3 py-2 ${overdue ? "font-semibold text-danger" : "text-muted"}`}>
                         <span className="inline-flex items-center gap-2">
@@ -184,11 +184,11 @@ export function Ledger({ makerspace, isSuperadmin }: { makerspace: Makerspace; i
 
         {ledger.data && totalRows > LEDGER_PAGE_SIZE ? (
           <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-muted">
-            <button className="desk-button" type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+            <button className="desk-button-ghost" type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
               Previous
             </button>
-            <span>Page {page} of {totalPages}</span>
-            <button className="desk-button" type="button" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>
+            <span className="font-mono">Page {page} of {totalPages}</span>
+            <button className="desk-button-ghost" type="button" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>
               Next
             </button>
           </div>

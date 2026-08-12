@@ -13,6 +13,19 @@ type DirectoryEntry = {
 
 type Directory = { members: DirectoryEntry[]; hidden_count: number };
 
+const IDENTITY_TONES = [
+  { border: "border-accent", surface: "bg-accent/15", ink: "text-accent-ink" },
+  { border: "border-secondary", surface: "bg-secondary/15", ink: "text-secondary-ink" },
+  { border: "border-success", surface: "bg-success/15", ink: "text-success-ink" },
+  { border: "border-warn", surface: "bg-warn/15", ink: "text-warn-ink" },
+] as const;
+
+function identityTone(identity: string | number) {
+  const text = String(identity);
+  const total = [...text].reduce((sum, character) => sum + character.codePointAt(0)!, 0);
+  return IDENTITY_TONES[total % IDENTITY_TONES.length];
+}
+
 /**
  * Who else is here — but only the people who chose to be listed.
  *
@@ -47,22 +60,23 @@ export function MemberDirectory({ makerspaceId }: { makerspaceId: number }) {
 
   return (
     <section className="desk-panel p-5">
-      <h2 className="font-semibold text-ink">Members</h2>
+      <h2 className="title-panel">Members</h2>
       {entries.length === 0 ? (
         <p className="mt-1 text-sm text-muted">Nobody has published a profile yet.</p>
       ) : (
         <ul className="mt-3 space-y-2">
-          {entries.map((entry) => (
-            <li key={entry.membership_id}>
+          {entries.map((entry) => {
+            const tone = identityTone(entry.membership_id);
+            return <li className={`border-l-2 ${openId === entry.membership_id ? "border-secondary bg-secondary/15" : tone.border} pl-2`} key={entry.membership_id}>
               <button
-                className="flex w-full items-center gap-3 rounded-lg border border-line p-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                className="desk-button-ghost w-full justify-start text-left"
                 type="button"
                 onClick={() =>
                   setOpenId(openId === entry.membership_id ? null : entry.membership_id)
                 }
                 aria-expanded={openId === entry.membership_id}
               >
-                <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-line bg-surface">
+                <span className={`h-10 w-10 shrink-0 overflow-hidden rounded-full border ${tone.border} ${tone.surface}`}>
                   {entry.avatar_url ? (
                     <img src={entry.avatar_url} alt="" className="h-full w-full object-cover" />
                   ) : null}
@@ -79,8 +93,8 @@ export function MemberDirectory({ makerspaceId }: { makerspaceId: number }) {
               {openId === entry.membership_id && detail.data ? (
                 <ProfileDetail profile={detail.data} />
               ) : null}
-            </li>
-          ))}
+            </li>;
+          })}
         </ul>
       )}
       {hidden > 0 ? (
@@ -94,7 +108,7 @@ export function MemberDirectory({ makerspaceId }: { makerspaceId: number }) {
 
 function ProfileDetail({ profile }: { profile: MemberProfile }) {
   return (
-    <div className="mt-2 rounded-lg border border-line bg-surface p-3">
+    <div className="mt-2 rounded-lg border border-secondary bg-secondary/10 p-3">
       {profile.institution ? (
         <p className="text-sm text-muted">{profile.institution}</p>
       ) : null}
@@ -102,22 +116,23 @@ function ProfileDetail({ profile }: { profile: MemberProfile }) {
       <TagRow label="Interests" values={profile.interests} />
       <TagRow label="Languages" values={profile.languages} />
       {profile.education.length ? (
-        <ul className="mt-3 space-y-1 text-sm text-muted">
-          {profile.education.map((row, index) => (
-            <li key={index}>
+        <ul className="mt-3 space-y-2 text-sm text-muted">
+          {profile.education.map((row, index) => {
+            const tone = identityTone([row.qualification, row.institution, row.year].join("|"));
+            return <li className={`border-l-2 ${tone.border} pl-3`} key={index}>
               {[row.qualification, row.institution, row.year].filter(Boolean).join(" · ")}
-            </li>
-          ))}
+            </li>;
+          })}
         </ul>
       ) : null}
       {profile.github_contributions !== null ? (
         <p className="mt-3 text-sm text-muted">
-          {profile.github_contributions} GitHub contributions in the last year.
+          <span className="font-mono">{profile.github_contributions}</span> GitHub contributions in the last year.
         </p>
       ) : null}
       {typeof profile.activity?.events_attended === "number" ? (
         <p className="mt-1 text-sm text-muted">
-          {profile.activity.events_attended} events attended here.
+          <span className="font-mono">{profile.activity.events_attended}</span> events attended here.
         </p>
       ) : null}
       {profile.activity?.recent_attended_events?.length ? (
@@ -125,16 +140,16 @@ function ProfileDetail({ profile }: { profile: MemberProfile }) {
           {/* "Recent" is load-bearing, not decoration: the backend caps this list, so a
               heading reading "Events attended" would claim to be the full history. The
               count above is the truthful total. */}
-          <h4 className="text-sm font-medium text-ink">Recently attended</h4>
+          <h3 className="title-section">Recently attended</h3>
           <ul className="mt-1 space-y-1 text-sm text-muted">
             {profile.activity.recent_attended_events.map((event) => (
               <li key={event.id}>
                 {event.title} ·{" "}
-                {new Date(event.starts_at).toLocaleDateString(undefined, {
+                <span className="font-mono">{new Date(event.starts_at).toLocaleDateString(undefined, {
                   year: "numeric",
                   month: "short",
                   day: "numeric",
-                })}
+                })}</span>
               </li>
             ))}
           </ul>
@@ -142,8 +157,9 @@ function ProfileDetail({ profile }: { profile: MemberProfile }) {
       ) : null}
       {profile.projects.length ? (
         <div className="mt-3 space-y-3">
-          {profile.projects.map((project) => (
-            <article key={project.id} className="rounded-lg border border-line bg-panel p-3">
+          {profile.projects.map((project) => {
+            const tone = identityTone(project.id);
+            return <article key={project.id} className={`rounded-lg border ${tone.border} ${tone.surface} p-3`}>
               {project.image_url ? (
                 <img
                   src={project.image_url}
@@ -151,30 +167,31 @@ function ProfileDetail({ profile }: { profile: MemberProfile }) {
                   className="mb-2 max-h-40 w-full rounded-md object-cover"
                 />
               ) : null}
-              <h4 className="font-medium text-ink">{project.title}</h4>
+              <h3 className="title-section">{project.title}</h3>
               {project.description ? (
                 <p className="mt-1 text-sm text-muted">{project.description}</p>
               ) : null}
               {project.links.length ? (
                 <ul className="mt-2 flex flex-wrap gap-3 text-sm">
-                  {project.links.map((link, index) => (
-                    <li key={index}>
+                  {project.links.map((link, index) => {
+                    const linkTone = identityTone(`${link.label}|${link.url}`);
+                    return <li key={index}>
                       {/* External and member-authored: noopener/noreferrer keeps the
                           destination from reaching back through window.opener. */}
                       <a
-                        className="text-accent-ink underline"
+                        className={`${linkTone.ink} underline`}
                         href={link.url}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
                         {link.label}
                       </a>
-                    </li>
-                  ))}
+                    </li>;
+                  })}
                 </ul>
               ) : null}
-            </article>
-          ))}
+            </article>;
+          })}
         </div>
       ) : null}
     </div>
@@ -185,7 +202,7 @@ function TagRow({ label, values }: { label: string; values: string[] }) {
   if (!values.length) return null;
   return (
     <p className="mt-2 text-sm text-muted">
-      <span className="font-medium text-ink">{label}:</span> {values.join(", ")}
+      <span className="eyebrow text-ink">{label}:</span> {values.join(", ")}
     </p>
   );
 }

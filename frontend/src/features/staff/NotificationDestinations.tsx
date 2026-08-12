@@ -107,7 +107,7 @@ export function NotificationDestinations({
         />
       ) : (
         <button
-          className="desk-btn mt-3"
+          className="desk-button-primary mt-3"
           disabled={usable.length === 0}
           onClick={() => setCreating(true)}
           type="button"
@@ -170,10 +170,10 @@ function DestinationRow({
         {scopeCount === 0 ? "Everything" : `${scopeCount} scoped`}
       </span>
       <span className="ml-auto flex gap-2">
-        <button className="desk-btn" onClick={() => setEditing(true)} type="button">
+        <button className="desk-button" onClick={() => setEditing(true)} type="button">
           Edit
         </button>
-        <button className="desk-btn" onClick={onDelete} type="button">
+        <button className="desk-button-danger" onClick={onDelete} type="button">
           Remove
         </button>
       </span>
@@ -312,10 +312,10 @@ function DestinationForm({
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       <div className="flex gap-2">
-        <button className="desk-btn" disabled={save.isPending} type="submit">
+        <button className="desk-button-primary" disabled={save.isPending} type="submit">
           {save.isPending ? "Saving…" : "Save room"}
         </button>
-        <button className="desk-btn" onClick={onDone} type="button">
+        <button className="desk-button-ghost" onClick={onDone} type="button">
           Cancel
         </button>
       </div>
@@ -352,7 +352,7 @@ export function ScopePicker({
       <div className="grid gap-3 sm:grid-cols-3">
         {groups.map((group) => (
           <div key={group.key}>
-            <p className="text-xs font-semibold uppercase text-muted">{group.label}</p>
+            <p className="eyebrow">{group.label}</p>
             <div className="mt-1 grid max-h-40 gap-1 overflow-y-auto">
               {group.items.map((item) => (
                 <label className="flex items-center gap-2 text-sm" key={item.id}>

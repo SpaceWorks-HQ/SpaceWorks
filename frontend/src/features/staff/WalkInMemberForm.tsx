@@ -54,7 +54,7 @@ export function WalkInMemberForm({
   if (!open) {
     return (
       <button
-        className="mt-2 text-sm font-semibold text-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className="desk-button-ghost mt-2 px-0"
         type="button"
         onClick={() => setOpen(true)}
       >

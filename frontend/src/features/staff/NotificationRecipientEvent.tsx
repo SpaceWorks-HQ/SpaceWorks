@@ -117,7 +117,7 @@ export function EventRecipients({
       ) : null}
       <div className="flex flex-wrap gap-2">
         <button
-          className="desk-btn"
+          className="desk-button"
           onClick={() => update([
             ...rules,
             { kind: "role", role_id: null, user_id: null, scope: EMPTY_SCOPE },
@@ -127,7 +127,7 @@ export function EventRecipients({
           Add recipient
         </button>
         <button
-          className="desk-btn"
+          className="desk-button-primary"
           disabled={save.isPending || drafts === null || hasUnscopedRule}
           onClick={() => save.mutate(rules)}
           type="button"
@@ -135,7 +135,7 @@ export function EventRecipients({
           {save.isPending ? "Saving…" : "Save recipients"}
         </button>
         {drafts !== null ? (
-          <button className="desk-btn" onClick={() => setDrafts(null)} type="button">
+          <button className="desk-button-ghost" onClick={() => setDrafts(null)} type="button">
             Discard changes
           </button>
         ) : null}
@@ -192,7 +192,7 @@ function RecipientTarget({ data, index, rule, rules, update }: {
         </select>
       ) : null}
       <button
-        className="desk-btn ml-auto"
+        className="desk-button-danger ml-auto"
         onClick={() => update(rules.filter((_, position) => position !== index))}
         type="button"
       >

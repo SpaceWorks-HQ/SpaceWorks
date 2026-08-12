@@ -209,7 +209,7 @@ export function ImageUploader({
           {preview ? (
             <button
               type="button"
-              className="font-mono text-xs uppercase text-danger hover:underline disabled:opacity-50"
+              className="desk-button-ghost px-0 font-mono text-xs uppercase text-danger"
               disabled={disabled || status === "uploading"}
               onClick={clearImage}
             >

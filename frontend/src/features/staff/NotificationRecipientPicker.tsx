@@ -46,7 +46,7 @@ export function NotificationRecipientPicker({
 
   return (
     <section aria-labelledby="notification-recipients-heading" className="mt-6">
-      <h4 id="notification-recipients-heading" className="text-sm font-semibold text-ink">
+      <h4 id="notification-recipients-heading" className="title-section">
         Who gets notified
       </h4>
       <p className="mt-2 text-sm text-muted">
@@ -66,7 +66,7 @@ export function NotificationRecipientPicker({
         <>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <label className="grid gap-1 text-sm">
-              <span className="text-muted">Area</span>
+              <span className="eyebrow">Area</span>
               <select
                 className="desk-input"
                 onChange={(changed) => {
@@ -84,7 +84,7 @@ export function NotificationRecipientPicker({
               </select>
             </label>
             <label className="grid gap-1 text-sm">
-              <span className="text-muted">Event</span>
+              <span className="eyebrow">Event</span>
               <select
                 className="desk-input"
                 onChange={(changed) =>

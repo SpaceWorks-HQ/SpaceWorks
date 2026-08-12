@@ -68,9 +68,7 @@ export function MachineDrawer({
                   type="button"
                   role="tab"
                   aria-selected={activeTab === tab}
-                  className={activeTab === tab
-                    ? "border-b-2 border-accent px-3 py-2 text-sm font-semibold text-ink"
-                    : "border-b-2 border-transparent px-3 py-2 text-sm text-muted hover:text-ink"}
+                  className={activeTab === tab ? "desk-button-primary" : "desk-button-ghost"}
                   onClick={() => setActiveTab(tab)}
                 >
                   {tab}

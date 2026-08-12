@@ -135,16 +135,18 @@ export function PublicInventoryPage() {
       <SkipLink />
       <header className="border-b border-line bg-panel">
         <div className="mx-auto flex max-w-screen-2xl flex-col gap-2 px-5 py-4 sm:px-8">
-          <p className="text-sm font-semibold tracking-wide text-accent-ink">
+          <p className="eyebrow text-secondary-ink">
             Public Inventory
           </p>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="min-w-0">
-              <MakerspaceBrand
-                name={displayName}
-                logoUrl={bootstrap?.makerspace.logo_url}
-                size="xl"
-              />
+              <h1 className="title-page">
+                <MakerspaceBrand
+                  name={displayName}
+                  logoUrl={bootstrap?.makerspace.logo_url}
+                  size="xl"
+                />
+              </h1>
               <p className="mt-1 text-sm text-muted">
                 Shared tools and equipment published by this makerspace.
               </p>
@@ -155,7 +157,7 @@ export function PublicInventoryPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <SpaceWorksBadge />
-              <div className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-muted">
+              <div className="rounded-lg border border-secondary bg-secondary/15 px-3 py-2 font-mono text-sm text-secondary-ink">
                 {inventoryQuery.data?.count ?? "-"} listed items
               </div>
               {bootstrap?.makerspace.public_stats_enabled ? (
@@ -255,7 +257,7 @@ export function PublicInventoryPage() {
                 ))}
               </div>
               <div className="desk-panel flex flex-wrap items-center justify-between gap-3 p-3">
-                <p className="min-w-0 text-sm text-muted">
+                <p className="min-w-0 font-mono text-sm text-muted">
                   Page {page} of {pageCount}
                   {inventoryQuery.isFetching ? " loading..." : ""}
                 </p>

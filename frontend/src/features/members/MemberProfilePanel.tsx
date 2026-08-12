@@ -47,6 +47,19 @@ const tagsToText = (values: string[]) => values.join(", ");
 const textToTags = (value: string) =>
   value.split(",").map((item) => item.trim()).filter(Boolean);
 
+const PROFILE_TONES = [
+  "border-accent bg-accent/15",
+  "border-secondary bg-secondary/15",
+  "border-success bg-success/15",
+  "border-warn bg-warn/15",
+] as const;
+
+function profileToneForIdentity(identity: string | number | undefined) {
+  if (identity === undefined || identity === "") return "border-secondary bg-secondary/15";
+  const total = [...String(identity)].reduce((sum, character) => sum + character.codePointAt(0)!, 0);
+  return PROFILE_TONES[total % PROFILE_TONES.length];
+}
+
 /**
  * The member's own profile: what they choose to show the rest of their makerspace.
  *
@@ -136,7 +149,7 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
 
   return (
     <section className="desk-panel p-5">
-      <h2 className="font-semibold text-ink">Your maker profile</h2>
+      <h2 className="title-panel">Your maker profile</h2>
       <p className="mt-1 text-sm text-muted">
         Nothing here is shown to other members until you publish it.
       </p>
@@ -222,11 +235,11 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
       </Field>
       {draft.github_contributions !== null ? (
         <p className="mt-1 text-sm text-muted">
-          {draft.github_contributions} contributions in the last year.
+          <span className="font-mono">{draft.github_contributions}</span> contributions in the last year.
         </p>
       ) : null}
 
-      <h3 className="mt-6 font-semibold text-ink">Projects</h3>
+      <h3 className="title-section mt-6">Projects</h3>
       <div className="mt-2 space-y-3">
         {projects.map((project, index) => (
           <ProjectEditor
@@ -249,7 +262,7 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
         ))}
       </div>
       <button
-        className="desk-button mt-3"
+        className="desk-button-ghost mt-3"
         type="button"
         onClick={() =>
           editProjects([...projects, { title: "", description: "", links: [] }])
@@ -264,7 +277,7 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
         </p>
       ) : null}
       <button
-        className="desk-button-primary mt-4"
+        className="desk-button-secondary mt-4"
         type="button"
         disabled={save.isPending}
         onClick={() => save.mutate()}
@@ -288,9 +301,9 @@ function Field({
 }) {
   return (
     <div className="mt-3">
-      <label className="block text-sm font-semibold text-ink" htmlFor={id}>
+      <label className="eyebrow block" htmlFor={id}>
         {label}
-        {hint ? <span className="ml-2 font-normal text-muted">{hint}</span> : null}
+        {hint ? <span className="ml-2 normal-case tracking-normal text-muted">{hint}</span> : null}
       </label>
       {children}
     </div>
@@ -313,7 +326,7 @@ function ProjectEditor({
   onImageChanged: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-line bg-surface p-3">
+    <div className={`rounded-lg border ${profileToneForIdentity(project.id)} p-3`}>
       <input
         className="desk-input w-full"
         placeholder="Project title"
@@ -347,7 +360,7 @@ function ProjectEditor({
       )}
       <div className="mt-2 space-y-2">
         {project.links.map((link, index) => (
-          <div key={index} className="flex flex-col gap-2 sm:flex-row">
+          <div key={index} className={`flex flex-col gap-2 border-l-2 ${profileToneForIdentity(`${link.label}|${link.url}`)} p-2 sm:flex-row`}>
             <input
               className="desk-input w-full sm:w-40"
               placeholder="Label"
@@ -381,7 +394,7 @@ function ProjectEditor({
       </div>
       <div className="mt-2 flex gap-2">
         <button
-          className="desk-button"
+          className="desk-button-ghost"
           type="button"
           onClick={() =>
             onChange({ ...project, links: [...project.links, { label: "", url: "" }] })
@@ -389,7 +402,7 @@ function ProjectEditor({
         >
           Add link
         </button>
-        <button className="desk-button" type="button" onClick={onRemove}>
+        <button className="desk-button-danger" type="button" onClick={onRemove}>
           Remove project
         </button>
       </div>

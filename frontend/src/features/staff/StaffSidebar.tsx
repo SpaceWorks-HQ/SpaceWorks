@@ -6,6 +6,17 @@ import type { Makerspace } from "./panels/shared";
 import { TAB_GROUPS, TAB_LABELS } from "./staffAccess";
 import { staffTabPath } from "./staffTabs";
 
+const GROUP_TONE_CLASSES: Record<string, string> = {
+  Operate: "border-accent/40 text-accent-ink hover:bg-accent/15",
+  Inventory: "border-secondary/40 text-secondary-ink hover:bg-secondary/15",
+  Machines: "border-success/40 text-success-ink hover:bg-success/15",
+  Events: "border-warn/40 text-warn-ink hover:bg-warn/15",
+  Bookings: "border-accent/40 text-accent-ink hover:bg-accent/15",
+  Members: "border-secondary/40 text-secondary-ink hover:bg-secondary/15",
+  Insights: "border-success/40 text-success-ink hover:bg-success/15",
+  Admin: "border-warn/40 text-warn-ink hover:bg-warn/15",
+};
+
 function NotificationUnreadBadge({ makerspaceId }: { makerspaceId: number }) {
   const query = useQuery({
     queryKey: ["notifications-unread", makerspaceId],
@@ -16,7 +27,7 @@ function NotificationUnreadBadge({ makerspaceId }: { makerspaceId: number }) {
   const count = query.data?.count ?? 0;
   if (query.isError || count <= 0) return null;
   return (
-    <span className="ml-auto shrink-0 rounded-full bg-danger px-1.5 text-xs font-semibold text-bg">
+    <span className="ml-auto shrink-0 rounded-full bg-danger px-1.5 font-mono text-xs font-semibold text-bg">
       {count > 99 ? "99+" : count}
     </span>
   );
@@ -56,16 +67,16 @@ export function StaffSidebar({
       <div className="flex min-w-0 items-center gap-3 border-b border-line px-5 py-4">
         <SpaceWorksBadge className="shrink-0" />
         <div className="min-w-0">
-          <p className="truncate font-mono text-xs uppercase text-muted">
+          <p className="eyebrow truncate">
             {guestOnly ? "Guest admin" : isSuperadmin ? "Super Admin" : printingOnly ? "Print Manager" : "Space Manager"}
           </p>
         </div>
       </div>
       <div className="p-4">
         {singleTenantLocked ? (
-          <div className="break-words rounded-lg border border-line bg-accent px-3 py-2 text-sm font-semibold text-on-accent dark:bg-[#0b2a38] dark:text-[#7dd3fc]">
+          <h2 className="title-section break-words rounded-lg border border-accent bg-accent px-3 py-2 text-on-accent dark:bg-accent/15 dark:text-accent-ink">
             {activeMakerspace?.name ?? "Configured makerspace"}
-          </div>
+          </h2>
         ) : (
           <select
             className="desk-input w-full"
@@ -94,14 +105,14 @@ export function StaffSidebar({
             return (
               <div key={group.label}>
                 <button
-                  className="flex min-h-11 w-full items-center justify-between border-b border-line px-1 pb-1 font-display text-sm font-bold tracking-tight text-ink transition hover:text-accent-ink"
+                  className={`desk-button-ghost w-full justify-between rounded-none border-b px-1 text-left ${GROUP_TONE_CLASSES[group.label] ?? GROUP_TONE_CLASSES.Operate}`}
                   type="button"
                   aria-expanded={open}
                   aria-controls={groupId}
                   onClick={() => toggleGroup(group.label)}
                 >
-                  <span className="min-w-0 truncate">{group.label}</span>
-                  <span aria-hidden>{open ? "-" : "+"}</span>
+                  <span className="eyebrow min-w-0 truncate text-inherit">{group.label}</span>
+                  <span className="font-mono" aria-hidden>{open ? "-" : "+"}</span>
                 </button>
                 {open ? (
                   <div className="mt-1 grid gap-1" id={groupId}>

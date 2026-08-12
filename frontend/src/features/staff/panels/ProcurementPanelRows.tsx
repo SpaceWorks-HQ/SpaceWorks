@@ -78,14 +78,14 @@ export function ProcurementRow({ item, makerspaceSlug, updatePending, deletePend
     <tr>
       <td className="px-3 py-2 text-xs uppercase text-muted">{item.kind}</td>
       <td className="px-3 py-2"><span className="block max-w-56 break-words">{item.name}</span>{item.source_pool ? <span className="mt-1 block"><Badge tone="warn">Auto - low stock</Badge></span> : null}</td>
-      <td className="px-3 py-2">{item.quantity}</td>
+      <td className="px-3 py-2 font-mono">{item.quantity}</td>
       <td className="px-3 py-2"><ItemLink link={item.link} /></td>
-      <td className="px-3 py-2">{item.estimated_unit_cost ?? "-"}</td>
+      <td className="px-3 py-2 font-mono">{item.estimated_unit_cost ?? "-"}</td>
       <td className="px-3 py-2"><input className="desk-input w-36" value={draft.vendor_name} onChange={(event) => setDraft({ ...draft, vendor_name: event.target.value })} /></td>
       <td className="px-3 py-2"><input className="desk-input w-28" type="number" min={0} step="0.01" value={draft.actual_unit_cost} onChange={(event) => setDraft({ ...draft, actual_unit_cost: event.target.value })} /></td>
       <td className="px-3 py-2 text-muted"><span className="block max-w-36 break-words">{item.purchaser_username ?? "-"}</span></td>
-      <td className="px-3 py-2 text-xs text-muted">{formatDateTime(item.ordered_at)}</td>
-      <td className="px-3 py-2 text-xs text-muted">{formatDateTime(item.received_at)}</td>
+      <td className="px-3 py-2 font-mono text-xs text-muted">{formatDateTime(item.ordered_at)}</td>
+      <td className="px-3 py-2 font-mono text-xs text-muted">{formatDateTime(item.received_at)}</td>
       <td className="px-3 py-2"><ProcurementReceipts itemId={item.id} receipts={item.receipts ?? []} onChanged={onReceiptsChanged} /></td>
       <td className="px-3 py-2">
         <select className="desk-input w-32" value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as ToBuyStatus })}>
@@ -95,9 +95,9 @@ export function ProcurementRow({ item, makerspaceSlug, updatePending, deletePend
       <td className="px-3 py-2 text-xs text-muted"><MoveState item={item} makerspaceSlug={makerspaceSlug} /></td>
       <td className="px-3 py-2 text-right">
         <div className="flex flex-col gap-2">
-          {item.status === "received" && !item.moved_to_inventory_at ? <button type="button" className="desk-button bg-success text-on-success" onClick={onMove}>Move</button> : null}
-          <button type="button" className="desk-button" disabled={updatePending || !isDraftChanged(item, draft)} onClick={() => onSave(draft)}>Save</button>
-          <button type="button" className="desk-button" disabled={deletePending} onClick={onDelete}>Delete</button>
+          {item.status === "received" && !item.moved_to_inventory_at ? <button type="button" className="desk-button-success" onClick={onMove}>Move</button> : null}
+          <button type="button" className="desk-button-primary" disabled={updatePending || !isDraftChanged(item, draft)} onClick={() => onSave(draft)}>Save</button>
+          <button type="button" className="desk-button-danger" disabled={deletePending} onClick={onDelete}>Delete</button>
         </div>
       </td>
     </tr>

@@ -6,6 +6,8 @@ import { StructuredApiError, staffRequest } from "../../lib/api";
 import { MemberAuthPanel } from "./MemberAuthPanel";
 import { MemberPaymentRows, type MemberPayment } from "./MemberPayments";
 
+const MAKERSPACE_TONES = ["border-accent", "border-secondary", "border-success", "border-warn"] as const;
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to load archived payments.";
 }
@@ -33,15 +35,15 @@ function ArchivedMakerspacePayments({ summary }: { summary: ArchivedPaymentSumma
   });
 
   return (
-    <section className="desk-panel p-5">
+    <section className={`desk-panel ${MAKERSPACE_TONES[summary.makerspace.id % MAKERSPACE_TONES.length]} p-5`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-ink">{summary.makerspace.name}</h2>
+          <h2 className="title-panel">{summary.makerspace.name}</h2>
           <p className="mt-1 text-sm text-muted">
             This makerspace is closed. Outstanding charges can still be settled and receipts remain readable here.
           </p>
         </div>
-        <span className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-muted">
+        <span className="chip font-mono">
           {summary.pending_count} pending · {summary.total_count} total
         </span>
       </div>
@@ -89,11 +91,11 @@ export function ArchivedPayments() {
     return (
       <main className="desk-shell grid min-h-[60vh] place-items-center px-5">
         <div className="desk-panel w-full max-w-md p-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wide text-accent-ink">
+          <p className="eyebrow text-secondary-ink">
             Space Works
           </p>
-          <h1 className="mt-2 text-3xl font-bold text-ink">Page not found</h1>
-          <Link className="desk-button mt-5 inline-flex" to="/">
+          <h1 className="title-page mt-2">Page not found</h1>
+          <Link className="desk-button-ghost mt-5 inline-flex" to="/">
             Back to Space Works
           </Link>
         </div>
@@ -116,10 +118,10 @@ export function ArchivedPayments() {
   return (
     <main className="desk-shell mx-auto max-w-3xl space-y-5 px-5 py-8">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-wide text-accent-ink">
+        <p className="eyebrow text-secondary-ink">
           Archived makerspaces
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-ink">Payments and receipts</h1>
+        <h1 className="title-page mt-2">Payments and receipts</h1>
         <p className="mt-3 text-sm leading-6 text-muted">
           Closed makerspaces no longer appear in the normal member area. This page remains available so outstanding charges can be settled and past receipts can be read.
         </p>
@@ -139,7 +141,7 @@ export function ArchivedPayments() {
       ) : null}
       {discovery.data?.length === 0 ? (
         <section className="desk-panel p-5">
-          <h2 className="font-semibold text-ink">No archived payments</h2>
+          <h2 className="title-panel">No archived payments</h2>
           <p className="mt-1 text-sm text-muted">
             No charges outstanding from closed makerspaces.
           </p>
@@ -149,7 +151,7 @@ export function ArchivedPayments() {
         <ArchivedMakerspacePayments key={summary.makerspace.id} summary={summary} />
       ))}
 
-      <Link className="desk-button inline-flex" to="/">
+      <Link className="desk-button-ghost inline-flex" to="/">
         Back to Space Works
       </Link>
     </main>

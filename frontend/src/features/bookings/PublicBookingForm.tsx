@@ -55,8 +55,8 @@ export function PublicBookingForm({ makerspaceSlug, space }: {
   if (booking.data) {
     const pending = booking.data.status === "pending";
     return (
-      <div ref={successRef} className="rounded-lg border border-line bg-surface p-4 outline-none" role="status" tabIndex={-1}>
-        <h3 className="font-semibold text-ink">{pending ? "Booking request received" : "Space booked"}</h3>
+      <div ref={successRef} className={`rounded-lg border ${pending ? "border-warn bg-warn/15" : "border-success bg-success/15"} p-4 outline-none`} role="status" tabIndex={-1}>
+        <h3 className="title-section">{pending ? "Booking request received" : "Space booked"}</h3>
         <p className="mt-1 text-sm text-muted">
           {pending ? "Staff must approve this request before the slot is confirmed." : "Your selected slot is confirmed and booked."}
         </p>
@@ -89,10 +89,10 @@ export function PublicBookingForm({ makerspaceSlug, space }: {
   return (
     <div className="grid gap-4">
       <AvailabilityCalendar makerspaceSlug={makerspaceSlug} publicToken={space.public_token} />
-      <form className="grid gap-4 rounded-lg border border-line bg-bg p-4" onSubmit={submit} noValidate>
+      <form className="grid gap-4 rounded-lg border border-secondary bg-bg p-4" onSubmit={submit} noValidate>
         <div>
-          <h3 className="font-semibold text-ink">Request this space</h3>
-          <p className="mt-1 text-xs text-muted">Times are shown in your device timezone.</p>
+          <h3 className="title-section">Request this space</h3>
+          <p className="eyebrow mt-1">Times are shown in your device timezone.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Starts" error={errorFor("starts_at")}><input className="desk-input" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} required /></Field>
@@ -103,7 +103,7 @@ export function PublicBookingForm({ makerspaceSlug, space }: {
           <input name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(event) => setWebsite(event.target.value)} />
         </label>
         {booking.error ? <p className="text-sm text-danger" role="alert">{failureMessage(apiError)}</p> : null}
-        <button className="desk-button-primary" type="submit" disabled={booking.isPending}>
+        <button className="desk-button-secondary" type="submit" disabled={booking.isPending}>
           {booking.isPending ? "Submitting..." : space.approval_mode === "approve" ? "Submit booking request" : "Book this slot"}
         </button>
       </form>
@@ -113,8 +113,8 @@ export function PublicBookingForm({ makerspaceSlug, space }: {
 
 function Field({ label, error, children }: { label: string; error: string; children: ReactElement<{ "aria-invalid"?: boolean }> }) {
   return (
-    <label className="grid gap-1 text-sm font-semibold text-ink">
-      {label}
+    <label className="grid gap-1 text-ink">
+      <span className="eyebrow">{label}</span>
       {error ? <span className="text-xs font-normal text-danger">{error}</span> : null}
       {cloneElement(children, { "aria-invalid": Boolean(error) })}
     </label>

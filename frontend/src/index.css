@@ -262,6 +262,40 @@
     @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-accent px-3 py-2 text-sm font-semibold text-on-accent shadow-soft transition-all hover:-translate-y-0.5 hover:bg-accent-bright hover:text-on-accent hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-accent disabled:hover:shadow-soft;
   }
 
+  /* --- the rest of the button family ------------------------------------------------
+     `desk-button` (253 uses) and `desk-button-primary` (97) already covered neutral and
+     primary. These are the variants components were spelling out inline, each slightly
+     differently -- which is how a button ends up with a colour nothing else in the product
+     uses. Every one keeps the 44px target and the same focus-visible ring, and every fill
+     pairs with its FIXED `on-*` ink so it survives dark mode.
+
+     `-secondary` is the public/member primary: on a stranger-facing surface pink is the
+     interaction colour, and a page whose only call to action is sky-blue does not belong to
+     the same product as its own logo. */
+  .desk-button-secondary {
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-secondary px-3 py-2 text-sm font-semibold text-on-secondary shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-soft;
+  }
+
+  .desk-button-success {
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-success px-3 py-2 text-sm font-semibold text-on-success shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-soft;
+  }
+
+  .desk-button-warn {
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-warn px-3 py-2 text-sm font-semibold text-on-warn shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-soft;
+  }
+
+  /* Destructive. `text-bg` rather than an `on-*` token because `danger` is the one
+     non-pastel and is dark in both themes. */
+  .desk-button-danger {
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-danger bg-danger px-3 py-2 text-sm font-semibold text-bg shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-soft;
+  }
+
+  /* Tertiary: no fill, no border, for a link-like action sitting beside a real button. Still
+     44px and still focus-visible, because "quiet" must not mean "unreachable by keyboard". */
+  .desk-button-ghost {
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-accent-ink transition-colors hover:bg-accent/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
   .desk-nav-item {
     @apply min-h-11 flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border-l border-transparent px-3 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:bg-accent/15 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus;
   }

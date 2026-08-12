@@ -297,7 +297,7 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
         {containerScanError ? <p className="mt-1 text-sm text-danger">{containerScanError}</p> : null}
         <div className="mt-4">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-ink">Items</h3>
+            <h3 className="title-section">Items</h3>
             <button className="desk-button" type="button" onClick={addLine}>Add item</button>
           </div>
           <div className="grid gap-2">
@@ -325,7 +325,7 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
         </div>
         <div className="mt-4">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-ink">QR payloads</h3>
+            <h3 className="title-section">QR payloads</h3>
             <button className="desk-button" type="button" onClick={() => setShowScanner(true)}>Scan QR</button>
           </div>
           {scanned.length ? (
@@ -333,7 +333,7 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
               {scanned.map((item) => (
                 <span key={item.payload} className="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-1 text-sm text-ink">
                   {item.label}
-                  <button className="text-muted hover:text-danger" type="button" onClick={() => removeScanned(item.payload)}>Remove</button>
+                  <button className="desk-button-ghost px-2 text-danger" type="button" onClick={() => removeScanned(item.payload)}>Remove</button>
                 </span>
               ))}
             </div>
@@ -355,7 +355,7 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
             onUploaded={setIssueEvidenceId}
           />
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+            <span className="eyebrow mb-1 block">
               Issue remark
             </span>
             <textarea

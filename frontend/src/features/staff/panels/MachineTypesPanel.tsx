@@ -54,14 +54,14 @@ function PricingEditor({ makerspaceId, machineType, currency, canConfigure }: {
 
   if (!canConfigure) return null;
   return <div className="grid gap-2 rounded-lg bg-bg p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] md:items-end">
-    <label className="grid gap-1 text-xs font-semibold text-muted">Rate per unit ({currency})
+    <label className="eyebrow grid gap-1">Rate per unit ({currency})
       <input className="desk-input" type="number" min="0" step="0.01" value={shownRate} onChange={(event) => setRate(event.target.value)} />
     </label>
-    <label className="grid gap-1 text-xs font-semibold text-muted">Flat fee ({currency})
+    <label className="eyebrow grid gap-1">Flat fee ({currency})
       <input className="desk-input" type="number" min="0" step="0.01" value={shownFlatFee} onChange={(event) => setFlatFee(event.target.value)} />
     </label>
-    <label className="flex items-center gap-2 text-xs font-semibold text-muted"><input type="checkbox" checked={shownEnabled} onChange={(event) => setPaymentEnabled(event.target.checked)} /> Enable payment</label>
-    <button className="desk-button" type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending}>{mutation.isPending ? "Saving..." : "Save pricing"}</button>
+    <label className="eyebrow flex items-center gap-2"><input type="checkbox" checked={shownEnabled} onChange={(event) => setPaymentEnabled(event.target.checked)} /> Enable payment</label>
+    <button className="desk-button-primary" type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending}>{mutation.isPending ? "Saving..." : "Save pricing"}</button>
     {pricing.isLoading ? <p className="text-xs text-muted md:col-span-4">Loading pricing...</p> : null}
     {pricing.error instanceof Error ? <p className="text-xs text-danger md:col-span-4">{pricing.error.message}</p> : null}
     {mutation.isSuccess ? <p className="text-xs text-success md:col-span-4">Pricing saved.</p> : null}
@@ -82,11 +82,11 @@ function CustomTypeRow({ makerspaceId, machineType, canConfigure, currency }: {
   });
   return <div className="border-t border-line p-3 first:border-t-0">
     <form className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end" onSubmit={(event) => { event.preventDefault(); rename.mutate(); }}>
-      <label className="grid gap-1 text-xs font-semibold text-muted">Name<input className="desk-input" value={name} disabled={!canConfigure} onChange={(event) => setName(event.target.value)} required /></label>
-      <label className="grid gap-1 text-xs font-semibold text-muted">Icon<input className="desk-input" value={icon} disabled={!canConfigure} onChange={(event) => setIcon(event.target.value)} placeholder="Optional icon" /></label>
-      <label className="grid gap-1 text-xs font-semibold text-muted">Metering unit<select className="desk-input" value={config.metering_unit} disabled={!canConfigure} onChange={(event) => setConfig({ ...config, metering_unit: event.target.value as MeteringUnit })}>{meteringUnits.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}</select></label>
-      {canConfigure ? <button className="desk-button" type="submit" disabled={rename.isPending || !name.trim()}>{rename.isPending ? "Saving..." : "Save type"}</button> : null}
-      <label className="flex items-center gap-2 text-xs font-semibold text-muted md:col-span-4"><input type="checkbox" checked={config.requires_booking} disabled={!canConfigure} onChange={(event) => setConfig({ ...config, requires_booking: event.target.checked })} /> Requires booking</label>
+      <label className="eyebrow grid gap-1">Name<input className="desk-input" value={name} disabled={!canConfigure} onChange={(event) => setName(event.target.value)} required /></label>
+      <label className="eyebrow grid gap-1">Icon<input className="desk-input" value={icon} disabled={!canConfigure} onChange={(event) => setIcon(event.target.value)} placeholder="Optional icon" /></label>
+      <label className="eyebrow grid gap-1">Metering unit<select className="desk-input" value={config.metering_unit} disabled={!canConfigure} onChange={(event) => setConfig({ ...config, metering_unit: event.target.value as MeteringUnit })}>{meteringUnits.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}</select></label>
+      {canConfigure ? <button className="desk-button-primary" type="submit" disabled={rename.isPending || !name.trim()}>{rename.isPending ? "Saving..." : "Save type"}</button> : null}
+      <label className="eyebrow flex items-center gap-2 md:col-span-4"><input type="checkbox" checked={config.requires_booking} disabled={!canConfigure} onChange={(event) => setConfig({ ...config, requires_booking: event.target.checked })} /> Requires booking</label>
       <p className="text-xs text-muted md:col-span-4">Slug: {machineType.slug} (fixed)</p>
       {rename.error instanceof Error ? <p className="text-sm text-danger md:col-span-4">{rename.error.message}</p> : null}
     </form>
@@ -114,11 +114,11 @@ export function MachineTypesPanel({ makerspaceId, canConfigureMachineTypes }: { 
     <div className="grid gap-3 p-3">
       <p className="text-sm text-muted">Structural configuration is fixed for built-in types. Prices are makerspace-specific and use the default currency shown beside each amount.</p>
       {canConfigureMachineTypes ? <form className="grid gap-2 rounded-xl border border-line bg-bg p-3 md:grid-cols-4 md:items-end" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}>
-        <label className="grid gap-1 text-xs font-semibold text-muted">Slug<input className="desk-input" value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="laser-cutter" required /></label>
-        <label className="grid gap-1 text-xs font-semibold text-muted">Name<input className="desk-input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Laser cutter" required /></label>
-        <label className="grid gap-1 text-xs font-semibold text-muted">Icon<input className="desk-input" value={icon} onChange={(event) => setIcon(event.target.value)} placeholder="Optional icon" /></label>
-        <label className="grid gap-1 text-xs font-semibold text-muted">Metering unit<select className="desk-input" value={config.metering_unit} onChange={(event) => setConfig({ ...config, metering_unit: event.target.value as MeteringUnit })}>{meteringUnits.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}</select></label>
-        <label className="flex items-center gap-2 text-xs font-semibold text-muted"><input type="checkbox" checked={config.requires_booking} onChange={(event) => setConfig({ ...config, requires_booking: event.target.checked })} /> Requires booking</label>
+        <label className="eyebrow grid gap-1">Slug<input className="desk-input" value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="laser-cutter" required /></label>
+        <label className="eyebrow grid gap-1">Name<input className="desk-input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Laser cutter" required /></label>
+        <label className="eyebrow grid gap-1">Icon<input className="desk-input" value={icon} onChange={(event) => setIcon(event.target.value)} placeholder="Optional icon" /></label>
+        <label className="eyebrow grid gap-1">Metering unit<select className="desk-input" value={config.metering_unit} onChange={(event) => setConfig({ ...config, metering_unit: event.target.value as MeteringUnit })}>{meteringUnits.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}</select></label>
+        <label className="eyebrow flex items-center gap-2"><input type="checkbox" checked={config.requires_booking} onChange={(event) => setConfig({ ...config, requires_booking: event.target.checked })} /> Requires booking</label>
         <button className="desk-button-primary" type="submit" disabled={create.isPending || !slug.trim() || !name.trim()}>{create.isPending ? "Creating..." : "Create type"}</button>
         {create.error instanceof Error ? <p className="text-sm text-danger md:col-span-4">{create.error.message}</p> : null}
       </form> : <p className="text-sm text-muted">You have read-only access to machine types and pricing.</p>}

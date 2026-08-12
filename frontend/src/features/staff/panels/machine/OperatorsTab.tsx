@@ -44,7 +44,7 @@ export function OperatorsTab({ machineId, canDelegate }: { machineId: number; ca
 
   return (
     <section>
-      <h3 className="mb-3 text-sm font-semibold text-ink">Operators</h3>
+      <h3 className="title-section mb-3">Operators</h3>
       {operators.isLoading ? <p className="text-sm text-muted">Loading operators...</p> : null}
       {operators.error instanceof Error ? <p className="text-sm text-danger">{operators.error.message}</p> : null}
       {!operators.isLoading && !operators.error && !items.length ? (
@@ -56,7 +56,7 @@ export function OperatorsTab({ machineId, canDelegate }: { machineId: number; ca
             <span className="font-medium text-ink">{operator.username}</span>
             <span className="text-muted">{operator.access_level}</span>
             {canDelegate ? (
-              <button className="desk-button ml-auto" type="button" disabled={remove.isPending}
+              <button className="desk-button-danger ml-auto" type="button" disabled={remove.isPending}
                 onClick={() => remove.mutate(operator.user)}>Remove</button>
             ) : null}
           </div>
@@ -65,7 +65,7 @@ export function OperatorsTab({ machineId, canDelegate }: { machineId: number; ca
       {canDelegate ? (
         <form className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
           onSubmit={(event) => { event.preventDefault(); add.mutate(); }}>
-          <label className="grid gap-1 text-xs font-semibold text-muted">Member
+          <label className="eyebrow grid gap-1">Member
             <select className="desk-input" value={userId} disabled={candidates.isLoading}
               onChange={(event) => setUserId(event.target.value)} required>
               <option value="">{candidates.isLoading ? "Loading members..." : "Select a member"}</option>
@@ -76,7 +76,7 @@ export function OperatorsTab({ machineId, canDelegate }: { machineId: number; ca
               ))}
             </select>
           </label>
-          <label className="grid gap-1 text-xs font-semibold text-muted">Access level
+          <label className="eyebrow grid gap-1">Access level
             <select className="desk-input" value={accessLevel}
               onChange={(event) => setAccessLevel(event.target.value as MachineAccessLevel)}>
               <option value="operate">Operate</option>

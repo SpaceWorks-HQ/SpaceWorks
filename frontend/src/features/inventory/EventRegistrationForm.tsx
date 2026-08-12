@@ -43,7 +43,7 @@ export function EventRegistrationForm({ makerspaceSlug, publicToken, waitlist }:
 
   if (registration.data) {
     return <div ref={successRef} className="rounded-lg border border-line bg-surface p-4 outline-none" role="status" tabIndex={-1}>
-      <h3 className="font-semibold text-ink">{registration.data.status === "waitlisted" ? "You’re on the waitlist" : "Registration received"}</h3>
+      <h3 className="title-section">{registration.data.status === "waitlisted" ? "You’re on the waitlist" : "Registration received"}</h3>
       <p className="mt-1 text-sm text-muted">{registration.data.status === "waitlisted" ? "The makerspace has recorded your waitlist request." : "The makerspace has recorded your registration."}</p>
     </div>;
   }
@@ -55,7 +55,7 @@ export function EventRegistrationForm({ makerspaceSlug, publicToken, waitlist }:
   const apiError = registration.error instanceof StructuredApiError ? registration.error : null;
 
   return <form className="grid gap-3 rounded-lg border border-line bg-bg p-4" onSubmit={submit} noValidate>
-    <h3 className="font-semibold text-ink">{waitlist ? "Join the waitlist" : "Register"}</h3>
+    <h3 className="title-section">{waitlist ? "Join the waitlist" : "Register"}</h3>
     <label className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">Website
       <input name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
     </label>

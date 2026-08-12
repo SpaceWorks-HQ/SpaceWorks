@@ -115,7 +115,7 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
       <p className="mb-4 text-sm text-muted">Create events, publish registrations, and record attendance.</p>
       <CollaborationInbox makerspaceId={makerspaceId} />
       <form className="mb-5 rounded-xl border border-line bg-bg p-4" onSubmit={submit}>
-        <h3 className="mb-3 font-semibold text-ink">Create draft event</h3>
+        <h3 className="title-section mb-3">Create draft event</h3>
         <EventFields values={values} setValues={setValues} />
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button className="desk-button-primary" type="submit" disabled={create.isPending}>{create.isPending ? "Creating..." : "Create event"}</button>
@@ -129,18 +129,18 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
       {events.data?.results.length ? (
         <div className="overflow-x-auto rounded-xl border border-line">
           <table className="w-full text-left text-sm"><caption className="sr-only">Events in chronological order</caption>
-            <thead className="bg-surface text-xs text-muted"><tr><th className="p-3">Event</th><th className="p-3">Status</th><th className="p-3">Capacity</th><th className="p-3">Registrations</th></tr></thead>
+            <thead className="bg-surface"><tr><th className="eyebrow p-3">Event</th><th className="eyebrow p-3">Status</th><th className="eyebrow p-3">Capacity</th><th className="eyebrow p-3">Registrations</th></tr></thead>
             <tbody>{events.data.results.map((item) => <tr key={item.id} className="border-t border-line">
-              <td className="p-3"><button className="text-left font-semibold text-ink hover:underline" type="button" onClick={() => setSelectedId(item.id)}>{item.title}</button><span className="mt-1 block text-xs text-muted">{dateRange(item)}{item.location ? ` · ${item.location}` : ""}</span></td>
-              <td className="p-3"><StatusBadge status={item.status} /></td><td className="p-3">{item.capacity === 0 ? "Unlimited" : item.capacity}</td>
-              <td className="p-3">{item.registration_counts.registered + item.registration_counts.attended}</td>
+              <td className="p-3"><button className="desk-button-ghost h-auto justify-start px-0 text-left" type="button" onClick={() => setSelectedId(item.id)}>{item.title}</button><span className="mt-1 block font-mono text-xs text-muted">{dateRange(item)}{item.location ? ` · ${item.location}` : ""}</span></td>
+              <td className="p-3"><StatusBadge status={item.status} /></td><td className="p-3 font-mono">{item.capacity === 0 ? "Unlimited" : item.capacity}</td>
+              <td className="p-3 font-mono">{item.registration_counts.registered + item.registration_counts.attended}</td>
             </tr>)}</tbody>
           </table>
         </div>
       ) : null}
       {events.data ? <div className="mt-3 flex items-center justify-between gap-3 text-sm">
         <button className="desk-button" type="button" disabled={!events.data.previous} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>
-        <span className="text-muted">Page {page}{" - "}{events.data.count} total</span>
+        <span className="font-mono text-muted">Page {page}{" - "}{events.data.count} total</span>
         <button className="desk-button" type="button" disabled={!events.data.next} onClick={() => setPage((current) => current + 1)}>Next</button>
       </div> : null}
       {selectedId !== null ? <EventDrawer key={selectedId} eventId={selectedId} makerspaceId={makerspaceId} onClose={() => setSelectedId(null)} /> : null}
@@ -179,11 +179,11 @@ function EventDrawer({ eventId, makerspaceId, onClose }: { eventId: number; make
           {!readOnly ? <button className="desk-button-primary mt-3" type="submit" disabled={update.isPending}>{update.isPending ? "Saving..." : "Save changes"}</button> : <p className="mt-3 text-sm text-muted">Terminal events are read-only.</p>}
         </form>
         <div className="flex flex-wrap gap-2">
-          {event.status === "draft" ? <button className="desk-button" type="button" onClick={() => setConfirm("publish")}>Publish</button> : null}
-          {event.status === "published" ? <><button className="desk-button" type="button" onClick={() => setConfirm("complete")}>Complete</button><button className="desk-button text-danger" type="button" onClick={() => setConfirm("cancel")}>Cancel event</button></> : null}
+          {event.status === "draft" ? <button className="desk-button-primary" type="button" onClick={() => setConfirm("publish")}>Publish</button> : null}
+          {event.status === "published" ? <><button className="desk-button-success" type="button" onClick={() => setConfirm("complete")}>Complete</button><button className="desk-button-danger" type="button" onClick={() => setConfirm("cancel")}>Cancel event</button></> : null}
         </div>
         {actionError ? <p className="text-sm text-danger" role="alert">{errorText(actionError)}</p> : null}
-        <section aria-labelledby="registrations-title"><h3 id="registrations-title" className="mb-2 font-semibold text-ink">Registrations ({registrations.data?.count ?? event.registration_counts.registered + event.registration_counts.waitlisted + event.registration_counts.cancelled + event.registration_counts.attended})</h3>
+        <section aria-labelledby="registrations-title"><h3 id="registrations-title" className="title-section mb-2">Registrations <span className="font-mono">({registrations.data?.count ?? event.registration_counts.registered + event.registration_counts.waitlisted + event.registration_counts.cancelled + event.registration_counts.attended})</span></h3>
           {registrations.isLoading ? <Skeleton className="h-32 w-full" /> : null}
           {registrations.error ? <p className="text-sm text-danger">{errorText(registrations.error)}</p> : null}
           {registrations.data && !registrations.data.results.length ? <p className="text-sm text-muted">No registrations yet.</p> : null}
@@ -196,10 +196,10 @@ function EventDrawer({ eventId, makerspaceId, onClose }: { eventId: number; make
               ? <EventCheckInScanner makerspaceId={makerspaceId} eventId={eventId} onClose={() => setScanning(false)} />
               : <button className="desk-button mt-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus" type="button" onClick={() => setScanning(true)}>Scan check-in</button>
           ) : null}
-          {registrations.data?.results.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Event registration contact details</caption><thead className="text-xs text-muted"><tr><th className="p-2">Name</th><th className="p-2">Contact</th><th className="p-2">Status</th><th className="p-2">Action</th></tr></thead><tbody>
-            {registrations.data.results.map((row) => <tr key={row.id} className="border-t border-line"><td className="p-2">{row.name}<PaymentReconcileActions makerspaceId={makerspaceId} payment={row.payment} invalidateKeys={[["event", eventId, "registrations"], ["event", eventId], ["events", makerspaceId]]} /></td><td className="p-2"><a className="block hover:underline" href={`mailto:${row.email}`}>{row.email}</a><a className="block text-muted hover:underline" href={`tel:${row.phone}`}>{row.phone}</a></td><td className="p-2"><StatusBadge status={row.status} /></td><td className="p-2">{row.status === "registered" && (event.status === "published" || event.status === "completed") ? <button className="desk-button" type="button" disabled={attended.isPending} onClick={() => attended.mutate(row.id)}>Mark attended</button> : "—"}</td></tr>)}
+          {registrations.data?.results.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Event registration contact details</caption><thead><tr><th className="eyebrow p-2">Name</th><th className="eyebrow p-2">Contact</th><th className="eyebrow p-2">Status</th><th className="eyebrow p-2">Action</th></tr></thead><tbody>
+            {registrations.data.results.map((row) => <tr key={row.id} className="border-t border-line"><td className="p-2">{row.name}<PaymentReconcileActions makerspaceId={makerspaceId} payment={row.payment} invalidateKeys={[["event", eventId, "registrations"], ["event", eventId], ["events", makerspaceId]]} /></td><td className="p-2"><a className="block hover:underline" href={`mailto:${row.email}`}>{row.email}</a><a className="block text-muted hover:underline" href={`tel:${row.phone}`}>{row.phone}</a></td><td className="p-2"><StatusBadge status={row.status} /></td><td className="p-2">{row.status === "registered" && (event.status === "published" || event.status === "completed") ? <button className="desk-button-success" type="button" disabled={attended.isPending} onClick={() => attended.mutate(row.id)}>Mark attended</button> : "—"}</td></tr>)}
           </tbody></table></div> : null}
-          <div className="mt-3 flex items-center justify-between gap-2"><span className="text-xs text-muted">Page {page}</span><div className="flex gap-2"><button className="desk-button" type="button" disabled={!registrations.data?.previous} onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</button><button className="desk-button" type="button" disabled={!registrations.data?.next} onClick={() => setPage((p) => p + 1)}>Next</button></div></div>
+          <div className="mt-3 flex items-center justify-between gap-2"><span className="font-mono text-xs text-muted">Page {page}</span><div className="flex gap-2"><button className="desk-button" type="button" disabled={!registrations.data?.previous} onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</button><button className="desk-button" type="button" disabled={!registrations.data?.next} onClick={() => setPage((p) => p + 1)}>Next</button></div></div>
         </section>
         <EventCollaborators makerspaceId={makerspaceId} eventId={eventId} />
       </div> : null}
