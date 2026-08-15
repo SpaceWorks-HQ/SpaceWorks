@@ -329,26 +329,23 @@ def test_group_lookup_tolerates_an_unknown_legacy_key():
     assert module_registry.group_for("events") == module_registry.GROUP_EVENTS
 
 
-def test_membership_and_mobile_require_member_accounts():
-    # Community membership presupposes a member account: join requests, waivers,
-    # referrals and verification are all things an account holds. A device grant is
-    # bound to a user for the same reason. Staff authentication is core RBAC and is
-    # deliberately NOT expressed here -- a space that could switch off its own staff
-    # logins could not be administered.
+def test_only_mobile_requires_member_accounts():
+    # Community enrolment may use external OIDC while built-in account self-service is
+    # off. A native device grant still binds to a built-in member account.
     dependencies = module_registry.module_dependencies()
 
-    assert dependencies["membership"] == ("accounts",)
+    assert "accounts" not in dependencies.get("membership", ())
     assert dependencies["mobile"] == ("accounts",)
     assert "accounts" not in dependencies
 
 
 def test_events_and_bookings_do_not_require_member_accounts():
     # The lean install is Inventory + Machines with the space's own login, and events,
-    # bookings and machine service must all keep working there. Only the community and
-    # native-device layers depend on member accounts.
+    # bookings and machine service must all keep working there. Only the native-device
+    # layer depends on built-in member accounts.
     dependencies = module_registry.module_dependencies()
 
-    for key in ("events", "bookings", "machines", "machine_service", "payments", "reports"):
+    for key in ("events", "bookings", "machines", "machine_service", "membership", "payments", "reports"):
         assert "accounts" not in dependencies.get(key, ())
 
 

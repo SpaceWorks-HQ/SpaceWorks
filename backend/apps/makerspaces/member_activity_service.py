@@ -6,6 +6,7 @@ from apps.accounts.models import User
 from apps.hardware_requests.self_checkout_models import PublicToolLoan
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.waiver_state import current_acceptance
 from apps.presence.models import PresenceSession
 from apps.separability.registry import runtime_active
 
@@ -213,8 +214,7 @@ def _accountability(membership):
     return {
         "membership_active": membership.status == "active",
         "waiver_acceptance_required": bool(
-            waiver and (membership.accepted_waiver_id != waiver.id
-                        or membership.waiver_version_accepted != waiver.version)
+            waiver and not current_acceptance(membership, active_waiver=waiver)
         ),
         "restriction_code": None,
     }

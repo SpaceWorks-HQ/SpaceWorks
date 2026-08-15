@@ -114,8 +114,8 @@ PLANS = (
     # always the exception; they are now simply the rule.
     ModulePurgePlan(
         "membership",
-        "Join requests, waivers, waiver acceptances and member profiles with their "
-        "projects and imagery. Memberships themselves stay — they are core RBAC state.",
+        "Join requests and member profiles with their projects and imagery. "
+        "Memberships, waivers and acceptance evidence stay as core RBAC/liability state.",
         membership_delete,
         public_image_keys=membership_public_image_keys,
     ),

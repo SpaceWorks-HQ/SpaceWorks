@@ -12,7 +12,15 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.bookings.models import BookableSpace, Booking
 from apps.events.models import Event, EventRegistration
-from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole, MakerspaceWaiver
+from apps.makerspaces.models import (
+    Makerspace,
+    MakerspaceMembership,
+    MakerspaceRole,
+    MakerspaceWaiver,
+    MemberProfile,
+    MemberProject,
+    MembershipRequest,
+)
 from apps.makerspaces.module_install import install_module, uninstall_module
 from apps.makerspaces.module_purge import purge_module, purgeable_modules
 from apps.payments.models import Payment
@@ -174,10 +182,7 @@ def test_purging_bookings_removes_spaces_and_bookings():
     assert not Booking.objects.filter(space__makerspace=makerspace).exists()
 
 
-def test_purging_membership_keeps_the_roster_but_clears_waiver_acceptance():
-    # MakerspaceMembership is core RBAC state (plan A7) and must survive. Its waiver
-    # acceptance is under an all-or-none check constraint, so the three fields have to
-    # be cleared together before the waiver rows they point at are deleted.
+def test_purging_membership_keeps_waiver_evidence_but_removes_community_data():
     makerspace = space("purge-membership", "membership")
     member = User.objects.create_user(username="waiver-member", email="wm@example.test", password="password")
     waiver = MakerspaceWaiver.objects.create(makerspace=makerspace, version="1", body="Be careful", is_active=True)
@@ -187,16 +192,27 @@ def test_purging_membership_keeps_the_roster_but_clears_waiver_acceptance():
         status="active", accepted_waiver=waiver, waiver_accepted_at=timezone.now(),
         waiver_version_accepted="1",
     )
+    profile = MemberProfile.objects.create(membership=membership)
+    project = MemberProject.objects.create(profile=profile, title="Laser guide")
+    request = MembershipRequest.objects.create(
+        makerspace=makerspace,
+        user=member,
+        kind=MembershipRequest.Kind.REQUEST,
+        state=MembershipRequest.State.REVOKED,
+    )
     uninstall_module(makerspace, "membership")
 
     purge_module(makerspace, "membership", superadmin("membership-admin"))
 
     membership.refresh_from_db()
     assert MakerspaceMembership.objects.filter(pk=membership.pk).exists()
-    assert membership.accepted_waiver_id is None
-    assert membership.waiver_accepted_at is None
-    assert membership.waiver_version_accepted is None
-    assert not MakerspaceWaiver.objects.filter(makerspace=makerspace).exists()
+    assert membership.accepted_waiver_id == waiver.id
+    assert membership.waiver_accepted_at is not None
+    assert membership.waiver_version_accepted == "1"
+    assert MakerspaceWaiver.objects.filter(pk=waiver.pk).exists()
+    assert not MemberProfile.objects.filter(pk=profile.pk).exists()
+    assert not MemberProject.objects.filter(pk=project.pk).exists()
+    assert not MembershipRequest.objects.filter(pk=request.pk).exists()
 
 
 def test_purging_machine_service_keeps_machines_module_data():

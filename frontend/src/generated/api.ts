@@ -271,6 +271,7 @@ export const openApiPaths = [
   "/api/v1/admin/memberships/{id}/role",
   "/api/v1/admin/memberships/{id}/unverify",
   "/api/v1/admin/memberships/{id}/verify",
+  "/api/v1/admin/memberships/{id}/waiver/witness",
   "/api/v1/admin/platform/email-settings",
   "/api/v1/admin/platform/payment-settings",
   "/api/v1/admin/platform/social-auth-settings",
@@ -468,6 +469,7 @@ export type AdminMembership = {
   "waiver_accepted_at"?: string | null;
   "waiver_version_accepted"?: string | null;
   "waiver_current": boolean;
+  "waiver_required": boolean;
   "payment": StaffPaymentSummary | null;
 };
 
@@ -1166,6 +1168,7 @@ export type DirectLoanItem = {
 };
 
 export type DirectLoanMember = {
+  "membership_id": number;
   "user_id": number;
   "display_name": string;
   "username": string;
@@ -2536,6 +2539,12 @@ export type MemberSignUp = {
 
 export type MemberVerificationAck = {
   "detail": string;
+};
+
+export type MemberWaiverResponse = {
+  "has_waiver": boolean;
+  "body"?: string;
+  "version"?: string;
 };
 
 export type MethodEnum = "PUT";
@@ -5020,6 +5029,13 @@ export type WarrantyUpsert = {
   "warranty_expires_on"?: string | null;
   "vendor_name"?: string;
   "vendor_contact"?: string;
+};
+
+export type WitnessWaiverResponse = {
+  "membership_id": number;
+  "waiver_id": number;
+  "waiver_version": string;
+  "witnessed_at": string;
 };
 
 export class MakerspaceApiClient {

@@ -16,9 +16,11 @@ from apps.makerspaces.models import Makerspace, MakerspaceMembership, Makerspace
 from apps.makerspaces.serializers_memberships import (
     MembershipOutcomeSerializer,
     MembershipRequestCreateSerializer,
+    MemberWaiverResponseSerializer,
     MyMembershipsSerializer,
 )
 from apps.makerspaces.waiver_services import accept_waiver
+from apps.makerspaces.waiver_state import acceptance_on_file, current_acceptance
 
 ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer, 409: ErrorSerializer, 429: ErrorSerializer}
 
@@ -73,8 +75,8 @@ class MyMembershipsView(APIView):
                          "can_verify": membership.can_verify,
                          "verified_at": membership.verified_at,
                          "referrals_enabled": membership.makerspace.referrals_enabled,
-                         "waiver_accepted": bool(membership.waiver_accepted_at),
-                         "waiver_acceptance_required": bool(active and membership.waiver_version_accepted != active.version)})
+                         "waiver_accepted": acceptance_on_file(membership),
+                         "waiver_acceptance_required": bool(active and not current_acceptance(membership, active_waiver=active))})
         return Response({"memberships": rows, "requests": [
             {"makerspace": {"slug": item.makerspace.slug, "name": item.makerspace.name}, "state": item.state, "kind": item.kind}
             for item in requests
@@ -84,12 +86,14 @@ class MyMembershipsView(APIView):
 class MemberWaiverView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Memberships"], responses={200: ErrorSerializer, **ERRORS})
+    @extend_schema(
+        tags=["Memberships"],
+        responses={200: MemberWaiverResponseSerializer, **ERRORS},
+    )
     def get(self, request, makerspace_id):
         if not active_user(request.user):
             raise PermissionDenied()
         membership = _membership(request.user, makerspace_id)
-        require_module(membership.makerspace, "membership")
         waiver = MakerspaceWaiver.objects.filter(makerspace_id=makerspace_id, is_active=True).first()
         if waiver is None:
             return Response({"has_waiver": False})
@@ -104,6 +108,5 @@ class MemberWaiverAcceptView(APIView):
         if not active_user(request.user):
             raise PermissionDenied()
         membership = _membership(request.user, makerspace_id)
-        require_module(membership.makerspace, "membership")
         membership, waiver = accept_waiver(membership)
         return Response({"accepted": waiver is not None, "version": waiver.version if waiver else None})

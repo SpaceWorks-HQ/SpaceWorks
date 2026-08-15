@@ -59,7 +59,9 @@ class AdminMembershipRosterView(APIView):
         pager = self.pagination_class()
         page = pager.paginate_queryset(queryset, request)
         context = {
-            "active_waiver_version": active.version if active else None,
+            # Resolved once for the whole roster. The waiver predicates take it as an
+            # explicit argument precisely so a per-row lookup cannot become an N+1.
+            "active_waiver": active,
             **scoped_payment_context(
                 request.user,
                 rbac.Action.MANAGE_MAKERSPACE,

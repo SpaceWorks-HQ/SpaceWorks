@@ -107,6 +107,7 @@ from apps.admin_api.views_memberships import (
     MembershipRoleAssignView,
 )
 from apps.admin_api.views_walk_in import WalkInMemberCreateView
+from apps.admin_api.views_waiver_witness import AdminWitnessWaiverAcceptanceView
 from apps.admin_api.views_member_memberships import (
     AdminInvitationView, AdminMembershipRequestListView, AdminMembershipRevokeM2View,
     AdminMembershipRoleM2View, AdminMembershipRosterView, AdminRequestApproveView,
@@ -189,6 +190,7 @@ urlpatterns = [
     path("memberships/<int:pk>/capabilities", AdminMembershipCapabilitiesView.as_view(), name="admin-membership-capabilities"),
     path("memberships/<int:pk>/verify", AdminMembershipVerifyView.as_view(), name="admin-membership-verify"),
     path("memberships/<int:pk>/unverify", AdminMembershipUnverifyView.as_view(), name="admin-membership-unverify"),
+    path("memberships/<int:pk>/waiver/witness", AdminWitnessWaiverAcceptanceView.as_view(), name="admin-membership-waiver-witness"),
     path("makerspaces/<int:makerspace_id>/waiver", AdminWaiverView.as_view(), name="admin-makerspace-waiver"),
     path("makerspace/<int:makerspace_id>/machine-service-report", MakerspaceMachineServiceReportView.as_view(), name="admin-makerspace-machine-service-report"),
     path("machine-service-report", SuperadminMachineServiceReportView.as_view(), name="admin-machine-service-report"),

@@ -24,7 +24,7 @@ type ProductOption = {
 };
 type ContainerOption = { id: number; label: string };
 type ContainerResponse = ContainerOption[] | { results: ContainerOption[] };
-type DirectLoanMember = { user_id: number; display_name: string; username: string };
+type DirectLoanMember = { membership_id: number; user_id: number; display_name: string; username: string };
 type DirectLoanMemberResponse = DirectLoanMember[] | { results: DirectLoanMember[] };
 type LineDraft = { key: number; productId: string; quantity: string };
 type ScannedPayload = { payload: string; label: string };
@@ -93,6 +93,9 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
   const memberOptions = Array.isArray(members.data)
     ? members.data
     : members.data?.results ?? [];
+  const selectedMember = memberOptions.find(
+    (member) => String(member.user_id) === borrowerId,
+  );
   const containerOptions = Array.isArray(containers.data)
     ? containers.data
     : containers.data?.results ?? [];
@@ -134,6 +137,18 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
       setIssueRemark("Issued from direct handout.");
       setIssueUploadKey((key) => key + 1);
     },
+  });
+  const witnessWaiver = useMutation({
+    mutationFn: () => {
+      if (!selectedMember) throw new Error("Select a member first.");
+      return staffRequest(
+        `/admin/memberships/${selectedMember.membership_id}/waiver/witness`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+    },
+    onSuccess: () => queryClient.invalidateQueries({
+      queryKey: ["members", makerspace.id],
+    }),
   });
   const pastedQrPayloads = qrPayloads.split("\n").map((value) => value.trim()).filter(Boolean);
   const validManualLines = lineRows.filter((line) => {
@@ -255,7 +270,10 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
           className="desk-input mt-1 w-full"
           value={borrowerId}
           disabled={members.isLoading}
-          onChange={(event) => setBorrowerId(event.target.value)}
+          onChange={(event) => {
+            setBorrowerId(event.target.value);
+            witnessWaiver.reset();
+          }}
         >
           <option value="">Select an active member</option>
           {memberOptions.map((member) => (
@@ -265,6 +283,18 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
           ))}
         </select>
         {members.error ? <p className="mt-2 text-sm text-danger">{members.error.message}</p> : null}
+        {selectedMember ? (
+          <button
+            className="desk-button mt-2"
+            type="button"
+            disabled={witnessWaiver.isPending}
+            onClick={() => witnessWaiver.mutate()}
+          >
+            Record witnessed waiver acceptance
+          </button>
+        ) : null}
+        {witnessWaiver.isSuccess ? <p className="mt-2 text-sm text-success-ink">Waiver acceptance recorded.</p> : null}
+        {witnessWaiver.error ? <p className="mt-2 text-sm text-danger">{witnessWaiver.error.message}</p> : null}
         <WalkInMemberForm
           makerspaceId={makerspace.id}
           onCreated={(userId) => setBorrowerId(String(userId))}

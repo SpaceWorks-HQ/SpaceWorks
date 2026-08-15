@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field, inline_serializer
 
-from apps.makerspaces.models import MakerspaceMembership, MembershipRequest
 from apps.admin_api.serializers_payment_summary import PaymentSummaryMixin
+from apps.makerspaces.models import MakerspaceMembership, MembershipRequest
+from apps.makerspaces.waiver_state import active_waiver_for, current_acceptance
 
 
 class RoleIdSerializer(serializers.Serializer):
@@ -17,15 +18,32 @@ class RevokeSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True)
 
 
+class WitnessWaiverRequestSerializer(serializers.Serializer):
+    def to_internal_value(self, data):
+        if not isinstance(data, dict) or data:
+            raise serializers.ValidationError(
+                {"detail": "This endpoint does not accept request fields."}
+            )
+        return {}
+
+
+class WitnessWaiverResponseSerializer(serializers.Serializer):
+    membership_id = serializers.IntegerField()
+    waiver_id = serializers.IntegerField()
+    waiver_version = serializers.CharField()
+    witnessed_at = serializers.DateTimeField()
+
+
 class AdminMembershipSerializer(PaymentSummaryMixin, serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     payment = serializers.SerializerMethodField()
     assigned_role = serializers.SerializerMethodField()
     waiver_current = serializers.SerializerMethodField()
+    waiver_required = serializers.SerializerMethodField()
 
     class Meta:
         model = MakerspaceMembership
-        fields = ("id", "status", "user", "assigned_role", "can_refer", "can_verify", "verified_at", "activated_at", "revoked_at", "revocation_reason", "waiver_accepted_at", "waiver_version_accepted", "waiver_current", "payment")
+        fields = ("id", "status", "user", "assigned_role", "can_refer", "can_verify", "verified_at", "activated_at", "revoked_at", "revocation_reason", "waiver_accepted_at", "waiver_version_accepted", "waiver_current", "waiver_required", "payment")
 
     @extend_schema_field(inline_serializer("AdminMembershipUser", {
         "id": serializers.IntegerField(),
@@ -46,10 +64,26 @@ class AdminMembershipSerializer(PaymentSummaryMixin, serializers.ModelSerializer
             return None
         return {"id": obj.assigned_role_id, "name": obj.assigned_role.name, "slug": obj.assigned_role.slug}
 
+    def _active_waiver(self, obj):
+        # Resolved once per serializer instance, per makerspace: a roster is one
+        # response, and caching on the membership rows instead would let a superseded
+        # waiver keep reading as current.
+        if "active_waiver" in self.context:
+            return self.context["active_waiver"]
+        cache = getattr(self, "_active_waiver_cache", None)
+        if cache is None:
+            cache = self._active_waiver_cache = {}
+        if obj.makerspace_id not in cache:
+            cache[obj.makerspace_id] = active_waiver_for(obj.makerspace_id)
+        return cache[obj.makerspace_id]
+
     @extend_schema_field(serializers.BooleanField())
     def get_waiver_current(self, obj):
-        version = self.context.get("active_waiver_version")
-        return bool(version and obj.waiver_version_accepted == version)
+        return current_acceptance(obj, active_waiver=self._active_waiver(obj))
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_waiver_required(self, obj):
+        return self._active_waiver(obj) is not None
 
 
 class MembershipCapabilitiesSerializer(serializers.Serializer):

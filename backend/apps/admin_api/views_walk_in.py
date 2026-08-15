@@ -7,8 +7,8 @@ makerspace-wide action instead would mean the person who cannot complete a hando
 without it has to call a manager to create the borrower first.
 
 Deliberately **not** gated by a module. See `makerspaces.walk_in_services` for why: this
-is the identity path an accounts-off deployment runs on, and `membership` requires
-`accounts`.
+is the identity path an accounts-off deployment runs on, while person records and staff
+RBAC remain core regardless of self-service enrolment settings.
 """
 
 from drf_spectacular.utils import extend_schema

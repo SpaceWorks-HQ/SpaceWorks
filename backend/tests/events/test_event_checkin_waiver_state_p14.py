@@ -118,6 +118,28 @@ def test_a_superseded_acceptance_still_counts():
     assert response.data["host_waiver_state"] == "on_file"
 
 
+def test_a_superseded_witnessed_acceptance_still_counts():
+    from django.utils import timezone
+    from apps.makerspaces.models import MakerspaceMembership
+
+    space = make_space()
+    old = waiver(space, version="v1", active=False)
+    waiver(space, version="v2")
+    event = make_event(space)
+    member = make_member(space)
+    staff = make_staff(space, "waiver-witness")
+    MakerspaceMembership.objects.filter(makerspace=space, user=member).update(
+        witnessed_waiver=old,
+        witnessed_waiver_version=old.version,
+        witnessed_by=staff,
+        witnessed_at=timezone.now(),
+    )
+
+    response = resolve(space, event, register(event, member))
+
+    assert response.data["host_waiver_state"] == "on_file"
+
+
 def test_a_registration_stamped_acceptance_is_on_file():
     space = make_space()
     wv = waiver(space)

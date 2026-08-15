@@ -239,8 +239,8 @@ def test_membership_payment_uses_the_registered_membership_module():
     from apps.makerspaces.models import Makerspace
     from apps.makerspaces.platform import feature_enabled
 
-    # `membership` requires `accounts` from phase 3: the community layer presupposes a
-    # member account to attach to.
+    # Membership dues require the community and payments modules. Identity may come
+    # from external OIDC, so built-in member accounts are independent.
     makerspace = Makerspace(
         name="No membership", slug="no-membership",
         enabled_modules=["membership", "accounts", "payments"],
@@ -254,11 +254,11 @@ def test_membership_payment_uses_the_registered_membership_module():
     assert modules == sorted(core_module_keys() | {"membership", "accounts", "payments"})
 
 
-def test_membership_without_member_accounts_is_refused():
-    # The lean install is Inventory + Machines with the space's own login; the community
-    # layer is what needs accounts, and asking for it without them is a contradiction.
-    with pytest.raises(ValidationError, match="requires member accounts"):
-        validate_capabilities(["membership"], [])
+def test_membership_without_builtin_member_accounts_is_valid():
+    modules, features = validate_capabilities(["membership"], [])
+
+    assert modules == sorted(core_module_keys() | {"membership"})
+    assert features == []
 
 
 def test_frontend_feature_definitions_match_the_backend():

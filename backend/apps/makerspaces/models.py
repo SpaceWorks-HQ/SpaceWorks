@@ -399,6 +399,17 @@ class MakerspaceMembership(models.Model):
         "makerspaces.MakerspaceWaiver", null=True, blank=True, on_delete=models.PROTECT,
         related_name="accepted_by_memberships",
     )
+    witnessed_waiver = models.ForeignKey(
+        "makerspaces.MakerspaceWaiver", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="witnessed_by_memberships",
+    )
+    witnessed_waiver_version = models.CharField(max_length=64, null=True, blank=True)
+    witnessed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="witnessed_waiver_acceptances",
+    )
+    witnessed_actor_snapshot = models.JSONField(null=True, blank=True)
+    witnessed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -415,6 +426,27 @@ class MakerspaceMembership(models.Model):
                         accepted_waiver__isnull=False)
                 ),
                 name="membership_waiver_acceptance_all_or_none",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        witnessed_waiver__isnull=True,
+                        witnessed_waiver_version__isnull=True,
+                        witnessed_by__isnull=True,
+                        witnessed_actor_snapshot__isnull=True,
+                        witnessed_at__isnull=True,
+                    )
+                    | Q(
+                        witnessed_waiver__isnull=False,
+                        witnessed_waiver_version__isnull=False,
+                        witnessed_at__isnull=False,
+                    )
+                    & (
+                        Q(witnessed_by__isnull=False)
+                        | Q(witnessed_actor_snapshot__isnull=False)
+                    )
+                ),
+                name="membership_witnessed_waiver_all_or_none",
             ),
         ]
 
@@ -439,6 +471,13 @@ class MakerspaceMembership(models.Model):
             and self.accepted_waiver.makerspace_id != self.makerspace_id
         ):
             raise ValidationError({"accepted_waiver": "Waiver must belong to the same makerspace."})
+        if (
+            self.witnessed_waiver_id and self.makerspace_id
+            and self.witnessed_waiver.makerspace_id != self.makerspace_id
+        ):
+            raise ValidationError(
+                {"witnessed_waiver": "Waiver must belong to the same makerspace."}
+            )
 
     def __str__(self):
         return f"{self.user} @ {self.makerspace.slug} ({self.role})"

@@ -1,10 +1,9 @@
 """Staff-created person records for people who will never hold an account.
 
 This is the identity path an accounts-off deployment runs on, and it is deliberately
-**not** gated by any module. `membership` requires `accounts`, so gating walk-ins by
-either would remove the substitute at the same moment it removes the thing being
-substituted -- and a person record is core RBAC state either way, the same reasoning
-that keeps the staff roster ungated (plan A7). It stays available with `accounts` on
+**not** gated by any module. A person record is core RBAC state, the same reasoning
+that keeps the staff roster ungated (plan A7), while `accounts` now means self-service
+enrolment rather than identity itself. This path stays available with `accounts` on
 too: a space that runs member accounts still has walk-ins at the counter.
 
 The record is a real `User` with an **unusable password** and no verified email, which
@@ -45,6 +44,11 @@ def create_walk_in_member(actor, makerspace, *, display_name, email="", phone=""
         membership = _activate_membership(
             actor, makerspace, user, _member_role(makerspace), source="walk_in"
         )
+        # Referral invitations auto-activate. A staff-created bearer identity must not
+        # inherit that delegation from the model's historical default.
+        if membership.can_refer:
+            membership.can_refer = False
+            membership.save(update_fields=["can_refer"])
         audit.record(
             actor,
             "member.walk_in_created",

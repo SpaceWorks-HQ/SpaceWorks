@@ -66,6 +66,12 @@ class MyMembershipsSerializer(serializers.Serializer):
     requests = MyMembershipRequestSerializer(many=True)
 
 
+class MemberWaiverResponseSerializer(serializers.Serializer):
+    has_waiver = serializers.BooleanField()
+    body = serializers.CharField(required=False)
+    version = serializers.CharField(required=False)
+
+
 class WaiverPublishSerializer(serializers.Serializer):
     body = serializers.CharField(required=False, allow_blank=True)
     version = serializers.CharField(required=False, allow_blank=True, max_length=64)

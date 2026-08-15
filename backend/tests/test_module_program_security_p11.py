@@ -69,6 +69,7 @@ def test_a_walk_in_record_grants_no_authority_anywhere():
     assert membership.user.is_staff is False
     assert membership.user.is_superuser is False
     assert membership.user.role == User.Role.REQUESTER
+    assert membership.can_refer is False
 
 
 def test_a_walk_in_record_cannot_be_signed_into():

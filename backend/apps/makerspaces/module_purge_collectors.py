@@ -183,36 +183,19 @@ def membership_public_image_keys(makerspace):
 
 
 def membership_delete(makerspace, cursor):
-    from apps.events.models import EventRegistration
-    from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver, MembershipRequest
-    from apps.makerspaces.models import MemberProfile
+    from apps.makerspaces.models import MemberProfile, MembershipRequest
 
     # `MakerspaceMembership` itself is core RBAC state and is NEVER deleted here -- the
-    # module gates the community feature, not the roster (plan A7). But a membership
-    # and a visiting registration can carry waiver acceptance under all-or-none check
-    # constraints, so each set of three fields must be cleared *together* before the
-    # waivers they point at go, or a constraint fires mid-purge.
-    cleared = MakerspaceMembership.objects.filter(
-        makerspace=makerspace, accepted_waiver__isnull=False
-    ).update(accepted_waiver=None, waiver_accepted_at=None, waiver_version_accepted=None)
-    event_cleared = EventRegistration.objects.filter(
-        host_waiver__makerspace=makerspace,
-    ).update(
-        host_waiver=None,
-        host_waiver_accepted_at=None,
-        host_waiver_version_accepted=None,
-    )
+    # module gates community enrolment/content, not the roster (plan A7). Waivers and
+    # both acceptance evidence types are core liability records and likewise survive.
     # Profiles go even though the membership stays: a profile is community content the
     # module owns, not the RBAC state the module deliberately leaves behind. Projects
     # cascade from the profile.
     profiles = MemberProfile.objects.filter(membership__makerspace=makerspace).delete()[0]
     requests = MembershipRequest.objects.filter(makerspace=makerspace).delete()[0]
-    waivers = MakerspaceWaiver.objects.filter(makerspace=makerspace).delete()[0]
     return _counts(
-        waiver_acceptances_cleared=cleared,
-        event_waiver_acceptances_cleared=event_cleared,
         member_profiles=profiles,
-        membership_requests=requests, waivers=waivers,
+        membership_requests=requests,
     )
 
 

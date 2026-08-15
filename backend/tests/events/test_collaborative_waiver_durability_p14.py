@@ -48,13 +48,7 @@ def setup_pair(host_waiver_version=None):
 # --- the PROTECT FK must not break either purge --------------------------------------
 
 
-def test_the_membership_module_purge_is_not_blocked_by_a_held_waiver():
-    """A new PROTECT FK is exactly how a break-glass path stops working unnoticed.
-
-    `membership_delete` clears the MEMBERSHIP's three acceptance fields before deleting
-    waivers. A registration holding the same waiver has to be cleared in the same step, or
-    the module purge raises ProtectedError and the operator cannot purge at all.
-    """
+def test_the_membership_module_purge_keeps_visitor_waiver_evidence():
     from django.db import connection
     from apps.makerspaces.module_purge_collectors import membership_delete
 
@@ -71,19 +65,13 @@ def test_the_membership_module_purge_is_not_blocked_by_a_held_waiver():
         membership_delete(host, cursor)
 
     registration.refresh_from_db()
-    assert registration.host_waiver_id is None
-    assert registration.host_waiver_accepted_at is None
-    assert registration.host_waiver_version_accepted is None
-    assert not MakerspaceWaiver.objects.filter(pk=waiver.pk).exists()
+    assert registration.host_waiver_id == waiver.pk
+    assert registration.host_waiver_accepted_at is not None
+    assert registration.host_waiver_version_accepted == "v1"
+    assert MakerspaceWaiver.objects.filter(pk=waiver.pk).exists()
 
 
-def test_a_registration_hosted_elsewhere_does_not_block_a_full_purge():
-    """The registration lives under host A while the waiver belongs to the purged space.
-
-    `lifecycle.purge` only deletes registrations hosted BY the space being purged, so a
-    partner-hosted registration holding this space's waiver would survive into the final
-    cascade and raise ProtectedError there.
-    """
+def test_membership_module_purge_keeps_cross_tenant_waiver_evidence():
     from django.db import connection
 
     host, partner, event, member, waiver = setup_pair("v1")
@@ -95,7 +83,6 @@ def test_a_registration_hosted_elsewhere_does_not_block_a_full_purge():
     registration = EventRegistration.objects.get(event=event, member=member)
     assert registration.host_waiver_id == waiver.pk
 
-    # Only the clearing step matters here; the full purge is exercised by its own suite.
     with connection.cursor() as cursor:
         from apps.makerspaces.module_purge_collectors import membership_delete
 
@@ -103,7 +90,7 @@ def test_a_registration_hosted_elsewhere_does_not_block_a_full_purge():
 
     registration.refresh_from_db()
     assert registration.event.makerspace_id == host.pk
-    assert registration.host_waiver_id is None
+    assert registration.host_waiver_id == waiver.pk
 
 
 def test_the_acceptance_is_audited_with_the_version_but_never_the_body():

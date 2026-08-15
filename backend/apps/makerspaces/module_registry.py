@@ -231,13 +231,12 @@ MODULES = (
         "maintenance", "Maintenance", "Maintenance schedules and work orders.",
         "maintenance", GUARD, group=GROUP_MACHINES, frontend_workflows=("maintenance",),
     ),
-    # Requires `accounts`: join requests, waivers, referrals and verification all
-    # presuppose a member account, so the community layer unlocks only once member
-    # accounts exist. Staff membership rows are core RBAC and are not this key.
+    # Community enrolment/content. Identity may instead come from external OIDC or a
+    # staff-created person record, so this deliberately does not depend on `accounts`.
     ModuleDefinition(
-        "membership", "Membership", "Community membership, waivers and referrals.",
+        "membership", "Membership",
+        "Join requests, referrals, verification, profiles, directory and member activity.",
         "makerspaces", FEATURE_PARENT, group=GROUP_MEMBERSHIP,
-        requires_modules=("accounts",),
     ),
     # Enforced by apps/notifications, but historically absent from the defaults list --
     # which is why the /control/ matrix (choices = defaults + keys already on the row)
@@ -291,8 +290,8 @@ MODULES = (
     # same reasoning that keeps the staff roster ungated by `membership` (plan A7).
     ModuleDefinition(
         "accounts", "Member accounts",
-        "Member self sign-up, social and phone login, and the member area. Staff sign-in "
-        "is core and unaffected.",
+        "Member self-service enrolment and built-in password, social and phone login. "
+        "Staff sign-in, external identity and member-domain APIs are unaffected.",
         "accounts", GUARD, group=GROUP_ACCOUNTS, default_enabled=True,
     ),
     # Requires `accounts` because a device grant is bound to a user: without member

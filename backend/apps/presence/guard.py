@@ -4,6 +4,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
+from apps.makerspaces.waiver_state import current_acceptance
 from apps.presence.models import PresenceSession
 from apps.separability.registry import runtime_active
 
@@ -62,10 +63,7 @@ def require_active_member(user, makerspace):
     waiver = MakerspaceWaiver.objects.filter(
         makerspace=makerspace, is_active=True
     ).first()
-    if waiver and (
-        membership.accepted_waiver_id != waiver.id
-        or membership.waiver_version_accepted != waiver.version
-    ):
+    if waiver and not current_acceptance(membership, active_waiver=waiver):
         raise WaiverAcceptanceRequired()
     return ActiveMemberPresence(membership, waiver, None)
 

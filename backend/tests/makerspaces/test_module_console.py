@@ -93,7 +93,7 @@ def test_a_card_says_what_installing_would_also_switch_on(client, space, superad
     }
     # A dependency resolved silently is a capability the operator did not choose.
     assert modules["printing"]["pulls_in"] == ["machine_service"]
-    assert modules["membership"]["pulls_in"] == ["accounts"]
+    assert modules["membership"]["pulls_in"] == []
     assert modules["reports"]["pulls_in"] == []
 
 
@@ -108,7 +108,7 @@ def test_a_card_says_what_blocks_uninstalling_it(client, space, superadmin):
         for module in group["modules"]
     }
     assert modules["machine_service"]["required_by"] == ["printing"]
-    assert modules["accounts"]["required_by"] == ["membership", "mobile"]
+    assert modules["accounts"]["required_by"] == ["mobile"]
 
 
 def test_the_inventory_group_is_reported_as_always_on(client, space, superadmin):

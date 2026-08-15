@@ -13,7 +13,12 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.makerspaces import membership_services
-from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
+from apps.makerspaces.models import (
+    Makerspace,
+    MakerspaceMembership,
+    MakerspaceRole,
+    MakerspaceWaiver,
+)
 from apps.makerspaces.module_install import install_module, uninstall_module
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -129,21 +134,35 @@ def test_verify_and_unverify_are_gated():
         assert "module" in response.data
 
 
-def test_member_waiver_and_activity_are_gated():
+def test_member_waiver_read_and_accept_are_core_but_community_surfaces_stay_gated():
     off = space("waiver-off", membership_enabled=False)
     member = user("waiver-member")
-    MakerspaceMembership.objects.create(
+    membership = MakerspaceMembership.objects.create(
         makerspace=off, user=member, assigned_role=role(off, "member"), status="active",
+    )
+    waiver_record = MakerspaceWaiver.objects.create(
+        makerspace=off, version="v1", body="Mind the laser.", is_active=True,
     )
     client = client_for(member)
 
     waiver = client.get(reverse("member-waiver", kwargs={"makerspace_id": off.id}))
     accept = client.post(reverse("member-waiver-accept", kwargs={"makerspace_id": off.id}))
     activity = client.get(reverse("member-activity", kwargs={"makerspace_id": off.id}))
+    profile = client.get(reverse("member-profile", kwargs={"makerspace_id": off.id}))
+    directory = client.get(reverse("member-directory", kwargs={"makerspace_id": off.id}))
 
-    assert waiver.status_code == 400
-    assert accept.status_code == 400
+    assert waiver.status_code == 200
+    assert waiver.data == {
+        "has_waiver": True,
+        "body": waiver_record.body,
+        "version": waiver_record.version,
+    }
+    assert accept.status_code == 200
+    membership.refresh_from_db()
+    assert membership.accepted_waiver_id == waiver_record.id
     assert activity.status_code == 400
+    assert profile.status_code == 400
+    assert directory.status_code == 400
 
 
 # --- core RBAC state is NEVER gated -----------------------------------------

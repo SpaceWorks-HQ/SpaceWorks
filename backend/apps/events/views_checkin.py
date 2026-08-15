@@ -24,6 +24,7 @@ from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.member_activity_service import active_membership
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
+from apps.makerspaces.waiver_state import acceptance_on_file_q
 from apps.payments.models import Payment
 from apps.presence.guard import MemberPresenceRequired
 
@@ -55,8 +56,7 @@ def host_waiver_state(registration):
     if registration.member_id and MakerspaceMembership.objects.filter(
         user_id=registration.member_id,
         makerspace_id=registration.event.makerspace_id,
-        accepted_waiver_id__isnull=False,
-    ).exists():
+    ).filter(acceptance_on_file_q()).exists():
         return "on_file"
 
     return "missing"

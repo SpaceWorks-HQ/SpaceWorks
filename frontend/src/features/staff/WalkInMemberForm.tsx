@@ -9,8 +9,7 @@ type WalkInMember = { user_id: number; display_name: string; username: string };
  * Name the person at the counter so a handout can be recorded against them.
  *
  * This is the identity path a deployment running without member accounts lives on, so
- * it sits inside the handout flow rather than behind the members tab: the `membership`
- * module requires `accounts`, and the tab goes with it.
+ * it sits inside the handout flow rather than relying on self-service enrolment.
  *
  * Collapsed by default. The normal case is picking an existing member, and an always-open
  * creation form next to a dropdown invites creating a duplicate of the person already in it.

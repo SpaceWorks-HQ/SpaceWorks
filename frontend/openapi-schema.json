@@ -18410,6 +18410,91 @@
                 }
             }
         },
+        "/api/v1/admin/memberships/{id}/waiver/witness": {
+            "post": {
+                "operationId": "api_v1_admin_memberships_waiver_witness_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WitnessWaiverResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/admin/platform/email-settings": {
             "get": {
                 "operationId": "api_v1_admin_platform_email_settings_retrieve",
@@ -25146,7 +25231,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                    "$ref": "#/components/schemas/MemberWaiverResponse"
                                 }
                             }
                         },
@@ -29155,6 +29240,10 @@
                         "type": "boolean",
                         "readOnly": true
                     },
+                    "waiver_required": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "payment": {
                         "allOf": [
                             {
@@ -29170,7 +29259,8 @@
                     "id",
                     "payment",
                     "user",
-                    "waiver_current"
+                    "waiver_current",
+                    "waiver_required"
                 ]
             },
             "AdminMembershipRole": {
@@ -32056,6 +32146,10 @@
             "DirectLoanMember": {
                 "type": "object",
                 "properties": {
+                    "membership_id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "user_id": {
                         "type": "integer",
                         "readOnly": true
@@ -32071,6 +32165,7 @@
                 },
                 "required": [
                     "display_name",
+                    "membership_id",
                     "user_id",
                     "username"
                 ]
@@ -37471,6 +37566,23 @@
                 },
                 "required": [
                     "detail"
+                ]
+            },
+            "MemberWaiverResponse": {
+                "type": "object",
+                "properties": {
+                    "has_waiver": {
+                        "type": "boolean"
+                    },
+                    "body": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "has_waiver"
                 ]
             },
             "MembershipCreate": {
@@ -47466,6 +47578,30 @@
                         "maxLength": 200
                     }
                 }
+            },
+            "WitnessWaiverResponse": {
+                "type": "object",
+                "properties": {
+                    "membership_id": {
+                        "type": "integer"
+                    },
+                    "waiver_id": {
+                        "type": "integer"
+                    },
+                    "waiver_version": {
+                        "type": "string"
+                    },
+                    "witnessed_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "membership_id",
+                    "waiver_id",
+                    "waiver_version",
+                    "witnessed_at"
+                ]
             }
         },
         "securitySchemes": {
