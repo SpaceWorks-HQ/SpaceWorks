@@ -8,7 +8,7 @@ import pytest
 from datetime import timedelta
 from django.utils import timezone
 
-from apps.accounts.models import EmailVerificationChallenge, User
+from apps.accounts.models import EmailVerificationChallenge, PasswordResetEnvelope, User
 from apps.accounts.models_phone import PhoneChallengePurpose, PhoneVerificationChallenge
 from apps.accounts.services_challenge_purge import RETENTION, purge_spent_challenges
 from tests.return_helpers import make_user
@@ -51,6 +51,17 @@ def email_challenge(owner, *, age, **kwargs):
         created_at=timezone.now() - age
     )
     return row
+
+
+def reset_envelope(*, requested_at, terminal_at=None, status="pending"):
+    return PasswordResetEnvelope.objects.create(
+        email_normalized="queued@example.org",
+        email_fingerprint="f" * 64,
+        digest="d" * 64,
+        status=status,
+        requested_at=requested_at,
+        terminal_at=terminal_at,
+    )
 
 
 def test_a_live_challenge_is_never_deleted_however_old():
@@ -106,8 +117,50 @@ def test_both_tables_are_covered_independently():
     deleted = purge_spent_challenges()
     assert set(deleted) == {
         "accounts.EmailVerificationChallenge",
+        "accounts.PasswordResetEnvelope",
         "accounts.PhoneVerificationChallenge",
     }
+
+
+def test_stranded_pending_envelope_ages_from_requested_at():
+    reset_envelope(requested_at=timezone.now() - OLD)
+
+    purge_spent_challenges()
+
+    assert PasswordResetEnvelope.objects.count() == 0
+
+
+def test_terminal_envelope_ages_from_terminal_at():
+    reset_envelope(
+        requested_at=timezone.now(),
+        terminal_at=timezone.now() - OLD,
+        status="discarded",
+    )
+
+    purge_spent_challenges()
+
+    assert PasswordResetEnvelope.objects.count() == 0
+
+
+def test_recent_terminal_and_live_envelopes_are_retained():
+    reset_envelope(
+        requested_at=timezone.now() - OLD,
+        terminal_at=timezone.now() - timedelta(days=1),
+        status="discarded",
+    )
+    PasswordResetEnvelope.objects.create(
+        email_normalized="live@example.org",
+        email_fingerprint="a" * 64,
+        digest="b" * 64,
+        status="issued",
+        requested_at=timezone.now(),
+        expires_at=timezone.now() + timedelta(minutes=5),
+        digest_is_live=True,
+    )
+
+    purge_spent_challenges()
+
+    assert PasswordResetEnvelope.objects.count() == 2
 
 
 def test_the_task_is_registered_on_the_beat_schedule():

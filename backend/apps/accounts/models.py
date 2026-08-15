@@ -209,6 +209,10 @@ from apps.accounts.models_phone import (  # noqa: E402
     PhoneChallengePurpose,
     PhoneVerificationChallenge,
 )
+from apps.accounts.models_password_reset import (  # noqa: E402
+    PasswordResetEnvelope,
+    PasswordResetEnvelopeStatus,
+)
 from apps.accounts.models_social import (  # noqa: E402
     PlatformSocialAuthSettings,
     SocialClientPlatform,
@@ -230,6 +234,8 @@ __all__ = [
     'EmailVerificationChallenge',
     'PhoneChallengePurpose',
     'PhoneVerificationChallenge',
+    'PasswordResetEnvelope',
+    'PasswordResetEnvelopeStatus',
     'PlatformLoginMethods',
     'PlatformSocialAuthSettings',
     'SocialClientPlatform',
