@@ -13,6 +13,7 @@ from apps.payments.models import (
     PlatformStripeConnectSettings,
 )
 from apps.payments.resolution import resolve_payment_source, source_for_payment
+from apps.payments.services_checkout_audit import record_checkout_created
 from apps.payments.subjects import resolve_subject_labels, subject_label
 from apps.payments.services_webhooks import (
     apply_connect_webhook_event,
@@ -84,20 +85,22 @@ def create_payment(
 
 def create_checkout(payment):
     """Schedule checkout creation; Stripe failure is deliberately never caller-visible."""
-    transaction.on_commit(lambda: _create_checkout_safely(payment.pk))
+    transaction.on_commit(
+        lambda: _create_checkout_safely(payment.pk, actor=payment.created_by)
+    )
 
 
-def _create_checkout_safely(payment_id):
+def _create_checkout_safely(payment_id, *, actor=None):
     try:
-        create_checkout_url(payment_id)
+        create_checkout_url(payment_id, actor=actor)
     except Exception:
         logger.exception("payment_checkout_creation_failed", extra={"payment_id": payment_id})
 
 
-def create_checkout_url(payment_id):
+def create_checkout_url(payment_id, *, actor=None):
     """Create and persist a pending payment's Checkout URL exactly once."""
     try:
-        return _create_checkout_url_atomic(payment_id)
+        return _create_checkout_url_atomic(payment_id, actor=actor)
     except _ConnectAccountCannotCharge as exc:
         merchant = MakerspacePaymentSettings.objects.get(pk=exc.merchant_id)
         restrict_account_status(merchant)
@@ -106,7 +109,7 @@ def create_checkout_url(payment_id):
         ) from None
 
 
-def _create_checkout_url_atomic(payment_id):
+def _create_checkout_url_atomic(payment_id, *, actor=None):
     payment_snapshot = Payment.objects.only(
         "makerspace_id", "stripe_provider"
     ).get(pk=payment_id)
@@ -178,7 +181,11 @@ def _create_checkout_url_atomic(payment_id):
             # Non-Stripe rows go through the provider seam. The Stripe branch below is
             # left untouched on purpose: it is the path taking real money today, and
             # this phase must not change its behaviour to add a second vendor.
-            return _create_checkout_via_provider(payment, source, label, member_url)
+            checkout_url = _create_checkout_via_provider(
+                payment, source, label, member_url
+            )
+            record_checkout_created(payment, actor=actor)
+            return checkout_url
         checkout_params = {
             "mode": "payment",
             "client_reference_id": str(payment.pk),
@@ -218,6 +225,7 @@ def _create_checkout_url_atomic(payment_id):
                 "updated_at",
             ]
         )
+        record_checkout_created(payment, actor=actor)
         return checkout_url
 
 

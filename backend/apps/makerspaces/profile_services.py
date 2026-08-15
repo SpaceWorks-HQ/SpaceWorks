@@ -26,7 +26,12 @@ def display_name_for(membership):
 
 
 def read_profile(membership, *, include_activity=True):
-    profile = profile_for(membership)
+    # Reads must not call the write-side ``profile_for`` helper. An unsaved model
+    # instance gives serializers the model defaults without publishing a row merely
+    # because somebody opened the page.
+    profile = MemberProfile.objects.filter(membership=membership).first()
+    projects = profile.projects.all() if profile is not None else ()
+    profile = profile or MemberProfile(membership=membership)
     payload = {
         "membership_id": membership.pk,
         "display_name": display_name_for(membership),
@@ -49,7 +54,7 @@ def read_profile(membership, *, include_activity=True):
                 "links": project.links or [],
                 "image_url": public_image_storage.public_url(project.image_key) or None,
             }
-            for project in profile.projects.all()
+            for project in projects
         ],
         "activity": profile_activity(membership) if include_activity else {},
     }

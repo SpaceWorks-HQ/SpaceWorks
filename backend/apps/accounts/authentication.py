@@ -3,6 +3,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
+from apps.accounts.claim_routes import CLAIM_REACHABLE_PREFIXES
 from apps.accounts.models import User
 from apps.accounts.models_devices import DeviceGrant, DeviceRefreshFamily
 
@@ -59,14 +60,7 @@ class SpaceWorksJWTScheme(SimpleJWTScheme):
 
 
 def _member_surface_path_allowed(path):
-    return path.startswith(
-        (
-            "/api/v1/auth/",
-            "/api/v1/member/",
-            "/api/v1/memberships/",
-            "/api/v1/public/",
-        )
-    )
+    return path.startswith(CLAIM_REACHABLE_PREFIXES)
 
 
 def _validate_staff_surface(request, token):
