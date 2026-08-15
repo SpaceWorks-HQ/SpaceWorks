@@ -78,6 +78,8 @@ def profile_activity(membership):
         from apps.events.models import EventRegistration
 
         registrations = registrations_for_space(makerspace, membership.user)
+        if getattr(membership.user, "_claim_audit_context", None) is not None:
+            registrations = registrations.filter(event__makerspace=makerspace)
         activity["events_attended"] = registrations.filter(
             status=EventRegistration.Status.ATTENDED
         ).count()

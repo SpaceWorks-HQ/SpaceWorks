@@ -19,6 +19,11 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.accounts import audit_events
+from apps.accounts.claim_sessions import ClaimSessionInvalid
+from apps.accounts.claim_tokens import (
+    ClaimRefreshToken,
+    rotate_claim_refresh,
+)
 from apps.accounts.login_methods import password_login_enabled
 from apps.accounts.auth_cookies import assert_csrf, clear_refresh_cookies, set_refresh_cookies
 from apps.accounts.models import User
@@ -173,6 +178,11 @@ def _refresh_user_is_active(token_str):
 
 def _refresh_surface(token_str):
     try:
+        if ClaimRefreshToken(token_str).get("surface") == "member":
+            return "member"
+    except TokenError:
+        pass
+    try:
         return RefreshToken(token_str).get("surface")
     except TokenError:
         return None
@@ -233,6 +243,30 @@ class RefreshView(TokenRefreshView):
                 None, "auth.refresh_rejected", meta={"reason": "missing_cookie"}
             )
             raise InvalidToken("No refresh cookie.")
+        try:
+            ClaimRefreshToken(cookie)
+        except TokenError:
+            is_claim_refresh = False
+        else:
+            is_claim_refresh = True
+        if is_claim_refresh:
+            try:
+                pair, actor = rotate_claim_refresh(cookie)
+            except (TokenError, ClaimSessionInvalid) as exc:
+                actor = audit_events.user_from_refresh_token(cookie)
+                audit_events.record_auth_event(
+                    actor,
+                    "auth.refresh_rejected",
+                    target=actor,
+                    meta={"reason": "invalid_claim_session"},
+                )
+                raise InvalidToken("Claim session is no longer active.") from exc
+            audit_events.record_auth_event(
+                actor, "auth.refresh_succeeded", target=actor
+            )
+            response = Response({"access": pair.access})
+            set_refresh_cookies(response, pair.refresh, request)
+            return response
         if not _refresh_user_is_active(cookie):  # review fix #5
             actor = audit_events.user_from_refresh_token(cookie)
             audit_events.record_auth_event(
@@ -297,7 +331,11 @@ class LogoutView(APIView):
         actor = audit_events.user_from_refresh_token(cookie)
         if cookie:
             try:
-                RefreshToken(cookie).blacklist()
+                try:
+                    refresh = ClaimRefreshToken(cookie)
+                except TokenError:
+                    refresh = RefreshToken(cookie)
+                refresh.blacklist()
             except TokenError:
                 pass
         audit_events.record_auth_event(

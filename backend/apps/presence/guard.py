@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.accounts.claim_sessions import claim_context
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
 from apps.presence.models import PresenceSession
 from apps.separability.registry import runtime_active
@@ -59,6 +60,9 @@ def require_active_member(user, makerspace):
     ).select_related("accepted_waiver").first()
     if membership is None:
         raise MemberPresenceRequired()
+    context = claim_context(user)
+    if context is not None and membership.pk != context.membership_id:
+        raise MemberPresenceRequired()
     waiver = MakerspaceWaiver.objects.filter(
         makerspace=makerspace, is_active=True
     ).first()
@@ -103,7 +107,14 @@ def require_active_member_presence(user, makerspace):
     session = PresenceSession.objects.filter(
         member=user, makerspace=makerspace, ended_at__isnull=True,
         expires_at__gt=timezone.now(),
-    ).order_by("-started_at", "-id").first()
+    )
+    context = claim_context(user)
+    if context is not None:
+        session = session.filter(
+            created_via_claim_session__session_id=context.session_id,
+            expires_at__lte=context.absolute_expires_at,
+        )
+    session = session.order_by("-started_at", "-id").first()
     if session is None:
         raise PresenceRequired()
     return replace(active, session=session)

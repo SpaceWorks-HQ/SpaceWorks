@@ -119,6 +119,8 @@ def _event_registrations(makerspace, member):
         "event__starts_at", "event__ends_at", "event__status", "event__makerspace_id",
         "registered_via_makerspace_id", "host_waiver_id",
     )
+    if getattr(member, "_claim_audit_context", None) is not None:
+        rows = rows.filter(event__makerspace=makerspace)
     # Two halves of one question, and they must match `EventCheckInQrView`'s filter exactly:
     # the REGISTRATION must be registered (a waitlisted row has nothing confirmable behind
     # it) and the EVENT must still be checkable. `services.cancel()` changes only

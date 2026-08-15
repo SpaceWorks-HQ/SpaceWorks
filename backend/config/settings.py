@@ -681,6 +681,9 @@ SOCIAL_AUTH_JWKS_MAX_BYTES = env.int("SOCIAL_AUTH_JWKS_MAX_BYTES", default=10485
 MEMBER_CLAIM_CODE_TTL_SECONDS = env.int(
     "MEMBER_CLAIM_CODE_TTL_SECONDS", default=15 * 60
 )
+MEMBER_CLAIM_SESSION_TTL_SECONDS = env.int(
+    "MEMBER_CLAIM_SESSION_TTL_SECONDS", default=12 * 60 * 60
+)
 SOCIAL_GOOGLE_JWKS_URL = env("SOCIAL_GOOGLE_JWKS_URL", default="https://www.googleapis.com/oauth2/v3/certs")
 SOCIAL_APPLE_JWKS_URL = env("SOCIAL_APPLE_JWKS_URL", default="https://appleid.apple.com/auth/keys")
 

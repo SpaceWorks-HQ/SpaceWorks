@@ -37,6 +37,7 @@ from apps.accounts.views_social import (
     SocialProviderDetailView,
     SocialProviderListLinkView,
 )
+from apps.accounts.views_claim import ClaimRedemptionView
 
 urlpatterns = [
     path("social/nonce", SocialNonceView.as_view(), name="social-nonce"),
@@ -59,6 +60,7 @@ urlpatterns = [
     path("phone/link/confirm", PhoneLinkConfirmView.as_view(), name="auth-phone-link-confirm"),
     path("phone", PhoneUnlinkView.as_view(), name="auth-phone-unlink"),
     path("login", LoginView.as_view(), name="auth-login"),
+    path("claim/redeem", ClaimRedemptionView.as_view(), name="auth-claim-redeem"),
     path("refresh", RefreshView.as_view(), name="auth-refresh"),
     path("logout", LogoutView.as_view(), name="auth-logout"),
     path("me", MeView.as_view(), name="auth-me"),

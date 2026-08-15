@@ -52,6 +52,9 @@ def resolve_claim_tenant(resolver, *, view_name, url_kwargs, body=None):
         )
     else:
         raise ClaimTenantResolutionError(f"Unknown claim tenant resolver: {resolver!r}")
+    slug = url_kwargs.get("makerspace_slug")
+    if tenant is not None and slug is not None and tenant.slug != slug:
+        raise ClaimTenantResolutionError("URL and object tenants do not match.")
     if tenant is None or tenant.archived_at is not None:
         raise ClaimTenantResolutionError("Claim route tenant could not be resolved.")
     return tenant

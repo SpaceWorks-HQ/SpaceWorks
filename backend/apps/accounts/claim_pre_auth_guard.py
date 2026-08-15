@@ -20,7 +20,13 @@ from rest_framework.views import APIView
 # configured on claim-reachable routes. Exact class+method matching makes a new hook a
 # build failure instead of silently trusting executable pre-auth code.
 POLICY_OVERRIDE_ALLOWLIST = {
-    "apps.accounts.authentication.SpaceWorksJWTAuthentication": {"authenticate"},
+    # `_authenticate_claim` is the sanctioned claim-session path added in D5. It is listed
+    # deliberately: this guard exists so that a NEW method on a configured policy class is a
+    # decision rather than an accident, and the claim authenticator is exactly such a decision.
+    "apps.accounts.authentication.SpaceWorksJWTAuthentication": {
+        "authenticate",
+        "_authenticate_claim",
+    },
     "apps.accounts.throttles.DeviceLoginThrottle": {"get_cache_key"},
     "apps.accounts.throttles.DeviceLoginUserThrottle": {"get_cache_key"},
     "apps.accounts.throttles.MemberVerificationEmailThrottle": {"get_cache_key"},

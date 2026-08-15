@@ -2,7 +2,17 @@ from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import TokenError
 
+from apps.accounts.claim_route_types import AnonymousRead, ControlRoute, Refused
+from apps.accounts.claim_routes import policy_for
+from apps.accounts.claim_sessions import (
+    ClaimSessionInvalid,
+    attach_claim_context,
+    validated_claim_session,
+)
+from apps.accounts.claim_tenants import claim_tenant_matches
+from apps.accounts.claim_tokens import ClaimAccessToken
 from apps.accounts.claim_routes import CLAIM_REACHABLE_PREFIXES
 from apps.accounts.models import User
 from apps.accounts.models_devices import DeviceGrant, DeviceRefreshFamily
@@ -12,6 +22,9 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
     """Adds immediate device-grant checks while preserving ordinary JWT behavior."""
 
     def authenticate(self, request):
+        claim_authenticated = self._authenticate_claim(request)
+        if claim_authenticated is not False:
+            return claim_authenticated
         authenticated = super().authenticate(request)
         if authenticated is None:
             return None
@@ -45,6 +58,43 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
 
         validate_native_makerspace_scope(request, user, grant)
         DeviceGrant.objects.filter(pk=grant.pk).update(last_used_at=timezone.now())
+        return user, token
+
+    def _authenticate_claim(self, request):
+        header = self.get_header(request)
+        if header is None:
+            return False
+        raw_token = self.get_raw_token(header)
+        if raw_token is None:
+            return False
+        try:
+            token = ClaimAccessToken(raw_token)
+        except TokenError:
+            return False
+
+        view_name = getattr(request.resolver_match, "view_name", "") or ""
+        policy = policy_for(view_name, request.method)
+        if isinstance(policy, AnonymousRead):
+            return None
+        try:
+            claim = validated_claim_session(token)
+        except ClaimSessionInvalid as exc:
+            from apps.presence.services import expire_claim_presence
+
+            expire_claim_presence(token.get("claim_session_id"))
+            raise AuthenticationFailed("Claim session is no longer active.") from exc
+        if isinstance(policy, Refused):
+            raise PermissionDenied(policy.reason)
+        if not isinstance(policy, ControlRoute) and not claim_tenant_matches(
+            policy.tenant,
+            claim_makerspace_id=claim.membership.makerspace_id,
+            view_name=view_name,
+            url_kwargs=getattr(request.resolver_match, "kwargs", {}) or {},
+            body=request.data,
+        ):
+            raise PermissionDenied("Claim session is not valid for this makerspace.")
+        user = attach_claim_context(claim.membership.user, claim)
+        request.claim_session = claim
         return user, token
 
 

@@ -24,6 +24,7 @@ class MemberClaimCode(models.Model):
     expires_at = models.DateTimeField()
     consumed_at = models.DateTimeField(null=True, blank=True)
     consumed_ip = models.GenericIPAddressField(null=True, blank=True)
+    absolute_expires_at = models.DateTimeField(null=True, blank=True)
     failed_attempts = models.PositiveSmallIntegerField(default=0)
     revoked_at = models.DateTimeField(null=True, blank=True)
     revoked_by = models.ForeignKey(
@@ -48,4 +49,3 @@ class MemberClaimCode(models.Model):
                 name="claim_session_revoke_idx",
             ),
         ]
-

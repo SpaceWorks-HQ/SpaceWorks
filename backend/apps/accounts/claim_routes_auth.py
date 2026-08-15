@@ -43,6 +43,8 @@ AUTH_CLAIM_ROUTES = {
     **_refused("auth-phone-link-confirm", ("POST",), "claim sessions cannot change login identity"),
     **_refused("auth-phone-unlink", ("DELETE",), "claim sessions cannot change login identity"),
     **_refused("auth-login", ("POST",), "claim sessions do not authenticate with passwords"),
+    ("auth-claim-redeem", "POST"): ControlRoute(),
+    ("auth-claim-redeem", "OPTIONS"): AnonymousRead(),
     ("auth-refresh", "POST"): ControlRoute(),
     ("auth-refresh", "OPTIONS"): AnonymousRead(),
     ("auth-logout", "POST"): ControlRoute(),

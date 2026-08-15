@@ -102,9 +102,13 @@ def issue_claim_code(*, actor, makerspace_id: int, membership_id: int) -> Issued
 
         # One current physical credential per membership. This also makes re-issuing a
         # code terminate the eventual D5 session bound to an older code row.
-        MemberClaimCode.objects.filter(
-            membership=membership, revoked_at__isnull=True
-        ).update(revoked_at=now, revoked_by=authority.actor)
+        existing = list(
+            MemberClaimCode.objects.select_for_update().filter(
+                membership=membership, revoked_at__isnull=True
+            )
+        )
+        for prior in existing:
+            _revoke_locked_claim(prior, now=now, actor=authority.actor)
 
         claim = MemberClaimCode.objects.create(
             membership=membership,
@@ -166,9 +170,9 @@ def revoke_claim_code(*, actor, makerspace_id: int, claim_id: int) -> MemberClai
 
             raise NotFound()
         if claim.revoked_at is None:
-            claim.revoked_at = timezone.now()
-            claim.revoked_by = authority.actor
-            claim.save(update_fields=["revoked_at", "revoked_by"])
+            _revoke_locked_claim(
+                claim, now=timezone.now(), actor=authority.actor
+            )
             audit.record(
                 authority.actor,
                 "member.claim_code_revoked",
@@ -178,7 +182,9 @@ def revoke_claim_code(*, actor, makerspace_id: int, claim_id: int) -> MemberClai
         return claim
 
 
-def consume_claim_code(raw_code: str, *, redemption_ip: str) -> MemberClaimCode:
+def consume_claim_code(
+    raw_code: str, *, redemption_ip: str, makerspace_id: int | None = None
+) -> MemberClaimCode:
     """Consume and validate a code for D5 without minting a session.
 
     Post-consumption refusals deliberately commit ``consumed_at`` and their audit before
@@ -227,11 +233,18 @@ def consume_claim_code(raw_code: str, *, redemption_ip: str) -> MemberClaimCode:
                 failure = ClaimCodeError()
             else:
                 claim.membership = membership
-                if claim.revoked_at is not None or claim.expires_at <= now:
+                if makerspace_id is not None and claim.membership.makerspace_id != makerspace_id:
+                    _audit_redemption(claim, "member.claim_code_redemption_refused", redemption_ip, "wrong_makerspace")
+                    failure = ClaimCodeError()
+                elif claim.revoked_at is not None or claim.expires_at <= now:
                     reason = "revoked" if claim.revoked_at is not None else "expired"
                     _audit_redemption(claim, "member.claim_code_redemption_refused", redemption_ip, reason)
                     failure = ClaimCodeError()
                 else:
+                    claim.absolute_expires_at = now + timedelta(
+                        seconds=settings.MEMBER_CLAIM_SESSION_TTL_SECONDS
+                    )
+                    claim.save(update_fields=["absolute_expires_at"])
                     _audit_redemption(claim, "member.claim_code_consumed", redemption_ip, "accepted")
                     resolved = claim
     if failure is not None:
@@ -250,9 +263,23 @@ def _audit_redemption(claim, action: str, redemption_ip: str, outcome: str) -> N
 
 
 def _revoke_transition_claim_state(user: User, transitioned_at) -> None:
-    MemberClaimCode.objects.filter(
-        membership__user=user, revoked_at__isnull=True
-    ).update(revoked_at=transitioned_at, revoked_by=None)
+    claims = list(
+        MemberClaimCode.objects.select_for_update().filter(
+            membership__user=user, revoked_at__isnull=True
+        )
+    )
+    for claim in claims:
+        _revoke_locked_claim(claim, now=transitioned_at, actor=None)
+
+
+def _revoke_locked_claim(claim, *, now, actor) -> None:
+    """Revoke a locked claim before locking only its provenanced presence rows."""
+    claim.revoked_at = now
+    claim.revoked_by = actor
+    claim.save(update_fields=["revoked_at", "revoked_by"])
+    from apps.presence.services import end_sessions_for_claim
+
+    end_sessions_for_claim(claim, ended_at=now, actor=actor)
 
 
 def register_transition_revocation() -> None:
