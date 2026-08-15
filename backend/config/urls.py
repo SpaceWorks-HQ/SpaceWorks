@@ -8,6 +8,7 @@ from drf_spectacular.views import (
 )
 
 from apps.admin_api.views_hosting import TlsCheckView
+from apps.data_export.views import DataExportDownloadView
 from apps.payments.views import RazorpayWebhookView, StripeWebhookView
 from apps.payments.views_connect import (
     StripeConnectCallbackView,
@@ -64,6 +65,11 @@ def docs_root(_request):
 
 
 urlpatterns = [
+    path(
+        "api/v1/data-exports/download/<uuid:job_id>/<str:token>",
+        DataExportDownloadView.as_view(),
+        name="data-export-download",
+    ),
     # Spliced, not appended: a deployment that ships no payment surfaces must not answer
     # on the Stripe webhook either. An endpoint that accepts and verifies a charge for an
     # app whose console is gone would settle money nobody can see or reconcile.

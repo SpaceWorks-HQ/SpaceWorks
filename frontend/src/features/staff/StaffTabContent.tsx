@@ -41,6 +41,7 @@ const MakerspaceSettingsPanel = lazy(() => import("./MakerspaceSettingsPanel").t
 const ModulesPanel = lazy(() => import("./ModulesPanel").then((m) => ({ default: m.ModulesPanel })));
 const PaymentsPanel = lazy(() => import("./PaymentsPanel").then((m) => ({ default: m.PaymentsPanel })));
 const HandoverConsole = lazy(() => import("./panels/machine/HandoverConsole").then((m) => ({ default: m.HandoverConsole })));
+const DataExportsPanel = lazy(() => import("./DataExportsPanel").then((m) => ({ default: m.DataExportsPanel })));
 
 export function StaffTabContent({
   activeMakerspace,
@@ -254,6 +255,9 @@ export function StaffTabContent({
       ) : null}
       {activeTab === "users" && canManageMakerspace ? (
         <Users makerspaces={makerspaces} isSuperadmin={isSuperadmin} currentUser={currentUser} onAuthRefresh={onAuthRefresh} />
+      ) : null}
+      {activeTab === "exports" && canManageMakerspace ? (
+        <DataExportsPanel key={makerspaceKey} makerspaceId={makerspaceKey} />
       ) : null}
       {activeTab === "audit" && canViewAudit ? <AuditLog /> : null}
       </Suspense>

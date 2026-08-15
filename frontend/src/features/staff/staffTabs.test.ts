@@ -21,6 +21,14 @@ describe("staff printing route alias", () => {
   });
 });
 
+describe("data export authority", () => {
+  it("shows the export tab only to MANAGE_MAKERSPACE", () => {
+    expect(getStaffAccess(["manage_makerspace"], false, false).allowedTabs).toContain("exports");
+    expect(getStaffAccess(["edit_inventory"], false, false).allowedTabs).not.toContain("exports");
+    expect(staffTabPath("exports", false)).toBe("/admin/data-export");
+  });
+});
+
 describe("machine-type subpaths", () => {
   it("reads the subpath from both the scoped and unscoped route shapes", () => {
     expect(staffPathState("/admin/machines/12-laser", false).subPath).toBe("12-laser");

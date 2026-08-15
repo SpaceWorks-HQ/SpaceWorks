@@ -2,6 +2,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
 from apps.bookings.models import BookableSpace
+from apps.data_export import storage as export_storage
+from apps.data_export.models import DataExportJob
 from apps.events.models import Event
 from apps.evidence import storage as evidence_storage
 from apps.evidence.models import EvidencePhoto
@@ -56,6 +58,14 @@ class Command(BaseCommand):
                     # space's recorded usage. Reached through the log's machine; the rows carry
                     # `size_bytes`, so a HEAD that cannot see the object falls back to it.
                     "maintenance_documents": self._sum(MaintenanceLogDocument.objects.filter(log__machine__makerspace=makerspace).values_list("object_key", "size_bytes"), maintenance_storage.object_size, True),
+                    "data_exports": self._sum(
+                        DataExportJob.objects.filter(
+                            makerspace=makerspace,
+                            status=DataExportJob.Status.AVAILABLE,
+                        ).values_list("object_key", "accounted_size_bytes"),
+                        export_storage.object_size,
+                        True,
+                    ),
                 }
             except StorageReadError as exc:
                 self.stdout.write(self.style.WARNING(f"{makerspace.slug}: usage left unchanged due to storage read error for {exc}."))

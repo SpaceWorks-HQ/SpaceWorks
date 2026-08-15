@@ -41,6 +41,8 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("accounts.PhoneVerificationChallenge", "user"),
         ("accounts.SocialIdentity", "user"),
         ("admin_api.BulkImportJob", "actor"),
+        ("data_export.DataExportJob", "requested_by"),
+        ("data_export.DataExportJob", "download_issued_to"),
         ("apiclients.ApiClient", "created_by"),
         ("apiclients.ApiKeyRequest", "requester"),
         ("apiclients.ApiKeyRequest", "resolved_by"),
