@@ -2,16 +2,24 @@ from django import forms
 from django.contrib import admin
 from django.contrib import messages
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.admin import GroupAdmin as DjangoGroupAdmin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group
 from django.db import transaction
+from django.http import HttpResponseRedirect
 from django.template.response import TemplateResponse
+from django.urls import reverse
+from django.utils.translation import gettext
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from rest_framework.exceptions import APIException
 
 from apps.accounts.models import User
+from apps.accounts.transition_services import (
+    WalkInTransitionError,
+    transition_walk_in_to_account,
+)
 from apps.admin_api.services_user_access import reset_user_password
 from apps.audit import services as audit
 from apps.makerspaces import limits
@@ -66,6 +74,49 @@ class UserAdmin(SuperuserOnlyModelAdmin, DjangoUserAdmin, ModelAdmin):
         "makerspace_memberships__makerspace",
     )
     inlines = (MakerspaceMembershipInline,)
+
+    def user_change_password(self, request, id, form_url=""):
+        """Make the inherited password form an explicit account transition."""
+        user = self.get_object(request, id)
+        if (
+            request.method != "POST"
+            or user is None
+            or not user.is_walk_in
+            or not self.has_change_permission(request, user)
+        ):
+            return super().user_change_password(request, id, form_url)
+
+        form = self.change_password_form(user, request.POST)
+        if not form.is_valid() or not form.cleaned_data["set_usable_password"]:
+            return super().user_change_password(request, id, form_url)
+
+        password = form.cleaned_data["password1"]
+
+        def write_password(locked_user):
+            locked_user.set_password(password)
+            locked_user.save(update_fields=["password"])
+
+        try:
+            user = transition_walk_in_to_account(
+                user,
+                actor=request.user,
+                credential_writer=write_password,
+            )
+        except WalkInTransitionError:
+            # A concurrent transition won the row lock. The record is now an ordinary
+            # account, so the inherited form is again the correct writer.
+            return super().user_change_password(request, id, form_url)
+
+        form.user = user
+        self.log_change(request, user, self.construct_change_message(request, form, None))
+        messages.success(request, gettext("Password changed successfully."))
+        update_session_auth_hash(request, user)
+        return HttpResponseRedirect(
+            reverse(
+                f"{self.admin_site.name}:{user._meta.app_label}_{user._meta.model_name}_change",
+                args=(user.pk,),
+            )
+        )
 
     @admin.action(description="Reset selected user passwords")
     def reset_password_selected(self, request, queryset):

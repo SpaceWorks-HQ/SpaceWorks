@@ -48,14 +48,19 @@ def _digest(code):
 def issue_challenge(user):
     """Persist a fresh challenge and attempt delivery without exposing delivery state."""
     now = timezone.now()
-    email = _normalize_email(user.email)
     with transaction.atomic():
+        locked_user = User.objects.select_for_update().get(pk=user.pk)
+        # Staff typed this address as contact data; it is not identity proof. Returning
+        # quietly preserves the endpoint's account-enumeration-safe acknowledgement.
+        if locked_user.is_walk_in:
+            return None
+        email = _normalize_email(locked_user.email)
         if EmailVerificationChallenge.objects.filter(
-            user=user, email=email, last_sent_at__gte=now - RESEND_COOLDOWN
+            user=locked_user, email=email, last_sent_at__gte=now - RESEND_COOLDOWN
         ).exists():
             raise ChallengeCooldown
         EmailVerificationChallenge.objects.filter(
-            user=user,
+            user=locked_user,
             email=email,
             consumed_at__isnull=True,
             failed_attempts__lt=5,
@@ -63,7 +68,7 @@ def issue_challenge(user):
         ).update(consumed_at=now)
         code = _generate_otp()
         challenge = EmailVerificationChallenge.objects.create(
-            user=user,
+            user=locked_user,
             email=email,
             code_digest=_digest(code),
             expires_at=now + CHALLENGE_TTL,
@@ -77,9 +82,9 @@ def issue_challenge(user):
         except Exception:
             logger.exception("email_verification_dispatch_failed")
     audit_events.record_auth_event(
-        user,
+        locked_user,
         "member.email_verification_requested",
-        target=user,
+        target=locked_user,
         meta={"email_hash": audit_events.fingerprint(email), "email_sent": sent},
     )
     return challenge
@@ -98,15 +103,17 @@ def _record_confirm_failure(user, challenge=None):
 
 def confirm_challenge(user, code):
     now = timezone.now()
-    email = _normalize_email(user.email)
     failed = False
+    refused_walk_in = False
     with transaction.atomic():
+        locked_user = User.objects.select_for_update().get(pk=user.pk)
+        email = _normalize_email(locked_user.email)
         # Resolve ONLY the caller's own newest usable challenge for their current email.
         # A foreign user has no matching row, so guessing IDs cannot burn a victim's attempts.
         challenge = (
             EmailVerificationChallenge.objects.select_for_update()
             .filter(
-                user=user,
+                user=locked_user,
                 email=email,
                 consumed_at__isnull=True,
                 failed_attempts__lt=5,
@@ -118,25 +125,38 @@ def confirm_challenge(user, code):
         if challenge is None or not hmac.compare_digest(
             challenge.code_digest, _digest(code)
         ):
-            _record_confirm_failure(user, challenge)
+            _record_confirm_failure(locked_user, challenge)
             failed = True
         else:
             challenge.consumed_at = now
             challenge.save(update_fields=["consumed_at"])
-            User.objects.filter(pk=user.pk, email_verified_at__isnull=True).update(
-                email_verified_at=now
-            )
-            EmailVerificationChallenge.objects.filter(
-                user=user, email=challenge.email, consumed_at__isnull=True
-            ).update(consumed_at=now)
-            user.email_verified_at = now
-            audit_events.record_auth_event(
-                user,
-                "member.email_verified",
-                target=user,
-                meta={"email_hash": audit_events.fingerprint(challenge.email)},
-            )
-    if failed:
+            if locked_user.is_walk_in:
+                refused_walk_in = True
+                audit_events.record_auth_event(
+                    locked_user,
+                    "member.email_verification_refused_walk_in",
+                    target=locked_user,
+                    meta={"email_hash": audit_events.fingerprint(challenge.email)},
+                )
+            else:
+                User.objects.filter(
+                    pk=locked_user.pk, email_verified_at__isnull=True
+                ).update(email_verified_at=now)
+                EmailVerificationChallenge.objects.filter(
+                    user=locked_user,
+                    email=challenge.email,
+                    consumed_at__isnull=True,
+                ).update(consumed_at=now)
+                user.email_verified_at = now
+                audit_events.record_auth_event(
+                    locked_user,
+                    "member.email_verified",
+                    target=locked_user,
+                    meta={"email_hash": audit_events.fingerprint(challenge.email)},
+                )
+    # The refusal consumed a valid challenge and wrote an audit row. Raising inside the
+    # atomic block would roll both state changes back and silently reopen the attempt.
+    if failed or refused_walk_in:
         raise serializers.ValidationError({"detail": GENERIC_CONFIRM_ERROR})
     return challenge
 

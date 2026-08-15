@@ -6,6 +6,7 @@ prose because a boundary nobody tests is a boundary that quietly moves.
 """
 
 import pytest
+from django.db import connection, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -901,6 +902,7 @@ def test_an_ordinary_member_can_still_have_their_password_reset():
     assert membership.user.has_usable_password() is True
 
 
+@pytest.mark.django_db(transaction=True)
 def test_the_walk_in_backfill_revokes_a_password_acquired_through_the_hole():
     """Marking the row is not enough on an upgrading database.
 
@@ -925,7 +927,10 @@ def test_the_walk_in_backfill_revokes_a_password_acquired_through_the_hole():
     # usable password, and the audit entry naming it is already on disk.
     membership.user.set_password(PASSWORD)
     membership.user.is_walk_in = False
-    membership.user.save(update_fields=["password", "is_walk_in"])
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL app.allow_walk_in_transition = 'on'")
+        membership.user.save(update_fields=["password", "is_walk_in"])
     assert membership.user.has_usable_password() is True
 
     backfill.mark_walk_ins(global_apps, None)
@@ -940,6 +945,7 @@ def test_the_walk_in_backfill_revokes_a_password_acquired_through_the_hole():
 # --- fixes from the FOURTH Codex Stage-4 pass --------------------------------------
 
 
+@pytest.mark.django_db(transaction=True)
 def test_the_backfill_revokes_durable_identities_not_just_the_password():
     """A password reset does not reach what the session it opened was used to link.
 
@@ -966,9 +972,14 @@ def test_the_backfill_revokes_durable_identities_not_just_the_password():
     user.is_walk_in = False
     user.phone_e164 = "+15550100777"
     user.phone_verified_at = timezone.now()
-    user.save(
-        update_fields=["password", "is_walk_in", "phone_e164", "phone_verified_at"]
-    )
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL app.allow_walk_in_transition = 'on'")
+        user.save(
+            update_fields=[
+                "password", "is_walk_in", "phone_e164", "phone_verified_at"
+            ]
+        )
     SocialIdentity.objects.create(
         user=user, provider="google", provider_sub="walkin-subject"
     )
