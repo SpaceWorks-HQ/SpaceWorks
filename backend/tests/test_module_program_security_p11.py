@@ -6,11 +6,20 @@ prose because a boundary nobody tests is a boundary that quietly moves.
 """
 
 import pytest
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.accounts import rbac
-from apps.accounts.models import PlatformLoginMethods, User
+from apps.accounts.models import (
+    PasswordResetEnvelopeStatus,
+    PlatformLoginMethods,
+    User,
+)
+from apps.accounts.services_password_reset_drain import (
+    claim_pending_envelopes,
+    prepare_delivery,
+)
 from apps.inventory.public_image_storage import build_object_key
 from apps.makerspaces import profile_services
 from apps.makerspaces.models import (
@@ -465,6 +474,9 @@ def test_the_github_task_is_inert_without_a_token(settings, monkeypatch):
 # pass found in code the first had already read.
 
 
+@override_settings(
+    DEBUG=True, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+)
 def test_a_walk_in_cannot_be_turned_into_an_account_by_forgot_password():
     """The unusable password is not the boundary -- `set_password` walks straight past it.
 
@@ -484,6 +496,8 @@ def test_a_walk_in_cannot_be_turned_into_an_account_by_forgot_password():
     # The generic acknowledgement is unchanged -- refusing visibly would disclose which
     # addresses belong to walk-ins.
     assert response.status_code == 200
+    claim = claim_pending_envelopes(owner="walk-in-regression")[0]
+    assert prepare_delivery(claim) == PasswordResetEnvelopeStatus.DISCARDED
     membership.user.refresh_from_db()
     assert membership.user.has_usable_password() is False
 
@@ -516,21 +530,27 @@ def test_a_reset_token_is_refused_at_confirm_time_for_a_walk_in():
     assert user.has_usable_password() is False
 
 
-def test_an_ordinary_account_can_still_reset_its_password():
+@override_settings(
+    DEBUG=True, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+)
+def test_an_ordinary_account_can_still_reset_its_password(monkeypatch):
     """The guard must be narrow -- a marker that catches everyone breaks account recovery."""
     space = make_space("ordinary-reset")
     user = staffer(space)
     assert user.is_walk_in is False
 
-    assert APIClient().post(
+    response = APIClient().post(
         "/api/v1/auth/forgot-password", {"email": user.email}, format="json"
-    ).status_code == 200
-    # The real assertion is the queryset, not the generic ack: the ack is identical
-    # either way, so only the lookup can tell us the account was found.
-    assert User.objects.filter(
-        email__iexact=user.email, is_active=True,
-        access_status=User.AccessStatus.ACTIVE,
-    ).exclude(is_walk_in=True).exists()
+    )
+    assert response.status_code == 200
+
+    monkeypatch.setattr(
+        "apps.accounts.services_password_reset_drain.email_enabled", lambda: True
+    )
+    claim = claim_pending_envelopes(owner="ordinary-reset-regression")[0]
+    attempt = prepare_delivery(claim)
+    assert attempt is not None
+    assert attempt.recipient == user.email
 
 
 def event_for(space, **kwargs):

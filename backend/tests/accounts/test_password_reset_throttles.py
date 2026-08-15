@@ -24,3 +24,18 @@ def test_request_and_guess_budgets_are_distinct_and_never_cache_raw_email():
         "password_reset_confirm_email"
         in settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
     )
+
+
+def test_both_endpoints_apply_ip_and_distinct_email_budgets():
+    from rest_framework.throttling import ScopedRateThrottle
+
+    from apps.accounts.views import ForgotPasswordView, ResetPasswordConfirmView
+
+    assert ForgotPasswordView.throttle_classes == [
+        ScopedRateThrottle,
+        PasswordResetEmailThrottle,
+    ]
+    assert ResetPasswordConfirmView.throttle_classes == [
+        ScopedRateThrottle,
+        PasswordResetConfirmEmailThrottle,
+    ]

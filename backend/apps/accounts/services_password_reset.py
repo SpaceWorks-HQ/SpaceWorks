@@ -183,7 +183,7 @@ def confirm_password_reset(email, code, new_password, *, now=None):
                 _discard_locked(envelope, confirmed_at, superseded=True)
             else:
                 try:
-                    validate_password(new_password, user=user)
+                    validate_recovery_password(new_password, user)
                 except DjangoValidationError as exc:
                     password_failure = {"new_password": list(exc.messages)}
                 else:
@@ -237,6 +237,13 @@ def _credential_state_matches(user, envelope, normalized):
             credential_fingerprint(user, normalized),
         )
     )
+
+
+def validate_recovery_password(new_password, user):
+    """Run candidate-password checks only after the caller has proved possession."""
+    if not new_password:
+        raise DjangoValidationError("This password may not be blank.")
+    validate_password(new_password, user=user)
 
 
 def _discard_locked(envelope, now, *, superseded=False):

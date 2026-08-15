@@ -22450,7 +22450,7 @@
         "/api/v1/auth/forgot-password": {
             "post": {
                 "operationId": "api_v1_auth_forgot_password_create",
-                "summary": "Request a password reset email",
+                "summary": "Request an emailed password reset code",
                 "tags": [
                     "Auth"
                 ],
@@ -22476,7 +22476,30 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Generic acknowledgement."
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PasswordResetAcknowledgement"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid request."
+                    },
+                    "429": {
+                        "description": "Request throttled."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecoveryUnavailable"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -22923,7 +22946,7 @@
         "/api/v1/auth/reset-password": {
             "post": {
                 "operationId": "api_v1_auth_reset_password_create",
-                "summary": "Confirm a password reset",
+                "summary": "Confirm an OTP or coexisting legacy password reset link",
                 "tags": [
                     "Auth"
                 ],
@@ -22931,28 +22954,44 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ResetPasswordConfirm"
+                                "$ref": "#/components/schemas/ResetPasswordConfirmRequest"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/ResetPasswordConfirm"
+                                "$ref": "#/components/schemas/ResetPasswordConfirmRequest"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/ResetPasswordConfirm"
+                                "$ref": "#/components/schemas/ResetPasswordConfirmRequest"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "responses": {
                     "200": {
-                        "description": "Password updated."
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PasswordUpdated"
+                                }
+                            }
+                        },
+                        "description": ""
                     },
                     "400": {
-                        "description": "Invalid/expired token or password."
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResetPasswordConfirmError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "description": "Request throttled."
                     }
                 }
             }
@@ -34597,6 +34636,27 @@
                     "serial_number"
                 ]
             },
+            "LegacyResetPasswordConfirm": {
+                "type": "object",
+                "properties": {
+                    "uid": {
+                        "type": "string"
+                    },
+                    "token": {
+                        "type": "string",
+                        "writeOnly": true
+                    },
+                    "new_password": {
+                        "type": "string",
+                        "writeOnly": true
+                    }
+                },
+                "required": [
+                    "new_password",
+                    "token",
+                    "uid"
+                ]
+            },
             "LegacyRoleEnum": {
                 "enum": [
                     "space_manager",
@@ -38609,6 +38669,29 @@
                     "username"
                 ]
             },
+            "OtpResetPasswordConfirm": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "code": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "pattern": "^\\d{6}$"
+                    },
+                    "new_password": {
+                        "type": "string",
+                        "writeOnly": true
+                    }
+                },
+                "required": [
+                    "code",
+                    "email",
+                    "new_password"
+                ]
+            },
             "PaginatedAdminMembershipList": {
                 "type": "object",
                 "required": [
@@ -39290,6 +39373,53 @@
                         }
                     }
                 }
+            },
+            "PasswordResetAcknowledgement": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "PasswordResetFailure": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "PasswordUpdated": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "PasswordValidationFailure": {
+                "type": "object",
+                "properties": {
+                    "new_password": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "new_password"
+                ]
             },
             "PatchedApiClient": {
                 "type": "object",
@@ -44401,6 +44531,21 @@
                     "machines"
                 ]
             },
+            "RecoveryUnavailable": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "detail"
+                ]
+            },
             "ReferralCreate": {
                 "type": "object",
                 "properties": {
@@ -44543,24 +44688,24 @@
                     "truncated"
                 ]
             },
-            "ResetPasswordConfirm": {
-                "type": "object",
-                "properties": {
-                    "uid": {
-                        "type": "string"
+            "ResetPasswordConfirmError": {
+                "oneOf": [
+                    {
+                        "$ref": "#/components/schemas/PasswordResetFailure"
                     },
-                    "token": {
-                        "type": "string"
-                    },
-                    "new_password": {
-                        "type": "string",
-                        "writeOnly": true
+                    {
+                        "$ref": "#/components/schemas/PasswordValidationFailure"
                     }
-                },
-                "required": [
-                    "new_password",
-                    "token",
-                    "uid"
+                ]
+            },
+            "ResetPasswordConfirmRequest": {
+                "oneOf": [
+                    {
+                        "$ref": "#/components/schemas/OtpResetPasswordConfirm"
+                    },
+                    {
+                        "$ref": "#/components/schemas/LegacyResetPasswordConfirm"
+                    }
                 ]
             },
             "ResetPasswordRequest": {
