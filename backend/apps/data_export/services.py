@@ -52,7 +52,10 @@ def create_export_job(actor, makerspace):
             "data_export.requested",
             makerspace=locked,
             target=job,
-            meta={"fidelity": Fidelity.REDACTED.value},
+            meta={
+                "fidelity": Fidelity.REDACTED.value,
+                **_row_count_meta(job),
+            },
         )
     return job
 
@@ -211,7 +214,7 @@ def consume_download_token(job_id, raw_token):
     with transaction.atomic():
         job = (
             DataExportJob.objects.select_for_update()
-            .select_related("makerspace", "download_issued_to")
+            .select_related("makerspace")
             .filter(pk=job_id)
             .first()
         )
