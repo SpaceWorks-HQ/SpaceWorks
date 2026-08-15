@@ -2,25 +2,126 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **On this file's structure.** The durable, load-bearing rules live in the lower half
-> ("Cross-cutting invariants", "Project Status", "Engineering Conventions", "Architecture",
-> "Hard Rules"). The chronological batch history was condensed into the "Condensed changelog"
-> — full detail lives in `git log` and in the assistant's memory files. When editing a shipped
-> feature, prefer `git log`/`git blame` for its history; use the invariants section for the rules
-> you must not regress.
+> **This file has two names, and they must stay byte-identical.** `CLAUDE.md` and `AGENTS.md`
+> are the *same document* under the two filenames the tooling looks for: Claude Code reads
+> `CLAUDE.md`, while Codex and other-model agents (GPT, Gemini, Copilot, Cursor) read
+> `AGENTS.md`. **Any edit to one must be copied to the other in the same commit** —
+> `diff CLAUDE.md AGENTS.md` must print nothing, and that emptiness is the drift guard.
+> Do not let them diverge into a "full" and a "summary" version: `AGENTS.md` was previously
+> a hand-written short mirror and silently rotted for months, still routing state transitions
+> through the tombstoned `apps/printing/workflow.py` and still demanding the retired Check-In
+> client fail safe. One document with two names cannot rot in only one of them.
 
-## Current work — FabLab expansion (branch `dev`)
+> **How this file is ordered.** Orientation first — what the system is, the two architectural
+> rules, the state machine, tenancy, the Hard Rules, and the engineering conventions — then how
+> to work in the repo, then Project Status, then the long **Invariants** section (the
+> load-bearing "do not regress" rules, grouped by area), and finally the condensed changelog.
+> Everything from "Invariants" down is reference material: read the area you are touching, not
+> the whole thing. When editing a shipped feature, prefer `git log`/`git blame` for its history
+> and the Invariants section for the rules you must not break.
+>
+> This ordering is deliberate and replaces an older note that said the durable rules "live in
+> the lower half" — which was true, and was the problem: a reader met 1,400 lines of
+> per-program detail before reaching the description of what the system does.
 
-Active multi-part FabLab program built on `dev`. Historically a **Codex-driven workflow** (Codex wrote
-specs and code in parallel where files didn't collide; Claude orchestrated and verified). **Codex is
-currently unusable — `codex doctor` reports no credentials — so Claude implements directly and the
-Codex Stage-1/2/4 gates are waived by owner direction.** Commit trailers must then name only the owner
-and Claude: a `Co-Authored-By: Codex` trailer on work Codex did not write is false attribution, and
-this overrides the unconditional three-trailer rule in the global config.
+## What This System Is
 
-Per user direction, the **single user QA is deferred to the very end** (after all Parts) — no per-Part
-QA gate. Specs live (gitignored) under `docs/superpowers/specs/2026-07-1*`. Commits sit **local and
-unpushed on `dev`**; pushing is the owner's call alone.
+A multi-tenant system for managing community hardware loans across makerspaces. The central concern is **traceability of physical handovers**: every issue and return must produce evidence (QR scans + photos + remarks + audit log) so that accountability for lost/damaged hardware is never ambiguous. Public users browse and request; when self-checkout is enabled they may also issue/return eligible QR tools after authentication and evidence upload. Staff physically issue reviewed requests and direct handouts according to action scope.
+
+## Architecture: Concepts That Span Multiple Modules
+
+The PRD specifies a layered design where UIs and the Telegram bot are thin clients over an API server composed of deep modules. Two architectural rules are load-bearing and easy to violate if you only read one module:
+
+1. **The Request Workflow Module is the single source of truth for state transitions.** Telegram callbacks, the web admin panel, and the guest-admin app must all route through the *same* workflow service — never mutate `HardwareRequest.status` directly. The Telegram module in particular must call the workflow module, not the database. This is what keeps web and bot behavior consistent and audited.
+
+2. **The Inventory Availability Module owns all quantity math.** Reserve / issue / return / mark-lost all flow through it. No other module computes available/reserved/issued counts. The invariant "availability never goes below zero" lives here.
+
+### Module responsibilities
+
+- **Auth & RBAC** — enforces the role/action matrix AND makerspace scoping on every query. Super Admin is global; every other role is a per-makerspace membership resolved through an editable `MakerspaceRole` row, action-based. `roles.DEFAULT_ROLE_DEFINITIONS` + `MEMBER_ROLE_DEFINITION` seed **four** protected defaults per makerspace — Space Manager, Inventory Manager, Machine Manager, Member. **Guest Admin is not among them** (retired by `0052`, fully removed from both role enums by `0053`/`0054` + `accounts/0009`/`0010`; handover is a custom role). **Print Manager is retired** (migration `0046` reassigned its memberships to Machine Manager, whose `MANAGE_MACHINES` implies `MANAGE_PRINTING`); the string survives only in `_MEMBERSHIP_ROLE_ACTIONS` as the frozen legacy fallback for a null-FK membership. Inventory Manager is membership-only and covers the full hardware lifecycle but not printing, staff, or makerspace settings. Also verifies Telegram actors and blocks restricted/suspended users. Interface: `can(actor, action, resource)`, `scope_by_makerspace(actor, query)`, `assertTelegramActorCan(...)`.
+- **Request Workflow** — owns the state machine, emits audit logs, triggers Telegram alerts, coordinates inventory reservation/issue/return.
+- **Inventory Availability** — quantity math + asset status for QR-tracked tools.
+- **QR Code & Box** — generates/resolves/revokes QR codes, assigns boxes to requests, tracks scan history.
+- **Evidence Photo** — immutable issue/return photo storage linked to actor + request + QR scans; object storage, never public.
+- **Check-In API Client** — **RETIRED** (`73a480c`, Part M7). `apps/checkin/` no longer exists and there is no `CHECKIN_MODE` setting. Requester identity now comes from authenticated member accounts, so there is no external verify dependency left to fail safe on.
+- **Telegram Integration** — sends per-makerspace group alerts and processes accept/reject callbacks (delegating to Request Workflow).
+
+## Request State Machine
+
+```
+draft → pending_approval → {rejected | accepted}
+accepted → issued → {partially_returned | returned | closed_with_issue}
+```
+
+The workflow module enforces *allowed* transitions only. `closed_with_issue` and the accountability/access-restriction flow (PRD §6.5) are how lost/damaged hardware ties back to a requester's `access_status`.
+
+## Multi-Tenancy (Makerspace Scoping)
+
+Every domain entity is scoped to a `makerspace_id`. A makerspace owns its inventory, public URL, Space Managers, Inventory Managers, its own custom roles (handover included), Telegram group chat ID, QR namespace, and audit-log scope. **Any list/query for makerspace-scoped staff actors must be scoped through the Auth module** — forgetting this is a cross-tenant data leak, not just a bug.
+
+## Hard Rules Baked Into Workflows (don't regress these)
+
+> The machine-scoping program (`MANAGE_MACHINES` per role, the Machines console, procurement
+> and dashboard narrowing) used to be appended to this list and made it ~440 lines long. It is
+> documentation of an invariant, not a workflow rule, and now lives under
+> **Invariants → Machine scoping**. This section is back to the short list it is meant to be.
+
+- Reviewed-request hardware **cannot be issued** without both a box QR scan and an issue photo.
+- Public self-checkout and staff direct handout **cannot be issued** without uploaded issue evidence and an eligible scanned/selected tool.
+- Hardware **cannot be returned** without a return photo and a return remark/notes.
+- Issued quantity cannot exceed accepted quantity without authorized workflow permission.
+- **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`). Handover staff get a **custom role** holding the handout actions. `rbac.HANDOUT_ACTIONS` is no longer a cap on what a role may hold — `role_services._validate_actions` dropped that branch — and now only defines what counts as handover-only for `rbac.is_handout_only`, which decides how narrow the console is. A handout role issues accepted requests, creates **direct handouts** (`ISSUE_DIRECT_LOAN` is in the set, pinned by `test_guest_admin_can_create_direct_loan`), processes scoped returns, and uploads evidence — through the same evidence/QR/remark/audit workflow as staff. It still cannot accept/reject requests, edit inventory, or manage QR unless granted those actions. **Both enum members are now gone** (`makerspaces/0053` moved every remaining `role="guest_admin"` membership onto a real role row — reusing the space's untouched handover role only when its actions still equal the frozen six, else creating a collision-safe "Front Desk" role — and `0054` dropped the choice; `accounts/0009`/`0010` did the same for `User.Role.GUEST_ADMIN`). The `_MEMBERSHIP_ROLE_ACTIONS` fallback entry went with them, so `print_manager` is now the only frozen legacy string. Tests build a front-desk staffer through `tests/handout_roles.py` (`handout_role`/`grant_handout`/`make_handout_member`), whose default action set is deliberately the exact six the built-in granted — so every boundary a guest-admin test used to assert is still asserted. The `guest-admin/` **URL paths** in `hardware_requests/urls.py` are untouched: they are the handover API surface (module key `guest_handover`), not the role, and renaming them would break clients.
+- Public request submission requires an **authenticated member** (`RequestSubmitView` → `IsAuthenticated`), and request lookup is scoped to that verified identity — it never matches free-text contact fields (no enumeration by known email/phone). The anti-enumeration invariant is unchanged; since the Check-In retirement (`73a480c`) it is enforced by member auth rather than an external verify call.
+- Inventory Managers can run the full hardware lifecycle but **cannot** manage printing, staff, or makerspace settings.
+- Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks active status.
+- Evidence photos and QR scan records are **immutable**; audit logs are **append-only**.
+- Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos, requester history, or hidden counts. Public visibility is governed per-item by `is_public`, `show_public_count`, and `public_availability_mode` (`exact_count | status_only | hidden`).
+
+## Engineering Conventions (apply to all code written here)
+
+- **Every edit to this file must be made to BOTH `CLAUDE.md` and `AGENTS.md`, in the same commit.** They are one document under two filenames (Claude Code reads the first, Codex and other-model agents read the second); `diff CLAUDE.md AGENTS.md` must print nothing. See the note at the top of this file for why they are byte-identical rather than a full version plus a summary.
+- **Follow the global Claude config.** The gated workflow in `~/.claude/CLAUDE.md` (Stages 1–6, Codex delegation, mandatory review/QA gates) governs all work in this repo. Repo-specific rules below add to it; they do not override it.
+- **Document every API endpoint in Swagger / OpenAPI.** Every route in the API surface (PRD §14) must have an OpenAPI spec entry — request/response schemas, auth requirements, and error responses. Keep the spec in sync with the code; an undocumented endpoint is incomplete.
+- **Keep files modular — target ~200 lines per file, hard ceiling ~300.** One clear responsibility per file. When a module file grows past the target, split it (e.g. route handlers, validation, and service logic in separate files). The deep modules in §12 are logical boundaries, not single files. **Established split pattern:** when an app's `views.py`/`serializers.py`/`admin.py`/`services.py` outgrows the ceiling, split classes/functions into domain submodules (`views_*`, `serializers_*`, `admin_*`, `services_*`) and keep the original file as a **thin re-export barrel** (explicit `from .submodule import (...)`, never `import *`) so `from app.views import X` and `views.X` keep resolving; for `admin.py` the barrel must still import the admin submodules so the `@admin.register` side effects fire. Every backend code file is within the ceiling **except `backend/config/settings.py`** — Django settings are conventionally a single file (accepted exception).
+- **Production-level code, not prototype code.** Validate all inputs at the boundary, handle external-service failure explicitly (especially outbound integrations — Stripe, Telegram, SMTP, object storage — fail safe, never crash a request flow), use structured logging, return consistent typed error responses, and never leave `TODO`/stub auth or scoping in a merged path. Every state-changing endpoint must emit its audit log entry (PRD §11). Honor the immutability/append-only and makerspace-scoping invariants already documented above as enforced code, not convention.
+
+## Learning And Explanation Contract
+
+This repo is also being used to learn production Django, DRF, React, and TanStack Query through the inventory manager project. When making changes:
+
+- Explain the reason for each meaningful change in plain language.
+- Keep explanations brief but logically deep enough to show the production tradeoff.
+- For small diffs, explicitly state what changed, why it changed, and what behavior it protects.
+- Tie backend changes back to Django/DRF concepts such as models, serializers, viewsets/APIViews, permissions, transactions, migrations, and service modules.
+- Tie frontend changes back to React/TanStack Query concepts such as component state, server state, query keys, mutations, invalidation, loading/error states, and cache refresh.
+- Avoid unexplained "magic" abstractions. If an abstraction is introduced, explain the repeated problem it removes.
+- Prefer teaching through this project's real workflows: request creation, accept/reject, issue, return, QR scan, evidence upload, and audit log.
+
+The goal is not just to ship code, but to understand why each production-quality decision exists.
+
+## Working in this repo — program state and build conventions
+
+### Current work — FabLab expansion (branch `dev`)
+
+Active multi-part FabLab program built on `dev`. This is a **Codex-driven workflow** (Codex writes
+specs and code in parallel where files don't collide; Claude orchestrates and verifies).
+
+**Codex is AVAILABLE — verified 2026-08-15: `codex doctor` reports `auth is configured` (ChatGPT
+tokens, standalone runtime 0.147.0, all checks green) — so the Stage-1/2/4 gates in
+`~/.claude/CLAUDE.md` are LIVE and must be run.** There was a stretch when `codex doctor` reported
+no credentials, during which Claude implemented directly and the owner waived those gates; that no
+longer applies. **Re-check `codex doctor` rather than trusting this paragraph** — it is the one
+claim here that goes stale without anyone editing the file, and it stayed wrong for weeks.
+
+**The commit-trailer rule is attribution, not ceremony:** name Codex in a `Co-Authored-By` trailer
+only on work Codex actually wrote. A Codex trailer on work it did not write is false attribution,
+and that overrides the unconditional three-trailer rule in the global config — so the trailer set is
+decided per commit by who really wrote the code, never by the branch or the program.
+
+Per user direction, the **single user QA is deferred to the very end** (after all Parts) — no
+per-Part QA gate. Specs live (gitignored) under `docs/superpowers/specs/2026-07-1*`. Commits sit
+**local and unpushed on `dev`** (5 ahead of `origin/dev` as of 2026-08-15); **pushing is the owner's
+call alone.** Ask `git rev-list --count origin/dev..dev` rather than trusting that number.
 
 **Shipped on `dev` (see condensed changelog for the module list):** Events, Bookings, Maintenance,
 Analytics/reports, Machine Manager role + delegated role assignment, public
@@ -47,148 +148,8 @@ opt-in attended-events on the maker profile, QR event check-in, and cross-makers
 events with a host-waiver acceptance.
 The one deferred end-to-end user QA remains an owner-run release gate.
 
-## Events program invariants (four phases, `f16896f`..`dab0354`)
+### Standing build conventions for this program
 
-- **Registering for an event does NOT require a `PresenceSession`; check-in does.**
-  `require_active_member` (identity + membership + waiver) was split out of
-  `require_active_member_presence`, and **only** `PublicEventRegistrationView` switched. The other
-  **nine invocations across six surfaces** — self-checkout ×3, direct handout, public request submit,
-  public booking, and the two machine-service surfaces — still require a session, because those are
-  hardware and facility acts where "is this member here right now" is the whole question. Signing up
-  is planning to attend; presence is proven later by the staff-scanned QR, which is stronger evidence
-  than a self-declared session.
-- **`events.member_history.registrations_for_space` is the ONE answer to "which registrations does
-  this member hold in this space"**, shared by the profile counts, the profile's recent-attended list,
-  member activity and the QR lookup. It filters on **durable provenance**
-  (`EventRegistration.registered_via_makerspace`, `SET_NULL`), **not** current collaboration: accepted
-  collaboration authorizes *discovery and creation*, provenance records *where participation
-  happened*, so an administrator editing a collaborator list cannot retroactively delete a member's
-  history or break a QR someone already holds. A **NULL provenance falls back to the host**, so the
-  read fails OPEN to pre-provenance behaviour and the backfill is tidiness rather than load-bearing.
-  History still stops at the **host's** archival or withdrawn `events` module.
-- **Presentation and PAYMENT are gated differently, and conflating them loses money.**
-  `payments.member_scope.member_payment_queryset` widens the three member payment surfaces (history,
-  web checkout, native intent) to an `EVENT_REGISTRATION` charge raised by another host when the
-  member's own registration names this space as provenance — otherwise a visitor's charge exists and
-  is undiscoverable, since the host 403s them and their own space filters it out. It is gated by
-  **neither** the host's module **nor** archival: a module toggle must never hide a receipt or block a
-  pending charge, and the separability contract keeps historical payment subjects usable when
-  tombstoned.
-- **PAYMENT ROUTING LIVES ON `Payment.via_makerspace`, NOT ON THE REGISTRATION'S PROVENANCE.**
-  One column cannot serve both: `module_purge_collectors.events_delete` must clear
-  `registered_via_makerspace` (destroying activity history is what a purge is *for*), and keying
-  payment visibility on that same column meant a collaborator's purge made a host-raised charge
-  invisible in the member's area while the host still 403s them — a receipt gone and a **pending
-  charge unpayable**. The routing therefore sits on the money record, which no purge touches:
-  stamped at creation by `service_payments._get_or_create` as
-  `registered_via_makerspace or event.makerspace`, read directly by `member_scope`'s second arm, and
-  **never cleared by any collector**. The `subject_type=EVENT_REGISTRATION` clause stays on that arm
-  so it can never widen to "every payment this user has anywhere". Two traps this hit: the backfill
-  (`payments/0011`) stamps **only where the registration's member matches the payment's member** —
-  `Payment.clean()` does not validate that, and the old subquery did, so stamping blindly would newly
-  expose one member's charge through another space; and a payment whose registration was already
-  deleted by an earlier purge is **unrecoverable and reported**, not silently skipped. The immutability
-  trigger permits the backfill because it raises only when `status` or `amount` change.
-- **A DELAYED charge needs routing preserved BEFORE the purge, which `Payment` cannot do.** A
-  waitlisted registration has no `Payment` at all — one is raised only when `_promote()` lifts it to
-  REGISTERED — so if the collaborator purges `events` in between, provenance is already NULL and the
-  charge falls back to the **host**, where the visiting member holds no membership: refused there,
-  filtered out at home, payable from neither. `EventRegistration.payment_via_makerspace` is the second
-  durable copy, written beside `registered_via_makerspace` at registration and **deliberately not
-  cleared** by `events_delete`; `_get_or_create` reads it first. Keeping it resurrects nothing —
-  member history, the maker profile and the QR lookup all read `registered_via_makerspace`, never
-  this column. **Both columns are scoped to the COLLABORATOR's purge, not the host's.** When the
-  *host* purges `events`, the plan's `payment_subjects=("event_registration",)` deletes every
-  host-owned event charge — visitors' included — before either column can route anything, and the
-  registration goes with it. That is deliberate: `module_purge._purge` deletes payments *before*
-  their subject precisely so none survives as a dangling generic reference. So a host purge still
-  destroys a visiting member's receipt and cancels their pending debt. **Open question, not a
-  settled rule** — preserving externally-routed payments there would mean accepting dangling
-  subjects, which is the trade the current code deliberately refuses.
-- **`create_for_registered_registration` SWALLOWS EVERY EXCEPTION**, so a signature mismatch against
-  `payments.services.create_payment` does not raise — it silently stops creating charges while
-  registration still returns 201. Any test covering event charging must drive the real path; one that
-  fabricates a `Payment` row proves nothing about the wiring. `create_payment`'s `via_makerspace`
-  keyword defaults to `None`, so bookings/membership/machine-service call sites are unaffected (their
-  charges are owned by the member's own space, which arm 1 already covers).
-- **The collaborative registration route shares the CREATE budget and splits the RETRY budget.**
-  `_collaborative_events()` deliberately includes the member's own space's events, so the same event
-  is reachable through both `MemberCollaborativeEventRegistrationView` and
-  `PublicEventRegistrationView`; throttling only one is a bypass. Both therefore use
-  `ClientTierRateThrottle` + scope `event_register` — **not** `MemberPrincipalRateThrottle`, whose
-  `member:<pk>` ident is a *different* DRF cache key and would hand out the limit twice, closing half
-  the bypass. But DRF checks throttles in `initial()`, before `post()`, so a blanket throttle 429s the
-  `DuplicateRegistration` retry that is a member's **only** way to repair a registration holding no
-  waiver acceptance — and since the bucket is shared, the public route could exhaust it and strand
-  them at the door. `check_throttles` therefore reassigns `self.throttle_scope` to
-  `event_registration_retry` when a registration already exists (`self.kwargs` is set by `dispatch()`
-  before `initial()`). Retries stay bounded; they are never blocked by the create budget.
-- **`checkin_token` is surfaced only while the registration is REGISTERED AND the event is still
-  checkable.** `services.cancel()` changes only `Event.status` and leaves registrations REGISTERED, so
-  gating on the registration alone hands out an admission code nothing can ever confirm. The QR route
-  and `member_activity_service` must agree, or a token is advertised whose route refuses it.
-- **Resolve answers unknown, malformed and wrong-event tokens identically.** Distinguishing them makes
-  it an oracle for "this code is real but belongs elsewhere". **UUID4 entropy** is what makes
-  enumeration infeasible; authorization + event scoping + the uniform 404 stop a stolen token crossing
-  tenants; the staff-keyed throttle only bounds abuse. Resolve is **read-only** and confirm reuses the
-  existing pk-authorized `mark-attended`, so a scanned token never mutates anything.
-- **A route kwarg feeding `MODEL_LOOKUPS` MUST be named `pk`** — `origin_scope_routes` reads
-  `kwargs['pk']` and marks the request invalid when absent, so `<int:event_id>` is **denied on every
-  tenant custom domain despite being registered**.
-- **The collaboration API has TWO tenant scopes and needs four DISTINCT route names**, because
-  `origin_scope_routes` is keyed by route name, not HTTP method: host invite/list → `events.Event`,
-  host remove → `EventCollaborator.event__makerspace_id`, collaborator inbox → its `makerspace_id`
-  kwarg, accept/decline → `EventCollaborator.makerspace_id`. Registering accept against the host would
-  **403 it from the collaborator's own domain**, which is the entire feature.
-- **Lock order in `apps.events` is `event → makerspace(s)`**, matching shipped `publish()`,
-  `update_event()` and image attach. `require_module_locked` goes **after** `_locked_event` in
-  `register()` (before would deadlock against `publish`), two makerspaces lock in **sorted pk order**,
-  and `remove_collaborator` reads the event id **unlocked** first — a `select_for_update()
-  .select_related("event")` locks both rows in the wrong order.
-- **The host waiver lives on the `EventRegistration`, not a membership** (a visitor membership would
-  corrupt the host's member reporting, roster, quota and dues — `reports_members` counts every row).
-  Three fields under an all-or-none check constraint, `PROTECT`, with acceptance an **explicit API
-  field** — inferring it from a submitted id lets any caller manufacture evidence about a real person.
-  Re-read under the host lock so a superseded version is refused. Stamping is one helper shared by the
-  create and idempotent-retry paths. Audited with id + version, **never the body**: the purge clears
-  the columns, so the append-only log is the surviving evidence, and the body would be undeletable
-  member data. A registration with **no** acceptance yields no QR — but **not** gated on the *current*
-  version, or revising a waiver strands a legitimate member at the door.
-- **Waiver evidence lives in TWO places, and reading one reports a falsehood about a real person.**
-  A visitor's acceptance is stamped on the `EventRegistration`; a **host member's lives on their
-  `MakerspaceMembership`**, because the registration path deliberately does not re-record an agreement
-  the member already gave their own space. The check-in resolve payload shipped as
-  `bool(registration.host_waiver_id)`, which is therefore **structurally false for every host member**
-  — the scanner told correctly-accepted members to "take one at the desk", and said the same when the
-  host had configured no waiver at all. `views_checkin.host_waiver_state()` is the one answer:
-  `not_required` when the host has no active waiver, `on_file` when either location holds an
-  acceptance, `missing` otherwise. Not compared against the *current* version, matching the QR gate.
-  **"Not a visitor" is NOT "not required"** — `views_admin`'s staff registration only checks that a
-  membership exists, never `require_active_member`, so a host member genuinely can hold a registration
-  with an active waiver and no acceptance anywhere. That contract had **no test at all** before
-  (nothing ever asserted on the field), which is how it shipped wrong.
-- **`confirmable` mirrors `mark_attended`'s own precondition** (`status == REGISTERED` **and**
-  `event.status in CHECKABLE_EVENT_STATUSES`) rather than inventing a second rule. Resolve accepts
-  waitlisted/cancelled/attended rows and previously omitted event status, so a registered row on a
-  **cancelled event** rendered a Confirm button whose request could only ever 409. Everything on this
-  screen stays reported-never-enforced: it is the button that is withheld, never the door.
-- **That `PROTECT` FK breaks BOTH purges if unhandled**: `membership_delete` must clear the
-  registration's three fields alongside the membership's, and `lifecycle.purge` must clear them for
-  registrations hosted **elsewhere** before its explicit
-  `EventRegistration.objects.filter(event__makerspace=makerspace).delete()` (placed after the
-  `ProcessedStripeEvent` delete, since Payment must precede its generic subject). Verified: removing
-  either clearing step raises `ProtectedError`.
-- **The member QR route lives in its own separable `events/urls_member.py`.** Declared alongside the
-  rest of the `member/` surface it kept resolving, and stayed in the OpenAPI schema, on a deployment
-  that ships no events app — caught by the tombstone suite.
-- **Purging `events` at a collaborator must clear `registered_via_makerspace` on registrations hosted
-  elsewhere**, or reinstalling resurrects supposedly purged activity and profile history.
-- **`MemberProfile.show_attended_events` is consent, not configurability.** `is_visible` publishes the
-  fields the member typed into the profile form; attendance is neither typed nor on that form. The
-  `activity` payload is now a typed nested serializer that **omits** absent keys — a zero says
-  "attended nothing", an absent key says "this space does not run events".
-
-**Standing build conventions for this program:**
 - **Parallel Codex via git worktree.** A second track runs in a sibling worktree
   (e.g. `../IM-nbuild` on its own branch) with a dedicated test DB, so two Codex builds don't collide
   on shared files (`rbac.py`, `origin_scope.py`, `admin_api/urls.py`, `openapi-schema.json`, `api.ts`).
@@ -211,8 +172,11 @@ The one deferred end-to-end user QA remains an owner-run release gate.
   races + false concurrency failures) and **never run the full suite concurrently with `codex review`**
   (it runs its own pytest). If a background full-suite is killed by the environment, run it as
   **foreground chunks** (`pytest tests/<subdirs>`, `tests/test_[a-l]*.py`, `tests/test_[m-z]*.py`).
-  Pre-existing non-regression: `test_machine_image_presign_finalize_delete_and_audit` fails because
-  MinIO is on a remapped host port vs the test default :9000.
+  **The baseline is ZERO reds** — the seven long-standing failures were fixed on 2026-08-12, so any
+  red is a NEW regression, not background noise. This bullet previously exempted
+  `test_machine_image_presign_finalize_delete_and_audit` as a permitted MinIO-host-port failure;
+  that test no longer exists in the tree and the exemption went with it. Do not reintroduce a
+  "known failures" allowance without naming the test and the date it was granted.
 - **Local dev topology (Arch host) — three ways to run, one set of port remaps.** Host ports are
   remapped in the gitignored, machine-specific `docker-compose.override.yml`: Postgres :5433, Redis
   :6379, MinIO :9200/:9201 (:9100 is taken by a Dart dev tool on this machine). Secrets always come
@@ -252,156 +216,220 @@ The one deferred end-to-end user QA remains an owner-run release gate.
   migration whose dep is a rewound app can break migration-executor tests (rewind the full graph
   forward in the test's `finally`).
 
-**Separability: two registries, and the gap that fails OPEN (Phase 7, `apps/separability/`).**
-An app can be **tombstoned** — surfaces gone, rows and migrations retained (`apps/printing`,
-`apps/roadmap` are the precedent) — and that forces two registries with opposite lifetimes.
-**Retention** (PII field mappings, purge plans, storage collectors, historical payment subjects) is
-registered **even when tombstoned**: deregistering it makes retained rows unpurgeable and
-unencryptable and strands private S3 objects nothing can name. **Runtime** (URLs, reports, admin,
-frontend surfaces, origin-scope routes) registers only while the app is active.
-- **A missing PII registration fails OPEN, which is why B3 is a system check and not an assertion.**
-  `ScopedPiiModelMixin` asks the registry for a model's fields and reads an empty answer as "holds no
-  PII"; every protection then no-ops in the safe-looking direction — `__getattribute__` returns the raw
-  column, the `bulk_create` guard passes, the save boundary writes no envelope, the write fence is
-  skipped — and the row lands in the clear with nothing raised. `separability.E001` now **refuses
-  startup** (verified: deleting `bookings.Booking` from the map makes `manage.py check` a
-  `SystemCheckError`), and `UnmappedPiiModel` is the runtime backstop for a `--skip-checks` process.
-  The check is deliberately **not** gated on `PII_ENCRYPTION_ENABLED` — the deployment that has not
-  enabled encryption yet is exactly the one that will, and the gap must be caught before the flip.
-- **Registration happens in `AppConfig.ready()`, so it must be query-free and idempotent** — `ready()`
-  also runs for `migrate`, `makemigrations`, tests, Celery workers and management commands.
-- **`apps.separability` must stay LAST in `INSTALLED_APPS`.** Django imports every models module, then
-  calls every `ready()` in list order; being last is what guarantees all registration precedes
-  `finalize()`, which freezes the maps. Registering after the freeze raises rather than mutating a map
-  some consumers already read.
-- **Duplicate keys are fatal, never last-write-wins** — two apps claiming one purge node or PII model
-  means one is silently unprotected, and the loser is invisible.
-- **Consumers call accessors (`fields_for_label`, `all_fields`, `registered_labels`, `runtime_active`),
-  never `from ... import BY_MODEL`/`ALL_FIELDS`** — a module-level import binds an import-time snapshot
-  that stops being true once registration is per-app.
-- **`runtime_active(app_label)` replaces `apps.is_installed()`** at the two call sites that had it
-  (`member_activity_service`, `reports_health`): a tombstoned app is still installed — it must be, or
-  its migrations unapply — so `is_installed()` answers "are the tables there?" when the caller means
-  "are the surfaces live?". Unregistered defaults to **active**, so no app must opt in to keep working.
+### Local development
 
-**Tombstoning an app: `TOMBSTONED_APPS` + `SEPARABLE_APPS` (Phase 8+, `separability/tombstones.py`).**
-A tombstone is a **deployment** decision, never per-tenant — URL routing, admin registration and the
-OpenAPI schema are process-global, so an app's surfaces are present for everyone or absent for everyone.
-It composes with, and does not replace, the per-makerspace `enabled_modules` switch: a module is usable
-only when the tenant enabled it **and** the deployment ships the app. The env var names **app labels,
-not module keys** (one app can own several keys — `printing`/`machines`/`machine_service` are all
-`apps.machines`), and it never touches data: rows, migrations, purge plans and PII mappings all stay.
-- **`payments` and `updates` joined `SEPARABLE_APPS` (phase 16).** A makerspace that takes no money
-  online ships **no Stripe surfaces at all**, and a deployment updated by its own host tooling ships
-  no in-app release control. The import counts are a red herring — 26 modules import `apps.payments`
-  and every one keeps working, because a tombstone removes *surfaces*, never models: the rows stay
-  readable, purgeable and nameable by the retention registry. Three things this needed beyond the
-  standard pattern:
-  - **The Stripe webhook is spliced out, not left answering.** An endpoint that still verified and
-    settled a charge for an app whose reconciliation console is gone would move real money nobody
-    can see. `config.urls.separable_paths` is the shape of `separable()` for inline single-view
-    routes rather than an app urlconf.
-  - **Some routes live in another app's urlconf.** `admin_api` owns the staff surface for payments
-    and updates, so those cannot be removed by dropping an `include()` — `admin_api/urls.py` has its
-    own in-place `_separable()` gate. The tombstone tests assert a **neighbouring** route in the
-    same list still resolves, because splicing in place is exactly where an off-by-one removes too
-    much.
-  - **`_managed_item` had to become None-safe.** It called `_item(...)` and then subscripted the
-    result; `_item` returns `None` for a tombstoned app, so the Stripe Connect entry would have
-    turned a supported tombstone into a boot crash.
-  Both apps own **feature** keys or no key at all, so `available_modules` has nothing to drop and
-  `unavailable_apps()` is what tells the console to hide the tabs — the same reason it exists for
-  `warranty` and `presence`. `TOMBSTONE_PROFILE_APPS` in `tests/tombstone/conftest.py` was extended
-  in step, and the profile is now nine apps.
-- **Still NOT separable, with reasons:** `integrations` (platform mail carries password reset and
-  email verification — removing it locks users out of their own accounts), `encryption` (the
-  `ScopedPiiModelMixin` substrate six models depend on), `operations` (owns six module keys and the
-  report registry that `machines`/`bookings`/`events` builders extend), `apiclients` (its HMAC
-  middleware authenticates the whole public API surface), plus the core apps. `machines` is
-  removable in principle and is the remaining piece for an inventory-only install; it has the widest
-  surface area of any candidate and is deliberately left to its own phase.
-- **`SEPARABLE_APPS` is declared, not derived.** Nothing in the module registry encodes "can this app's
-  surfaces be removed without leaving the rest incoherent" — `is_core` comes closest and is a different
-  question (`apps.makerspaces` owns only non-core modules yet is the tenant root; `apps.inventory` owns
-  a core module *and* two optional ones). Anything in `TOMBSTONED_APPS` but absent from `SEPARABLE_APPS`
-  **refuses startup** (`separability.E007`), which is what turns a typo, a dotted path or a core app
-  from a silently inert setting into a boot failure. The set grows one app per B6 phase.
-- **`module_enabled()` is the chokepoint**, ANDing `module_registry.module_available(key)` in, so a
-  guard written later inherits the check without knowing it exists. `platform.available_modules()` is
-  the read side — used by the bootstrap payload and both staff makerspace serializers, because the
-  console turns those keys straight into tabs and a stale key renders a tab whose every request 404s.
-  `/control/` and `module_install` keep reading the **raw** field: a superadmin must see what is stored.
-- **Admin registration cannot ask the manifest.** `django.contrib.admin` sits above every `apps.*` entry
-  in `INSTALLED_APPS`, so autodiscovery imports every `admin.py` *before* the owning app's `ready()` has
-  registered anything. An `admin.py` must therefore call `app_is_tombstoned()` (settings) rather than
-  `runtime_active()` (manifest); both derive from `tombstoned_app_labels()`, so they cannot disagree.
-- **A sidebar entry must be omitted, not permission-hidden.** Unfold calls `str(link)` on every item to
-  compute `active` **before** consulting the permission callback, so a `reverse_lazy` to a route the
-  tombstoned app no longer registers raises `NoReverseMatch` and 500s the whole console.
-  `_item(..., app_label=...)` returns `None` and `_prune_navigation` drops it (and any group left
-  empty). `config/unfold.py` reads the env directly because settings *imports* it.
-- **URL includes are spliced in place, never appended** (`config.urls.separable`): resolution is
-  order-sensitive. `include()` is evaluated only when the app is active, because a genuinely gutted app
-  has no urlconf to import.
-- **The tombstone suite is a separate pytest run** (`tests/tombstone/`), because import-time surfaces
-  cannot be re-derived in-process and the all-active suite asserts the opposite for the same objects:
-  `TOMBSTONED_APPS=bookings,events,maintenance,notifications,payments,presence,procurement,updates,warranty
-  pytest tests/tombstone` — the conftest demands the **whole nine-app profile** and names the exact
-  string it wants, so a single app (this line said `procurement` alone until 2026-08-11) is a hard
-  `UsageError`, not a partial run. A whole-tree run skips the directory; an
-  explicit run without the profile is a hard `UsageError`, never a green no-op. `TOMBSTONE_PROFILE_APPS`
-  in its conftest must stay in step with `SEPARABLE_APPS`.
+The topology bullet above explains *why* there are three ways to run this and what each one is for;
+this section is the commands. They were 1,400 lines apart in the previous ordering, which is how the
+two accounts drifted — keep them adjacent.
 
-## Container/deployment invariants (do not regress)
+The default path needs nothing installed on the host but Docker. Migrations run automatically as a
+`depends_on: service_completed_successfully` step, so `up` is the whole story:
 
-**The images run unprivileged.** `backend/Dockerfile` creates uid 10001 `app`, uses `COPY --chown`
-(a later `chown -R /app` would duplicate the whole tree into a second layer) and drops `USER app`
-before CMD. Two paths must therefore stay writable and owned by `app`: `STATIC_ROOT`
-(`/app/staticfiles`, written by the boot-time `collectstatic`) and `/var/lib/celery`. In **dev** the
-`./backend` bind mount is owned by the host user, and `makemigrations` has to write into it, so
-`docker-compose.dev.yml` sets `user: "${DEV_UID:-1000}:${DEV_GID:-1000}"` on `backend` only —
-worker/beat stay on the image uid because they only ever write to `/var/lib/celery`.
+```bash
+# Everything — db, redis, minio, Django, Celery worker/beat, Vite — with live reload.
+./scripts/dev-docker.sh up -d --build     # first run; drop --build afterwards
+./scripts/dev-docker.sh exec backend python manage.py seed_demo   # first run only
+./scripts/dev-docker.sh logs -f backend
+./scripts/dev-docker.sh restart worker beat   # Celery has no autoreload
+./scripts/dev-docker.sh down
 
-**Celery beat must be given an explicit `--schedule`.** It otherwise drops its shelve in the CWD:
-under the dev bind mount that wrote a **root-owned `celerybeat-schedule` into the repo working tree**,
-and post-hardening `/app` is not writable at all. Both the base and prod compose point it at the
-`celerybeat_data` named volume so last-run timestamps survive a restart (otherwise every periodic task
-re-fires on boot).
+# After changing package.json, recreate the node_modules volume:
+./scripts/dev-docker.sh up -d --build -V frontend
 
-**Never split a shell command across lines in a YAML folded scalar (`>`).** A more-indented line keeps
-its newline instead of folding to a space, and a newline inside `sh -c` terminates the command. Splitting
-gunicorn's flags one-per-line made it run bare — silently falling back to its **127.0.0.1** default while
-each flag became a failing command. The killer detail: the healthcheck probes `localhost`, so the
-container reported **healthy** while nginx got connection-refused and every request 502'd. Keep the whole
-invocation on one line. A healthcheck that probes localhost cannot detect a localhost-only bind.
+# Tests
+./scripts/dev-docker.sh exec backend pytest
+```
 
-**`mc cors set` is unusable — CORS lives on the MinIO server.** Modern `mc` sends S3 XML and rejects the
-JSON the compose file used to write ("decoding xml: EOF", exit 1). Because `backend` has
-`depends_on: createbuckets: service_completed_successfully`, that exit-1 left backend and frontend stuck
-in `Created` — **`setup.sh` could never bring the app up**. Origins are now set with
-`MINIO_API_CORS_ALLOW_ORIGIN` (comma-separated) on the `minio` service, fed by `MINIO_CORS_ALLOWED_ORIGINS`;
-`createbuckets` provisions buckets/policies only and runs under `set -e`. The old
-`MINIO_CORS_ALLOWED_ORIGINS_JSON` is gone from compose, both installers and the docs.
+Host fallback (faster `pytest` / one-off `manage.py`; needs `backend/.venv` + `npm install`):
 
-**Browser-facing storage URLs must name the real host, never `localhost`.**
-`AWS_S3_PUBLIC_ENDPOINT_URL` / `PUBLIC_IMAGE_BASE_URL` are baked into presigned evidence upload/view URLs
-and every public image `src`. The compose default (`http://localhost:9000`) makes a deployment work only
-from the server console and show broken images to everyone else, so `setup.sh`/`setup.ps1` now write both
-from the answered web address. The compose default is kept (not made `:?` required) so existing
-deployments don't hard-break on upgrade.
+```bash
+./scripts/dev-local.sh infra          # db, redis, minio only
+./scripts/dev-local.sh migrate
+./scripts/dev-local.sh backend        # http://localhost:8000
+./scripts/dev-local.sh frontend       # http://localhost:5000
+./scripts/dev-local.sh test
+```
 
-**`.dockerignore` patterns are root-anchored.** A bare `__pycache__`/`*.pyc` does not match nested
-directories — every `apps/*/__pycache__` was shipping inside the image. Nested patterns need `**/`.
+**Never run both at once** — they bind the same host ports (:8000, :5000) and the same database.
 
-**Production compose defaults that are not optional:** every long-running service carries
-`restart: unless-stopped` (via the `x-restart` anchor) or the stack does not survive a host reboot, and a
-capped `json-file` `logging` block (via `x-logging`) or container logs fill the host disk. Third-party
-images are pinned to a verified release tag — **verify a tag actually resolves before pinning it**
-(`minio/mc` release tags do not match the epoch in the image's `release` label).
+- Public inventory page: `http://localhost:5000/m/makerspace`
+- API: `http://localhost:8000/api` — Swagger UI at `/docs/`, ReDoc at `/redoc/`, schema at `/schema/`.
 
-## Cross-cutting invariants (from shipped batches — do not regress)
+## Project Status
 
-These rules were established across many batches and are load-bearing beyond any single module:
+### Admin control plane (superadmin-only)
+
+The **Unfold Django admin is the Super Admin's sole control plane**, mounted at **`/control/`**
+(NOT `/admin/` — `/admin` belongs to the React staff console SPA route), locked to superadmins, and
+**not exposed on the public frontend port** (`frontend/nginx.conf` does not proxy it — makerspace staff
+on port 80 can never reach the Django console; the superadmin reaches `/control/` only via direct backend
+access). Gated two ways: `config.admin_access.AdminSuperuserOnlyMiddleware` (denies any authenticated
+non-superadmin; the `/api/v1/admin/...` React staff APIs are NOT gated) and
+`config.admin_access.SuperuserOnlyModelAdmin` (first base of every `ModelAdmin`). Superadmin operations
+are Django admin **actions that route through the existing services** (never mutating status directly);
+issue/return remain React-only. Superadmin monitoring surfaces (QR ZIP, inline QR/photo previews, print
+file downloads) are read-only and guard storage failures.
+
+**U-SEC:** django-axes admin-login lockout, scoped `login`/`public_request_submit` throttles + write-only
+`website` honeypot on public submit, production-gated security headers, always-on CSP via django-csp 4,
+and a `pip-audit` CI job. The global CSP `script-src` omits `'unsafe-eval'`; a tiny
+`config.admin_access.AdminCspEvalMiddleware` appends `'unsafe-eval'` to `script-src` **and** the S3 public
+origin to `img-src` **only for `/control/` responses** (django-unfold ships eval-requiring Alpine.js; the
+JSON API + public docs stay on the strict policy). Design spec:
+`docs/superpowers/specs/2026-06-13-superadmin-admin-control-plane-design.md`.
+
+**Django admin coverage** is complete (every domain model registered; immutable/workflow-owned models
+read-only; a `list_filter` per makerspace-scoped admin). The Unfold sidebar (`config/unfold.py`) is
+curated into grouped sections; a test asserts every sidebar link resolves. A drift-guard test
+(`tests/test_admin_hidden_scope.py`) walks every registered admin and forces an explicit scoped/global
+decision (via `NESTED_MAKERSPACE_LOOKUPS` / `GLOBAL_ADMIN_MODELS`) so a new admin can't silently leak
+across the superadmin hide/archive scoping.
+
+**Non-technical install:** `setup.sh` / `setup.ps1` (first-run wizard: Docker check → generate secrets
+incl. Fernet `API_CLIENT_ENC_KEY` → write `.env` → build → `setup_instance` → print URL/creds),
+`docker/compose.build.yml`, and `docs/setup-for-makerspaces.md`. TLS is env-gated (`ENABLE_HTTPS`,
+default off). First-run `setup_instance` seeds `superadmin`/`super123` + `must_change_password` (surfaced
+by login + `/auth/me`, cleared by `/auth/change-password`).
+
+**Releases are titled `SpaceWorks <version>`** (owner-stated convention, recorded 2026-08-15). The
+version is the git-tag form `v<semver>-<branch>.<n>.<sha>` — e.g. `v0.5.1-main.12.a9cd82c0dd89` — so
+a release reads `SpaceWorks v0.5.1-main.12.a9cd82c0dd89`. **The `SpaceWorks ` prefix is a display
+title, not part of the version value:** `updates.UpdateState` stores the bare string in
+`current_version` / `available_version` / `target_version`, and writing the prefix into those columns
+(or comparing against it) would break every version equality check the update flow makes. No code
+literal spells the prefix today — it is applied when publishing — so any surface that needs to show
+it should compose `f"SpaceWorks {version}"` at the display layer.
+
+**Per-makerspace integrations are backend-only and never leak.** `Makerspace` holds per-tenant
+`telegram_bot_token` + `smtp_*`; secrets are encrypted at rest with `API_CLIENT_ENC_KEY` via
+`apps/makerspaces/secrets.py` and decrypted only in delivery code. The staff serializer exposes them
+**write-only** + a `*_set` boolean. Bootstrap returns only frontend-safe config (module flags, not
+secrets). No shared-integration entity exists — makerspaces sharing SMTP/Telegram enter the same
+credentials per space (stored/encrypted independently).
+
+**Implementation status.** The multi-frontend platform and open operations/reporting PRDs are implemented
+end-to-end (public browse, auth/RBAC, API-client HMAC, QR/box, audit/evidence, 3D Printing Manager,
+Hardware Request Workflow, procurement "To Buy", stock transfers incl. true cross-makerspace movement,
+stocktake, analytics/ledger/exports, Users CRUD, the FabLab modules in the changelog). The detailed PRDs
+(`docs/prd-*.md`) are **internal planning docs kept local only** (gitignored); "PRD §N" references point
+to those. Google Sheets OAuth publishing, native apps, and physical label-printer control remain out of
+scope.
+
+Stack (in use):
+
+- **Backend:** Django 6 + Django REST Framework (`backend/`). Requires Python 3.12+.
+- **Frontend:** React 19 + Vite 8 + TypeScript (`frontend/`). Requires Node 20.19+ / 22.12+.
+- **Server-state management:** TanStack Query v5
+- **Database:** PostgreSQL 16 (via `docker-compose.yml`)
+- **Styling:** Tailwind CSS 4 (CSS-first; `src/index.css` uses `@import "tailwindcss"` + `@config
+  "../tailwind.config.ts"`; PostCSS via `@tailwindcss/postcss`) with CSS-variable light/dark theme tokens.
+  Light default; dark toggle persisted locally.
+- **API documentation:** drf-spectacular / OpenAPI (snapshot `frontend/openapi-schema.json` + generated
+  `frontend/src/generated/api.ts`; regenerate both when routes/models change — spectacular needs
+  `--format openapi-json`).
+- **Admin theme:** django-unfold; site name via `ADMIN_SITE_NAME` (default "Space Works").
+- **Telegram:** request alerts, test alerts, authenticated webhook accept/reject callbacks.
+
+### Current source map (real paths)
+
+- `backend/config/` — Django project (`settings.py`, `urls.py`, wsgi/asgi). All API routes under `/api/`.
+  `config/admin_access.py` holds the `/control/` gating, CSP middleware, and the hidden-scope drift-guard
+  registries (`NESTED_MAKERSPACE_LOOKUPS`, `GLOBAL_ADMIN_MODELS`).
+- `backend/apps/accounts/` — custom `User` model (`AUTH_USER_MODEL`), browser JWT auth, attested device
+  grants/rotating refresh families, Google/Apple social identities + nonce/JWKS verification, and `rbac.py` (the Auth &
+  RBAC module: `can(...)`, action-based `actions_for_membership`/`makerspaces_for_action`/`scope_by_action`,
+  makerspace scoping, superadmin hide/archive exclusion).
+- `backend/apps/makerspaces/` — `Makerspace` model (tenant root; unique `slug`; `frontend_domain`,
+  module flags, `resource_limit_overrides`, `archived_at`, `superadmin_access_enabled`), bootstrap views,
+  dynamic CORS, module guards, `module_registry.py` (canonical module definitions — all module lists
+  derive from it), `platform.py` origin helpers, `limits.py` (fair-use quotas), `lifecycle.py`
+  (archive/purge), `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`
+  (managed subdomains), `secrets.py`.
+- `backend/apps/audit/` — append-only `AuditLog` + `audit.record(...)` (Postgres-trigger immutable).
+- `backend/apps/evidence/` — immutable evidence photos, S3 storage helpers, signed upload/view URLs gated
+  by per-makerspace `UPLOAD_EVIDENCE` + active status.
+- `backend/apps/boxes/` — `QrCode`/`Box` payloads, immutable `BoxScan`/`QrScanEvent`, `qr_render.py`
+  (namespaced standalone SVG shared by QR-print + batch ZIP), QR rebind. Camera scanner at
+  `frontend/src/components/ui/QrScanner.tsx` (native `BarcodeDetector` + `zxing-wasm` fallback).
+- `backend/apps/admin_api/` — staff REST surface: makerspaces, inventory CRUD + per-makerspace category
+  CRUD (`EDIT_INVENTORY`), bulk import, staff/membership + role management, user restrict/restore,
+  API-client issuance, audit reads, warranty, email-log, notification-recipient, FabLab report views.
+- `backend/apps/operations/` — open operations/reporting: health, stock transfers (intra + true
+  cross-makerspace), stocktake, adjustments, ledger, `report_registry.py` + `report_scope.py` +
+  `reports_*` builders, CSV/XLSX exports, container APIs, QR print batches (`qr_zip.py`), dashboard,
+  accountability. `views.py`/`services.py` are thin re-export barrels over `views_*`/`services_*`.
+- `backend/apps/integrations/` — Telegram/email/Slack/Mattermost/native-push delivery, encrypted FCM/APNs
+  platform credentials + device registrations, `dispatch_email` choke point +
+  `EmailLog` outbox + Celery task, webhook (auth via `X-Telegram-Bot-Api-Secret-Token` vs
+  `TELEGRAM_WEBHOOK_SECRET`, fail-closed), `PlatformEmailSettings`, `DailyEmailCounter`, staff-notification
+  recipient matrix.
+- `backend/apps/updates/` — singleton platform update state, audited superadmin controls, and the
+  `update_control` management command used by the privileged host scheduler. The web process never gets
+  Docker-socket access; host scripts claim queued/automatic releases and report check/backup/result state.
+- `backend/apps/inventory/` — `InventoryProduct`/`InventoryAsset`, `availability.py` (**the only place**
+  available/reserved/issued/damaged/lost counts change: `reserve_for_request`, `issue_items`/`return_items`,
+  `issue_available`/`return_to_available`, `consume_available`; row-locked, never-below-zero,
+  `InsufficientStock`), `public_availability.py` (public availability service), allowlist-only public
+  serializers/views, `public_image_storage.py`, `seed_demo`.
+- `backend/apps/hardware_requests/` — Hardware Request Workflow: `HardwareRequest`/`HardwareRequestItem`,
+  `HardwareRequestItemAsset` through-model, immutable `ReturnEvent`/`RequesterAccountability`,
+  `PublicToolLoan`, `PublicProblemReport`. `workflow.py` is the **single source of truth** for state
+  transitions (atomic + row-locked + audited; also `assign_box`/`issue_request`/`return_items`);
+  `permissions.py`, `exceptions.py` (workflow→HTTP map + `ErrorSerializer._EXCEPTION_MAP`),
+  `notifications.py` (Telegram seam), public submit/verify/status views, `send_return_reminders` command.
+- `backend/apps/payments/` — immutable multi-subject Payment authority, per-space raw credentials + managed
+  Stripe Connect resolution, checkout/webhook settlement, reconciliation, and native PaymentSheet intents.
+- `backend/apps/printing/` — **TOMBSTONED** (Project B). Contains only an `AppConfig` and an empty
+  `models.py`; it stays in `INSTALLED_APPS` solely so its historical migrations remain installed. 3D
+  printing is now a `MachineType` inside `apps/machines/` — look there, not here.
+- `backend/apps/warranty/`, `apps/machines/`, `apps/maintenance/`, `apps/events/`, `apps/bookings/`,
+  `apps/forms_schema/`, `apps/encryption/`, `apps/procurement/`, `apps/notifications/`,
+  `apps/operations/report_registry.py` — the FabLab + governance modules (see condensed changelog).
+- `backend/apps/roadmap/` — **TOMBSTONED**: the `RoadmapItem` model is retained for migration history
+  only. No URLs, no serializers, no admin surface, no frontend.
+  `tests/roadmap/test_removed_surfaces.py` asserts the surfaces stay removed.
+- `backend/tests/` — pytest behavior tests (external behavior, not implementation).
+- `frontend/src/features/inventory/` — public catalog/detail/self-checkout + `ProductCard`/
+  `AvailabilityBadge`. `frontend/src/features/staff/` — staff console panels (grouped nav via
+  `staffAccess.ts` `TAB_GROUPS` (sidebar grouping AND permission derivation — **not** `StaffApp.tsx`,
+  which this said until 2026-08-12; module gating and routing are the separate `staffTabs.ts`);
+  capabilities from action-based `staffAccess.ts`; payment reconciliation and
+  platform credential panels). `frontend/src/features/auth/` + `members/MemberAuthPanel.tsx` provide the
+  provider-config-driven social/member auth surfaces. `frontend/src/features/
+  printing|bookings|forms|...` — feature slices. `frontend/src/lib/`, `components/ui/`, `types/`,
+  `generated/api.ts`.
+
+### Public availability rule (resolves PRD §5's two overlapping fields)
+
+`public_availability_mode` is the master display switch; `show_public_count` is a safety gate for exact counts:
+
+- `is_public = false` → product excluded from the public list entirely.
+- mode `hidden` → product listed, `availability: null`.
+- mode `status_only` → `{ mode: "status_only", label }`.
+- mode `exact_count` → exact `count` **only if** `show_public_count = true`; otherwise falls back to `status_only`.
+- Status label: `available ≤ 0` or `total ≤ 0` → `Unavailable`; `available ≤ ceil(total × 0.2)` → `Limited`; else `Available`.
+
+The API response is DRF-paginated (`PageNumberPagination`, page size 24): `{ count, next, previous, results }`. This is the standing convention for all list endpoints.
+
+### Audit + evidence conventions
+
+- Audit writes go through `apps.audit.services.record(actor, action, ...)`. `AuditLog` is append-only in
+  model methods and by Postgres triggers; state-changing services must emit entries.
+- Evidence photos live in a private S3-compatible bucket (`EvidencePhoto` rows: `makerspace`,
+  `evidence_type`, `object_key`, `uploaded_by`, `created_at`). Workflow records link to these rows.
+- Evidence upload uses presigned upload with exact MIME binding + content-length range
+  (`EVIDENCE_ALLOWED_MIME`). Upload/detail URLs are scoped by per-makerspace `UPLOAD_EVIDENCE` + active
+  status (not global roles — membership-only Inventory Managers can upload/view in their makerspace).
+- `AWS_S3_ENDPOINT_URL` = backend-facing; `AWS_S3_PUBLIC_ENDPOINT_URL` = browser-facing presigned URLs
+  (dockerized backend needs `http://minio:9000` vs `http://localhost:9000`).
+- Object keys are identifiers, not secrets — privacy is the private bucket + short-lived signed URLs.
+
+## Invariants (do not regress)
+
+The load-bearing rules, grouped by area. These were established across many shipped batches and
+matter beyond any single module. Read the subsection covering what you are touching.
+
+### Cross-cutting invariants (from shipped batches)
 
 **Self-host vs managed SaaS (all managed features dormant by default).** `PLATFORM_DOMAIN_SUFFIX`
 blank/whitespace ⇒ `domain_verification.is_self_host()` is True ⇒ **every managed feature is inert**
@@ -1454,344 +1482,113 @@ why the colour is there; `bg-tone-mint` does not) and the `tone-*` tokens are de
 admin must have a React staff-console surface — a capability with no console surface is a latent
 dead/broken feature for normal staff. New workflow actions ship their staff UI in the same batch.
 
-## Condensed changelog (newest first — full detail in `git log`)
+### Separability and tombstoning
 
-Each line names a shipped feature and, where useful, the load-bearing rule it introduced (folded into the
-invariants above). Use `git log --oneline`/`git blame` for the implementing commits and per-file history.
+**Separability: two registries, and the gap that fails OPEN (Phase 7, `apps/separability/`).**
+An app can be **tombstoned** — surfaces gone, rows and migrations retained (`apps/printing`,
+`apps/roadmap` are the precedent) — and that forces two registries with opposite lifetimes.
+**Retention** (PII field mappings, purge plans, storage collectors, historical payment subjects) is
+registered **even when tombstoned**: deregistering it makes retained rows unpurgeable and
+unencryptable and strands private S3 objects nothing can name. **Runtime** (URLs, reports, admin,
+frontend surfaces, origin-scope routes) registers only while the app is active.
+- **A missing PII registration fails OPEN, which is why B3 is a system check and not an assertion.**
+  `ScopedPiiModelMixin` asks the registry for a model's fields and reads an empty answer as "holds no
+  PII"; every protection then no-ops in the safe-looking direction — `__getattribute__` returns the raw
+  column, the `bulk_create` guard passes, the save boundary writes no envelope, the write fence is
+  skipped — and the row lands in the clear with nothing raised. `separability.E001` now **refuses
+  startup** (verified: deleting `bookings.Booking` from the map makes `manage.py check` a
+  `SystemCheckError`), and `UnmappedPiiModel` is the runtime backstop for a `--skip-checks` process.
+  The check is deliberately **not** gated on `PII_ENCRYPTION_ENABLED` — the deployment that has not
+  enabled encryption yet is exactly the one that will, and the gap must be caught before the flip.
+- **Registration happens in `AppConfig.ready()`, so it must be query-free and idempotent** — `ready()`
+  also runs for `migrate`, `makemigrations`, tests, Celery workers and management commands.
+- **`apps.separability` must stay LAST in `INSTALLED_APPS`.** Django imports every models module, then
+  calls every `ready()` in list order; being last is what guarantees all registration precedes
+  `finalize()`, which freezes the maps. Registering after the freeze raises rather than mutating a map
+  some consumers already read.
+- **Duplicate keys are fatal, never last-write-wins** — two apps claiming one purge node or PII model
+  means one is silently unprotected, and the loser is invisible.
+- **Consumers call accessors (`fields_for_label`, `all_fields`, `registered_labels`, `runtime_active`),
+  never `from ... import BY_MODEL`/`ALL_FIELDS`** — a module-level import binds an import-time snapshot
+  that stops being true once registration is per-app.
+- **`runtime_active(app_label)` replaces `apps.is_installed()`** at the two call sites that had it
+  (`member_activity_service`, `reports_health`): a tombstoned app is still installed — it must be, or
+  its migrations unapply — so `is_installed()` answers "are the tables there?" when the caller means
+  "are the surfaces live?". Unregistered defaults to **active**, so no app must opt in to keep working.
 
-- **Public imagery, machine grouping, accessibility** (2026-08-10, `dev`, local): `Event.image_key`
-  with presign/attach/clear mirroring the machine image flow, and `image_url` on the staff and public
-  serializers — the four-place registration this needed is written up under public images above;
-  machines grouped under their `MachineType` in the staff console plus a public `/machines` page,
-  display-only and reusing the existing public endpoint unchanged; and an accessibility floor
-  (contrast guard, real focus indicators, skip links, 44px targets, labelled sidebar landmarks).
-  **The pastel theme was kept**: only `--color-muted` failed AA, every other text token already
-  passed, so the visible change is one token in light mode. The blueprint grid and Instrument Sans
-  were confirmed intentional and waived in `.impeccable/config.json`.
-- **Notifications v2** (2026-08-09, `dev`, local): per-event recipient selection where no rows means
-  today's behaviour (`9d8d5a7`); per-room chat destinations with typed credentials, union scoping,
-  per-room log rows and a per-channel length table (`f7fd8b2`); editable email wording for the four
-  FabLab streams plus one shared chat body per event, staff-only by construction (`69b8e45`);
-  recipient rules narrowed by machine/type/category, composed so they can only narrow (`6eca688`);
-  staff API + console for recipients and rooms, with write-only credentials (`99dcb00`).
-  **Per-destination Telegram bot tokens were considered and dropped** — one webhook secret means a
-  second bot's accept/reject buttons would be dead.
-- **Auth + notification-channel modularity** (2026-08-08, `dev`, local): SMS provider seam + phone as a
-  verified member login identity (`f04fbb5`); guided-but-skippable Google sign-in in `setup.sh`/`setup.ps1`
-  plus the `configure_social_auth` command (`1210208`); Discord as an incoming-webhook channel and one
-  module key per notification channel, with the `0056` slack/mattermost backfill and a README module
-  section. **SAML and per-makerspace auth-credential overrides were both considered and dropped** —
-  OIDC already covers every IdP a makerspace runs, and identity is platform-scoped by construction.
-- **Phase C final tracks** (2026-07-23, `dev`): encrypted per-space Stripe credentials + managed Stripe
-  Connect (`3b43f47`); makerspace-scoped reconciliation dashboard/reports (`1ad63f5`); unified booking,
-  event-registration, and membership-dues Payment subjects (`159a88f`, hardened by `396cb27`); attested
-  device grants, rotating native refresh, native push, and Stripe PaymentSheet (`1aa2029`); server-verified
-  Google/Apple member + staff social sign-in with surface/origin enforcement (`ad2fe42`).
-- **Phase C — capabilities + payments + geofence** (2026-07-21/22, `dev`): Track 1 two-level module/feature
-  toggles (`41e6a2a`); C.2 Stripe foundation — per-makerspace encrypted creds + verify-only webhook
-  (`92eda37`); C.3 machine-service payments — `apps/payments.Payment` as the single payment authority,
-  gated non-blocking charge at machine `complete()`, idempotent webhook settlement, member/staff surfaces
-  + reconciliation, legacy `payment_*` → read-only historic with a backfill migration (`9c1d928`); C.7
-  **advisory** geofenced presence check-in — records proximity buckets, never blocks (`007ef55`);
-  C.3-hardening — `Payment` DELETE-immutability trigger + purge-graph wiring + async Stripe checkout
-  settlement (`c8225c0`); **C.6 + P1-A** — custom machine-type config (SM-identity authority) + generic
-  non-gram `MachineServiceConsole` + seed migration `0017`, and the unified per-space
-  `MakerspaceMachineTypePricing` override (pricing out of `capability_config`, built-ins priceable per-space,
-  migration `0018` fail-safe backfill) (`8d39cb0`).
-- **FabLab Parts C–N + L + H + Settings + K** (2026-07-16→18, `dev`): Events, Bookings (+ public
-  self-booking + shared `forms_schema` custom forms + structured event location), Maintenance, Analytics
-  reports, public Roadmap (later tombstoned), Machine Manager role + SM-delegated role assignment, per-feature×per-channel
-  notification matrix (Slack/Mattermost), scoped PII encryption H1–H4, custom roles L, machine service
-  requests N (in worktree). New apps: `events`, `bookings`, `maintenance`, `roadmap`, `forms_schema`,
-  `encryption`, machine-service models under `machines`.
-- **Machines module M1 + M1.5** (2026-07-14/15): generic `apps/machines/` (types/machine/operators/usage/
-  docs/errors), 3-tier authz (`MANAGE_MACHINES` + type-managers via `MachineType.managing_action` +
-  per-machine operators), services single-source-of-truth, printer auto-link, custom types, photo,
-  warranty (3rd host), consumables (count via inventory + grams ledger), public exposure.
-- **Self-host-first + SaaS hosting Parts A/B + space-works.tech** (2026-07-15/16): self-host custom-domain
-  auto-trust, managed fair-use limits + subdomain request→approve, one-shared-instance multi-tenant
-  hosting (all dormant on blank `PLATFORM_DOMAIN_SUFFIX`). AGPL relicense + repo professionalization.
-- **Audit fixes + dependency upgrade P1–P17** (2026-07-08): integration health center, scan-first
-  stocktake, ops dashboard, notifications app + inbox + fail-safe emit hooks; force-latest upgrade to
-  Django 6 / React 19 / Vite 8 / Tailwind 4 / TS 6.
-- **Manager fixes P5–P10** (2026-06-30): direct-loan return resolutions + accountability + public
-  report-a-problem, unified asset editor, optional partial approval, accountability dashboard,
-  actionable warranty/reports UI.
-- **Email/async stack** (2026-06-21): `EmailLog` outbox + single `dispatch_email` choke point + Celery/
-  Redis async delivery + retry. Per-makerspace staff-notification recipient matrix.
-- **Print filament grams / payment / manual logs** (2026-06-16/28): requester grams estimate, failed-%
-  → printer hours, manual-log outcomes, staff-private cash payment on prints (never exposed to requester
-  — enforced by serializer split), top-requesters leaderboard by email.
-- **Warranty tracking** (2026-06-27): `apps/warranty/` (asset XOR printer XOR machine host, private
-  bill/doc uploads, display-only status; per-host RBAC; public-leak invariant tested).
-- **UI reskins** (frontend-only): pastel "notebook" theme (2026-06-22, fill/`-ink` token split),
-  Blueprint redesign + item/makerspace imagery (2026-06-20).
-- **Collaborative self-governance** (2026-06-16): superadmin-access toggle (later hard block),
-  API-client self-serve, admin + self-service password resets, Platform Email settings.
-- **Console-parity + workflow surfacing** (2026-06-16): broken-at-handover + to-be-fixed shelf,
-  ledger specific-unit + staff-return evidence, direct-handout UX, lending history, QR rebind,
-  surfacing ~10 orphaned backend lifecycles into the React console.
-- **Deploy / production** (2026-06-19): single-tenant branded frontend, Supabase free-tier dual-mode
-  (env-toggled; localhost default unchanged), lean-paid production deploy artifacts + perf hardening.
+**Tombstoning an app: `TOMBSTONED_APPS` + `SEPARABLE_APPS` (Phase 8+, `separability/tombstones.py`).**
+A tombstone is a **deployment** decision, never per-tenant — URL routing, admin registration and the
+OpenAPI schema are process-global, so an app's surfaces are present for everyone or absent for everyone.
+It composes with, and does not replace, the per-makerspace `enabled_modules` switch: a module is usable
+only when the tenant enabled it **and** the deployment ships the app. The env var names **app labels,
+not module keys** (one app can own several keys — `printing`/`machines`/`machine_service` are all
+`apps.machines`), and it never touches data: rows, migrations, purge plans and PII mappings all stay.
+- **`payments` and `updates` joined `SEPARABLE_APPS` (phase 16).** A makerspace that takes no money
+  online ships **no Stripe surfaces at all**, and a deployment updated by its own host tooling ships
+  no in-app release control. The import counts are a red herring — 26 modules import `apps.payments`
+  and every one keeps working, because a tombstone removes *surfaces*, never models: the rows stay
+  readable, purgeable and nameable by the retention registry. Three things this needed beyond the
+  standard pattern:
+  - **The Stripe webhook is spliced out, not left answering.** An endpoint that still verified and
+    settled a charge for an app whose reconciliation console is gone would move real money nobody
+    can see. `config.urls.separable_paths` is the shape of `separable()` for inline single-view
+    routes rather than an app urlconf.
+  - **Some routes live in another app's urlconf.** `admin_api` owns the staff surface for payments
+    and updates, so those cannot be removed by dropping an `include()` — `admin_api/urls.py` has its
+    own in-place `_separable()` gate. The tombstone tests assert a **neighbouring** route in the
+    same list still resolves, because splicing in place is exactly where an off-by-one removes too
+    much.
+  - **`_managed_item` had to become None-safe.** It called `_item(...)` and then subscripted the
+    result; `_item` returns `None` for a tombstoned app, so the Stripe Connect entry would have
+    turned a supported tombstone into a boot crash.
+  Both apps own **feature** keys or no key at all, so `available_modules` has nothing to drop and
+  `unavailable_apps()` is what tells the console to hide the tabs — the same reason it exists for
+  `warranty` and `presence`. `TOMBSTONE_PROFILE_APPS` in `tests/tombstone/conftest.py` was extended
+  in step, and the profile is now nine apps.
+- **Still NOT separable, with reasons:** `integrations` (platform mail carries password reset and
+  email verification — removing it locks users out of their own accounts), `encryption` (the
+  `ScopedPiiModelMixin` substrate six models depend on), `operations` (owns six module keys and the
+  report registry that `machines`/`bookings`/`events` builders extend), `apiclients` (its HMAC
+  middleware authenticates the whole public API surface), plus the core apps. `machines` is
+  removable in principle and is the remaining piece for an inventory-only install; it has the widest
+  surface area of any candidate and is deliberately left to its own phase.
+- **`SEPARABLE_APPS` is declared, not derived.** Nothing in the module registry encodes "can this app's
+  surfaces be removed without leaving the rest incoherent" — `is_core` comes closest and is a different
+  question (`apps.makerspaces` owns only non-core modules yet is the tenant root; `apps.inventory` owns
+  a core module *and* two optional ones). Anything in `TOMBSTONED_APPS` but absent from `SEPARABLE_APPS`
+  **refuses startup** (`separability.E007`), which is what turns a typo, a dotted path or a core app
+  from a silently inert setting into a boot failure. The set grows one app per B6 phase.
+- **`module_enabled()` is the chokepoint**, ANDing `module_registry.module_available(key)` in, so a
+  guard written later inherits the check without knowing it exists. `platform.available_modules()` is
+  the read side — used by the bootstrap payload and both staff makerspace serializers, because the
+  console turns those keys straight into tabs and a stale key renders a tab whose every request 404s.
+  `/control/` and `module_install` keep reading the **raw** field: a superadmin must see what is stored.
+- **Admin registration cannot ask the manifest.** `django.contrib.admin` sits above every `apps.*` entry
+  in `INSTALLED_APPS`, so autodiscovery imports every `admin.py` *before* the owning app's `ready()` has
+  registered anything. An `admin.py` must therefore call `app_is_tombstoned()` (settings) rather than
+  `runtime_active()` (manifest); both derive from `tombstoned_app_labels()`, so they cannot disagree.
+- **A sidebar entry must be omitted, not permission-hidden.** Unfold calls `str(link)` on every item to
+  compute `active` **before** consulting the permission callback, so a `reverse_lazy` to a route the
+  tombstoned app no longer registers raises `NoReverseMatch` and 500s the whole console.
+  `_item(..., app_label=...)` returns `None` and `_prune_navigation` drops it (and any group left
+  empty). `config/unfold.py` reads the env directly because settings *imports* it.
+- **URL includes are spliced in place, never appended** (`config.urls.separable`): resolution is
+  order-sensitive. `include()` is evaluated only when the app is active, because a genuinely gutted app
+  has no urlconf to import.
+- **The tombstone suite is a separate pytest run** (`tests/tombstone/`), because import-time surfaces
+  cannot be re-derived in-process and the all-active suite asserts the opposite for the same objects:
+  `TOMBSTONED_APPS=bookings,events,maintenance,notifications,payments,presence,procurement,updates,warranty
+  pytest tests/tombstone` — the conftest demands the **whole nine-app profile** and names the exact
+  string it wants, so a single app (this line said `procurement` alone until 2026-08-11) is a hard
+  `UsageError`, not a partial run. A whole-tree run skips the directory; an
+  explicit run without the profile is a hard `UsageError`, never a green no-op. `TOMBSTONE_PROFILE_APPS`
+  in its conftest must stay in step with `SEPARABLE_APPS`.
 
-## Project Status
+### Machine scoping — `MANAGE_MACHINES` is per role, and fails CLOSED
 
-### Admin control plane (superadmin-only)
+Moved here from "Hard Rules", where it had been appended and had grown to ~430 lines. Content is
+unchanged.
 
-The **Unfold Django admin is the Super Admin's sole control plane**, mounted at **`/control/`**
-(NOT `/admin/` — `/admin` belongs to the React staff console SPA route), locked to superadmins, and
-**not exposed on the public frontend port** (`frontend/nginx.conf` does not proxy it — makerspace staff
-on port 80 can never reach the Django console; the superadmin reaches `/control/` only via direct backend
-access). Gated two ways: `config.admin_access.AdminSuperuserOnlyMiddleware` (denies any authenticated
-non-superadmin; the `/api/v1/admin/...` React staff APIs are NOT gated) and
-`config.admin_access.SuperuserOnlyModelAdmin` (first base of every `ModelAdmin`). Superadmin operations
-are Django admin **actions that route through the existing services** (never mutating status directly);
-issue/return remain React-only. Superadmin monitoring surfaces (QR ZIP, inline QR/photo previews, print
-file downloads) are read-only and guard storage failures.
-
-**U-SEC:** django-axes admin-login lockout, scoped `login`/`public_request_submit` throttles + write-only
-`website` honeypot on public submit, production-gated security headers, always-on CSP via django-csp 4,
-and a `pip-audit` CI job. The global CSP `script-src` omits `'unsafe-eval'`; a tiny
-`config.admin_access.AdminCspEvalMiddleware` appends `'unsafe-eval'` to `script-src` **and** the S3 public
-origin to `img-src` **only for `/control/` responses** (django-unfold ships eval-requiring Alpine.js; the
-JSON API + public docs stay on the strict policy). Design spec:
-`docs/superpowers/specs/2026-06-13-superadmin-admin-control-plane-design.md`.
-
-**Django admin coverage** is complete (every domain model registered; immutable/workflow-owned models
-read-only; a `list_filter` per makerspace-scoped admin). The Unfold sidebar (`config/unfold.py`) is
-curated into grouped sections; a test asserts every sidebar link resolves. A drift-guard test
-(`tests/test_admin_hidden_scope.py`) walks every registered admin and forces an explicit scoped/global
-decision (via `NESTED_MAKERSPACE_LOOKUPS` / `GLOBAL_ADMIN_MODELS`) so a new admin can't silently leak
-across the superadmin hide/archive scoping.
-
-**Non-technical install:** `setup.sh` / `setup.ps1` (first-run wizard: Docker check → generate secrets
-incl. Fernet `API_CLIENT_ENC_KEY` → write `.env` → build → `setup_instance` → print URL/creds),
-`docker/compose.build.yml`, and `docs/setup-for-makerspaces.md`. TLS is env-gated (`ENABLE_HTTPS`,
-default off). First-run `setup_instance` seeds `superadmin`/`super123` + `must_change_password` (surfaced
-by login + `/auth/me`, cleared by `/auth/change-password`).
-
-**Per-makerspace integrations are backend-only and never leak.** `Makerspace` holds per-tenant
-`telegram_bot_token` + `smtp_*`; secrets are encrypted at rest with `API_CLIENT_ENC_KEY` via
-`apps/makerspaces/secrets.py` and decrypted only in delivery code. The staff serializer exposes them
-**write-only** + a `*_set` boolean. Bootstrap returns only frontend-safe config (module flags, not
-secrets). No shared-integration entity exists — makerspaces sharing SMTP/Telegram enter the same
-credentials per space (stored/encrypted independently).
-
-**Implementation status.** The multi-frontend platform and open operations/reporting PRDs are implemented
-end-to-end (public browse, auth/RBAC, API-client HMAC, QR/box, audit/evidence, 3D Printing Manager,
-Hardware Request Workflow, procurement "To Buy", stock transfers incl. true cross-makerspace movement,
-stocktake, analytics/ledger/exports, Users CRUD, the FabLab modules in the changelog). The detailed PRDs
-(`docs/prd-*.md`) are **internal planning docs kept local only** (gitignored); "PRD §N" references point
-to those. Google Sheets OAuth publishing, native apps, and physical label-printer control remain out of
-scope.
-
-Stack (in use):
-
-- **Backend:** Django 6 + Django REST Framework (`backend/`). Requires Python 3.12+.
-- **Frontend:** React 19 + Vite 8 + TypeScript (`frontend/`). Requires Node 20.19+ / 22.12+.
-- **Server-state management:** TanStack Query v5
-- **Database:** PostgreSQL 16 (via `docker-compose.yml`)
-- **Styling:** Tailwind CSS 4 (CSS-first; `src/index.css` uses `@import "tailwindcss"` + `@config
-  "../tailwind.config.ts"`; PostCSS via `@tailwindcss/postcss`) with CSS-variable light/dark theme tokens.
-  Light default; dark toggle persisted locally.
-- **API documentation:** drf-spectacular / OpenAPI (snapshot `frontend/openapi-schema.json` + generated
-  `frontend/src/generated/api.ts`; regenerate both when routes/models change — spectacular needs
-  `--format openapi-json`).
-- **Admin theme:** django-unfold; site name via `ADMIN_SITE_NAME` (default "Space Works").
-- **Telegram:** request alerts, test alerts, authenticated webhook accept/reject callbacks.
-
-### Local development
-
-The default path needs nothing installed on the host but Docker. Migrations run automatically as a
-`depends_on: service_completed_successfully` step, so `up` is the whole story:
-
-```bash
-# Everything — db, redis, minio, Django, Celery worker/beat, Vite — with live reload.
-./scripts/dev-docker.sh up -d --build     # first run; drop --build afterwards
-./scripts/dev-docker.sh exec backend python manage.py seed_demo   # first run only
-./scripts/dev-docker.sh logs -f backend
-./scripts/dev-docker.sh restart worker beat   # Celery has no autoreload
-./scripts/dev-docker.sh down
-
-# After changing package.json, recreate the node_modules volume:
-./scripts/dev-docker.sh up -d --build -V frontend
-
-# Tests
-./scripts/dev-docker.sh exec backend pytest
-```
-
-Host fallback (faster `pytest` / one-off `manage.py`; needs `backend/.venv` + `npm install`):
-
-```bash
-./scripts/dev-local.sh infra          # db, redis, minio only
-./scripts/dev-local.sh migrate
-./scripts/dev-local.sh backend        # http://localhost:8000
-./scripts/dev-local.sh frontend       # http://localhost:5000
-./scripts/dev-local.sh test
-```
-
-**Never run both at once** — they bind the same host ports (:8000, :5000) and the same database.
-
-- Public inventory page: `http://localhost:5000/m/makerspace`
-- API: `http://localhost:8000/api` — Swagger UI at `/docs/`, ReDoc at `/redoc/`, schema at `/schema/`.
-
-### Current source map (real paths)
-
-- `backend/config/` — Django project (`settings.py`, `urls.py`, wsgi/asgi). All API routes under `/api/`.
-  `config/admin_access.py` holds the `/control/` gating, CSP middleware, and the hidden-scope drift-guard
-  registries (`NESTED_MAKERSPACE_LOOKUPS`, `GLOBAL_ADMIN_MODELS`).
-- `backend/apps/accounts/` — custom `User` model (`AUTH_USER_MODEL`), browser JWT auth, attested device
-  grants/rotating refresh families, Google/Apple social identities + nonce/JWKS verification, and `rbac.py` (the Auth &
-  RBAC module: `can(...)`, action-based `actions_for_membership`/`makerspaces_for_action`/`scope_by_action`,
-  makerspace scoping, superadmin hide/archive exclusion).
-- `backend/apps/makerspaces/` — `Makerspace` model (tenant root; unique `slug`; `frontend_domain`,
-  module flags, `resource_limit_overrides`, `archived_at`, `superadmin_access_enabled`), bootstrap views,
-  dynamic CORS, module guards, `module_registry.py` (canonical module definitions — all module lists
-  derive from it), `platform.py` origin helpers, `limits.py` (fair-use quotas), `lifecycle.py`
-  (archive/purge), `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`
-  (managed subdomains), `secrets.py`.
-- `backend/apps/audit/` — append-only `AuditLog` + `audit.record(...)` (Postgres-trigger immutable).
-- `backend/apps/evidence/` — immutable evidence photos, S3 storage helpers, signed upload/view URLs gated
-  by per-makerspace `UPLOAD_EVIDENCE` + active status.
-- `backend/apps/boxes/` — `QrCode`/`Box` payloads, immutable `BoxScan`/`QrScanEvent`, `qr_render.py`
-  (namespaced standalone SVG shared by QR-print + batch ZIP), QR rebind. Camera scanner at
-  `frontend/src/components/ui/QrScanner.tsx` (native `BarcodeDetector` + `zxing-wasm` fallback).
-- `backend/apps/admin_api/` — staff REST surface: makerspaces, inventory CRUD + per-makerspace category
-  CRUD (`EDIT_INVENTORY`), bulk import, staff/membership + role management, user restrict/restore,
-  API-client issuance, audit reads, warranty, email-log, notification-recipient, FabLab report views.
-- `backend/apps/operations/` — open operations/reporting: health, stock transfers (intra + true
-  cross-makerspace), stocktake, adjustments, ledger, `report_registry.py` + `report_scope.py` +
-  `reports_*` builders, CSV/XLSX exports, container APIs, QR print batches (`qr_zip.py`), dashboard,
-  accountability. `views.py`/`services.py` are thin re-export barrels over `views_*`/`services_*`.
-- `backend/apps/integrations/` — Telegram/email/Slack/Mattermost/native-push delivery, encrypted FCM/APNs
-  platform credentials + device registrations, `dispatch_email` choke point +
-  `EmailLog` outbox + Celery task, webhook (auth via `X-Telegram-Bot-Api-Secret-Token` vs
-  `TELEGRAM_WEBHOOK_SECRET`, fail-closed), `PlatformEmailSettings`, `DailyEmailCounter`, staff-notification
-  recipient matrix.
-- `backend/apps/updates/` — singleton platform update state, audited superadmin controls, and the
-  `update_control` management command used by the privileged host scheduler. The web process never gets
-  Docker-socket access; host scripts claim queued/automatic releases and report check/backup/result state.
-- `backend/apps/inventory/` — `InventoryProduct`/`InventoryAsset`, `availability.py` (**the only place**
-  available/reserved/issued/damaged/lost counts change: `reserve_for_request`, `issue_items`/`return_items`,
-  `issue_available`/`return_to_available`, `consume_available`; row-locked, never-below-zero,
-  `InsufficientStock`), `public_availability.py` (public availability service), allowlist-only public
-  serializers/views, `public_image_storage.py`, `seed_demo`.
-- `backend/apps/hardware_requests/` — Hardware Request Workflow: `HardwareRequest`/`HardwareRequestItem`,
-  `HardwareRequestItemAsset` through-model, immutable `ReturnEvent`/`RequesterAccountability`,
-  `PublicToolLoan`, `PublicProblemReport`. `workflow.py` is the **single source of truth** for state
-  transitions (atomic + row-locked + audited; also `assign_box`/`issue_request`/`return_items`);
-  `permissions.py`, `exceptions.py` (workflow→HTTP map + `ErrorSerializer._EXCEPTION_MAP`),
-  `notifications.py` (Telegram seam), public submit/verify/status views, `send_return_reminders` command.
-- `backend/apps/payments/` — immutable multi-subject Payment authority, per-space raw credentials + managed
-  Stripe Connect resolution, checkout/webhook settlement, reconciliation, and native PaymentSheet intents.
-- `backend/apps/printing/` — **TOMBSTONED** (Project B). Contains only an `AppConfig` and an empty
-  `models.py`; it stays in `INSTALLED_APPS` solely so its historical migrations remain installed. 3D
-  printing is now a `MachineType` inside `apps/machines/` — look there, not here.
-- `backend/apps/warranty/`, `apps/machines/`, `apps/maintenance/`, `apps/events/`, `apps/bookings/`,
-  `apps/forms_schema/`, `apps/encryption/`, `apps/procurement/`, `apps/notifications/`,
-  `apps/operations/report_registry.py` — the FabLab + governance modules (see condensed changelog).
-- `backend/apps/roadmap/` — **TOMBSTONED**: the `RoadmapItem` model is retained for migration history
-  only. No URLs, no serializers, no admin surface, no frontend.
-  `tests/roadmap/test_removed_surfaces.py` asserts the surfaces stay removed.
-- `backend/tests/` — pytest behavior tests (external behavior, not implementation).
-- `frontend/src/features/inventory/` — public catalog/detail/self-checkout + `ProductCard`/
-  `AvailabilityBadge`. `frontend/src/features/staff/` — staff console panels (grouped nav via
-  `staffAccess.ts` `TAB_GROUPS` (sidebar grouping AND permission derivation — **not** `StaffApp.tsx`,
-  which this said until 2026-08-12; module gating and routing are the separate `staffTabs.ts`);
-  capabilities from action-based `staffAccess.ts`; payment reconciliation and
-  platform credential panels). `frontend/src/features/auth/` + `members/MemberAuthPanel.tsx` provide the
-  provider-config-driven social/member auth surfaces. `frontend/src/features/
-  printing|bookings|forms|...` — feature slices. `frontend/src/lib/`, `components/ui/`, `types/`,
-  `generated/api.ts`.
-
-### Public availability rule (resolves PRD §5's two overlapping fields)
-
-`public_availability_mode` is the master display switch; `show_public_count` is a safety gate for exact counts:
-
-- `is_public = false` → product excluded from the public list entirely.
-- mode `hidden` → product listed, `availability: null`.
-- mode `status_only` → `{ mode: "status_only", label }`.
-- mode `exact_count` → exact `count` **only if** `show_public_count = true`; otherwise falls back to `status_only`.
-- Status label: `available ≤ 0` or `total ≤ 0` → `Unavailable`; `available ≤ ceil(total × 0.2)` → `Limited`; else `Available`.
-
-The API response is DRF-paginated (`PageNumberPagination`, page size 24): `{ count, next, previous, results }`. This is the standing convention for all list endpoints.
-
-### Audit + evidence conventions
-
-- Audit writes go through `apps.audit.services.record(actor, action, ...)`. `AuditLog` is append-only in
-  model methods and by Postgres triggers; state-changing services must emit entries.
-- Evidence photos live in a private S3-compatible bucket (`EvidencePhoto` rows: `makerspace`,
-  `evidence_type`, `object_key`, `uploaded_by`, `created_at`). Workflow records link to these rows.
-- Evidence upload uses presigned upload with exact MIME binding + content-length range
-  (`EVIDENCE_ALLOWED_MIME`). Upload/detail URLs are scoped by per-makerspace `UPLOAD_EVIDENCE` + active
-  status (not global roles — membership-only Inventory Managers can upload/view in their makerspace).
-- `AWS_S3_ENDPOINT_URL` = backend-facing; `AWS_S3_PUBLIC_ENDPOINT_URL` = browser-facing presigned URLs
-  (dockerized backend needs `http://minio:9000` vs `http://localhost:9000`).
-- Object keys are identifiers, not secrets — privacy is the private bucket + short-lived signed URLs.
-
-## Learning And Explanation Contract
-
-This repo is also being used to learn production Django, DRF, React, and TanStack Query through the inventory manager project. When making changes:
-
-- Explain the reason for each meaningful change in plain language.
-- Keep explanations brief but logically deep enough to show the production tradeoff.
-- For small diffs, explicitly state what changed, why it changed, and what behavior it protects.
-- Tie backend changes back to Django/DRF concepts such as models, serializers, viewsets/APIViews, permissions, transactions, migrations, and service modules.
-- Tie frontend changes back to React/TanStack Query concepts such as component state, server state, query keys, mutations, invalidation, loading/error states, and cache refresh.
-- Avoid unexplained "magic" abstractions. If an abstraction is introduced, explain the repeated problem it removes.
-- Prefer teaching through this project's real workflows: request creation, accept/reject, issue, return, QR scan, evidence upload, and audit log.
-
-The goal is not just to ship code, but to understand why each production-quality decision exists.
-
-## Engineering Conventions (apply to all code written here)
-
-- **Follow the global Claude config.** The gated workflow in `~/.claude/CLAUDE.md` (Stages 1–6, Codex delegation, mandatory review/QA gates) governs all work in this repo. Repo-specific rules below add to it; they do not override it.
-- **Document every API endpoint in Swagger / OpenAPI.** Every route in the API surface (PRD §14) must have an OpenAPI spec entry — request/response schemas, auth requirements, and error responses. Keep the spec in sync with the code; an undocumented endpoint is incomplete.
-- **Keep files modular — target ~200 lines per file, hard ceiling ~300.** One clear responsibility per file. When a module file grows past the target, split it (e.g. route handlers, validation, and service logic in separate files). The deep modules in §12 are logical boundaries, not single files. **Established split pattern:** when an app's `views.py`/`serializers.py`/`admin.py`/`services.py` outgrows the ceiling, split classes/functions into domain submodules (`views_*`, `serializers_*`, `admin_*`, `services_*`) and keep the original file as a **thin re-export barrel** (explicit `from .submodule import (...)`, never `import *`) so `from app.views import X` and `views.X` keep resolving; for `admin.py` the barrel must still import the admin submodules so the `@admin.register` side effects fire. Every backend code file is within the ceiling **except `backend/config/settings.py`** — Django settings are conventionally a single file (accepted exception).
-- **Production-level code, not prototype code.** Validate all inputs at the boundary, handle external-service failure explicitly (especially outbound integrations — Stripe, Telegram, SMTP, object storage — fail safe, never crash a request flow), use structured logging, return consistent typed error responses, and never leave `TODO`/stub auth or scoping in a merged path. Every state-changing endpoint must emit its audit log entry (PRD §11). Honor the immutability/append-only and makerspace-scoping invariants already documented above as enforced code, not convention.
-
-## What This System Is
-
-A multi-tenant system for managing community hardware loans across makerspaces. The central concern is **traceability of physical handovers**: every issue and return must produce evidence (QR scans + photos + remarks + audit log) so that accountability for lost/damaged hardware is never ambiguous. Public users browse and request; when self-checkout is enabled they may also issue/return eligible QR tools after authentication and evidence upload. Staff physically issue reviewed requests and direct handouts according to action scope.
-
-## Architecture: Concepts That Span Multiple Modules
-
-The PRD specifies a layered design where UIs and the Telegram bot are thin clients over an API server composed of deep modules. Two architectural rules are load-bearing and easy to violate if you only read one module:
-
-1. **The Request Workflow Module is the single source of truth for state transitions.** Telegram callbacks, the web admin panel, and the guest-admin app must all route through the *same* workflow service — never mutate `HardwareRequest.status` directly. The Telegram module in particular must call the workflow module, not the database. This is what keeps web and bot behavior consistent and audited.
-
-2. **The Inventory Availability Module owns all quantity math.** Reserve / issue / return / mark-lost all flow through it. No other module computes available/reserved/issued counts. The invariant "availability never goes below zero" lives here.
-
-### Module responsibilities
-
-- **Auth & RBAC** — enforces the role/action matrix AND makerspace scoping on every query. Super Admin is global; every other role is a per-makerspace membership resolved through an editable `MakerspaceRole` row, action-based. `roles.DEFAULT_ROLE_DEFINITIONS` + `MEMBER_ROLE_DEFINITION` seed **four** protected defaults per makerspace — Space Manager, Inventory Manager, Machine Manager, Member. **Guest Admin is not among them** (retired by `0052`, fully removed from both role enums by `0053`/`0054` + `accounts/0009`/`0010`; handover is a custom role). **Print Manager is retired** (migration `0046` reassigned its memberships to Machine Manager, whose `MANAGE_MACHINES` implies `MANAGE_PRINTING`); the string survives only in `_MEMBERSHIP_ROLE_ACTIONS` as the frozen legacy fallback for a null-FK membership. Inventory Manager is membership-only and covers the full hardware lifecycle but not printing, staff, or makerspace settings. Also verifies Telegram actors and blocks restricted/suspended users. Interface: `can(actor, action, resource)`, `scope_by_makerspace(actor, query)`, `assertTelegramActorCan(...)`.
-- **Request Workflow** — owns the state machine, emits audit logs, triggers Telegram alerts, coordinates inventory reservation/issue/return.
-- **Inventory Availability** — quantity math + asset status for QR-tracked tools.
-- **QR Code & Box** — generates/resolves/revokes QR codes, assigns boxes to requests, tracks scan history.
-- **Evidence Photo** — immutable issue/return photo storage linked to actor + request + QR scans; object storage, never public.
-- **Check-In API Client** — **RETIRED** (`73a480c`, Part M7). `apps/checkin/` no longer exists and there is no `CHECKIN_MODE` setting. Requester identity now comes from authenticated member accounts, so there is no external verify dependency left to fail safe on.
-- **Telegram Integration** — sends per-makerspace group alerts and processes accept/reject callbacks (delegating to Request Workflow).
-
-## Request State Machine
-
-```
-draft → pending_approval → {rejected | accepted}
-accepted → issued → {partially_returned | returned | closed_with_issue}
-```
-
-The workflow module enforces *allowed* transitions only. `closed_with_issue` and the accountability/access-restriction flow (PRD §6.5) are how lost/damaged hardware ties back to a requester's `access_status`.
-
-## Multi-Tenancy (Makerspace Scoping)
-
-Every domain entity is scoped to a `makerspace_id`. A makerspace owns its inventory, public URL, Space Managers, Inventory Managers, its own custom roles (handover included), Telegram group chat ID, QR namespace, and audit-log scope. **Any list/query for makerspace-scoped staff actors must be scoped through the Auth module** — forgetting this is a cross-tenant data leak, not just a bug.
-
-## Hard Rules Baked Into Workflows (don't regress these)
-
-- Reviewed-request hardware **cannot be issued** without both a box QR scan and an issue photo.
-- Public self-checkout and staff direct handout **cannot be issued** without uploaded issue evidence and an eligible scanned/selected tool.
-- Hardware **cannot be returned** without a return photo and a return remark/notes.
-- Issued quantity cannot exceed accepted quantity without authorized workflow permission.
-- **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`). Handover staff get a **custom role** holding the handout actions. `rbac.HANDOUT_ACTIONS` is no longer a cap on what a role may hold — `role_services._validate_actions` dropped that branch — and now only defines what counts as handover-only for `rbac.is_handout_only`, which decides how narrow the console is. A handout role issues accepted requests, creates **direct handouts** (`ISSUE_DIRECT_LOAN` is in the set, pinned by `test_guest_admin_can_create_direct_loan`), processes scoped returns, and uploads evidence — through the same evidence/QR/remark/audit workflow as staff. It still cannot accept/reject requests, edit inventory, or manage QR unless granted those actions. **Both enum members are now gone** (`makerspaces/0053` moved every remaining `role="guest_admin"` membership onto a real role row — reusing the space's untouched handover role only when its actions still equal the frozen six, else creating a collision-safe "Front Desk" role — and `0054` dropped the choice; `accounts/0009`/`0010` did the same for `User.Role.GUEST_ADMIN`). The `_MEMBERSHIP_ROLE_ACTIONS` fallback entry went with them, so `print_manager` is now the only frozen legacy string. Tests build a front-desk staffer through `tests/handout_roles.py` (`handout_role`/`grant_handout`/`make_handout_member`), whose default action set is deliberately the exact six the built-in granted — so every boundary a guest-admin test used to assert is still asserted. The `guest-admin/` **URL paths** in `hardware_requests/urls.py` are untouched: they are the handover API surface (module key `guest_handover`), not the role, and renaming them would break clients.
 - **`MANAGE_MACHINES` is scoped per role, and the scoping fails CLOSED.** `machines/role_scope.py`
   narrows **tier 1** of `access.py` using two link tables (`RoleMachineTypeScope`,
   `RoleMachineScope`, migration `0019`): a role holding `MANAGE_MACHINES` reaches a machine when
@@ -2222,11 +2019,282 @@ Load-bearing details that carried over unchanged:
     dependencies, so `makerspaces` left unpinned yields a historical `Makerspace` behind the real
     table; Django applies field defaults in Python rather than DDL, so the INSERT omits newer
     columns and Postgres rejects the NOT NULL. Rewind the full graph forward in `finally`.
-- Public request submission requires an **authenticated member** (`RequestSubmitView` → `IsAuthenticated`), and request lookup is scoped to that verified identity — it never matches free-text contact fields (no enumeration by known email/phone). The anti-enumeration invariant is unchanged; since the Check-In retirement (`73a480c`) it is enforced by member auth rather than an external verify call.
-- Inventory Managers can run the full hardware lifecycle but **cannot** manage printing, staff, or makerspace settings.
-- Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks active status.
-- Evidence photos and QR scan records are **immutable**; audit logs are **append-only**.
-- Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos, requester history, or hidden counts. Public visibility is governed per-item by `is_public`, `show_public_count`, and `public_availability_mode` (`exact_count | status_only | hidden`).
+
+### Events program invariants (four phases, `f16896f`..`dab0354`)
+
+- **Registering for an event does NOT require a `PresenceSession`; check-in does.**
+  `require_active_member` (identity + membership + waiver) was split out of
+  `require_active_member_presence`, and **only** `PublicEventRegistrationView` switched. The other
+  **nine invocations across six surfaces** — self-checkout ×3, direct handout, public request submit,
+  public booking, and the two machine-service surfaces — still require a session, because those are
+  hardware and facility acts where "is this member here right now" is the whole question. Signing up
+  is planning to attend; presence is proven later by the staff-scanned QR, which is stronger evidence
+  than a self-declared session.
+- **`events.member_history.registrations_for_space` is the ONE answer to "which registrations does
+  this member hold in this space"**, shared by the profile counts, the profile's recent-attended list,
+  member activity and the QR lookup. It filters on **durable provenance**
+  (`EventRegistration.registered_via_makerspace`, `SET_NULL`), **not** current collaboration: accepted
+  collaboration authorizes *discovery and creation*, provenance records *where participation
+  happened*, so an administrator editing a collaborator list cannot retroactively delete a member's
+  history or break a QR someone already holds. A **NULL provenance falls back to the host**, so the
+  read fails OPEN to pre-provenance behaviour and the backfill is tidiness rather than load-bearing.
+  History still stops at the **host's** archival or withdrawn `events` module.
+- **Presentation and PAYMENT are gated differently, and conflating them loses money.**
+  `payments.member_scope.member_payment_queryset` widens the three member payment surfaces (history,
+  web checkout, native intent) to an `EVENT_REGISTRATION` charge raised by another host when the
+  member's own registration names this space as provenance — otherwise a visitor's charge exists and
+  is undiscoverable, since the host 403s them and their own space filters it out. It is gated by
+  **neither** the host's module **nor** archival: a module toggle must never hide a receipt or block a
+  pending charge, and the separability contract keeps historical payment subjects usable when
+  tombstoned.
+- **PAYMENT ROUTING LIVES ON `Payment.via_makerspace`, NOT ON THE REGISTRATION'S PROVENANCE.**
+  One column cannot serve both: `module_purge_collectors.events_delete` must clear
+  `registered_via_makerspace` (destroying activity history is what a purge is *for*), and keying
+  payment visibility on that same column meant a collaborator's purge made a host-raised charge
+  invisible in the member's area while the host still 403s them — a receipt gone and a **pending
+  charge unpayable**. The routing therefore sits on the money record, which no purge touches:
+  stamped at creation by `service_payments._get_or_create` as
+  `registered_via_makerspace or event.makerspace`, read directly by `member_scope`'s second arm, and
+  **never cleared by any collector**. The `subject_type=EVENT_REGISTRATION` clause stays on that arm
+  so it can never widen to "every payment this user has anywhere". Two traps this hit: the backfill
+  (`payments/0011`) stamps **only where the registration's member matches the payment's member** —
+  `Payment.clean()` does not validate that, and the old subquery did, so stamping blindly would newly
+  expose one member's charge through another space; and a payment whose registration was already
+  deleted by an earlier purge is **unrecoverable and reported**, not silently skipped. The immutability
+  trigger permits the backfill because it raises only when `status` or `amount` change.
+- **A DELAYED charge needs routing preserved BEFORE the purge, which `Payment` cannot do.** A
+  waitlisted registration has no `Payment` at all — one is raised only when `_promote()` lifts it to
+  REGISTERED — so if the collaborator purges `events` in between, provenance is already NULL and the
+  charge falls back to the **host**, where the visiting member holds no membership: refused there,
+  filtered out at home, payable from neither. `EventRegistration.payment_via_makerspace` is the second
+  durable copy, written beside `registered_via_makerspace` at registration and **deliberately not
+  cleared** by `events_delete`; `_get_or_create` reads it first. Keeping it resurrects nothing —
+  member history, the maker profile and the QR lookup all read `registered_via_makerspace`, never
+  this column. **Both columns are scoped to the COLLABORATOR's purge, not the host's** — and what
+  the HOST's purge does has since CHANGED, so the text that stood here is corrected rather than
+  preserved. It read that a host purging `events` destroyed every host-owned event charge
+  (visitors' included) through the plan's `payment_subjects=("event_registration",)`, deleting
+  payments before their subject so none survived as a dangling generic reference, and it recorded
+  that as an **open question**. That question is now **settled the other way, and the mechanism it
+  described no longer exists**: `ModulePurgePlan` has no `payment_subjects` field at all (removed
+  2026-08-11 — see "NO MODULE PURGE DELETES A `Payment`" under the per-module purge invariant),
+  `module_purge_plans.py` carries a comment saying so deliberately, and
+  `tests/payments/test_payment_survives_module_purge.py` asserts
+  `not hasattr(ModulePurgePlan, "payment_subjects")` for every plan. **A host purge therefore leaves
+  a visiting member's receipt readable and their pending charge payable.** The dangling generic
+  subject the old design refused to accept is exactly what `Payment.subject_label`'s creation-time
+  snapshot and the relaxed `Payment.clean()` were built to tolerate. This contradiction survived in
+  this file because the two programs were written weeks apart and neither re-read the other —
+  **verify against `module_purge_plans.py` before relying on any account of purge-versus-payment.**
+- **`create_for_registered_registration` SWALLOWS EVERY EXCEPTION**, so a signature mismatch against
+  `payments.services.create_payment` does not raise — it silently stops creating charges while
+  registration still returns 201. Any test covering event charging must drive the real path; one that
+  fabricates a `Payment` row proves nothing about the wiring. `create_payment`'s `via_makerspace`
+  keyword defaults to `None`, so bookings/membership/machine-service call sites are unaffected (their
+  charges are owned by the member's own space, which arm 1 already covers).
+- **The collaborative registration route shares the CREATE budget and splits the RETRY budget.**
+  `_collaborative_events()` deliberately includes the member's own space's events, so the same event
+  is reachable through both `MemberCollaborativeEventRegistrationView` and
+  `PublicEventRegistrationView`; throttling only one is a bypass. Both therefore use
+  `ClientTierRateThrottle` + scope `event_register` — **not** `MemberPrincipalRateThrottle`, whose
+  `member:<pk>` ident is a *different* DRF cache key and would hand out the limit twice, closing half
+  the bypass. But DRF checks throttles in `initial()`, before `post()`, so a blanket throttle 429s the
+  `DuplicateRegistration` retry that is a member's **only** way to repair a registration holding no
+  waiver acceptance — and since the bucket is shared, the public route could exhaust it and strand
+  them at the door. `check_throttles` therefore reassigns `self.throttle_scope` to
+  `event_registration_retry` when a registration already exists (`self.kwargs` is set by `dispatch()`
+  before `initial()`). Retries stay bounded; they are never blocked by the create budget.
+- **`checkin_token` is surfaced only while the registration is REGISTERED AND the event is still
+  checkable.** `services.cancel()` changes only `Event.status` and leaves registrations REGISTERED, so
+  gating on the registration alone hands out an admission code nothing can ever confirm. The QR route
+  and `member_activity_service` must agree, or a token is advertised whose route refuses it.
+- **Resolve answers unknown, malformed and wrong-event tokens identically.** Distinguishing them makes
+  it an oracle for "this code is real but belongs elsewhere". **UUID4 entropy** is what makes
+  enumeration infeasible; authorization + event scoping + the uniform 404 stop a stolen token crossing
+  tenants; the staff-keyed throttle only bounds abuse. Resolve is **read-only** and confirm reuses the
+  existing pk-authorized `mark-attended`, so a scanned token never mutates anything.
+- **A route kwarg feeding `MODEL_LOOKUPS` MUST be named `pk`** — `origin_scope_routes` reads
+  `kwargs['pk']` and marks the request invalid when absent, so `<int:event_id>` is **denied on every
+  tenant custom domain despite being registered**.
+- **The collaboration API has TWO tenant scopes and needs four DISTINCT route names**, because
+  `origin_scope_routes` is keyed by route name, not HTTP method: host invite/list → `events.Event`,
+  host remove → `EventCollaborator.event__makerspace_id`, collaborator inbox → its `makerspace_id`
+  kwarg, accept/decline → `EventCollaborator.makerspace_id`. Registering accept against the host would
+  **403 it from the collaborator's own domain**, which is the entire feature.
+- **Lock order in `apps.events` is `event → makerspace(s)`**, matching shipped `publish()`,
+  `update_event()` and image attach. `require_module_locked` goes **after** `_locked_event` in
+  `register()` (before would deadlock against `publish`), two makerspaces lock in **sorted pk order**,
+  and `remove_collaborator` reads the event id **unlocked** first — a `select_for_update()
+  .select_related("event")` locks both rows in the wrong order.
+- **The host waiver lives on the `EventRegistration`, not a membership** (a visitor membership would
+  corrupt the host's member reporting, roster, quota and dues — `reports_members` counts every row).
+  Three fields under an all-or-none check constraint, `PROTECT`, with acceptance an **explicit API
+  field** — inferring it from a submitted id lets any caller manufacture evidence about a real person.
+  Re-read under the host lock so a superseded version is refused. Stamping is one helper shared by the
+  create and idempotent-retry paths. Audited with id + version, **never the body**: the purge clears
+  the columns, so the append-only log is the surviving evidence, and the body would be undeletable
+  member data. A registration with **no** acceptance yields no QR — but **not** gated on the *current*
+  version, or revising a waiver strands a legitimate member at the door.
+- **Waiver evidence lives in TWO places, and reading one reports a falsehood about a real person.**
+  A visitor's acceptance is stamped on the `EventRegistration`; a **host member's lives on their
+  `MakerspaceMembership`**, because the registration path deliberately does not re-record an agreement
+  the member already gave their own space. The check-in resolve payload shipped as
+  `bool(registration.host_waiver_id)`, which is therefore **structurally false for every host member**
+  — the scanner told correctly-accepted members to "take one at the desk", and said the same when the
+  host had configured no waiver at all. `views_checkin.host_waiver_state()` is the one answer:
+  `not_required` when the host has no active waiver, `on_file` when either location holds an
+  acceptance, `missing` otherwise. Not compared against the *current* version, matching the QR gate.
+  **"Not a visitor" is NOT "not required"** — `views_admin`'s staff registration only checks that a
+  membership exists, never `require_active_member`, so a host member genuinely can hold a registration
+  with an active waiver and no acceptance anywhere. That contract had **no test at all** before
+  (nothing ever asserted on the field), which is how it shipped wrong.
+- **`confirmable` mirrors `mark_attended`'s own precondition** (`status == REGISTERED` **and**
+  `event.status in CHECKABLE_EVENT_STATUSES`) rather than inventing a second rule. Resolve accepts
+  waitlisted/cancelled/attended rows and previously omitted event status, so a registered row on a
+  **cancelled event** rendered a Confirm button whose request could only ever 409. Everything on this
+  screen stays reported-never-enforced: it is the button that is withheld, never the door.
+- **That `PROTECT` FK breaks BOTH purges if unhandled**: `membership_delete` must clear the
+  registration's three fields alongside the membership's, and `lifecycle.purge` must clear them for
+  registrations hosted **elsewhere** before its explicit
+  `EventRegistration.objects.filter(event__makerspace=makerspace).delete()` (placed after the
+  `ProcessedStripeEvent` delete, since Payment must precede its generic subject). Verified: removing
+  either clearing step raises `ProtectedError`.
+- **The member QR route lives in its own separable `events/urls_member.py`.** Declared alongside the
+  rest of the `member/` surface it kept resolving, and stayed in the OpenAPI schema, on a deployment
+  that ships no events app — caught by the tombstone suite.
+- **Purging `events` at a collaborator must clear `registered_via_makerspace` on registrations hosted
+  elsewhere**, or reinstalling resurrects supposedly purged activity and profile history.
+- **`MemberProfile.show_attended_events` is consent, not configurability.** `is_visible` publishes the
+  fields the member typed into the profile form; attendance is neither typed nor on that form. The
+  `activity` payload is now a typed nested serializer that **omits** absent keys — a zero says
+  "attended nothing", an absent key says "this space does not run events".
+
+### Container / deployment invariants
+
+**The images run unprivileged.** `backend/Dockerfile` creates uid 10001 `app`, uses `COPY --chown`
+(a later `chown -R /app` would duplicate the whole tree into a second layer) and drops `USER app`
+before CMD. Two paths must therefore stay writable and owned by `app`: `STATIC_ROOT`
+(`/app/staticfiles`, written by the boot-time `collectstatic`) and `/var/lib/celery`. In **dev** the
+`./backend` bind mount is owned by the host user, and `makemigrations` has to write into it, so
+`docker-compose.dev.yml` sets `user: "${DEV_UID:-1000}:${DEV_GID:-1000}"` on `backend` only —
+worker/beat stay on the image uid because they only ever write to `/var/lib/celery`.
+
+**Celery beat must be given an explicit `--schedule`.** It otherwise drops its shelve in the CWD:
+under the dev bind mount that wrote a **root-owned `celerybeat-schedule` into the repo working tree**,
+and post-hardening `/app` is not writable at all. Both the base and prod compose point it at the
+`celerybeat_data` named volume so last-run timestamps survive a restart (otherwise every periodic task
+re-fires on boot).
+
+**Never split a shell command across lines in a YAML folded scalar (`>`).** A more-indented line keeps
+its newline instead of folding to a space, and a newline inside `sh -c` terminates the command. Splitting
+gunicorn's flags one-per-line made it run bare — silently falling back to its **127.0.0.1** default while
+each flag became a failing command. The killer detail: the healthcheck probes `localhost`, so the
+container reported **healthy** while nginx got connection-refused and every request 502'd. Keep the whole
+invocation on one line. A healthcheck that probes localhost cannot detect a localhost-only bind.
+
+**`mc cors set` is unusable — CORS lives on the MinIO server.** Modern `mc` sends S3 XML and rejects the
+JSON the compose file used to write ("decoding xml: EOF", exit 1). Because `backend` has
+`depends_on: createbuckets: service_completed_successfully`, that exit-1 left backend and frontend stuck
+in `Created` — **`setup.sh` could never bring the app up**. Origins are now set with
+`MINIO_API_CORS_ALLOW_ORIGIN` (comma-separated) on the `minio` service, fed by `MINIO_CORS_ALLOWED_ORIGINS`;
+`createbuckets` provisions buckets/policies only and runs under `set -e`. The old
+`MINIO_CORS_ALLOWED_ORIGINS_JSON` is gone from compose, both installers and the docs.
+
+**Browser-facing storage URLs must name the real host, never `localhost`.**
+`AWS_S3_PUBLIC_ENDPOINT_URL` / `PUBLIC_IMAGE_BASE_URL` are baked into presigned evidence upload/view URLs
+and every public image `src`. The compose default (`http://localhost:9000`) makes a deployment work only
+from the server console and show broken images to everyone else, so `setup.sh`/`setup.ps1` now write both
+from the answered web address. The compose default is kept (not made `:?` required) so existing
+deployments don't hard-break on upgrade.
+
+**`.dockerignore` patterns are root-anchored.** A bare `__pycache__`/`*.pyc` does not match nested
+directories — every `apps/*/__pycache__` was shipping inside the image. Nested patterns need `**/`.
+
+**Production compose defaults that are not optional:** every long-running service carries
+`restart: unless-stopped` (via the `x-restart` anchor) or the stack does not survive a host reboot, and a
+capped `json-file` `logging` block (via `x-logging`) or container logs fill the host disk. Third-party
+images are pinned to a verified release tag — **verify a tag actually resolves before pinning it**
+(`minio/mc` release tags do not match the epoch in the image's `release` label).
+
+## Condensed changelog (newest first — full detail in `git log`)
+
+Each line names a shipped feature and, where useful, the load-bearing rule it introduced (folded into the
+invariants above). Use `git log --oneline`/`git blame` for the implementing commits and per-file history.
+
+- **Public imagery, machine grouping, accessibility** (2026-08-10, `dev`, local): `Event.image_key`
+  with presign/attach/clear mirroring the machine image flow, and `image_url` on the staff and public
+  serializers — the four-place registration this needed is written up under public images above;
+  machines grouped under their `MachineType` in the staff console plus a public `/machines` page,
+  display-only and reusing the existing public endpoint unchanged; and an accessibility floor
+  (contrast guard, real focus indicators, skip links, 44px targets, labelled sidebar landmarks).
+  **The pastel theme was kept**: only `--color-muted` failed AA, every other text token already
+  passed, so the visible change is one token in light mode. The blueprint grid and Instrument Sans
+  were confirmed intentional and waived in `.impeccable/config.json`.
+- **Notifications v2** (2026-08-09, `dev`, local): per-event recipient selection where no rows means
+  today's behaviour (`9d8d5a7`); per-room chat destinations with typed credentials, union scoping,
+  per-room log rows and a per-channel length table (`f7fd8b2`); editable email wording for the four
+  FabLab streams plus one shared chat body per event, staff-only by construction (`69b8e45`);
+  recipient rules narrowed by machine/type/category, composed so they can only narrow (`6eca688`);
+  staff API + console for recipients and rooms, with write-only credentials (`99dcb00`).
+  **Per-destination Telegram bot tokens were considered and dropped** — one webhook secret means a
+  second bot's accept/reject buttons would be dead.
+- **Auth + notification-channel modularity** (2026-08-08, `dev`, local): SMS provider seam + phone as a
+  verified member login identity (`f04fbb5`); guided-but-skippable Google sign-in in `setup.sh`/`setup.ps1`
+  plus the `configure_social_auth` command (`1210208`); Discord as an incoming-webhook channel and one
+  module key per notification channel, with the `0056` slack/mattermost backfill and a README module
+  section. **SAML and per-makerspace auth-credential overrides were both considered and dropped** —
+  OIDC already covers every IdP a makerspace runs, and identity is platform-scoped by construction.
+- **Phase C final tracks** (2026-07-23, `dev`): encrypted per-space Stripe credentials + managed Stripe
+  Connect (`3b43f47`); makerspace-scoped reconciliation dashboard/reports (`1ad63f5`); unified booking,
+  event-registration, and membership-dues Payment subjects (`159a88f`, hardened by `396cb27`); attested
+  device grants, rotating native refresh, native push, and Stripe PaymentSheet (`1aa2029`); server-verified
+  Google/Apple member + staff social sign-in with surface/origin enforcement (`ad2fe42`).
+- **Phase C — capabilities + payments + geofence** (2026-07-21/22, `dev`): Track 1 two-level module/feature
+  toggles (`41e6a2a`); C.2 Stripe foundation — per-makerspace encrypted creds + verify-only webhook
+  (`92eda37`); C.3 machine-service payments — `apps/payments.Payment` as the single payment authority,
+  gated non-blocking charge at machine `complete()`, idempotent webhook settlement, member/staff surfaces
+  + reconciliation, legacy `payment_*` → read-only historic with a backfill migration (`9c1d928`); C.7
+  **advisory** geofenced presence check-in — records proximity buckets, never blocks (`007ef55`);
+  C.3-hardening — `Payment` DELETE-immutability trigger + purge-graph wiring + async Stripe checkout
+  settlement (`c8225c0`); **C.6 + P1-A** — custom machine-type config (SM-identity authority) + generic
+  non-gram `MachineServiceConsole` + seed migration `0017`, and the unified per-space
+  `MakerspaceMachineTypePricing` override (pricing out of `capability_config`, built-ins priceable per-space,
+  migration `0018` fail-safe backfill) (`8d39cb0`).
+- **FabLab Parts C–N + L + H + Settings + K** (2026-07-16→18, `dev`): Events, Bookings (+ public
+  self-booking + shared `forms_schema` custom forms + structured event location), Maintenance, Analytics
+  reports, public Roadmap (later tombstoned), Machine Manager role + SM-delegated role assignment, per-feature×per-channel
+  notification matrix (Slack/Mattermost), scoped PII encryption H1–H4, custom roles L, machine service
+  requests N (in worktree). New apps: `events`, `bookings`, `maintenance`, `roadmap`, `forms_schema`,
+  `encryption`, machine-service models under `machines`.
+- **Machines module M1 + M1.5** (2026-07-14/15): generic `apps/machines/` (types/machine/operators/usage/
+  docs/errors), 3-tier authz (`MANAGE_MACHINES` + type-managers via `MachineType.managing_action` +
+  per-machine operators), services single-source-of-truth, printer auto-link, custom types, photo,
+  warranty (3rd host), consumables (count via inventory + grams ledger), public exposure.
+- **Self-host-first + SaaS hosting Parts A/B + space-works.tech** (2026-07-15/16): self-host custom-domain
+  auto-trust, managed fair-use limits + subdomain request→approve, one-shared-instance multi-tenant
+  hosting (all dormant on blank `PLATFORM_DOMAIN_SUFFIX`). AGPL relicense + repo professionalization.
+- **Audit fixes + dependency upgrade P1–P17** (2026-07-08): integration health center, scan-first
+  stocktake, ops dashboard, notifications app + inbox + fail-safe emit hooks; force-latest upgrade to
+  Django 6 / React 19 / Vite 8 / Tailwind 4 / TS 6.
+- **Manager fixes P5–P10** (2026-06-30): direct-loan return resolutions + accountability + public
+  report-a-problem, unified asset editor, optional partial approval, accountability dashboard,
+  actionable warranty/reports UI.
+- **Email/async stack** (2026-06-21): `EmailLog` outbox + single `dispatch_email` choke point + Celery/
+  Redis async delivery + retry. Per-makerspace staff-notification recipient matrix.
+- **Print filament grams / payment / manual logs** (2026-06-16/28): requester grams estimate, failed-%
+  → printer hours, manual-log outcomes, staff-private cash payment on prints (never exposed to requester
+  — enforced by serializer split), top-requesters leaderboard by email.
+- **Warranty tracking** (2026-06-27): `apps/warranty/` (asset XOR printer XOR machine host, private
+  bill/doc uploads, display-only status; per-host RBAC; public-leak invariant tested).
+- **UI reskins** (frontend-only): pastel "notebook" theme (2026-06-22, fill/`-ink` token split),
+  Blueprint redesign + item/makerspace imagery (2026-06-20).
+- **Collaborative self-governance** (2026-06-16): superadmin-access toggle (later hard block),
+  API-client self-serve, admin + self-service password resets, Platform Email settings.
+- **Console-parity + workflow surfacing** (2026-06-16): broken-at-handover + to-be-fixed shelf,
+  ledger specific-unit + staff-return evidence, direct-handout UX, lending history, QR rebind,
+  surfacing ~10 orphaned backend lifecycles into the React console.
+- **Deploy / production** (2026-06-19): single-tenant branded frontend, Supabase free-tier dual-mode
+  (env-toggled; localhost default unchanged), lean-paid production deploy artifacts + perf hardening.
 
 ## Key References in the PRD
 
