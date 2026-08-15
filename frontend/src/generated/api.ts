@@ -251,6 +251,8 @@ export const openApiPaths = [
   "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/typed-manual-usage",
   "/api/v1/admin/makerspaces/{makerspace_id}/machines/{machine_id}/maintenance/logs/",
   "/api/v1/admin/makerspaces/{makerspace_id}/machines/{machine_id}/maintenance/schedules/",
+  "/api/v1/admin/makerspaces/{makerspace_id}/member-claim-codes",
+  "/api/v1/admin/makerspaces/{makerspace_id}/member-claim-codes/{claim_id}/revoke",
   "/api/v1/admin/makerspaces/{makerspace_id}/memberships",
   "/api/v1/admin/makerspaces/{makerspace_id}/memberships/{membership_id}/role",
   "/api/v1/admin/makerspaces/{makerspace_id}/roles",
@@ -1166,9 +1168,11 @@ export type DirectLoanItem = {
 };
 
 export type DirectLoanMember = {
+  "membership_id": number;
   "user_id": number;
   "display_name": string;
   "username": string;
+  "is_walk_in": boolean;
 };
 
 export type DirectLoanReturn = {
@@ -2399,6 +2403,36 @@ export type MemberActivityRow = {
   "open_invites": number;
   "referred_joins": number;
   "verified_members": number;
+};
+
+export type MemberClaimCode = {
+  "id": number;
+  "membership_id": number;
+  "member_display_name": string;
+  "issued_by_id": number | null;
+  "issued_at": string;
+  "expires_at": string;
+  "consumed_at": string | null;
+  "revoked_at": string | null;
+  "status": string;
+};
+
+export type MemberClaimCodeIssueRequest = {
+  "membership_id": number;
+};
+
+export type MemberClaimCodeIssueResponse = {
+  "id": number;
+  "membership_id": number;
+  "member_display_name": string;
+  "issued_by_id": number | null;
+  "issued_at": string;
+  "expires_at": string;
+  "consumed_at": string | null;
+  "revoked_at": string | null;
+  "status": string;
+  "code": string;
+  "qr_svg": string;
 };
 
 export type MemberEventRegistrationActivity = {

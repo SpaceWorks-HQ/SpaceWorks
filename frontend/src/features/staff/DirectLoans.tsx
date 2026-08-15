@@ -10,6 +10,7 @@ import { invalidateInventoryViews } from "./queryInvalidation";
 import { DirectLoanReturnModal, type DirectLoanResolution } from "./DirectLoanReturnModal";
 import { Panel, type Makerspace, useStaffGet } from "./StaffPanels";
 import { WalkInMemberForm } from "./WalkInMemberForm";
+import { MemberClaimCodes, type ClaimableMember } from "./MemberClaimCodes";
 import { EvidenceUpload } from "./panels/EvidenceUpload";
 
 type ProductOption = {
@@ -24,7 +25,7 @@ type ProductOption = {
 };
 type ContainerOption = { id: number; label: string };
 type ContainerResponse = ContainerOption[] | { results: ContainerOption[] };
-type DirectLoanMember = { user_id: number; display_name: string; username: string };
+type DirectLoanMember = ClaimableMember;
 type DirectLoanMemberResponse = DirectLoanMember[] | { results: DirectLoanMember[] };
 type LineDraft = { key: number; productId: string; quantity: string };
 type ScannedPayload = { payload: string; label: string };
@@ -376,6 +377,7 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
         {showScanner ? <QrScanner onScan={handleScan} onClose={() => setShowScanner(false)} /> : null}
         {showContainerScanner ? <QrScanner onScan={handleContainerScan} onClose={() => setShowContainerScanner(false)} /> : null}
       </Panel>
+      <MemberClaimCodes makerspaceId={makerspace.id} members={memberOptions} />
       <DirectLoanList loans={loans.results} onReturn={openReturnModal} />
       <Pagination page={loans.page} totalPages={loans.totalPages} onChange={loans.setPage} count={loans.count} pageSize={loans.pageSize} />
       <DirectLoanReturnModal
