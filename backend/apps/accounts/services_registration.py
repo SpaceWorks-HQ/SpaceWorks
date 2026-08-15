@@ -138,6 +138,9 @@ def confirm_challenge(user, code):
             )
     if failed:
         raise serializers.ValidationError({"detail": GENERIC_CONFIRM_ERROR})
+    from apps.makerspaces.import_adoption import adopt_pending_memberships_for_user
+
+    adopt_pending_memberships_for_user(user)
     return challenge
 
 

@@ -42,6 +42,7 @@ from apps.accounts.social_nonces import (
 )
 from apps.audit import services as audit
 from apps.hardware_requests.exceptions import ErrorSerializer
+from apps.makerspaces.import_adoption import adopt_pending_memberships_for_user
 from apps.makerspaces.origin_scope import NO_STAFF_ORIGIN_SCOPE, staff_origin_scope
 
 
@@ -123,6 +124,7 @@ class SocialLoginView(APIView):
                 allow_auto_link=claims.get("allow_auto_link", True))
             if data["delivery"] == "device" and nonce_row.device_grant.user_id != user.pk:
                 raise SocialResolutionError("access_denied", 403)
+            adopt_pending_memberships_for_user(user)
             scope = staff_origin_scope(request)
             staff_scope = (
                 None if scope is NO_STAFF_ORIGIN_SCOPE else str(scope)

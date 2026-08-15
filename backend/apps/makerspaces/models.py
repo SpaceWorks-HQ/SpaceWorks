@@ -15,6 +15,7 @@ from apps.makerspaces.capabilities import (
     validate_capabilities,
 )
 from apps.makerspaces.module_registry import default_enabled_module_keys
+from apps.makerspaces.provenance import validate_actor_snapshot
 from apps.makerspaces.secrets import decrypt_value, encrypt_value
 from apps.makerspaces.validators import (
     DEFAULT_PRESENCE_PRESETS,
@@ -377,6 +378,9 @@ class MakerspaceMembership(models.Model):
         on_delete=models.SET_NULL,
         related_name="verified_memberships",
     )
+    verified_actor_snapshot = models.JSONField(
+        null=True, blank=True, validators=[validate_actor_snapshot]
+    )
     status = models.CharField(
         max_length=16,
         choices=(("active", "Active"), ("revoked", "Revoked")),
@@ -387,10 +391,16 @@ class MakerspaceMembership(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="activated_makerspace_memberships",
     )
+    activated_actor_snapshot = models.JSONField(
+        null=True, blank=True, validators=[validate_actor_snapshot]
+    )
     revoked_at = models.DateTimeField(null=True, blank=True)
     revoked_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="revoked_makerspace_memberships",
+    )
+    revoked_actor_snapshot = models.JSONField(
+        null=True, blank=True, validators=[validate_actor_snapshot]
     )
     revocation_reason = models.TextField(blank=True)
     waiver_accepted_at = models.DateTimeField(null=True, blank=True)
@@ -655,4 +665,8 @@ from apps.makerspaces.models_profiles import (  # noqa: E402,F401
 )
 from apps.makerspaces.models_archive_requests import (  # noqa: E402,F401
     MakerspaceArchiveRequest,
+)
+from apps.makerspaces.models_imports import (  # noqa: E402,F401
+    ImportedUserReconciliation,
+    PendingImportedMembership,
 )

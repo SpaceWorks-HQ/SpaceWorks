@@ -8,6 +8,10 @@ from apps.makerspaces.admin_capabilities import MakerspaceAdminForm, MakerspaceC
 from apps.makerspaces.admin_images import MakerspaceImageAdminMixin
 from apps.makerspaces.admin_subdomains import SubdomainRequestAdmin
 from apps.makerspaces.admin_archive_requests import MakerspaceArchiveRequestAdmin
+from apps.makerspaces.admin_imports import (  # noqa: F401
+    ImportedUserReconciliationAdmin,
+    PendingImportedMembershipAdmin,
+)
 from apps.makerspaces.models import (
     Makerspace, MakerspaceArchiveRequest, MakerspaceMembership, MakerspaceWaiver, MemberProfile, MemberProject,
     MembershipRequest,
@@ -278,7 +282,8 @@ class MakerspaceMembershipAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     search_fields = ("user__username", "user__email")
     autocomplete_fields = ("user", "makerspace")
     readonly_fields = (
-        "can_refer", "can_verify", "verified_at", "verified_by",
+        "can_refer", "can_verify", "verified_at", "verified_by", "verified_actor_snapshot",
+        "activated_actor_snapshot", "revoked_actor_snapshot",
         "waiver_accepted_at", "waiver_version_accepted", "accepted_waiver",
         "witnessed_at", "witnessed_waiver_version", "witnessed_waiver",
         "witnessed_by", "witnessed_actor_snapshot", "created_at",
