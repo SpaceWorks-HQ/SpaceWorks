@@ -37,6 +37,13 @@ EXEMPTIONS = {
     ("makerspaces/admin.py", "MakerspaceAdmin.archived"),
     # Members may discover old charges only after a tenant has actually been archived.
     ("payments/views_member.py", "ArchivedPaymentDiscoveryView.get"),
+    # The abort-recovery twin of `unarchive`: cutover archives the source, so reopening
+    # it after a failed migration must both inspect and clear `archived_at`. Routing it
+    # through the servability policy would make the one operation that undoes a cutover
+    # refuse to run on the only state it is ever called in. It is not a hole -- it
+    # requires a superuser, a locked pairing, and a verified single-use abort receipt
+    # from the target proving it reached ABORTED and can no longer activate.
+    ("tenant_migration/cutover.py", "reopen_source"),
 }
 
 
