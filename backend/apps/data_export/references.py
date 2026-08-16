@@ -98,6 +98,9 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("makerspaces.Makerspace", "archived_by"),
         ("makerspaces.MakerspaceArchiveRequest", "requested_by"),
         ("makerspaces.MakerspaceArchiveRequest", "resolved_by"),
+        # Phase 8: resolved by the drain, never by the request path. The model is
+        # omitted, but the edge is declared so completeness stays a total check.
+        ("accounts.PasswordResetEnvelope", "user"),
         ("makerspaces.MakerspaceMembership", "user"),
         ("makerspaces.MakerspaceMembership", "verified_by"),
         ("makerspaces.MakerspaceMembership", "activated_by"),

@@ -45,6 +45,14 @@ SCHEDULED_TASKS = (
         "apps.makerspaces.tasks.refresh_github_contributions_task",
         24 * 60,
     ),
+    # Same fixed-hour-versus-interval reasoning as above. Without this entry a beat-less
+    # cloud deployment would retain expired export archives -- and the download bearer
+    # tokens that reach them -- indefinitely.
+    (
+        "purge-expired-data-exports",
+        "apps.data_export.tasks.purge_expired_exports_task",
+        24 * 60,
+    ),
 )
 
 

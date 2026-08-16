@@ -107,6 +107,11 @@ OMITTED_MODELS = {
     "accounts.DeviceRefreshToken": "Live bearer-session authority.",
     "accounts.EmailVerificationChallenge": "Transient authentication state.",
     "accounts.OidcProvider": "Platform identity configuration.",
+    # Phase 8. One row per submitted address -- including addresses that belong to
+    # nobody, since anyone can create one by asking for a reset -- holding a live OTP
+    # digest and a credential fingerprint. Transient authentication state, and global
+    # rather than tenant data.
+    "accounts.PasswordResetEnvelope": "Transient authentication state.",
     "accounts.PhoneVerificationChallenge": "Transient authentication state.",
     "accounts.PlatformLoginMethods": "Platform identity configuration.",
     "accounts.PlatformSocialAuthSettings": "Platform credentials and identity configuration.",
