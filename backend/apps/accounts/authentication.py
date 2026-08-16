@@ -16,6 +16,7 @@ from apps.accounts.claim_tokens import ClaimAccessToken
 from apps.accounts.claim_routes import CLAIM_REACHABLE_PREFIXES
 from apps.accounts.models import User
 from apps.accounts.models_devices import DeviceGrant, DeviceRefreshFamily
+from apps.accounts.tokens import validate_auth_generation
 
 
 class SpaceWorksJWTAuthentication(JWTAuthentication):
@@ -29,6 +30,10 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
         if authenticated is None:
             return None
         user, token = authenticated
+        validate_auth_generation(token)
+        from apps.backup.recovery import assert_principal_allowed
+
+        assert_principal_allowed(user)
         if token.get("surface") == "staff":
             _validate_staff_surface(request, token)
         if token.get("surface") == "member" and not _member_surface_path_allowed(
@@ -71,6 +76,7 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
             token = ClaimAccessToken(raw_token)
         except TokenError:
             return False
+        validate_auth_generation(token)
 
         view_name = getattr(request.resolver_match, "view_name", "") or ""
         policy = policy_for(view_name, request.method)
@@ -94,6 +100,9 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
         ):
             raise PermissionDenied("Claim session is not valid for this makerspace.")
         user = attach_claim_context(claim.membership.user, claim)
+        from apps.backup.recovery import assert_principal_allowed
+
+        assert_principal_allowed(user)
         request.claim_session = claim
         return user, token
 

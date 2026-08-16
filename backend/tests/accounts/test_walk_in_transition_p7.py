@@ -9,7 +9,7 @@ from rest_framework_simplejwt.token_blacklist.models import (
     BlacklistedToken,
     OutstandingToken,
 )
-from rest_framework_simplejwt.tokens import RefreshToken
+from apps.accounts.tokens import SpaceWorksRefreshToken
 
 from apps.accounts import services_registration
 from apps.accounts.models import EmailVerificationChallenge, User
@@ -74,7 +74,7 @@ def test_transition_revokes_every_token_and_fires_hooks_in_one_transaction():
         username="transition-actor", email="actor@example.test", password=PASSWORD
     )
     user = make_walk_in()
-    RefreshToken.for_user(user)
+    SpaceWorksRefreshToken.for_user(user)
     grant = DeviceGrant.objects.create(
         user=user,
         platform="apple",
@@ -138,7 +138,7 @@ def test_transition_revokes_every_token_and_fires_hooks_in_one_transaction():
 
 def test_transition_failure_rolls_back_marker_hook_and_token_revocation():
     user = make_walk_in("transition-rollback", "")
-    RefreshToken.for_user(user)
+    SpaceWorksRefreshToken.for_user(user)
     grant = DeviceGrant.objects.create(
         user=user,
         platform="apple",

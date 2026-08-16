@@ -48,8 +48,10 @@ services:
       /bin/sh -c '
       until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
       mc mb --ignore-existing local/evidence;
+      mc version enable local/evidence;
       mc anonymous set none local/evidence;
       mc mb --ignore-existing local/public-images;
+      mc version enable local/public-images;
       mc anonymous set download local/public-images;
       '
 
@@ -113,6 +115,8 @@ services:
       PUBLIC_APP_BASE_URL: ${PUBLIC_APP_BASE_URL:-}
       STRIPE_CONNECT_REDIRECT_URI: ${STRIPE_CONNECT_REDIRECT_URI:-}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+      BACKUP_OPS_DIR: /var/lib/spaceworks/ops
     command: >
       sh -c "python manage.py collectstatic --noinput &&
              gunicorn config.wsgi:application --bind 0.0.0.0:8000"
@@ -123,6 +127,8 @@ services:
       retries: 6
     ports:
       - "8001:8000"
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
     depends_on:
       db:
         condition: service_healthy
@@ -137,6 +143,8 @@ services:
     container_name: spaceworks-migrate
     environment: *backend-env
     command: python manage.py migrate
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
     depends_on:
       db:
         condition: service_healthy
@@ -147,6 +155,8 @@ services:
     restart: unless-stopped
     environment: *backend-env
     command: celery -A config worker -l info
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
     depends_on:
       db:
         condition: service_healthy
@@ -169,6 +179,7 @@ services:
     command: celery -A config beat -l info --schedule /var/lib/celery/celerybeat-schedule
     volumes:
       - celerybeat_data:/var/lib/celery
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
     depends_on:
       db:
         condition: service_healthy

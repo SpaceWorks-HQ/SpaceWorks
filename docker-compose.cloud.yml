@@ -76,6 +76,8 @@ x-app-env: &app-env
   AWS_S3_PUBLIC_ENDPOINT_URL: ${AWS_S3_PUBLIC_ENDPOINT_URL:?set AWS_S3_PUBLIC_ENDPOINT_URL}
   # R2 and Supabase need PUT presigning; the POST-policy flow is MinIO-only.
   STORAGE_PRESIGN_METHOD: ${STORAGE_PRESIGN_METHOD:-put}
+  BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+  BACKUP_OPS_DIR: /var/lib/spaceworks/ops
   # Left EMPTY on purpose. Blank => CELERY_TASK_ALWAYS_EAGER defaults True and tasks run
   # inline in this process, which is the whole point of the profile. Setting it here
   # without also running a worker would queue tasks nothing ever consumes.
@@ -87,12 +89,16 @@ services:
     environment: *app-env
     command: python manage.py migrate
     logging: *default-logging
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
 
   backend:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
     restart: *default-restart
     logging: *default-logging
     environment: *app-env
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
     # Keep the whole gunicorn invocation on ONE line: in a YAML folded scalar a
     # more-indented line keeps its newline, and a newline inside `sh -c` ends the
     # command -- gunicorn then runs bare on its 127.0.0.1 default while the healthcheck,
@@ -118,6 +124,8 @@ services:
     restart: *default-restart
     logging: *default-logging
     environment: *app-env
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
     # A sleep loop rather than a cron daemon: the image runs unprivileged as uid 10001
     # and ships no crond, and `--due-only` already makes the cadence idempotent, so the
     # loop only has to be frequent enough -- not accurate.

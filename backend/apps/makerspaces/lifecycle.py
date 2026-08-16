@@ -112,6 +112,7 @@ def _audit_meta(makerspace):
 
 
 def _collect_storage_keys(makerspace):
+    from apps.backup.models import RestoreRollbackObject
     from apps.admin_api.models import BulkImportJob
     from apps.data_export.models import DataExportJob
     from apps.evidence.models import EvidencePhoto
@@ -152,10 +153,16 @@ def _collect_storage_keys(makerspace):
     ):
         add(name)
     collect_private_object_keys(makerspace, add)
+    for key in RestoreRollbackObject.objects.filter(
+        makerspace=makerspace,
+        bucket_kind=RestoreRollbackObject.BucketKind.PRIVATE,
+    ).exclude(copy_key="").values_list("copy_key", flat=True):
+        add(key)
     return keys
 
 
 def _collect_public_image_keys(makerspace):
+    from apps.backup.models import RestoreRollbackObject
     from apps.bookings.models import BookableSpace
     from apps.events.models import Event
     from apps.inventory.models import InventoryProduct
@@ -177,9 +184,16 @@ def _collect_public_image_keys(makerspace):
             profile__membership__makerspace=makerspace
         ).values_list("image_key", flat=True)
     )
+    keys.extend(
+        RestoreRollbackObject.objects.filter(
+            makerspace=makerspace,
+            bucket_kind=RestoreRollbackObject.BucketKind.PUBLIC_IMAGE,
+        ).exclude(copy_key="").values_list("copy_key", flat=True)
+    )
     return [key for key in dict.fromkeys(keys) if key]
 
 def _delete_object_graph(makerspace):
+    from apps.backup.models import RestoreRollbackObject
     from apps.apiclients.models import ApiClient, ApiKeyRequest
     from apps.audit.models import AuditLog
     from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
@@ -287,6 +301,7 @@ def _delete_object_graph(makerspace):
             "DELETE FROM encryption_piimakerspacewritefence WHERE makerspace_id = %s",
             [makerspace.id],
         )
+        RestoreRollbackObject.objects.filter(makerspace=makerspace).delete()
         makerspace.delete()
 
 

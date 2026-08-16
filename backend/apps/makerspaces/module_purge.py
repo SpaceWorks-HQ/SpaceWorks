@@ -131,8 +131,8 @@ def _purge(makerspace, plan, cursor):
 
 
 def _collect_private_keys(makerspace, plan):
-    if plan.private_keys is None:
-        return []
+    from apps.backup.models import RestoreRollbackObject
+
     keys, seen = [], set()
 
     def add(key):
@@ -140,14 +140,29 @@ def _collect_private_keys(makerspace, plan):
             seen.add(key)
             keys.append(key)
 
-    plan.private_keys(makerspace, add)
+    if plan.private_keys is not None:
+        plan.private_keys(makerspace, add)
+    for key in RestoreRollbackObject.objects.filter(
+        makerspace=makerspace,
+        module_key=plan.key,
+        bucket_kind=RestoreRollbackObject.BucketKind.PRIVATE,
+    ).exclude(copy_key="").values_list("copy_key", flat=True):
+        add(key)
     return keys
 
 
 def _collect_public_keys(makerspace, plan):
-    if plan.public_image_keys is None:
-        return []
-    return [key for key in dict.fromkeys(plan.public_image_keys(makerspace)) if key]
+    from apps.backup.models import RestoreRollbackObject
+
+    keys = list(plan.public_image_keys(makerspace)) if plan.public_image_keys is not None else []
+    keys.extend(
+        RestoreRollbackObject.objects.filter(
+            makerspace=makerspace,
+            module_key=plan.key,
+            bucket_kind=RestoreRollbackObject.BucketKind.PUBLIC_IMAGE,
+        ).exclude(copy_key="").values_list("copy_key", flat=True)
+    )
+    return [key for key in dict.fromkeys(keys) if key]
 
 
 def _delete_private_keys(keys):
@@ -173,13 +188,25 @@ def _delete_private_keys(keys):
             logger.exception("module_purge_storage_delete_failed: %s", key)
         else:
             deleted.add(key)
+    if deleted:
+        from apps.backup.models import RestoreRollbackObject
+
+        RestoreRollbackObject.objects.filter(copy_key__in=deleted).delete()
     return deleted
 
 
 def _collect_private_key_sizes(makerspace, plan):
-    if plan.private_key_sizes is None:
-        return {}
-    return plan.private_key_sizes(makerspace)
+    from apps.backup.models import RestoreRollbackObject
+
+    sizes = plan.private_key_sizes(makerspace) if plan.private_key_sizes is not None else {}
+    sizes.update({
+        key: size for key, size in RestoreRollbackObject.objects.filter(
+            makerspace=makerspace,
+            module_key=plan.key,
+            bucket_kind=RestoreRollbackObject.BucketKind.PRIVATE,
+        ).exclude(copy_key="").values_list("copy_key", "size_bytes")
+    })
+    return sizes
 
 
 def _free_private_storage(makerspace, sizes, deleted_keys):
@@ -208,3 +235,6 @@ def _delete_public_images_and_free_storage(makerspace, keys):
     # permanently wrong in the direction that grants free storage.
     for key in keys:
         public_image_storage.release_public_image(makerspace, key)
+        from apps.backup.models import RestoreRollbackObject
+
+        RestoreRollbackObject.objects.filter(copy_key=key).delete()

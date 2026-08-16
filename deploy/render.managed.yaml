@@ -114,6 +114,8 @@ envVarGroups:
         sync: false
       - key: CRON_SECRET
         sync: false
+      - key: BACKUP_AGE_RECIPIENT
+        sync: false
       - key: PUBLIC_APP_BASE_URL
         sync: false
       - key: TELEGRAM_BOT_TOKEN

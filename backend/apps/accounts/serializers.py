@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 
 from apps.accounts.models import User
+from apps.accounts.tokens import SpaceWorksRefreshToken, validate_auth_generation
 
 
 def user_payload(user, request=None):
@@ -142,6 +143,8 @@ def _legacy_role_name(role):
 
 
 class LoginSerializer(TokenObtainPairSerializer):
+    token_class = SpaceWorksRefreshToken
+
     def validate(self, attrs):
         supplied_username = attrs.get(self.username_field, "")
         if supplied_username and not User.objects.filter(username=supplied_username).exists():
@@ -151,7 +154,18 @@ class LoginSerializer(TokenObtainPairSerializer):
             if email_matches.count() == 1:
                 attrs[self.username_field] = email_matches.first().username
         data = super().validate(attrs)  # raises AuthenticationFailed on bad creds/inactive
+        from apps.backup.recovery import assert_token_issuance_allowed
+
+        assert_token_issuance_allowed(self.user)
         if self.user.access_status != User.AccessStatus.ACTIVE:
             raise AuthenticationFailed("Account access is restricted.", code="access_denied")
         data["user"] = user_payload(self.user, request=self.context.get("request"))
         return data
+
+
+class SpaceWorksTokenRefreshSerializer(TokenRefreshSerializer):
+    token_class = SpaceWorksRefreshToken
+
+    def validate(self, attrs):
+        validate_auth_generation(self.token_class(attrs["refresh"]))
+        return super().validate(attrs)

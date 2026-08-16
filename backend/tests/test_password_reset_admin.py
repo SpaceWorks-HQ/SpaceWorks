@@ -159,7 +159,7 @@ def test_admin_reset_blacklists_outstanding_tokens():
         BlacklistedToken,
         OutstandingToken,
     )
-    from rest_framework_simplejwt.tokens import RefreshToken
+    from apps.accounts.tokens import SpaceWorksRefreshToken
 
     space = make_space("admin-reset-revoke")
     admin = make_member("admin-reset-revoke-actor", space)
@@ -170,7 +170,7 @@ def test_admin_reset_blacklists_outstanding_tokens():
         role=User.Role.REQUESTER,
     )
     # A live session for the target: its refresh token is recorded as outstanding.
-    RefreshToken.for_user(target)
+    SpaceWorksRefreshToken.for_user(target)
     outstanding = OutstandingToken.objects.filter(user=target)
     assert outstanding.exists()
     assert not BlacklistedToken.objects.filter(token__in=outstanding).exists()

@@ -5,6 +5,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
+mkdir -p "$OPS_DIR"
+exec 8>"$OPS_DIR/operation.lock"
+flock -n 8 || { printf '[Space Works updater] Another deployment operation is running; skipping.\n'; exit 0; }
+
 COMPOSE=(docker compose -f docker-compose.prod.yml)
 LOCK_DIR="$ROOT/.spaceworks-update.lock"
 VERSION_FILE="$ROOT/.spaceworks-version"

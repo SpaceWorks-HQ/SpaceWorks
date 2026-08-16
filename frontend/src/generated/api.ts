@@ -26,6 +26,8 @@ export const openApiTags = [
   "Analytics",
   "Asset units",
   "Auth",
+  "Backup",
+  "Backup recovery",
   "Bulk import",
   "Containers",
   "Dashboard",
@@ -81,6 +83,7 @@ export const openApiPaths = [
   "/api/v1/admin/assets/{id}/qr-history",
   "/api/v1/admin/assets/{id}/warranty",
   "/api/v1/admin/audit-logs",
+  "/api/v1/admin/backups/{archive_id}/download-url",
   "/api/v1/admin/bookings/{id}/approve/",
   "/api/v1/admin/bookings/{id}/cancel/",
   "/api/v1/admin/bookings/{id}/complete/",
@@ -183,6 +186,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/api-settings",
   "/api/v1/admin/makerspace/{makerspace_id}/archive-requests",
   "/api/v1/admin/makerspace/{makerspace_id}/archive-requests/{id}/withdraw",
+  "/api/v1/admin/makerspace/{makerspace_id}/backups",
   "/api/v1/admin/makerspace/{makerspace_id}/categories",
   "/api/v1/admin/makerspace/{makerspace_id}/containers",
   "/api/v1/admin/makerspace/{makerspace_id}/cover",
@@ -278,8 +282,13 @@ export const openApiPaths = [
   "/api/v1/admin/memberships/{id}/unverify",
   "/api/v1/admin/memberships/{id}/verify",
   "/api/v1/admin/memberships/{id}/waiver/witness",
+  "/api/v1/admin/platform/backup-settings",
+  "/api/v1/admin/platform/backups",
   "/api/v1/admin/platform/email-settings",
   "/api/v1/admin/platform/payment-settings",
+  "/api/v1/admin/platform/restores",
+  "/api/v1/admin/platform/restores/{restore_id}",
+  "/api/v1/admin/platform/restores/{restore_id}/decision",
   "/api/v1/admin/platform/social-auth-settings",
   "/api/v1/admin/platform/update-settings",
   "/api/v1/admin/platform/update-settings/update-now",
@@ -357,6 +366,7 @@ export const openApiPaths = [
   "/api/v1/auth/social/oidc/{slug}/authorize",
   "/api/v1/auth/social/providers",
   "/api/v1/auth/social/providers/{provider}",
+  "/api/v1/backups/download/{archive_id}/{token}",
   "/api/v1/bootstrap",
   "/api/v1/config",
   "/api/v1/data-exports/download/{job_id}/{token}",
@@ -430,6 +440,7 @@ export const openApiPaths = [
   "/api/v1/public/{makerspace_slug}/tools/checkout",
   "/api/v1/public/{makerspace_slug}/tools/evidence-url",
   "/api/v1/public/{makerspace_slug}/tools/return",
+  "/api/v1/recovery",
   "/api/v1/webhooks/razorpay/{public_code}",
   "/api/v1/webhooks/stripe/connect",
   "/api/v1/webhooks/stripe/{public_code}"
@@ -738,6 +749,30 @@ export type AuthUserPayload = {
 };
 
 export type AvailabilityEnum = "Available" | "Limited" | "Full";
+
+export type BackupArchive = {
+  "id": string;
+  "scope": ScopeEnum;
+  "makerspace": number | null;
+  "status": BackupArchiveStatusEnum;
+  "manifest": unknown;
+  "size_bytes": number;
+  "age_encrypted": boolean;
+  "failure_detail": string;
+  "started_at": string | null;
+  "completed_at": string | null;
+  "expires_at": string;
+  "created_at": string;
+  "purge_warning": string;
+};
+
+export type BackupArchiveStatusEnum = "pending" | "running" | "available" | "failed" | "expired";
+
+export type BackupDownload = {
+  "url": string;
+  "expires_at": string;
+  "purge_warning": string;
+};
 
 export type BlankEnum = "";
 
@@ -1823,6 +1858,8 @@ export type KeyCbbEnum = "email" | "telegram" | "slack" | "mattermost" | "discor
 export type KeyD07Enum = "hardware_requests" | "printing" | "events" | "bookings" | "maintenance" | "members";
 
 export type Kind3bfEnum = "dev_room" | "bench" | "meeting" | "other";
+
+export type KindB02Enum = "rollback_in_place" | "disaster";
 
 export type KindE56Enum = "role" | "requester" | "members" | "user";
 
@@ -3353,6 +3390,15 @@ export type PatchedNotificationRulesPatch = {
   "preferences"?: Array<NotificationPreferenceChange>;
 };
 
+export type PatchedPlatformBackupSettings = {
+  "automatic_backups_enabled"?: boolean;
+  "retention_days"?: number;
+  "last_scheduled_at"?: string | null;
+  "last_success_at"?: string | null;
+  "last_error"?: string;
+  "updated_at"?: string;
+};
+
 export type PatchedPlatformEmailSettings = {
   "id"?: number;
   "smtp_host"?: string;
@@ -3501,6 +3547,15 @@ export type PhoneStartResponse = {
 export type PhoneStatus = {
   "phone_e164": string;
   "verified": boolean;
+};
+
+export type PlatformBackupSettings = {
+  "automatic_backups_enabled"?: boolean;
+  "retention_days"?: number;
+  "last_scheduled_at": string | null;
+  "last_success_at": string | null;
+  "last_error": string;
+  "updated_at": string;
 };
 
 export type PlatformEmailSettings = {
@@ -4358,6 +4413,26 @@ export type RecipientScopeOptions = {
   "categories": Array<RecipientScopeOption>;
 };
 
+export type RecoveryAcknowledge = {
+  "acknowledgement": string;
+};
+
+export type RecoveryState = {
+  "mode": RecoveryStateModeEnum;
+  "auth_generation": string;
+  "active_restore": string | null;
+  "recovery_principal": number | null;
+  "quarantine_reason": string;
+  "quarantined_at": string | null;
+  "acknowledged_at": string | null;
+  "acknowledged_by": number | null;
+  "acknowledgement": string;
+  "residual_risk": string;
+  "updated_at": string;
+};
+
+export type RecoveryStateModeEnum = "normal" | "quiesced" | "quarantined";
+
 export type RecoveryUnavailable = {
   "detail": string;
   "code": string;
@@ -4419,6 +4494,35 @@ export type ResetPasswordResponse = {
   "username": string;
   "temporary_password": string;
 };
+
+export type RestoreCreate = {
+  "archive": string;
+  "kind": KindB02Enum;
+};
+
+export type RestoreDecision = {
+  "decision": RestoreDecisionDecisionEnum;
+};
+
+export type RestoreDecisionDecisionEnum = "proceed" | "reset" | "abort";
+
+export type RestoreOperation = {
+  "id": string;
+  "archive": string;
+  "kind": KindB02Enum;
+  "stage": StageEnum;
+  "decision": RestoreOperationDecisionEnum;
+  "restore_diff": unknown;
+  "decision_deadline_at": string | null;
+  "supervisor_heartbeat_at": string | null;
+  "error_detail": string;
+  "requested_by_username_snapshot": string;
+  "requested_at": string;
+  "completed_at": string | null;
+  "updated_at": string;
+};
+
+export type RestoreOperationDecisionEnum = "pending" | "proceed" | "reset" | "abort";
 
 export type RestrictUser = {
   "reason": string;
@@ -4517,6 +4621,8 @@ export type RoleMachineScopeWrite = {
   "machine_type_ids": Array<number>;
   "machine_ids": Array<number>;
 };
+
+export type ScopeEnum = "deployment" | "makerspace";
 
 export type ScopeModeEnum = "machine" | "full";
 
@@ -4729,6 +4835,8 @@ export type StaffPaymentSummary = {
   "amount": string;
   "currency": string;
 };
+
+export type StageEnum = "requested" | "claimed" | "preflight" | "quiesced" | "db_restoring" | "objects_restoring" | "validating" | "completed" | "restored_quarantined" | "rolling_back" | "failed" | "aborted";
 
 export type StateEnum = "requested" | "invited" | "active" | "revoked";
 

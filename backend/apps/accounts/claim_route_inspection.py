@@ -21,13 +21,24 @@ class ClaimRoute:
 
 
 def flatten_claim_routes(patterns):
+    return flatten_routes(patterns, include_path=_is_claim_reachable)
+
+
+def flatten_routes(patterns, *, include_path=lambda _path: True):
     routes = []
     errors = []
-    _flatten(patterns, route_prefix="", namespaces=(), routes=routes, errors=errors)
+    _flatten(
+        patterns,
+        route_prefix="",
+        namespaces=(),
+        routes=routes,
+        errors=errors,
+        include_path=include_path,
+    )
     return routes, errors
 
 
-def _flatten(patterns, *, route_prefix, namespaces, routes, errors):
+def _flatten(patterns, *, route_prefix, namespaces, routes, errors, include_path):
     for pattern in patterns:
         path = f"{route_prefix}{pattern.pattern}"
         if isinstance(pattern, URLResolver):
@@ -40,9 +51,10 @@ def _flatten(patterns, *, route_prefix, namespaces, routes, errors):
                 namespaces=child_namespaces,
                 routes=routes,
                 errors=errors,
+                include_path=include_path,
             )
             continue
-        if not isinstance(pattern, URLPattern) or not _is_claim_reachable(path):
+        if not isinstance(pattern, URLPattern) or not include_path(path):
             continue
         if pattern.name is None:
             errors.append(f"Unnamed claim-reachable URL pattern: /{path}")

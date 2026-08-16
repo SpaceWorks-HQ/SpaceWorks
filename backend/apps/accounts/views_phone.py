@@ -119,10 +119,13 @@ class PhoneLoginConfirmView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         user = confirm_login(data["phone"], data["code"])
+        from apps.backup.recovery import assert_token_issuance_allowed
 
-        from rest_framework_simplejwt.tokens import RefreshToken
+        assert_token_issuance_allowed(user)
 
-        refresh = RefreshToken.for_user(user)
+        from apps.accounts.tokens import SpaceWorksRefreshToken
+
+        refresh = SpaceWorksRefreshToken.for_user(user)
         # Hardcoded "member", never derived from the request. An SMS code is the weakest
         # factor here (SIM swap, number recycling) and staff surfaces reject this claim.
         refresh["surface"] = "member"

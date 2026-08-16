@@ -134,6 +134,7 @@ INSTALLED_APPS = [
     "apps.procurement",
     "apps.notifications",
     "apps.updates",
+    "apps.backup",
     "apps.machines",
     "apps.events",
     "apps.bookings",
@@ -154,6 +155,7 @@ INSTALLED_APPS = [
 TOMBSTONED_APPS = tombstoned_app_labels()
 
 MIDDLEWARE = [
+    "apps.backup.middleware.DeploymentRecoveryGateMiddleware",
     "apps.makerspaces.middleware.TenantHostValidationMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "apps.accounts.social_csp.SocialCspMiddleware",
@@ -448,6 +450,15 @@ DATA_EXPORT_RETENTION_SECONDS = env.int(
 DATA_EXPORT_DOWNLOAD_TTL_SECONDS = env.int(
     "DATA_EXPORT_DOWNLOAD_TTL_SECONDS", default=5 * 60
 )
+BACKUP_AGE_RECIPIENT = env("BACKUP_AGE_RECIPIENT", default="")
+BACKUP_DOWNLOAD_TTL_SECONDS = env.int("BACKUP_DOWNLOAD_TTL_SECONDS", default=5 * 60)
+BACKUP_LEASE_SECONDS = env.int("BACKUP_LEASE_SECONDS", default=2 * 60 * 60)
+BACKUP_DECISION_SECONDS = env.int("BACKUP_DECISION_SECONDS", default=5 * 60)
+BACKUP_PRESIGN_DRAIN_SECONDS = env.int(
+    "BACKUP_PRESIGN_DRAIN_SECONDS",
+    default=max(EVIDENCE_URL_TTL_SECONDS, PUBLIC_IMAGE_URL_TTL_SECONDS, PRINT_URL_TTL_SECONDS),
+)
+BACKUP_OPS_DIR = env("BACKUP_OPS_DIR", default="/var/lib/spaceworks/ops")
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
 CELERY_BEAT_SCHEDULE = {
     # Recovery issuance stays entirely off the anonymous request path. One minute keeps
@@ -476,6 +487,18 @@ CELERY_BEAT_SCHEDULE = {
     "purge-expired-data-exports": {
         "task": "apps.data_export.tasks.purge_expired_exports_task",
         "schedule": crontab(hour=3, minute=45),
+    },
+    "scheduled-deployment-backup": {
+        "task": "apps.backup.tasks.scheduled_deployment_backup_task",
+        "schedule": crontab(hour=2, minute=0),
+    },
+    "purge-expired-backup-archives": {
+        "task": "apps.backup.tasks.purge_expired_backup_archives_task",
+        "schedule": crontab(hour=3, minute=55),
+    },
+    "cleanup-expired-restore-rollbacks": {
+        "task": "apps.backup.tasks.cleanup_expired_restore_rollbacks_task",
+        "schedule": crontab(hour=4, minute=5),
     },
 }
 
@@ -674,6 +697,10 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_TOKEN_CLASSES": (
+        "apps.accounts.tokens.SpaceWorksAccessToken",
+        "apps.accounts.claim_tokens.ClaimAccessToken",
+    ),
 }
 
 # Cross-site refresh cookie (frontends live on separate origins).

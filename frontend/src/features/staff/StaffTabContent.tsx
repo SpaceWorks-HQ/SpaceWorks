@@ -42,6 +42,7 @@ const ModulesPanel = lazy(() => import("./ModulesPanel").then((m) => ({ default:
 const PaymentsPanel = lazy(() => import("./PaymentsPanel").then((m) => ({ default: m.PaymentsPanel })));
 const HandoverConsole = lazy(() => import("./panels/machine/HandoverConsole").then((m) => ({ default: m.HandoverConsole })));
 const DataExportsPanel = lazy(() => import("./DataExportsPanel").then((m) => ({ default: m.DataExportsPanel })));
+const BackupRestorePanel = lazy(() => import("./BackupRestorePanel").then((m) => ({ default: m.BackupRestorePanel })));
 
 export function StaffTabContent({
   activeMakerspace,
@@ -258,6 +259,9 @@ export function StaffTabContent({
       ) : null}
       {activeTab === "exports" && canManageMakerspace ? (
         <DataExportsPanel key={makerspaceKey} makerspaceId={makerspaceKey} />
+      ) : null}
+      {activeTab === "backups" && canManageMakerspace ? (
+        <BackupRestorePanel key={makerspaceKey} makerspaceId={makerspaceKey} isSuperadmin={isSuperadmin} />
       ) : null}
       {activeTab === "audit" && canViewAudit ? <AuditLog /> : null}
       </Suspense>

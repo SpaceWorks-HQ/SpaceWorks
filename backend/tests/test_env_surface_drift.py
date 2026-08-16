@@ -283,3 +283,10 @@ def test_the_proxy_posture_is_explicit_in_every_production_manifest(manifest):
         f"number of proxies actually in front of the backend (0 disables forwarded-header "
         f"trust) so throttling keys on the real client IP."
     )
+
+
+def test_backup_preflight_policy_covers_the_complete_environment_surface():
+    """A newly read environment value cannot silently escape restore preflight policy."""
+    from apps.backup.settings_policy import POLICIES
+
+    assert set(POLICIES) == _names_the_backend_reads()

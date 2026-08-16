@@ -119,6 +119,19 @@ Say "Building and starting the app (first run can take a few minutes)..."
 docker @compose up -d --build
 if ($LASTEXITCODE -ne 0) { Die "docker compose failed to start. See the output above." }
 
+# Windows can create/download archives, but the Linux flock-based in-place supervisor
+# is intentionally unavailable. The shared path still fences backend/cron work inside
+# Docker Desktop and holds the age identity used for downloads restored elsewhere.
+$opsHostDir = if ($env:SPACEWORKS_OPS_HOST_DIR) { $env:SPACEWORKS_OPS_HOST_DIR } else { "/var/lib/spaceworks/ops" }
+docker run --rm -v "${opsHostDir}:/target" alpine:3.22 sh -c "chown -R 10001:10001 /target && chmod 700 /target"
+if (-not (Select-String -Path ".env" -Pattern '^BACKUP_AGE_RECIPIENT=' -Quiet)) {
+  docker @compose exec -T backend age-keygen -o /var/lib/spaceworks/ops/age-identity.txt *> $null
+  $backupRecipient = (docker @compose exec -T backend age-keygen -y /var/lib/spaceworks/ops/age-identity.txt).Trim()
+  [System.IO.File]::AppendAllText((Join-Path $PSScriptRoot ".env"), "`nBACKUP_AGE_RECIPIENT=$backupRecipient`n", (New-Object System.Text.UTF8Encoding($false)))
+  docker @compose up -d
+  Warn "In-place restore requires a Linux host with flock. Windows backups remain downloadable and can be restored on a supported host."
+}
+
 Say "Waiting for the app to be ready..."
 $ready = $false
 for ($i = 0; $i -lt 60; $i++) {

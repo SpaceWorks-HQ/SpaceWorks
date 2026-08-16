@@ -43,14 +43,17 @@ def assert_staff_authority(user, request):
 
 def issue_social_session(user, *, surface, delivery, nonce_row, staff_scope=None):
     assert_social_user_active(user)
+    from apps.backup.recovery import assert_token_issuance_allowed
+
+    assert_token_issuance_allowed(user)
     if delivery == SocialDelivery.DEVICE:
         grant = nonce_row.device_grant
         with transaction.atomic():
             access, refresh, _family = issue_device_token_pair(user, grant)
         return {"access": access, "refresh": refresh, "device_grant": grant}
-    from rest_framework_simplejwt.tokens import RefreshToken
+    from apps.accounts.tokens import SpaceWorksRefreshToken
 
-    refresh = RefreshToken.for_user(user)
+    refresh = SpaceWorksRefreshToken.for_user(user)
     refresh["surface"] = surface
     if surface == SocialSurface.STAFF:
         refresh["staff_scope"] = staff_scope or "platform"

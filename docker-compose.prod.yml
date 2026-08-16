@@ -78,8 +78,10 @@ services:
       set -e;
       until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do sleep 1; done;
       mc mb --ignore-existing "local/$$AWS_STORAGE_BUCKET_NAME";
+      mc version enable "local/$$AWS_STORAGE_BUCKET_NAME";
       mc anonymous set none "local/$$AWS_STORAGE_BUCKET_NAME";
       mc mb --ignore-existing "local/$$PUBLIC_IMAGE_BUCKET";
+      mc version enable "local/$$PUBLIC_IMAGE_BUCKET";
       mc anonymous set download "local/$$PUBLIC_IMAGE_BUCKET";
       '
 
@@ -138,6 +140,8 @@ services:
       STORAGE_PRESIGN_METHOD: ${STORAGE_PRESIGN_METHOD:-post}
       CRON_SECRET: ${CRON_SECRET:-}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+      BACKUP_OPS_DIR: /var/lib/spaceworks/ops
     # Gunicorn's defaults are one synchronous worker with a 30s hard timeout and no
     # request log — a single slow upload or Stripe call then blocks the entire site,
     # and nothing is recorded. Workers default to 3 (a sane 2-core box); raise
@@ -168,11 +172,15 @@ services:
         condition: service_completed_successfully
       migrate:
         condition: service_completed_successfully
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
 
   migrate:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
     environment: *backend-env
     command: python manage.py migrate
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
     depends_on:
       db:
         condition: service_healthy
@@ -182,6 +190,8 @@ services:
     logging: *default-logging
     environment: *backend-env
     command: celery -A config worker -l info --concurrency ${CELERY_CONCURRENCY:-4}
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
     depends_on:
       db:
         condition: service_healthy
@@ -201,6 +211,7 @@ services:
     command: celery -A config beat -l info --schedule /var/lib/celery/celerybeat-schedule
     volumes:
       - celerybeat_data:/var/lib/celery
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
     depends_on:
       db:
         condition: service_healthy

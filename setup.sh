@@ -106,6 +106,21 @@ fi
 say "Building and starting the app (first run can take a few minutes)..."
 "${COMPOSE[@]}" up -d --build
 
+# The deployment operation lock must be the same inode for backend, worker, beat and
+# the privileged host scripts. Docker performs the ownership step so setup does not
+# require host sudo merely to create uid 10001's bind mount.
+OPS_HOST_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
+docker run --rm -v "$OPS_HOST_DIR:/target" alpine:3.22 \
+  sh -c 'chown -R 10001:10001 /target && chmod 700 /target'
+if ! grep -q '^BACKUP_AGE_RECIPIENT=' .env; then
+  "${COMPOSE[@]}" exec -T backend age-keygen \
+    -o /var/lib/spaceworks/ops/age-identity.txt >/dev/null
+  BACKUP_RECIPIENT="$("${COMPOSE[@]}" exec -T backend age-keygen \
+    -y /var/lib/spaceworks/ops/age-identity.txt | tr -d '\r\n')"
+  printf '\nBACKUP_AGE_RECIPIENT=%s\n' "$BACKUP_RECIPIENT" >> .env
+  "${COMPOSE[@]}" up -d
+fi
+
 say "Waiting for the app to be ready..."
 ready=0
 for _ in $(seq 1 60); do

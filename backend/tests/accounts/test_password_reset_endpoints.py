@@ -8,7 +8,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
-from rest_framework_simplejwt.tokens import RefreshToken
+from apps.accounts.tokens import SpaceWorksRefreshToken
 
 from apps.accounts.models import PasswordResetEnvelope, PasswordResetEnvelopeStatus, User
 from apps.accounts.services_password_reset import GENERIC_CONFIRM_ERROR, MAX_ATTEMPTS
@@ -284,6 +284,6 @@ def test_legacy_link_coexists_end_to_end_and_audits_method_link():
 def _client_for(user):
     client = APIClient()
     client.credentials(
-        HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}"
+        HTTP_AUTHORIZATION=f"Bearer {SpaceWorksRefreshToken.for_user(user).access_token}"
     )
     return client

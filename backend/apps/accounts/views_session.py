@@ -8,7 +8,6 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.accounts import audit_events
@@ -29,7 +28,8 @@ from apps.accounts.schemas_auth import (
     RefreshResponseSerializer,
     UserPayloadSerializer,
 )
-from apps.accounts.serializers import LoginSerializer, user_payload
+from apps.accounts.serializers import LoginSerializer, SpaceWorksTokenRefreshSerializer, user_payload
+from apps.accounts.tokens import SpaceWorksRefreshToken
 from apps.openapi import LOGIN_EXAMPLE
 
 
@@ -89,7 +89,7 @@ class LoginView(TokenObtainPairView):
 def _refresh_user_is_active(token_str):
     """Return False if the refresh token's user is suspended/restricted/inactive."""
     try:
-        token = RefreshToken(token_str)
+        token = SpaceWorksRefreshToken(token_str)
     except TokenError:
         return True
     user = User.objects.filter(pk=token.get("user_id")).first()
@@ -108,14 +108,14 @@ def _refresh_surface(token_str):
     except TokenError:
         pass
     try:
-        return RefreshToken(token_str).get("surface")
+        return SpaceWorksRefreshToken(token_str).get("surface")
     except TokenError:
         return None
 
 
 def _assert_staff_refresh_scope(request, token_str):
     try:
-        token = RefreshToken(token_str)
+        token = SpaceWorksRefreshToken(token_str)
     except TokenError:
         return
     if token.get("surface") != "staff":
@@ -139,6 +139,7 @@ def _assert_staff_refresh_scope(request, token_str):
 
 
 class RefreshView(TokenRefreshView):
+    serializer_class = SpaceWorksTokenRefreshSerializer
     @extend_schema(
         tags=["Auth"],
         summary="Refresh access token",
@@ -261,7 +262,7 @@ class LogoutView(APIView):
                 try:
                     refresh = ClaimRefreshToken(cookie)
                 except TokenError:
-                    refresh = RefreshToken(cookie)
+                    refresh = SpaceWorksRefreshToken(cookie)
                 refresh.blacklist()
             except TokenError:
                 pass

@@ -53,6 +53,21 @@ SCHEDULED_TASKS = (
         "apps.data_export.tasks.purge_expired_exports_task",
         24 * 60,
     ),
+    (
+        "scheduled-deployment-backup",
+        "apps.backup.tasks.scheduled_deployment_backup_task",
+        24 * 60,
+    ),
+    (
+        "purge-expired-backup-archives",
+        "apps.backup.tasks.purge_expired_backup_archives_task",
+        24 * 60,
+    ),
+    (
+        "cleanup-expired-restore-rollbacks",
+        "apps.backup.tasks.cleanup_expired_restore_rollbacks_task",
+        24 * 60,
+    ),
 )
 
 

@@ -4,16 +4,16 @@ from dataclasses import dataclass
 
 from django.utils import timezone
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from apps.accounts.tokens import SpaceWorksAccessToken, SpaceWorksRefreshToken
 
 from apps.accounts.claim_sessions import attach_claim_context, validated_claim_session
 
 
-class ClaimAccessToken(AccessToken):
+class ClaimAccessToken(SpaceWorksAccessToken):
     token_type = "claim_access"
 
 
-class ClaimRefreshToken(RefreshToken):
+class ClaimRefreshToken(SpaceWorksRefreshToken):
     token_type = "claim_refresh"
     access_token_class = ClaimAccessToken
 
@@ -51,6 +51,9 @@ def claim_user_from_refresh(raw_refresh, *, require_active=True):
 def _tokens_for_claim(claim):
     if claim.absolute_expires_at is None or claim.absolute_expires_at <= timezone.now():
         raise TokenError("Claim session has expired.")
+    from apps.backup.recovery import assert_token_issuance_allowed
+
+    assert_token_issuance_allowed(claim.membership.user)
     refresh = ClaimRefreshToken.for_user(claim.membership.user)
     refresh["surface"] = "member"
     refresh["claim_session_id"] = str(claim.session_id)

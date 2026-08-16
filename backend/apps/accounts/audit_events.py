@@ -4,9 +4,8 @@ import hmac
 from django.conf import settings
 
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import RefreshToken
-
 from apps.accounts.models import User
+from apps.accounts.tokens import SpaceWorksRefreshToken
 from apps.audit import services as audit
 
 
@@ -40,7 +39,7 @@ def user_from_refresh_token(token_str):
     except TokenError:
         pass
     try:
-        token = RefreshToken(token_str)
+        token = SpaceWorksRefreshToken(token_str)
     except TokenError:
         return None
     return User.objects.filter(pk=token.get("user_id")).first()

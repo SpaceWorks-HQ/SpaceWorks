@@ -18,6 +18,7 @@ from apps.procurement import storage as procurement_storage
 from apps.procurement.models import ToBuyReceipt
 from apps.warranty import storage as warranty_storage
 from apps.warranty.models import WarrantyDocument
+from apps.backup.models import RestoreRollbackObject
 
 
 class StorageReadError(Exception):
@@ -65,6 +66,10 @@ class Command(BaseCommand):
                         ).values_list("object_key", "accounted_size_bytes"),
                         export_storage.object_size,
                         True,
+                    ),
+                    "restore_rollback_objects": sum(
+                        RestoreRollbackObject.objects.filter(makerspace=makerspace)
+                        .values_list("size_bytes", flat=True)
                     ),
                 }
             except StorageReadError as exc:

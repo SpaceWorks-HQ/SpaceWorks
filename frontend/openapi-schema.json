@@ -1016,6 +1016,55 @@
                 }
             }
         },
+        "/api/v1/admin/backups/{archive_id}/download-url": {
+            "post": {
+                "operationId": "api_v1_admin_backups_download_url_create",
+                "summary": "Issue a one-use backup download URL",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "archive_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Backup"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BackupDownload"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "The request is invalid for the current lifecycle state."
+                    },
+                    "404": {
+                        "description": "The requested resource does not exist in the actor's scope."
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/bookings/{id}/approve/": {
             "post": {
                 "operationId": "api_v1_admin_bookings_approve_create",
@@ -9717,6 +9766,100 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/backups": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_backups_list",
+                "summary": "List makerspace backup archives",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Backup"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/BackupArchive"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "The requested resource does not exist in the actor's scope."
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspace_backups_create",
+                "summary": "Request an age-encrypted makerspace backup",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Backup"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BackupArchive"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "The requested resource does not exist in the actor's scope."
+                    },
+                    "503": {
+                        "description": "The backup worker is unavailable."
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
                     }
                 }
             }
@@ -19001,6 +19144,158 @@
                 }
             }
         },
+        "/api/v1/admin/platform/backup-settings": {
+            "get": {
+                "operationId": "api_v1_admin_platform_backup_settings_retrieve",
+                "summary": "Get deployment backup settings",
+                "tags": [
+                    "Backup"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlatformBackupSettings"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "api_v1_admin_platform_backup_settings_partial_update",
+                "summary": "Update deployment backup settings",
+                "tags": [
+                    "Backup"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedPlatformBackupSettings"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedPlatformBackupSettings"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedPlatformBackupSettings"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlatformBackupSettings"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "The request is invalid for the current lifecycle state."
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/backups": {
+            "get": {
+                "operationId": "api_v1_admin_platform_backups_list",
+                "summary": "List full-deployment backup archives",
+                "tags": [
+                    "Backup"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/BackupArchive"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_platform_backups_create",
+                "summary": "Request an age-encrypted full-deployment backup",
+                "tags": [
+                    "Backup"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BackupArchive"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
+                        "description": "The backup worker is unavailable."
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/platform/email-settings": {
             "get": {
                 "operationId": "api_v1_admin_platform_email_settings_retrieve",
@@ -19135,6 +19430,209 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/restores": {
+            "get": {
+                "operationId": "api_v1_admin_platform_restores_list",
+                "summary": "List deployment restore operations",
+                "tags": [
+                    "Backup"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/RestoreOperation"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_platform_restores_create",
+                "summary": "Record restore intent for the privileged host supervisor",
+                "tags": [
+                    "Backup"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RestoreCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RestoreCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RestoreCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RestoreOperation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "The request is invalid for the current lifecycle state."
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/restores/{restore_id}": {
+            "get": {
+                "operationId": "api_v1_admin_platform_restores_retrieve",
+                "summary": "Get restore stage, diff, and decision deadline",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "restore_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Backup"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RestoreOperation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "The requested resource does not exist in the actor's scope."
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/restores/{restore_id}/decision": {
+            "post": {
+                "operationId": "api_v1_admin_platform_restores_decision_create",
+                "summary": "Decide a quiesced in-place restore",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "restore_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Backup"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RestoreDecision"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RestoreDecision"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RestoreDecision"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RestoreOperation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "The request is invalid for the current lifecycle state."
+                    },
+                    "404": {
+                        "description": "The requested resource does not exist in the actor's scope."
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
                     }
                 }
             }
@@ -24310,6 +24808,42 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/backups/download/{archive_id}/{token}": {
+            "get": {
+                "operationId": "api_v1_backups_download_retrieve",
+                "summary": "Consume a one-use backup download",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "archive_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "token",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Backup"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Age-encrypted archive stream."
+                    },
+                    "404": {
+                        "description": "Invalid or expired download."
                     }
                 }
             }
@@ -29824,6 +30358,91 @@
                 }
             }
         },
+        "/api/v1/recovery": {
+            "get": {
+                "operationId": "api_v1_recovery_retrieve",
+                "summary": "Get deployment quarantine and residual-risk state",
+                "tags": [
+                    "Backup recovery"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecoveryState"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_recovery_create",
+                "summary": "Acknowledge residual risk and lift quarantine",
+                "tags": [
+                    "Backup recovery"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecoveryAcknowledge"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecoveryAcknowledge"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecoveryAcknowledge"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecoveryState"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "The request is invalid for the current lifecycle state."
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "The authenticated actor is not authorized."
+                    }
+                }
+            }
+        },
         "/api/v1/webhooks/razorpay/{public_code}": {
             "post": {
                 "operationId": "api_v1_webhooks_razorpay_create",
@@ -31198,6 +31817,125 @@
                     "Available",
                     "Limited",
                     "Full"
+                ]
+            },
+            "BackupArchive": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "scope": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ScopeEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "makerspace": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/BackupArchiveStatusEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "manifest": {
+                        "readOnly": true
+                    },
+                    "size_bytes": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "age_encrypted": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "failure_detail": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "started_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "completed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "purge_warning": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "age_encrypted",
+                    "completed_at",
+                    "created_at",
+                    "expires_at",
+                    "failure_detail",
+                    "id",
+                    "makerspace",
+                    "manifest",
+                    "purge_warning",
+                    "scope",
+                    "size_bytes",
+                    "started_at",
+                    "status"
+                ]
+            },
+            "BackupArchiveStatusEnum": {
+                "enum": [
+                    "pending",
+                    "running",
+                    "available",
+                    "failed",
+                    "expired"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `running` - Running\n* `available` - Available\n* `failed` - Failed\n* `expired` - Expired"
+            },
+            "BackupDownload": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "purge_warning": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "expires_at",
+                    "purge_warning",
+                    "url"
                 ]
             },
             "BlankEnum": {
@@ -35585,6 +36323,14 @@
                 ],
                 "type": "string",
                 "description": "* `dev_room` - Development room\n* `bench` - Bench\n* `meeting` - Meeting room\n* `other` - Other"
+            },
+            "KindB02Enum": {
+                "enum": [
+                    "rollback_in_place",
+                    "disaster"
+                ],
+                "type": "string",
+                "description": "* `rollback_in_place` - Rollback in place\n* `disaster` - Disaster or cross-server"
             },
             "KindE56Enum": {
                 "enum": [
@@ -41870,6 +42616,40 @@
                     }
                 }
             },
+            "PatchedPlatformBackupSettings": {
+                "type": "object",
+                "properties": {
+                    "automatic_backups_enabled": {
+                        "type": "boolean"
+                    },
+                    "retention_days": {
+                        "type": "integer",
+                        "maximum": 3650,
+                        "minimum": 1
+                    },
+                    "last_scheduled_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "last_success_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "last_error": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
             "PatchedPlatformEmailSettings": {
                 "type": "object",
                 "properties": {
@@ -42464,6 +43244,46 @@
                 "required": [
                     "phone_e164",
                     "verified"
+                ]
+            },
+            "PlatformBackupSettings": {
+                "type": "object",
+                "properties": {
+                    "automatic_backups_enabled": {
+                        "type": "boolean"
+                    },
+                    "retention_days": {
+                        "type": "integer",
+                        "maximum": 3650,
+                        "minimum": 1
+                    },
+                    "last_scheduled_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "last_success_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "last_error": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "last_error",
+                    "last_scheduled_at",
+                    "last_success_at",
+                    "updated_at"
                 ]
             },
             "PlatformEmailSettings": {
@@ -45855,6 +46675,102 @@
                     "machines"
                 ]
             },
+            "RecoveryAcknowledge": {
+                "type": "object",
+                "properties": {
+                    "acknowledgement": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "acknowledgement"
+                ]
+            },
+            "RecoveryState": {
+                "type": "object",
+                "properties": {
+                    "mode": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/RecoveryStateModeEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "auth_generation": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "active_restore": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "recovery_principal": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "quarantine_reason": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "quarantined_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "acknowledged_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "acknowledged_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "acknowledgement": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "residual_risk": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "acknowledged_at",
+                    "acknowledged_by",
+                    "acknowledgement",
+                    "active_restore",
+                    "auth_generation",
+                    "mode",
+                    "quarantine_reason",
+                    "quarantined_at",
+                    "recovery_principal",
+                    "residual_risk",
+                    "updated_at"
+                ]
+            },
+            "RecoveryStateModeEnum": {
+                "enum": [
+                    "normal",
+                    "quiesced",
+                    "quarantined"
+                ],
+                "type": "string",
+                "description": "* `normal` - Normal\n* `quiesced` - Quiesced\n* `quarantined` - Quarantined"
+            },
             "RecoveryUnavailable": {
                 "type": "object",
                 "properties": {
@@ -46056,6 +46972,145 @@
                     "temporary_password",
                     "username"
                 ]
+            },
+            "RestoreCreate": {
+                "type": "object",
+                "properties": {
+                    "archive": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "kind": {
+                        "$ref": "#/components/schemas/KindB02Enum"
+                    }
+                },
+                "required": [
+                    "archive",
+                    "kind"
+                ]
+            },
+            "RestoreDecision": {
+                "type": "object",
+                "properties": {
+                    "decision": {
+                        "$ref": "#/components/schemas/RestoreDecisionDecisionEnum"
+                    }
+                },
+                "required": [
+                    "decision"
+                ]
+            },
+            "RestoreDecisionDecisionEnum": {
+                "enum": [
+                    "proceed",
+                    "reset",
+                    "abort"
+                ],
+                "type": "string",
+                "description": "* `proceed` - proceed\n* `reset` - reset\n* `abort` - abort"
+            },
+            "RestoreOperation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "archive": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "kind": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/KindB02Enum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "stage": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/StageEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "decision": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/RestoreOperationDecisionEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "restore_diff": {
+                        "readOnly": true
+                    },
+                    "decision_deadline_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "supervisor_heartbeat_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "error_detail": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "requested_by_username_snapshot": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "requested_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "completed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "archive",
+                    "completed_at",
+                    "decision",
+                    "decision_deadline_at",
+                    "error_detail",
+                    "id",
+                    "kind",
+                    "requested_at",
+                    "requested_by_username_snapshot",
+                    "restore_diff",
+                    "stage",
+                    "supervisor_heartbeat_at",
+                    "updated_at"
+                ]
+            },
+            "RestoreOperationDecisionEnum": {
+                "enum": [
+                    "pending",
+                    "proceed",
+                    "reset",
+                    "abort"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `proceed` - Proceed\n* `reset` - Proceed with authority reset\n* `abort` - Abort"
             },
             "RestrictUser": {
                 "type": "object",
@@ -46449,6 +47504,14 @@
                     "machine_ids",
                     "machine_type_ids"
                 ]
+            },
+            "ScopeEnum": {
+                "enum": [
+                    "deployment",
+                    "makerspace"
+                ],
+                "type": "string",
+                "description": "* `deployment` - Full deployment\n* `makerspace` - Makerspace"
             },
             "ScopeModeEnum": {
                 "enum": [
@@ -47187,6 +48250,24 @@
                     "id",
                     "status"
                 ]
+            },
+            "StageEnum": {
+                "enum": [
+                    "requested",
+                    "claimed",
+                    "preflight",
+                    "quiesced",
+                    "db_restoring",
+                    "objects_restoring",
+                    "validating",
+                    "completed",
+                    "restored_quarantined",
+                    "rolling_back",
+                    "failed",
+                    "aborted"
+                ],
+                "type": "string",
+                "description": "* `requested` - Requested\n* `claimed` - Claimed\n* `preflight` - Preflight\n* `quiesced` - Quiesced\n* `db_restoring` - Database restoring\n* `objects_restoring` - Objects restoring\n* `validating` - Validating\n* `completed` - Completed\n* `restored_quarantined` - Restored quarantined\n* `rolling_back` - Rolling back\n* `failed` - Failed\n* `aborted` - Aborted"
             },
             "StateEnum": {
                 "enum": [

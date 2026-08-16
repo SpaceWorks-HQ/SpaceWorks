@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework.test import APIClient
-from rest_framework_simplejwt.tokens import RefreshToken
+from apps.accounts.tokens import SpaceWorksRefreshToken
 
 from apps.accounts.models import User
 from apps.accounts.services_password_reset import confirm_password_reset
@@ -65,7 +65,7 @@ def test_legacy_link_waiting_behind_otp_rechecks_the_locked_user(monkeypatch):
 def test_change_password_waiting_behind_otp_rechecks_current_password(monkeypatch):
     user = make_user("race-change-otp")
     code = issue_otp(user, monkeypatch)
-    access = str(RefreshToken.for_user(user).access_token)
+    access = str(SpaceWorksRefreshToken.for_user(user).access_token)
     pid_queue = queue.Queue()
 
     def submit_change():

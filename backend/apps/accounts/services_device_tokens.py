@@ -7,11 +7,12 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import RefreshToken, UntypedToken
+from rest_framework_simplejwt.tokens import UntypedToken
 
 from apps.accounts import audit_events
 from apps.accounts.models_devices import DeviceRefreshFamily, DeviceRefreshToken
 from apps.accounts.services_tokens import blacklist_device_family
+from apps.accounts.tokens import SpaceWorksRefreshToken
 
 
 def token_fingerprint(raw):
@@ -19,8 +20,11 @@ def token_fingerprint(raw):
 
 
 def issue_device_token_pair(user, grant, *, family=None):
+    from apps.backup.recovery import assert_token_issuance_allowed
+
+    assert_token_issuance_allowed(user)
     family = family or DeviceRefreshFamily.objects.create(grant=grant, user=user)
-    refresh = RefreshToken.for_user(user)
+    refresh = SpaceWorksRefreshToken.for_user(user)
     refresh["device_grant_id"] = str(grant.pk)
     refresh["device_family_id"] = str(family.pk)
     raw = str(refresh)
@@ -71,7 +75,7 @@ def rotate_device_refresh(raw):
             blacklist_device_family(family)
         else:
             try:
-                RefreshToken(raw).blacklist()
+                SpaceWorksRefreshToken(raw).blacklist()
             except TokenError as exc:
                 blacklist_device_family(family, revoke_grant=True, reuse=True)
                 replay = True

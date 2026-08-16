@@ -107,6 +107,17 @@ from apps.data_export.views import (
     DataExportDownloadUrlView,
     DataExportListCreateView,
 )
+from apps.backup.views_archives import (
+    BackupDownloadUrlView,
+    DeploymentArchiveListCreateView,
+    MakerspaceArchiveListCreateView,
+)
+from apps.backup.views_restore import (
+    PlatformBackupSettingsView,
+    RestoreDecisionView,
+    RestoreOperationListCreateView,
+    RestoreOperationView,
+)
 from apps.admin_api.views_memberships import (
     MembershipListCreateView,
     MembershipRoleAssignView,
@@ -140,6 +151,41 @@ def _separable(app_label, *routes):
 
 
 urlpatterns = [
+    path(
+        "platform/backup-settings",
+        PlatformBackupSettingsView.as_view(),
+        name="admin-platform-backup-settings",
+    ),
+    path(
+        "platform/backups",
+        DeploymentArchiveListCreateView.as_view(),
+        name="admin-deployment-backups",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/backups",
+        MakerspaceArchiveListCreateView.as_view(),
+        name="admin-makerspace-backups",
+    ),
+    path(
+        "backups/<uuid:archive_id>/download-url",
+        BackupDownloadUrlView.as_view(),
+        name="admin-backup-download-url",
+    ),
+    path(
+        "platform/restores",
+        RestoreOperationListCreateView.as_view(),
+        name="admin-restore-operations",
+    ),
+    path(
+        "platform/restores/<uuid:restore_id>",
+        RestoreOperationView.as_view(),
+        name="admin-restore-operation",
+    ),
+    path(
+        "platform/restores/<uuid:restore_id>/decision",
+        RestoreDecisionView.as_view(),
+        name="admin-restore-decision",
+    ),
     path(
         "makerspace/<int:makerspace_id>/data-exports",
         DataExportListCreateView.as_view(),

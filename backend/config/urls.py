@@ -9,6 +9,8 @@ from drf_spectacular.views import (
 
 from apps.admin_api.views_hosting import TlsCheckView
 from apps.data_export.views import DataExportDownloadView
+from apps.backup.views_archives import BackupArchiveDownloadView
+from apps.backup.views_recovery import RecoveryStateView
 from apps.payments.views import RazorpayWebhookView, StripeWebhookView
 from apps.payments.views_connect import (
     StripeConnectCallbackView,
@@ -65,6 +67,16 @@ def docs_root(_request):
 
 
 urlpatterns = [
+    path(
+        "api/v1/backups/download/<uuid:archive_id>/<str:token>",
+        BackupArchiveDownloadView.as_view(),
+        name="backup-archive-download",
+    ),
+    path(
+        "api/v1/recovery",
+        RecoveryStateView.as_view(),
+        name="backup-recovery-state",
+    ),
     path(
         "api/v1/data-exports/download/<uuid:job_id>/<str:token>",
         DataExportDownloadView.as_view(),
