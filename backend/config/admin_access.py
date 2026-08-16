@@ -11,6 +11,7 @@ from django.urls import reverse
 # Keyed by "app_label.model_name" (lowercase) -> ORM lookup ending in _id.
 NESTED_MAKERSPACE_LOOKUPS = {
     "accounts.memberclaimcode": "membership__makerspace_id",
+    "accounts.oidcbrowserattempt": "intended_membership__makerspace_id",
     "makerspaces.membershiprequest": "makerspace_id",
     "makerspaces.makerspacewaiver": "makerspace_id",
     # Profiles hang off the membership, so the membership is the only end of the row

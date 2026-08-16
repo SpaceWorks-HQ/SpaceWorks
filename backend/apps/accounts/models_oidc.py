@@ -37,10 +37,9 @@ def slug_from_provider_key(provider):
 class OidcProvider(models.Model):
     """One configured OpenID Connect identity provider.
 
-    ``client_secret`` is deliberately absent. This is the **implicit/ID-token** flow the
-    built-in providers already use: the client obtains an ID token and the server verifies
-    its signature against the provider's JWKS. No secret is needed to verify a signature,
-    and not storing one removes a credential that could leak.
+    ``client_secret`` is deliberately absent. Browser login uses authorization code plus
+    PKCE, so this deployment is a public client; the token's signature is verified against
+    the configured JWKS without introducing a server secret that could leak.
     """
 
     slug = models.SlugField(max_length=40, unique=True)

@@ -23605,6 +23605,186 @@
                 }
             }
         },
+        "/api/v1/auth/social/oidc/{slug}/authorize": {
+            "post": {
+                "operationId": "api_v1_auth_social_oidc_authorize_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Social auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserStart"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserStart"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserStart"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OidcBrowserStartResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/social/oidc/callback": {
+            "post": {
+                "operationId": "api_v1_auth_social_oidc_callback_create",
+                "tags": [
+                    "Social auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserCallback"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserCallback"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserCallback"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OidcBrowserLoginResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/auth/social/providers": {
             "get": {
                 "operationId": "api_v1_auth_social_providers_list",
@@ -39034,6 +39214,109 @@
                     null
                 ]
             },
+            "OidcBrowserCallback": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "state": {
+                        "type": "string",
+                        "maxLength": 512
+                    },
+                    "nonce": {
+                        "type": "string",
+                        "maxLength": 512
+                    }
+                },
+                "required": [
+                    "code",
+                    "nonce",
+                    "state"
+                ]
+            },
+            "OidcBrowserLoginResponse": {
+                "type": "object",
+                "properties": {
+                    "access": {
+                        "type": "string"
+                    },
+                    "user": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "outcome": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "access",
+                    "outcome",
+                    "user"
+                ]
+            },
+            "OidcBrowserStart": {
+                "type": "object",
+                "properties": {
+                    "redirect_uri": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 2048
+                    },
+                    "email": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "email"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
+                    },
+                    "makerspace_slug": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "pattern": "^[-a-zA-Z0-9_]+$"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "redirect_uri"
+                ]
+            },
+            "OidcBrowserStartResponse": {
+                "type": "object",
+                "properties": {
+                    "authorization_url": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "state": {
+                        "type": "string"
+                    },
+                    "nonce": {
+                        "type": "string"
+                    },
+                    "expires_in": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "authorization_url",
+                    "expires_in",
+                    "nonce",
+                    "state"
+                ]
+            },
             "OperatorCandidate": {
                 "type": "object",
                 "properties": {
@@ -42400,13 +42683,13 @@
                     "title"
                 ]
             },
-            "Provider760Enum": {
+            "ProviderEnum": {
                 "enum": [
-                    "google",
-                    "apple"
+                    "fcm",
+                    "apns"
                 ],
                 "type": "string",
-                "description": "* `google` - Google\n* `apple` - Apple"
+                "description": "* `fcm` - FCM\n* `apns` - APNs"
             },
             "ProvisionSubdomainRequest": {
                 "type": "object",
@@ -44023,7 +44306,7 @@
                         "pattern": "^[A-Za-z0-9_:.-]{20,4096}$"
                     },
                     "provider": {
-                        "$ref": "#/components/schemas/PushDeviceRegistrationProviderEnum"
+                        "$ref": "#/components/schemas/ProviderEnum"
                     },
                     "environment": {
                         "$ref": "#/components/schemas/EnvironmentEnum"
@@ -44034,14 +44317,6 @@
                     "provider",
                     "token"
                 ]
-            },
-            "PushDeviceRegistrationProviderEnum": {
-                "enum": [
-                    "fcm",
-                    "apns"
-                ],
-                "type": "string",
-                "description": "* `fcm` - FCM\n* `apns` - APNs"
             },
             "QrCode": {
                 "type": "object",
@@ -45852,7 +46127,8 @@
                 "type": "object",
                 "properties": {
                     "provider": {
-                        "$ref": "#/components/schemas/Provider760Enum"
+                        "type": "string",
+                        "maxLength": 64
                     },
                     "id_token": {
                         "type": "string",
@@ -45949,7 +46225,8 @@
                 "type": "object",
                 "properties": {
                     "provider": {
-                        "$ref": "#/components/schemas/Provider760Enum"
+                        "type": "string",
+                        "maxLength": 64
                     },
                     "surface": {
                         "$ref": "#/components/schemas/SurfaceEnum"

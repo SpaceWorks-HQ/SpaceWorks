@@ -346,7 +346,9 @@ export const openApiPaths = [
   "/api/v1/auth/social/apple",
   "/api/v1/auth/social/google",
   "/api/v1/auth/social/nonce",
+  "/api/v1/auth/social/oidc/callback",
   "/api/v1/auth/social/oidc/{slug}",
+  "/api/v1/auth/social/oidc/{slug}/authorize",
   "/api/v1/auth/social/providers",
   "/api/v1/auth/social/providers/{provider}",
   "/api/v1/bootstrap",
@@ -2786,6 +2788,33 @@ export type NotificationUnreadCount = {
 
 export type NullEnum = null;
 
+export type OidcBrowserCallback = {
+  "code": string;
+  "state": string;
+  "nonce": string;
+};
+
+export type OidcBrowserLoginResponse = {
+  "access": string;
+  "user": {
+  [key: string]: unknown;
+};
+  "outcome": string;
+};
+
+export type OidcBrowserStart = {
+  "redirect_uri": string;
+  "email"?: string;
+  "makerspace_slug"?: string;
+};
+
+export type OidcBrowserStartResponse = {
+  "authorization_url": string;
+  "state": string;
+  "nonce": string;
+  "expires_in": number;
+};
+
 export type OperatorCandidate = {
   "user_id": number;
   "username": string;
@@ -3625,7 +3654,7 @@ export type ProjectWrite = {
   "links"?: Array<ProjectLink>;
 };
 
-export type Provider760Enum = "google" | "apple";
+export type ProviderEnum = "fcm" | "apns";
 
 export type ProvisionSubdomainRequest = {
   "label": string;
@@ -4025,11 +4054,9 @@ export type PushDevice = {
 
 export type PushDeviceRegistration = {
   "token": string;
-  "provider": PushDeviceRegistrationProviderEnum;
+  "provider": ProviderEnum;
   "environment": EnvironmentEnum;
 };
-
-export type PushDeviceRegistrationProviderEnum = "fcm" | "apns";
 
 export type QrCode = {
   "id": number;
@@ -4526,7 +4553,7 @@ export type SocialIdentity = {
 };
 
 export type SocialLink = {
-  "provider": Provider760Enum;
+  "provider": string;
   "id_token": string;
   "nonce": string;
   "client_platform"?: ClientPlatformEnum;
@@ -4555,7 +4582,7 @@ export type SocialLoginResponse = {
 };
 
 export type SocialNonce = {
-  "provider": Provider760Enum;
+  "provider": string;
   "surface": SurfaceEnum;
   "delivery": DeliveryEnum;
   "client_platform": ClientPlatformEnum;
