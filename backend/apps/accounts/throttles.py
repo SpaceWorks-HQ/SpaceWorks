@@ -5,10 +5,21 @@ class PasswordResetEmailThrottle(SimpleRateThrottle):
     scope = "password_reset_email"
 
     def get_cache_key(self, request, view):
+        from apps.accounts.audit_events import fingerprint
+
         email = (request.data.get("email") or "").strip().lower()
         if not email:
             return None
-        return self.cache_format % {"scope": self.scope, "ident": email}
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": fingerprint(email),
+        }
+
+
+class PasswordResetConfirmEmailThrottle(PasswordResetEmailThrottle):
+    """Per-address guessing budget, separate from the resend allowance."""
+
+    scope = "password_reset_confirm_email"
 
 
 class MemberVerificationEmailThrottle(SimpleRateThrottle):

@@ -32,7 +32,7 @@ def _spent(now):
 
 
 def purge_spent_challenges(*, retention=RETENTION):
-    """Delete spent email and phone challenges older than the retention window.
+    """Delete spent auth challenges and aged password-reset envelopes.
 
     Returns a per-model count. Each model is deleted independently so one failure cannot
     prevent the other from being cleaned -- this runs unattended, and a periodic task that
@@ -40,6 +40,7 @@ def purge_spent_challenges(*, retention=RETENTION):
     """
     from apps.accounts.models import EmailVerificationChallenge
     from apps.accounts.models_phone import PhoneVerificationChallenge
+    from apps.accounts.models_password_reset import PasswordResetEnvelope
 
     now = timezone.now()
     cutoff = now - retention
@@ -56,5 +57,19 @@ def purge_spent_challenges(*, retention=RETENTION):
         except Exception:
             logger.exception("auth_challenge_purge_failed", extra={"model": label})
             deleted[label] = 0
+
+    # PasswordResetEnvelope is an upserted queue row, not an append-only challenge.
+    # `requested_at` is therefore its non-terminal age source; `expires_at` may never
+    # exist for an attacker-submitted address stranded before issuance.
+    label = PasswordResetEnvelope._meta.label
+    try:
+        count, _ = PasswordResetEnvelope.objects.filter(
+            Q(terminal_at__isnull=False, terminal_at__lt=cutoff)
+            | Q(terminal_at__isnull=True, requested_at__lt=cutoff)
+        ).delete()
+        deleted[label] = count
+    except Exception:
+        logger.exception("auth_challenge_purge_failed", extra={"model": label})
+        deleted[label] = 0
     logger.info("auth_challenge_purge_complete", extra={"deleted": deleted})
     return deleted

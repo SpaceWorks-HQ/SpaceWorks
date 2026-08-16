@@ -34,11 +34,10 @@ class User(AbstractUser):
     telegram_user_id = models.CharField(max_length=64, blank=True)
     must_change_password = models.BooleanField(default=False)
     # A staff-created person record, not an account. An unusable password alone is NOT
-    # enough to keep it that way: `ForgotPasswordView` finds any active user by email and
-    # `ResetPasswordConfirmView` calls `set_password`, so a walk-in given an email address
-    # could be turned into a real login by whoever receives that mailbox -- bypassing
-    # disabled self-registration entirely. This flag is the durable marker both paths
-    # check. See `makerspaces.walk_in_services`.
+    # enough to keep it that way: the reset-envelope drain resolves an active user by
+    # email and OTP confirmation calls `set_password`, so a walk-in given an email address
+    # could otherwise become a real login. This flag is checked under the user lock at
+    # issuance and confirmation. See `makerspaces.walk_in_services`.
     is_walk_in = models.BooleanField(default=False)
     role = models.CharField(
         max_length=32,
@@ -209,6 +208,10 @@ from apps.accounts.models_phone import (  # noqa: E402
     PhoneChallengePurpose,
     PhoneVerificationChallenge,
 )
+from apps.accounts.models_password_reset import (  # noqa: E402
+    PasswordResetEnvelope,
+    PasswordResetEnvelopeStatus,
+)
 from apps.accounts.models_social import (  # noqa: E402
     PlatformSocialAuthSettings,
     SocialClientPlatform,
@@ -230,6 +233,8 @@ __all__ = [
     'EmailVerificationChallenge',
     'PhoneChallengePurpose',
     'PhoneVerificationChallenge',
+    'PasswordResetEnvelope',
+    'PasswordResetEnvelopeStatus',
     'PlatformLoginMethods',
     'PlatformSocialAuthSettings',
     'SocialClientPlatform',

@@ -450,6 +450,12 @@ DATA_EXPORT_DOWNLOAD_TTL_SECONDS = env.int(
 )
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
 CELERY_BEAT_SCHEDULE = {
+    # Recovery issuance stays entirely off the anonymous request path. One minute keeps
+    # user-visible latency bounded while each invocation still claims a bounded batch.
+    "drain-password-reset-envelopes": {
+        "task": "apps.accounts.tasks.drain_password_reset_envelopes_task",
+        "schedule": crontab(minute="*"),
+    },
     "return-reminders": {
         "task": "apps.hardware_requests.tasks.send_return_reminders_task",
         "schedule": crontab(minute=0),
@@ -553,6 +559,10 @@ REST_FRAMEWORK = {
         "password_reset_confirm": env(
             "THROTTLE_PASSWORD_RESET_CONFIRM",
             default="10/min",
+        ),
+        "password_reset_confirm_email": env(
+            "THROTTLE_PASSWORD_RESET_CONFIRM_EMAIL",
+            default="15/hour",
         ),
         "member_sign_up": env("THROTTLE_MEMBER_SIGN_UP", default="5/min"),
         "email_verification_resend": env(

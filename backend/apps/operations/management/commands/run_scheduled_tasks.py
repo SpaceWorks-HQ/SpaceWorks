@@ -31,6 +31,11 @@ from django.utils import timezone
 # counterpart here, so a task added for the Celery deployment cannot silently go missing
 # from the beat-less one.
 SCHEDULED_TASKS = (
+    (
+        "drain-password-reset-envelopes",
+        "apps.accounts.tasks.drain_password_reset_envelopes_task",
+        1,
+    ),
     ("return-reminders", "apps.hardware_requests.tasks.send_return_reminders_task", 60),
     ("purge-auth-challenges", "apps.accounts.tasks.purge_auth_challenges_task", 24 * 60),
     # Beat runs this at a fixed hour; the beat-less runner has no wall-clock schedule, so

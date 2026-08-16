@@ -1839,6 +1839,12 @@ export type LedgerUnit = {
   "serial_number": string;
 };
 
+export type LegacyResetPasswordConfirm = {
+  "uid": string;
+  "token": string;
+  "new_password": string;
+};
+
 export type LegacyRoleEnum = "space_manager" | "inventory_manager" | "print_manager" | "machine_manager";
 
 export type LendingHistoryActor = {
@@ -2802,6 +2808,12 @@ export type OperatorCandidate = {
   "display_name": string;
 };
 
+export type OtpResetPasswordConfirm = {
+  "email": string;
+  "code": string;
+  "new_password": string;
+};
+
 export type PaginatedAdminMembershipList = {
   "count": number;
   "next"?: string | null;
@@ -2954,6 +2966,22 @@ export type PaginatedWarrantyReportRowList = {
   "next"?: string | null;
   "previous"?: string | null;
   "results": Array<WarrantyReportRow>;
+};
+
+export type PasswordResetAcknowledgement = {
+  "detail": string;
+};
+
+export type PasswordResetFailure = {
+  "detail": string;
+};
+
+export type PasswordUpdated = {
+  "detail": string;
+};
+
+export type PasswordValidationFailure = {
+  "new_password": Array<string>;
 };
 
 export type PatchedApiClient = {
@@ -4259,6 +4287,11 @@ export type RecipientScopeOptions = {
   "categories": Array<RecipientScopeOption>;
 };
 
+export type RecoveryUnavailable = {
+  "detail": string;
+  "code": string;
+};
+
 export type ReferralCreate = {
   "invite_email": string;
 };
@@ -4303,11 +4336,9 @@ export type RequestTimelineResponse = {
   "events": Array<TimelineEvent>;
 };
 
-export type ResetPasswordConfirm = {
-  "uid": string;
-  "token": string;
-  "new_password": string;
-};
+export type ResetPasswordConfirmError = PasswordResetFailure | PasswordValidationFailure;
+
+export type ResetPasswordConfirmRequest = OtpResetPasswordConfirm | LegacyResetPasswordConfirm;
 
 export type ResetPasswordRequest = {
   "password"?: string;

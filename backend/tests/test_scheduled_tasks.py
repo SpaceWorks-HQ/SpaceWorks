@@ -38,6 +38,18 @@ def test_every_declared_task_actually_resolves():
         assert callable(getattr(import_module(module_path), attribute))
 
 
+def test_password_reset_drain_is_registered_in_both_schedulers():
+    from django.conf import settings
+
+    task = "apps.accounts.tasks.drain_password_reset_envelopes_task"
+    assert settings.CELERY_BEAT_SCHEDULE["drain-password-reset-envelopes"]["task"] == task
+    assert (
+        "drain-password-reset-envelopes",
+        task,
+        1,
+    ) in SCHEDULED_TASKS
+
+
 def test_running_records_a_row_per_task():
     call_command("run_scheduled_tasks", stdout=StringIO())
 
