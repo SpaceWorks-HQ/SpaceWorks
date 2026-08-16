@@ -24,6 +24,15 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
+def sha256_bytes(value):
+    """Hash an in-memory archive member without first persisting it."""
+    digest = hashlib.sha256()
+    view = memoryview(value)
+    for offset in range(0, len(view), CHUNK_SIZE):
+        digest.update(view[offset : offset + CHUNK_SIZE])
+    return digest.hexdigest()
+
+
 def build_content_ledger(root):
     root = Path(root)
     entries = []

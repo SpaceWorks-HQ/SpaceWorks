@@ -33,8 +33,13 @@ class ExportDeadlineExceeded(RuntimeError):
         )
 
 
-def build_archive(job, *, page_size=None, monotonic=time.monotonic):
-    """Return (zip path, manifest, tempdir); caller owns cleanup and remote upload."""
+def build_archive(job, *, page_size=None, monotonic=time.monotonic, package=True):
+    """Project an export and optionally package it as a ZIP.
+
+    The normal export path returns ``(zip_path, manifest, tempdir)``. Callers that
+    must provide their own secure packaging can pass ``package=False`` and receive
+    the projected directory in the same tuple instead.
+    """
     fidelity = Fidelity(job.fidelity)
     page_size = page_size or settings.DATA_EXPORT_PAGE_SIZE
     remaining = max(0.0, (job.deadline_at - timezone.now()).total_seconds())
@@ -126,6 +131,8 @@ def build_archive(job, *, page_size=None, monotonic=time.monotonic):
     }
     write_manifest(root, manifest)
     write_readme(root)
+    if not package:
+        return root, manifest, tempdir
     archive_base = Path(tempdir.name, "makerspace-export")
     zip_path = shutil.make_archive(str(archive_base), "zip", root)
     return zip_path, manifest, tempdir
