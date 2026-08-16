@@ -205,6 +205,7 @@ JSON_FIELDS = frozenset(
         ("makerspaces.MemberProfile", "languages"),
         ("makerspaces.MemberProfile", "education"),
         ("makerspaces.MemberProject", "links"),
+        ("tenant_migration.ExternalTenantReference", "snapshot"),
     }
 )
 

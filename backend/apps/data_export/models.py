@@ -87,6 +87,7 @@ EXPORTED_MODEL_FIELDS = {
     "presence.PresenceSession": "id member makerspace membership started_at expires_at ended_at ended_by end_reason created_via_claim_session",
     "procurement.ToBuyItem": "id makerspace machine_type kind name quantity link status estimated_unit_cost vendor_name actual_unit_cost purchaser ordered_at received_at moved_to_inventory_at resulting_product resulting_pool resulting_machine source_pool created_by created_at updated_at",
     "procurement.ToBuyReceipt": "id to_buy_item object_key uploaded_by created_at",
+    "tenant_migration.ExternalTenantReference": "id makerspace source_archive_digest source_model_label source_object_id field_name target_model_label target_object_id snapshot created_at",
     "warranty.Warranty": "id makerspace asset machine purchased_on warranty_expires_on vendor_name vendor_contact created_at updated_at",
     "warranty.WarrantyDocument": "id warranty object_key original_filename content_type size_bytes uploaded_by created_at",
 }

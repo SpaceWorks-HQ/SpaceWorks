@@ -22,16 +22,23 @@ from apps.makerspaces.models import Makerspace
 from apps.makerspaces.module_registry import MODULES
 from apps.separability.tombstones import SEPARABLE_APPS, tombstoned_app_labels
 
-# Separable apps that own no module key at all, so "is any module of theirs installed?"
-# cannot answer for them. Each needs its own question.
-# `payments` and `updates` were here until phase 3 gave them real module keys, so they
-# are now answered by the ordinary "is any module of theirs installed?" question. Leaving
-# them listed would have asked the operator to decide by hand about apps the registry can
-# already answer for -- and would have suggested tombstoning an app a tenant still runs.
-_KEYLESS_APPS = {
+# Which separable apps own no module key is DERIVED from the registry, never hand-kept.
+# "Is any module of theirs installed?" cannot answer for a keyless app -- it is vacuously
+# true -- so such an app would otherwise be suggested for tombstoning on no evidence at
+# all. A hand-kept list gets that wrong in both directions and already did once: `payments`
+# and `updates` sat here until phase 3 gave them real module keys, which asked the operator
+# to decide by hand about apps the registry could already answer for. Deriving the set means
+# a new app lands in the right bucket the day it is added, with or without a key.
+_KEYLESS_DESCRIPTIONS = {
     "warranty": "warranty tracking (gated by core staff_admin, so it has no key of its own)",
     "presence": "geofenced check-in",
+    "tenant_migration": "moving a makerspace between deployments (superadmin-only)",
 }
+
+
+def _keyless_apps():
+    keyed = {definition.app_label for definition in MODULES}
+    return {app for app in SEPARABLE_APPS if app not in keyed}
 
 
 class Command(BaseCommand):
@@ -51,14 +58,13 @@ class Command(BaseCommand):
         }
         already = tombstoned_app_labels()
 
+        keyless_apps = _keyless_apps()
         unused = sorted(
             app
             for app in SEPARABLE_APPS
-            if app not in apps_in_use and app not in already and app not in _KEYLESS_APPS
+            if app not in apps_in_use and app not in already and app not in keyless_apps
         )
-        keyless = sorted(
-            app for app in _KEYLESS_APPS if app in SEPARABLE_APPS and app not in already
-        )
+        keyless = sorted(app for app in keyless_apps if app not in already)
 
         if already:
             self.stdout.write(f"Already tombstoned: {', '.join(sorted(already))}\n")
@@ -75,7 +81,8 @@ class Command(BaseCommand):
                 "\nThese own no module key, so decide by hand whether you use them:\n"
             )
             for app in keyless:
-                self.stdout.write(f"  {app} -- {_KEYLESS_APPS[app]}")
+                described = _KEYLESS_DESCRIPTIONS.get(app, "owns no module key")
+                self.stdout.write(f"  {app} -- {described}")
 
         if unused:
             self.stdout.write(

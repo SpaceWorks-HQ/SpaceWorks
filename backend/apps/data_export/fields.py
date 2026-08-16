@@ -78,6 +78,10 @@ CUSTOM_ANSWERS = {
     ("events.EventRegistration", "custom_answers"),
 }
 
+EXTERNAL_REFERENCE_SNAPSHOTS = {
+    ("tenant_migration.ExternalTenantReference", "snapshot"),
+}
+
 EXTERNAL_REFERENCES = {
     ("events.EventCollaborator", "event"),
     ("events.EventRegistration", "registered_via_makerspace"),
@@ -106,6 +110,8 @@ def _field_disposition(fidelity: Fidelity, label: str, field_name: str):
         return Redacted("meta_redacted")
     if pair in CUSTOM_ANSWERS and fidelity is Fidelity.REDACTED:
         return Redacted("custom_answers_redacted")
+    if pair in EXTERNAL_REFERENCE_SNAPSHOTS and fidelity is Fidelity.REDACTED:
+        return Redacted("external_reference_snapshot_redacted")
     if pair in SAFE_TRANSFORMS and fidelity is Fidelity.REDACTED:
         return Transformed(SAFE_TRANSFORMS[pair])
     if pair in EXTERNAL_REFERENCES and fidelity is Fidelity.PORTABLE:

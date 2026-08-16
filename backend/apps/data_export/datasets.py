@@ -88,6 +88,7 @@ DATASET_SPECS = {
     "presence.PresenceSession": ("presence/sessions.csv", P(("makerspace",), ("membership__makerspace",))),
     "procurement.ToBuyItem": ("procurement/to_buy_items.csv", P(("makerspace",))),
     "procurement.ToBuyReceipt": ("procurement/receipts.csv", P(("to_buy_item__makerspace",))),
+    "tenant_migration.ExternalTenantReference": ("migration/external_references.csv", P(("makerspace",))),
     "warranty.Warranty": ("warranty/warranties.csv", P(("makerspace",), ("asset__makerspace", "machine__makerspace"))),
     "warranty.WarrantyDocument": ("warranty/documents.csv", P(("warranty__makerspace",))),
 }

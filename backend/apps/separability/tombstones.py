@@ -40,6 +40,9 @@ SEPARABLE_APPS = frozenset({
     # Superadmin-only release plumbing. A deployment updated by its own host tooling has
     # no use for the in-app control surface.
     "updates",
+    # Deployments that never move tenants between servers ship none of these surfaces;
+    # retained provenance rows remain readable and purgeable.
+    "tenant_migration",
 })
 
 

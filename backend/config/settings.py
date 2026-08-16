@@ -140,6 +140,7 @@ INSTALLED_APPS = [
     "apps.bookings",
     "apps.maintenance",
     "apps.roadmap",
+    "apps.tenant_migration",
     # Must stay LAST. Django calls ready() in this order, so being last is what
     # guarantees every other app has registered before finalize() freezes the
     # separability registries.

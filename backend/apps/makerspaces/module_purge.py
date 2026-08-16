@@ -126,8 +126,29 @@ def _purge(makerspace, plan, cursor):
         ).delete()[0]
         if deleted:
             counts["pii_blind_index"] = deleted
-    counts.update(plan.delete(makerspace, cursor))
+    outcome = plan.delete(makerspace, cursor)
+    counts.update(outcome)
+    # Read the attribute directly. Every collector returns a ``PurgeResult``, so a
+    # ``getattr`` default would only ever hide a future collector that forgot to report
+    # its labels -- and the symptom of that is provenance silently outliving the rows it
+    # describes, which is exactly what this deletion exists to prevent.
+    deleted = _delete_external_references(makerspace, outcome.model_labels)
+    if deleted:
+        counts["external_tenant_references"] = deleted
     return counts
+
+
+def _delete_external_references(makerspace, target_model_labels):
+    if not target_model_labels:
+        return 0
+    # Imported unguarded: a tombstone removes an app's *surfaces*, never its models --
+    # the rows and migrations must stay -- so this package is always importable.
+    from apps.tenant_migration.models import ExternalTenantReference
+
+    return ExternalTenantReference.objects.filter(
+        makerspace=makerspace,
+        target_model_label__in=target_model_labels,
+    ).delete()[0]
 
 
 def _collect_private_keys(makerspace, plan):

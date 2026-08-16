@@ -211,6 +211,7 @@ def _delete_object_graph(makerspace):
     from apps.machines.models import Machine, MachineType, MakerspaceMachineTypePricing
     from apps.machines.service_lifecycle import delete_for_makerspace
     from apps.payments.models import Payment, ProcessedStripeEvent
+    from apps.tenant_migration.models import ExternalTenantReference
 
     with connection.cursor() as cursor:
         # Suspend ALL triggers for THIS transaction only via the session-replication
@@ -302,6 +303,9 @@ def _delete_object_graph(makerspace):
             [makerspace.id],
         )
         RestoreRollbackObject.objects.filter(makerspace=makerspace).delete()
+        # Generic provenance has no FK to the source/anchor rows it describes, so
+        # delete it explicitly rather than relying on the makerspace CASCADE.
+        ExternalTenantReference.objects.filter(makerspace=makerspace).delete()
         makerspace.delete()
 
 

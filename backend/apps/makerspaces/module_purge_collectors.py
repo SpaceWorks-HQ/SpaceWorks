@@ -16,8 +16,10 @@ Two rules every collector here obeys:
   scope would drag half the app graph into every `manage.py` invocation.
 """
 
+from apps.makerspaces.module_purge_collectors_machine_service import machine_service_delete
 from apps.makerspaces.module_purge_collectors_single_model import (
     _counts,
+    _delete,
     bookings_delete,
     bookings_public_images,
     machine_service_private_key_sizes,
@@ -31,16 +33,21 @@ from apps.makerspaces.module_purge_collectors_single_model import (
 def events_delete(makerspace, cursor):
     from apps.events.models import Event, EventCollaborator, EventRegistration
 
-    collaborations = EventCollaborator.objects.filter(makerspace=makerspace).delete()[0]
+    collaborations, collaboration_labels = _delete(
+        EventCollaborator.objects.filter(makerspace=makerspace)
+    )
     # Clearing activity provenance is the point. Payment routing is left intact in both places
     # holding it (`Payment.via_makerspace`, and the registration's `payment_via_makerspace` for
     # a charge raised later at promotion), so a receipt stays visible and a pending charge payable.
     provenance_cleared = EventRegistration.objects.filter(
         registered_via_makerspace=makerspace,
     ).exclude(event__makerspace=makerspace).update(registered_via_makerspace=None)
-    registrations = EventRegistration.objects.filter(event__makerspace=makerspace).delete()[0]
-    events = Event.objects.filter(makerspace=makerspace).delete()[0]
+    registrations, registration_labels = _delete(
+        EventRegistration.objects.filter(event__makerspace=makerspace)
+    )
+    events, event_labels = _delete(Event.objects.filter(makerspace=makerspace))
     return _counts(
+        model_labels=collaboration_labels | registration_labels | event_labels,
         event_collaborations=collaborations,
         event_registration_provenance_cleared=provenance_cleared,
         event_registrations=registrations,
@@ -62,12 +69,21 @@ def maintenance_delete(makerspace, cursor):
         MaintenanceLogDocument,
         MaintenanceSchedule,
     )
-    documents = MaintenanceLogDocument.objects.filter(
-        log__machine__makerspace=makerspace
-    ).delete()[0]
-    logs = MaintenanceLog.objects.filter(machine__makerspace=makerspace).delete()[0]
-    schedules = MaintenanceSchedule.objects.filter(machine__makerspace=makerspace).delete()[0]
-    return _counts(documents=documents, logs=logs, schedules=schedules)
+    documents, document_labels = _delete(
+        MaintenanceLogDocument.objects.filter(log__machine__makerspace=makerspace)
+    )
+    logs, log_labels = _delete(
+        MaintenanceLog.objects.filter(machine__makerspace=makerspace)
+    )
+    schedules, schedule_labels = _delete(
+        MaintenanceSchedule.objects.filter(machine__makerspace=makerspace)
+    )
+    return _counts(
+        model_labels=document_labels | log_labels | schedule_labels,
+        documents=documents,
+        logs=logs,
+        schedules=schedules,
+    )
 
 
 def maintenance_private_keys(makerspace, add):
@@ -103,9 +119,15 @@ def maintenance_private_key_sizes(makerspace):
 def procurement_delete(makerspace, cursor):
     from apps.procurement.models import ToBuyItem, ToBuyReceipt
 
-    receipts = ToBuyReceipt.objects.filter(to_buy_item__makerspace=makerspace).delete()[0]
-    items = ToBuyItem.objects.filter(makerspace=makerspace).delete()[0]
-    return _counts(receipts=receipts, to_buy_items=items)
+    receipts, receipt_labels = _delete(
+        ToBuyReceipt.objects.filter(to_buy_item__makerspace=makerspace)
+    )
+    items, item_labels = _delete(ToBuyItem.objects.filter(makerspace=makerspace))
+    return _counts(
+        model_labels=receipt_labels | item_labels,
+        receipts=receipts,
+        to_buy_items=items,
+    )
 
 
 def procurement_private_keys(makerspace, add):
@@ -120,9 +142,8 @@ def procurement_private_keys(makerspace, add):
 def notifications_delete(makerspace, cursor):
     from apps.notifications.models import Notification
 
-    return _counts(
-        notifications=Notification.objects.filter(makerspace=makerspace).delete()[0]
-    )
+    deleted, labels = _delete(Notification.objects.filter(makerspace=makerspace))
+    return _counts(model_labels=labels, notifications=deleted)
 
 
 def _chat_destinations_delete(makerspace, channel):
@@ -137,11 +158,10 @@ def _chat_destinations_delete(makerspace, channel):
     """
     from apps.integrations.models_destinations import NotificationDestination
 
-    return _counts(
-        destinations=NotificationDestination.objects.filter(
-            makerspace=makerspace, channel=channel
-        ).delete()[0]
+    deleted, labels = _delete(
+        NotificationDestination.objects.filter(makerspace=makerspace, channel=channel)
     )
+    return _counts(model_labels=labels, destinations=deleted)
 
 
 def telegram_destinations_delete(makerspace, cursor):
@@ -191,93 +211,14 @@ def membership_delete(makerspace, cursor):
     # Profiles go even though the membership stays: a profile is community content the
     # module owns, not the RBAC state the module deliberately leaves behind. Projects
     # cascade from the profile.
-    profiles = MemberProfile.objects.filter(membership__makerspace=makerspace).delete()[0]
-    requests = MembershipRequest.objects.filter(makerspace=makerspace).delete()[0]
+    profiles, profile_labels = _delete(
+        MemberProfile.objects.filter(membership__makerspace=makerspace)
+    )
+    requests, request_labels = _delete(
+        MembershipRequest.objects.filter(makerspace=makerspace)
+    )
     return _counts(
+        model_labels=profile_labels | request_labels,
         member_profiles=profiles,
         membership_requests=requests,
-    )
-
-
-def machine_service_delete(makerspace, cursor):
-    # The whole-tenant twin of this is `machines.service_lifecycle.delete_for_makerspace`,
-    # which is called by `lifecycle.purge()`. It is deliberately NOT reused, and the two
-    # differ in more than scope: there the whole makerspace goes, so it can delete every
-    # Payment, every usage entry and every consumable pool. Here `machines` is still
-    # installed, so this must delete only what `machine_service` owns:
-    #   * Payments are not deleted at all any more, by this or any other plan -- see
-    #     `module_purge._purge`. Service-request charges outlive their request.
-    #   * Consumable POOLS stay. They are gated by `require_module(..., "machines")`
-    #     (`views_machine_consumables.py`), are created from procurement, and surviving
-    #     manual usage entries PROTECT-reference them.
-    #   * Usage entries derived from a service request GO. They carry the requester's
-    #     name/email/phone copied off the request, so leaving them behind would defeat
-    #     the purge; manual entries (`service_request IS NULL`) are machines-module
-    #     history and stay.
-    # Consumable ledger rows are deleted, not reversed: the material really was consumed,
-    # so the pool keeps its `remaining_grams` and loses only the audit trail -- the same
-    # trade every purge makes.
-    from apps.machines.models import (
-        MachineServiceRequest,
-        PrintingCutoverRepair,
-        PrintingCutoverState,
-        ServiceBucket,
-        ServiceQueue,
-        ServiceRequestFile,
-    )
-
-    # Storage quota is NOT released here. It is released after the commit, and only for
-    # the object keys the bucket confirmed it deleted -- see the plan's
-    # `machine_service_private_key_sizes`. Freeing it inline meant the rows committed, the
-    # best-effort object delete could then fail, and the makerspace stopped being charged
-    # for storage it still held.
-
-    # Append-only ledgers with both ORM and DB guards, so the deletes go through raw SQL
-    # under the transaction-scoped bypass the caller opened. The id sets are resolved in
-    # Python rather than as subqueries: it keeps the PROTECT ordering readable, and the
-    # blind-index cleanup needs the usage-entry ids anyway.
-    from apps.encryption.models import PiiBlindIndex
-    from apps.machines.models import MachineUsageEntry
-
-    request_ids = list(
-        MachineServiceRequest.objects.filter(makerspace=makerspace).values_list("pk", flat=True)
-    )
-    doomed_entries = list(
-        MachineUsageEntry.objects.filter(service_request_id__in=request_ids).values_list(
-            "pk", flat=True
-        )
-    )
-    usage_entries = 0
-    if request_ids:
-        # PROTECT ordering: consumption and adjustments point at both the request and
-        # the usage entry, so they go before either.
-        cursor.execute(
-            "DELETE FROM machines_servicerequestconsumption WHERE service_request_id = ANY(%s)",
-            [request_ids],
-        )
-        cursor.execute(
-            "DELETE FROM machines_machineconsumableadjustment "
-            "WHERE service_request_id = ANY(%s) OR usage_entry_id = ANY(%s)",
-            [request_ids, doomed_entries],
-        )
-    if doomed_entries:
-        # Blind-index rows are removed per-id, not per-label: the surviving manual usage
-        # entries share the label and must keep theirs, or search silently loses them.
-        PiiBlindIndex.objects.filter(
-            makerspace=makerspace,
-            model_label="machines.MachineUsageEntry",
-            object_id__in=doomed_entries,
-        ).delete()
-        cursor.execute(
-            "DELETE FROM machines_machineusageentry WHERE id = ANY(%s)", [doomed_entries]
-        )
-        usage_entries = cursor.rowcount
-    files = ServiceRequestFile.objects.filter(makerspace=makerspace).delete()[0]
-    requests = MachineServiceRequest.objects.filter(makerspace=makerspace).delete()[0]
-    ServiceBucket.objects.filter(machine__makerspace=makerspace).delete()
-    ServiceQueue.objects.filter(makerspace=makerspace).delete()
-    PrintingCutoverRepair.objects.filter(makerspace=makerspace).delete()
-    PrintingCutoverState.objects.filter(makerspace=makerspace).delete()
-    return _counts(
-        service_requests=requests, service_files=files, machine_usage_entries=usage_entries
     )

@@ -34,6 +34,10 @@ CREDENTIAL_NAME = re.compile(
 )
 REVIEWED_NON_CREDENTIAL = {
     ("makerspaces.MembershipRequest", "state"): "Durable request workflow state.",
+    (
+        "tenant_migration.ExternalTenantReference",
+        "source_archive_digest",
+    ): "Archive integrity identifier, not an authentication credential.",
 }
 
 
