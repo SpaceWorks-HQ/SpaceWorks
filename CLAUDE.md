@@ -146,6 +146,23 @@ audit is **done and pushed** (`a465a2d`).
 Then the **events program** (four phases, all on `dev`): presence split out of event registration,
 opt-in attended-events on the maker profile, QR event check-in, and cross-makerspace collaborative
 events with a host-waiver acceptance.
+Most recently **phases 8, 7, 4 and 5A** — emailed-OTP recovery, account-less member surfaces,
+Space-Manager data export and deployment backup/restore — all merged to `dev` (see the changelog).
+**`dev` is 31 commits ahead of `origin/dev` and unpushed; pushing is the owner's call.**
+
+**Phase 5B (per-makerspace tenant migration, managed → self-host) is PLAN-APPROVED AND UNBUILT.**
+All three review lenses approved `2026-08-16-phase5b-plan-v13.md` after thirteen adversarial rounds;
+the owner's Stage-1 sign-off and one scope decision are outstanding — `ExternalTenantReference` plus
+its export transform is work the locked tier-2 disposition assumed the archive format already had,
+and it does not (`archive.py` returns unrecognised transforms unchanged, emitting raw source ids).
+Do not start building it without that sign-off. Its load-bearing conclusions are under
+**Invariants → Backup, restore and tenant migration**.
+
+**Review prompts must be scoped to the DELTA once a plan is large.** Two round-13 reviewers ran
+**6h11m** (against a normal 5–10 min) still grepping migrations, because they were handed the full
+~900-line cumulative plan plus the standing "verify every claim against the real code" instruction —
+unbounded when the document carries hundreds of `file:line` citations. Re-running them against a
+48-line `diff -u v12 v13` plus their prior verdict returned both approvals in minutes.
 The one deferred end-to-end user QA remains an owner-run release gate.
 
 ### Standing build conventions for this program
@@ -366,6 +383,17 @@ Stack (in use):
 - `backend/apps/updates/` — singleton platform update state, audited superadmin controls, and the
   `update_control` management command used by the privileged host scheduler. The web process never gets
   Docker-socket access; host scripts claim queued/automatic releases and report check/backup/result state.
+- `backend/apps/backup/` — deployment backup + restore (Phase 5A). Archive builder, `restore_diff`,
+  the global quarantine `middleware.py` + `route_policy.py`, `recovery.py`, `object_restore.py`,
+  `operation_lock.py`, and the privileged host scripts (`scripts/restore.sh`,
+  `scripts/import-backup.sh`) that mirror `apps/updates` — the web process never gets Docker-socket
+  access. Project JWT classes (`accounts/tokens.py`, `token_guard.py`) stamp `auth_generation`.
+- `backend/apps/data_export/` — Space-Manager data export (Phase 4). Per-fidelity
+  (`REDACTED`/`PORTABLE`) disposition registry over models, fields, datasets, traversals and the
+  global-user reference closure, with **drift guards that refuse an unclassified model or field**.
+  Its `guards._equal(subject, declared, actual)` is called with the *scanned* set passed as
+  `declared`, so `extra=` in a failure means **scanned but not registered** — read the signature
+  before deciding which side to fix.
 - `backend/apps/inventory/` — `InventoryProduct`/`InventoryAsset`, `availability.py` (**the only place**
   available/reserved/issued/damaged/lost counts change: `reserve_for_request`, `issue_items`/`return_items`,
   `issue_available`/`return_to_available`, `consume_available`; row-locked, never-below-zero,
@@ -2169,6 +2197,59 @@ Load-bearing details that carried over unchanged:
   `activity` payload is now a typed nested serializer that **omits** absent keys — a zero says
   "attended nothing", an absent key says "this space does not run events".
 
+### Backup, restore and tenant migration (Phase 5A shipped; 5B plan-approved, unbuilt)
+
+**The deployment recovery gate reads live state on EVERY request, deliberately uncached.**
+`apps/backup/middleware.py` is first in `MIDDLEWARE` and resolves `DeploymentRecoveryState.mode`
+before anything else. A cache was written and **reverted**, and the reasoning is the invariant: a TTL
+leaves a deployment that has *just* been quarantined still serving traffic, which is the one failure
+a default-deny gate exists to prevent. It also made the per-request query count depend on cache
+warmth, which broke three query-count tests that capture a count with N rows and assert **equality**
+with N+1 — the first request paid for the lookup and later ones did not. The cost is one primary-key
+lookup on a single-row table. **If it ever needs optimising, use an invalidation mechanism with no
+staleness window (connection-level or `LISTEN`/`NOTIFY`), never a TTL.** A cache miss must still
+query and still fail closed; treating a miss as `NORMAL` makes the gate fail open.
+
+**Consequence for query-count tests:** the gate is a constant **+1 on every request**, not an N+1.
+`tests/events/test_public_api.py`'s constant is 3 for that reason. The tests that capture-then-assert
+equality (`test_perf_query_counts.py`, `test_machines.py`) stay correct **because** the count is
+deterministic — which is the second reason not to reintroduce caching.
+
+**A new app must classify its models in `apps/data_export`, or the drift guards refuse the build.**
+Phase 5A added six `backup.*` models and four user edges and hit this, exactly as phases 7 and 8 did
+at their integration. Deployment-scoped operational state is `OmittedModel` even when a row names a
+makerspace: `BackupArchive.makerspace` records which tenant an archive covers, and exporting the row
+would carry its single-use download token into a tenant archive. **Archives are outside the purge
+guarantee, so they must not travel inside one either.**
+
+**`select_for_update()` + `select_related()` across a NULLABLE FK is rejected by Postgres** — *"FOR
+UPDATE cannot be applied to the nullable side of an outer join"*. Already documented under
+procurement (`move_to_printing`); Phase 5A hit it again in three places. Drop the `select_related`
+and lazy-load; the extra query is free next to the writes the transaction already performs. **This
+is now a recurring trap, not a one-off.**
+
+**Phase 5B (tenant migration) is APPROVED BUT UNBUILT.** The plan is
+`docs/superpowers/specs/2026-08-16-phase5b-plan-v13.md` (gitignored) — **cumulative and standalone;
+v1–v12 are history only**. Conclusions that cost thirteen review rounds and must not be re-derived:
+
+- **Phase 4's archive projection DECRYPTS mapped PII.** `archive.source_value` reads fields through
+  `getattr`, and `ScopedPiiModelMixin.__getattribute__` decrypts — so a PORTABLE archive built on it
+  contains **plaintext**, and the target then calls `parse_envelope()` on plaintext and aborts.
+  PORTABLE needs a raw-column path (`row.__dict__[attname]` / `.values()`).
+- **Do not reuse Phase 7's `PendingImportedMembership` / `ImportedUserReconciliation` for migration.**
+  Both are makerspace-FK'd (so cannot hold a pre-tenant decision), the former rejects an empty email
+  at the database level, and its adoption path discovers rows by `email__iexact` **on every social
+  login**. The anonymous OIDC walk-in transition has the same shape. **Phase 7 built safe mechanisms
+  whose safety depends on a target-authorized person having authored the input** — a foreign archive
+  is not that person.
+- **A Space Manager must never obtain a PORTABLE archive**, and authorizing the export *request* does
+  not authorize the *closure*: a manager can plant unrelated global accounts into the user closure
+  with an ordinary invitation or a membership for an existing username, and PORTABLE emits their
+  email and phone. Phase 4 already forces `REDACTED` for Space Managers.
+- **Verification must measure authority CONFERRED BY THE IMPORT**, not total effective authority —
+  the latter is unsatisfiable for a legitimately linked target superadmin, since `rbac` grants
+  superusers everything.
+
 ### Container / deployment invariants
 
 **The images run unprivileged.** `backend/Dockerfile` creates uid 10001 `app`, uses `COPY --chown`
@@ -2221,6 +2302,22 @@ images are pinned to a verified release tag — **verify a tag actually resolves
 Each line names a shipped feature and, where useful, the load-bearing rule it introduced (folded into the
 invariants above). Use `git log --oneline`/`git blame` for the implementing commits and per-file history.
 
+- **Account recovery, account-less members, data export, deployment backup** (2026-08-16, `dev`,
+  local, 31 commits unpushed): **Phase 8** emailed-OTP recovery (`PasswordResetEnvelope`, at-most-once
+  drain with generation fencing) which also closed two **pre-existing** TOCTOU races in the legacy
+  reset link and `change-password`; **Phase 7** account-less member surfaces (the `is_walk_in`
+  Postgres trigger, the claim route matrix keyed on view-name+method, claim codes, the bounded claim
+  session, imported-membership adoption, the OIDC browser flow) with end-to-end tests proving every
+  member surface works with `accounts` disabled; **Phase 4** Space-Manager data export
+  (`apps/data_export`, per-fidelity disposition registry with drift guards, one `REPEATABLE READ`
+  snapshot); **Phase 5A** deployment backup + restore (`apps/backup`, above). Merged from four build
+  worktrees, all since torn down. Suite: **3647 passed**.
+  - Defects found only at integration, which is the argument for merging early: Phase 4's export
+    purge was registered in `CELERY_BEAT_SCHEDULE` but **not** `SCHEDULED_TASKS`, so a beat-less
+    cloud deployment would have retained expired archives and their download tokens forever; phase 7's
+    and 8's new models had no export disposition and the registry guard refused them; and a
+    `.venv` **symlink got committed** from a build worktree — checking it out later destroyed the real
+    virtualenv, because `.gitignore` never untracks an already-tracked path.
 - **Public imagery, machine grouping, accessibility** (2026-08-10, `dev`, local): `Event.image_key`
   with presign/attach/clear mirroring the machine image flow, and `image_url` on the staff and public
   serializers — the four-place registration this needed is written up under public images above;
