@@ -20,6 +20,7 @@ from apps.events.views_admin import _manageable_event
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 
 
 COLLABORATION_ERRORS = {
@@ -54,16 +55,15 @@ def _manageable_collaboration(actor, pk):
     collaborator = get_object_or_404(
         rbac.scope_by_makerspace(
             actor,
-            EventCollaborator.objects.filter(
+            servable_queryset(EventCollaborator.objects.filter(
                 # An archived host's invitation must not remain answerable: accepting it
                 # would grant eligibility for an event that is invisible everywhere but
                 # `/control/`. The read filter alone is not enough -- a partner holding the
                 # row id could otherwise still POST to respond. The host's MODULE state
                 # matters for the same reason: with `events` off, A's event surfaces are
                 # withdrawn, so its invitation must not stay answerable either.
-                event__makerspace__archived_at__isnull=True,
                 event__makerspace__enabled_modules__contains=["events"],
-            ).select_related("makerspace", "event__makerspace"),
+            ), relation="event__makerspace").select_related("makerspace", "event__makerspace"),
             makerspace_field="makerspace_id",
         ),
         pk=pk,
@@ -89,12 +89,11 @@ class EventCollaboratorListView(APIView):
     )
     def get(self, request, pk, *args, **kwargs):
         event = _manageable_event(request.user, pk)
-        collaborators = EventCollaborator.objects.filter(
+        collaborators = servable_queryset(EventCollaborator.objects.filter(
             event=event,
             # Archived spaces are invisible outside `/control/`, and this response carries
             # a partner's name and slug.
-            makerspace__archived_at__isnull=True,
-        ).select_related("makerspace").order_by("makerspace__slug", "id")
+        ), relation="makerspace").select_related("makerspace").order_by("makerspace__slug", "id")
         return Response(EventCollaboratorSerializer(collaborators, many=True).data)
 
     @extend_schema(
@@ -154,16 +153,15 @@ class EventCollaborationInboxView(APIView):
         makerspace = _collaborator_makerspace(request.user, makerspace_id)
         collaborations = rbac.scope_by_makerspace(
             request.user,
-            EventCollaborator.objects.filter(
+            servable_queryset(EventCollaborator.objects.filter(
                 makerspace=makerspace,
                 # Archiving the HOST -- or its disabling `events` -- does not remove its
                 # collaboration rows, and this serializer carries the host's event title
                 # and times. Archived is invisible everywhere but `/control/`, and a
                 # withdrawn module means those surfaces are gone, so neither may keep
                 # appearing in a partner's inbox.
-                event__makerspace__archived_at__isnull=True,
                 event__makerspace__enabled_modules__contains=["events"],
-            ).select_related("event__makerspace"),
+            ), relation="event__makerspace").select_related("event__makerspace"),
             makerspace_field="makerspace_id",
         ).order_by("-created_at", "-id")
         return Response(

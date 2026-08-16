@@ -1,12 +1,12 @@
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 
 
 def eligible_makerspaces(*source_modules):
-    queryset = Makerspace.objects.filter(
-        archived_at__isnull=True,
+    queryset = servable_queryset(Makerspace.objects.filter(
         superadmin_access_enabled=True,
         enabled_modules__contains=["reports"],
-    )
+    ))
     for module in source_modules:
         queryset = queryset.filter(enabled_modules__contains=[module])
     return queryset

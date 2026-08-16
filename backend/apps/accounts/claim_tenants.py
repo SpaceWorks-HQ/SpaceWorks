@@ -8,6 +8,7 @@ from apps.accounts.claim_route_types import (
     PUBLIC_TOKEN,
     SLUG,
 )
+from apps.makerspaces.servability import is_servable, servable_queryset
 
 
 class ClaimTenantResolutionError(ValueError):
@@ -35,13 +36,13 @@ def resolve_claim_tenant(resolver, *, view_name, url_kwargs, body=None):
     from apps.makerspaces.models import Makerspace
 
     if resolver == SLUG:
-        tenant = Makerspace.objects.filter(
-            slug=url_kwargs.get("makerspace_slug"), archived_at__isnull=True
-        ).first()
+        tenant = servable_queryset(Makerspace.objects.filter(
+            slug=url_kwargs.get("makerspace_slug")
+        )).first()
     elif resolver == ID:
-        tenant = Makerspace.objects.filter(
-            pk=_positive_int(url_kwargs.get("makerspace_id")), archived_at__isnull=True
-        ).first()
+        tenant = servable_queryset(Makerspace.objects.filter(
+            pk=_positive_int(url_kwargs.get("makerspace_id"))
+        )).first()
     elif resolver == PUBLIC_TOKEN:
         tenant = _object_tenant(
             PUBLIC_TOKEN_TARGETS, view_name, url_kwargs, body or {}
@@ -55,7 +56,7 @@ def resolve_claim_tenant(resolver, *, view_name, url_kwargs, body=None):
     slug = url_kwargs.get("makerspace_slug")
     if tenant is not None and slug is not None and tenant.slug != slug:
         raise ClaimTenantResolutionError("URL and object tenants do not match.")
-    if tenant is None or tenant.archived_at is not None:
+    if tenant is None or not is_servable(tenant):
         raise ClaimTenantResolutionError("Claim route tenant could not be resolved.")
     return tenant
 

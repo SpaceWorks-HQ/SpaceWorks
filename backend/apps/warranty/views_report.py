@@ -19,8 +19,8 @@ from apps.warranty.serializers import (
 )
 from apps.admin_api.views_inventory import InventoryPagination
 from apps.inventory.models import InventoryAsset
-from apps.makerspaces.models import Makerspace
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.servability import servable_queryset
 from apps.machines import access as machine_access
 from apps.machines.models import Machine
 from apps.warranty.models import Warranty
@@ -68,7 +68,7 @@ class MakerspaceWarrantyReportView(APIView):
         makerspace = get_object_or_404(
             rbac.scope_by_makerspace(
                 request.user,
-                Makerspace.objects.filter(archived_at__isnull=True),
+                servable_queryset(),
                 "id",
             ),
             pk=makerspace_id,

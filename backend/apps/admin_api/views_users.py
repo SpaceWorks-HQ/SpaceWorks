@@ -19,6 +19,7 @@ from apps.admin_api.serializers_users import (
 from apps.audit import services as audit
 from apps.audit.models import AuditLog
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
+from apps.makerspaces.servability import is_servable
 
 # Roles a Space Manager (MANAGE_MAKERSPACE holder, non-superadmin) may assign, list, and
 # revoke within their own makerspace scope. Deliberately excludes SPACE_MANAGER: an SM must
@@ -82,7 +83,7 @@ class StaffListCreateView(generics.ListCreateAPIView):
             raise ValidationError({"makerspace_id": "Makerspace does not exist."})
         # An archived makerspace is soft-deleted / operationally unreachable; never attach
         # new staff to it (the superadmin branch of _can_create_staff_role bypasses rbac scope).
-        if makerspace.archived_at is not None:
+        if not is_servable(makerspace):
             raise ValidationError({"makerspace_id": "Makerspace is archived."})
         role = MakerspaceRole.objects.get(
             makerspace=makerspace, legacy_role=target_role

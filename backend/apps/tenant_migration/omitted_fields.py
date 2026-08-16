@@ -58,6 +58,9 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         # Unlike public_api_key, this callable-generated field has no database
         # uniqueness contract, so it cannot use the collision-checked FRESH rule.
         ("makerspaces.Makerspace", "domain_verification_token"),
+        # The importer owns this outright: the row is created IMPORTING and only the
+        # activation transition may make it ACTIVE, so no archived value may travel.
+        ("makerspaces.Makerspace", "lifecycle_state"),
     ),
     **_rules(
         EMPTY_STRING,

@@ -11,16 +11,16 @@ from apps.events.models import EventCollaborator, EventRegistration
 from apps.forms_schema.validation import validate_answers
 from apps.makerspaces.guards import require_module_locked
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.servability import servable_queryset
 
 
 def collaborator_makerspace_ids(event):
     """Return eligible accepted collaborator makerspace IDs for an event."""
     collaborators = (
-        EventCollaborator.objects.filter(
+        servable_queryset(EventCollaborator.objects.filter(
             event=event,
             status=EventCollaborator.Status.ACCEPTED,
-            makerspace__archived_at__isnull=True,
-        )
+        ), relation="makerspace")
         # Model validation prevents this relation; excluding it here is the
         # service-level defense because clean() is not invoked by every write path.
         .exclude(makerspace_id=event.makerspace_id)

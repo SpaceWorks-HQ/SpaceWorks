@@ -12,6 +12,7 @@ from apps.makerspaces.serializers_memberships import (
     InvitationClaimOutcomeSerializer,
     InvitationListSerializer,
 )
+from apps.makerspaces.servability import servable_queryset
 
 
 ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer}
@@ -20,12 +21,11 @@ ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404:
 def _claimable_invitations(user):
     if not user.email_verified_at or not user.email:
         return MembershipRequest.objects.none()
-    return MembershipRequest.objects.filter(
+    return servable_queryset(MembershipRequest.objects.filter(
         kind=MembershipRequest.Kind.INVITE,
         state=MembershipRequest.State.INVITED,
         invite_email=normalized_email(user.email),
-        makerspace__archived_at__isnull=True,
-    ).select_related("makerspace", "invited_by", "assigned_role")
+    ), relation="makerspace").select_related("makerspace", "invited_by", "assigned_role")
 
 
 def _invitation_payload(invitation):

@@ -27,6 +27,7 @@ from apps.inventory import public_image_storage
 from apps.makerspaces.limits import add_storage
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.origin_scope import origin_scoped_makerspace_id
+from apps.makerspaces.servability import servable_queryset
 
 
 @extend_schema(tags=["Admin makerspaces"], summary="List or create makerspaces")
@@ -42,7 +43,7 @@ class MakerspaceListCreateView(generics.ListCreateAPIView):
         # manager isn't stuck on an empty list / "No makerspace" screen. Create
         # (POST) stays superadmin-only in perform_create, so widening the read
         # scope here doesn't grant anyone new write access.
-        queryset = Makerspace.objects.filter(archived_at__isnull=True)
+        queryset = servable_queryset()
         actor = self.request.user
         origin_scope = origin_scoped_makerspace_id(self.request)
         scope = rbac.makerspaces_for_actions(
@@ -98,7 +99,7 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
 
     def get_queryset(self):
         actor = self.request.user
-        queryset = Makerspace.objects.filter(archived_at__isnull=True)
+        queryset = servable_queryset()
         action = (
             rbac.Action.MANAGE_MAKERSPACE
             if self.request.method == "PATCH"
@@ -182,7 +183,7 @@ class MakerspaceImageView(APIView):
             rbac.scope_by_action(
                 request.user,
                 rbac.Action.MANAGE_MAKERSPACE,
-                Makerspace.objects.filter(archived_at__isnull=True),
+                servable_queryset(),
                 field="id",
             ),
             pk=makerspace_id,

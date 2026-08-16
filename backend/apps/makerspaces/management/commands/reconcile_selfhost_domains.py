@@ -4,6 +4,7 @@ from django.utils import timezone
 
 from apps.makerspaces.hosting import invalidate
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 
 
 class Command(BaseCommand):
@@ -14,7 +15,7 @@ class Command(BaseCommand):
             self.stdout.write("Managed instance (PLATFORM_DOMAIN_SUFFIX set) — nothing to reconcile.")
             return
         updated = (
-            Makerspace.objects.filter(archived_at__isnull=True, frontend_domain__isnull=False)
+            servable_queryset(Makerspace.objects.filter(frontend_domain__isnull=False))
             .exclude(frontend_domain="")
             .exclude(frontend_domain_status=Makerspace.DomainStatus.VERIFIED)
             .update(

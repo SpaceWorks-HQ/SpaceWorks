@@ -14,6 +14,7 @@ from apps.machines.service_queue_position import queue_counts_for
 from apps.machines.service_storage import create_staged_queue_file, finalize_file
 from apps.machines.service_workflow import submit
 from apps.makerspaces import limits
+from apps.makerspaces.servability import servable_queryset
 
 
 def _kernel_queues(makerspace):
@@ -121,10 +122,10 @@ class _StatusProjection:
 
 def public_status(public_token):
     """Return a PII-free printer-status projection or 404."""
-    kernel = MachineServiceRequest.objects.select_related("makerspace").filter(
-        public_token=public_token, makerspace__archived_at__isnull=True,
+    kernel = servable_queryset(MachineServiceRequest.objects.select_related("makerspace").filter(
+        public_token=public_token,
         queue__machine_type__slug=PRINTER_SLUG,
-    ).first()
+    ), relation="makerspace").first()
     if kernel is None:
         raise NotFound()
     return _StatusProjection(kernel), queue_counts_for([kernel])

@@ -8,7 +8,8 @@ from rest_framework.views import APIView
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.makerspaces import archive_requests
-from apps.makerspaces.models import Makerspace, MakerspaceArchiveRequest
+from apps.makerspaces.models import MakerspaceArchiveRequest
+from apps.makerspaces.servability import servable_queryset
 
 
 class MakerspaceArchiveRequestSerializer(serializers.ModelSerializer):
@@ -89,7 +90,7 @@ class MakerspaceArchiveRequestListCreateView(generics.ListCreateAPIView):
 
     def _makerspace(self):
         makerspace = get_object_or_404(
-            Makerspace.objects.filter(archived_at__isnull=True),
+            servable_queryset(),
             pk=self.kwargs["makerspace_id"],
         )
         # Action-based, NOT `is_space_manager_identity`. That helper documents itself as
@@ -163,7 +164,7 @@ class MakerspaceArchiveRequestWithdrawView(APIView):
     )
     def post(self, request, makerspace_id, pk, *args, **kwargs):
         makerspace = get_object_or_404(
-            Makerspace.objects.filter(archived_at__isnull=True),
+            servable_queryset(),
             pk=makerspace_id,
         )
         # Same action-based gate as the list/create view above.

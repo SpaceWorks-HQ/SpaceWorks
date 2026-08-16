@@ -21,6 +21,7 @@ shared box may be updated, which is worse than a deployment-wide reading, not be
 """
 
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.servability import servable_queryset
 
 # The keys answered at deployment level, declared as a table rather than as three
 # separate literal call sites. This is the `CHANNEL_MODULE_KEYS` shape: one gate shared
@@ -49,7 +50,7 @@ def any_makerspace_enables(key):
     from apps.makerspaces.models import Makerspace
 
     rows = list(
-        Makerspace.objects.filter(archived_at__isnull=True).only("id", "enabled_modules")
+        servable_queryset().only("id", "enabled_modules")
     )
     if not rows:
         return True

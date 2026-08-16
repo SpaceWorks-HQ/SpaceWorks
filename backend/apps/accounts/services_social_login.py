@@ -10,6 +10,7 @@ from apps.makerspaces.origin_scope import (
     NO_STAFF_ORIGIN_SCOPE,
     staff_origin_scope,
 )
+from apps.makerspaces.servability import servable_queryset
 
 
 def assert_social_user_active(user):
@@ -30,8 +31,9 @@ def assert_staff_authority(user, request):
     if user.is_superuser or user.role == User.Role.SUPERADMIN:
         if scope is NO_STAFF_ORIGIN_SCOPE:
             return
-    memberships = MakerspaceMembership.objects.filter(
-        user=user, status="active", makerspace__archived_at__isnull=True
+    memberships = servable_queryset(
+        MakerspaceMembership.objects.filter(user=user, status="active"),
+        relation="makerspace",
     ).select_related("assigned_role")
     memberships = rbac.hide_from_superadmin(user, memberships, field="makerspace_id")
     if scope is not NO_STAFF_ORIGIN_SCOPE:

@@ -14,8 +14,9 @@ from apps.admin_api.serializers_payment_summary import scoped_payment_context
 from apps.admin_api.views_roles import ERRORS
 from apps.makerspaces import membership_services, waiver_services
 from apps.makerspaces.guards import require_module
-from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole, MakerspaceWaiver, MembershipRequest
+from apps.makerspaces.models import MakerspaceMembership, MakerspaceRole, MakerspaceWaiver, MembershipRequest
 from apps.makerspaces.serializers_memberships import WaiverPublishSerializer
+from apps.makerspaces.servability import servable_queryset
 from apps.payments.models import Payment
 
 
@@ -24,7 +25,9 @@ class MembershipPagination(PageNumberPagination):
 
 
 def _makerspace(actor, makerspace_id):
-    queryset = rbac.scope_by_action(actor, rbac.Action.MANAGE_MAKERSPACE, Makerspace.objects.filter(archived_at__isnull=True), field="id")
+    queryset = rbac.scope_by_action(
+        actor, rbac.Action.MANAGE_MAKERSPACE, servable_queryset(), field="id"
+    )
     makerspace = get_object_or_404(queryset, pk=makerspace_id)
     if not rbac.can(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.id):
         raise PermissionDenied()

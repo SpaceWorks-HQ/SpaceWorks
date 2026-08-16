@@ -6,6 +6,7 @@ from apps.accounts.models import User
 from apps.hardware_requests.self_checkout_models import PublicToolLoan
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.servability import servable_queryset
 from apps.makerspaces.waiver_state import current_acceptance
 from apps.presence.models import PresenceSession
 from apps.separability.registry import runtime_active
@@ -36,9 +37,9 @@ def active_member_memberships(user):
 
 
 def active_membership(user, makerspace_id):
-    membership = active_member_memberships(user).filter(
-        makerspace_id=makerspace_id,
-        makerspace__archived_at__isnull=True,
+    membership = servable_queryset(
+        active_member_memberships(user).filter(makerspace_id=makerspace_id),
+        relation="makerspace",
     ).first()
     if membership is not None:
         # Preserve request-scoped identity context (notably claim provenance) instead

@@ -14,6 +14,7 @@ from apps.machines.models import Machine, MachineDocument, ServiceRequestFile
 from apps.maintenance import storage as maintenance_storage
 from apps.maintenance.models import MaintenanceLogDocument
 from apps.makerspaces.models import Makerspace, MemberProfile, MemberProject
+from apps.makerspaces.servability import servable_queryset
 from apps.procurement import storage as procurement_storage
 from apps.procurement.models import ToBuyReceipt
 from apps.warranty import storage as warranty_storage
@@ -33,7 +34,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         selector = options["makerspace"]
-        makerspaces = Makerspace.objects.all()
+        makerspaces = servable_queryset()
         if selector:
             lookup = Q(slug=selector)
             if selector.isdigit():
@@ -41,8 +42,6 @@ class Command(BaseCommand):
             makerspaces = makerspaces.filter(lookup)
             if not makerspaces.exists():
                 raise CommandError(f"Makerspace {selector!r} was not found.")
-        else:
-            makerspaces = makerspaces.filter(archived_at__isnull=True)
         for makerspace in makerspaces.order_by("pk"):
             try:
                 values = {

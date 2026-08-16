@@ -8,6 +8,7 @@ from apps.payments.models import (
     Payment,
     ProcessedStripeEvent,
 )
+from apps.makerspaces.servability import is_servable
 
 
 def apply_webhook_event(
@@ -18,7 +19,7 @@ def apply_webhook_event(
     connected_account_id=None,
 ):
     event_id = _value(event, "id")
-    if not event_id:
+    if not event_id or not is_servable(makerspace, allow_archived=True):
         return None
     event_type, data = _value(event, "type"), _value(event, "data") or {}
     obj = _value(data, "object") or {}
@@ -165,7 +166,9 @@ def _apply_account_event(event_id, event_type, account_id, *, event_created):
             .filter(connect_account_id=account_id)
             .first()
         )
-        if merchant is None or not _record_once(merchant.makerspace, event_id):
+        if merchant is None:
+            return None
+        if not is_servable(merchant.makerspace, allow_archived=True) or not _record_once(merchant.makerspace, event_id):
             return None
         if event_type == "account.application.deauthorized" and _event_is_stale(
             event_created, merchant.connect_account_assigned_at
@@ -246,7 +249,7 @@ def apply_razorpay_webhook_event(makerspace, event):
     * A paid event for an already-terminal row is audited as `payment.paid_after_terminal`
       rather than dropped or re-applied, so a double charge is visible instead of silent.
     """
-    if not event.event_id or not event.is_paid:
+    if not is_servable(makerspace, allow_archived=True) or not event.event_id or not event.is_paid:
         # Non-payment events are not recorded: claiming their id would make a later
         # genuine settlement carrying the same delivery id read as a duplicate.
         return None

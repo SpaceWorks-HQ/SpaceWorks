@@ -12,7 +12,7 @@ from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.machines import role_scope
 from apps.makerspaces.guards import require_module
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 from apps.notifications.models import Notification
 from apps.notifications.serializers import NotificationSerializer
 
@@ -40,7 +40,7 @@ def _makerspace_for_manager(user, makerspace_id):
     makerspace = get_object_or_404(
         rbac.scope_by_makerspace(
             user,
-            Makerspace.objects.filter(archived_at__isnull=True),
+            servable_queryset(),
             makerspace_field="id",
         ),
         pk=makerspace_id,

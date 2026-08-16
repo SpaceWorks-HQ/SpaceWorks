@@ -5,6 +5,7 @@ from django.conf import settings
 from apps.inventory import public_image_storage
 from apps.integrations.email import email_enabled
 from apps.makerspaces.models import Makerspace, default_branding_config, default_theme_config
+from apps.makerspaces.servability import is_servable, servable_queryset
 from apps.makerspaces.capabilities import FEATURE_MODULES, FEATURES
 from apps.makerspaces.module_registry import is_frontend_exposed, module_available, module_workflows
 from apps.separability.registry import runtime_active
@@ -61,7 +62,7 @@ def member_payment_return_url(makerspace):
     authentication-only and always lives on the central app, so it is reachable regardless of
     what happened to the tenant's domain.
     """
-    if makerspace.archived_at is not None:
+    if not is_servable(makerspace):
         base = (settings.PUBLIC_APP_BASE_URL or "http://localhost:5000").rstrip("/")
         return f"{base}/member/archived" if base else ""
     return member_area_url(makerspace)
@@ -90,21 +91,18 @@ def staff_payment_settings_url(makerspace=None, *, outcome):
 
 def resolve_frontend(*, tenant=None, slug=None, origin=None, host=None):
     if tenant:
-        return Makerspace.objects.filter(
+        return servable_queryset(Makerspace.objects.filter(
             public_code__iexact=tenant,
-            archived_at__isnull=True,
-        ).first()
+        )).first()
     if slug:
-        return Makerspace.objects.filter(
+        return servable_queryset(Makerspace.objects.filter(
             slug=slug,
-            archived_at__isnull=True,
-        ).first()
+        )).first()
     hostname = origin_to_hostname(origin) or origin_to_hostname(host)
     if hostname:
-        return Makerspace.objects.filter(
+        return servable_queryset(Makerspace.objects.filter(
             frontend_domain__iexact=hostname,
-            archived_at__isnull=True,
-        ).first()
+        )).first()
     return None
 
 
@@ -113,7 +111,19 @@ def module_enabled(makerspace, module_key):
     # module, and this deployment still ships the app that implements it. Merging
     # them here rather than at each call site is what makes tombstoning safe -- a
     # guard added in future code inherits the check without knowing it exists.
-    return module_key in set(makerspace.enabled_modules or []) and module_available(module_key)
+    #
+    # `allow_archived=True` is deliberate: this answers a CAPABILITY question, not a
+    # liveness one. Letting archival answer it here would tell every caller that an
+    # archived tenant's modules are "disabled", which is both false and a change to
+    # shipped behaviour -- an archived makerspace is meant to fail its own archived
+    # checks with PermissionDenied, not to report that maintenance was uninstalled.
+    # The IMPORTING/ABORTED states are new, so refusing them here adds defence in
+    # depth behind the boundary guards without altering any existing contract.
+    return (
+        is_servable(makerspace, allow_archived=True)
+        and module_key in set(makerspace.enabled_modules or [])
+        and module_available(module_key)
+    )
 
 
 def available_modules(makerspace):
@@ -127,6 +137,10 @@ def available_modules(makerspace):
 
 
 def feature_enabled(makerspace, key):
+    # See `module_enabled`: capability, not liveness, so archival is left to the
+    # archived checks and only the new lifecycle states fail closed here.
+    if not is_servable(makerspace, allow_archived=True):
+        return False
     definition = FEATURES.get(key)
     if definition is None or key not in set(makerspace.enabled_features or []):
         return False

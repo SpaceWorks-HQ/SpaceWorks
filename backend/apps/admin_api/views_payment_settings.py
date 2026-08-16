@@ -11,8 +11,8 @@ from apps.admin_api.serializers_payments import (
     StripeConnectOnboardingSerializer,
 )
 from apps.audit import services as audit
-from apps.makerspaces.models import Makerspace
 from apps.makerspaces.domain_verification import is_self_host
+from apps.makerspaces.servability import servable_queryset
 from apps.payments.connect import create_onboarding
 from apps.payments.models import MakerspacePaymentSettings
 from apps.payments.stripe_client import PaymentsUnavailable
@@ -28,7 +28,7 @@ class MakerspacePaymentSettingsView(APIView):
             rbac.scope_by_action(
                 request.user,
                 rbac.Action.MANAGE_MAKERSPACE,
-                Makerspace.objects.filter(archived_at__isnull=True),
+                servable_queryset(),
                 field="id",
             ),
             pk=makerspace_id,
@@ -102,7 +102,7 @@ class StripeConnectOnboardingView(APIView):
             rbac.scope_by_action(
                 request.user,
                 rbac.Action.MANAGE_MAKERSPACE,
-                Makerspace.objects.filter(archived_at__isnull=True),
+                servable_queryset(),
                 field="id",
             ),
             pk=makerspace_id,

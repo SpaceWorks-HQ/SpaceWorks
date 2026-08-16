@@ -11,6 +11,7 @@ from apps.admin_api.permissions import IsActiveStaff, require_action
 from apps.audit import services as audit
 from apps.makerspaces import domain_verification, provisioning
 from apps.makerspaces.models import Makerspace, SubdomainRequest
+from apps.makerspaces.servability import servable_queryset
 
 
 class SubdomainRequestSerializer(serializers.ModelSerializer):
@@ -74,7 +75,7 @@ class SubdomainRequestListCreateView(generics.ListCreateAPIView):
         visible_makerspaces = rbac.scope_by_action(
             request.user,
             rbac.Action.MANAGE_MAKERSPACE,
-            Makerspace.objects.filter(archived_at__isnull=True),
+            servable_queryset(),
             field="id",
         )
         makerspace = get_object_or_404(visible_makerspaces, pk=makerspace_id)

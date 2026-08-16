@@ -23,6 +23,7 @@ from apps.hardware_requests.view_helpers import (
 )
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.lookup import get_public_makerspace
+from apps.makerspaces.servability import servable_queryset
 from apps.makerspaces.platform import module_enabled
 from apps.presence.guard import require_active_member_presence
 from apps.openapi import (
@@ -101,7 +102,7 @@ class RequestStatusView(generics.RetrieveAPIView):
     def get_queryset(self):
         from apps.hardware_requests.view_helpers import request_queryset
 
-        return request_queryset().filter(makerspace__archived_at__isnull=True)
+        return servable_queryset(request_queryset(), relation="makerspace")
 
     @extend_schema(
         tags=["Public requests"],

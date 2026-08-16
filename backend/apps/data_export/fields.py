@@ -42,6 +42,9 @@ ALWAYS_OMITTED = {
     ("machines.ServiceQueue", "legacy_print_bucket_id"): "Retired cutover provenance.",
     ("machines.ServiceRequestFile", "legacy_print_request_file_id"): "Retired cutover provenance.",
     ("makerspaces.Makerspace", "domain_verification_token"): "Source routing challenge.",
+    # Whether a tenant may serve traffic is decided by the deployment it lives on, and a
+    # mid-import or aborted source state must never be able to describe the target.
+    ("makerspaces.Makerspace", "lifecycle_state"): "Target-owned deployment lifecycle state.",
     ("makerspaces.Makerspace", "public_api_key"): "Source publishable tenant credential.",
     ("makerspaces.Makerspace", "telegram_bot_token"): "Encrypted integration credential.",
     ("makerspaces.Makerspace", "smtp_password"): "Encrypted integration credential.",
