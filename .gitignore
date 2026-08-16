@@ -1,8 +1,13 @@
 # Python / Django
 __pycache__/
 *.py[cod]
+# Both the directory and the bare name: a pattern ending in `/` does NOT match a
+# symlink to a directory, and a parallel git worktree normally symlinks these in
+# rather than reinstalling them -- so `git add backend` staged the symlink itself.
 .venv/
+.venv
 venv/
+venv
 *.sqlite3
 backend/.env
 # Root deployment env written by setup.sh / setup.ps1 (holds generated secrets).
@@ -14,6 +19,7 @@ staticfiles/
 
 # Node / Vite
 node_modules/
+node_modules
 frontend/dist/
 frontend/.env
 
