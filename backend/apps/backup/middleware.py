@@ -2,23 +2,32 @@ from django.db import OperationalError, ProgrammingError
 from django.http import JsonResponse
 from django.urls import Resolver404, resolve
 
-from apps.backup import recovery_cache
 from apps.backup.models import DeploymentRecoveryState
 from apps.backup.route_policy import route_allowed
 
 
 class DeploymentRecoveryGateMiddleware:
-    """Global, default-deny request gate for quiescence and disaster recovery."""
+    """Global, default-deny request gate for quiescence and disaster recovery.
+
+    This reads the mode from the database on EVERY request, deliberately and without a cache.
+    A cache was written and removed: it bought an amortised query at the cost of a staleness
+    window in which a deployment that had just been quarantined would keep serving traffic,
+    which is the one failure this gate exists to prevent. It also made the per-request query
+    count depend on cache warmth, which broke three query-count tests that capture a count and
+    then assert equality -- the first request paid for the lookup and later ones did not.
+
+    The cost is one primary-key lookup on a single-row table, served from shared buffers. If
+    that ever needs optimising, the answer is a mechanism with no staleness window (a
+    connection-level or LISTEN/NOTIFY-driven invalidation), not a TTL.
+    """
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         try:
-            mode = recovery_cache.cached_mode(self._load_mode)
+            mode = self._load_mode()
         except (OperationalError, ProgrammingError):
-            # Fail closed, and do not cache the failure: an unreadable state must refuse
-            # every request rather than be remembered as NORMAL for the TTL.
             return self._refused("unavailable")
         if mode == DeploymentRecoveryState.Mode.NORMAL:
             return self.get_response(request)

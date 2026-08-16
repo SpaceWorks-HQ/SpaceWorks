@@ -112,12 +112,10 @@ def test_list_filters_by_tenant_slug_or_code_and_orders_without_n_plus_one(
     make_event(other, 'Other tenant')
 
     # Three, not two, since Phase 5A: the deployment recovery gate is first in MIDDLEWARE and
-    # must resolve the mode before any request is served. It is cached and invalidated by a
-    # post_save signal, so the steady-state cost is nothing -- but a cold cache (every test
-    # starts with one) costs exactly one primary-key lookup, and treating a cache miss as
-    # NORMAL would make a default-deny gate fail OPEN, which is the one thing it may not do.
-    # The count is still constant in the number of events, which is what this test exists to
-    # protect; add an event and it stays at three.
+    # resolves its mode from the database before any request is served. That lookup is
+    # deliberately uncached -- a TTL would leave a just-quarantined deployment serving traffic
+    # -- so it is a constant +1 on every request, not an N+1. The count this test protects is
+    # still constant in the number of events; add an event and it stays at three.
     with django_assert_num_queries(3):
         response = APIClient().get(list_url(space.slug))
 
