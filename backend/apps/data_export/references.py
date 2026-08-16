@@ -211,17 +211,34 @@ JSON_FIELDS = frozenset(
 
 SEMANTIC_REFERENCES = {}
 for _fidelity in Fidelity:
+    # PORTABLE stopped pulling a user audit TARGET into the global closure when the
+    # migration audit registry took over: it never remaps a user target, keeping it as
+    # inert source provenance instead, so nothing downstream needs that person emitted.
+    # REDACTED is deliberately unchanged. It is shipped, operator-facing behaviour, and
+    # the closure decides who appears in `global/users.csv` -- narrowing it here would
+    # quietly drop people from an existing export as a side effect of building migration
+    # support, which is not this phase's decision to make.
     SEMANTIC_REFERENCES[(_fidelity, "audit.AuditLog", "target_type+target_id")] = (
-        SemanticUserRef(
-            "audit.AuditLog",
-            "target_type=accounts.user + target_id",
-            "A user audit target joins the user closure and is remapped for PORTABLE.",
-        ),
-        SourceLocalProvenance(
-            "audit.AuditLog",
-            "target_type!=accounts.user + target_id",
-            "Non-user polymorphic targets retain their source model label.",
-        ),
+        (
+            SemanticUserRef(
+                "audit.AuditLog",
+                "target_type=accounts.user + target_id",
+                "A user audit target joins the REDACTED user closure, as shipped.",
+            ),
+            SourceLocalProvenance(
+                "audit.AuditLog",
+                "target_type!=accounts.user + target_id",
+                "Non-user polymorphic targets retain their source model label.",
+            ),
+        )
+        if _fidelity is Fidelity.REDACTED
+        else (
+            SourceLocalProvenance(
+                "audit.AuditLog",
+                "target_type + target_id",
+                "The audit target registry decides remap versus inert source provenance.",
+            ),
+        )
     )
     for _model, _location in POLYMORPHIC_PAIRS - {
         ("audit.AuditLog", "target_type+target_id")
@@ -233,14 +250,10 @@ for _fidelity in Fidelity:
         )
     for _model, _field in JSON_FIELDS:
         if (_model, _field) == ("audit.AuditLog", "meta"):
-            decision = SemanticUserRef(
+            decision = SourceLocalProvenance(
                 _model,
-                "meta.user_id",
-                (
-                    "Machine-operator audit events survive relational operator deletion; "
-                    "the reference joins the closure only when metadata is retained."
-                ),
-                included=_fidelity is Fidelity.PORTABLE,
+                "meta id-bearing paths",
+                "The per-action audit registry remaps or source-namespaces every ID path.",
             )
         elif _field.endswith("_actor_snapshot"):
             # `source_user_id` here is deliberately NOT a live reference: Phase 7 v13

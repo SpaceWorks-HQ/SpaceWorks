@@ -2,6 +2,13 @@
 
 from dataclasses import dataclass
 
+from .audit_references import (
+    AUDIT_META_REFERENCES,
+    AUDIT_TARGET_DISPOSITIONS,
+    UNRECOGNISED_AUDIT_TARGET,
+    normalize_audit_target_type,
+)
+
 
 @dataclass(frozen=True)
 class RemapScalar:

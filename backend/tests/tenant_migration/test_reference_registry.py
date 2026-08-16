@@ -1,6 +1,7 @@
 import pytest
 
 from apps.boxes.models import QrCode
+from apps.data_export.models import MODELS
 from apps.payments.models import Payment
 from apps.tenant_migration.reference_guards import (
     ReferenceRegistryError,
@@ -10,6 +11,16 @@ from apps.tenant_migration.reference_guards import (
     validate_payment_subject_references,
     validate_raw_scalar_references,
     validate_reference_registry,
+)
+from apps.tenant_migration.audit_reference_guards import (
+    discover_audit_meta_references,
+    validate_audit_meta_references,
+)
+from apps.tenant_migration.audit_references import (
+    AUDIT_META_REFERENCES,
+    AUDIT_TARGET_DISPOSITIONS,
+    AuditReferenceDisposition,
+    normalize_audit_target_type,
 )
 from apps.tenant_migration.references import (
     DISCRIMINATOR_REFERENCES,
@@ -77,3 +88,43 @@ def test_raw_user_guard_rejects_a_removed_disposition():
 
     with pytest.raises(ReferenceRegistryError, match="raw scalar references"):
         validate_raw_scalar_references(changed)
+
+
+def test_audit_meta_guard_rejects_a_removed_dictionary_key_declaration():
+    changed = dict(AUDIT_META_REFERENCES)
+    changed.pop(("request.accepted", "accepted.<keys>"))
+
+    with pytest.raises(ReferenceRegistryError, match="audit meta ID paths"):
+        validate_audit_meta_references(changed)
+
+
+def test_audit_meta_guard_rejects_a_new_id_bearing_key(tmp_path):
+    source = tmp_path / "producer.py"
+    source.write_text(
+        'from apps.audit import services as audit\n'
+        'audit.record(actor, "future.action", meta={"future_id": object.pk})\n',
+        encoding="utf-8",
+    )
+    discovery = discover_audit_meta_references(tmp_path)
+
+    with pytest.raises(ReferenceRegistryError, match="future_id"):
+        validate_audit_meta_references(AUDIT_META_REFERENCES, discovery=discovery)
+
+
+def test_audit_target_registry_is_derived_from_export_model_labels():
+    assert set(AUDIT_TARGET_DISPOSITIONS) == {
+        normalize_audit_target_type(label) for label in MODELS
+    }
+    assert AUDIT_TARGET_DISPOSITIONS["inventory.inventoryproduct"].disposition is (
+        AuditReferenceDisposition.REMAP
+    )
+    assert AUDIT_TARGET_DISPOSITIONS["accounts.user"].kind == "audit_user_target"
+    assert AUDIT_TARGET_DISPOSITIONS["accounts.memberclaimcode"].kind == (
+        "audit_omitted_target_model"
+    )
+
+
+def test_ast_discovery_reports_dynamic_actions_and_non_literal_meta():
+    unresolved = discover_audit_meta_references().unresolvable
+    assert any(item.reason == "dynamic action" for item in unresolved)
+    assert any(item.reason == "non-literal meta" for item in unresolved)

@@ -19,6 +19,12 @@ from .references import (
     ClearWithProvenance,
     NullWithProvenance,
 )
+from .audit_reference_guards import validate_audit_meta_references
+from .audit_references import (
+    AUDIT_TARGET_DISPOSITIONS,
+    AuditReferenceDisposition,
+    audit_target_dispositions,
+)
 
 
 class ReferenceRegistryError(AssertionError):
@@ -33,11 +39,26 @@ def validate_reference_registry(
     payment_subject_references=PAYMENT_SUBJECT_REFERENCES,
     notification_url_routes=NOTIFICATION_URL_ROUTES,
 ):
+    validate_audit_target_references()
+    validate_audit_meta_references()
     validate_discriminator_references(discriminator_references)
     validate_raw_scalar_references(raw_scalar_references)
     validate_omitted_target_relations(omitted_target_relations)
     validate_payment_subject_references(payment_subject_references)
     validate_notification_url_routes(notification_url_routes)
+
+
+def validate_audit_target_references(declarations=AUDIT_TARGET_DISPOSITIONS):
+    expected = audit_target_dispositions()
+    _equal("audit target_type dispositions", set(declarations), set(expected))
+    for target_type, disposition in declarations.items():
+        expected_disposition = expected[target_type]
+        if disposition != expected_disposition:
+            raise ReferenceRegistryError(
+                f"audit target disposition drifted for {target_type}"
+            )
+        if disposition.disposition is AuditReferenceDisposition.REMAP:
+            _validate_model_labels((disposition.target_model_label,))
 
 
 def validate_discriminator_references(declarations=DISCRIMINATOR_REFERENCES):

@@ -1,5 +1,6 @@
 """PORTABLE reference validation and typed inert-provenance output."""
 
+import copy
 import json
 import re
 from collections import defaultdict
@@ -25,16 +26,30 @@ class ReferenceProvenanceWriter:
         # tombstone tenant_migration and must still be able to build REDACTED exports.
         from apps.tenant_migration.reference_guards import validate_reference_registry
         from apps.tenant_migration.references import (
+            AUDIT_META_REFERENCES,
+            AUDIT_TARGET_DISPOSITIONS,
             DISCRIMINATOR_REFERENCES,
             NOTIFICATION_URL_ROUTES,
             OMITTED_TARGET_RELATIONS,
             ORPHANED_PAYMENT_SUBJECT_KIND,
             PAYMENT_SUBJECT_REFERENCES,
             UNRECOGNISED_NOTIFICATION_URL,
+            UNRECOGNISED_AUDIT_TARGET,
+            normalize_audit_target_type,
+        )
+        from apps.tenant_migration.audit_references import (
+            SOURCE_ID_PREFIX,
+            AuditReferenceDisposition,
         )
 
         validate_reference_registry()
         self._discriminators = DISCRIMINATOR_REFERENCES
+        self._audit_meta = AUDIT_META_REFERENCES
+        self._audit_targets = AUDIT_TARGET_DISPOSITIONS
+        self._unknown_audit_target = UNRECOGNISED_AUDIT_TARGET
+        self._normalize_audit_target = normalize_audit_target_type
+        self._source_id_prefix = SOURCE_ID_PREFIX
+        self._audit_disposition = AuditReferenceDisposition
         self._omitted_targets = OMITTED_TARGET_RELATIONS
         self._payment_targets = PAYMENT_SUBJECT_REFERENCES
         self._orphan_kind = ORPHANED_PAYMENT_SUBJECT_KIND
@@ -62,8 +77,86 @@ class ReferenceProvenanceWriter:
             self._record_row(row, present)
 
     def project(self, row, field_name, value):
+        if row._meta.label == "audit.AuditLog":
+            return self._project_audit(row, field_name, value)
         disposition = self._omitted_targets.get((row._meta.label, field_name))
         return None if disposition is not None else value
+
+    def _project_audit(self, row, field_name, value):
+        target_disposition = self._audit_target_disposition(row.target_type)
+        if field_name in {"target_type", "target_id"}:
+            if (
+                row.target_id
+                and target_disposition.disposition
+                is not self._audit_disposition.REMAP
+            ):
+                return ""
+            return value
+        if field_name == "meta":
+            return self._project_audit_meta(row.action, value)
+        return value
+
+    def _project_audit_meta(self, action, value):
+        if not isinstance(value, dict):
+            return value
+        return self._project_meta_dict(action, copy.deepcopy(value), "")
+
+    def _project_meta_dict(self, action, value, prefix):
+        projected = {}
+        key_rule = self._audit_meta.get((action, f"{prefix}.<keys>")) if prefix else None
+        for key, child in value.items():
+            output_key = key
+            if key_rule is not None:
+                output_key = self._project_meta_id(key_rule, key)
+            elif not isinstance(key, str) or key.isdigit():
+                output_key = self._source_namespace(key)
+            name = str(key)
+            path = f"{prefix}.{name}" if prefix else name
+            rule = self._audit_meta.get((action, path))
+            if rule is not None:
+                projected[output_key] = self._project_meta_id(rule, child)
+            elif isinstance(child, dict):
+                projected[output_key] = self._project_meta_dict(action, child, path)
+            elif self._runtime_id_name(name):
+                projected[output_key] = self._source_namespace_value(child)
+            else:
+                projected[output_key] = child
+        return projected
+
+    def _project_meta_id(self, rule, value):
+        if rule.disposition is self._audit_disposition.REMAP:
+            return value
+        if rule.disposition is self._audit_disposition.NULL:
+            return None
+        return self._source_namespace_value(value)
+
+    def _source_namespace_value(self, value):
+        if value is None:
+            return None
+        if isinstance(value, list):
+            return [self._source_namespace_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._source_namespace_value(item) for item in value]
+        if isinstance(value, dict):
+            return {
+                self._source_namespace(key): self._source_namespace_value(child)
+                for key, child in value.items()
+            }
+        return self._source_namespace(value)
+
+    def _source_namespace(self, value):
+        rendered = str(value)
+        if rendered.startswith(self._source_id_prefix):
+            return rendered
+        return f"{self._source_id_prefix}{rendered}"
+
+    @staticmethod
+    def _runtime_id_name(name):
+        return name == "id" or name.endswith(("_id", "_ids"))
+
+    def _audit_target_disposition(self, target_type):
+        normalized = self._normalize_audit_target(target_type)
+        return self._audit_targets.get(normalized, self._unknown_audit_target)
 
     def _validate_discriminators(self, model_label, rows):
         edge = (model_label, "target_type", "target_id")
@@ -103,6 +196,19 @@ class ReferenceProvenanceWriter:
 
     def _record_row(self, row, present_payment_subjects):
         label = row._meta.label
+        if label == "audit.AuditLog" and row.target_id:
+            disposition = self._audit_target_disposition(row.target_type)
+            if disposition.disposition is not self._audit_disposition.REMAP:
+                self._write(
+                    row,
+                    "target_type+target_id",
+                    disposition.kind,
+                    {
+                        "source_target_id": str(row.target_id),
+                        "source_target_type": row.target_type,
+                        "target_model_label": disposition.target_model_label,
+                    },
+                )
         for (source_label, field_name), disposition in self._omitted_targets.items():
             if source_label != label:
                 continue
