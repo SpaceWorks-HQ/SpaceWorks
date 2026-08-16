@@ -68,6 +68,11 @@ SCHEDULED_TASKS = (
         "apps.backup.tasks.cleanup_expired_restore_rollbacks_task",
         24 * 60,
     ),
+    (
+        "cleanup-expired-tenant-import-jobs",
+        "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task",
+        60,
+    ),
 )
 
 

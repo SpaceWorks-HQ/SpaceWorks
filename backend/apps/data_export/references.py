@@ -122,6 +122,9 @@ RELATIONAL_USER_FIELDS = frozenset(
         # Phase 7 import machinery. The model itself is omitted, but the edge is
         # declared so user-edge completeness stays a total check over the graph.
         ("makerspaces.ImportedUserReconciliation", "target_user"),
+        # Phase 5B target-side coordination is omitted from exports, but the model-graph
+        # guard still requires its nullable account edge to be declared explicitly.
+        ("tenant_migration.ImportIdentityDecision", "target_user"),
         ("makerspaces.MakerspaceWaiver", "created_by"),
         ("makerspaces.MembershipRequest", "user"),
         ("makerspaces.MembershipRequest", "requested_by"),

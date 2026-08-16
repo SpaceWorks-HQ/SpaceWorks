@@ -2,6 +2,10 @@ from django.db import models
 
 from .schemas import validate_snapshot
 
+# Re-exported so Django registers the split models and callers retain the stable
+# `apps.tenant_migration.models` import path.
+from .models_import_job import ImportIdentityDecision, TenantImportJob  # noqa: F401,E402
+
 
 class ExternalTenantReference(models.Model):
     """Typed provenance for a source reference that cannot become a live target FK."""
