@@ -9,8 +9,8 @@ from rest_framework.views import APIView
 from apps.admin_api.permissions import active_user
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.membership_services import refer_membership
-from apps.makerspaces.models import Makerspace
 from apps.makerspaces.serializers_memberships import ReferralCreateSerializer, ReferralOutcomeSerializer
+from apps.makerspaces.servability import servable_queryset
 
 
 ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer, 409: ErrorSerializer}
@@ -28,7 +28,7 @@ class MemberReferralView(APIView):
         if not active_user(request.user):
             raise PermissionDenied()
         makerspace = get_object_or_404(
-            Makerspace.objects.filter(archived_at__isnull=True), pk=makerspace_id
+            servable_queryset(), pk=makerspace_id
         )
         serializer = ReferralCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

@@ -14,6 +14,7 @@ from apps.inventory.serializers import (
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.servability import servable_queryset
 from apps.openapi import PUBLISHABLE_KEY_PARAMETER
 
 
@@ -32,10 +33,9 @@ class PublicMakerspaceListView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return Makerspace.objects.filter(
+        return servable_queryset(Makerspace.objects.filter(
             public_inventory_enabled=True,
-            archived_at__isnull=True,
-        ).exclude(hidden_from_central_directory=True).order_by("name")
+        )).exclude(hidden_from_central_directory=True).order_by("name")
 
 
 @extend_schema(
@@ -86,10 +86,12 @@ class PublicInventoryListView(ListAPIView):
         ):
             raise Http404
 
-        queryset = makerspace.products.select_related("category").filter(
-            is_public=True,
-            is_archived=False,
-            makerspace__archived_at__isnull=True,
+        queryset = servable_queryset(
+            makerspace.products.select_related("category").filter(
+                is_public=True,
+                is_archived=False,
+            ),
+            relation="makerspace",
         )
         query = self.request.query_params.get("q", "").strip()
         if query:
@@ -174,12 +176,10 @@ class PublicInventoryDetailView(RetrieveAPIView):
             "public_inventory",
         ):
             raise Http404
-        return (
-            makerspace.products.select_related("category")
-            .filter(
+        return servable_queryset(
+            makerspace.products.select_related("category").filter(
                 is_public=True,
                 is_archived=False,
-                makerspace__archived_at__isnull=True,
-            )
-            .order_by("name")
-        )
+            ),
+            relation="makerspace",
+        ).order_by("name")

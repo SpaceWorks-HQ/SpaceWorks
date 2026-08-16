@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.audit import services as audit
+from apps.makerspaces.servability import is_servable
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,8 @@ def archive(makerspace, actor):
 def _archive_locked(makerspace, actor, *, archived_at):
     if not makerspace.superadmin_access_enabled:
         raise ValidationError("Cannot archive a hidden makerspace.")
-    if makerspace.archived_at is not None:
-        raise ValidationError("Makerspace is already archived.")
+    if not is_servable(makerspace):
+        raise ValidationError("Makerspace is not available for archival.")
 
     # This is an advisory snapshot: payment creation does not universally take
     # this lock, so a concurrent insert can change the count before commit.

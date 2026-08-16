@@ -9,6 +9,7 @@ from apps.admin_api.permissions import IsActiveStaff, require_action
 from apps.audit import services as audit
 from apps.makerspaces.domain_verification import expected_record, verify_domain
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 
 
 class DomainVerificationRecordSerializer(serializers.Serializer):
@@ -43,7 +44,7 @@ class MakerspaceVerifyDomainView(APIView):
         makerspace = get_object_or_404(
             rbac.scope_by_makerspace(
                 request.user,
-                Makerspace.objects.filter(archived_at__isnull=True),
+                servable_queryset(),
                 makerspace_field="id",
             ),
             pk=makerspace_id,

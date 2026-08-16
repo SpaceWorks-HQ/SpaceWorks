@@ -11,6 +11,7 @@ from apps.makerspaces.origin_scope_routes import (
     request_route_targets,
 )
 from apps.makerspaces.platform import makerspace_staff_origins
+from apps.makerspaces.servability import servable_queryset
 
 
 NO_STAFF_ORIGIN_SCOPE = object()
@@ -33,10 +34,9 @@ def staff_origin_scope(request):
         return NO_STAFF_ORIGIN_SCOPE
     matches = {
         makerspace.id
-        for makerspace in Makerspace.objects.filter(
+        for makerspace in servable_queryset(Makerspace.objects.filter(
             frontend_domain__isnull=False,
-            archived_at__isnull=True,
-        )
+        ))
         if origin in makerspace_staff_origins(makerspace)
     }
     if not matches:
@@ -83,12 +83,11 @@ def validate_native_makerspace_scope(request, user, grant):
                 'Makerspace selection conflicts with browser origin.'
             )
 
-    memberships = MakerspaceMembership.objects.filter(
+    memberships = servable_queryset(MakerspaceMembership.objects.filter(
         user=user,
         makerspace_id=makerspace_id,
         status='active',
-        makerspace__archived_at__isnull=True,
-    ).select_related('makerspace', 'assigned_role')
+    ), relation="makerspace").select_related('makerspace', 'assigned_role')
     memberships = rbac.hide_from_superadmin(
         user, memberships, field='makerspace_id'
     )

@@ -12,13 +12,14 @@ from apps.accounts.models import User
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.membership_services import request_membership
-from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceWaiver, MembershipRequest
+from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver, MembershipRequest
 from apps.makerspaces.serializers_memberships import (
     MembershipOutcomeSerializer,
     MembershipRequestCreateSerializer,
     MemberWaiverResponseSerializer,
     MyMembershipsSerializer,
 )
+from apps.makerspaces.servability import servable_queryset
 from apps.makerspaces.waiver_services import accept_waiver
 from apps.makerspaces.waiver_state import acceptance_on_file, current_acceptance
 
@@ -27,10 +28,10 @@ ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404:
 
 def _membership(user, makerspace_id):
     return get_object_or_404(
-        MakerspaceMembership.objects.select_related("makerspace", "assigned_role").filter(
+        servable_queryset(MakerspaceMembership.objects.select_related("makerspace", "assigned_role").filter(
             user=user, user__is_active=True, user__access_status=User.AccessStatus.ACTIVE,
-            makerspace_id=makerspace_id, status="active", makerspace__archived_at__isnull=True
-        )
+            makerspace_id=makerspace_id, status="active"
+        ), relation="makerspace")
     )
 
 
@@ -47,7 +48,7 @@ class PublicMembershipRequestView(APIView):
     def post(self, request, makerspace_slug):
         if not active_user(request.user):
             raise PermissionDenied()
-        makerspace = get_object_or_404(Makerspace.objects.filter(archived_at__isnull=True), slug=makerspace_slug)
+        makerspace = get_object_or_404(servable_queryset(), slug=makerspace_slug)
         require_module(makerspace, "membership")
         serializer = MembershipRequestCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -62,8 +63,12 @@ class MyMembershipsView(APIView):
     def get(self, request):
         if not active_user(request.user):
             raise PermissionDenied()
-        memberships = MakerspaceMembership.objects.filter(user=request.user, makerspace__archived_at__isnull=True).select_related("makerspace", "assigned_role")
-        requests = MembershipRequest.objects.filter(user=request.user, makerspace__archived_at__isnull=True).select_related("makerspace")
+        memberships = servable_queryset(
+            MakerspaceMembership.objects.filter(user=request.user), relation="makerspace"
+        ).select_related("makerspace", "assigned_role")
+        requests = servable_queryset(
+            MembershipRequest.objects.filter(user=request.user), relation="makerspace"
+        ).select_related("makerspace")
         rows = []
         for membership in memberships:
             active = MakerspaceWaiver.objects.filter(makerspace=membership.makerspace, is_active=True).first()

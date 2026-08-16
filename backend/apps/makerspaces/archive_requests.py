@@ -11,6 +11,7 @@ from apps.makerspaces.archive_request_notifications import (
     schedule_resolved,
 )
 from apps.makerspaces.models import Makerspace, MakerspaceArchiveRequest
+from apps.makerspaces.servability import is_servable
 
 COOLDOWN = timedelta(hours=1)
 DIRECT_ARCHIVE_NOTE = "Approved automatically because a superadmin archived the makerspace directly."
@@ -43,9 +44,9 @@ def create(makerspace, actor, reason):
         with transaction.atomic():
             locked = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
             _require_archive_authority(actor, locked)
-            if locked.archived_at is not None:
+            if not is_servable(locked):
                 raise ArchiveRequestConflict(
-                    "An archived makerspace cannot request archival.",
+                    "An unavailable makerspace cannot request archival.",
                     "makerspace_already_archived",
                 )
             if not locked.superadmin_access_enabled:

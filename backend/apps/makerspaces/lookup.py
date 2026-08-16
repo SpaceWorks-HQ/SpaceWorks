@@ -1,6 +1,7 @@
 from django.http import Http404
 
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 
 
 def get_public_makerspace(identifier):
@@ -11,11 +12,10 @@ def get_public_makerspace(identifier):
     # and could collide with another makerspace's 4-char code, so a single OR-query
     # could raise MultipleObjectsReturned (-> 500). Two scoped lookups avoid that.
     makerspace = (
-        Makerspace.objects.filter(slug=value, archived_at__isnull=True).first()
-        or Makerspace.objects.filter(
+        servable_queryset(Makerspace.objects.filter(slug=value)).first()
+        or servable_queryset(Makerspace.objects.filter(
             public_code__iexact=value,
-            archived_at__isnull=True,
-        ).first()
+        )).first()
     )
     if makerspace is None:
         raise Http404

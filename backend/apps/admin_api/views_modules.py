@@ -16,7 +16,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.admin_api.permissions import IsActiveSuperAdmin
-from apps.makerspaces.models import Makerspace
 from apps.makerspaces.module_groups import deployment_app_status, grouped_module_status
 from apps.makerspaces.module_install import (
     ModuleInstallError,
@@ -24,6 +23,7 @@ from apps.makerspaces.module_install import (
     uninstall_module,
 )
 from apps.makerspaces.module_profiles import PROFILES
+from apps.makerspaces.servability import servable_queryset
 
 class ModuleActionSerializer(serializers.Serializer):
     """The one field either mutation takes.
@@ -38,7 +38,7 @@ class ModuleActionSerializer(serializers.Serializer):
 def _makerspace(makerspace_id):
     # Archived spaces are excluded everywhere but /control/, and installing a module on
     # one would be a change nobody can see the effect of.
-    return get_object_or_404(Makerspace, pk=makerspace_id, archived_at__isnull=True)
+    return get_object_or_404(servable_queryset(), pk=makerspace_id)
 
 
 class ModuleGroupListView(APIView):

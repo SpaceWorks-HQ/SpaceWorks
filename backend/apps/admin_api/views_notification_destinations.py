@@ -23,13 +23,13 @@ from apps.audit import services as audit
 from apps.integrations.dispatch_channels import channel_module_blocks
 from apps.admin_api.notification_scope import ScopeTargetError, apply_scope
 from apps.integrations.models_destinations import NotificationDestination
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 
 
 def _makerspace(request, makerspace_id):
     require_action(request.user, rbac.Action.MANAGE_MAKERSPACE, makerspace_id)
     return get_object_or_404(
-        Makerspace.objects.filter(archived_at__isnull=True), pk=makerspace_id
+        servable_queryset(), pk=makerspace_id
     )
 
 

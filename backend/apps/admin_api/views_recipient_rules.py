@@ -31,15 +31,15 @@ from apps.integrations import notification_catalog, recipients as recipient_sele
 from apps.integrations.notification_enums import NotificationFeature
 from apps.integrations.recipient_rule_management import replace_recipient_rules
 from apps.machines import role_scope
-from apps.makerspaces.models import Makerspace
 from apps.makerspaces.platform import feature_enabled
+from apps.makerspaces.servability import servable_queryset
 
 DELEGATION_FEATURE = "notifications.delegated_recipients"
 
 
 def _access(request, makerspace_id):
     makerspace = get_object_or_404(
-        Makerspace.objects.filter(archived_at__isnull=True), pk=makerspace_id
+        servable_queryset(), pk=makerspace_id
     )
     if rbac.can(request.user, rbac.Action.MANAGE_MAKERSPACE, makerspace_id):
         return makerspace, False, None

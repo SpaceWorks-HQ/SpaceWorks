@@ -22,6 +22,7 @@ from apps.apiclients.services import sync_makerspace_origins
 from apps.audit import services as audit
 from apps.makerspaces import limits
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from apps.makerspaces.servability import is_servable
 
 
 @extend_schema(tags=["API clients"], summary="List or create makerspace API clients")
@@ -193,7 +194,7 @@ class ApiKeyRequestListCreateView(generics.ListCreateAPIView):
         is_member = MakerspaceMembership.objects.filter(
             user=user, makerspace_id=makerspace.id, status="active"
         ).exists()
-        if makerspace.archived_at is not None:
+        if not is_servable(makerspace):
             raise PermissionDenied()
         if is_superadmin and not is_member:
             require_action(user, rbac.Action.MANAGE_MAKERSPACE, makerspace.id)

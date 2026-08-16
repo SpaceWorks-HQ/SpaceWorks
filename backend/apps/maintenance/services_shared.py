@@ -7,6 +7,7 @@ from apps.audit.services import record
 from apps.machines import access
 from apps.machines.models import Machine
 from apps.makerspaces.guards import require_module
+from apps.makerspaces.servability import is_servable
 from apps.maintenance.exceptions import (
     MaintenanceStatusConflict,
     RetiredMachineMaintenance,
@@ -25,7 +26,7 @@ def prepare_machine(machine, actor, *, manage):
     # Archived makerspaces are soft-deleted for everyone; reject after the row lock
     # reloads the makerspace so a per-machine operator can't complete an in-flight
     # mutation (and finalize an attachment) during the archive->purge window.
-    if machine.makerspace.archived_at is not None:
+    if not is_servable(machine.makerspace):
         raise PermissionDenied()
     if not machine.is_active:
         raise RetiredMachineMaintenance("Machine is retired.")

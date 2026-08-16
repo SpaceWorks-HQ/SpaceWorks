@@ -27,8 +27,9 @@ def registrations_for_space(makerspace, user):
     from apps.events.models import EventRegistration
     from apps.makerspaces.models import Makerspace
     from apps.makerspaces.platform import module_enabled
+    from apps.makerspaces.servability import servable_queryset
 
-    registrations = EventRegistration.objects.filter(
+    registrations = servable_queryset(EventRegistration.objects.filter(
         # A NULL provenance falls back to the host, which is what every row meant before
         # provenance existed. This read fails OPEN to the previous behaviour on purpose: the
         # column is SET_NULL and can also be absent on a row written outside `register()`
@@ -38,8 +39,7 @@ def registrations_for_space(makerspace, user):
         Q(registered_via_makerspace=makerspace)
         | Q(registered_via_makerspace__isnull=True, event__makerspace=makerspace),
         member=user,
-        event__makerspace__archived_at__isnull=True,
-    )
+    ), relation="event__makerspace")
     # `module_enabled` needs the row, so the host set is resolved in Python. It is bounded by
     # the number of distinct hosts this member registered through -- one, for everybody who
     # never attended a joint event -- not by the number of registrations.

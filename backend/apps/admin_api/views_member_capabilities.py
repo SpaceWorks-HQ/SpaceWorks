@@ -14,6 +14,7 @@ from apps.admin_api.views_roles import ERRORS
 from apps.makerspaces import membership_services
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import MakerspaceMembership
+from apps.makerspaces.servability import servable_queryset
 
 
 def _membership_for_manager(actor, pk):
@@ -33,8 +34,11 @@ def _membership_for_verifier(actor, pk):
         MakerspaceMembership.objects.all(),
         field="makerspace_id",
     ).values("makerspace_id")
-    delegate_scope = MakerspaceMembership.objects.filter(
-        user=actor, status="active", can_verify=True, makerspace__archived_at__isnull=True
+    delegate_scope = servable_queryset(
+        MakerspaceMembership.objects.filter(
+            user=actor, status="active", can_verify=True
+        ),
+        relation="makerspace",
     ).values("makerspace_id")
     return get_object_or_404(
         MakerspaceMembership.objects.select_related("makerspace", "user", "assigned_role").filter(

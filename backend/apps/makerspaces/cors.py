@@ -5,6 +5,7 @@ from django.conf import settings
 
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.platform import makerspace_public_origins, makerspace_staff_origins
+from apps.makerspaces.servability import servable_queryset
 
 _STAFF_PATH_PREFIXES = (
     "/api/v1/auth/",
@@ -28,17 +29,15 @@ def origin_is_registered(origin):
     # matches by exact membership in cors_allowed_origins (jsonb containment).
     host = _origin_host(origin)
     if host:
-        for makerspace in Makerspace.objects.filter(
+        for makerspace in servable_queryset(Makerspace.objects.filter(
             frontend_domain__iexact=host,
             frontend_domain_status=Makerspace.DomainStatus.VERIFIED,
-            archived_at__isnull=True,
-        ):
+        )):
             if origin in makerspace_public_origins(makerspace):
                 return True
-    return Makerspace.objects.filter(
-        archived_at__isnull=True,
+    return servable_queryset(Makerspace.objects.filter(
         cors_allowed_origins__contains=[origin],
-    ).exists()
+    )).exists()
 
 
 def staff_origin_is_registered(origin):
@@ -52,11 +51,10 @@ def staff_origin_is_registered(origin):
         return False
     # Narrow to the (at most one) makerspace owning this host, then require the EXACT
     # https://<frontend_domain> origin â€” never cors_allowed_origins.
-    for makerspace in Makerspace.objects.filter(
+    for makerspace in servable_queryset(Makerspace.objects.filter(
         frontend_domain__iexact=host,
         frontend_domain_status=Makerspace.DomainStatus.VERIFIED,
-        archived_at__isnull=True,
-    ):
+    )):
         if origin in makerspace_staff_origins(makerspace):
             return True
     return False
@@ -75,11 +73,10 @@ def member_origin_is_registered(origin):
         return False
     return any(
         origin in makerspace_staff_origins(makerspace)
-        for makerspace in Makerspace.objects.filter(
+        for makerspace in servable_queryset(Makerspace.objects.filter(
             frontend_domain__iexact=host,
             frontend_domain_status=Makerspace.DomainStatus.VERIFIED,
-            archived_at__isnull=True,
-        )
+        ))
     )
 
 

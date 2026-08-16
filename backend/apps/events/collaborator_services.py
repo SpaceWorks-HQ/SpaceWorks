@@ -8,6 +8,7 @@ from apps.audit import services as audit
 from apps.makerspaces.guards import require_module_locked
 from apps.events.models import Event, EventCollaborator
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import is_servable
 
 
 def _collaborators(event):
@@ -27,7 +28,7 @@ def invite_collaborators(event, *, actor, slugs):
     requested_slugs = set(slugs)
     candidates = list(
         Makerspace.objects.filter(slug__in=requested_slugs).only(
-            "id", "slug", "archived_at"
+            "id", "slug", "archived_at", "lifecycle_state"
         )
     )
     current_ids = set(
@@ -44,7 +45,7 @@ def invite_collaborators(event, *, actor, slugs):
                 *(row.pk for row in candidates),
             }
         )
-        .only("id", "slug", "archived_at")
+        .only("id", "slug", "archived_at", "lifecycle_state")
         .order_by("pk")
     )
     host = next(row for row in locked_spaces if row.pk == locked_event.makerspace_id)
@@ -60,7 +61,7 @@ def invite_collaborators(event, *, actor, slugs):
     resolved = {
         row.slug: row
         for row in locked_spaces
-        if row.pk != locked_event.makerspace_id and row.archived_at is None
+        if row.pk != locked_event.makerspace_id and is_servable(row)
     }
     invalid = sorted(requested_slugs - resolved.keys())
     if invalid:

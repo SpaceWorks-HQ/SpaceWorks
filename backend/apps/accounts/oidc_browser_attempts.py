@@ -18,6 +18,7 @@ from apps.accounts.social_nonces import request_origin
 from apps.audit import services as audit
 from apps.makerspaces.cors import member_origin_is_registered
 from apps.makerspaces.models import MakerspaceMembership
+from apps.makerspaces.servability import servable_queryset
 
 
 class OidcAttemptRejected(Exception):
@@ -130,13 +131,12 @@ def _transition_binding(request, *, email, makerspace_slug):
     if not normalized or not slug:
         return None, None
     membership = (
-        MakerspaceMembership.objects.filter(
+        servable_queryset(MakerspaceMembership.objects.filter(
             makerspace__slug=slug,
-            makerspace__archived_at__isnull=True,
             status="active",
             user__email__iexact=normalized,
             user__is_walk_in=True,
-        )
+        ), relation="makerspace")
         .select_related("user")
         .first()
     )

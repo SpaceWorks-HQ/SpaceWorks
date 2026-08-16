@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.integrations import health as integration_health
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 
 
 class HealthStatusSerializer(serializers.Serializer):
@@ -76,7 +76,7 @@ class IntegrationHealthView(APIView):
         makerspace = get_object_or_404(
             rbac.scope_by_makerspace(
                 request.user,
-                Makerspace.objects.filter(archived_at__isnull=True),
+                servable_queryset(),
                 makerspace_field="id",
             ),
             pk=makerspace_id,

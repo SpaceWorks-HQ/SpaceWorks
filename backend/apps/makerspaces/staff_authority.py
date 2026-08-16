@@ -8,6 +8,7 @@ from rest_framework.exceptions import PermissionDenied
 from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
+from apps.makerspaces.servability import is_servable
 
 
 @dataclass(frozen=True)
@@ -40,7 +41,7 @@ def lock_and_validate_staff_authority(
         not locked_actor.is_active
         or locked_actor.access_status != User.AccessStatus.ACTIVE
         or locked_actor.must_change_password
-        or makerspace.archived_at is not None
+        or not is_servable(makerspace)
     ):
         raise PermissionDenied()
 

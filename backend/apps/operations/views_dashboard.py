@@ -18,8 +18,8 @@ from apps.hardware_requests.models import (
 )
 from apps.integrations.models import EmailLog
 from apps.inventory.models import InventoryProduct
-from apps.makerspaces.models import Makerspace
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.servability import servable_queryset
 from apps.machines import role_scope
 from apps.machines.printer_capabilities import PRINTER_SLUG
 from apps.operations.models import StocktakeSession
@@ -62,7 +62,7 @@ class DashboardView(APIView):
         makerspace = get_object_or_404(
             rbac.scope_by_makerspace(
                 request.user,
-                Makerspace.objects.filter(archived_at__isnull=True),
+                servable_queryset(),
                 makerspace_field="id",
             ),
             pk=makerspace_id,

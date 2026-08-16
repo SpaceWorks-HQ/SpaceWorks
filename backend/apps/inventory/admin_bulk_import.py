@@ -7,6 +7,7 @@ from apps.accounts import rbac
 from apps.admin_api import bulk_import
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
 
@@ -14,7 +15,7 @@ SESSION_KEY = "admin_inventory_bulk_import_preview"
 
 
 def visible_makerspaces():
-    qs = Makerspace.objects.filter(archived_at__isnull=True)
+    qs = servable_queryset()
     hidden = rbac.superadmin_hidden_makerspace_ids()
     return qs.exclude(id__in=hidden) if hidden else qs
 

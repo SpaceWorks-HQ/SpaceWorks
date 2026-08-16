@@ -352,14 +352,10 @@ def superadmin_hidden_makerspace_ids():
 
 
 def archived_makerspace_ids():
-    from apps.makerspaces.models import Makerspace
+    """Compatibility name for every makerspace normal RBAC must exclude."""
+    from apps.makerspaces.servability import unservable_makerspace_ids
 
-    return set(
-        Makerspace.objects.filter(archived_at__isnull=False).values_list(
-            "id",
-            flat=True,
-        )
-    )
+    return unservable_makerspace_ids()
 
 
 def _exclude_archived_ids(scope):

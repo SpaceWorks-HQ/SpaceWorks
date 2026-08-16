@@ -14,7 +14,7 @@ from apps.payments.serializers_reconciliation import (
     PaymentListFilterSerializer,
     PaymentReconciliationSerializer,
 )
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 from apps.payments.subjects import resolve_subject_labels
 
 ERRORS = {
@@ -43,7 +43,7 @@ class PaymentListView(APIView):
             rbac.scope_by_action(
                 request.user,
                 rbac.Action.MANAGE_MAKERSPACE,
-                Makerspace.objects.filter(archived_at__isnull=True),
+                servable_queryset(),
                 field="id",
             ),
             pk=makerspace_id,

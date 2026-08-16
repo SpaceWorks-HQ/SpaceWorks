@@ -84,6 +84,11 @@ def presence_presets(makerspace):
 
 
 class Makerspace(models.Model):
+    class LifecycleState(models.TextChoices):
+        ACTIVE = "active", "Active"
+        IMPORTING = "importing", "Importing"
+        ABORTED = "aborted", "Aborted"
+
     class MembershipPolicy(models.TextChoices):
         REQUEST = "request", "Request"
         OPEN = "open", "Open"
@@ -216,10 +221,15 @@ class Makerspace(models.Model):
         related_name="created_makerspaces",
     )
     # Soft-delete state. archived_at IS NOT NULL â‡’ archived (single source of truth; no
-    # separate boolean). An archived makerspace is operationally unreachable for everyone
-    # (excluded centrally in rbac + public surfaces) but stays visible to the superadmin in
-    # the Django /control/ admin so it can be permanently purged.
+    # separate boolean). Operational reachability also requires lifecycle_state=ACTIVE;
+    # importing/aborted rows stay visible only to narrow import/recovery operations.
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    lifecycle_state = models.CharField(
+        max_length=16,
+        choices=LifecycleState.choices,
+        default=LifecycleState.ACTIVE,
+        db_index=True,
+    )
     archived_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

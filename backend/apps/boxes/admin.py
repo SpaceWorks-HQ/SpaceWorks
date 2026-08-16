@@ -15,6 +15,7 @@ from apps.boxes.serializers import QrRebindTargetSerializer
 from apps.boxes.services import revoke_qr_code
 from apps.inventory.models import InventoryAsset, InventoryProduct
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 from config.admin_access import SuperuserOnlyModelAdmin
 from apps.encryption.admin_search import ScopedPiiAdminSearchMixin
 
@@ -34,10 +35,9 @@ class QrRebindAdminForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        visible_spaces = Makerspace.objects.filter(
-            archived_at__isnull=True,
+        visible_spaces = servable_queryset(Makerspace.objects.filter(
             superadmin_access_enabled=True,
-        ).order_by("name")
+        )).order_by("name")
         visible_space_ids = visible_spaces.values("id")
         visible_products = InventoryProduct.objects.select_related("makerspace").filter(
             makerspace_id__in=visible_space_ids,

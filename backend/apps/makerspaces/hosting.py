@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.cache import cache
 
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 
 
 CACHE_KEY = "hosting:verified_domains"
@@ -54,11 +55,10 @@ def verified_frontend_domains() -> frozenset[str]:
         return frozenset(cached)
     domains = frozenset(
         domain.lower()
-        for domain in Makerspace.objects.filter(
+        for domain in servable_queryset(Makerspace.objects.filter(
             frontend_domain_status=Makerspace.DomainStatus.VERIFIED,
-            archived_at__isnull=True,
             frontend_domain__isnull=False,
-        )
+        ))
         .exclude(frontend_domain="")
         .values_list("frontend_domain", flat=True)
     )

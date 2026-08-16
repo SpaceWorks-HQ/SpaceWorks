@@ -23,6 +23,7 @@ from apps.makerspaces.models import (
     MakerspaceRole,
 )
 from apps.makerspaces.platform import staff_payment_settings_url
+from apps.makerspaces.servability import is_servable
 from apps.payments.connect import (
     account_has_pending_payments,
     deauthorize_account,
@@ -48,7 +49,6 @@ from apps.payments.stripe_client import (
 
 
 logger = logging.getLogger(__name__)
-
 
 class _PostExchangeRejected(Exception):
     pass
@@ -82,7 +82,7 @@ def _lock_callback_authority(makerspace_id, actor_id):
         return makerspace, actor, False
 
     authorized = bool(
-        makerspace.archived_at is None
+        is_servable(makerspace)
         and active_user(actor)
         and (
             (
@@ -142,7 +142,7 @@ class StripeConnectCallbackView(APIView):
                 target=oauth_state,
             )
             if not (
-                makerspace.archived_at is None
+                is_servable(makerspace)
                 and active_user(actor)
                 and rbac.can(
                     actor,

@@ -24,6 +24,7 @@ from apps.makerspaces.guards import require_module, require_module_locked
 from apps.makerspaces.member_activity_service import active_membership
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceWaiver
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.servability import servable_q, servable_queryset
 from apps.presence.guard import MemberPresenceRequired, require_active_member
 
 
@@ -60,18 +61,16 @@ def _collaborative_events(makerspace):
     asymmetry would be absurd -- the space that created the event being the one space unable
     to see it.
     """
-    return Event.objects.filter(
+    return servable_queryset(Event.objects.filter(
         Q(makerspace=makerspace)
         | Q(
             collaborators__makerspace=makerspace,
             collaborators__status=EventCollaborator.Status.ACCEPTED,
-            collaborators__makerspace__archived_at__isnull=True,
-        ),
-        makerspace__archived_at__isnull=True,
+        ) & servable_q("collaborators__makerspace"),
         makerspace__enabled_modules__contains=["events"],
         status=Event.Status.PUBLISHED,
         ends_at__gte=timezone.now(),
-    ).distinct()
+    ), relation="makerspace").distinct()
 
 
 class MemberCollaborativeEventListView(APIView):
@@ -201,13 +200,16 @@ class MemberCollaborativeEventRegistrationView(APIView):
             # The view's collaboration check is unlocked and can go stale. Re-read it
             # under the event lock used by every collaboration mutation before register()
             # takes its own nested locks, so removal cannot race registration creation.
-            collaboration = (
+            collaboration = servable_queryset(
                 EventCollaborator.objects.filter(
                     event=locked_event,
                     makerspace=membership.makerspace,
-                    makerspace__archived_at__isnull=True,
                     status=EventCollaborator.Status.ACCEPTED,
-                )
+                ),
+                relation="makerspace",
+            )
+            collaboration = (
+                collaboration
                 .select_related("makerspace")
                 .first()
             )

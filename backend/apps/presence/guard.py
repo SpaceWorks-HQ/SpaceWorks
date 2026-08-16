@@ -5,6 +5,7 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.accounts.claim_sessions import claim_context
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
+from apps.makerspaces.servability import is_servable
 from apps.makerspaces.waiver_state import current_acceptance
 from apps.presence.models import PresenceSession
 from apps.separability.registry import runtime_active
@@ -48,7 +49,7 @@ def require_active_member(user, makerspace):
     Keeping it as the single implementation of the membership and waiver rules is the
     point: two copies would drift, and the copy that drifted would be an auth rule.
     """
-    if not (
+    if not is_servable(makerspace) or not (
         user
         and user.is_authenticated
         and user.pk
