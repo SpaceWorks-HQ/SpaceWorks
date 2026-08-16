@@ -96,6 +96,33 @@ class TransactionPkMap:
             )
         return model._meta.pk.to_python(row[0])
 
+    def count(self, model):
+        require_import_transaction(self.using)
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE model_label = %s",
+                [model._meta.label],
+            )
+            return cursor.fetchone()[0]
+
+    def existing_target_count(self, model):
+        """Count mappings whose final target row exists in the current transaction."""
+        require_import_transaction(self.using)
+        quote = self.connection.ops.quote_name
+        table = quote(model._meta.db_table)
+        pk = quote(model._meta.pk.column)
+        cast = model._meta.pk.db_type(self.connection)
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT COUNT(*) FROM {TABLE_NAME} map
+                JOIN {table} target ON target.{pk} = map.target_pk::{cast}
+                WHERE map.model_label = %s
+                """,
+                [model._meta.label],
+            )
+            return cursor.fetchone()[0]
+
     def _reserve_target_pks(self, model, count):
         pk_field = model._meta.pk
         if isinstance(

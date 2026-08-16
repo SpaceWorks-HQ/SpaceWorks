@@ -21,8 +21,31 @@ def reencrypt_mapped_value(
     malformed envelope, unavailable version, or authentication failure propagates and
     must abort the caller's all-or-nothing import transaction.
     """
+    rebound, _plaintext = reencrypt_mapped_value_with_plaintext(
+        envelope,
+        source_aad=source_aad,
+        target_makerspace_id=target_makerspace_id,
+        target_table=target_table,
+        target_pk=target_pk,
+        target_field=target_field,
+        deks=deks,
+    )
+    return rebound
+
+
+def reencrypt_mapped_value_with_plaintext(
+    envelope,
+    *,
+    source_aad: Mapping[str, object],
+    target_makerspace_id,
+    target_table,
+    target_pk,
+    target_field,
+    deks: Mapping[int, bytes],
+):
+    """Return the rebound envelope and its bounded plaintext for derived indexes."""
     if envelope in (None, ""):
-        return envelope
+        return envelope, envelope
     version, _nonce, _ciphertext = parse_envelope(envelope)
     plaintext = decrypt_with_key_loader(
         envelope,
@@ -32,7 +55,7 @@ def reencrypt_mapped_value(
         field=source_aad["field"],
         load_dek=lambda declared_version: deks[declared_version],
     )
-    return encrypt(
+    rebound = encrypt(
         plaintext,
         deks[version],
         key_version=version,
@@ -41,3 +64,4 @@ def reencrypt_mapped_value(
         pk=target_pk,
         field=target_field,
     )
+    return rebound, plaintext

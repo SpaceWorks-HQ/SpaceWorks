@@ -23,3 +23,19 @@ class UnsupportedPrimaryKey(TenantInsertionError):
 
 class PrimaryKeyMapUnavailable(TenantInsertionError):
     """A requested source primary key has no transaction-local mapping."""
+
+
+class ArchiveFormatError(TenantInsertionError):
+    """The decrypted archive is missing data or contains an invalid value."""
+
+
+class DependencyCycleError(TenantInsertionError):
+    """The exported concrete-FK graph cannot be inserted in dependency order."""
+
+
+class IdentityResolutionError(TenantInsertionError):
+    """A retained source identity has no complete target-side decision."""
+
+
+class ImportVerificationError(TenantInsertionError):
+    """The materialized database state does not satisfy the import contract."""

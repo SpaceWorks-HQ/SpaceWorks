@@ -104,7 +104,19 @@ class RawImportRepository:
         columns_sql = ", ".join(quote(column) for column in columns)
         row_sql = "(" + ", ".join(["%s"] * len(columns)) + ")"
         values_sql = ", ".join([row_sql] * len(rows))
-        parameters = [row[column] for row in rows for column in columns]
+        # Prepare every value through its own field rather than binding the Python
+        # object directly. The ORM normally does this on the way to the driver, and
+        # bypassing `save()` bypasses it too: psycopg2 cannot adapt a `dict`, so a
+        # JSONField column fails with "can't adapt type 'dict'". Asking the field also
+        # keeps dates, decimals and UUIDs correct without a type table of our own.
+        fields_by_column = {
+            field.column: field for field in model._meta.local_concrete_fields
+        }
+        parameters = [
+            fields_by_column[column].get_db_prep_save(row[column], connection)
+            for row in rows
+            for column in columns
+        ]
         try:
             with connection.cursor() as cursor:
                 cursor.execute(
