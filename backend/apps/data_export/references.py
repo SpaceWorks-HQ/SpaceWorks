@@ -102,6 +102,11 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("makerspaces.MakerspaceMembership", "verified_by"),
         ("makerspaces.MakerspaceMembership", "activated_by"),
         ("makerspaces.MakerspaceMembership", "revoked_by"),
+        # Phase 7: the staff actor who witnessed a waiver acceptance in person.
+        ("makerspaces.MakerspaceMembership", "witnessed_by"),
+        # Phase 7 import machinery. The model itself is omitted, but the edge is
+        # declared so user-edge completeness stays a total check over the graph.
+        ("makerspaces.ImportedUserReconciliation", "target_user"),
         ("makerspaces.MakerspaceWaiver", "created_by"),
         ("makerspaces.MembershipRequest", "user"),
         ("makerspaces.MembershipRequest", "requested_by"),
@@ -157,6 +162,12 @@ JSON_FIELDS = frozenset(
         ("apiclients.ApiClient", "allowed_origins"),
         ("apiclients.ApiKeyRequest", "allowed_origins"),
         ("audit.AuditLog", "meta"),
+        # Phase 7 imported-actor provenance. Each holds actor_username,
+        # actor_display, source_user_id and recorded_at.
+        ("makerspaces.MakerspaceMembership", "witnessed_actor_snapshot"),
+        ("makerspaces.MakerspaceMembership", "verified_actor_snapshot"),
+        ("makerspaces.MakerspaceMembership", "activated_actor_snapshot"),
+        ("makerspaces.MakerspaceMembership", "revoked_actor_snapshot"),
         ("bookings.BookableSpace", "custom_form"),
         ("bookings.Booking", "custom_answers"),
         ("events.Event", "custom_form"),
@@ -214,6 +225,17 @@ for _fidelity in Fidelity:
                     "the reference joins the closure only when metadata is retained."
                 ),
                 included=_fidelity is Fidelity.PORTABLE,
+            )
+        elif _field.endswith("_actor_snapshot"):
+            # `source_user_id` here is deliberately NOT a live reference: Phase 7 v13
+            # made imported actor references typed TEXT snapshots precisely because the
+            # source user may not exist at the target or may map to a different person.
+            # Remapping it would bind evidence to the wrong human, so it stays
+            # source-local at BOTH fidelities.
+            decision = SourceLocalProvenance(
+                _model,
+                f"{_field}.source_user_id",
+                "Imported actor provenance is source-local text and is never remapped.",
             )
         else:
             decision = SourceLocalProvenance(

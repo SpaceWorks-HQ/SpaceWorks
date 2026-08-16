@@ -67,7 +67,7 @@ EXPORTED_MODEL_FIELDS = {
     "maintenance.MaintenanceLogDocument": "id log object_key size_bytes uploaded_by created_at",
     "maintenance.MaintenanceSchedule": "id machine description interval_days next_due is_active created_by created_at updated_at",
     "makerspaces.Makerspace": "id name slug public_code location map_url geofence_latitude geofence_longitude geofence_radius_m geofence_enabled public_inventory_enabled public_stats_enabled public_stats_show_holder_names public_print_status_lookup_policy membership_policy membership_dues_amount referrals_enabled filament_low_stock_threshold_grams superadmin_access_enabled staff_notifications_enabled booking_requester_notifications_enabled logo_key cover_image_key frontend_domain frontend_domain_status domain_verification_token domain_verified_at frontend_domain_changed_at hidden_from_central_directory public_api_key cors_allowed_origins enabled_modules enabled_features resource_limit_overrides storage_bytes_used theme_config branding_config telegram_group_chat_id telegram_bot_token smtp_host smtp_port smtp_username smtp_password smtp_use_tls smtp_use_ssl smtp_from_email slack_webhook_url mattermost_webhook_url discord_webhook_url default_loan_days presence_preset_minutes created_by archived_at archived_by created_at updated_at",
-    "makerspaces.MakerspaceMembership": "id makerspace user role assigned_role receives_notifications can_refer can_verify verified_at verified_by status activated_at activated_by revoked_at revoked_by revocation_reason waiver_accepted_at waiver_version_accepted accepted_waiver created_at",
+    "makerspaces.MakerspaceMembership": "id makerspace user role assigned_role receives_notifications can_refer can_verify verified_at verified_by status activated_at activated_by revoked_at revoked_by revocation_reason waiver_accepted_at waiver_version_accepted accepted_waiver witnessed_waiver witnessed_waiver_version witnessed_at witnessed_by witnessed_actor_snapshot verified_actor_snapshot activated_actor_snapshot revoked_actor_snapshot created_at",
     "makerspaces.MakerspaceRole": "id makerspace name slug granted_actions legacy_role is_default is_protected created_at updated_at",
     "makerspaces.MakerspaceWaiver": "id makerspace body version is_active created_by created_at superseded_at",
     "makerspaces.MemberProfile": "id membership is_visible show_attended_events headline institution bio avatar_key interests languages education github_username github_contributions github_synced_at created_at updated_at",
@@ -130,6 +130,13 @@ OMITTED_MODELS = {
     "machines.PrintingCutoverRepair": "Retired migration provenance.",
     "machines.PrintingCutoverState": "Retired migration coordination state.",
     "makerspaces.MakerspaceArchiveRequest": "Source-deployment lifecycle request.",
+    # Phase 7 import staging. Both are TARGET-side machinery rather than source tenant
+    # data: a pending row is an archived membership waiting for its address to be proven
+    # here, and a reconciliation is the operator's persisted judgement that an archived
+    # person is a particular target account. The readable export omits them (Phase 4 v8
+    # section 4); carrying and remapping unresolved pending rows is PORTABLE's job in 5B.
+    "makerspaces.PendingImportedMembership": "Import staging awaiting target-side proof.",
+    "makerspaces.ImportedUserReconciliation": "Target-side operator reconciliation input.",
     "makerspaces.SubdomainRequest": "Source-deployment routing request.",
     "operations.PeriodicTaskRun": "Deployment scheduler state.",
     "payments.PlatformStripeConnectSettings": "Platform payment credentials.",
