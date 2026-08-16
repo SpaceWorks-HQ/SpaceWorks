@@ -328,6 +328,7 @@ export const openApiPaths = [
   "/api/v1/admin/warranty/{id}/documents",
   "/api/v1/admin/warranty/{id}/documents/presign",
   "/api/v1/auth/change-password",
+  "/api/v1/auth/claim/redeem",
   "/api/v1/auth/device/attestation-challenge",
   "/api/v1/auth/device/grants",
   "/api/v1/auth/device/grants/{grant_id}",
@@ -943,6 +944,16 @@ export type ClaimableInvitation = {
   "role": string | null;
 };
 
+export type ClaimRedemption = {
+  "code": string;
+  "makerspace_slug": string;
+};
+
+export type ClaimRedemptionResponse = {
+  "user": AuthUserPayload;
+  "access": string;
+};
+
 export type ClientPlatformEnum = "web" | "ios" | "android";
 
 export type ClientTypeEnum = "browser" | "server";
@@ -1348,7 +1359,7 @@ export type EmailVerificationConfirm = {
   "code": string;
 };
 
-export type EndReasonEnum = "superseded" | "membership_revoked" | "user_ended";
+export type EndReasonEnum = "superseded" | "membership_revoked" | "claim_revoked" | "user_ended";
 
 export type EnvironmentEnum = "development" | "production";
 
