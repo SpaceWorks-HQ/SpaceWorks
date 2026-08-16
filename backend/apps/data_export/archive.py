@@ -19,7 +19,7 @@ THEME_KEYS = frozenset({"mode", "primary_color", "accent_color", "logo_url"})
 
 def write_dataset(
     path, dataset, rows, *, dangling_refs=None, pii_collector=None,
-    external_writer=None,
+    external_writer=None, reference_writer=None,
 ):
     if pii_collector is not None:
         pii_collector.register_model(dataset.model)
@@ -37,12 +37,14 @@ def write_dataset(
                     dataset, row, row_dangling,
                     pii_collector=pii_collector,
                     external_writer=external_writer,
+                    reference_writer=reference_writer,
                 )
             )
 
 
 def project_row(
     dataset, row, dangling_refs, *, pii_collector=None, external_writer=None,
+    reference_writer=None,
 ):
     projected = {}
     portable_mapped = (
@@ -62,6 +64,8 @@ def project_row(
             value = source_value(row, source)
         if (row.pk, source) in dangling_refs:
             value = None
+        if reference_writer is not None:
+            value = reference_writer.project(row, source, value)
         projected[column.name] = csv_value(
             transform_value(
                 dataset.model, source, column.disposition, value,

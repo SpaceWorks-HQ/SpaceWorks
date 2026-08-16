@@ -18,6 +18,7 @@ from .datasets import DATASETS
 from .errors import ExportIntegrityError
 from .external_refs import ExternalReferenceWriter, select_related_paths as external_paths
 from .pii_raw import PiiAadCollector, select_related_paths as pii_paths
+from .reference_provenance import ReferenceProvenanceWriter
 from .references import SEMANTIC_REFERENCES, USER_EDGES, require_raw_user
 from .types import Fidelity, SemanticUserRef
 
@@ -48,10 +49,12 @@ def build_archive(job, *, page_size=None, monotonic=time.monotonic):
     total_rows = 0
     pii_collector = None
     external_writer = None
+    reference_writer = None
     try:
         if fidelity is Fidelity.PORTABLE:
             pii_collector = PiiAadCollector(job.makerspace_id)
             external_writer = ExternalReferenceWriter(root, job.makerspace_id)
+            reference_writer = ReferenceProvenanceWriter(root, job.makerspace_id)
         with transaction.atomic():
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -72,10 +75,13 @@ def build_archive(job, *, page_size=None, monotonic=time.monotonic):
                 rows, count = _read_dataset(
                     dataset, job.makerspace_id, closure, page_size, deadline_clock, monotonic
                 )
+                if reference_writer is not None:
+                    reference_writer.prepare_rows(dataset.model, rows)
                 write_dataset(
                     root / dataset.path, dataset, rows,
                     pii_collector=pii_collector,
                     external_writer=external_writer,
+                    reference_writer=reference_writer,
                 )
                 counts[dataset.path] = count
                 total_rows += count
@@ -89,6 +95,7 @@ def build_archive(job, *, page_size=None, monotonic=time.monotonic):
                 root / users.path, users, user_rows,
                 pii_collector=pii_collector,
                 external_writer=external_writer,
+                reference_writer=reference_writer,
             )
             counts[users.path] = user_count
             total_rows += user_count
@@ -104,6 +111,8 @@ def build_archive(job, *, page_size=None, monotonic=time.monotonic):
     finally:
         if external_writer is not None:
             external_writer.close()
+        if reference_writer is not None:
+            reference_writer.close()
 
     if pii_collector is not None:
         pii_collector.write(root)

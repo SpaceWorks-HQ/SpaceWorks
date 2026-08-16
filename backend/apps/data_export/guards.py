@@ -7,6 +7,8 @@ from django.apps import apps
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 
+from apps.separability.registry import runtime_active
+
 from .datasets import DATASETS
 from .fields import FIELDS, USER_PROJECTIONS
 from .models import EXPORTED_MODELS, MODELS
@@ -63,6 +65,12 @@ def validate_all(
     validate_semantic_references(semantic_references)
     validate_credentials(fields)
     validate_user_projection(datasets)
+    if runtime_active("tenant_migration"):
+        # Migration semantics are separable. Keep this import behind the runtime
+        # guard so a tombstoned deployment can still validate REDACTED exports.
+        from apps.tenant_migration.reference_guards import validate_reference_registry
+
+        validate_reference_registry()
 
 
 def validate_model_and_field_coverage(fields=FIELDS):
