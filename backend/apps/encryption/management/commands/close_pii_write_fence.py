@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
+from apps.encryption.models import PiiMakerspaceWriteFence
 from apps.encryption.write_fence import close_global, close_makerspace
 
 
@@ -14,7 +15,7 @@ class Command(BaseCommand):
         scope.add_argument("--all-makerspaces", action="store_true")
         parser.add_argument(
             "--operation-kind",
-            choices=["enable_transition", "decrypt_rollback", "search_rotation"],
+            choices=PiiMakerspaceWriteFence.OperationKind.values,
             required=True,
         )
         parser.add_argument("--actor-id", type=int, required=True)

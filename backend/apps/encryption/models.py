@@ -140,6 +140,7 @@ class _FenceModel(models.Model):
         ENABLE_TRANSITION = "enable_transition", "Enable transition"
         DECRYPT_ROLLBACK = "decrypt_rollback", "Decrypt rollback"
         SEARCH_ROTATION = "search_rotation", "Search rotation"
+        TENANT_IMPORT = "tenant_import", "Tenant import"
 
     state = models.CharField(max_length=8, choices=State.choices, default=State.OPEN)
     operation_id = models.UUIDField(null=True, blank=True)
