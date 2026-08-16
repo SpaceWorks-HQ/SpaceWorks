@@ -15,6 +15,9 @@ from django.utils import timezone
 from . import REGISTRY_VERSION
 from .archive import write_dataset, write_manifest, write_readme
 from .datasets import DATASETS
+from .errors import ExportIntegrityError
+from .external_refs import ExternalReferenceWriter, select_related_paths as external_paths
+from .pii_raw import PiiAadCollector, select_related_paths as pii_paths
 from .references import SEMANTIC_REFERENCES, USER_EDGES, require_raw_user
 from .types import Fidelity, SemanticUserRef
 
@@ -30,10 +33,6 @@ class ExportDeadlineExceeded(RuntimeError):
         )
 
 
-class ExportIntegrityError(RuntimeError):
-    pass
-
-
 def build_archive(job, *, page_size=None, monotonic=time.monotonic):
     """Return (zip path, manifest, tempdir); caller owns cleanup and remote upload."""
     fidelity = Fidelity(job.fidelity)
@@ -47,7 +46,12 @@ def build_archive(job, *, page_size=None, monotonic=time.monotonic):
     snapshot_at = None
     current_path = "starting"
     total_rows = 0
+    pii_collector = None
+    external_writer = None
     try:
+        if fidelity is Fidelity.PORTABLE:
+            pii_collector = PiiAadCollector(job.makerspace_id)
+            external_writer = ExternalReferenceWriter(root, job.makerspace_id)
         with transaction.atomic():
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -68,7 +72,11 @@ def build_archive(job, *, page_size=None, monotonic=time.monotonic):
                 rows, count = _read_dataset(
                     dataset, job.makerspace_id, closure, page_size, deadline_clock, monotonic
                 )
-                write_dataset(root / dataset.path, dataset, rows)
+                write_dataset(
+                    root / dataset.path, dataset, rows,
+                    pii_collector=pii_collector,
+                    external_writer=external_writer,
+                )
                 counts[dataset.path] = count
                 total_rows += count
 
@@ -77,7 +85,11 @@ def build_archive(job, *, page_size=None, monotonic=time.monotonic):
             user_rows, user_count = _read_users(
                 users, closure, page_size, deadline_clock, monotonic
             )
-            write_dataset(root / users.path, users, user_rows)
+            write_dataset(
+                root / users.path, users, user_rows,
+                pii_collector=pii_collector,
+                external_writer=external_writer,
+            )
             counts[users.path] = user_count
             total_rows += user_count
             _check_deadline(current_path, total_rows, deadline_clock, monotonic)
@@ -89,6 +101,12 @@ def build_archive(job, *, page_size=None, monotonic=time.monotonic):
     except Exception:
         tempdir.cleanup()
         raise
+    finally:
+        if external_writer is not None:
+            external_writer.close()
+
+    if pii_collector is not None:
+        pii_collector.write(root)
 
     manifest = {
         "fidelity": fidelity.value,
@@ -226,6 +244,9 @@ def _select_declared_relations(queryset, dataset):
         source.rsplit("__", 1)[0]
         for column in dataset.columns for source in column.sources if "__" in source
     }
+    if dataset.fidelity is Fidelity.PORTABLE:
+        paths.update(pii_paths(dataset.model))
+        paths.update(external_paths(dataset.model))
     return queryset.select_related(*paths) if paths else queryset
 
 

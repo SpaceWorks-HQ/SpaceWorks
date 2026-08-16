@@ -8,13 +8,21 @@ from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
-from .types import Redacted, Transformed
+from .errors import ExportIntegrityError
+from .fields import EXTERNAL_REFERENCES
+from .pii_raw import mapped_field_names
+from .types import Fidelity, Redacted, Transformed
 
 FREE_TEXT_TYPES = frozenset({"short_text", "paragraph"})
 THEME_KEYS = frozenset({"mode", "primary_color", "accent_color", "logo_url"})
 
 
-def write_dataset(path, dataset, rows, *, dangling_refs=None):
+def write_dataset(
+    path, dataset, rows, *, dangling_refs=None, pii_collector=None,
+    external_writer=None,
+):
+    if pii_collector is not None:
+        pii_collector.register_model(dataset.model)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=[column.name for column in dataset.columns])
@@ -24,18 +32,41 @@ def write_dataset(path, dataset, rows, *, dangling_refs=None):
                 row, row_dangling = item
             else:
                 row, row_dangling = item, dangling_refs or set()
-            writer.writerow(project_row(dataset, row, row_dangling))
+            writer.writerow(
+                project_row(
+                    dataset, row, row_dangling,
+                    pii_collector=pii_collector,
+                    external_writer=external_writer,
+                )
+            )
 
 
-def project_row(dataset, row, dangling_refs):
+def project_row(
+    dataset, row, dangling_refs, *, pii_collector=None, external_writer=None,
+):
     projected = {}
+    portable_mapped = (
+        frozenset(mapped_field_names(dataset.model))
+        if dataset.fidelity is Fidelity.PORTABLE else frozenset()
+    )
     for column in dataset.columns:
         source = column.sources[0]
-        value = source_value(row, source)
+        if source in portable_mapped:
+            if pii_collector is None:
+                raise ExportIntegrityError(
+                    f"PORTABLE projection of {dataset.model}.{source} requires "
+                    "the raw PII collector."
+                )
+            value = pii_collector.project(row, source)
+        else:
+            value = source_value(row, source)
         if (row.pk, source) in dangling_refs:
             value = None
         projected[column.name] = csv_value(
-            transform_value(dataset.model, source, column.disposition, value)
+            transform_value(
+                dataset.model, source, column.disposition, value,
+                row=row, external_writer=external_writer,
+            )
         )
     return projected
 
@@ -54,7 +85,9 @@ def source_value(row, source):
     return current
 
 
-def transform_value(model, source, disposition, value):
+def transform_value(
+    model, source, disposition, value, *, row=None, external_writer=None,
+):
     if isinstance(disposition, Redacted):
         if (model, source) == ("audit.AuditLog", "meta"):
             return {"meta_redacted": True}
@@ -63,6 +96,13 @@ def transform_value(model, source, disposition, value):
         return f"[{disposition.marker.upper()}]"
     if not isinstance(disposition, Transformed):
         return value
+    if (model, source) in EXTERNAL_REFERENCES:
+        if external_writer is None:
+            raise ExportIntegrityError(
+                f"PORTABLE projection of {model}.{source} requires the "
+                "external-reference writer."
+            )
+        return external_writer.project(row, source, value)
     if source in {"map_url", "link"}:
         return strip_sensitive_url_parts(value)
     if (model, source) == ("makerspaces.Makerspace", "theme_config"):

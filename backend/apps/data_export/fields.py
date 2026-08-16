@@ -84,6 +84,13 @@ EXTERNAL_REFERENCE_SNAPSHOTS = {
 
 EXTERNAL_REFERENCES = {
     ("events.EventCollaborator", "event"),
+    # Both directions of a collaboration are exported (the predicate matches on
+    # `event__makerspace` OR `makerspace`), and each direction has a different foreign
+    # side: an inbound collaboration's `event` belongs to the other space, while a
+    # HOSTED event's collaborator `makerspace` does. Listing only `event` left the
+    # hosted case emitting a live foreign makerspace id, which is the same defect this
+    # set exists to prevent.
+    ("events.EventCollaborator", "makerspace"),
     ("events.EventRegistration", "registered_via_makerspace"),
     ("events.EventRegistration", "payment_via_makerspace"),
     ("operations.StockTransfer", "source_container"),

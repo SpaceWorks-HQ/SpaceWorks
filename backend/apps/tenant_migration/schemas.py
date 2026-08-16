@@ -14,12 +14,20 @@ def object_schema(**fields):
     return {"type": "object", "fields": fields, "required": frozenset(fields)}
 
 
+# Nothing here is nullable, and that follows from WHEN a snapshot is written rather
+# than from the columns being non-nullable. Most of these columns are nullable, but
+# `ExternalReferenceWriter.project` records provenance only for a reference that exists
+# AND belongs to another makerspace -- a null column is left null and produces no
+# snapshot at all, so a null can never reach validation. `Box.makerspace` is genuinely
+# non-null. Declaring these nullable would only stop the schema catching a builder that
+# silently produced nothing.
 MAKERSPACE = object_schema(name=STRING, slug=STRING)
 EVENT = object_schema(title=STRING, starts_at=TIMESTAMP, ends_at=TIMESTAMP)
 CONTAINER = object_schema(label=STRING, makerspace=MAKERSPACE)
 
 EDGE_SCHEMAS = {
     ("events.EventCollaborator", "event"): EVENT,
+    ("events.EventCollaborator", "makerspace"): MAKERSPACE,
     ("events.EventRegistration", "registered_via_makerspace"): MAKERSPACE,
     ("events.EventRegistration", "payment_via_makerspace"): MAKERSPACE,
     ("operations.StockTransfer", "source_container"): CONTAINER,
