@@ -150,6 +150,8 @@ OMITTED_MODELS = {
     "makerspaces.ImportedUserReconciliation": "Target-side operator reconciliation input.",
     "makerspaces.SubdomainRequest": "Source-deployment routing request.",
     "operations.PeriodicTaskRun": "Deployment scheduler state.",
+    "tenant_migration.TenantImportJob": "Target-side tenant import coordination state.",
+    "tenant_migration.ImportIdentityDecision": "Target-side identity resolution input.",
     "payments.PlatformStripeConnectSettings": "Platform payment credentials.",
     "payments.ProcessedStripeEvent": "Provider idempotency telemetry.",
     "payments.StripeConnectOAuthState": "Transient OAuth state.",

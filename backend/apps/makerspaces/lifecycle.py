@@ -211,7 +211,7 @@ def _delete_object_graph(makerspace):
     from apps.machines.models import Machine, MachineType, MakerspaceMachineTypePricing
     from apps.machines.service_lifecycle import delete_for_makerspace
     from apps.payments.models import Payment, ProcessedStripeEvent
-    from apps.tenant_migration.models import ExternalTenantReference
+    from apps.tenant_migration.models import ExternalTenantReference, TenantImportJob
 
     with connection.cursor() as cursor:
         # Suspend ALL triggers for THIS transaction only via the session-replication
@@ -303,6 +303,10 @@ def _delete_object_graph(makerspace):
             [makerspace.id],
         )
         RestoreRollbackObject.objects.filter(makerspace=makerspace).delete()
+        # TenantImportJob deliberately uses SET_NULL so an ordinary tenant deletion is
+        # possible. Purge must delete the jobs first or that safety valve would strand
+        # target-side identity decisions after their tenant disappeared.
+        TenantImportJob.objects.filter(target_makerspace=makerspace).delete()
         # Generic provenance has no FK to the source/anchor rows it describes, so
         # delete it explicitly rather than relying on the makerspace CASCADE.
         ExternalTenantReference.objects.filter(makerspace=makerspace).delete()
