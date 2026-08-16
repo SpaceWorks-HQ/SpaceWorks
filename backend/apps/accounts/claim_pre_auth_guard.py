@@ -82,6 +82,16 @@ def validate_pre_auth_route(route):
     return errors
 
 
+def view_authenticates_claims(view_class):
+    """Whether this view actually runs the central claim-token authenticator."""
+    configured = getattr(view_class, "authentication_classes", ())
+    return any(
+        f"{policy.__module__}.{policy.__qualname__}"
+        == "apps.accounts.authentication.SpaceWorksJWTAuthentication"
+        for policy in configured
+    )
+
+
 @lru_cache(maxsize=1)
 def framework_lifecycle_methods():
     """Discover the installed Django/DRF request graph from their live callables."""

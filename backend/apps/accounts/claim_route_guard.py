@@ -6,7 +6,9 @@ from django.urls import get_resolver
 from apps.accounts.claim_pre_auth_guard import (
     validate_claim_middleware,
     validate_pre_auth_route,
+    view_authenticates_claims,
 )
+from apps.accounts.claim_route_types import Refused
 from apps.accounts.claim_route_inspection import flatten_claim_routes, handled_methods
 from apps.accounts.claim_routes import CLAIM_ROUTES
 
@@ -58,6 +60,13 @@ def validate_claim_route_matrix(
             actual_keys.add(key)
             if key not in policies:
                 errors.append(f"Unclassified claim route: {route.view_name} {method}")
+            elif isinstance(policies[key], Refused) and not view_authenticates_claims(
+                route.callback.cls
+            ):
+                errors.append(
+                    f"Refused claim route does not authenticate claim tokens: "
+                    f"{route.view_name} {method}"
+                )
 
     stale = set(policies) - actual_keys
     if stale:

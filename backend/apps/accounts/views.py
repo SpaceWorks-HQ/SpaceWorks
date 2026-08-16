@@ -19,6 +19,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.accounts import audit_events
+from apps.accounts.authentication import SpaceWorksJWTAuthentication
 from apps.accounts.claim_sessions import ClaimSessionInvalid
 from apps.accounts.claim_tokens import (
     ClaimRefreshToken,
@@ -112,6 +113,9 @@ class LoginView(TokenObtainPairView):
     # Explicit under deny-by-default (DEFAULT_PERMISSION_CLASSES=IsAuthenticated):
     # obtaining a token must be open. RefreshView inherits simplejwt's AllowAny.
     permission_classes = [AllowAny]
+    # SimpleJWT's token view disables authentication entirely. Keep anonymous login,
+    # but still inspect a presented claim token so the central Refused matrix is real.
+    authentication_classes = [SpaceWorksJWTAuthentication]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"
     serializer_class = LoginSerializer

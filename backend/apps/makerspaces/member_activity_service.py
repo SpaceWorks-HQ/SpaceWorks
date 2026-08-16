@@ -35,10 +35,15 @@ def active_member_memberships(user):
 
 
 def active_membership(user, makerspace_id):
-    return active_member_memberships(user).filter(
+    membership = active_member_memberships(user).filter(
         makerspace_id=makerspace_id,
         makerspace__archived_at__isnull=True,
     ).first()
+    if membership is not None:
+        # Preserve request-scoped identity context (notably claim provenance) instead
+        # of lazily loading a second, context-free User instance from the membership.
+        membership.user = user
+    return membership
 
 
 def member_activity(membership):

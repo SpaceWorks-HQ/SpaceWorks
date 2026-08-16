@@ -48,6 +48,29 @@ def test_unclassified_runtime_lookup_fails_closed_and_middleware_stays_out():
     assert validate_claim_middleware() == []
 
 
+def test_refused_route_must_run_the_claim_authenticator():
+    class AuthenticationBypassView(APIView):
+        authentication_classes = []
+
+        def post(self, request):
+            return Response({})
+
+    patterns = [
+        path(
+            "api/v1/auth/bypass",
+            AuthenticationBypassView.as_view(),
+            name="auth-bypass",
+        )
+    ]
+    matrix = {
+        ("auth-bypass", "POST"): Refused("must refuse"),
+        ("auth-bypass", "OPTIONS"): AnonymousRead(),
+    }
+    assert_guard_fails(
+        patterns, matrix, "Refused claim route does not authenticate claim tokens"
+    )
+
+
 def test_an_unclassified_route_fails_the_guard():
     patterns = [path("api/v1/member/new", ReadView.as_view(), name="new-member-route")]
     assert_guard_fails(patterns, {}, "Unclassified claim route")
