@@ -284,12 +284,20 @@ class ServiceRequestFile(models.Model):
 
 
 class MachineConsumablePool(models.Model):
-    """A makerspace gram pool with an optional compatible-machine affinity."""
+    """A makerspace gram pool with an optional machine or machine-type affinity."""
 
     makerspace = models.ForeignKey("makerspaces.Makerspace", on_delete=models.PROTECT, related_name="machine_consumable_pools")
     machine = models.ForeignKey("machines.Machine", null=True, blank=True, on_delete=models.PROTECT, related_name="consumable_pools")
+    machine_type = models.ForeignKey(
+        "machines.MachineType",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="consumable_pools",
+    )
     material = models.CharField(max_length=100)
     color = models.CharField(max_length=100, blank=True)
+    color_hex = models.CharField(max_length=7, blank=True, default="")
     brand = models.CharField(max_length=100, blank=True)
     unit = models.CharField(max_length=12, choices=ConsumablePoolUnit.choices, default=ConsumablePoolUnit.GRAMS)
     lot_code = models.CharField(max_length=100, blank=True)
@@ -297,6 +305,7 @@ class MachineConsumablePool(models.Model):
     remaining_grams = models.DecimalField(max_digits=12, decimal_places=2)
     low_threshold_grams = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    is_public = models.BooleanField(default=True)
     opened_at = models.DateTimeField(null=True, blank=True)
     legacy_filament_spool_id = models.PositiveIntegerField(null=True, blank=True, unique=True, editable=False)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
@@ -308,6 +317,14 @@ class MachineConsumablePool(models.Model):
         constraints = [
             models.CheckConstraint(condition=Q(initial_grams__gte=0), name="consumable_pool_initial_nonnegative"),
             models.CheckConstraint(condition=Q(remaining_grams__gte=0) & Q(remaining_grams__lte=models.F("initial_grams")), name="consumable_pool_balance_capped"),
+            models.CheckConstraint(
+                condition=Q(machine__isnull=True) | Q(machine_type__isnull=True),
+                name="consumable_pool_single_scope",
+            ),
+            models.CheckConstraint(
+                condition=Q(color_hex="") | Q(color_hex__regex=r"^#[0-9A-Fa-f]{6}$"),
+                name="consumable_pool_color_hex_valid",
+            ),
         ]
 
     @property

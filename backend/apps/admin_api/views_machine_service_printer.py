@@ -12,13 +12,25 @@ from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.admin_api.serializers_machine_service_printer import (
     PrinterPoolCorrectionSerializer, PrinterPoolCreateSerializer, PrinterPoolSerializer,
-    TypedManualUsageResponseSerializer, TypedManualUsageSerializer,
+    PrinterPoolVisibilitySerializer, TypedManualUsageResponseSerializer,
+    TypedManualUsageSerializer,
 )
 from apps.admin_api.views_machine_service import _query_int
 from apps.machines import role_scope
-from apps.machines.models import Machine, MachineConsumablePool, MachineServiceRequest, MachineUsageEntry
+from apps.machines.models import (
+    Machine,
+    MachineConsumablePool,
+    MachineServiceRequest,
+    MachineType,
+    MachineUsageEntry,
+)
 from apps.machines.printer_capabilities import PRINTER_SLUG
-from apps.machines.service_consumable_pools import correct_pool, create_pool, log_typed_manual_usage
+from apps.machines.service_consumable_pools import (
+    correct_pool,
+    create_pool,
+    log_typed_manual_usage,
+    set_pool_visibility,
+)
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
 
@@ -44,10 +56,10 @@ def _pool(actor, pk):
 def scoped_pools(actor, queryset):
     """Consumable pools the actor's role scope reaches.
 
-    A pool is stock held for a machine, so it follows that machine. Pools with **no
-    machine** are makerspace-wide shared stock and stay visible to anyone holding
-    MANAGE_MACHINES in the space -- they belong to no team, and hiding them would leave
-    shared filament unmanageable by everyone rather than by the wrong people.
+    Machine- and type-scoped pools follow that scope. Pools with neither are
+    makerspace-wide shared stock and stay visible to anyone holding MANAGE_MACHINES in
+    the space -- they belong to no team, and hiding them would leave shared filament
+    unmanageable by everyone rather than by the wrong people.
     """
     queryset = rbac.scope_by_action(
         actor, rbac.Action.MANAGE_MACHINES, queryset, field="makerspace_id"
@@ -58,10 +70,22 @@ def scoped_pools(actor, queryset):
     scoped = role_scope.scoped_related_q(
         actor,
         manage_scope,
-        machine_id_paths=("machine_id",),
-        type_id_paths=("machine__machine_type_id",),
+        machine_id_paths=("machine_id", "machine_type__machines__id"),
+        type_id_paths=("machine__machine_type_id", "machine_type_id"),
     )
-    return queryset.filter(scoped | Q(machine__isnull=True)).distinct()
+    shared = Q(machine__isnull=True, machine_type__isnull=True)
+    return queryset.filter(scoped | shared).distinct()
+
+
+def _scoped_types(actor, makerspace):
+    authority = role_scope.manage_scope_for(actor, makerspace.pk)
+    scope = role_scope.scope_q_for(
+        authority,
+        machine_id_paths=("machines__id",),
+        type_id_paths=("id",),
+    )
+    available = Q(makerspace__isnull=True) | Q(makerspace=makerspace)
+    return MachineType.objects.filter(available).filter(scope).distinct()
 
 
 class MachineServicePrinterPoolListCreateView(APIView):
@@ -72,7 +96,9 @@ class MachineServicePrinterPoolListCreateView(APIView):
         space = _space(request.user, makerspace_id)
         rows = scoped_pools(
             request.user,
-            MachineConsumablePool.objects.filter(makerspace=space).select_related("machine"),
+            MachineConsumablePool.objects.filter(makerspace=space).select_related(
+                "machine", "machine_type"
+            ),
         ).order_by("material", "color", "id")
         return Response(PrinterPoolSerializer(rows, many=True).data)
 
@@ -81,17 +107,29 @@ class MachineServicePrinterPoolListCreateView(APIView):
         space = _space(request.user, makerspace_id)
         serializer = PrinterPoolCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
+        data = dict(serializer.validated_data)
         machine = None
-        if data.get("machine_id"):
+        if machine_id := data.pop("machine_id", None):
             machine = get_object_or_404(
                 Machine.objects.select_related("machine_type").filter(
                     role_scope.scoped_q(request.user, [space.pk]),
                     makerspace=space,
                 ),
-                pk=data["machine_id"],
+                pk=machine_id,
             )
-        row = create_pool(space, request.user, machine=machine, **{key: value for key, value in data.items() if key != "machine_id"})
+        machine_type = None
+        if machine_type_id := data.pop("machine_type_id", None):
+            machine_type = get_object_or_404(
+                _scoped_types(request.user, space),
+                pk=machine_type_id,
+            )
+        row = create_pool(
+            space,
+            request.user,
+            machine=machine,
+            machine_type=machine_type,
+            **data,
+        )
         return Response(PrinterPoolSerializer(row).data, status=status.HTTP_201_CREATED)
 
 
@@ -101,6 +139,14 @@ class MachineServicePrinterPoolDetailView(APIView):
     @extend_schema(tags=["Admin machine service"], responses={200: PrinterPoolSerializer})
     def get(self, request, pk):
         return Response(PrinterPoolSerializer(_pool(request.user, pk)).data)
+
+    @extend_schema(tags=["Admin machine service"], request=PrinterPoolVisibilitySerializer, responses={200: PrinterPoolSerializer})
+    def patch(self, request, pk):
+        pool = _pool(request.user, pk)
+        serializer = PrinterPoolVisibilitySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        row = set_pool_visibility(pool, request.user, **serializer.validated_data)
+        return Response(PrinterPoolSerializer(row).data)
 
 
 class MachineServicePrinterPoolAdjustmentView(APIView):

@@ -34,9 +34,15 @@ function machine(id: number, name: string, type = laserType, status: MachineStat
   };
 }
 
-function pool(id: number, material: string, machineId: number | null, unit: PrinterPool["unit"] = "millimeters"): PrinterPool {
+function pool(
+  id: number,
+  material: string,
+  machineId: number | null,
+  unit: PrinterPool["unit"] = "millimeters",
+  machineTypeId: number | null = null,
+): PrinterPool {
   return {
-    id, machine_id: machineId, material, color: "", brand: "", unit,
+    id, machine_id: machineId, machine_type_id: machineTypeId, material, color: "", brand: "", unit,
     initial_grams: "100", remaining_grams: "80", is_active: true, created_at: "", updated_at: "",
   };
 }
@@ -55,8 +61,9 @@ function mockApi(setup: Setup) {
   const rows = setup.machines ?? [];
   const pools = setup.pools ?? [];
   const requests = setup.requests ?? {};
-  staffRequest.mockImplementation(async (path: string) => {
+  staffRequest.mockImplementation(async (path: string, options?: RequestInit) => {
     if (!path) return [];
+    if (options?.method === "POST" && path.endsWith("/machines")) return { id: 99 };
     if (path.endsWith("/machine-types")) return types;
     if (path.includes("/machines?page=")) {
       const page = new URLSearchParams(path.split("?")[1]).get("page") ?? "";
@@ -114,14 +121,17 @@ describe("MachinesPanel index and per-type subpages", () => {
   });
 
   // A single reachable type renders ITS PAGE inline at the index URL rather than redirecting.
-  // An unconditional redirect would make the index unreachable, and with it machine creation,
-  // machine-type configuration, shared pools and the delegated recipient picker -- all of
-  // which the scoped maintainer with one type is exactly the actor who needs them.
+  // An unconditional redirect would make the index unreachable, and with it machine-type
+  // configuration, shared pools and the delegated recipient picker -- all of which the scoped
+  // maintainer with one type is exactly the actor who needs them.
   it("renders the sole reachable type inline without hiding the index controls", async () => {
     renderPanel({ types: [laserType] });
 
     expect(await screen.findByText("No machines are registered for this type.")).toBeVisible();
-    expect(screen.getByLabelText("Machine type")).toBeInTheDocument();
+    expect(screen.getByLabelText("Machine name")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Machine type")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Printer model")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Laser cutters" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Shared consumables/ })).toBeInTheDocument();
   });
 
@@ -145,11 +155,11 @@ describe("MachinesPanel index and per-type subpages", () => {
   it("shows shared pools only in the Shared consumables section", async () => {
     renderPanel({ pools: [pool(1, "Shared acrylic", null)] });
     await screen.findByText("No machines are registered for this type.");
-    expect(screen.queryByText(/Shared acrylic/, { selector: "span" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Shared acrylic/, { selector: "strong" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Shared consumables.*1 item\b/ }));
 
-    expect(screen.getAllByText(/Shared acrylic/, { selector: "span" })).toHaveLength(1);
+    expect(screen.getAllByText(/Shared acrylic/, { selector: "strong" })).toHaveLength(1);
   });
 
   it("shows a bound pool only on its machine's type page", async () => {
@@ -160,17 +170,52 @@ describe("MachinesPanel index and per-type subpages", () => {
     };
     renderPanel(setup, {}, "/admin/machines/1-laser");
     await screen.findByText("Laser One", { selector: "strong" });
-    expect(screen.queryByText(/Printer PLA/, { selector: "span" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Printer PLA/, { selector: "strong" })).not.toBeInTheDocument();
 
     renderPanel(setup, {}, "/admin/machines/2-3d_printer");
 
     expect(await screen.findByText("Printer One", { selector: "strong" })).toBeVisible();
-    expect(screen.getAllByText(/Printer PLA/, { selector: "span" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Printer PLA/, { selector: "strong" }).length).toBeGreaterThan(0);
+  });
+
+  it("keeps type-wide pools out of Shared and on their machine-type page", async () => {
+    const typedPool = pool(4, "All-printer PLA", null, "grams", printerType.id);
+    const setup: Setup = {
+      types: [printerType],
+      machines: [machine(2, "Printer One", printerType)],
+      pools: [typedPool],
+    };
+    renderPanel(setup);
+
+    expect(await screen.findByText("All-printer PLA", { selector: "strong" })).toBeVisible();
+    expect(screen.getByText("Type-wide")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Shared consumables.*0 items\b/ })).toBeVisible();
+  });
+
+  it("creates consumables from a type page with that type scope", async () => {
+    renderPanel({ types: [printerType], machines: [machine(2, "Printer One", printerType)] });
+    await screen.findByText("Printer One", { selector: "strong" });
+
+    fireEvent.change(screen.getByLabelText("Material"), { target: { value: "PLA" } });
+    fireEvent.change(screen.getByLabelText("Initial quantity"), { target: { value: "1000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add filament" }));
+
+    await waitFor(() => {
+      const createCall = staffRequest.mock.calls.find(([, options]) => options?.method === "POST" && String(options?.body).includes('"material":"PLA"'));
+      expect(createCall).toBeDefined();
+      expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({ machine_type_id: printerType.id, unit: "grams", is_public: true });
+    });
   });
 
   it("offers shared pools plus only the selected machine's bound pool", async () => {
     const rows = [machine(1, "Laser One"), machine(2, "Laser Two")];
-    const pools = [pool(1, "Shared acrylic", null), pool(2, "One acrylic", 1), pool(3, "Two acrylic", 2)];
+    const pools = [
+      pool(1, "Shared acrylic", null),
+      pool(2, "One acrylic", 1),
+      pool(3, "Two acrylic", 2),
+      pool(4, "All lasers acrylic", null, "millimeters", laserType.id),
+      pool(5, "Printer-only PLA", null, "millimeters", printerType.id),
+    ];
     renderPanel({ machines: rows, pools, requests: { laser: [{ id: 10, title: "Cut acrylic", status: "accepted", planned_quantity: "20", actual_consumed_quantity: "0" }] } });
     fireEvent.click(await screen.findByRole("button", { name: "Start" }));
     fireEvent.change(screen.getByLabelText("Machine"), { target: { value: "1" } });
@@ -178,29 +223,66 @@ describe("MachinesPanel index and per-type subpages", () => {
     const startPool = screen.getByLabelText("Pool");
     expect(within(startPool).getByRole("option", { name: /Shared acrylic/ })).toBeInTheDocument();
     expect(within(startPool).getByRole("option", { name: /One acrylic/ })).toBeInTheDocument();
+    expect(within(startPool).getByRole("option", { name: /All lasers acrylic/ })).toBeInTheDocument();
     expect(within(startPool).queryByRole("option", { name: /Two acrylic/ })).not.toBeInTheDocument();
+    expect(within(startPool).queryByRole("option", { name: /Printer-only PLA/ })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Manual usage machine"), { target: { value: "2" } });
     const manualPool = screen.getByLabelText("Manual usage pool");
     expect(within(manualPool).getByRole("option", { name: /Shared acrylic/ })).toBeInTheDocument();
     expect(within(manualPool).getByRole("option", { name: /Two acrylic/ })).toBeInTheDocument();
+    expect(within(manualPool).getByRole("option", { name: /All lasers acrylic/ })).toBeInTheDocument();
     expect(within(manualPool).queryByRole("option", { name: /One acrylic/ })).not.toBeInTheDocument();
   });
 
-  it("limits machine creation to explicitly authorized types", async () => {
-    renderPanel({ types: [laserType, printerType] });
-    const selector = await screen.findByLabelText("Machine type");
-
-    expect(within(selector).getByRole("option", { name: "Laser cutters" })).toBeInTheDocument();
-    expect(within(selector).queryByRole("option", { name: "3D printers" })).not.toBeInTheDocument();
-  });
-
-  it("hides machine creation when no type grants creation authority", async () => {
-    renderPanel({ types: [{ ...laserType, can_create_machine: false }, { ...printerType, can_create_machine: undefined }] });
+  it("moves machine creation off the multi-type index and onto an authorized type page", async () => {
+    const view = renderPanel({ types: [laserType, printerType] });
     await screen.findByRole("link", { name: /Laser cutters/ });
 
+    expect(screen.queryByLabelText("Machine name")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Machine type")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "New machine" })).not.toBeInTheDocument();
+
+    view.unmount();
+    renderPanel({ types: [laserType, printerType] }, {}, "/admin/machines/1-laser");
+
+    expect(await screen.findByLabelText("Machine name")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Machine type")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Laser cutters" })).toBeInTheDocument();
+  });
+
+  it("hides machine creation without explicit type authority or the manage gate", async () => {
+    const deniedLaser = { ...laserType, can_create_machine: false };
+    const denied = renderPanel({ types: [deniedLaser] });
+    await screen.findByText("No machines are registered for this type.");
+    expect(screen.queryByLabelText("Machine name")).not.toBeInTheDocument();
+
+    denied.unmount();
+    renderPanel({ types: [laserType] }, { canManage: false });
+    await screen.findByText("No machines are registered for this type.");
+    expect(screen.queryByLabelText("Machine name")).not.toBeInTheDocument();
+  });
+
+  it("pre-scopes printer creation, preserves its model, and refreshes the machine list", async () => {
+    const creatablePrinter = { ...printerType, can_create_machine: true };
+    renderPanel({ types: [creatablePrinter] });
+    await screen.findByText("No machines are registered for this type.");
+
+    fireEvent.change(screen.getByLabelText("Machine name"), { target: { value: "  Printer One  " } });
+    fireEvent.change(screen.getByLabelText("Printer model"), { target: { value: "  Prusa MK4  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Add 3D printers" }));
+
+    await waitFor(() => {
+      const createCall = staffRequest.mock.calls.find(([, options]) => options?.method === "POST" && String(options?.body).includes('"name":"Printer One"'));
+      expect(createCall).toBeDefined();
+      expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({
+        name: "Printer One",
+        machine_type_id: printerType.id,
+        type_payload: { model: "Prusa MK4" },
+      });
+      expect(staffRequest.mock.calls.filter(([path, options]) => String(path).endsWith("/machines") && !options?.method)).toHaveLength(2);
+    });
+
+    expect(screen.queryByLabelText("Machine type")).not.toBeInTheDocument();
   });
 
   it("mounts no service requests when machine_service is disabled", async () => {
@@ -261,9 +343,11 @@ describe("MachinesPanel index and per-type subpages", () => {
   // whose machines loaded fine, those machines must still appear -- and the type must still be
   // navigable, because the machines list is server-scoped too.
   it("still renders machines whose type is missing from the machine-type response", async () => {
-    renderPanel({ types: [], machines: [machine(1, "Orphaned laser")] });
+    const nestedLaser = { ...laserType, can_create_machine: undefined };
+    renderPanel({ types: [], machines: [machine(1, "Orphaned laser", nestedLaser)] });
 
     expect(await screen.findByText("Orphaned laser", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Machine name")).not.toBeInTheDocument();
   });
 
   // THE ID IS AUTHORITATIVE, THE SLUG IS DECORATION. Slug uniqueness is only scoped, so a

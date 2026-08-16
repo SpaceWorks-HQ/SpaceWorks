@@ -40,8 +40,8 @@ export function MachineServiceConsole({ makerspaceId, canManage, machineType, ma
     `/admin/makerspaces/${makerspaceId}/machine-service/typed-manual-usage?${machineTypeFilter}`,
     canManage,
   );
-  const actionPools = usablePools(pools, poolUnit, draft.actionValues.machine_id);
-  const manualPools = usablePools(pools, poolUnit, draft.manual.machine_id);
+  const actionPools = usablePools(pools, poolUnit, draft.actionValues.machine_id, machines, makerspaceId);
+  const manualPools = usablePools(pools, poolUnit, draft.manual.machine_id, machines, makerspaceId);
 
   const invalidate = () => void Promise.all([
     queryClient.invalidateQueries({ queryKey: ["machine-service-requests", makerspaceId, machineType.id] }),

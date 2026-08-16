@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { EmptyState } from "../../../components/ui";
+import { ConfirmDialog, EmptyState } from "../../../components/ui";
 import { deleteRole, type Capability, type StaffRole } from "./rolesApi";
 import { RoleEditor } from "./RoleEditor";
 import { useStaffGet } from "./shared";
@@ -17,6 +17,7 @@ export function RoleManager({ msId, actorActions, isSuperadmin, onRolesChanged }
   const capabilities = useStaffGet<Capability[]>(["staff", "capabilities", msId], `/admin/makerspaces/${msId}/roles/capabilities`);
   const [editing, setEditing] = useState<StaffRole | null | undefined>();
   const [deleteError, setDeleteError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<StaffRole | null>(null);
   const labels = new Map((capabilities.data ?? []).map((item) => [item.value, item.label]));
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["staff", "roles", msId] });
@@ -50,12 +51,24 @@ export function RoleManager({ msId, actorActions, isSuperadmin, onRolesChanged }
               <span className="text-muted">{role.member_count} members</span>
               <span className="min-w-48 flex-1 text-xs text-muted">{role.granted_actions.map((action) => labels.get(action) ?? action).join(", ") || "No capabilities"}</span>
               <button className="desk-button-ghost" type="button" onClick={() => { setDeleteError(""); setEditing(role); }}>Edit</button>
-              <button className="desk-button-danger" type="button" disabled={role.is_protected || role.member_count > 0 || remove.isPending} onClick={() => { if (window.confirm(`Delete ${role.name}?`)) remove.mutate(role); }}>Delete</button>
+              <button className="desk-button-danger" type="button" disabled={role.is_protected || role.member_count > 0 || remove.isPending} onClick={() => setPendingDelete(role)}>Delete</button>
             </div>
           ))}
         </div>
       </div>
       {editing !== undefined ? <RoleEditor msId={msId} role={editing} capabilities={capabilities.data ?? []} actorActions={actorActions} isSuperadmin={isSuperadmin} onClose={() => setEditing(undefined)} onSaved={() => { setEditing(undefined); refresh(); }} /> : null}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete role?"
+        message={pendingDelete ? `Delete ${pendingDelete.name}?` : "Delete this role?"}
+        confirmLabel="Delete role"
+        tone="danger"
+        pending={remove.isPending}
+        onConfirm={() => {
+          if (pendingDelete) remove.mutate(pendingDelete, { onSuccess: () => setPendingDelete(null) });
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </details>
   );
 }

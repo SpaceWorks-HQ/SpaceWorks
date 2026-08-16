@@ -104,16 +104,22 @@ export function StaffSidebar({
             const groupId = `staff-nav-group-${group.label.replace(/\W+/g, "-").toLowerCase()}`;
             return (
               <div key={group.label}>
-                <button
-                  className={`desk-button-ghost w-full justify-between rounded-none border-b px-1 text-left ${GROUP_TONE_CLASSES[group.label] ?? GROUP_TONE_CLASSES.Operate}`}
-                  type="button"
-                  aria-expanded={open}
-                  aria-controls={groupId}
-                  onClick={() => toggleGroup(group.label)}
-                >
-                  <span className="eyebrow min-w-0 truncate text-inherit">{group.label}</span>
-                  <span className="font-mono" aria-hidden>{open ? "-" : "+"}</span>
-                </button>
+                {/* A real heading, not a styled span: these are the sidebar's topic names, so a
+                    screen-reader user gets them in the heading list, and the base layer hands the
+                    display face (Clash Display) to h1-h6 only. Title case + the display voice is
+                    what makes it read as a topic rather than the mono `.eyebrow` label voice. */}
+                <h2>
+                  <button
+                    className={`desk-button-ghost w-full justify-between rounded-none border-b px-1 text-left ${GROUP_TONE_CLASSES[group.label] ?? GROUP_TONE_CLASSES.Operate}`}
+                    type="button"
+                    aria-expanded={open}
+                    aria-controls={groupId}
+                    onClick={() => toggleGroup(group.label)}
+                  >
+                    <span className="min-w-0 truncate text-base font-semibold text-inherit">{group.label}</span>
+                    <span className="font-mono text-base" aria-hidden>{open ? "−" : "+"}</span>
+                  </button>
+                </h2>
                 {open ? (
                   <div className="mt-1 grid gap-1" id={groupId}>
                     {tabs.map((item) => (

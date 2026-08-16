@@ -55,8 +55,8 @@ export function PrinterServiceConsole({ makerspaceId, canManage, printingEnabled
     () => (manualUsage.data ?? []).filter((entry) => entry.metering_unit === "weight"),
     [manualUsage.data],
   );
-  const actionPools = usablePools(pools, "grams", draft.actionValues.machine_id);
-  const manualPools = usablePools(pools, "grams", draft.manual.machine_id);
+  const actionPools = usablePools(pools, "grams", draft.actionValues.machine_id, machines, makerspaceId);
+  const manualPools = usablePools(pools, "grams", draft.manual.machine_id, machines, makerspaceId);
 
   const invalidate = () => void Promise.all([
     queryClient.invalidateQueries({ queryKey: ["machine-service-requests", makerspaceId, machineType.id] }),

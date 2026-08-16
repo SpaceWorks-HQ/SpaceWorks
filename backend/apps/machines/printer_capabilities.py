@@ -27,6 +27,17 @@ def is_printer_type(machine_type):
     return machine_type is not None and machine_type.makerspace_id is None and machine_type.slug == PRINTER_SLUG
 
 
+def resolve_global_printer_type():
+    """Return the built-in printer type, or ``None`` when it is not installed."""
+    # MachineType imports this module for its validators, so resolve the model lazily.
+    from apps.machines.models import MachineType
+
+    return MachineType.objects.filter(
+        makerspace__isnull=True,
+        slug=PRINTER_SLUG,
+    ).first()
+
+
 def validate_printer_config(machine_type, config):
     """Validate the global printer pack while leaving ordinary type packs alone."""
     if not is_printer_type(machine_type):

@@ -4,12 +4,19 @@ from decimal import Decimal
 import json
 
 from django.db import transaction
+from django.db.models import Q
 from rest_framework.exceptions import NotFound, ValidationError
 
-from apps.machines.models import MachineConsumablePool, MachineServiceRequest, ServiceQueue, ServiceRequestFile
+from apps.machines.metering import ConsumablePoolUnit
+from apps.machines.models import (
+    MachineConsumablePool,
+    MachineServiceRequest,
+    ServiceQueue,
+    ServiceRequestFile,
+)
 from apps.machines.print_uploads import validate_print_upload
 
-from apps.machines.printer_capabilities import PRINTER_SLUG
+from apps.machines.printer_capabilities import resolve_global_printer_type
 from apps.machines.service_queue_position import queue_counts_for
 from apps.machines.service_storage import create_staged_queue_file, finalize_file
 from apps.machines.service_workflow import submit
@@ -17,17 +24,41 @@ from apps.makerspaces import limits
 
 
 def _kernel_queues(makerspace):
-    return ServiceQueue.objects.filter(makerspace=makerspace, is_active=True, machine_type__slug=PRINTER_SLUG)
+    printer_type = resolve_global_printer_type()
+    if printer_type is None:
+        return ServiceQueue.objects.none()
+    return ServiceQueue.objects.filter(
+        makerspace=makerspace,
+        is_active=True,
+        machine_type=printer_type,
+    )
 
 
 def public_queues(makerspace):
     return _kernel_queues(makerspace).order_by("name", "id")
 
 
-def public_pools(makerspace):
+def _eligible_public_pools(makerspace):
+    printer_type = resolve_global_printer_type()
+    if printer_type is None:
+        return MachineConsumablePool.objects.none()
+    serves_printers = (
+        Q(machine_type=printer_type)
+        | Q(machine__machine_type=printer_type)
+        | Q(machine__isnull=True, machine_type__isnull=True)
+    )
     return MachineConsumablePool.objects.filter(
-        makerspace=makerspace, is_active=True,
-    ).order_by("material", "color", "id")
+        serves_printers,
+        makerspace=makerspace,
+        is_active=True,
+        is_public=True,
+        remaining_grams__gt=0,
+        unit=ConsumablePoolUnit.GRAMS,
+    )
+
+
+def public_pools(makerspace):
+    return _eligible_public_pools(makerspace).order_by("material", "color", "id")
 
 
 def resolve_queue(makerspace, queue_id, *, compatibility=False):
@@ -74,7 +105,9 @@ def _settings(value):
 def _kernel_payload(queue, data):
     pool = None
     if data.get("consumable_pool_id") is not None:
-        pool = MachineConsumablePool.objects.filter(pk=data["consumable_pool_id"], makerspace=queue.makerspace, is_active=True).first()
+        pool = _eligible_public_pools(queue.makerspace).filter(
+            pk=data["consumable_pool_id"]
+        ).first()
         if pool is None:
             raise ValidationError({"consumable_pool_id": "Invalid or inactive consumable pool."})
     config = queue.machine_type.capability_config
@@ -121,9 +154,12 @@ class _StatusProjection:
 
 def public_status(public_token):
     """Return a PII-free printer-status projection or 404."""
+    printer_type = resolve_global_printer_type()
+    if printer_type is None:
+        raise NotFound()
     kernel = MachineServiceRequest.objects.select_related("makerspace").filter(
         public_token=public_token, makerspace__archived_at__isnull=True,
-        queue__machine_type__slug=PRINTER_SLUG,
+        queue__machine_type=printer_type,
     ).first()
     if kernel is None:
         raise NotFound()

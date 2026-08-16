@@ -59,8 +59,21 @@ def _create_pool(makerspace, actor, data, machine_type):
             raise ValidationError(
                 {"machine_type": "This item cannot create a pool for another machine type."}
             )
-    pool = MachineConsumablePool.objects.create(makerspace=makerspace, machine=machine, material=material, color=str(data.get("color") or "").strip(), brand=str(data.get("brand") or "").strip(), lot_code=str(data.get("lot_code") or "").strip(), initial_grams=initial, remaining_grams=remaining, low_threshold_grams=makerspace.filament_low_stock_threshold_grams or None, is_active=data.get("is_active", True), opened_at=data.get("opened_at"), created_by=actor)
+    pool = MachineConsumablePool.objects.create(
+        makerspace=makerspace,
+        machine=machine,
+        machine_type=machine_type if machine is None else None,
+        material=material,
+        color=str(data.get("color") or "").strip(),
+        brand=str(data.get("brand") or "").strip(),
+        lot_code=str(data.get("lot_code") or "").strip(),
+        initial_grams=initial,
+        remaining_grams=remaining,
+        low_threshold_grams=makerspace.filament_low_stock_threshold_grams or None,
+        is_active=data.get("is_active", True),
+        opened_at=data.get("opened_at"),
+        created_by=actor,
+    )
     from apps.machines.low_stock import maybe_flag_low_stock
     maybe_flag_low_stock(actor, pool)
     return pool
-
