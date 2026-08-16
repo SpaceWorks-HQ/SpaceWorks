@@ -56,6 +56,7 @@ class BackupArchive(models.Model):
     object_key = models.CharField(max_length=512, unique=True)
     manifest = models.JSONField(default=dict, blank=True)
     size_bytes = models.PositiveBigIntegerField(default=0)
+    archive_sha256 = models.CharField(max_length=64, blank=True)
     age_encrypted = models.BooleanField(default=False)
     failure_detail = models.CharField(max_length=500, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)

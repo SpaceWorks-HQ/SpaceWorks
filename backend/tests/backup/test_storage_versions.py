@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import hashlib
 from io import BytesIO
 
 from botocore.exceptions import ClientError
@@ -41,6 +42,7 @@ def test_versioned_capture_pins_retained_bytes_behind_a_delete_marker(
 
     assert destination.read_bytes() == b"retained bytes"
     assert item["version_id"] == "retained-version"
+    assert item["sha256"] == hashlib.sha256(b"retained bytes").hexdigest()
     assert calls == [{
         "Bucket": "public-images",
         "Key": "events/1/image.jpg",

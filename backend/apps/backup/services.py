@@ -80,10 +80,10 @@ def _run_archive_locked(archive_id):
         archive = _claim_archive(archive_id)
         if archive is None:
             return None
-        encrypted, manifest, tempdir = build_archive(archive)
+        encrypted, manifest, tempdir, archive_sha256 = build_archive(archive)
         size = os.path.getsize(encrypted)
         storage.upload_archive(archive.object_key, encrypted)
-        _complete_archive(archive.pk, manifest, size)
+        _complete_archive(archive.pk, manifest, size, archive_sha256)
         return BackupArchive.objects.get(pk=archive_id)
     except Exception as exc:
         if archive is not None:
@@ -113,16 +113,20 @@ def _claim_archive(archive_id):
 
 
 @transaction.atomic
-def _complete_archive(archive_id, manifest, size):
+def _complete_archive(archive_id, manifest, size, archive_sha256):
     archive = BackupArchive.objects.select_for_update().get(pk=archive_id)
     if archive.status != BackupArchive.Status.RUNNING:
         raise RuntimeError("The claimed backup changed state before completion.")
     archive.status = BackupArchive.Status.AVAILABLE
     archive.manifest = manifest
     archive.size_bytes = size
+    archive.archive_sha256 = archive_sha256
     archive.age_encrypted = True
     archive.completed_at = timezone.now()
-    archive.save()
+    archive.save(update_fields=(
+        "status", "manifest", "size_bytes", "archive_sha256", "age_encrypted",
+        "completed_at", "updated_at",
+    ))
     settings_row = PlatformBackupSettings.load()
     settings_row.last_success_at = archive.completed_at
     settings_row.last_error = ""

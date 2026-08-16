@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from datetime import timedelta
 import hashlib
+import hmac
 import os
 import shutil
 import time
@@ -13,6 +14,11 @@ from django.db import connections
 from django.utils import timezone
 
 from apps.backup import storage
+from apps.backup.digests import (
+    ArchiveDigestError,
+    SUPPORTED_ARCHIVE_FORMATS,
+    verify_content_ledger,
+)
 from apps.backup.models import BackupArchive, DeploymentRecoveryState, RestoreOperation
 from apps.backup.recovery import enter_quarantine
 from apps.backup.object_restore import (
@@ -48,6 +54,7 @@ class Command(BaseCommand):
         actions.choices["quarantine"].add_argument("--reason", required=True)
         actions.choices["preflight"].add_argument("--current-oci-digest", default="")
         actions.choices["preflight"].add_argument("--manifest", required=True)
+        actions.choices["preflight"].add_argument("--bundle")
         export = actions.add_parser("export-archive")
         export.add_argument("restore_id")
         export.add_argument("--output", required=True)
@@ -96,7 +103,10 @@ class Command(BaseCommand):
                 self.stdout.write("skip")
         elif action == "preflight":
             self._preflight(
-                restore_id, options["manifest"], options["current_oci_digest"]
+                restore_id,
+                options["manifest"],
+                options["current_oci_digest"],
+                options.get("bundle"),
             )
         elif action == "quiesce":
             enter_quiescence(restore_id)
@@ -166,7 +176,9 @@ class Command(BaseCommand):
             set_stage(restore_id, options["value"])
             self.stdout.write(options["value"])
 
-    def _preflight(self, restore_id, manifest_path, current_oci_digest=""):
+    def _preflight(
+        self, restore_id, manifest_path, current_oci_digest="", bundle_path=None
+    ):
         restore = RestoreOperation.objects.select_related("archive").get(pk=restore_id)
         archive = restore.archive
         if archive.status != BackupArchive.Status.AVAILABLE or not archive.age_encrypted:
@@ -176,12 +188,17 @@ class Command(BaseCommand):
         except (OSError, json.JSONDecodeError) as exc:
             raise CommandError("The authenticated archive manifest is unreadable.") from exc
         if (
-            manifest.get("format") != "spaceworks-phase5a-v1"
+            manifest.get("format") not in SUPPORTED_ARCHIVE_FORMATS
             or manifest.get("scope") != BackupArchive.Scope.DEPLOYMENT
             or manifest.get("archive_id") != str(archive.pk)
             or not manifest.get("age_encrypted")
         ):
             raise CommandError("The authenticated archive manifest does not match the restore intent.")
+        if bundle_path:
+            try:
+                verify_content_ledger(bundle_path, manifest.get("contents"))
+            except ArchiveDigestError as exc:
+                raise CommandError(str(exc)) from exc
         source_major = int(manifest.get("postgres", {}).get("source_server_major", 0))
         with connections["default"].cursor() as cursor:
             cursor.execute("SHOW server_version_num")
@@ -256,9 +273,15 @@ class Command(BaseCommand):
         path = Path(output)
         path.parent.mkdir(parents=True, exist_ok=True)
         body = storage.open_archive(restore.archive.object_key)
+        digest = hashlib.sha256()
         with path.open("wb") as handle:
             while chunk := body.read(1024 * 1024):
                 handle.write(chunk)
+                digest.update(chunk)
+        expected = restore.archive.archive_sha256
+        if expected and not hmac.compare_digest(digest.hexdigest(), expected):
+            path.unlink(missing_ok=True)
+            raise CommandError("The exported archive sha256 does not match the stored digest.")
         self.stdout.write(str(path))
 
     def _diff_wait(self, restore_id, archive_url):

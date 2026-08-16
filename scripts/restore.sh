@@ -150,6 +150,7 @@ PY
   || die "The archive is missing its manifest or database dump."
 control preflight "$RESTORE_ID" \
   --manifest "/var/lib/spaceworks/ops/restore-$RESTORE_ID/bundle/manifest.json" \
+  --bundle "/var/lib/spaceworks/ops/restore-$RESTORE_ID/bundle" \
   --current-oci-digest "$oci_digest" >/dev/null
 
 drain_seconds="$(control quiesce "$RESTORE_ID" | tail -n 1)"

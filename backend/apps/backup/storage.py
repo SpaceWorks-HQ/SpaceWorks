@@ -1,5 +1,6 @@
 """Private storage for age-encrypted archives."""
 
+import hashlib
 import logging
 
 import boto3
@@ -130,13 +131,16 @@ def download_object(bucket, key, destination, *, versioned):
             params["VersionId"] = version_id
         response = s3.get_object(**params)
         destination.parent.mkdir(parents=True, exist_ok=True)
+        digest = hashlib.sha256()
         with destination.open("wb") as handle:
             while chunk := response["Body"].read(1024 * 1024):
                 handle.write(chunk)
+                digest.update(chunk)
         return {
             "key": key,
             "version_id": version_id,
             "size": destination.stat().st_size,
+            "sha256": digest.hexdigest(),
             "metadata": response.get("Metadata", {}),
             "content_type": response.get("ContentType", ""),
             "headers": {

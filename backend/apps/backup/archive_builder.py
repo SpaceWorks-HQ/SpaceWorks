@@ -1,5 +1,4 @@
 """Snapshot-consistent archive construction; caller owns remote upload."""
-
 import hashlib
 import json
 import os
@@ -15,8 +14,8 @@ from django.conf import settings
 from django.db import connection, transaction
 from django.utils import timezone
 
-from apps.backup import storage
-from apps.backup import quiescence
+from apps.backup import quiescence, storage
+from apps.backup.digests import build_content_ledger, sha256_file
 from apps.backup.models import ARCHIVE_PURGE_WARNING, BackupArchive, DeploymentRecoveryState
 from apps.backup.settings_policy import POLICIES, Policy
 from apps.backup.tenant_projection import project_dataset
@@ -61,6 +60,7 @@ def build_archive(archive):
             raise
     try:
         manifest = _snapshot_payload(archive, root, modes)
+        manifest["contents"] = build_content_ledger(root)  # Built before manifest.json; intentionally excluded.
         _write_json(root / "manifest.json", manifest)
         encrypted = Path(tempdir.name, f"{archive.id}.tar.age")
         plain = Path(tempdir.name, f"{archive.id}.tar")
@@ -73,7 +73,7 @@ def build_archive(archive):
             stderr=subprocess.PIPE,
         )
         plain.unlink()
-        return encrypted, manifest, tempdir
+        return encrypted, manifest, tempdir, sha256_file(encrypted)
     except (OSError, subprocess.CalledProcessError) as exc:
         tempdir.cleanup()
         raise BackupBuildError("The age-encrypted archive could not be built.") from exc
@@ -99,7 +99,7 @@ def _snapshot_payload(archive, root, modes):
             object_keys = _tenant_payload(archive.makerspace_id, root / "tenant")
         object_manifest = _capture_objects(root / "objects", object_keys, modes)
     return {
-        "format": "spaceworks-phase5a-v1",
+        "format": "spaceworks-phase5a-v2",
         "archive_id": str(archive.pk),
         "scope": archive.scope,
         "makerspace_id": archive.makerspace_id,

@@ -14,6 +14,7 @@ class Command(BaseCommand):
         parser.add_argument("--username", required=True)
         parser.add_argument("--encrypted-file", required=True)
         parser.add_argument("--manifest", required=True)
+        parser.add_argument("--expected-sha256")
 
     def handle(self, *args, **options):
         actor = User.objects.filter(username=options["username"]).first()
@@ -25,7 +26,12 @@ class Command(BaseCommand):
         manifest_path = Path(options["manifest"]).resolve()
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            restore = import_disaster_archive(actor, encrypted, manifest)
+            restore = import_disaster_archive(
+                actor,
+                encrypted,
+                manifest,
+                expected_sha256=options.get("expected_sha256"),
+            )
         except Exception as exc:
             raise CommandError(str(exc)) from exc
         self.stdout.write(str(restore.pk))

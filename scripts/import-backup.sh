@@ -9,10 +9,11 @@ OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
 IDENTITY_FILE="${BACKUP_AGE_IDENTITY_FILE:-$OPS_DIR/age-identity.txt}"
 SOURCE="${1:-}"
 USERNAME="${2:-}"
+EXPECTED_SHA256="${3:-}"
 
 die() { printf '[Space Works backup import] ERROR: %s\n' "$*" >&2; exit 1; }
 [[ -f "$SOURCE" && -n "$USERNAME" ]] \
-  || die "Usage: scripts/import-backup.sh <archive.tar.age> <target-superadmin-username>"
+  || die "Usage: scripts/import-backup.sh <archive.tar.age> <target-superadmin-username> [expected-sha256]"
 [[ -d "$OPS_DIR" && -f "$IDENTITY_FILE" ]] || die "The operation directory or age identity is missing."
 command -v flock >/dev/null 2>&1 || die "flock is required."
 
@@ -101,9 +102,16 @@ install -m 600 "$WORK/target.env" .env
 printf '[Space Works backup import] Continuity secrets installed; previous environment retained at %s.\n' "$env_backup"
 "${COMPOSE[@]}" up -d --force-recreate backend worker beat >/dev/null
 
+import_args=(
+  --username "$USERNAME"
+  --encrypted-file "$CONTAINER_WORK/archive.tar.age"
+  --manifest "$CONTAINER_WORK/manifest.json"
+)
+if [[ -n "$EXPECTED_SHA256" ]]; then
+  import_args+=(--expected-sha256 "$EXPECTED_SHA256")
+fi
 restore_id="$("${COMPOSE[@]}" exec -T backend python manage.py import_backup_archive \
-  --username "$USERNAME" --encrypted-file "$CONTAINER_WORK/archive.tar.age" \
-  --manifest "$CONTAINER_WORK/manifest.json" | tail -n 1)"
+  "${import_args[@]}" | tail -n 1)"
 [[ "$restore_id" =~ ^[0-9a-fA-F-]{36}$ ]] || die "The app did not record a restore intent."
 trap - EXIT
 cleanup
