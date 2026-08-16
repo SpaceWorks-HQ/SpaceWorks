@@ -101,6 +101,11 @@ RELATIONAL_USER_FIELDS = frozenset(
         # Phase 8: resolved by the drain, never by the request path. The model is
         # omitted, but the edge is declared so completeness stays a total check.
         ("accounts.PasswordResetEnvelope", "user"),
+        # Phase 7. The models are omitted, but the edges are declared so user-edge
+        # completeness stays a total check over the model graph.
+        ("accounts.MemberClaimCode", "issued_by"),
+        ("accounts.MemberClaimCode", "revoked_by"),
+        ("accounts.OidcBrowserAttempt", "intended_user"),
         ("makerspaces.MakerspaceMembership", "user"),
         ("makerspaces.MakerspaceMembership", "verified_by"),
         ("makerspaces.MakerspaceMembership", "activated_by"),

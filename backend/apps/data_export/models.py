@@ -84,7 +84,7 @@ EXPORTED_MODEL_FIELDS = {
     "operations.StockTransferLine": "id transfer product asset quantity from_status to_status notes",
     "payments.MakerspacePaymentSettings": "id makerspace provider stripe_publishable_key stripe_secret_key stripe_webhook_secret default_currency connect_account_id connect_status connect_charges_enabled connect_payouts_enabled connect_account_assigned_at connect_status_updated_at razorpay_key_id razorpay_key_secret razorpay_webhook_secret",
     "payments.Payment": "id makerspace subject_type subject_id member via_makerspace subject_label amount currency status provider external_order_id external_payment_id checkout_url stripe_provider stripe_connected_account_id stripe_application_fee_amount online_rail stripe_checkout_session_id stripe_checkout_url stripe_checkout_session_expired_at stripe_payment_intent_id created_by created_at updated_at",
-    "presence.PresenceSession": "id member makerspace membership started_at expires_at ended_at ended_by end_reason",
+    "presence.PresenceSession": "id member makerspace membership started_at expires_at ended_at ended_by end_reason created_via_claim_session",
     "procurement.ToBuyItem": "id makerspace machine_type kind name quantity link status estimated_unit_cost vendor_name actual_unit_cost purchaser ordered_at received_at moved_to_inventory_at resulting_product resulting_pool resulting_machine source_pool created_by created_at updated_at",
     "procurement.ToBuyReceipt": "id to_buy_item object_key uploaded_by created_at",
     "warranty.Warranty": "id makerspace asset machine purchased_on warranty_expires_on vendor_name vendor_contact created_at updated_at",
@@ -107,6 +107,11 @@ OMITTED_MODELS = {
     "accounts.DeviceRefreshToken": "Live bearer-session authority.",
     "accounts.EmailVerificationChallenge": "Transient authentication state.",
     "accounts.OidcProvider": "Platform identity configuration.",
+    # Phase 7 named both of these omitted-as-transient when it was planned: a claim
+    # code is a short-lived bearer credential stored only as a digest, and a browser
+    # attempt holds a live PKCE verifier and two more secrets.
+    "accounts.MemberClaimCode": "Transient authentication state.",
+    "accounts.OidcBrowserAttempt": "Transient authentication state.",
     # Phase 8. One row per submitted address -- including addresses that belong to
     # nobody, since anyone can create one by asking for a reset -- holding a live OTP
     # digest and a credential fingerprint. Transient authentication state, and global
