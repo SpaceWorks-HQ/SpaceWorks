@@ -102,6 +102,11 @@ from apps.admin_api.views_platform_updates import (
 )
 from apps.admin_api.views_subdomain_requests import SubdomainRequestListCreateView
 from apps.makerspaces.models import MakerspaceMembership
+from apps.data_export.views import (
+    DataExportDetailView,
+    DataExportDownloadUrlView,
+    DataExportListCreateView,
+)
 from apps.admin_api.views_memberships import (
     MembershipListCreateView,
     MembershipRoleAssignView,
@@ -131,6 +136,21 @@ def _separable(app_label, *routes):
 
 
 urlpatterns = [
+    path(
+        "makerspace/<int:makerspace_id>/data-exports",
+        DataExportListCreateView.as_view(),
+        name="data-export-list-create",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/data-exports/<uuid:job_id>",
+        DataExportDetailView.as_view(),
+        name="data-export-detail",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/data-exports/<uuid:job_id>/download-url",
+        DataExportDownloadUrlView.as_view(),
+        name="data-export-download-url",
+    ),
     # Module install/uninstall. NOT wrapped in _separable: the registry is core, and a
     # console that could not list modules on a deployment with one app tombstoned would
     # be unable to show the operator what they had removed.

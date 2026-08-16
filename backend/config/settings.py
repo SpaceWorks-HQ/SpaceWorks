@@ -75,6 +75,9 @@ MANAGED_RESOURCE_LIMITS = {
     "native_push": 500,
     "api_clients": 1,
     "custom_roles": 20,
+    # Tenant exports retain a long-lived database snapshot while running. This is an
+    # active-job ceiling, independent of the byte quota charged when an archive lands.
+    "data_exports": 1,
     "otp_email": 200,
     "otp_sms": 100,
 }
@@ -125,6 +128,7 @@ INSTALLED_APPS = [
     "apps.evidence",
     "apps.warranty",
     "apps.admin_api",
+    "apps.data_export",
     "apps.integrations",
     "apps.operations",
     "apps.procurement",
@@ -433,6 +437,17 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
+
+# A bounded repeatable-read snapshot is part of the export's correctness contract.
+# Operators may tune the bound, but disabling it would pin PostgreSQL vacuum forever.
+DATA_EXPORT_DEADLINE_SECONDS = env.int("DATA_EXPORT_DEADLINE_SECONDS", default=900)
+DATA_EXPORT_PAGE_SIZE = env.int("DATA_EXPORT_PAGE_SIZE", default=500)
+DATA_EXPORT_RETENTION_SECONDS = env.int(
+    "DATA_EXPORT_RETENTION_SECONDS", default=7 * 24 * 60 * 60
+)
+DATA_EXPORT_DOWNLOAD_TTL_SECONDS = env.int(
+    "DATA_EXPORT_DOWNLOAD_TTL_SECONDS", default=5 * 60
+)
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
 CELERY_BEAT_SCHEDULE = {
     "return-reminders": {
@@ -451,6 +466,10 @@ CELERY_BEAT_SCHEDULE = {
     "refresh-github-contributions": {
         "task": "apps.makerspaces.tasks.refresh_github_contributions_task",
         "schedule": crontab(hour=4, minute=15),
+    },
+    "purge-expired-data-exports": {
+        "task": "apps.data_export.tasks.purge_expired_exports_task",
+        "schedule": crontab(hour=3, minute=45),
     },
 }
 
@@ -574,6 +593,7 @@ REST_FRAMEWORK = {
         # avatar plus a handful of project images -- and a hard ceiling on how much one
         # member can strand. See `makerspaces.throttles.MemberImagePresignThrottle`.
         "member_image_presign": env("THROTTLE_MEMBER_IMAGE_PRESIGN", default="20/hour"),
+        "data_export_create": env("THROTTLE_DATA_EXPORT_CREATE", default="3/hour"),
     },
     # Proxy-aware client IP for throttling. Default None = DRF's legacy behavior
     # (REMOTE_ADDR, or the raw X-Forwarded-For string if present). Behind a CDN/reverse

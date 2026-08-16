@@ -113,6 +113,7 @@ def _audit_meta(makerspace):
 
 def _collect_storage_keys(makerspace):
     from apps.admin_api.models import BulkImportJob
+    from apps.data_export.models import DataExportJob
     from apps.evidence.models import EvidencePhoto
     from apps.maintenance.models import MaintenanceLogDocument
     from apps.machines.models import MachineDocument
@@ -142,6 +143,12 @@ def _collect_storage_keys(makerspace):
     # only -- which is exactly why it had no collector and would never have grown one.
     for name in BulkImportJob.objects.filter(makerspace=makerspace).values_list(
         "upload", flat=True
+    ):
+        add(name)
+    # ExportJob is the only durable name for a completed archive. Collect it before
+    # CASCADE removes the row or the archive becomes undiscoverable in the bucket.
+    for name in DataExportJob.objects.filter(makerspace=makerspace).values_list(
+        "object_key", flat=True
     ):
         add(name)
     collect_private_object_keys(makerspace, add)

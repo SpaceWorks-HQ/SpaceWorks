@@ -29,6 +29,7 @@ export const openApiTags = [
   "Bulk import",
   "Containers",
   "Dashboard",
+  "Data exports",
   "Device auth",
   "Email logs",
   "Email templates",
@@ -186,6 +187,9 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/containers",
   "/api/v1/admin/makerspace/{makerspace_id}/cover",
   "/api/v1/admin/makerspace/{makerspace_id}/dashboard",
+  "/api/v1/admin/makerspace/{makerspace_id}/data-exports",
+  "/api/v1/admin/makerspace/{makerspace_id}/data-exports/{job_id}",
+  "/api/v1/admin/makerspace/{makerspace_id}/data-exports/{job_id}/download-url",
   "/api/v1/admin/makerspace/{makerspace_id}/direct-loan-members",
   "/api/v1/admin/makerspace/{makerspace_id}/direct-loans",
   "/api/v1/admin/makerspace/{makerspace_id}/email-logs",
@@ -350,6 +354,7 @@ export const openApiPaths = [
   "/api/v1/auth/social/providers/{provider}",
   "/api/v1/bootstrap",
   "/api/v1/config",
+  "/api/v1/data-exports/download/{job_id}/{token}",
   "/api/v1/guest-admin/makerspace/{makerspace_id}/active-loans",
   "/api/v1/guest-admin/requests/{id}/return",
   "/api/v1/health/",
@@ -1071,6 +1076,32 @@ export type Dashboard = {
   "pending_payments"?: number;
 };
 
+export type DataExportCreate = {
+  "fidelity"?: FidelityEnum;
+};
+
+export type DataExportDownloadUrl = {
+  "url": string;
+  "expires_at": string;
+};
+
+export type DataExportJob = {
+  "id": string;
+  "fidelity": string;
+  "status": DataExportJobStatusEnum;
+  "manifest": unknown;
+  "failure_code": FailureCodeEnum | BlankEnum;
+  "failure_detail": string;
+  "deadline_at": string | null;
+  "snapshot_at": string | null;
+  "started_at": string | null;
+  "completed_at": string | null;
+  "expires_at": string;
+  "created_at": string;
+};
+
+export type DataExportJobStatusEnum = "pending" | "running" | "available" | "failed";
+
 export type DeliveryEnum = "web" | "device";
 
 export type DestinationScope = {
@@ -1530,7 +1561,11 @@ export type FabLabHealthRow = {
   "maintenance_overdue_schedules": number | null;
 };
 
+export type FailureCodeEnum = "deadline_exceeded" | "integrity_error" | "storage_error" | "quota_exceeded" | "internal_error";
+
 export type FeatureEnum = "hardware_requests" | "printing" | "events" | "bookings" | "maintenance" | "members";
+
+export type FidelityEnum = "REDACTED";
 
 export type ForgotPasswordRequest = {
   "email": string;

@@ -60,6 +60,7 @@ const TAB_PATHS: Record<string, string> = {
   emailtemplates: "email-templates",
   "email-logs": "email-log",
   modules: "modules",
+  exports: "data-export",
 };
 
 const PATH_TABS = Object.fromEntries(

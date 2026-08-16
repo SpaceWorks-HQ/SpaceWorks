@@ -15,17 +15,14 @@ access-restriction flow all take this row exactly as they take a self-registered
 """
 
 from django.db import transaction
-from django.utils.crypto import get_random_string
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import User
+from apps.accounts.username_allocation import allocate_username
 from apps.audit import services as audit
 from apps.makerspaces.membership_activation import _activate_membership
 from apps.makerspaces.membership_services import _member_role, normalized_email
 from apps.makerspaces.models import Makerspace
-
-ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
-
 
 def create_walk_in_member(actor, makerspace, *, display_name, email="", phone=""):
     """Create a person record and activate it as a plain member of `makerspace`."""
@@ -75,34 +72,21 @@ def _new_user(display_name, email, phone):
             {"email": "An account already uses that email. Add them from the members list."}
         )
 
-    user = User(
-        username=_available_username(display_name),
-        display_name=display_name[:200],
-        email=email,
-        # Free-text contact only. NEVER `phone_e164`: that column is a login identity
-        # under a partial unique constraint, and a number typed at a counter has not
-        # been proven to belong to the person standing there.
-        phone=phone[:32],
-        role=User.Role.REQUESTER,
-        access_status=User.AccessStatus.ACTIVE,
-        # The unusable password alone does NOT make this permanent: forgot-password finds
-        # any active user by email and sets one. This flag is what both reset paths check.
-        is_walk_in=True,
-    )
-    user.set_unusable_password()
-    user.save()
-    return user
+    def create(username):
+        user = User(
+            username=username,
+            display_name=display_name[:200],
+            email=email,
+            # Free-text contact only. NEVER `phone_e164`: that column is a login
+            # identity, and counter-entered contact has not been verified.
+            phone=phone[:32],
+            role=User.Role.REQUESTER,
+            access_status=User.AccessStatus.ACTIVE,
+            # This marker, not merely an unusable password, blocks recovery paths.
+            is_walk_in=True,
+        )
+        user.set_unusable_password()
+        user.save()
+        return user
 
-
-def _available_username(display_name):
-    """A readable username that is unique by construction.
-
-    Suffixed rather than probed with a `while ... exists()` loop: `username` is unique,
-    two people called Alex are the normal case, and a check-then-insert would leave the
-    duplicate to surface as an IntegrityError inside the caller's transaction. Staff
-    never type this -- they see `display_name` -- so the tail costs nothing.
-    """
-    stem = "".join(
-        char if char.isalnum() else "_" for char in display_name.lower()
-    ).strip("_")[:24]
-    return f"walkin_{stem or 'member'}_{get_random_string(6, ALPHABET)}"
+    return allocate_username(display_name, create=create)

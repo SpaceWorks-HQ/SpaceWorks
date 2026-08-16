@@ -35,6 +35,7 @@ NUMERIC_LIMIT_KEYS = frozenset(
         "custom_roles",
         "machine_service_open",
         "machine_service_submit",
+        "data_exports",
     }
 )
 BOOLEAN_LIMIT_KEYS = frozenset({"custom_domain"})
@@ -60,6 +61,7 @@ RESOURCE_LABELS = {
     "custom_roles": "custom roles",
     "machine_service_open": "open machine service requests",
     "machine_service_submit": "daily machine service requests",
+    "data_exports": "active data exports",
     "custom_domain": "custom domains",
 }
 
@@ -248,6 +250,15 @@ def _custom_roles(makerspace) -> int:
     return MakerspaceRole.objects.filter(makerspace=makerspace, is_default=False).count()
 
 
+def _data_exports(makerspace) -> int:
+    from apps.data_export.models import DataExportJob
+
+    return DataExportJob.objects.filter(
+        makerspace=makerspace,
+        status__in=(DataExportJob.Status.PENDING, DataExportJob.Status.RUNNING),
+    ).count()
+
+
 def _print_requests(makerspace) -> int:
     now = datetime.now(UTC)
     month_start = datetime(now.year, now.month, 1, tzinfo=UTC)
@@ -364,6 +375,7 @@ _COUNTERS: dict[str, Callable[[object], int]] = {
     "print": _print_requests,
     "machine_service_open": _machine_service_open,
     "machine_service_submit": _machine_service_submit,
+    "data_exports": _data_exports,
     "storage": _storage,
     "email": _emails,
 }
