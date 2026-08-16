@@ -6,10 +6,25 @@ from apps.accounts.models_social import (
     SocialProvider,
     SocialSurface,
 )
+from apps.accounts.models_oidc import provider_for_slug, slug_from_provider_key
+
+
+class SocialProviderKeyField(serializers.CharField):
+    def __init__(self, **kwargs):
+        super().__init__(max_length=64, **kwargs)
+
+    def to_internal_value(self, data):
+        value = super().to_internal_value(data)
+        if value in SocialProvider.values:
+            return value
+        slug = slug_from_provider_key(value)
+        if slug is None or provider_for_slug(slug) is None:
+            self.fail("invalid")
+        return value
 
 
 class SocialNonceSerializer(serializers.Serializer):
-    provider = serializers.ChoiceField(choices=SocialProvider.choices)
+    provider = SocialProviderKeyField()
     surface = serializers.ChoiceField(choices=SocialSurface.choices)
     delivery = serializers.ChoiceField(choices=SocialDelivery.choices)
     client_platform = serializers.ChoiceField(choices=SocialClientPlatform.choices)
@@ -39,7 +54,7 @@ class SocialLoginSerializer(serializers.Serializer):
 
 
 class SocialLinkSerializer(serializers.Serializer):
-    provider = serializers.ChoiceField(choices=SocialProvider.choices)
+    provider = SocialProviderKeyField()
     id_token = serializers.CharField(max_length=16384, write_only=True)
     nonce = serializers.CharField(max_length=512, write_only=True)
     client_platform = serializers.ChoiceField(

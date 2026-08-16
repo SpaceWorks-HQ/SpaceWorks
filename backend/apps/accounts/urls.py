@@ -37,11 +37,26 @@ from apps.accounts.views_social import (
     SocialProviderDetailView,
     SocialProviderListLinkView,
 )
+from apps.accounts.views_oidc_browser import (
+    OidcBrowserCallbackView,
+    OidcBrowserStartView,
+)
+from apps.accounts.views_claim import ClaimRedemptionView
 
 urlpatterns = [
     path("social/nonce", SocialNonceView.as_view(), name="social-nonce"),
     path("social/google", GoogleSocialLoginView.as_view(), name="social-google"),
     path("social/apple", AppleSocialLoginView.as_view(), name="social-apple"),
+    path(
+        "social/oidc/callback",
+        OidcBrowserCallbackView.as_view(),
+        name="social-oidc-browser-callback",
+    ),
+    path(
+        "social/oidc/<slug:slug>/authorize",
+        OidcBrowserStartView.as_view(),
+        name="social-oidc-browser-start",
+    ),
     # Declared before the `<str:provider>` detail route below only by accident of prefix
     # ("social/oidc/..." vs "social/providers/..."), but kept adjacent to its siblings.
     path("social/oidc/<slug:slug>", OidcSocialLoginView.as_view(), name="social-oidc"),
@@ -59,6 +74,7 @@ urlpatterns = [
     path("phone/link/confirm", PhoneLinkConfirmView.as_view(), name="auth-phone-link-confirm"),
     path("phone", PhoneUnlinkView.as_view(), name="auth-phone-unlink"),
     path("login", LoginView.as_view(), name="auth-login"),
+    path("claim/redeem", ClaimRedemptionView.as_view(), name="auth-claim-redeem"),
     path("refresh", RefreshView.as_view(), name="auth-refresh"),
     path("logout", LogoutView.as_view(), name="auth-logout"),
     path("me", MeView.as_view(), name="auth-me"),

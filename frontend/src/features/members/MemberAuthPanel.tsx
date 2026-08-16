@@ -4,7 +4,13 @@ import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
 import { publicV1Request, setAccessToken } from "../../lib/api";
 import { SocialSignInButtons } from "../auth/SocialSignInButtons";
 
-export function MemberAuthPanel({ onAuthenticated }: { onAuthenticated: () => void }) {
+export function MemberAuthPanel({
+  onAuthenticated,
+  makerspaceSlug = "",
+}: {
+  onAuthenticated: () => void;
+  makerspaceSlug?: string;
+}) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -103,7 +109,12 @@ export function MemberAuthPanel({ onAuthenticated }: { onAuthenticated: () => vo
             <label className="eyebrow mt-3 block" htmlFor="member-password">Password</label>
             <input id="member-password" className="desk-input mt-1 w-full" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} required />
           </>
-        ) : null}
+        ) : (
+          <>
+            <label className="eyebrow mt-5 block" htmlFor="member-email">Email</label>
+            <input id="member-email" className="desk-input mt-1 w-full" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+          </>
+        )}
         {notice ? <p className="mt-3 text-sm text-success-ink">{notice}</p> : null}
         {error ? <p className="mt-3 text-sm text-danger" role="alert">{error}</p> : null}
         {passwordLogin || mode === "signup" ? (
@@ -122,6 +133,8 @@ export function MemberAuthPanel({ onAuthenticated }: { onAuthenticated: () => vo
         )}
         <SocialSignInButtons
           surface="member"
+          email={email}
+          makerspaceSlug={makerspaceSlug}
           onSuccess={(result) => {
             setAccessToken(result.access);
             onAuthenticated();

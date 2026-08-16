@@ -8,6 +8,7 @@ from apps.accounts.login_methods import (
 )
 from apps.accounts.models_login_methods import PlatformLoginMethods
 from apps.accounts.models_oidc import OidcProvider
+from apps.accounts.models_oidc_browser import OidcBrowserAttempt
 from apps.accounts.models_social import (
     PlatformSocialAuthSettings,
     SocialIdentity,
@@ -184,4 +185,28 @@ class OidcProviderAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         the same lockout `social_lockout` refuses for the built-ins. Disable it instead:
         the row stays, the login stops, and re-enabling restores it.
         """
+        return False
+
+
+@admin.register(OidcBrowserAttempt)
+class OidcBrowserAttemptAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    list_display = ("id", "provider", "created_at", "expires_at", "consumed_at")
+    list_filter = ("provider", "consumed_at")
+    fields = (
+        "provider",
+        "intended_user",
+        "intended_membership",
+        "created_at",
+        "expires_at",
+        "consumed_at",
+    )
+    readonly_fields = fields
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False

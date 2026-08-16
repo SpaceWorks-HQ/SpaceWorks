@@ -25,8 +25,13 @@ def display_name_for(membership):
     return user.display_name or user.get_full_name().strip() or user.username
 
 
-def read_profile(membership, *, include_activity=True):
-    profile = profile_for(membership)
+def read_profile(membership, *, include_activity=True, local_activity_only=False):
+    # Reads must not call the write-side ``profile_for`` helper. An unsaved model
+    # instance gives serializers the model defaults without publishing a row merely
+    # because somebody opened the page.
+    profile = MemberProfile.objects.filter(membership=membership).first()
+    projects = profile.projects.all() if profile is not None else ()
+    profile = profile or MemberProfile(membership=membership)
     payload = {
         "membership_id": membership.pk,
         "display_name": display_name_for(membership),
@@ -49,14 +54,16 @@ def read_profile(membership, *, include_activity=True):
                 "links": project.links or [],
                 "image_url": public_image_storage.public_url(project.image_key) or None,
             }
-            for project in profile.projects.all()
+            for project in projects
         ],
-        "activity": profile_activity(membership) if include_activity else {},
+        "activity": profile_activity(
+            membership, local_only=local_activity_only
+        ) if include_activity else {},
     }
     return payload
 
 
-def profile_activity(membership):
+def profile_activity(membership, *, local_only=False):
     """Counts of what this member has done in THIS space.
 
     Derived, never stored: a stored counter drifts the moment a registration is
@@ -73,6 +80,8 @@ def profile_activity(membership):
         from apps.events.models import EventRegistration
 
         registrations = registrations_for_space(makerspace, membership.user)
+        if local_only or getattr(membership.user, "_claim_audit_context", None) is not None:
+            registrations = registrations.filter(event__makerspace=makerspace)
         activity["events_attended"] = registrations.filter(
             status=EventRegistration.Status.ATTENDED
         ).count()
@@ -262,7 +271,7 @@ def directory(makerspace):
     return {"members": members, "hidden_count": hidden}
 
 
-def visible_profile(makerspace, membership_id):
+def visible_profile(makerspace, membership_id, *, local_activity_only=False):
     """One other member's profile, or None when it is not theirs to see."""
     membership = MakerspaceMembership.objects.select_related("user", "profile").filter(
         pk=membership_id, makerspace=makerspace, status="active", user__is_active=True
@@ -272,4 +281,4 @@ def visible_profile(makerspace, membership_id):
     profile = getattr(membership, "profile", None)
     if profile is None or not profile.is_visible:
         return None
-    return read_profile(membership)
+    return read_profile(membership, local_activity_only=local_activity_only)

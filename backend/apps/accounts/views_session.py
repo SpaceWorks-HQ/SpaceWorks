@@ -19,6 +19,9 @@ from apps.accounts.auth_cookies import (
 )
 from apps.accounts.login_methods import password_login_enabled
 from apps.accounts.models import User
+from apps.accounts.authentication import SpaceWorksJWTAuthentication
+from apps.accounts.claim_sessions import ClaimSessionInvalid
+from apps.accounts.claim_tokens import ClaimRefreshToken, rotate_claim_refresh
 from apps.accounts.schemas_auth import (
     LoginRequestSerializer,
     LoginResponseSerializer,
@@ -35,6 +38,9 @@ class LoginView(TokenObtainPairView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"
     serializer_class = LoginSerializer
+    # SimpleJWT's token view disables authentication entirely. Keep anonymous login,
+    # but still inspect a presented claim token so the central Refused matrix is real.
+    authentication_classes = [SpaceWorksJWTAuthentication]
 
     @extend_schema(
         tags=["Auth"],
@@ -93,6 +99,14 @@ def _refresh_user_is_active(token_str):
 
 
 def _refresh_surface(token_str):
+    # A claim refresh is its own token type, so it must be decoded as one before the
+    # generic path -- otherwise its surface reads as None and the CSRF check picks the
+    # wrong exact-origin rule.
+    try:
+        if ClaimRefreshToken(token_str).get("surface") == "member":
+            return "member"
+    except TokenError:
+        pass
     try:
         return RefreshToken(token_str).get("surface")
     except TokenError:
@@ -154,6 +168,32 @@ class RefreshView(TokenRefreshView):
                 None, "auth.refresh_rejected", meta={"reason": "missing_cookie"}
             )
             raise InvalidToken("No refresh cookie.")
+        # A claim refresh rotates through its own path: the deadline lives on the claim
+        # row and is re-read there, which is why rotation cannot extend it.
+        try:
+            ClaimRefreshToken(cookie)
+        except TokenError:
+            is_claim_refresh = False
+        else:
+            is_claim_refresh = True
+        if is_claim_refresh:
+            try:
+                pair, actor = rotate_claim_refresh(cookie)
+            except (TokenError, ClaimSessionInvalid) as exc:
+                actor = audit_events.user_from_refresh_token(cookie)
+                audit_events.record_auth_event(
+                    actor,
+                    "auth.refresh_rejected",
+                    target=actor,
+                    meta={"reason": "invalid_claim_session"},
+                )
+                raise InvalidToken("Claim session is no longer active.") from exc
+            audit_events.record_auth_event(
+                actor, "auth.refresh_succeeded", target=actor
+            )
+            response = Response({"access": pair.access})
+            set_refresh_cookies(response, pair.refresh, request)
+            return response
         if not _refresh_user_is_active(cookie):
             actor = audit_events.user_from_refresh_token(cookie)
             audit_events.record_auth_event(
@@ -216,7 +256,13 @@ class LogoutView(APIView):
         actor = audit_events.user_from_refresh_token(cookie)
         if cookie:
             try:
-                RefreshToken(cookie).blacklist()
+                # A claim refresh will not decode as a plain RefreshToken, and logout
+                # must still revoke it.
+                try:
+                    refresh = ClaimRefreshToken(cookie)
+                except TokenError:
+                    refresh = RefreshToken(cookie)
+                refresh.blacklist()
             except TokenError:
                 pass
         audit_events.record_auth_event(

@@ -156,3 +156,4 @@ class DirectLoanMemberSerializer(serializers.Serializer):
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     display_name = serializers.CharField(source="user.display_name", read_only=True)
     username = serializers.CharField(source="user.username", read_only=True)
+    is_walk_in = serializers.BooleanField(source="user.is_walk_in", read_only=True)

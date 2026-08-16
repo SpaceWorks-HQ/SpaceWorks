@@ -9,7 +9,10 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0015_backfill_is_walk_in'),
+        # Renumbered at integration: phase 7 and phase 8 were built in parallel
+        # worktrees and both branched a 0016 off 0015. CreateModel with no data
+        # dependency, so chaining it onto phase 7's leaf is order-independent.
+        ('accounts', '0020_oidcbrowserattempt'),
     ]
 
     operations = [

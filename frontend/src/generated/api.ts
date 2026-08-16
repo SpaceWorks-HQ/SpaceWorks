@@ -255,6 +255,8 @@ export const openApiPaths = [
   "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/typed-manual-usage",
   "/api/v1/admin/makerspaces/{makerspace_id}/machines/{machine_id}/maintenance/logs/",
   "/api/v1/admin/makerspaces/{makerspace_id}/machines/{machine_id}/maintenance/schedules/",
+  "/api/v1/admin/makerspaces/{makerspace_id}/member-claim-codes",
+  "/api/v1/admin/makerspaces/{makerspace_id}/member-claim-codes/{claim_id}/revoke",
   "/api/v1/admin/makerspaces/{makerspace_id}/memberships",
   "/api/v1/admin/makerspaces/{makerspace_id}/memberships/{membership_id}/role",
   "/api/v1/admin/makerspaces/{makerspace_id}/roles",
@@ -349,7 +351,9 @@ export const openApiPaths = [
   "/api/v1/auth/social/apple",
   "/api/v1/auth/social/google",
   "/api/v1/auth/social/nonce",
+  "/api/v1/auth/social/oidc/callback",
   "/api/v1/auth/social/oidc/{slug}",
+  "/api/v1/auth/social/oidc/{slug}/authorize",
   "/api/v1/auth/social/providers",
   "/api/v1/auth/social/providers/{provider}",
   "/api/v1/bootstrap",
@@ -1203,6 +1207,7 @@ export type DirectLoanMember = {
   "user_id": number;
   "display_name": string;
   "username": string;
+  "is_walk_in": boolean;
 };
 
 export type DirectLoanReturn = {
@@ -2445,6 +2450,36 @@ export type MemberActivityRow = {
   "verified_members": number;
 };
 
+export type MemberClaimCode = {
+  "id": number;
+  "membership_id": number;
+  "member_display_name": string;
+  "issued_by_id": number | null;
+  "issued_at": string;
+  "expires_at": string;
+  "consumed_at": string | null;
+  "revoked_at": string | null;
+  "status": string;
+};
+
+export type MemberClaimCodeIssueRequest = {
+  "membership_id": number;
+};
+
+export type MemberClaimCodeIssueResponse = {
+  "id": number;
+  "membership_id": number;
+  "member_display_name": string;
+  "issued_by_id": number | null;
+  "issued_at": string;
+  "expires_at": string;
+  "consumed_at": string | null;
+  "revoked_at": string | null;
+  "status": string;
+  "code": string;
+  "qr_svg": string;
+};
+
 export type MemberEventRegistrationActivity = {
   "registration_id": number;
   "checkin_token": string | null;
@@ -2801,6 +2836,33 @@ export type NotificationUnreadCount = {
 };
 
 export type NullEnum = null;
+
+export type OidcBrowserCallback = {
+  "code": string;
+  "state": string;
+  "nonce": string;
+};
+
+export type OidcBrowserLoginResponse = {
+  "access": string;
+  "user": {
+  [key: string]: unknown;
+};
+  "outcome": string;
+};
+
+export type OidcBrowserStart = {
+  "redirect_uri": string;
+  "email"?: string;
+  "makerspace_slug"?: string;
+};
+
+export type OidcBrowserStartResponse = {
+  "authorization_url": string;
+  "state": string;
+  "nonce": string;
+  "expires_in": number;
+};
 
 export type OperatorCandidate = {
   "user_id": number;
@@ -3663,7 +3725,7 @@ export type ProjectWrite = {
   "links"?: Array<ProjectLink>;
 };
 
-export type Provider760Enum = "google" | "apple";
+export type ProviderEnum = "fcm" | "apns";
 
 export type ProvisionSubdomainRequest = {
   "label": string;
@@ -4063,11 +4125,9 @@ export type PushDevice = {
 
 export type PushDeviceRegistration = {
   "token": string;
-  "provider": PushDeviceRegistrationProviderEnum;
+  "provider": ProviderEnum;
   "environment": EnvironmentEnum;
 };
-
-export type PushDeviceRegistrationProviderEnum = "fcm" | "apns";
 
 export type QrCode = {
   "id": number;
@@ -4567,7 +4627,7 @@ export type SocialIdentity = {
 };
 
 export type SocialLink = {
-  "provider": Provider760Enum;
+  "provider": string;
   "id_token": string;
   "nonce": string;
   "client_platform"?: ClientPlatformEnum;
@@ -4596,7 +4656,7 @@ export type SocialLoginResponse = {
 };
 
 export type SocialNonce = {
-  "provider": Provider760Enum;
+  "provider": string;
   "surface": SurfaceEnum;
   "delivery": DeliveryEnum;
   "client_platform": ClientPlatformEnum;

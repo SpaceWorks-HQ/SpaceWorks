@@ -36,10 +36,15 @@ def active_member_memberships(user):
 
 
 def active_membership(user, makerspace_id):
-    return active_member_memberships(user).filter(
+    membership = active_member_memberships(user).filter(
         makerspace_id=makerspace_id,
         makerspace__archived_at__isnull=True,
     ).first()
+    if membership is not None:
+        # Preserve request-scoped identity context (notably claim provenance) instead
+        # of lazily loading a second, context-free User instance from the membership.
+        membership.user = user
+    return membership
 
 
 def member_activity(membership):
@@ -120,6 +125,8 @@ def _event_registrations(makerspace, member):
         "event__starts_at", "event__ends_at", "event__status", "event__makerspace_id",
         "registered_via_makerspace_id", "host_waiver_id",
     )
+    if getattr(member, "_claim_audit_context", None) is not None:
+        rows = rows.filter(event__makerspace=makerspace)
     # Two halves of one question, and they must match `EventCheckInQrView`'s filter exactly:
     # the REGISTRATION must be registered (a waitlisted row has nothing confirmable behind
     # it) and the EVENT must still be checkable. `services.cancel()` changes only

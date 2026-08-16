@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import audit_events
 from apps.accounts.auth_cookies import set_refresh_cookies
+from apps.accounts.authentication import SpaceWorksJWTAuthentication
 from apps.accounts.serializers import user_payload
 from apps.accounts.serializers_phone import (
     PhoneConfirmSerializer,
@@ -58,7 +59,9 @@ def _phone_login_available():
 class PhoneLoginStartView(APIView):
     """Request a login code for an already-verified number."""
 
-    authentication_classes = []
+    # Anonymous without a header; a presented claim token must still be evaluated by
+    # the Refused route policy before this endpoint can mint another credential.
+    authentication_classes = [SpaceWorksJWTAuthentication]
     permission_classes = [AllowAny]
     throttle_classes = [PhoneOtpRequestThrottle, PhoneOtpNumberThrottle]
 
@@ -91,7 +94,7 @@ class PhoneLoginStartView(APIView):
 class PhoneLoginConfirmView(APIView):
     """Exchange a valid code for a MEMBER session. Never mints a staff session."""
 
-    authentication_classes = []
+    authentication_classes = [SpaceWorksJWTAuthentication]
     permission_classes = [AllowAny]
     throttle_classes = [PhoneLoginConfirmThrottle, PhoneConfirmNumberThrottle]
 

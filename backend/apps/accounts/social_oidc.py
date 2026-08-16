@@ -34,8 +34,7 @@ def verify_oidc_token(raw_token, *, nonce, provider_row):
         # Only a literal true counts. Some IdPs omit the claim entirely, and a missing
         # claim must never read as verified -- auto-linking keys on this, so a lenient
         # parse here is an account-takeover path.
-        "email_verified": claims.get("email_verified") is True
-        or str(claims.get("email_verified")).lower() == "true",
+        "email_verified": claims.get("email_verified") is True,
         "name": str(claims.get("name") or claims.get("preferred_username") or "").strip(),
         "allow_auto_link": provider_row.allow_auto_link,
     }

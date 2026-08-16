@@ -7,7 +7,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from apps.accounts import rbac
 from apps.audit import services as audit
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceWaiver
-from apps.makerspaces.staff_authority import lock_staff_authority
+from apps.makerspaces.staff_authority import lock_and_validate_staff_authority
 
 
 def publish_waiver(actor, makerspace, body, version):
@@ -65,11 +65,17 @@ def witness_waiver_acceptance(actor, membership_id):
         ).first()
         if makerspace_id is None:
             raise NotFound()
-        makerspace, locked_actor, _, _ = lock_staff_authority(
-            actor,
-            makerspace_id,
-            {rbac.Action.MANAGE_MAKERSPACE, rbac.Action.ISSUE_DIRECT_LOAN},
+        # The SAME helper claim-code issuance uses. Two copies of an authority
+        # revalidation rule is how one of them drifts, and the drifting copy is an
+        # auth rule -- both worktrees wrote one independently, and this is the merge.
+        authority = lock_and_validate_staff_authority(
+            actor=actor,
+            makerspace_id=makerspace_id,
+            allowed_actions=frozenset(
+                {rbac.Action.MANAGE_MAKERSPACE, rbac.Action.ISSUE_DIRECT_LOAN}
+            ),
         )
+        makerspace, locked_actor = authority.makerspace, authority.actor
         membership = MakerspaceMembership.objects.select_for_update().get(
             pk=membership_id
         )

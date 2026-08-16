@@ -204,6 +204,8 @@ from apps.accounts.models_devices import (  # noqa: E402
     DeviceRefreshToken,
 )
 from apps.accounts.models_login_methods import PlatformLoginMethods  # noqa: E402
+from apps.accounts.models_claim import MemberClaimCode  # noqa: E402
+from apps.accounts.models_oidc_browser import OidcBrowserAttempt  # noqa: E402
 from apps.accounts.models_phone import (  # noqa: E402
     PhoneChallengePurpose,
     PhoneVerificationChallenge,
@@ -231,6 +233,8 @@ __all__ = [
     'DeviceRefreshFamily',
     'DeviceRefreshToken',
     'EmailVerificationChallenge',
+    'MemberClaimCode',
+    'OidcBrowserAttempt',
     'PhoneChallengePurpose',
     'PhoneVerificationChallenge',
     'PasswordResetEnvelope',

@@ -4,6 +4,7 @@ from rest_framework.views import exception_handler
 from drf_spectacular.utils import extend_schema_serializer
 
 from apps.bookings.exceptions import BookingConflict, BookingInvalidTransition
+from apps.accounts.services_claim import ClaimCodeError, ClaimCodeIneligible
 from apps.evidence.storage import StorageUnavailable
 from apps.events.exceptions import (
     CapacityConflict,
@@ -48,6 +49,16 @@ class ErrorSerializer(serializers.Serializer):
 
 
 _EXCEPTION_MAP = {
+    ClaimCodeError: (
+        status.HTTP_400_BAD_REQUEST,
+        "invalid_claim_code",
+        "Invalid or expired member claim code.",
+    ),
+    ClaimCodeIneligible: (
+        status.HTTP_409_CONFLICT,
+        "claim_code_ineligible",
+        "This membership is not eligible for a member claim code.",
+    ),
     MemberPresenceRequired: (
         status.HTTP_403_FORBIDDEN,
         "membership_required",

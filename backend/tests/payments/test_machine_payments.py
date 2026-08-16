@@ -143,6 +143,9 @@ def test_terminal_payment_webhook_is_audited_as_an_anomaly(monkeypatch):
 
 
 def test_member_can_generate_a_missing_checkout_url(monkeypatch):
+    import json
+
+    from apps.audit.models import AuditLog
     from rest_framework.test import APIClient
     space = make_space("c3-payment-regenerate")
     configured_settings(space)
@@ -157,3 +160,14 @@ def test_member_can_generate_a_missing_checkout_url(monkeypatch):
     assert response.data["checkout_url"] == "https://checkout.stripe.test/cs_regenerated"
     payment.refresh_from_db()
     assert payment.stripe_checkout_session_id == "cs_regenerated"
+    entry = AuditLog.objects.get(
+        action="payment.checkout_created", target_id=str(payment.pk)
+    )
+    assert entry.actor == actor
+    assert entry.meta == {
+        "payment_id": payment.pk,
+        "provider": Payment.Provider.STRIPE,
+        "subject_type": Payment.SubjectType.MACHINE_SERVICE_REQUEST,
+        "subject_id": payment.subject_id,
+    }
+    assert response.data["checkout_url"] not in json.dumps(entry.meta)

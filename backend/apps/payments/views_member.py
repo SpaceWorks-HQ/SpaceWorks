@@ -123,7 +123,7 @@ class MemberPaymentCheckoutView(APIView):
         if payment.stripe_checkout_url:
             return Response({"checkout_url": payment.stripe_checkout_url})
         try:
-            checkout_url = create_checkout_url(payment.pk)
+            checkout_url = create_checkout_url(payment.pk, actor=request.user)
         except PaymentRailConflict:
             return Response(
                 {

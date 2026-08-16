@@ -542,6 +542,11 @@ REST_FRAMEWORK = {
         "push_device_registration": env("THROTTLE_PUSH_DEVICE_REGISTRATION", default="10/min"),
         "social_nonce": env("THROTTLE_SOCIAL_NONCE", default="10/min"),
         "social_login": env("THROTTLE_SOCIAL_LOGIN", default="10/min"),
+        # Issuance and redemption deliberately have independent budgets. A member who
+        # mistypes a physically handed code must not consume the staff issue budget (or
+        # vice versa), repeating the phone-OTP shared-bucket failure.
+        "member_claim_issue": env("THROTTLE_MEMBER_CLAIM_ISSUE", default="10/hour"),
+        "member_claim_redeem": env("THROTTLE_MEMBER_CLAIM_REDEEM", default="10/min"),
         # Tighter than the email OTP rates: every one of these costs the operator money
         # and lands on a stranger's handset if the number is wrong.
         "phone_otp_request": env("THROTTLE_PHONE_OTP_REQUEST", default="5/min"),
@@ -703,6 +708,16 @@ SOCIAL_AUTH_CLOCK_SKEW_SECONDS = env.int("SOCIAL_AUTH_CLOCK_SKEW_SECONDS", defau
 SOCIAL_AUTH_JWKS_TIMEOUT_SECONDS = env.int("SOCIAL_AUTH_JWKS_TIMEOUT_SECONDS", default=5)
 SOCIAL_AUTH_JWKS_CACHE_SECONDS = env.int("SOCIAL_AUTH_JWKS_CACHE_SECONDS", default=3600)
 SOCIAL_AUTH_JWKS_MAX_BYTES = env.int("SOCIAL_AUTH_JWKS_MAX_BYTES", default=1048576)
+OIDC_ATTEMPT_TTL_SECONDS = env.int("OIDC_ATTEMPT_TTL_SECONDS", default=300)
+OIDC_HTTP_TIMEOUT_SECONDS = env.int("OIDC_HTTP_TIMEOUT_SECONDS", default=5)
+OIDC_HTTP_MAX_BYTES = env.int("OIDC_HTTP_MAX_BYTES", default=65536)
+OIDC_DISCOVERY_CACHE_SECONDS = env.int("OIDC_DISCOVERY_CACHE_SECONDS", default=300)
+MEMBER_CLAIM_CODE_TTL_SECONDS = env.int(
+    "MEMBER_CLAIM_CODE_TTL_SECONDS", default=15 * 60
+)
+MEMBER_CLAIM_SESSION_TTL_SECONDS = env.int(
+    "MEMBER_CLAIM_SESSION_TTL_SECONDS", default=12 * 60 * 60
+)
 SOCIAL_GOOGLE_JWKS_URL = env("SOCIAL_GOOGLE_JWKS_URL", default="https://www.googleapis.com/oauth2/v3/certs")
 SOCIAL_APPLE_JWKS_URL = env("SOCIAL_APPLE_JWKS_URL", default="https://appleid.apple.com/auth/keys")
 

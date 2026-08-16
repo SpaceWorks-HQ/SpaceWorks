@@ -32,6 +32,14 @@ def user_from_refresh_token(token_str):
     if not token_str:
         return None
     try:
+        from apps.accounts.claim_tokens import claim_user_from_refresh
+
+        claim_user = claim_user_from_refresh(token_str)
+        if claim_user is not None:
+            return claim_user
+    except TokenError:
+        pass
+    try:
         token = RefreshToken(token_str)
     except TokenError:
         return None

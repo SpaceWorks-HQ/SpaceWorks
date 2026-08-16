@@ -10126,215 +10126,6 @@
                 }
             }
         },
-        "/api/v1/admin/makerspace/{makerspace_id}/data-exports": {
-            "get": {
-                "operationId": "api_v1_admin_makerspace_data_exports_list",
-                "summary": "List makerspace data-export jobs",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "makerspace_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "Data exports"
-                ],
-                "security": [
-                    {
-                        "jwtAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/DataExportJob"
-                                    }
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "403": {
-                        "description": "MANAGE_MAKERSPACE is required."
-                    }
-                }
-            },
-            "post": {
-                "operationId": "api_v1_admin_makerspace_data_exports_create",
-                "summary": "Request a redacted makerspace data export",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "makerspace_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "Data exports"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/DataExportCreate"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/DataExportCreate"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/DataExportCreate"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "jwtAuth": []
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DataExportJob"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "description": "Invalid fidelity or quota/module policy failure."
-                    },
-                    "403": {
-                        "description": "MANAGE_MAKERSPACE is required."
-                    },
-                    "429": {
-                        "description": "Export creation rate limit exceeded."
-                    }
-                }
-            }
-        },
-        "/api/v1/admin/makerspace/{makerspace_id}/data-exports/{job_id}": {
-            "get": {
-                "operationId": "api_v1_admin_makerspace_data_exports_retrieve",
-                "summary": "Poll a makerspace data-export job",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "job_id",
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "required": true
-                    },
-                    {
-                        "in": "path",
-                        "name": "makerspace_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "Data exports"
-                ],
-                "security": [
-                    {
-                        "jwtAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DataExportJob"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "403": {
-                        "description": "MANAGE_MAKERSPACE is required."
-                    },
-                    "404": {
-                        "description": "Export job not found in this makerspace."
-                    }
-                }
-            }
-        },
-        "/api/v1/admin/makerspace/{makerspace_id}/data-exports/{job_id}/download-url": {
-            "post": {
-                "operationId": "api_v1_admin_makerspace_data_exports_download_url_create",
-                "summary": "Issue a short-lived one-use export download URL",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "job_id",
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "required": true
-                    },
-                    {
-                        "in": "path",
-                        "name": "makerspace_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "Data exports"
-                ],
-                "security": [
-                    {
-                        "jwtAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DataExportDownloadUrl"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "description": "Export is not available."
-                    },
-                    "403": {
-                        "description": "MANAGE_MAKERSPACE is required."
-                    },
-                    "404": {
-                        "description": "Export job not found in this makerspace."
-                    }
-                }
-            }
-        },
         "/api/v1/admin/makerspace/{makerspace_id}/direct-loan-members": {
             "get": {
                 "operationId": "api_v1_admin_makerspace_direct_loan_members_list",
@@ -16147,6 +15938,303 @@
                 }
             }
         },
+        "/api/v1/admin/makerspaces/{makerspace_id}/member-claim-codes": {
+            "get": {
+                "operationId": "api_v1_admin_makerspaces_member_claim_codes_list",
+                "summary": "List active physically handed member claim codes",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/MemberClaimCode"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspaces_member_claim_codes_create",
+                "summary": "Issue a claim code to an eligible walk-in member",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberClaimCodeIssueRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberClaimCodeIssueRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberClaimCodeIssueRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberClaimCodeIssueResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Issue rate limit exceeded."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspaces/{makerspace_id}/member-claim-codes/{claim_id}/revoke": {
+            "post": {
+                "operationId": "api_v1_admin_makerspaces_member_claim_codes_revoke_create",
+                "summary": "Revoke a member claim code and its bound session",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "claim_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberClaimCode"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspaces/{makerspace_id}/memberships": {
             "get": {
                 "operationId": "api_v1_admin_makerspaces_memberships_list",
@@ -18561,91 +18649,6 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/AdminMembership"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HardwareRequestError"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "401": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HardwareRequestError"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "403": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HardwareRequestError"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "404": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HardwareRequestError"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "409": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HardwareRequestError"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/api/v1/admin/memberships/{id}/waiver/witness": {
-            "post": {
-                "operationId": "api_v1_admin_memberships_waiver_witness_create",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "Admin memberships"
-                ],
-                "security": [
-                    {
-                        "jwtAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/WitnessWaiverResponse"
                                 }
                             }
                         },
@@ -22744,7 +22747,7 @@
         "/api/v1/auth/forgot-password": {
             "post": {
                 "operationId": "api_v1_auth_forgot_password_create",
-                "summary": "Request an emailed password reset code",
+                "summary": "Request a password reset email",
                 "tags": [
                     "Auth"
                 ],
@@ -22770,30 +22773,7 @@
                 },
                 "responses": {
                     "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PasswordResetAcknowledgement"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "description": "Invalid request."
-                    },
-                    "429": {
-                        "description": "Request throttled."
-                    },
-                    "503": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/RecoveryUnavailable"
-                                }
-                            }
-                        },
-                        "description": ""
+                        "description": "Generic acknowledgement."
                     }
                 }
             }
@@ -23240,7 +23220,7 @@
         "/api/v1/auth/reset-password": {
             "post": {
                 "operationId": "api_v1_auth_reset_password_create",
-                "summary": "Confirm an OTP or coexisting legacy password reset link",
+                "summary": "Confirm a password reset",
                 "tags": [
                     "Auth"
                 ],
@@ -23248,44 +23228,28 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ResetPasswordConfirmRequest"
+                                "$ref": "#/components/schemas/ResetPasswordConfirm"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/ResetPasswordConfirmRequest"
+                                "$ref": "#/components/schemas/ResetPasswordConfirm"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/ResetPasswordConfirmRequest"
+                                "$ref": "#/components/schemas/ResetPasswordConfirm"
                             }
                         }
-                    }
+                    },
+                    "required": true
                 },
                 "responses": {
                     "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PasswordUpdated"
-                                }
-                            }
-                        },
-                        "description": ""
+                        "description": "Password updated."
                     },
                     "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ResetPasswordConfirmError"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "429": {
-                        "description": "Request throttled."
+                        "description": "Invalid/expired token or password."
                     }
                 }
             }
@@ -23641,6 +23605,186 @@
                 }
             }
         },
+        "/api/v1/auth/social/oidc/{slug}/authorize": {
+            "post": {
+                "operationId": "api_v1_auth_social_oidc_authorize_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Social auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserStart"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserStart"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserStart"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OidcBrowserStartResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/social/oidc/callback": {
+            "post": {
+                "operationId": "api_v1_auth_social_oidc_callback_create",
+                "tags": [
+                    "Social auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserCallback"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserCallback"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OidcBrowserCallback"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OidcBrowserLoginResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/auth/social/providers": {
             "get": {
                 "operationId": "api_v1_auth_social_providers_list",
@@ -23846,53 +23990,6 @@
                             }
                         },
                         "description": ""
-                    }
-                }
-            }
-        },
-        "/api/v1/data-exports/download/{job_id}/{token}": {
-            "get": {
-                "operationId": "api_v1_data_exports_download_retrieve",
-                "summary": "Consume a one-use export download URL",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "job_id",
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "required": true
-                    },
-                    {
-                        "in": "path",
-                        "name": "token",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "Data exports"
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/zip": {
-                                "schema": {
-                                    "type": "string",
-                                    "format": "binary"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "404": {
-                        "description": "Download link is invalid, expired, or used."
-                    },
-                    "503": {
-                        "description": "Archive storage is unavailable."
                     }
                 }
             }
@@ -25526,7 +25623,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/MemberWaiverResponse"
+                                    "$ref": "#/components/schemas/HardwareRequestError"
                                 }
                             }
                         },
@@ -29535,10 +29632,6 @@
                         "type": "boolean",
                         "readOnly": true
                     },
-                    "waiver_required": {
-                        "type": "boolean",
-                        "readOnly": true
-                    },
                     "payment": {
                         "allOf": [
                             {
@@ -29554,8 +29647,7 @@
                     "id",
                     "payment",
                     "user",
-                    "waiver_current",
-                    "waiver_required"
+                    "waiver_current"
                 ]
             },
             "AdminMembershipRole": {
@@ -32065,134 +32157,6 @@
                     "scope_mode"
                 ]
             },
-            "DataExportCreate": {
-                "type": "object",
-                "properties": {
-                    "fidelity": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/FidelityEnum"
-                            }
-                        ],
-                        "default": "REDACTED"
-                    }
-                }
-            },
-            "DataExportDownloadUrl": {
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "format": "uri"
-                    },
-                    "expires_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                },
-                "required": [
-                    "expires_at",
-                    "url"
-                ]
-            },
-            "DataExportJob": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "readOnly": true
-                    },
-                    "fidelity": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "status": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/DataExportJobStatusEnum"
-                            }
-                        ],
-                        "readOnly": true
-                    },
-                    "manifest": {
-                        "readOnly": true
-                    },
-                    "failure_code": {
-                        "readOnly": true,
-                        "oneOf": [
-                            {
-                                "$ref": "#/components/schemas/FailureCodeEnum"
-                            },
-                            {
-                                "$ref": "#/components/schemas/BlankEnum"
-                            }
-                        ]
-                    },
-                    "failure_detail": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "deadline_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "snapshot_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "started_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "completed_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "nullable": true
-                    },
-                    "expires_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true
-                    }
-                },
-                "required": [
-                    "completed_at",
-                    "created_at",
-                    "deadline_at",
-                    "expires_at",
-                    "failure_code",
-                    "failure_detail",
-                    "fidelity",
-                    "id",
-                    "manifest",
-                    "snapshot_at",
-                    "started_at",
-                    "status"
-                ]
-            },
-            "DataExportJobStatusEnum": {
-                "enum": [
-                    "pending",
-                    "running",
-                    "available",
-                    "failed"
-                ],
-                "type": "string",
-                "description": "* `pending` - Pending\n* `running` - Running\n* `available` - Available\n* `failed` - Failed"
-            },
             "DeliveryEnum": {
                 "enum": [
                     "web",
@@ -32584,10 +32548,15 @@
                     "username": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "is_walk_in": {
+                        "type": "boolean",
+                        "readOnly": true
                     }
                 },
                 "required": [
                     "display_name",
+                    "is_walk_in",
                     "membership_id",
                     "user_id",
                     "username"
@@ -34054,17 +34023,6 @@
                     "maintenance_total_cost"
                 ]
             },
-            "FailureCodeEnum": {
-                "enum": [
-                    "deadline_exceeded",
-                    "integrity_error",
-                    "storage_error",
-                    "quota_exceeded",
-                    "internal_error"
-                ],
-                "type": "string",
-                "description": "* `` - None\n* `deadline_exceeded` - Deadline exceeded\n* `integrity_error` - Integrity error\n* `storage_error` - Storage error\n* `quota_exceeded` - Quota exceeded\n* `internal_error` - Internal error"
-            },
             "FeatureEnum": {
                 "enum": [
                     "hardware_requests",
@@ -34076,13 +34034,6 @@
                 ],
                 "type": "string",
                 "description": "* `hardware_requests` - Hardware requests\n* `printing` - Printing\n* `events` - Events\n* `bookings` - Bookings\n* `maintenance` - Maintenance\n* `members` - Members"
-            },
-            "FidelityEnum": {
-                "enum": [
-                    "REDACTED"
-                ],
-                "type": "string",
-                "description": "* `REDACTED` - Redacted"
             },
             "ForgotPasswordRequest": {
                 "type": "object",
@@ -35131,27 +35082,6 @@
                 "required": [
                     "asset_tag",
                     "serial_number"
-                ]
-            },
-            "LegacyResetPasswordConfirm": {
-                "type": "object",
-                "properties": {
-                    "uid": {
-                        "type": "string"
-                    },
-                    "token": {
-                        "type": "string",
-                        "writeOnly": true
-                    },
-                    "new_password": {
-                        "type": "string",
-                        "writeOnly": true
-                    }
-                },
-                "required": [
-                    "new_password",
-                    "token",
-                    "uid"
                 ]
             },
             "LegacyRoleEnum": {
@@ -37764,6 +37694,146 @@
                     "verified_members"
                 ]
             },
+            "MemberClaimCode": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "membership_id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "member_display_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "issued_by_id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "issued_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "consumed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "revoked_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "status": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "consumed_at",
+                    "expires_at",
+                    "id",
+                    "issued_at",
+                    "issued_by_id",
+                    "member_display_name",
+                    "membership_id",
+                    "revoked_at",
+                    "status"
+                ]
+            },
+            "MemberClaimCodeIssueRequest": {
+                "type": "object",
+                "properties": {
+                    "membership_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "membership_id"
+                ]
+            },
+            "MemberClaimCodeIssueResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "membership_id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "member_display_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "issued_by_id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "issued_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "consumed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "revoked_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "status": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "code": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "qr_svg": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "code",
+                    "consumed_at",
+                    "expires_at",
+                    "id",
+                    "issued_at",
+                    "issued_by_id",
+                    "member_display_name",
+                    "membership_id",
+                    "qr_svg",
+                    "revoked_at",
+                    "status"
+                ]
+            },
             "MemberEventRegistrationActivity": {
                 "type": "object",
                 "properties": {
@@ -38028,23 +38098,6 @@
                 },
                 "required": [
                     "detail"
-                ]
-            },
-            "MemberWaiverResponse": {
-                "type": "object",
-                "properties": {
-                    "has_waiver": {
-                        "type": "boolean"
-                    },
-                    "body": {
-                        "type": "string"
-                    },
-                    "version": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "has_waiver"
                 ]
             },
             "MembershipCreate": {
@@ -39161,6 +39214,109 @@
                     null
                 ]
             },
+            "OidcBrowserCallback": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "state": {
+                        "type": "string",
+                        "maxLength": 512
+                    },
+                    "nonce": {
+                        "type": "string",
+                        "maxLength": 512
+                    }
+                },
+                "required": [
+                    "code",
+                    "nonce",
+                    "state"
+                ]
+            },
+            "OidcBrowserLoginResponse": {
+                "type": "object",
+                "properties": {
+                    "access": {
+                        "type": "string"
+                    },
+                    "user": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "outcome": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "access",
+                    "outcome",
+                    "user"
+                ]
+            },
+            "OidcBrowserStart": {
+                "type": "object",
+                "properties": {
+                    "redirect_uri": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 2048
+                    },
+                    "email": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "email"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
+                    },
+                    "makerspace_slug": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "pattern": "^[-a-zA-Z0-9_]+$"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "redirect_uri"
+                ]
+            },
+            "OidcBrowserStartResponse": {
+                "type": "object",
+                "properties": {
+                    "authorization_url": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "state": {
+                        "type": "string"
+                    },
+                    "nonce": {
+                        "type": "string"
+                    },
+                    "expires_in": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "authorization_url",
+                    "expires_in",
+                    "nonce",
+                    "state"
+                ]
+            },
             "OperatorCandidate": {
                 "type": "object",
                 "properties": {
@@ -39181,29 +39337,6 @@
                     "display_name",
                     "user_id",
                     "username"
-                ]
-            },
-            "OtpResetPasswordConfirm": {
-                "type": "object",
-                "properties": {
-                    "email": {
-                        "type": "string",
-                        "format": "email"
-                    },
-                    "code": {
-                        "type": "string",
-                        "writeOnly": true,
-                        "pattern": "^\\d{6}$"
-                    },
-                    "new_password": {
-                        "type": "string",
-                        "writeOnly": true
-                    }
-                },
-                "required": [
-                    "code",
-                    "email",
-                    "new_password"
                 ]
             },
             "PaginatedAdminMembershipList": {
@@ -39887,53 +40020,6 @@
                         }
                     }
                 }
-            },
-            "PasswordResetAcknowledgement": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "PasswordResetFailure": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "PasswordUpdated": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "PasswordValidationFailure": {
-                "type": "object",
-                "properties": {
-                    "new_password": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "required": [
-                    "new_password"
-                ]
             },
             "PatchedApiClient": {
                 "type": "object",
@@ -42597,13 +42683,13 @@
                     "title"
                 ]
             },
-            "Provider760Enum": {
+            "ProviderEnum": {
                 "enum": [
-                    "google",
-                    "apple"
+                    "fcm",
+                    "apns"
                 ],
                 "type": "string",
-                "description": "* `google` - Google\n* `apple` - Apple"
+                "description": "* `fcm` - FCM\n* `apns` - APNs"
             },
             "ProvisionSubdomainRequest": {
                 "type": "object",
@@ -44220,7 +44306,7 @@
                         "pattern": "^[A-Za-z0-9_:.-]{20,4096}$"
                     },
                     "provider": {
-                        "$ref": "#/components/schemas/PushDeviceRegistrationProviderEnum"
+                        "$ref": "#/components/schemas/ProviderEnum"
                     },
                     "environment": {
                         "$ref": "#/components/schemas/EnvironmentEnum"
@@ -44231,14 +44317,6 @@
                     "provider",
                     "token"
                 ]
-            },
-            "PushDeviceRegistrationProviderEnum": {
-                "enum": [
-                    "fcm",
-                    "apns"
-                ],
-                "type": "string",
-                "description": "* `fcm` - FCM\n* `apns` - APNs"
             },
             "QrCode": {
                 "type": "object",
@@ -45045,21 +45123,6 @@
                     "machines"
                 ]
             },
-            "RecoveryUnavailable": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    },
-                    "code": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "code",
-                    "detail"
-                ]
-            },
             "ReferralCreate": {
                 "type": "object",
                 "properties": {
@@ -45202,24 +45265,24 @@
                     "truncated"
                 ]
             },
-            "ResetPasswordConfirmError": {
-                "oneOf": [
-                    {
-                        "$ref": "#/components/schemas/PasswordResetFailure"
+            "ResetPasswordConfirm": {
+                "type": "object",
+                "properties": {
+                    "uid": {
+                        "type": "string"
                     },
-                    {
-                        "$ref": "#/components/schemas/PasswordValidationFailure"
-                    }
-                ]
-            },
-            "ResetPasswordConfirmRequest": {
-                "oneOf": [
-                    {
-                        "$ref": "#/components/schemas/OtpResetPasswordConfirm"
+                    "token": {
+                        "type": "string"
                     },
-                    {
-                        "$ref": "#/components/schemas/LegacyResetPasswordConfirm"
+                    "new_password": {
+                        "type": "string",
+                        "writeOnly": true
                     }
+                },
+                "required": [
+                    "new_password",
+                    "token",
+                    "uid"
                 ]
             },
             "ResetPasswordRequest": {
@@ -46064,7 +46127,8 @@
                 "type": "object",
                 "properties": {
                     "provider": {
-                        "$ref": "#/components/schemas/Provider760Enum"
+                        "type": "string",
+                        "maxLength": 64
                     },
                     "id_token": {
                         "type": "string",
@@ -46161,7 +46225,8 @@
                 "type": "object",
                 "properties": {
                     "provider": {
-                        "$ref": "#/components/schemas/Provider760Enum"
+                        "type": "string",
+                        "maxLength": 64
                     },
                     "surface": {
                         "$ref": "#/components/schemas/SurfaceEnum"
@@ -48125,30 +48190,6 @@
                         "maxLength": 200
                     }
                 }
-            },
-            "WitnessWaiverResponse": {
-                "type": "object",
-                "properties": {
-                    "membership_id": {
-                        "type": "integer"
-                    },
-                    "waiver_id": {
-                        "type": "integer"
-                    },
-                    "waiver_version": {
-                        "type": "string"
-                    },
-                    "witnessed_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                },
-                "required": [
-                    "membership_id",
-                    "waiver_id",
-                    "waiver_version",
-                    "witnessed_at"
-                ]
             }
         },
         "securitySchemes": {

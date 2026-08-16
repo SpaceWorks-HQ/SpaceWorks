@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.hardware_requests.exceptions import ErrorSerializer
+from apps.accounts.claim_sessions import claim_context
 from apps.makerspaces import profile_services
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.member_activity_service import active_membership
@@ -86,7 +87,11 @@ class MemberDirectoryDetailView(MemberProfileBaseView):
     )
     def get(self, request, makerspace_id, membership_id):
         membership = self.membership(request, makerspace_id)
-        payload = profile_services.visible_profile(membership.makerspace, membership_id)
+        payload = profile_services.visible_profile(
+            membership.makerspace,
+            membership_id,
+            local_activity_only=claim_context(request.user) is not None,
+        )
         if payload is None:
             # One 404 for "no such member", "not a member here" and "has not published",
             # because distinguishing them would answer questions about people who chose

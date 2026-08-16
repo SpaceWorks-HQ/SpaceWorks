@@ -113,6 +113,10 @@ from apps.admin_api.views_memberships import (
 )
 from apps.admin_api.views_walk_in import WalkInMemberCreateView
 from apps.admin_api.views_waiver_witness import AdminWitnessWaiverAcceptanceView
+from apps.admin_api.views_member_claim import (
+    MemberClaimCodeListCreateView,
+    MemberClaimCodeRevokeView,
+)
 from apps.admin_api.views_member_memberships import (
     AdminInvitationView, AdminMembershipRequestListView, AdminMembershipRevokeM2View,
     AdminMembershipRoleM2View, AdminMembershipRosterView, AdminRequestApproveView,
@@ -313,6 +317,16 @@ urlpatterns = [
         "makerspaces/<int:makerspace_id>/walk-in-members",
         WalkInMemberCreateView.as_view(),
         name="admin-walk-in-member-create",
+    ),
+    path(
+        "makerspaces/<int:makerspace_id>/member-claim-codes",
+        MemberClaimCodeListCreateView.as_view(),
+        name="admin-member-claim-code-list-create",
+    ),
+    path(
+        "makerspaces/<int:makerspace_id>/member-claim-codes/<int:claim_id>/revoke",
+        MemberClaimCodeRevokeView.as_view(),
+        name="admin-member-claim-code-revoke",
     ),
     path(
         "makerspaces/<int:makerspace_id>/memberships/<int:membership_id>/role",

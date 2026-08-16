@@ -37,6 +37,14 @@ def member_payment_queryset(user, makerspace_id):
     paid it. Archival of the host is not filtered either, for the same reason -- the debt
     outlives the surface.
     """
+    claim = getattr(user, "_claim_audit_context", None)
+    if claim is not None:
+        if claim.makerspace_id != makerspace_id:
+            return Payment.objects.none()
+        return Payment.objects.filter(
+            makerspace_id=claim.makerspace_id,
+            member=user,
+        )
     return Payment.objects.filter(
         Q(makerspace_id=makerspace_id)
         | Q(
