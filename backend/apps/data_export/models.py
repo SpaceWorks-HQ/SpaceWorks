@@ -155,6 +155,17 @@ OMITTED_MODELS = {
     "roadmap.RoadmapItem": "Platform-global product roadmap.",
     "updates.PlatformUpdateSettings": "Platform update state.",
     "data_export.DataExportJob": "Source-deployment export lifecycle and bearer state.",
+    # Phase 5A. Every one of these is deployment-scoped operational state, not tenant data,
+    # even where a row names a makerspace: BackupArchive.makerspace records which tenant an
+    # archive covers, and exporting that row would carry its single-use download token into
+    # a tenant archive. Archives are explicitly outside the purge guarantee, so they must
+    # not travel inside one either.
+    "backup.BackupArchive": "Deployment archive lifecycle and download bearer state.",
+    "backup.BackupLease": "Deployment scheduler lease.",
+    "backup.DeploymentRecoveryState": "Deployment recovery and quarantine state.",
+    "backup.PlatformBackupSettings": "Platform backup configuration and age recipient.",
+    "backup.RestoreOperation": "Deployment restore lifecycle state.",
+    "backup.RestoreRollbackObject": "Deployment restore object-rollback journal.",
 }
 
 NOT_TENANT_MODELS = {

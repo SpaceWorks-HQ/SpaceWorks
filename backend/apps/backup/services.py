@@ -97,9 +97,12 @@ def _run_archive_locked(archive_id):
 
 @transaction.atomic
 def _claim_archive(archive_id):
-    archive = BackupArchive.objects.select_for_update().select_related(
-        "makerspace", "requested_by"
-    ).filter(pk=archive_id).first()
+    # No select_related on the locked read: `makerspace` and `requested_by` are both
+    # nullable, so select_related turns them into LEFT OUTER JOINs and Postgres refuses
+    # outright -- "FOR UPDATE cannot be applied to the nullable side of an outer join".
+    # They lazy-load in one extra query, free next to the writes this transaction
+    # already performs. Same reason as procurement.move_to_printing.
+    archive = BackupArchive.objects.select_for_update().filter(pk=archive_id).first()
     if archive is None or archive.status != BackupArchive.Status.PENDING:
         return None
     archive.status = BackupArchive.Status.RUNNING
@@ -111,9 +114,7 @@ def _claim_archive(archive_id):
 
 @transaction.atomic
 def _complete_archive(archive_id, manifest, size):
-    archive = BackupArchive.objects.select_for_update().select_related(
-        "makerspace", "requested_by"
-    ).get(pk=archive_id)
+    archive = BackupArchive.objects.select_for_update().get(pk=archive_id)
     if archive.status != BackupArchive.Status.RUNNING:
         raise RuntimeError("The claimed backup changed state before completion.")
     archive.status = BackupArchive.Status.AVAILABLE
@@ -232,7 +233,7 @@ def issue_download_token(archive, actor):
 
 @transaction.atomic
 def consume_download_token(archive_id, raw):
-    archive = BackupArchive.objects.select_for_update().select_related("makerspace").filter(pk=archive_id).first()
+    archive = BackupArchive.objects.select_for_update().filter(pk=archive_id).first()
     now = timezone.now()
     expected = hashlib.sha256(raw.encode()).hexdigest()
     valid = bool(

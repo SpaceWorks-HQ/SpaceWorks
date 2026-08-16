@@ -41,6 +41,13 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("accounts.PhoneVerificationChallenge", "user"),
         ("accounts.SocialIdentity", "user"),
         ("admin_api.BulkImportJob", "actor"),
+        # Phase 5A. The guard scans every internal model, not only exported ones, so these
+        # must be declared even though their owning models are deployment state that never
+        # travels -- the declaration keeps the scan and the registry in step.
+        ("backup.BackupArchive", "requested_by"),
+        ("backup.DeploymentRecoveryState", "acknowledged_by"),
+        ("backup.DeploymentRecoveryState", "recovery_principal"),
+        ("backup.RestoreOperation", "requested_by"),
         ("data_export.DataExportJob", "requested_by"),
         ("data_export.DataExportJob", "download_issued_to"),
         ("apiclients.ApiClient", "created_by"),

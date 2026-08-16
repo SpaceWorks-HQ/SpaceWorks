@@ -2,6 +2,7 @@ from django.db import OperationalError, ProgrammingError
 from django.http import JsonResponse
 from django.urls import Resolver404, resolve
 
+from apps.backup import recovery_cache
 from apps.backup.models import DeploymentRecoveryState
 from apps.backup.route_policy import route_allowed
 
@@ -14,10 +15,11 @@ class DeploymentRecoveryGateMiddleware:
 
     def __call__(self, request):
         try:
-            state = DeploymentRecoveryState.objects.only("mode").filter(pk=1).first()
+            mode = recovery_cache.cached_mode(self._load_mode)
         except (OperationalError, ProgrammingError):
+            # Fail closed, and do not cache the failure: an unreadable state must refuse
+            # every request rather than be remembered as NORMAL for the TTL.
             return self._refused("unavailable")
-        mode = state.mode if state else DeploymentRecoveryState.Mode.NORMAL
         if mode == DeploymentRecoveryState.Mode.NORMAL:
             return self.get_response(request)
         try:
@@ -27,6 +29,11 @@ class DeploymentRecoveryGateMiddleware:
         if not route_allowed(mode, view_name, request.method):
             return self._refused(mode)
         return self.get_response(request)
+
+    @staticmethod
+    def _load_mode():
+        state = DeploymentRecoveryState.objects.only("mode").filter(pk=1).first()
+        return state.mode if state else DeploymentRecoveryState.Mode.NORMAL
 
     @staticmethod
     def _refused(mode):
