@@ -68,6 +68,12 @@ def unarchive(makerspace, actor):
             raise ValidationError("Cannot unarchive a hidden makerspace.")
         if locked.archived_at is None:
             raise ValidationError("Makerspace is not archived.")
+        from apps.tenant_migration.cutover import has_active_migrated_out_handoff
+
+        if has_active_migrated_out_handoff(locked.pk):
+            raise ValidationError(
+                "A migrated-out makerspace can only be reopened with a signed abort receipt."
+            )
 
         locked.archived_at = None
         locked.archived_by = None
