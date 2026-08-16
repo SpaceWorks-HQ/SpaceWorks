@@ -125,6 +125,9 @@ RELATIONAL_USER_FIELDS = frozenset(
         # Phase 5B target-side coordination is omitted from exports, but the model-graph
         # guard still requires its nullable account edge to be declared explicitly.
         ("tenant_migration.ImportIdentityDecision", "target_user"),
+        ("tenant_migration.MigrationPairing", "approved_by"),
+        ("tenant_migration.ReceiptConsumption", "consumed_by"),
+        ("tenant_migration.MigratedOutHandoff", "reopened_by"),
         ("makerspaces.MakerspaceWaiver", "created_by"),
         ("makerspaces.MembershipRequest", "user"),
         ("makerspaces.MembershipRequest", "requested_by"),
