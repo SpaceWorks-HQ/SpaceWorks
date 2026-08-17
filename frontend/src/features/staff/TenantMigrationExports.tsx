@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { Query } from "@tanstack/react-query";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -44,7 +45,9 @@ export function TenantMigrationExports({
     queries: (exportsQuery.data ?? []).map((job) => ({
       queryKey: tenantMigrationKeys.export(makerspaceId, job.id),
       queryFn: () => getMigrationExport(makerspaceId, job.id),
-      refetchInterval: (query) => exportRunning((query.state.data as MigrationExportJob | undefined) ?? job) ? 1500 : false,
+      // `useQueries` with a computed array loses per-entry inference in Query v5,
+      // so the callback argument is annotated rather than left implicitly `any`.
+      refetchInterval: (query: Query) => exportRunning((query.state.data as MigrationExportJob | undefined) ?? job) ? 1500 : false,
     })),
   });
   const validApprovals = approvals.data?.filter(

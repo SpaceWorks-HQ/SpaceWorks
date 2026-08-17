@@ -108,7 +108,9 @@ specs and code in parallel where files don't collide; Claude orchestrates and ve
 
 **Codex is AVAILABLE — verified 2026-08-15: `codex doctor` reports `auth is configured` (ChatGPT
 tokens, standalone runtime 0.147.0, all checks green) — so the Stage-1/2/4 gates in
-`~/.claude/CLAUDE.md` are LIVE and must be run.** There was a stretch when `codex doctor` reported
+`~/.claude/CLAUDE.md` are LIVE and must be run.** It runs as the `gpt-5.6-sol` model at **high**
+reasoning effort (`model = "gpt-5.6-sol"`, `model_reasoning_effort = "high"` in
+`~/.codex/config.toml`). There was a stretch when `codex doctor` reported
 no credentials, during which Claude implemented directly and the owner waived those gates; that no
 longer applies. **Re-check `codex doctor` rather than trusting this paragraph** — it is the one
 claim here that goes stale without anyone editing the file, and it stayed wrong for weeks.
@@ -148,15 +150,20 @@ opt-in attended-events on the maker profile, QR event check-in, and cross-makers
 events with a host-waiver acceptance.
 Most recently **phases 8, 7, 4 and 5A** — emailed-OTP recovery, account-less member surfaces,
 Space-Manager data export and deployment backup/restore — all merged to `dev` (see the changelog).
-**`dev` is 31 commits ahead of `origin/dev` and unpushed; pushing is the owner's call.**
+**`dev` is 62 commits ahead of `origin/dev` and unpushed; pushing is the owner's call.** Ask
+`git rev-list --count origin/dev..dev` rather than trusting that number.
 
-**Phase 5B (per-makerspace tenant migration, managed → self-host) is PLAN-APPROVED AND UNBUILT.**
-All three review lenses approved `2026-08-16-phase5b-plan-v13.md` after thirteen adversarial rounds;
-the owner's Stage-1 sign-off and one scope decision are outstanding — `ExternalTenantReference` plus
-its export transform is work the locked tier-2 disposition assumed the archive format already had,
-and it does not (`archive.py` returns unrecognised transforms unchanged, emitting raw source ids).
-Do not start building it without that sign-off. Its load-bearing conclusions are under
-**Invariants → Backup, restore and tenant migration**.
+**Phase 5B (per-makerspace tenant migration, managed → self-host) is BUILT on `dev`.** All three
+review lenses approved `2026-08-16-phase5b-plan-v13.md` after thirteen adversarial rounds, the owner
+signed off, and every part is merged: `ExternalTenantReference` and its export transform (built in
+full, the one flagged scope increase), PORTABLE raw-column PII reads, reference dispositions, DEK
+carry, the import job and per-person identity decisions, one-shot insertion, the target-owned
+projection, the `IMPORTING`/`ACTIVE`/`ABORTED` lifecycle, signed single-use cutover receipts,
+row-level closure for movable assets and QRs, the lock-protocol source gate, objects carried inside
+the `age` archive with a promotion journal and pre-activation verification, and the closure-admission
+rule plus the superadmin export/import/cutover API and console. Its load-bearing conclusions are
+under **Invariants → Backup, restore and tenant migration**. The one deferred end-to-end owner QA is
+still outstanding.
 
 **Review prompts must be scoped to the DELTA once a plan is large.** Two round-13 reviewers ran
 **6h11m** (against a normal 5–10 min) still grepping migrations, because they were handed the full
@@ -394,6 +401,16 @@ Stack (in use):
   Its `guards._equal(subject, declared, actual)` is called with the *scanned* set passed as
   `declared`, so `extra=` in a failure means **scanned but not registered** — read the signature
   before deciding which side to fix.
+- `backend/apps/tenant_migration/` — per-makerspace migration, managed → self-host (Phase 5B), in
+  `SEPARABLE_APPS`. `source_gate.py` + `gate_locks.py`/`gate_runtime.py`/`gate_policy.py`/
+  `middleware.py`/`task_gate.py` (the write-drain lock protocol and its AST coverage guards in
+  `source_gate_guards.py`); `archive_envelope.py` + `object_export.py` (streamed straight into `age`,
+  objects carried inside it); `admission.py` (the source-superadmin closure approval);
+  `materialization.py` + `raw_repository.py` + `row_planning.py`/`row_dispositions.py` (one-shot
+  insertion); `target_projection.py` + `unique_values.py` + `closure_references.py` (what an archive
+  may become on the target); `verification.py` (pre-commit) and `target_cutover.py` (pre-activation
+  + the `IMPORTING → ACTIVE` transition); `receipts.py`/`receipt_crypto.py`/`cutover.py` (signed
+  single-use handoff); `views_*.py` (superadmin REST surface).
 - `backend/apps/inventory/` — `InventoryProduct`/`InventoryAsset`, `availability.py` (**the only place**
   available/reserved/issued/damaged/lost counts change: `reserve_for_request`, `issue_items`/`return_items`,
   `issue_available`/`return_to_available`, `consume_available`; row-locked, never-below-zero,
@@ -2228,7 +2245,7 @@ procurement (`move_to_printing`); Phase 5A hit it again in three places. Drop th
 and lazy-load; the extra query is free next to the writes the transaction already performs. **This
 is now a recurring trap, not a one-off.**
 
-**Phase 5B (tenant migration) is APPROVED BUT UNBUILT.** The plan is
+**Phase 5B (tenant migration) is BUILT on `dev`.** The plan is
 `docs/superpowers/specs/2026-08-16-phase5b-plan-v13.md` (gitignored) — **cumulative and standalone;
 v1–v12 are history only**. Conclusions that cost thirteen review rounds and must not be re-derived:
 
@@ -2249,6 +2266,92 @@ v1–v12 are history only**. Conclusions that cost thirteen review rounds and mu
 - **Verification must measure authority CONFERRED BY THE IMPORT**, not total effective authority —
   the latter is unsatisfiable for a legitimately linked target superadmin, since `rbac` grants
   superusers everything.
+
+**The source gate holds a SESSION-scoped advisory lock; it must NEVER wrap the request or the task
+in a transaction.** The drain guarantee needs every tenant writer to hold a shared advisory lock
+that quiescence's exclusive acquisition must wait on — but the first implementation got that by
+wrapping every state-changing request in `transaction.atomic()` and giving Celery a `task_cls` that
+did the same. The full suite refused it, and the two failures are the argument: SMTP then ran inside
+a transaction (`test_deliver_email_task_releases_lock_before_smtp` is an existing invariant test
+asserting `in_atomic_block` is 0), and the delivery task's `attempts` increment was **rolled back**
+by the very SMTP failure it was counting, so a failing send recorded zero attempts. Session locks
+(`pg_advisory_lock_shared` / `pg_advisory_unlock_shared`, released in `finally`, holding the physical
+connection so a reopened connection cannot release another session's reference) give the identical
+race-freedom — session and transaction advisory locks share one lock space — with none of that.
+`assert_write_allowed` therefore supports three shapes: inside an existing `atomic()` it takes the
+transaction-scoped lock, at a request/task boundary it uses the already-held session lock, and a
+direct non-atomic call takes a temporary session one. External I/O inside a lock-holding transaction
+stays banned; this is that rule applied to the gate itself.
+
+**The gate may refuse a request; it may never CHANGE one.** `_makerspace_id()` resolved the tenant
+with `get_public_makerspace()`, which raises `Http404` for an unknown, archived or non-public slug —
+so a route that was going to answer 403 answered 404 instead, and the gate had silently rewritten an
+authorization outcome (`test_every_refused_matrix_entry_returns_403[public-membership-request-POST]`
+caught it). Every resolution helper the gate calls must be non-raising: unresolvable means "no tenant
+known here", which falls through to the unscoped lock, never a rejection. Refusal requires a
+*resolved* tenant — an unresolved one must not 423 either, or a single tenant's migration takes down
+every unscoped POST on the deployment (login, refresh, password reset, the import control plane).
+The shared lock still covers those requests, so the drain guarantee survives the fail-open refusal;
+totality is then the AST coverage guard's job, not the middleware's.
+
+**A new model needs BOTH a model classification and a user-edge decision, and the second is the one
+that gets missed.** `SourceMigrationGate.actor` and then `TenantImportJob.actor` each failed
+`test_complete_registry_is_valid` after being correctly registered as `OmittedModel` — the model
+classification says nothing about the model's FKs to `accounts.User`, and a stray user edge would
+pull that account into the PORTABLE global closure. Both are declared as excluded. This was missed
+twice in consecutive parts; when adding a model, enumerate its user FKs as a separate step.
+
+**Deployment-global uniqueness is now introspected, not hand-listed.** `projection_guards` scans
+every model in `EXPORTED_MODELS` for uniqueness rules **not scoped by makerspace** — field-level
+`unique=True` included, which is how `boxes.QrCode.payload` slipped through and blew up a same-
+deployment round trip on `boxes_qrcode_payload_key`. All **39** discovered rules carry an explicit
+disposition in `unique_values.py`. Eight are **preserve-unless-collision** (`QrCode.payload`,
+`Box.code`, and the six private-bucket `object_key` columns): preservation is the default because a
+regenerated QR payload silently invalidates a label physically stuck to a box, and regeneration is
+per-colliding-value, never per-model, is added to `regenerated_fields` so the pre-commit uniqueness
+check covers it, and is **counted in the operator report** so the regeneration is visible.
+
+**A raw cursor returns `jsonb` as a STRING.** Django's psycopg2 backend decodes JSON at the *field*
+layer, not the connection layer, so `ReferenceState`'s temp-table reads handed back `detail` as text.
+Every consumer had only ever tested the record for existence, so it went unnoticed until the first
+caller read into it. `get()` now parses it. Expect the same anywhere this codebase reads `jsonb`
+through `connection.cursor()`.
+
+**A same-deployment round trip can never observe key PRESERVATION, and that is the harness, not the
+rule.** Source and target share one database and one bucket in tests, so every carried object key
+and QR payload collides with its own source row. A preservation test must first remove the source
+row and object *after* the archive is built — which is exactly what a target deployment that has
+never seen the key looks like. The collision check itself consults the **object store** (`head_object`),
+not the row table, because the constraint being protected is storage-key uniqueness in the target
+bucket; that also catches an orphaned object squatting a key.
+
+**A DROP disposition is enforced at BOTH ends, and they are not redundant.** PORTABLE export omits a
+drop-disposition row entirely (`admission.export_row_policy`) — `MembershipRequest.invite_email` is a
+stranger's email address, and a row that can never become live has no business travelling to a
+foreign deployment. The importer still refuses such a row, because the archive is not always one your
+own export produced: a crafted or older archive is precisely what that guard exists for. Export-side
+omission is PORTABLE-only, so the Space Manager's REDACTED export is unchanged.
+
+**Closure admission, as built.** The export computes the exact global-user closure **after** the
+retain/drop/stage dispositions are applied, canonicalizes it, and binds a source-superadmin approval
+to its **digest** — if the closure changes, the approval is void and the export refuses rather than
+disclosing someone new. An unapproved identity's PII is omitted and replaced with an opaque inert
+reference; if a retained non-null relationship cannot be reconstructed without it, the export aborts.
+Two adversarial tests plant an invitation and an active Member membership for an unrelated global
+account and assert on the **archive bytes** that a blanket approval discloses neither.
+
+**Do not discover a field by guessing its vocabulary.** `target_state._state_field_name()` scanned
+every concrete field for one whose `choices` contained `IMPORTING`/`ACTIVE`/`ABORTED`. That existed
+only while the lifecycle column was hypothetical; it crashed the moment a field with `choices=None`
+appeared (`getattr(field, "choices", ())` returns `None`, not the default, when the attribute exists
+and is None) and it would have bound to the wrong column the first time another field shared those
+values. `Makerspace.lifecycle_state` is real — name it.
+
+**One genuinely pre-existing flake was fixed, not papered over.** The encryption tests corrupt
+ciphertext by flipping a base64url character, but non-canonical endings can decode to identical
+bytes because the difference lives only in discarded padding bits — so roughly 1 in 16 corruptions
+decoded cleanly and no rollback happened. The decoder now requires canonical base64url. Our own
+encoder always emits canonical output, so stored envelopes are unaffected.
 
 ### Container / deployment invariants
 
@@ -2302,6 +2405,19 @@ images are pinned to a verified release tag — **verify a tag actually resolves
 Each line names a shipped feature and, where useful, the load-bearing rule it introduced (folded into the
 invariants above). Use `git log --oneline`/`git blame` for the implementing commits and per-file history.
 
+- **Phase 5B — per-makerspace tenant migration, managed → self-host** (2026-08-17/18, `dev`, local):
+  `apps/tenant_migration/`, built in parts across parallel worktrees. `ExternalTenantReference` and
+  its export transform; PORTABLE raw-column PII reads; reference dispositions and omitted-field
+  reconstruction; DEK carry with the archive streamed straight into `age`; the import job and
+  per-person identity decisions; one-shot insertion; the target-owned projection; the
+  `IMPORTING`/`ACTIVE`/`ABORTED` lifecycle failing closed on every serving path; signed single-use
+  cutover receipts; row-level closure for movable assets, QRs and inbound transfers; the
+  lock-protocol source gate; tenant objects carried inside the archive with a promotion journal and
+  pre-activation verification; and the closure-admission rule with its superadmin export/import/
+  cutover API and console. Suite: **3879 passed**. The load-bearing conclusions — including why the
+  gate uses session-scoped advisory locks rather than a request-wide transaction, and the 39-rule
+  deployment-global uniqueness guard — are under **Invariants → Backup, restore and tenant
+  migration**.
 - **Account recovery, account-less members, data export, deployment backup** (2026-08-16, `dev`,
   local, 31 commits unpushed): **Phase 8** emailed-OTP recovery (`PasswordResetEnvelope`, at-most-once
   drain with generation fencing) which also closed two **pre-existing** TOCTOU races in the legacy
