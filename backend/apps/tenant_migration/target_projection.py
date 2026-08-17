@@ -115,6 +115,10 @@ TARGET_FIELD_PROJECTION = {
     ("makerspaces.Makerspace", "resource_limit_overrides"): _default(
         "Resource limits are deployment-owned capacity policy."
     ),
+    ("makerspaces.Makerspace", "storage_bytes_used"): TargetField(
+        0,
+        reason="Target quota accounting starts empty and is charged as objects promote.",
+    ),
     ("makerspaces.Makerspace", "membership_policy"): TargetField(
         "request", allow_superadmin_override=True,
         reason="Open admission is a target grant, not a portable preference.",

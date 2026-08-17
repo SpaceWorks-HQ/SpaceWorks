@@ -1,7 +1,9 @@
 import pytest
+from django.conf import settings
 from django.contrib import admin
 from django.urls import Resolver404, resolve
 
+from apps.operations.management.commands.run_scheduled_tasks import SCHEDULED_TASKS
 from apps.separability.registry import runtime_active
 from apps.tenant_migration.models import (
     DisclosureClosureApproval,
@@ -52,3 +54,14 @@ def test_neighbouring_data_export_route_still_resolves():
 def test_runtime_admin_models_are_not_registered():
     assert DisclosureClosureApproval not in admin.site._registry
     assert TenantMigrationExportJob not in admin.site._registry
+
+
+def test_tenant_migration_cleanup_tasks_are_not_scheduled():
+    task_names = {
+        "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task",
+        "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task",
+    }
+    assert task_names.isdisjoint(
+        entry["task"] for entry in settings.CELERY_BEAT_SCHEDULE.values()
+    )
+    assert task_names.isdisjoint(task_path for _, task_path, _ in SCHEDULED_TASKS)

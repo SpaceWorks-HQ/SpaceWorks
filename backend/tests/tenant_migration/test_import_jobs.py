@@ -72,6 +72,10 @@ def test_job_precedes_the_tenant_and_never_protects_it():
     assert field.null is True
     assert field.remote_field.on_delete is models.SET_NULL
 
+    actor_field = TenantImportJob._meta.get_field("actor")
+    assert actor_field.null is True
+    assert actor_field.remote_field.on_delete is models.SET_NULL
+
 
 def test_target_account_is_unique_per_job_but_null_targets_are_not():
     job = make_job()

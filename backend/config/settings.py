@@ -523,7 +523,17 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task",
         "schedule": crontab(minute=20),
     },
+    "cleanup-abandoned-tenant-import-objects": {
+        "task": "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task",
+        "schedule": crontab(minute=35),
+    },
 }
+if "tenant_migration" in TOMBSTONED_APPS:
+    CELERY_BEAT_SCHEDULE = {
+        name: entry
+        for name, entry in CELERY_BEAT_SCHEDULE.items()
+        if ".tenant_migration." not in entry["task"]
+    }
 
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",

@@ -8,6 +8,10 @@ from django.utils import timezone
 
 from apps.audit import services as audit
 from apps.makerspaces.servability import is_servable
+from apps.makerspaces.storage_key_collectors import (
+    collect_private_object_keys as _collect_storage_keys,
+    collect_public_image_keys as _collect_public_image_keys,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -117,87 +121,6 @@ def _audit_meta(makerspace):
         "slug": makerspace.slug,
     }
 
-
-def _collect_storage_keys(makerspace):
-    from apps.backup.models import RestoreRollbackObject
-    from apps.admin_api.models import BulkImportJob
-    from apps.data_export.models import DataExportJob
-    from apps.evidence.models import EvidencePhoto
-    from apps.maintenance.models import MaintenanceLogDocument
-    from apps.machines.models import MachineDocument
-    from apps.machines.service_lifecycle import collect_private_object_keys
-    from apps.procurement.models import ToBuyReceipt
-    from apps.warranty.models import WarrantyDocument
-
-    keys, seen = [], set()
-    def add(key):
-        if key and key not in seen:
-            seen.add(key)
-            keys.append(key)
-    for model, lookup in (
-        (EvidencePhoto, {"makerspace": makerspace}),
-        (WarrantyDocument, {"warranty__makerspace": makerspace}),
-        (ToBuyReceipt, {"to_buy_item__makerspace": makerspace}),
-        (MaintenanceLogDocument, {"log__machine__makerspace": makerspace}),
-        (MachineDocument, {"machine__makerspace": makerspace}),
-    ):
-        for key in model.objects.filter(**lookup).values_list("object_key", flat=True):
-            add(key)
-    # `BulkImportJob.upload` is a FileField on the default storage, which is S3 -- so its
-    # name IS a key in the same private bucket as the rows above. The job rows themselves go
-    # with the makerspace through CASCADE, and nothing else names the file, so without this
-    # the uploads outlive every record that could identify them. No current path writes one
-    # (`views_bulk.py` parses the file and stores `rows` instead), so this is legacy data
-    # only -- which is exactly why it had no collector and would never have grown one.
-    for name in BulkImportJob.objects.filter(makerspace=makerspace).values_list(
-        "upload", flat=True
-    ):
-        add(name)
-    # ExportJob is the only durable name for a completed archive. Collect it before
-    # CASCADE removes the row or the archive becomes undiscoverable in the bucket.
-    for name in DataExportJob.objects.filter(makerspace=makerspace).values_list(
-        "object_key", flat=True
-    ):
-        add(name)
-    collect_private_object_keys(makerspace, add)
-    for key in RestoreRollbackObject.objects.filter(
-        makerspace=makerspace,
-        bucket_kind=RestoreRollbackObject.BucketKind.PRIVATE,
-    ).exclude(copy_key="").values_list("copy_key", flat=True):
-        add(key)
-    return keys
-
-
-def _collect_public_image_keys(makerspace):
-    from apps.backup.models import RestoreRollbackObject
-    from apps.bookings.models import BookableSpace
-    from apps.events.models import Event
-    from apps.inventory.models import InventoryProduct
-    from apps.machines.models import Machine
-
-    from apps.makerspaces.models import MemberProfile, MemberProject
-
-    keys = [makerspace.logo_key, makerspace.cover_image_key]
-    for model in (BookableSpace, Event, InventoryProduct, Machine):
-        keys.extend(model.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
-    # Member imagery is reached through the membership, not a makerspace column.
-    keys.extend(
-        MemberProfile.objects.filter(membership__makerspace=makerspace).values_list(
-            "avatar_key", flat=True
-        )
-    )
-    keys.extend(
-        MemberProject.objects.filter(
-            profile__membership__makerspace=makerspace
-        ).values_list("image_key", flat=True)
-    )
-    keys.extend(
-        RestoreRollbackObject.objects.filter(
-            makerspace=makerspace,
-            bucket_kind=RestoreRollbackObject.BucketKind.PUBLIC_IMAGE,
-        ).exclude(copy_key="").values_list("copy_key", flat=True)
-    )
-    return [key for key in dict.fromkeys(keys) if key]
 
 def _delete_object_graph(makerspace):
     from apps.backup.models import RestoreRollbackObject

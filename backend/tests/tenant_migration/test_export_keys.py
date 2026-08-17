@@ -128,6 +128,11 @@ def test_archive_stream_is_age_output_with_matching_in_memory_ledger(
         "build_archive",
         lambda _job, **_kwargs: (root, export_manifest, tempdir),
     )
+    monkeypatch.setattr(
+        archive_envelope,
+        "capture_tenant_objects",
+        lambda _root, _space, _modes: [],
+    )
     gate_owner = uuid.uuid4()
 
     @contextmanager

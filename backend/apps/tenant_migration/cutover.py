@@ -1,11 +1,10 @@
 from django.db import transaction
 from django.utils import timezone
 
-from apps.audit import services as audit
 from apps.accounts.models import User
+from apps.audit import services as audit
 from apps.makerspaces import lifecycle
 from apps.makerspaces.models import Makerspace
-from apps.tenant_migration import target_state
 from apps.tenant_migration.models_protocol import (
     MigratedOutHandoff,
     MigrationPairing,
@@ -82,99 +81,21 @@ def retire_source(*, pairing, makerspace, actor):
     return persisted_envelope(receipt)
 
 
-@transaction.atomic
 def activate_target(*, pairing, import_job, receipt_envelope, actor):
-    """Consume source authority in the same transaction as IMPORTING -> ACTIVE."""
-    _require_superuser(actor)
-    pairing = _locked_pairing(pairing)
-    target = _validated_target_job(pairing, import_job)
-    receipt = verify_and_persist_peer_receipt(
-        pairing,
-        receipt_envelope,
-        MigrationReceipt.Operation.SOURCE_CUTOVER,
-    )
-    consumed = ReceiptConsumption.objects.filter(receipt=receipt).first()
-    if consumed is not None:
-        _require_idempotent_consumption(
-            consumed,
-            ReceiptConsumption.Purpose.ACTIVATE_TARGET,
-        )
-        if not target_state.target_has_state(target.pk, target_state.ACTIVE):
-            raise TransitionConflictError(
-                "The activation receipt was consumed without an active target."
-            )
-        return persisted_envelope(receipt)
+    from .target_cutover import activate_target as activate
 
-    if target_state.transition_target(
-        target.pk,
-        target_state.IMPORTING,
-        target_state.ACTIVE,
-    ) != 1:
-        raise TransitionConflictError(
-            "Target activation requires the IMPORTING lifecycle state."
-        )
-    consume_once(receipt, ReceiptConsumption.Purpose.ACTIVATE_TARGET, actor)
-    audit.record(
-        actor,
-        "tenant_migration.target_activated",
-        makerspace=target,
-        target=receipt,
-        meta={
-            "migration_id": str(receipt.migration_id),
-            "receipt_id": str(receipt.receipt_id),
-            "signer_fingerprint": receipt.signer_fingerprint,
-            "source_deployment_id": receipt.source_deployment_id,
-            "target_deployment_id": receipt.target_deployment_id,
-            "format_version": receipt.format_version,
-            "outcome": "active",
-        },
-    )
-    return persisted_envelope(receipt)
-
-
-@transaction.atomic
-def abort_target(*, pairing, import_job, actor):
-    """Make activation impossible before issuing the target's abort proof."""
-    _require_superuser(actor)
-    pairing = _locked_pairing(pairing)
-    target = _validated_target_job(pairing, import_job)
-    existing = MigrationReceipt.objects.filter(
+    return activate(
         pairing=pairing,
-        operation=MigrationReceipt.Operation.TARGET_ABORT,
-        issued_here=True,
-    ).first()
-    if existing is not None:
-        if not target_state.target_has_state(target.pk, target_state.ABORTED):
-            raise TransitionConflictError(
-                "The abort receipt exists without an aborted target."
-            )
-        return persisted_envelope(existing)
-
-    if target_state.transition_target(
-        target.pk,
-        target_state.IMPORTING,
-        target_state.ABORTED,
-    ) != 1:
-        raise TransitionConflictError(
-            "Target abort requires the IMPORTING lifecycle state."
-        )
-    receipt = issue_local_receipt(pairing, MigrationReceipt.Operation.TARGET_ABORT)
-    audit.record(
-        actor,
-        "tenant_migration.target_aborted",
-        makerspace=target,
-        target=receipt,
-        meta={
-            "migration_id": str(receipt.migration_id),
-            "receipt_id": str(receipt.receipt_id),
-            "signer_fingerprint": receipt.signer_fingerprint,
-            "source_deployment_id": receipt.source_deployment_id,
-            "target_deployment_id": receipt.target_deployment_id,
-            "format_version": receipt.format_version,
-            "outcome": "aborted",
-        },
+        import_job=import_job,
+        receipt_envelope=receipt_envelope,
+        actor=actor,
     )
-    return persisted_envelope(receipt)
+
+
+def abort_target(*, pairing, import_job, actor):
+    from .target_cutover import abort_target as abort
+
+    return abort(pairing=pairing, import_job=import_job, actor=actor)
 
 
 @transaction.atomic
@@ -250,19 +171,6 @@ def has_active_migrated_out_handoff(makerspace_id):
 
 def _locked_pairing(pairing):
     return MigrationPairing.objects.select_for_update().get(pk=pairing.pk)
-
-
-def _validated_target_job(pairing, import_job):
-    job = import_job.__class__.objects.select_for_update().get(pk=import_job.pk)
-    if (
-        job.pk != pairing.migration_id
-        or job.target_makerspace_id is None
-        or job.source_archive_digest != pairing.archive_digest
-        or job.source_makerspace_id != pairing.source_tenant_id
-        or job.source_deployment_id != pairing.source_deployment_id
-    ):
-        raise TransitionConflictError("The import job does not match the pairing.")
-    return Makerspace.objects.get(pk=job.target_makerspace_id)
 
 
 def _require_superuser(actor):

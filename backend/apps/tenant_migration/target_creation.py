@@ -5,11 +5,14 @@ from django.utils.crypto import get_random_string
 from apps.makerspaces.models import Makerspace
 
 from .archive_stream import database_value
+from .object_fields import rewrite_object_fields
 from .omitted_fields import OMITTED_FIELD_RECONSTRUCTIONS, OmittedFieldDisposition
 from .target_projection import TARGET_FIELD_PROJECTION
 
 
-def create_target_makerspace(archive, job, *, target_identity=None):
+def create_target_makerspace(
+    archive, job, *, target_identity=None, object_key_map=None
+):
     source = next(archive.rows("makerspaces.Makerspace"))
     identity = dict(target_identity or {})
     unknown = set(identity) - {"name", "slug"}
@@ -29,7 +32,9 @@ def create_target_makerspace(archive, job, *, target_identity=None):
     values.update(identity)
     values["created_by"] = None
     values["archived_by"] = None
+    values["lifecycle_state"] = Makerspace.LifecycleState.IMPORTING
     values["slug"] = _available_slug(values["slug"], job)
+    rewrite_object_fields(Makerspace, values, object_key_map or {})
     if Makerspace.objects.filter(public_code=values["public_code"]).exists():
         values["public_code"] = _fresh_value(Makerspace._meta.get_field("public_code"))
     return Makerspace.objects.create(**values)

@@ -16,6 +16,7 @@ from apps.tenant_migration.archive_envelope import (
     build_tenant_migration_archive,
 )
 from apps.tenant_migration.gate_errors import SourceMigrationGateError
+from apps.tenant_migration.object_export import SourceMigrationObjectError
 from apps.tenant_migration.preflight import SourcePreflightError
 
 
@@ -56,6 +57,7 @@ class Command(BaseCommand):
             SourcePreflightError,
             MigrationArchiveError,
             SourceMigrationGateError,
+            SourceMigrationObjectError,
         ) as exc:
             raise CommandError(str(exc)) from exc
         self.stdout.write(self.style.SUCCESS(f"Archive: {path}"))

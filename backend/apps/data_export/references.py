@@ -123,7 +123,9 @@ RELATIONAL_USER_FIELDS = frozenset(
         # declared so user-edge completeness stays a total check over the graph.
         ("makerspaces.ImportedUserReconciliation", "target_user"),
         # Phase 5B target-side coordination is omitted from exports, but the model-graph
-        # guard still requires its nullable account edge to be declared explicitly.
+        # guard still requires every account edge to be declared explicitly. A model-level
+        # omission does not decide whether an account belongs in the global user closure.
+        ("tenant_migration.TenantImportJob", "actor"),
         ("tenant_migration.ImportIdentityDecision", "target_user"),
         ("tenant_migration.DisclosureClosureApproval", "approved_by"),
         ("tenant_migration.DisclosureClosureApproval", "revoked_by"),
@@ -160,6 +162,10 @@ RELATIONAL_USER_FIELDS = frozenset(
 
 USER_EDGES = {}
 _EXCLUDED_USER_EDGE_REASONS = {
+    ("tenant_migration.TenantImportJob", "actor"): (
+        "Target-side import coordination attribution must not contribute to a tenant "
+        "archive's global user closure."
+    ),
     ("tenant_migration.SourceMigrationGate", "actor"): (
         "Deployment-scoped source-gate ownership must not contribute to a tenant "
         "archive's global user closure."

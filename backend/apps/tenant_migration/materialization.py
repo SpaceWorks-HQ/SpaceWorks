@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from django.apps import apps
 from django.db import connection, transaction
+from django.utils import timezone
 
 from apps.encryption.cache import dek_cache
 from apps.encryption.models import PiiMakerspaceWriteFence
@@ -21,6 +22,11 @@ from .identity_resolution import (
 from .import_keys import install_carried_deks
 from .insertion_errors import IdentityResolutionError
 from .models_import_job import TenantImportJob
+from .object_import import (
+    prepare_import_objects,
+    promote_import_objects,
+    rollback_import_objects,
+)
 from .pk_maps import TransactionPkMap
 from .raw_repository import RawImportRepository
 from .reference_state import ReferenceState
@@ -48,6 +54,10 @@ class MaterializationResult:
     installed_dek_versions: tuple[int, ...]
     blind_indexes_created: int
     external_references_created: int
+    objects_staged: int
+    object_keys_regenerated: int
+    object_key_regenerations: dict[str, str]
+    objects_promoted: int
 
 
 def materialize_tenant(
@@ -58,19 +68,25 @@ def materialize_tenant(
     target_identity=None,
     batch_size=500,
 ):
-    """Create and verify one target tenant in a single database transaction."""
+    """Commit database state atomically, then promote its staged objects."""
     archive = PortableArchive(archive_directory)
     target = None
+    locked_job = None
+    object_plan = None
     carried = tuple(carried_deks)
     if batch_size < 1:
         raise ValueError("batch_size must be positive.")
     try:
+        object_plan = prepare_import_objects(archive, job)
         with transaction.atomic():
             locked_job = TenantImportJob.objects.select_for_update().get(pk=job.pk)
             if locked_job.target_makerspace_id is not None:
                 raise IdentityResolutionError("The import job is already materialized.")
             target = create_target_makerspace(
-                archive, locked_job, target_identity=target_identity
+                archive,
+                locked_job,
+                target_identity=target_identity,
+                object_key_map=object_plan.target_keys,
             )
             locked_job.target_makerspace = target
             locked_job.status = TenantImportJob.Status.MATERIALIZING
@@ -122,6 +138,7 @@ def materialize_tenant(
                     deks,
                     accounting,
                     batch_size,
+                    object_plan.target_keys,
                 )
                 external_count = materialize_external_references(
                     archive, locked_job, target, pk_map, batch_size=batch_size
@@ -138,7 +155,9 @@ def materialize_tenant(
                     identity_report=identities,
                     regenerated_fields=regenerated,
                 )
-            return MaterializationResult(
+            locked_job.status = TenantImportJob.Status.COMPLETED
+            locked_job.save(update_fields=("status", "updated_at"))
+            result = MaterializationResult(
                 target_makerspace_id=target.pk,
                 imported=dict(accounting.imported),
                 resolved=dict(accounting.resolved),
@@ -151,16 +170,36 @@ def materialize_tenant(
                 installed_dek_versions=installed_versions,
                 blind_indexes_created=blind_count,
                 external_references_created=external_count,
+                objects_staged=object_plan.staged,
+                object_keys_regenerated=object_plan.regenerated,
+                object_key_regenerations=dict(object_plan.regenerated_keys),
+                objects_promoted=0,
             )
+        promoted = promote_import_objects(locked_job)
+        return MaterializationResult(
+            **{
+                **result.__dict__,
+                "objects_promoted": promoted,
+            }
+        )
     except Exception:
         if target is not None:
             dek_cache.invalidate(target.pk)
+        TenantImportJob.objects.filter(pk=job.pk).update(
+            status=TenantImportJob.Status.FAILED,
+            terminal_at=timezone.now(),
+            updated_at=timezone.now(),
+        )
+        rollback_job = TenantImportJob.objects.select_related(
+            "target_makerspace", "actor"
+        ).get(pk=job.pk)
+        rollback_import_objects(rollback_job)
         raise
 
 
 def _insert_models(
     ordered, archive, job, pk_map, references, target, deks,
-    accounting, batch_size,
+    accounting, batch_size, object_key_map,
 ):
     repository = RawImportRepository()
     regenerated = set()
@@ -182,6 +221,7 @@ def _insert_models(
                 target=target,
                 deks=deks,
                 fresh_values=fresh_values,
+                object_key_map=object_key_map,
             )
             if row is None:
                 continue

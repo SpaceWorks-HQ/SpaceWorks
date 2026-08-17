@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.operations.models import PeriodicTaskRun
@@ -11,6 +12,7 @@ from apps.audit import services as audit
 
 
 CLEANUP_LEASE_NAME = "tenant-import-expiry-cleanup-work"
+CLEANUP_OBJECTS_LEASE_NAME = "tenant-import-object-cleanup-work"
 CLEANUP_LEASE_DURATION = timedelta(minutes=15)
 DEFAULT_CLEANUP_BATCH_SIZE = 100
 
@@ -47,6 +49,7 @@ def create_import_job(*, actor, archive, source_archive_digest, expires_at):
     try:
         with transaction.atomic():
             job = TenantImportJob.objects.create(
+                actor=actor,
                 source_archive_digest=source_archive_digest,
                 source_makerspace_id=str(source.get("id", "")),
                 source_makerspace_slug=str(source.get("slug", "")),
@@ -270,14 +273,50 @@ def cleanup_expired_import_jobs(*, now=None, batch_size=DEFAULT_CLEANUP_BATCH_SI
         .values_list("pk", flat=True)[:batch_size]
     )
     if job_ids:
+        from .object_import import rollback_import_objects
+
+        for job in TenantImportJob.objects.filter(pk__in=job_ids):
+            rollback_import_objects(job)
         TenantImportJob.objects.filter(pk__in=job_ids).delete()
+    return len(job_ids)
+
+
+def cleanup_abandoned_import_objects(*, now=None, batch_size=DEFAULT_CLEANUP_BATCH_SIZE):
+    """Roll back a bounded batch of failed/abandoned object journals."""
+    cleanup_at = now or timezone.now()
+    if not _claim_named_cleanup_lease(CLEANUP_OBJECTS_LEASE_NAME, cleanup_at):
+        return 0
+    job_ids = list(
+        TenantImportJob.objects.filter(
+            Q(status__in=(TenantImportJob.Status.FAILED, TenantImportJob.Status.ABANDONED))
+            | Q(
+                expires_at__lte=cleanup_at,
+                target_makerspace__lifecycle_state__in=("importing", "aborted"),
+            ),
+            import_objects__state__in=("staged", "promoted", "verified", "failed"),
+        )
+        .order_by("updated_at", "pk")
+        .values_list("pk", flat=True)
+        .distinct()[:batch_size]
+    )
+    from .object_import import rollback_import_objects
+
+    for job in TenantImportJob.objects.filter(pk__in=job_ids).select_related(
+        "target_makerspace", "actor"
+    ):
+        rollback_import_objects(job)
     return len(job_ids)
 
 
 @transaction.atomic
 def _claim_cleanup_lease(now):
+    return _claim_named_cleanup_lease(CLEANUP_LEASE_NAME, now)
+
+
+@transaction.atomic
+def _claim_named_cleanup_lease(name, now):
     row, created = PeriodicTaskRun.objects.select_for_update().get_or_create(
-        name=CLEANUP_LEASE_NAME,
+        name=name,
         defaults={"last_run_at": now},
     )
     if not created and now - row.last_run_at < CLEANUP_LEASE_DURATION:

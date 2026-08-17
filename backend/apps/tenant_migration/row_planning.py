@@ -13,6 +13,7 @@ from .closure_references import (
 from .event_hashes import event_registration_hash_columns
 from .identity_resolution import decision_for_source_user
 from .omitted_fields import OMITTED_FIELD_RECONSTRUCTIONS, OmittedFieldDisposition
+from .object_fields import rewrite_object_fields
 from .pii_reencryption import reencrypt_mapped_value_with_plaintext
 from .insertion_errors import PrimaryKeyMapUnavailable
 from .row_dispositions import row_disposition, _seeded_target_pk
@@ -36,6 +37,7 @@ def final_row(
     target,
     deks,
     fresh_values,
+    object_key_map,
 ):
     label = model._meta.label
     disposition = row_disposition(label, source, references)
@@ -60,6 +62,7 @@ def final_row(
         row[field.column] = value
 
     _apply_target_fields(label, source, row)
+    rewrite_object_fields(model, row, object_key_map)
     if not _remap_foreign_keys(model, source, row, job, pk_map, target, references):
         return None
     _clear_walk_in_waiver_evidence(label, source, row, job)
