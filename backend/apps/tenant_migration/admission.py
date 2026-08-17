@@ -16,6 +16,7 @@ from apps.data_export.types import Fidelity
 
 from .models_protocol import DisclosureClosureApproval
 from .protocol_errors import ClosureAdmissionError, ClosureChangedError
+from .row_conditions import condition_matches
 from .target_projection import ROW_POLICIES, RowDisposition
 
 
@@ -27,9 +28,12 @@ def export_row_policy(model_label, row):
         # that same closure through the audit actor edge.
         return False, False
     policy = ROW_POLICIES.get(model_label)
-    if policy is None or not _condition_matches(policy.condition, row):
+    if policy is None or not condition_matches(policy.condition, row):
         return True, True
     if policy.disposition is RowDisposition.DROP:
+        # Source-controlled PORTABLE exports omit rows that can never become live,
+        # while import applies the same refusal independently because crafted and
+        # older archives are not under the source exporter's control.
         return False, False
     if policy.disposition in {
         RowDisposition.STAGE_INERT,
@@ -178,16 +182,6 @@ def _model_field(model_label, field_name):
         return apps.get_model(model_label)._meta.get_field(field_name)
     except Exception:
         return None
-
-
-def _condition_matches(condition, row):
-    if condition is None:
-        return True
-    actual = str(getattr(row, condition[0], "")).lower()
-    expected = condition[1]
-    if isinstance(expected, (tuple, list, set, frozenset)):
-        return actual in {str(value).lower() for value in expected}
-    return actual == str(expected).lower()
 
 
 def _require_superadmin(actor):
