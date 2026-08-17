@@ -80,6 +80,8 @@ def build_archive(job, *, page_size=None, monotonic=time.monotonic, package=True
                 rows, count = _read_dataset(
                     dataset, job.makerspace_id, closure, page_size, deadline_clock, monotonic
                 )
+                if external_writer is not None:
+                    external_writer.prepare_rows(dataset.model, rows)
                 if reference_writer is not None:
                     reference_writer.prepare_rows(dataset.model, rows)
                 write_dataset(

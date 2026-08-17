@@ -25,7 +25,11 @@ from .pk_maps import TransactionPkMap
 from .raw_repository import RawImportRepository
 from .reference_state import ReferenceState
 from .row_dispositions import ImportAccounting, preallocate_model
-from .row_planning import final_row, update_resolved_row
+from .row_planning import (
+    final_row,
+    protect_carried_unique_values,
+    update_resolved_row,
+)
 from .target_creation import create_target_makerspace
 from .verification import verify_materialization
 
@@ -36,6 +40,8 @@ class MaterializationResult:
     imported: dict[str, int]
     resolved: dict[str, int]
     dropped: dict[str, int]
+    preserved: dict[tuple[str, str], int]
+    regenerated: dict[tuple[str, str], int]
     identities_linked: int
     identities_created: int
     preexisting_global_authority: tuple[dict[str, object], ...]
@@ -133,16 +139,18 @@ def materialize_tenant(
                     regenerated_fields=regenerated,
                 )
             return MaterializationResult(
-                target.pk,
-                dict(accounting.imported),
-                dict(accounting.resolved),
-                dict(accounting.dropped),
-                identities.linked,
-                identities.created,
-                identities.preexisting_global_authority,
-                installed_versions,
-                blind_count,
-                external_count,
+                target_makerspace_id=target.pk,
+                imported=dict(accounting.imported),
+                resolved=dict(accounting.resolved),
+                dropped=dict(accounting.dropped),
+                preserved=dict(accounting.preserved),
+                regenerated=dict(accounting.regenerated),
+                identities_linked=identities.linked,
+                identities_created=identities.created,
+                preexisting_global_authority=identities.preexisting_global_authority,
+                installed_dek_versions=installed_versions,
+                blind_indexes_created=blind_count,
+                external_references_created=external_count,
             )
     except Exception:
         if target is not None:
@@ -177,6 +185,10 @@ def _insert_models(
             )
             if row is None:
                 continue
+            for field_name, outcome in protect_carried_unique_values(
+                model, row, target, fresh_values
+            ):
+                accounting.increment_field(outcome, label, field_name)
             pending.append(row)
             if len(pending) == batch_size:
                 accounting.increment(

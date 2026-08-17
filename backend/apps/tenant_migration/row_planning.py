@@ -5,6 +5,11 @@ from django.apps import apps
 from apps.encryption.registry import fields_for
 
 from .archive_stream import database_value
+from .closure_references import (
+    CROSS_TENANT_DEPENDENT_REFERENCES,
+    MOVABLE_ROW_REFERENCES,
+    MissingReferenceDisposition,
+)
 from .event_hashes import event_registration_hash_columns
 from .identity_resolution import decision_for_source_user
 from .omitted_fields import OMITTED_FIELD_RECONSTRUCTIONS, OmittedFieldDisposition
@@ -18,6 +23,7 @@ from .target_projection import (
     TARGET_FIELD_PROJECTION,
     ReferenceDisposition,
 )
+from .unique_values import collision_policy
 
 
 def final_row(
@@ -54,7 +60,7 @@ def final_row(
         row[field.column] = value
 
     _apply_target_fields(label, source, row)
-    if not _remap_foreign_keys(model, source, row, job, pk_map, target):
+    if not _remap_foreign_keys(model, source, row, job, pk_map, target, references):
         return None
     _clear_walk_in_waiver_evidence(label, source, row, job)
     if not remap_semantic_references(label, source, row, pk_map, references):
@@ -125,11 +131,12 @@ def _reconstructed_value(label, field, fresh_values):
     return value
 
 
-def _fresh_unique(field, fresh_values):
+def _fresh_unique(field, fresh_values, generator=None):
     key = (field.model._meta.label, field.name)
     current_batch = fresh_values.setdefault(key, set())
+    generate = generator or field.get_default
     for _attempt in range(16):
-        value = field.get_default()
+        value = generate()
         if value in current_batch:
             continue
         if field.model._base_manager.filter(**{field.name: value}).exists():
@@ -137,6 +144,34 @@ def _fresh_unique(field, fresh_values):
         current_batch.add(value)
         return value
     raise RuntimeError(f"Could not generate a unique value for {key[0]}.{key[1]}.")
+
+
+def protect_carried_unique_values(model, row, target, fresh_values):
+    """Preserve carried labels/keys, changing only a value that actually collides."""
+    outcomes = []
+    label = model._meta.label
+    for field in model._meta.local_concrete_fields:
+        policy = collision_policy(label, field.name)
+        if policy is None:
+            continue
+        value = row[field.column]
+        key = (label, field.name)
+        current_batch = fresh_values.setdefault(key, set())
+        collision = value in current_batch or model._base_manager.filter(
+            **{field.name: value}
+        ).exists()
+        if collision:
+            generator = (
+                (lambda: policy.generator(row, target, value))
+                if policy.generator is not None
+                else field.get_default
+            )
+            row[field.column] = _fresh_unique(field, fresh_values, generator)
+            outcomes.append((field.name, "regenerated"))
+        else:
+            current_batch.add(value)
+            outcomes.append((field.name, "preserved"))
+    return outcomes
 
 
 def _apply_target_fields(label, source, row):
@@ -149,7 +184,7 @@ def _apply_target_fields(label, source, row):
         row[field.column] = policy.resolved_value(label, name)
 
 
-def _remap_foreign_keys(model, source, row, job, pk_map, target):
+def _remap_foreign_keys(model, source, row, job, pk_map, target, references):
     for field in model._meta.local_concrete_fields:
         if not field.is_relation or field.related_model is None:
             continue
@@ -172,11 +207,27 @@ def _remap_foreign_keys(model, source, row, job, pk_map, target):
             try:
                 row[field.column] = pk_map.lookup(field.related_model, source_value)
             except PrimaryKeyMapUnavailable:
-                if field.null and model._meta.label == "operations.InventoryAdjustment":
+                # A crafted archive may retain the numeric id beside its snapshot.
+                # Only a declared NULL disposition authorizes turning that id inert.
+                if field.null and _null_with_provenance(
+                    model._meta.label, field.name, source, references
+                ):
                     row[field.column] = None
                 else:
                     raise
     return True
+
+
+def _null_with_provenance(label, field_name, source, references):
+    rule = MOVABLE_ROW_REFERENCES.get((label, field_name))
+    if rule is not None:
+        disposition = rule.disposition
+    else:
+        disposition = CROSS_TENANT_DEPENDENT_REFERENCES.get((label, field_name))
+    return (
+        disposition is MissingReferenceDisposition.NULL_WITH_PROVENANCE
+        and references.get(label, source["id"], field_name) is not None
+    )
 
 
 def _clear_walk_in_waiver_evidence(label, source, row, job):

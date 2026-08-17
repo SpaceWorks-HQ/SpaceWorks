@@ -14,6 +14,10 @@ def object_schema(**fields):
     return {"type": "object", "fields": fields, "required": frozenset(fields)}
 
 
+def array_schema(items):
+    return {"type": "array", "items": items}
+
+
 # Nothing here is nullable, and that follows from WHEN a snapshot is written rather
 # than from the columns being non-nullable. Most of these columns are nullable, but
 # `ExternalReferenceWriter.project` records provenance only for a reference that exists
@@ -24,6 +28,39 @@ def object_schema(**fields):
 MAKERSPACE = object_schema(name=STRING, slug=STRING)
 EVENT = object_schema(title=STRING, starts_at=TIMESTAMP, ends_at=TIMESTAMP)
 CONTAINER = object_schema(label=STRING, makerspace=MAKERSPACE)
+SOURCE_REFERENCE = object_schema(
+    source_id=INTEGER,
+    target_model_label=STRING,
+    state=STRING,
+    label=STRING,
+)
+SOURCE_REFERENCES = object_schema(references=array_schema(SOURCE_REFERENCE))
+STOCK_TRANSFER = object_schema(
+    source_id=INTEGER,
+    reason=STRING,
+    status=STRING,
+    created_at=TIMESTAMP,
+    owner=MAKERSPACE,
+    source=MAKERSPACE,
+    destination=MAKERSPACE,
+)
+STOCK_TRANSFER_LINE = object_schema(
+    source_id=INTEGER,
+    transfer_source_id=INTEGER,
+    product_name=STRING,
+    asset_label=STRING,
+    quantity=INTEGER,
+    from_status=STRING,
+    to_status=STRING,
+    notes=STRING,
+)
+WARRANTY_DOCUMENT = object_schema(
+    source_id=INTEGER,
+    warranty_source_id=INTEGER,
+    original_filename=STRING,
+    content_type=STRING,
+    size_bytes=INTEGER,
+)
 
 EDGE_SCHEMAS = {
     ("events.EventCollaborator", "event"): EVENT,
@@ -35,6 +72,27 @@ EDGE_SCHEMAS = {
     ("operations.StockTransfer", "source_makerspace"): MAKERSPACE,
     ("operations.StockTransfer", "destination_makerspace"): MAKERSPACE,
     ("payments.Payment", "via_makerspace"): MAKERSPACE,
+    ("hardware_requests.HardwareRequestItemAsset", "asset"): SOURCE_REFERENCE,
+    ("hardware_requests.PublicToolLoan", "qr_code"): SOURCE_REFERENCE,
+    ("hardware_requests.PublicToolLoan", "asset_ids"): SOURCE_REFERENCES,
+    ("hardware_requests.PublicToolLoan", "qr_ids"): SOURCE_REFERENCES,
+    (
+        "hardware_requests.PublicToolLoan",
+        "target_type+target_id",
+    ): SOURCE_REFERENCE,
+    ("boxes.QrCode", "target_type+target_id"): SOURCE_REFERENCE,
+    ("boxes.QrScanEvent", "qr_code"): SOURCE_REFERENCE,
+    ("operations.QrPrintBatchItem", "qr_code"): SOURCE_REFERENCE,
+    ("operations.QrPrintBatchItem", "target_type+target_id"): SOURCE_REFERENCE,
+    ("operations.StocktakeLine", "asset"): SOURCE_REFERENCE,
+    ("operations.InventoryAdjustment", "asset"): SOURCE_REFERENCE,
+    ("operations.StocktakeLedgerEntry", "asset"): SOURCE_REFERENCE,
+    ("operations.StockTransferLine", "asset"): SOURCE_REFERENCE,
+    ("warranty.Warranty", "asset"): SOURCE_REFERENCE,
+    ("operations.StockTransfer", "inbound_transfer"): STOCK_TRANSFER,
+    ("operations.StockTransferLine", "inbound_transfer"): STOCK_TRANSFER_LINE,
+    ("operations.InventoryAdjustment", "transfer"): STOCK_TRANSFER,
+    ("warranty.WarrantyDocument", "external_warranty"): WARRANTY_DOCUMENT,
 }
 
 
@@ -49,6 +107,12 @@ def validate_snapshot(source_model_label, field_name, snapshot):
 
 def _validate_value(value, schema, *, path):
     if isinstance(schema, dict):
+        if schema["type"] == "array":
+            if not isinstance(value, list):
+                raise ValidationError({"snapshot": f"{path} must be an array."})
+            for index, item in enumerate(value):
+                _validate_value(item, schema["items"], path=f"{path}[{index}]")
+            return
         if not isinstance(value, dict):
             raise ValidationError({"snapshot": f"{path} must be an object."})
         fields = schema["fields"]

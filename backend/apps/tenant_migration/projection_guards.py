@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from django.apps import apps
 from django.db import models
 
+from apps.data_export.datasets import DATASET_SPECS
 from apps.data_export.models import EXPORTED_MODELS
 
 from .target_projection import (
@@ -12,9 +13,13 @@ from .target_projection import (
     FK_POLICIES,
     ROW_POLICIES,
     SEEDED_RESOLUTIONS,
-    UNIQUE_COLLISION_MODEL_REASONS,
     ReferenceDisposition,
     RowDisposition,
+)
+from .unique_values import (
+    DEPLOYMENT_GLOBAL_UNIQUE_RULES,
+    UniqueValueDisposition,
+    UniqueValuePolicy,
 )
 
 
@@ -30,9 +35,6 @@ REFERENCE_TARGET_MODELS = frozenset(
         if policy.disposition in {RowDisposition.DROP, RowDisposition.KEEP_TARGET}
     }
 )
-
-
-UNIQUE_COLLISION_MODELS = frozenset(UNIQUE_COLLISION_MODEL_REASONS)
 
 
 @dataclass(frozen=True, order=True)
@@ -95,33 +97,95 @@ def non_null_role_dependents():
     )
 
 
-def discover_unique_constraint_risks():
-    """Introspect every named uniqueness rule on rows that resolve or can collide.
-
-    The model list is the reviewed semantic boundary; constraint names are deliberately
-    obtained from Django metadata so conditional/expression constraints are not
-    reimplemented incorrectly here.
-    """
+def discover_unique_constraint_risks(
+    exported_models=EXPORTED_MODELS, ownership_paths=None
+):
+    """Return every exported uniqueness rule that is not tenant-scoped."""
     risks = set()
-    for label in UNIQUE_COLLISION_MODELS:
-        model = apps.get_model(label)
+    for item in exported_models:
+        model = item if isinstance(item, type) else apps.get_model(item)
+        label = model._meta.label
+        tenant_roots = _tenant_path_roots(label, ownership_paths)
+        for field in model._meta.local_concrete_fields:
+            if field.unique and not field.primary_key and field.name not in tenant_roots:
+                risks.add(UniqueConstraintRisk(label, f"field:{field.name}"))
         for constraint in model._meta.constraints:
-            if isinstance(constraint, models.UniqueConstraint):
+            if (
+                isinstance(constraint, models.UniqueConstraint)
+                and not (_constraint_fields(constraint) & tenant_roots)
+            ):
                 risks.add(UniqueConstraintRisk(label, constraint.name))
         for fields in model._meta.unique_together:
-            risks.add(UniqueConstraintRisk(label, "unique_together:" + ",".join(fields)))
+            if not (set(fields) & tenant_roots):
+                risks.add(
+                    UniqueConstraintRisk(
+                        label, "unique_together:" + ",".join(fields)
+                    )
+                )
     return frozenset(risks)
 
 
-DECLARED_UNIQUE_CONSTRAINT_RISKS = discover_unique_constraint_risks()
+def _tenant_path_roots(label, ownership_paths):
+    if ownership_paths is None:
+        predicate = DATASET_SPECS[label][1]
+        paths = predicate.any_paths + predicate.local_or_global_paths
+    else:
+        paths = ownership_paths[label]
+    # Makerspace itself is deployment-global; its ``pk`` export predicate is only the
+    # selector for the one source row, not a tenant column that scopes uniqueness.
+    return {
+        path.split("__", 1)[0]
+        for path in paths
+        if path not in {"pk", "id", "closure"}
+    }
 
 
-def validate_unique_constraint_risks(declarations=DECLARED_UNIQUE_CONSTRAINT_RISKS):
-    actual = discover_unique_constraint_risks()
-    declared = set(declarations)
+def _constraint_fields(constraint):
+    names = set(constraint.fields)
+    pending = list(constraint.expressions)
+    while pending:
+        expression = pending.pop()
+        if isinstance(expression, models.F):
+            names.add(expression.name.split("__", 1)[0])
+            continue
+        getter = getattr(expression, "get_source_expressions", None)
+        if getter is not None:
+            pending.extend(item for item in getter() if item is not None)
+    return names
+
+
+DECLARED_UNIQUE_CONSTRAINT_RISKS = frozenset(
+    UniqueConstraintRisk(*key) for key in DEPLOYMENT_GLOBAL_UNIQUE_RULES
+)
+
+
+def validate_unique_constraint_risks(
+    declarations=DEPLOYMENT_GLOBAL_UNIQUE_RULES,
+    *,
+    exported_models=EXPORTED_MODELS,
+    ownership_paths=None,
+):
+    actual = discover_unique_constraint_risks(exported_models, ownership_paths)
+    if isinstance(declarations, dict):
+        declared = {UniqueConstraintRisk(*key) for key in declarations}
+        for key, policy in declarations.items():
+            if not isinstance(policy, UniqueValuePolicy) or not policy.reason:
+                raise ProjectionRegistryError(
+                    f"deployment-global uniqueness rule {key} has no disposition"
+                )
+            if policy.disposition is UniqueValueDisposition.PRESERVE_OR_REGENERATE:
+                field = apps.get_model(key[0])._meta.get_field(policy.collision_field)
+                if policy.generator is None and not (
+                    field.has_default() and callable(field.default)
+                ):
+                    raise ProjectionRegistryError(
+                        f"{key} has no callable source for collision regeneration"
+                    )
+    else:
+        declared = set(declarations)
     if declared != set(actual):
         raise ProjectionRegistryError(
-            "resolved-row uniqueness registry drifted; "
+            "deployment-global uniqueness registry drifted; "
             f"missing={sorted(actual - declared)}, extra={sorted(declared - actual)}"
         )
 

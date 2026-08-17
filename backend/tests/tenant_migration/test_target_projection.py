@@ -1,4 +1,6 @@
 import pytest
+from django.db import models
+from django.test.utils import isolate_apps
 
 from apps.integrations.models_recipients import NotificationRecipientKind
 from apps.makerspaces.capabilities import default_enabled_features
@@ -15,6 +17,10 @@ from apps.tenant_migration.projection_guards import (
     validate_projection_fk_registry,
     validate_projection_registry,
     validate_unique_constraint_risks,
+)
+from apps.tenant_migration.unique_values import (
+    DEPLOYMENT_GLOBAL_UNIQUE_RULES,
+    UniqueValueDisposition,
 )
 from apps.tenant_migration.target_projection import (
     DROPPED_NOTIFICATION_RECIPIENT_KINDS,
@@ -89,6 +95,7 @@ def test_authority_and_disclosure_rows_cannot_arrive_live():
         "integrations.RecipientMachineTypeScope",
         "integrations.RecipientMachineScope",
         "integrations.RecipientCategoryScope",
+        "makerspaces.MembershipRequest",
     }
     assert all(
         ROW_POLICIES[label].disposition is RowDisposition.DROP
@@ -98,6 +105,11 @@ def test_authority_and_disclosure_rows_cannot_arrive_live():
         ROW_POLICIES["makerspaces.MakerspaceRole"].disposition
         is RowDisposition.KEEP_TARGET
     )
+
+
+def test_only_open_membership_request_states_are_authority_rows():
+    policy = ROW_POLICIES["makerspaces.MembershipRequest"]
+    assert policy.condition == ("state", frozenset({"requested", "invited"}))
 
 
 def test_every_notification_recipient_kind_is_declared_dropped():
@@ -168,15 +180,21 @@ def test_complete_projection_registry_is_valid():
     validate_projection_registry()
 
 
-def test_uniqueness_risks_are_introspected_for_resolved_and_seeded_rows():
+def test_deployment_global_uniqueness_risks_are_explicitly_disposed():
     assert {
         (risk.model_label, risk.constraint_name)
         for risk in DECLARED_UNIQUE_CONSTRAINT_RISKS
     } >= {
-        ("inventory.Category", "uniq_category_slug_per_makerspace"),
+        ("boxes.Box", "field:code"),
+        ("boxes.QrCode", "field:payload"),
+        ("evidence.EvidencePhoto", "field:object_key"),
         ("machines.MachineType", "uniq_global_machinetype_slug"),
-        ("machines.RoleMachineTypeScope", "rolemachinetypescope_uniq"),
     }
+    assert all(policy.reason for policy in DEPLOYMENT_GLOBAL_UNIQUE_RULES.values())
+    assert (
+        DEPLOYMENT_GLOBAL_UNIQUE_RULES[("boxes.QrCode", "field:payload")].disposition
+        is UniqueValueDisposition.PRESERVE_OR_REGENERATE
+    )
 
 
 def test_every_non_null_dropped_role_dependent_has_a_disposition():
@@ -195,10 +213,30 @@ def test_fk_guard_fails_when_one_declaration_is_removed():
 
 
 def test_uniqueness_guard_fails_when_one_declaration_is_removed():
-    changed = set(DECLARED_UNIQUE_CONSTRAINT_RISKS)
-    changed.pop()
+    changed = dict(DEPLOYMENT_GLOBAL_UNIQUE_RULES)
+    changed.pop(next(iter(changed)))
     with pytest.raises(ProjectionRegistryError, match="uniqueness registry drifted"):
         validate_unique_constraint_risks(changed)
+
+
+@isolate_apps()
+def test_uniqueness_guard_fails_for_undeclared_fixture_unique_column():
+    class ExportFixture(models.Model):
+        makerspace = models.IntegerField()
+        imported_key = models.CharField(max_length=32, unique=True)
+
+        class Meta:
+            app_label = "fixture"
+
+    with pytest.raises(
+        ProjectionRegistryError,
+        match=r"missing=.*fixture.ExportFixture.*field:imported_key",
+    ):
+        validate_unique_constraint_risks(
+            {},
+            exported_models=(ExportFixture,),
+            ownership_paths={"fixture.ExportFixture": ("makerspace",)},
+        )
 
 
 def test_recipient_kind_guard_fails_when_one_declaration_is_removed():

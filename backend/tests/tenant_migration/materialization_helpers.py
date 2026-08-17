@@ -14,7 +14,7 @@ from tests.data_export.portable_helpers import make_job
 
 
 @contextmanager
-def portable_import_case(space, source_user, *, rotate=None):
+def portable_import_case(space, source_user, *, rotate=None, prepare_source=None):
     get_or_create_active_dek(space.pk)
     membership = MakerspaceMembership.objects.create(
         makerspace=space,
@@ -46,6 +46,11 @@ def portable_import_case(space, source_user, *, rotate=None):
         registered_via_makerspace=space,
         payment_via_makerspace=space,
     )
+    source_data = (
+        prepare_source(space, source_user, request)
+        if prepare_source is not None
+        else None
+    )
     if rotate is not None:
         rotate(space.pk)
     export_job = make_job(space, source_user)
@@ -70,6 +75,7 @@ def portable_import_case(space, source_user, *, rotate=None):
             event=event,
             registration=registration,
             membership=membership,
+            source_data=source_data,
             carried=collect_source_keys(space),
         )
     finally:

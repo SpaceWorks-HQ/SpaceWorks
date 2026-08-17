@@ -7,6 +7,7 @@ from apps.separability.registry import runtime_active
 
 from .errors import ExportIntegrityError
 from .fields import EXTERNAL_REFERENCES
+from .closure_refs import ClosureReferenceProjector, select_related_paths as closure_paths
 
 # The referenced row's owning makerspace, per edge. A makerspace-valued edge owns
 # itself; every other edge is owned by the makerspace its target row belongs to.
@@ -18,6 +19,8 @@ _EVENT_EDGES = frozenset({("events.EventCollaborator", "event")})
 
 
 def select_related_paths(model_label):
+    from apps.tenant_migration.closure_references import MOVABLE_ROW_REFERENCES
+
     paths = set()
     for label, field_name in EXTERNAL_REFERENCES:
         if label != model_label:
@@ -29,6 +32,7 @@ def select_related_paths(model_label):
         # The hosted-collaboration anchor is the local Event, so it is needed even
         # when the projected field is the collaborator's own foreign makerspace.
         paths.add("event")
+    paths.update(closure_paths(model_label, MOVABLE_ROW_REFERENCES))
     return paths
 
 
@@ -45,6 +49,7 @@ class ExternalReferenceWriter:
         from apps.tenant_migration.schemas import validate_snapshot
 
         self._validate_snapshot = validate_snapshot
+        self._closure = ClosureReferenceProjector(makerspace_id, self._write_record)
         self.makerspace_id = makerspace_id
         self.path = Path(root, "migration", "external_references.jsonl")
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -52,6 +57,12 @@ class ExternalReferenceWriter:
 
     def close(self):
         self._handle.close()
+
+    def prepare_rows(self, model_label, rows):
+        self._closure.prepare_rows(model_label, rows)
+
+    def project_closure(self, row, field_name, value):
+        return self._closure.project(row, field_name, value)
 
     def project(self, row, field_name, value):
         """Return the cell value, recording provenance only for a FOREIGN reference.
@@ -83,8 +94,29 @@ class ExternalReferenceWriter:
                 f"{edge[0]} row {row.pk} has an invalid {field_name} snapshot."
             ) from exc
         target_label, target_id = _anchor(row, edge)
+        self._write_record(
+            row,
+            field_name,
+            snapshot,
+            anchor=(target_label, target_id),
+        )
+        return None
+
+    def _write_record(self, row, field_name, snapshot, *, anchor):
+        try:
+            self._validate_snapshot(row._meta.label, field_name, snapshot)
+        except Exception as exc:
+            raise ExportIntegrityError(
+                f"{row._meta.label} row {row.pk} has an invalid {field_name} snapshot."
+            ) from exc
+        if isinstance(anchor, tuple):
+            target_label, target_id = anchor
+        elif anchor is None:
+            target_label, target_id = row._meta.label, str(row.pk)
+        else:
+            target_label, target_id = anchor._meta.label, str(anchor.pk)
         record = {
-            "source_model_label": edge[0],
+            "source_model_label": row._meta.label,
             "source_object_id": str(row.pk),
             "field_name": field_name,
             "target_model_label": target_label,
@@ -95,7 +127,6 @@ class ExternalReferenceWriter:
             json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
             + "\n"
         )
-        return None
 
 
 def _owner_makerspace_id(edge, related):
