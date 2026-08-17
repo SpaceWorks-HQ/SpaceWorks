@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("tenant_migration", "0004_sourcemigrationgate"),
+        ("tenant_migration", "0005_part12a_api_state"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

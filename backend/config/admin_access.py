@@ -41,6 +41,8 @@ NESTED_MAKERSPACE_LOOKUPS = {
     "bookings.booking": "space__makerspace_id",
     "presence.presencesession": "makerspace_id",
     "payments.makerspacepaymentsettings": "makerspace_id",
+    "tenant_migration.disclosureclosureapproval": "makerspace_id",
+    "tenant_migration.tenantmigrationexportjob": "export_job__makerspace_id",
 }
 
 # Registered admin models that are intentionally NOT makerspace-scoped (account/global).

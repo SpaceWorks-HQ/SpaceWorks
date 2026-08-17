@@ -156,6 +156,8 @@ OMITTED_MODELS = {
         "but is coordination state, not portable tenant data."
     ),
     "tenant_migration.ImportIdentityDecision": "Target-side identity resolution input.",
+    "tenant_migration.DisclosureClosureApproval": "Source-side disclosure authorization state.",
+    "tenant_migration.TenantMigrationExportJob": "Source-side migration export coordination state.",
     "tenant_migration.DeploymentSigningKey": "Deployment-local private signing authority.",
     "tenant_migration.MigrationPairing": "Deployment-local pinned peer trust configuration.",
     "tenant_migration.MigrationReceipt": "Single-use cross-deployment cutover authority.",

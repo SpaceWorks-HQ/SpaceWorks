@@ -16,12 +16,14 @@ from apps.backup.digests import build_content_ledger, sha256_bytes, sha256_file
 from apps.data_export.runner import build_archive
 from apps.data_export.types import Fidelity
 from apps.encryption.cache import dek_cache_disabled
+from apps.tenant_migration.deployment_keys import public_deployment_identity
 from apps.tenant_migration.keys import collect_source_keys
 from apps.tenant_migration.object_export import (
     SourceMigrationObjectError,
     capture_tenant_objects,
 )
 from apps.tenant_migration.preflight import SourcePreflightError, run_source_preflight
+from apps.tenant_migration.protocol_errors import ClosureAdmissionError
 from apps.tenant_migration.source_gate import quiesced_snapshot
 
 FORMAT = "spaceworks-tenant-migration-v1"
@@ -34,13 +36,15 @@ class MigrationArchiveError(RuntimeError):
 
 def build_tenant_migration_archive(
     makerspace, output, *, gate_owner_id=None, gate_fencing_token=None,
-    actor=None, sleep=None,
+    actor=None, sleep=None, disclosure_approval=None, recipient=None,
 ):
     """Return ``(encrypted_path, manifest, encrypted_sha256)`` for one tenant."""
     output = Path(output).expanduser().resolve()
+    if disclosure_approval is None and hasattr(makerspace, "_meta"):
+        disclosure_approval = _current_approval(makerspace)
     if output.exists():
         raise MigrationArchiveError(f"Output path already exists: {output}")
-    recipient = settings.BACKUP_AGE_RECIPIENT
+    recipient = recipient or settings.BACKUP_AGE_RECIPIENT
     if not recipient:
         raise MigrationArchiveError(
             "BACKUP_AGE_RECIPIENT is required before tenant migration export can run."
@@ -65,7 +69,9 @@ def build_tenant_migration_archive(
             preflight = run_source_preflight(makerspace)
             keys = collect_source_keys(makerspace)
             export_root, export_manifest, tempdir = build_archive(
-                _portable_job(makerspace), package=False, existing_snapshot=True
+                _portable_job(makerspace, disclosure_approval),
+                package=False,
+                existing_snapshot=True,
             )
             try:
                 key_payload = _serialize_keys(keys)
@@ -92,7 +98,12 @@ def build_tenant_migration_archive(
                 return output, manifest, sha256_file(output)
             finally:
                 tempdir.cleanup()
-        except (MigrationArchiveError, SourcePreflightError, SourceMigrationObjectError):
+        except (
+            MigrationArchiveError,
+            SourcePreflightError,
+            SourceMigrationObjectError,
+            ClosureAdmissionError,
+        ):
             raise
         except Exception as exc:
             output.unlink(missing_ok=True)
@@ -101,16 +112,32 @@ def build_tenant_migration_archive(
             ) from exc
 
 
-def _portable_job(makerspace):
+def _portable_job(makerspace, disclosure_approval):
     now = timezone.now()
     return SimpleNamespace(
         fidelity=Fidelity.PORTABLE.value,
         makerspace=makerspace,
         makerspace_id=makerspace.pk,
+        disclosure_approval=disclosure_approval,
         deadline_at=now + timezone.timedelta(
             seconds=settings.DATA_EXPORT_DEADLINE_SECONDS
         ),
     )
+
+
+def _current_approval(makerspace):
+    from .admission import compute_pending_closure
+    from .models_protocol import DisclosureClosureApproval
+
+    digest = compute_pending_closure(makerspace)["digest"]
+    approval = DisclosureClosureApproval.objects.filter(
+        makerspace=makerspace, closure_digest=digest, revoked_at__isnull=True
+    ).order_by("-approved_at").first()
+    if approval is None:
+        raise ClosureAdmissionError(
+            "A source-superadmin disclosure approval is required for this exact closure."
+        )
+    return approval
 
 
 def _serialize_keys(keys):
@@ -147,8 +174,12 @@ def _manifest(
                 "name": makerspace.name,
             },
             "deployment_build": _build_info(),
+            "deployment": public_deployment_identity(),
         },
         "snapshot_at": export_manifest["snapshot_at"],
+        "row_counts": export_manifest.get("row_counts", {}),
+        "total_rows": export_manifest.get("total_rows", 0),
+        "registry_version": export_manifest.get("registry_version", ""),
         "storage_mode": preflight.storage_mode,
         "carried_keys": [
             {"version": version, "status": status}

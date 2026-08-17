@@ -464,6 +464,12 @@ TENANT_MIGRATION_PRESIGN_DRAIN_SECONDS = env.int(
     ),
 )
 BACKUP_AGE_RECIPIENT = env("BACKUP_AGE_RECIPIENT", default="")
+TENANT_MIGRATION_AGE_RECIPIENT = env(
+    "TENANT_MIGRATION_AGE_RECIPIENT", default=""
+)
+TENANT_MIGRATION_AGE_IDENTITY_FILE = env(
+    "TENANT_MIGRATION_AGE_IDENTITY_FILE", default=""
+)
 BACKUP_DOWNLOAD_TTL_SECONDS = env.int("BACKUP_DOWNLOAD_TTL_SECONDS", default=5 * 60)
 BACKUP_LEASE_SECONDS = env.int("BACKUP_LEASE_SECONDS", default=2 * 60 * 60)
 BACKUP_DECISION_SECONDS = env.int("BACKUP_DECISION_SECONDS", default=5 * 60)
@@ -522,6 +528,12 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(minute=35),
     },
 }
+if "tenant_migration" in TOMBSTONED_APPS:
+    CELERY_BEAT_SCHEDULE = {
+        name: entry
+        for name, entry in CELERY_BEAT_SCHEDULE.items()
+        if ".tenant_migration." not in entry["task"]
+    }
 
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
@@ -653,6 +665,12 @@ REST_FRAMEWORK = {
         # member can strand. See `makerspaces.throttles.MemberImagePresignThrottle`.
         "member_image_presign": env("THROTTLE_MEMBER_IMAGE_PRESIGN", default="20/hour"),
         "data_export_create": env("THROTTLE_DATA_EXPORT_CREATE", default="3/hour"),
+        "tenant_migration_read": env(
+            "THROTTLE_TENANT_MIGRATION_READ", default="120/min"
+        ),
+        "tenant_migration_write": env(
+            "THROTTLE_TENANT_MIGRATION_WRITE", default="30/hour"
+        ),
     },
     # Proxy-aware client IP for throttling. Default None = DRF's legacy behavior
     # (REMOTE_ADDR, or the raw X-Forwarded-For string if present). Behind a CDN/reverse

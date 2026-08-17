@@ -99,6 +99,13 @@ EDGE_SCHEMAS = {
 def validate_snapshot(source_model_label, field_name, snapshot):
     """Reject snapshots that do not exactly match their declared edge schema."""
     edge = (source_model_label, field_name)
+    if snapshot == {"kind": "withheld_identity"}:
+        from apps.data_export.references import USER_EDGES
+        from apps.data_export.types import Fidelity
+
+        declared = USER_EDGES.get((Fidelity.PORTABLE, source_model_label, field_name))
+        if declared is not None and declared.included:
+            return
     schema = EDGE_SCHEMAS.get(edge)
     if schema is None:
         raise ValidationError({"snapshot": f"Unknown external reference edge: {edge!r}."})

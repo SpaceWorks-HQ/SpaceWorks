@@ -9,6 +9,7 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -201,9 +202,19 @@ def issue_download_token(job, actor):
             "download_token_digest", "download_token_expires_at",
             "download_token_consumed_at", "download_issued_to", "updated_at",
         ))
+        meta = _row_count_meta(locked)
+        if locked.fidelity == Fidelity.PORTABLE.value:
+            try:
+                format_version = locked.migration_export.format_version
+            except ObjectDoesNotExist:
+                format_version = 0
+            meta.update(
+                export_id=str(locked.pk),
+                format_version=format_version,
+            )
         audit.record(
             actor, "data_export.download_url_issued", makerspace=locked.makerspace,
-            target=locked, meta=_row_count_meta(locked),
+            target=locked, meta=meta,
         )
     return raw, locked.download_token_expires_at
 
@@ -231,12 +242,16 @@ def consume_download_token(job_id, raw_token):
         else:
             job.download_token_consumed_at = now
             job.save(update_fields=("download_token_consumed_at", "updated_at"))
+            meta = _row_count_meta(job)
+            if job.fidelity == Fidelity.PORTABLE.value:
+                try:
+                    format_version = job.migration_export.format_version
+                except ObjectDoesNotExist:
+                    format_version = 0
+                meta.update(export_id=str(job.pk), format_version=format_version)
             audit.record(
-                job.download_issued_to,
-                "data_export.downloaded",
-                makerspace=job.makerspace,
-                target=job,
-                meta=_row_count_meta(job),
+                job.download_issued_to, "data_export.downloaded",
+                makerspace=job.makerspace, target=job, meta=meta,
             )
             claimed = job
     if failure:

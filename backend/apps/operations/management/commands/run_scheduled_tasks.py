@@ -22,6 +22,7 @@ Deliberately NOT an authenticated HTTP endpoint. A URL that runs jobs is a URL s
 can find, and rate-limiting it correctly is more work than a cron entry.
 """
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
@@ -79,6 +80,10 @@ SCHEDULED_TASKS = (
         60,
     ),
 )
+if "tenant_migration" in settings.TOMBSTONED_APPS:
+    SCHEDULED_TASKS = tuple(
+        task for task in SCHEDULED_TASKS if ".tenant_migration." not in task[1]
+    )
 
 
 def _import_task(dotted_path):

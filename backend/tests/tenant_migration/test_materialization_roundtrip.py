@@ -32,6 +32,21 @@ def _archived_request_envelope(root):
         return next(csv.DictReader(handle))["requester_contact_email"]
 
 
+def _archived_membership_requests(root):
+    path = root / "members" / "membership_requests.csv"
+    with path.open(encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _append_archived_membership_request(root, row):
+    path = root / "members" / "membership_requests.csv"
+    rows = _archived_membership_requests(root)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=tuple(rows[0]))
+        writer.writeheader()
+        writer.writerows([*rows, row])
+
+
 def test_portable_archive_round_trips_into_a_new_tenant_with_target_aad():
     with enabled_encryption():
         source_user = make_user("materialize-source")
@@ -102,6 +117,13 @@ def test_row_closure_dispositions_round_trip_without_live_foreign_ids():
         ) as case:
             case.decide_walk_in(source_user)
             scenario = case.source_data
+            archived_membership_requests = _archived_membership_requests(case.root)
+            assert {row["id"] for row in archived_membership_requests} == {
+                str(scenario.terminal_request.pk)
+            }
+            assert scenario.open_invitation.invite_email.encode() not in (
+                case.root / "members" / "membership_requests.csv"
+            ).read_bytes()
             result = materialize_tenant(
                 case.root,
                 case.job,
@@ -232,11 +254,64 @@ def test_row_closure_dispositions_round_trip_without_live_foreign_ids():
             makerspace=target,
             state=MembershipRequest.State.INVITED,
         ).exists()
-        assert result.dropped["makerspaces.MembershipRequest"] == 1
         assert result.external_references_created == ExternalTenantReference.objects.filter(
             makerspace=target,
             source_archive_digest=case.job.source_archive_digest,
         ).count()
+
+
+def test_crafted_archive_open_membership_request_is_counted_and_dropped():
+    with enabled_encryption():
+        source_user = make_user("crafted-open-membership-request")
+        source = make_space("crafted-open-membership-request")
+        with portable_import_case(
+            source,
+            source_user,
+            prepare_source=create_row_closure_scenario,
+        ) as case:
+            case.decide_walk_in(source_user)
+            scenario = case.source_data
+            archived_terminal = _archived_membership_requests(case.root)[0]
+            crafted_open_invitation = {
+                **archived_terminal,
+                "id": str(scenario.open_invitation.pk),
+                "user_id": "",
+                "invite_email": scenario.open_invitation.invite_email,
+                "kind": MembershipRequest.Kind.INVITE,
+                "state": MembershipRequest.State.INVITED,
+                "requested_by_id": "",
+                "invited_by_id": str(source_user.pk),
+                "decided_by_id": "",
+                "auto_activate_on_claim": "true",
+                "decision_note": "",
+                "decided_at": "",
+            }
+            _append_archived_membership_request(case.root, crafted_open_invitation)
+            assert any(
+                row["id"] == str(scenario.open_invitation.pk)
+                and row["state"] == MembershipRequest.State.INVITED
+                for row in _archived_membership_requests(case.root)
+            )
+
+            result = materialize_tenant(
+                case.root,
+                case.job,
+                case.carried,
+                target_identity={"slug": "crafted-open-membership-target"},
+            )
+
+        target = Makerspace.objects.get(pk=result.target_makerspace_id)
+        assert result.dropped["makerspaces.MembershipRequest"] == 1
+        assert not MembershipRequest.objects.filter(
+            makerspace=target,
+            state__in=(
+                MembershipRequest.State.REQUESTED,
+                MembershipRequest.State.INVITED,
+            ),
+        ).exists()
+        imported_requests = MembershipRequest.objects.filter(makerspace=target)
+        assert imported_requests.count() == 1
+        assert imported_requests.get().state == MembershipRequest.State.ACTIVE
 
 
 def test_noncolliding_qr_payload_is_preserved_byte_for_byte():

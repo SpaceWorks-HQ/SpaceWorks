@@ -24,6 +24,7 @@ class TenantImportJob(models.Model):
     source_makerspace_slug = models.CharField(max_length=100, blank=True)
     source_makerspace_name = models.CharField(max_length=200, blank=True)
     source_deployment_id = models.CharField(max_length=128, blank=True)
+    source_deployment_identity = models.JSONField(default=dict, blank=True)
     storage_mode = models.CharField(max_length=32, blank=True)
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -44,6 +45,10 @@ class TenantImportJob(models.Model):
         related_name="tenant_import_jobs",
     )
     aggregate_outcome = models.JSONField(default=dict, blank=True)
+    archive_path = models.CharField(max_length=1024, blank=True)
+    verification_report = models.JSONField(default=dict, blank=True)
+    failure_code = models.CharField(max_length=64, blank=True)
+    failure_detail = models.CharField(max_length=500, blank=True)
     expires_at = models.DateTimeField(db_index=True)
     terminal_at = models.DateTimeField(null=True, blank=True)
     scrubbed_at = models.DateTimeField(null=True, blank=True)

@@ -127,6 +127,8 @@ RELATIONAL_USER_FIELDS = frozenset(
         # omission does not decide whether an account belongs in the global user closure.
         ("tenant_migration.TenantImportJob", "actor"),
         ("tenant_migration.ImportIdentityDecision", "target_user"),
+        ("tenant_migration.DisclosureClosureApproval", "approved_by"),
+        ("tenant_migration.DisclosureClosureApproval", "revoked_by"),
         ("tenant_migration.MigrationPairing", "approved_by"),
         ("tenant_migration.ReceiptConsumption", "consumed_by"),
         ("tenant_migration.MigratedOutHandoff", "reopened_by"),

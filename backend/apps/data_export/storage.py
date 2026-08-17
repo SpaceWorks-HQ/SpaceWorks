@@ -31,14 +31,14 @@ def _client(*, public=False):
     )
 
 
-def upload_archive(object_key, file_path):
+def upload_archive(object_key, file_path, content_type="application/zip"):
     try:
         with open(file_path, "rb") as handle:
             _client().upload_fileobj(
                 handle,
                 settings.AWS_STORAGE_BUCKET_NAME,
                 object_key,
-                ExtraArgs={"ContentType": "application/zip"},
+                ExtraArgs={"ContentType": content_type},
             )
     except (BotoCoreError, ClientError, OSError) as exc:
         raise ExportStorageError("The export archive could not be stored.") from exc
