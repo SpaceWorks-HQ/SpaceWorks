@@ -157,6 +157,9 @@ OMITTED_MODELS = {
     "tenant_migration.MigrationReceipt": "Single-use cross-deployment cutover authority.",
     "tenant_migration.ReceiptConsumption": "Deployment-local receipt replay state.",
     "tenant_migration.MigratedOutHandoff": "Source-deployment tenant lifecycle state.",
+    "tenant_migration.SourceMigrationGate": (
+        "Source-deployment coordination state must not travel inside a tenant archive."
+    ),
     "payments.PlatformStripeConnectSettings": "Platform payment credentials.",
     "payments.ProcessedStripeEvent": "Provider idempotency telemetry.",
     "payments.StripeConnectOAuthState": "Transient OAuth state.",

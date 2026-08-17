@@ -15,6 +15,7 @@ from apps.accounts.serializers_claim import (
 from apps.accounts.services_claim import consume_claim_code
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.lookup import get_public_makerspace
+from apps.tenant_migration.gate_runtime import tenant_write
 
 
 class ClaimRedemptionView(APIView):
@@ -41,15 +42,16 @@ class ClaimRedemptionView(APIView):
         makerspace = get_public_makerspace(
             serializer.validated_data["makerspace_slug"]
         )
-        claim = consume_claim_code(
-            serializer.validated_data["code"],
-            redemption_ip=request.META.get("REMOTE_ADDR") or "0.0.0.0",
-            makerspace_id=makerspace.pk,
-        )
-        pair = mint_claim_tokens(claim)
-        user = attach_claim_context(claim.membership.user, claim)
-        response = Response(
-            {"access": pair.access, "user": user_payload(user, request=request)}
-        )
-        set_refresh_cookies(response, pair.refresh, request)
-        return response
+        with tenant_write(makerspace.pk):
+            claim = consume_claim_code(
+                serializer.validated_data["code"],
+                redemption_ip=request.META.get("REMOTE_ADDR") or "0.0.0.0",
+                makerspace_id=makerspace.pk,
+            )
+            pair = mint_claim_tokens(claim)
+            user = attach_claim_context(claim.membership.user, claim)
+            response = Response(
+                {"access": pair.access, "user": user_payload(user, request=request)}
+            )
+            set_refresh_cookies(response, pair.refresh, request)
+            return response

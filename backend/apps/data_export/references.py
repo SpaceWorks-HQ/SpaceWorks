@@ -128,6 +128,9 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("tenant_migration.MigrationPairing", "approved_by"),
         ("tenant_migration.ReceiptConsumption", "consumed_by"),
         ("tenant_migration.MigratedOutHandoff", "reopened_by"),
+        # Source-side gate ownership is deployment coordination state. Its actor is
+        # deliberately excluded from every tenant archive and global user closure.
+        ("tenant_migration.SourceMigrationGate", "actor"),
         ("makerspaces.MakerspaceWaiver", "created_by"),
         ("makerspaces.MembershipRequest", "user"),
         ("makerspaces.MembershipRequest", "requested_by"),
@@ -154,6 +157,12 @@ RELATIONAL_USER_FIELDS = frozenset(
 )
 
 USER_EDGES = {}
+_EXCLUDED_USER_EDGE_REASONS = {
+    ("tenant_migration.SourceMigrationGate", "actor"): (
+        "Deployment-scoped source-gate ownership must not contribute to a tenant "
+        "archive's global user closure."
+    ),
+}
 for _fidelity in Fidelity:
     for _label, _field in RELATIONAL_USER_FIELDS | RAW_USER_REFERENCE_FIELDS:
         disposition = FIELDS.get((_fidelity, _label, _field))
@@ -164,7 +173,10 @@ for _fidelity in Fidelity:
             reason=(
                 "Pull the referenced person into the bounded user closure."
                 if included
-                else "The source model or field is excluded at this fidelity."
+                else _EXCLUDED_USER_EDGE_REASONS.get(
+                    (_label, _field),
+                    "The source model or field is excluded at this fidelity.",
+                )
             ),
         )
 

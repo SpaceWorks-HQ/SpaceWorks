@@ -220,6 +220,13 @@ _SOURCE_LOCAL_EDGES = {
     ("tenant_migration.source_reopened", "receipt_id"),
     ("tenant_migration.source_reopened", "source_deployment_id"),
     ("tenant_migration.source_reopened", "target_deployment_id"),
+    ("tenant_migration.source_gate_closed", "owner_id"),
+    ("tenant_migration.source_gate_recovered", "owner_id"),
+    ("tenant_migration.source_gate_reopened", "owner_id"),
+    ("tenant_migration.source_gate_recovery_command", "makerspace_id"),
+    ("tenant_migration.source_gate_recovery_command", "owner_id"),
+    ("tenant_migration.source_gate_migrated_out", "owner_id"),
+    ("tenant_migration.source_quiesced", "owner_id"),
 }
 AUDIT_META_REFERENCES.update(_reference(S, None, *_SOURCE_LOCAL_EDGES))
 AUDIT_META_REFERENCES.update(

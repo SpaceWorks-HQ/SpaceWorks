@@ -19,6 +19,7 @@ from apps.integrations.serializers import (
 from apps.integrations.telegram import TelegramDeliveryError, send_message
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.guards import require_module
+from apps.tenant_migration.gate_runtime import tenant_write
 
 
 class TelegramWebhookView(APIView):
@@ -45,17 +46,18 @@ class TelegramWebhookView(APIView):
         actor = _telegram_actor(callback)
         action, request_id, reason = _parse_callback(callback.get("data", ""))
         hardware_request = get_object_or_404(HardwareRequest, pk=request_id)
-        require_module(hardware_request.makerspace, "telegram")
-        if action == "accept":
-            if not rbac.can(actor, rbac.Action.ACCEPT_REQUEST, hardware_request.makerspace_id):
-                return Response({"detail": "Permission denied."}, status=403)
-            workflow.accept_request(actor, hardware_request)
-        elif action == "reject":
-            if not rbac.can(actor, rbac.Action.REJECT_REQUEST, hardware_request.makerspace_id):
-                return Response({"detail": "Permission denied."}, status=403)
-            workflow.reject_request(actor, hardware_request, reason or "Rejected from Telegram.")
-        else:
-            return Response({"detail": "Unsupported action."}, status=400)
+        with tenant_write(hardware_request.makerspace_id):
+            require_module(hardware_request.makerspace, "telegram")
+            if action == "accept":
+                if not rbac.can(actor, rbac.Action.ACCEPT_REQUEST, hardware_request.makerspace_id):
+                    return Response({"detail": "Permission denied."}, status=403)
+                workflow.accept_request(actor, hardware_request)
+            elif action == "reject":
+                if not rbac.can(actor, rbac.Action.REJECT_REQUEST, hardware_request.makerspace_id):
+                    return Response({"detail": "Permission denied."}, status=403)
+                workflow.reject_request(actor, hardware_request, reason or "Rejected from Telegram.")
+            else:
+                return Response({"detail": "Unsupported action."}, status=400)
         return Response({"detail": "Processed."})
 
 

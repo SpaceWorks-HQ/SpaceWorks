@@ -6,6 +6,7 @@ from apps.encryption.crypto import (
     decrypt,
     encrypt,
     is_envelope,
+    parse_envelope,
 )
 
 
@@ -49,3 +50,10 @@ def test_envelope_rejects_malformed_nonce_and_ciphertext(args):
     altered = ":".join(parts)
     with pytest.raises(PiiAuthenticationFailed):
         decrypt(altered, b"d" * 32, **{k: v for k, v in args.items() if k != "key_version"})
+
+
+def test_envelope_rejects_noncanonical_base64url_padding_bits():
+    with pytest.raises(PiiMalformedEnvelope):
+        parse_envelope(
+            "pii:gcm:v1:1:AAAAAAAAAAAAAAAA:AAAAAAAAAAAAAAAAAAAAAB"
+        )

@@ -5,6 +5,7 @@ from apps.accounts import rbac
 from apps.hardware_requests import notifications
 from apps.hardware_requests.models import HardwareRequest
 from apps.notifications.emit import emit_notification
+from apps.tenant_migration.gate_runtime import tenant_write
 
 
 def run_return_reminders(*, now=None, limit=200) -> dict:
@@ -29,33 +30,34 @@ def run_return_reminders(*, now=None, limit=200) -> dict:
     sent_count = 0
     skipped_count = 0
     for hardware_request in queryset:
-        with transaction.atomic():
-            claimed = HardwareRequest.objects.filter(
-                pk=hardware_request.pk,
-                return_reminder_sent_at__isnull=True,
-            ).update(return_reminder_sent_at=now)
-        if not claimed:
-            continue
-        try:
-            sent = notifications.notify_return_due(hardware_request)
-        except Exception:
+        with tenant_write(hardware_request.makerspace_id):
+            with transaction.atomic():
+                claimed = HardwareRequest.objects.filter(
+                    pk=hardware_request.pk,
+                    return_reminder_sent_at__isnull=True,
+                ).update(return_reminder_sent_at=now)
+            if not claimed:
+                continue
+            try:
+                sent = notifications.notify_return_due(hardware_request)
+            except Exception:
+                HardwareRequest.objects.filter(pk=hardware_request.pk).update(
+                    return_reminder_sent_at=None
+                )
+                raise
+            if sent:
+                sent_count += 1
+                emit_notification(
+                    hardware_request.makerspace,
+                    level="warning",
+                    event="loan.overdue",
+                    title="Overdue loan reminder sent",
+                    body=f"Request #{hardware_request.pk} is overdue; a reminder was sent.",
+                )
+                continue
             HardwareRequest.objects.filter(pk=hardware_request.pk).update(
                 return_reminder_sent_at=None
             )
-            raise
-        if sent:
-            sent_count += 1
-            emit_notification(
-                hardware_request.makerspace,
-                level="warning",
-                event="loan.overdue",
-                title="Overdue loan reminder sent",
-                body=f"Request #{hardware_request.pk} is overdue; a reminder was sent.",
-            )
-            continue
-        HardwareRequest.objects.filter(pk=hardware_request.pk).update(
-            return_reminder_sent_at=None
-        )
-        skipped_count += 1
+            skipped_count += 1
 
     return {"sent": sent_count, "skipped": skipped_count}

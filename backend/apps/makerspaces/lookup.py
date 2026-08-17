@@ -20,3 +20,13 @@ def get_public_makerspace(identifier):
     if makerspace is None:
         raise Http404
     return makerspace
+
+
+def get_makerspace_by_public_code(public_code, *, allow_archived=False):
+    """Resolve an exact webhook/public-code tenant through canonical servability."""
+    queryset = Makerspace.objects.filter(public_code__iexact=str(public_code or ""))
+    if allow_archived:
+        queryset = queryset.filter(lifecycle_state=Makerspace.LifecycleState.ACTIVE)
+    else:
+        queryset = servable_queryset(queryset)
+    return queryset.first()

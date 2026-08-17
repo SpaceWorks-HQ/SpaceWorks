@@ -8,7 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.lookup import get_makerspace_by_public_code
 from apps.makerspaces.servability import is_servable
 from apps.payments.models import MakerspacePaymentSettings
 from apps.payments.providers import WebhookVerificationError, get_provider
@@ -29,7 +29,7 @@ class StripeWebhookView(APIView):
         # authenticates the callback. An archived row must remain addressable because
         # the provider has already taken the money and ProcessedStripeEvent keeps
         # settlement idempotent, while a purged row still misses this lookup naturally.
-        makerspace = Makerspace.objects.filter(public_code__iexact=public_code).first()
+        makerspace = get_makerspace_by_public_code(public_code, allow_archived=True)
         if makerspace is None or not is_servable(makerspace, allow_archived=True):
             logger.warning("stripe_webhook_unknown_makerspace", extra={"public_code": public_code})
             return Response({"detail": "Makerspace not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -91,7 +91,7 @@ class RazorpayWebhookView(APIView):
         # authenticates the callback. An archived row must remain addressable because
         # the provider has already taken the money and ProcessedStripeEvent keeps
         # settlement idempotent, while a purged row still misses this lookup naturally.
-        makerspace = Makerspace.objects.filter(public_code__iexact=public_code).first()
+        makerspace = get_makerspace_by_public_code(public_code, allow_archived=True)
         if makerspace is None or not is_servable(makerspace, allow_archived=True):
             logger.warning("razorpay_webhook_unknown_makerspace", extra={"public_code": public_code})
             return Response({"detail": "Makerspace not found."}, status=status.HTTP_404_NOT_FOUND)

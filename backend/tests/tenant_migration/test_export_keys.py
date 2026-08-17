@@ -1,4 +1,5 @@
 import base64
+from contextlib import contextmanager
 import io
 import json
 from pathlib import Path
@@ -6,6 +7,7 @@ import tarfile
 import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
+import uuid
 
 import pytest
 
@@ -114,8 +116,15 @@ def test_archive_stream_is_age_output_with_matching_in_memory_ledger(
     monkeypatch.setattr(
         archive_envelope,
         "build_archive",
-        lambda _job, package: (root, export_manifest, tempdir),
+        lambda _job, **_kwargs: (root, export_manifest, tempdir),
     )
+    gate_owner = uuid.uuid4()
+
+    @contextmanager
+    def quiesced(_space, _actor, **_kwargs):
+        yield SimpleNamespace(owner_id=gate_owner, fencing_token=7)
+
+    monkeypatch.setattr(archive_envelope, "quiesced_snapshot", quiesced)
 
     captured = {}
 
@@ -153,6 +162,10 @@ def test_archive_stream_is_age_output_with_matching_in_memory_ledger(
     assert path.read_bytes() == b"age-encrypted-test-envelope"
     assert archive_digest == sha256_file(path)
     assert manifest["format"] == archive_envelope.FORMAT
+    assert manifest["source"]["gate"] == {
+        "owner_id": str(gate_owner),
+        "fencing_token": 7,
+    }
     assert manifest["format"] not in SUPPORTED_ARCHIVE_FORMATS
     assert captured["process"].command == [
         "age",

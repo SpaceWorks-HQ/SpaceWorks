@@ -157,6 +157,7 @@ TOMBSTONED_APPS = tombstoned_app_labels()
 
 MIDDLEWARE = [
     "apps.backup.middleware.DeploymentRecoveryGateMiddleware",
+    "apps.tenant_migration.middleware.SourceMigrationGateMiddleware",
     "apps.makerspaces.middleware.TenantHostValidationMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "apps.accounts.social_csp.SocialCspMiddleware",
@@ -450,6 +451,17 @@ DATA_EXPORT_RETENTION_SECONDS = env.int(
 )
 DATA_EXPORT_DOWNLOAD_TTL_SECONDS = env.int(
     "DATA_EXPORT_DOWNLOAD_TTL_SECONDS", default=5 * 60
+)
+TENANT_MIGRATION_GATE_LEASE_SECONDS = env.int(
+    "TENANT_MIGRATION_GATE_LEASE_SECONDS", default=2 * 60 * 60
+)
+TENANT_MIGRATION_PRESIGN_DRAIN_SECONDS = env.int(
+    "TENANT_MIGRATION_PRESIGN_DRAIN_SECONDS",
+    default=max(
+        EVIDENCE_URL_TTL_SECONDS,
+        PUBLIC_IMAGE_URL_TTL_SECONDS,
+        PRINT_URL_TTL_SECONDS,
+    ),
 )
 BACKUP_AGE_RECIPIENT = env("BACKUP_AGE_RECIPIENT", default="")
 BACKUP_DOWNLOAD_TTL_SECONDS = env.int("BACKUP_DOWNLOAD_TTL_SECONDS", default=5 * 60)

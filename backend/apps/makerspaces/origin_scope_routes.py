@@ -189,7 +189,9 @@ def request_route_targets(request, view=None):
         if parsed is not None:
             targets.append(parsed)
 
-    query = getattr(request, 'query_params', {})
+    query = getattr(request, 'query_params', None)
+    if query is None:
+        query = getattr(request, 'GET', {})
     for key in ('makerspace', 'makerspace_id'):
         value = query.get(key)
         if value in (None, ''):
@@ -198,6 +200,18 @@ def request_route_targets(request, view=None):
         invalid = invalid or parsed is None
         if parsed is not None:
             targets.append(parsed)
+
+    if getattr(request, "method", "GET") not in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+        body = getattr(request, "data", {})
+        if hasattr(body, "get"):
+            for key in ("makerspace", "makerspace_id"):
+                value = body.get(key)
+                if value in (None, ""):
+                    continue
+                parsed = _positive_int(value)
+                invalid = invalid or parsed is None
+                if parsed is not None:
+                    targets.append(parsed)
 
     if url_name in MODEL_LOOKUPS:
         pk = kwargs.get('pk')

@@ -18,6 +18,7 @@ from apps.data_export.types import Fidelity
 from apps.encryption.cache import dek_cache_disabled
 from apps.tenant_migration.keys import collect_source_keys
 from apps.tenant_migration.preflight import SourcePreflightError, run_source_preflight
+from apps.tenant_migration.source_gate import quiesced_snapshot
 
 FORMAT = "spaceworks-tenant-migration-v1"
 FORMAT_VERSION = 1
@@ -27,7 +28,10 @@ class MigrationArchiveError(RuntimeError):
     pass
 
 
-def build_tenant_migration_archive(makerspace, output):
+def build_tenant_migration_archive(
+    makerspace, output, *, gate_owner_id=None, gate_fencing_token=None,
+    actor=None, sleep=None,
+):
     """Return ``(encrypted_path, manifest, encrypted_sha256)`` for one tenant."""
     output = Path(output).expanduser().resolve()
     if output.exists():
@@ -44,18 +48,30 @@ def build_tenant_migration_archive(makerspace, output):
 
     # This context clears cache-owned DEK references and prevents either preflight
     # or collection from repopulating the process-wide cache.
-    with dek_cache_disabled():
+    gate_kwargs = {
+        "owner_id": gate_owner_id,
+        "fencing_token": gate_fencing_token,
+    }
+    if sleep is not None:
+        gate_kwargs["sleep"] = sleep
+    with dek_cache_disabled(), quiesced_snapshot(
+        makerspace, actor, **gate_kwargs
+    ) as gate_lease:
         try:
             preflight = run_source_preflight(makerspace)
             keys = collect_source_keys(makerspace)
             export_root, export_manifest, tempdir = build_archive(
-                _portable_job(makerspace), package=False
+                _portable_job(makerspace), package=False, existing_snapshot=True
             )
             try:
                 key_payload = _serialize_keys(keys)
                 manifest = _manifest(
                     makerspace, preflight, export_manifest, export_root, key_payload
                 )
+                manifest["source"]["gate"] = {
+                    "owner_id": str(gate_lease.owner_id),
+                    "fencing_token": gate_lease.fencing_token,
+                }
                 manifest_payload = _json_bytes(manifest)
                 output.parent.mkdir(parents=True, exist_ok=True)
                 _stream_age_archive(
