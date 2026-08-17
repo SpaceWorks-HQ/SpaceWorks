@@ -64,6 +64,8 @@ def project_row(
             value = source_value(row, source)
         if (row.pk, source) in dangling_refs:
             value = None
+        if external_writer is not None:
+            value = external_writer.project_closure(row, source, value)
         if reference_writer is not None:
             value = reference_writer.project(row, source, value)
         projected[column.name] = csv_value(

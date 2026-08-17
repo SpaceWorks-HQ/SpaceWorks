@@ -17,7 +17,7 @@ from .references import (
 
 def remap_semantic_references(label, source, row, pk_map, references):
     if label in {edge[0] for edge in DISCRIMINATOR_REFERENCES}:
-        _remap_discriminator(label, row, pk_map)
+        _remap_discriminator(label, source, row, pk_map, references)
     if label == "payments.Payment":
         if references.get(label, source["id"], "subject_id"):
             return False
@@ -40,7 +40,9 @@ def remap_semantic_references(label, source, row, pk_map, references):
     return True
 
 
-def _remap_discriminator(label, row, pk_map):
+def _remap_discriminator(label, source, row, pk_map, references):
+    if references.get(label, source["id"], "target_type+target_id"):
+        return
     declarations = DISCRIMINATOR_REFERENCES[(label, "target_type", "target_id")]
     target_label = declarations[row["target_type"]]
     row["target_id"] = pk_map.lookup(apps.get_model(target_label), row["target_id"])

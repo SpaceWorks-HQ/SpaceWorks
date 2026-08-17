@@ -1,5 +1,7 @@
 """Pre-commit, database-only verification for tenant materialization."""
 
+import json
+
 from django.apps import apps
 from django.db.models import Count
 
@@ -29,7 +31,7 @@ def verify_materialization(
     identity_report, regenerated_fields,
 ):
     _verify_counts(archive, models, references, accounting, pk_map)
-    _verify_reference_remaps(archive, models, pk_map)
+    _verify_reference_remaps(archive, models, pk_map, references)
     _verify_mapped_round_trips(target)
     _verify_blind_index_generation(target)
     verify_event_hashes(target)
@@ -161,7 +163,7 @@ def _verify_authority(target, job, pk_map, identity_report):
         )
 
 
-def _verify_reference_remaps(archive, models, pk_map):
+def _verify_reference_remaps(archive, models, pk_map, references):
     for model in models:
         label = model._meta.label
         user_fields = [
@@ -193,7 +195,7 @@ def _verify_reference_remaps(archive, models, pk_map):
                     raise ImportVerificationError(
                         f"User reference was not remapped for {label}.{field.name}."
                     )
-            _verify_semantic_row(label, source, actual, pk_map)
+            _verify_semantic_row(label, source, actual, pk_map, references)
 
 
 def _semantic_field_names(label):
@@ -208,16 +210,29 @@ def _semantic_field_names(label):
         names.extend(("target_type", "target_id"))
     elif label == "notifications.Notification":
         names.append("url_path")
+    elif label == "hardware_requests.PublicToolLoan":
+        names.extend(("asset_ids", "qr_ids"))
     return list(dict.fromkeys(names))
 
 
-def _verify_semantic_row(label, source, actual, pk_map):
+def _verify_semantic_row(label, source, actual, pk_map, references):
     edge = (label, "target_type", "target_id")
     if edge in DISCRIMINATOR_REFERENCES:
-        target_label = DISCRIMINATOR_REFERENCES[edge][source["target_type"]]
-        expected = pk_map.lookup(apps.get_model(target_label), source["target_id"])
-        if str(actual["target_id"]) != str(expected):
-            raise ImportVerificationError(f"Discriminator reference is invalid for {label}.")
+        external = references.get(label, source["id"], "target_type+target_id")
+        if external:
+            if not str(actual["target_type"]).startswith("external_") or actual[
+                "target_id"
+            ] != 0:
+                raise ImportVerificationError(
+                    f"External discriminator reference is live for {label}."
+                )
+        else:
+            target_label = DISCRIMINATOR_REFERENCES[edge][source["target_type"]]
+            expected = pk_map.lookup(apps.get_model(target_label), source["target_id"])
+            if str(actual["target_id"]) != str(expected):
+                raise ImportVerificationError(
+                    f"Discriminator reference is invalid for {label}."
+                )
     if label == "payments.Payment":
         target_label = PAYMENT_SUBJECT_REFERENCES[source["subject_type"]]
         expected = pk_map.lookup(apps.get_model(target_label), source["subject_id"])
@@ -241,3 +256,27 @@ def _verify_semantic_row(label, source, actual, pk_map):
         expected = _remap_notification_url(source["url_path"], pk_map)
         if actual["url_path"] != expected:
             raise ImportVerificationError("A notification URL reference is invalid.")
+    if label == "hardware_requests.PublicToolLoan":
+        _verify_loan_reference_list(
+            source, actual, pk_map, references, "asset_ids", "inventory.InventoryAsset"
+        )
+        _verify_loan_reference_list(
+            source, actual, pk_map, references, "qr_ids", "boxes.QrCode"
+        )
+
+
+def _verify_loan_reference_list(source, actual, pk_map, references, field_name, label):
+    snapshot = references.external_snapshot(
+        "hardware_requests.PublicToolLoan", source["id"], field_name
+    )
+    missing = {
+        int(item["source_id"])
+        for item in (snapshot or {}).get("references", [])
+    }
+    expected = [
+        pk_map.lookup(apps.get_model(label), value)
+        for value in json.loads(source[field_name] or "[]")
+        if int(value) not in missing
+    ]
+    if actual[field_name] != expected:
+        raise ImportVerificationError(f"Loan {field_name} contains an unresolved id.")

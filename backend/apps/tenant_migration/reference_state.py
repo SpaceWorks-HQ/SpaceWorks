@@ -80,7 +80,24 @@ class ReferenceState:
                 [model_label, str(source_object_id), field_name],
             )
             row = cursor.fetchone()
-        return None if row is None else {"kind": row[0], "detail": row[1]}
+        if row is None:
+            return None
+        # Django's psycopg2 backend decodes jsonb at the FIELD layer, not the
+        # connection layer, so a raw cursor hands back the column as text. Every
+        # existing consumer only tested this record for existence, which is why a
+        # string detail went unnoticed until a caller first read into it.
+        detail = row[1]
+        return {
+            "kind": row[0],
+            "detail": json.loads(detail) if isinstance(detail, str) else detail,
+        }
+
+    def external_snapshot(self, model_label, source_object_id, field_name):
+        """Return a closure snapshot only when the record declares that shape."""
+        record = self.get(model_label, source_object_id, field_name)
+        if record is None or record["kind"] != "external_reference":
+            return None
+        return record["detail"]["snapshot"]
 
     def count(self):
         with self.connection.cursor() as cursor:

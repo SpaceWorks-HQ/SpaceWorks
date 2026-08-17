@@ -192,6 +192,14 @@ ROW_POLICIES = {
         "Imported Telegram rooms require target-authorized activation.",
         condition=("channel", "telegram"),
     ),
+    # Open source-authored requests/invitations are target admission capability.
+    # Dropping both open states prevents a later claim/approval from granting target
+    # membership; active/revoked history may still import.
+    "makerspaces.MembershipRequest": RowPolicy(
+        RowDisposition.DROP,
+        "Imported invitations are authority the target never authorized and must be re-created.",
+        condition=("state", frozenset({"requested", "invited"})),
+    ),
 }
 
 
@@ -206,16 +214,6 @@ SEEDED_RESOLUTIONS = {
         archive_update_fields=(),
         definition_fingerprint_fields=("name", "icon", "is_builtin", "managing_action", "capability_config"),
         reason="Only an identical global built-in definition may resolve to a target global type.",
-    ),
-}
-
-
-UNIQUE_COLLISION_MODEL_REASONS = {
-    "inventory.Category": "Target creation seeds rows with the same per-space slugs.",
-    "makerspaces.MakerspaceRole": "Target creation seeds protected role natural keys.",
-    "machines.MachineType": "Global built-ins already exist on the target deployment.",
-    "machines.RoleMachineTypeScope": (
-        "Machine Manager creation seeds the same protected-role/global-type links."
     ),
 }
 

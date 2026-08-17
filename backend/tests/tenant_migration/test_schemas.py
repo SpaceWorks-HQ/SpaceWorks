@@ -2,11 +2,27 @@ import pytest
 from django.core.exceptions import ValidationError
 
 from apps.data_export.fields import EXTERNAL_REFERENCES
+from apps.tenant_migration.closure_references import (
+    CROSS_TENANT_DEPENDENT_REFERENCES,
+    MOVABLE_DISCRIMINATOR_REFERENCES,
+    MOVABLE_LIST_REFERENCES,
+    MOVABLE_ROW_REFERENCES,
+)
 from apps.tenant_migration.schemas import EDGE_SCHEMAS, validate_snapshot
 
 
 def test_every_external_reference_edge_has_exactly_one_snapshot_schema():
-    assert set(EDGE_SCHEMAS) == EXTERNAL_REFERENCES
+    discriminator_edges = {
+        (model_label, "target_type+target_id")
+        for model_label, _type_field, _id_field in MOVABLE_DISCRIMINATOR_REFERENCES
+    }
+    closure_edges = (
+        set(MOVABLE_ROW_REFERENCES)
+        | set(MOVABLE_LIST_REFERENCES)
+        | discriminator_edges
+        | set(CROSS_TENANT_DEPENDENT_REFERENCES)
+    )
+    assert set(EDGE_SCHEMAS) == EXTERNAL_REFERENCES | closure_edges
 
 
 @pytest.mark.parametrize("edge", sorted(EDGE_SCHEMAS))

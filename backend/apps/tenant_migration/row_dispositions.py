@@ -5,6 +5,12 @@ from dataclasses import dataclass, field
 from django.apps import apps
 
 from .omitted_fields import OMITTED_FIELD_RECONSTRUCTIONS, OmittedFieldDisposition
+from .closure_references import (
+    CROSS_TENANT_DEPENDENT_REFERENCES,
+    MOVABLE_DISCRIMINATOR_REFERENCES,
+    MOVABLE_ROW_REFERENCES,
+    MissingReferenceDisposition,
+)
 from .target_projection import ROW_POLICIES, RowDisposition, SEEDED_RESOLUTIONS
 
 
@@ -13,11 +19,19 @@ class ImportAccounting:
     imported: dict[str, int] = field(default_factory=dict)
     resolved: dict[str, int] = field(default_factory=dict)
     dropped: dict[str, int] = field(default_factory=dict)
+    preserved: dict[tuple[str, str], int] = field(default_factory=dict)
     regenerated: dict[tuple[str, str], int] = field(default_factory=dict)
 
     def increment(self, bucket, label, amount=1):
         values = getattr(self, bucket)
         values[label] = values.get(label, 0) + amount
+
+    def increment_field(self, bucket, label, field_name, amount=1):
+        values = getattr(self, bucket)
+        key = (label, field_name)
+        values[key] = values.get(key, 0) + amount
+        other = self.regenerated if bucket == "preserved" else self.preserved
+        other.setdefault(key, 0)
 
 
 def row_disposition(model_label, row, references):
@@ -38,6 +52,34 @@ def row_disposition(model_label, row, references):
         for (label, _field), disposition in OMITTED_FIELD_RECONSTRUCTIONS.items()
     ):
         return "drop"
+
+    for (label, field_name), rule in MOVABLE_ROW_REFERENCES.items():
+        if (
+            label == model_label
+            and rule.disposition is MissingReferenceDisposition.DROP_WITH_PROVENANCE
+            and references.get(model_label, row["id"], field_name)
+        ):
+            return "drop"
+    for edge, typed_rules in MOVABLE_DISCRIMINATOR_REFERENCES.items():
+        if edge[0] != model_label:
+            continue
+        target_type = row.get("target_type", "")
+        if target_type.startswith("external_"):
+            target_type = target_type.removeprefix("external_")
+        rule = typed_rules.get(target_type)
+        if (
+            rule is not None
+            and rule.disposition is MissingReferenceDisposition.DROP_WITH_PROVENANCE
+            and references.get(model_label, row["id"], "target_type+target_id")
+        ):
+            return "drop"
+    for (label, field_name), disposition in CROSS_TENANT_DEPENDENT_REFERENCES.items():
+        if (
+            label == model_label
+            and disposition is MissingReferenceDisposition.DROP_WITH_PROVENANCE
+            and references.get(model_label, row["id"], field_name)
+        ):
+            return "drop"
 
     # Both foreign-collaboration shapes have a non-null FK to a row that is not
     # imported. Their typed snapshot survives separately, anchored where possible.
@@ -133,4 +175,10 @@ def _seeded_target_pk(label, row, target):
 
 
 def _condition_matches(condition, row):
-    return condition is None or row.get(condition[0]) == str(condition[1]).lower()
+    if condition is None:
+        return True
+    actual = str(row.get(condition[0], "")).lower()
+    expected = condition[1]
+    if isinstance(expected, (set, frozenset, tuple, list)):
+        return actual in {str(value).lower() for value in expected}
+    return actual == str(expected).lower()
