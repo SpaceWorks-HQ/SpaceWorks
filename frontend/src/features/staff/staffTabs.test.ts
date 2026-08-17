@@ -29,6 +29,19 @@ describe("data export authority", () => {
   });
 });
 
+describe("tenant migration authority", () => {
+  it("omits the tab for every non-superadmin and gives it a stable route", () => {
+    expect(getStaffAccess(["manage_makerspace"], false, false).allowedTabs).not.toContain("migration");
+    expect(getStaffAccess([], true, false).allowedTabs).toContain("migration");
+    expect(staffTabPath("migration", false)).toBe("/admin/tenant-migration");
+  });
+
+  it("omits the tab when the tenant_migration app is tombstoned", () => {
+    const space = { id: 1, name: "Forge", unavailable_apps: ["tenant_migration"] };
+    expect(filterTabsByEnabledModules(["dashboard", "migration"], space)).toEqual(["dashboard"]);
+  });
+});
+
 describe("machine-type subpaths", () => {
   it("reads the subpath from both the scoped and unscoped route shapes", () => {
     expect(staffPathState("/admin/machines/12-laser", false).subPath).toBe("12-laser");

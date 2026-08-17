@@ -48,6 +48,7 @@ const TAB_MODULES: Record<string, string[]> = {
 // tombstoned app's key from `enabled_modules`.
 const TAB_APPS: Record<string, string> = {
   warranty: "warranty",
+  migration: "tenant_migration",
 };
 
 const TAB_PATHS: Record<string, string> = {
@@ -62,6 +63,7 @@ const TAB_PATHS: Record<string, string> = {
   modules: "modules",
   exports: "data-export",
   backups: "backup-restore",
+  migration: "tenant-migration",
 };
 
 const PATH_TABS = Object.fromEntries(
