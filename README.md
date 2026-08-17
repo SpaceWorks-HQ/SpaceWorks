@@ -471,6 +471,26 @@ Postgres (e.g. Supabase) and host the app anywhere; a fully-managed free-tier pa
 **[docs/supabase-deployment.md](docs/supabase-deployment.md)** (best for demo/pilot, not dependable
 production).
 
+### Moving a makerspace onto its own server
+
+A space that started as a tenant on someone else's instance can take its data with it. A superadmin
+on the source deployment exports that one makerspace — rows, encrypted personal data, and the
+space's uploaded files, all inside a single `age`-encrypted archive — and a superadmin on the
+destination imports it as a new tenant.
+
+Three things are deliberate, because this moves real accountability records:
+
+- **Whose personal details travel is approved explicitly.** The export lists the exact people whose
+  contact details the archive would contain and requires a source superadmin to approve that list.
+  Anyone not approved is carried as an opaque reference instead. Approval is bound to that exact
+  list, so if it changes the approval no longer counts.
+- **Only one deployment is writable at a time.** The source freezes its writes before the final
+  snapshot and stays frozen through cutover, so nothing committed after the export can be lost. The
+  destination stays closed to users until every file has been copied and verified.
+- **The source is archived, not deleted** — and archives are outside the purge guarantee.
+
+Both sides are driven from the staff console; nothing here needs a shell.
+
 ## Tech stack
 
 Django 6 + DRF · React 19 + Vite 8 + Tailwind CSS 4 + TypeScript (TanStack Query v5) · PostgreSQL 16 ·

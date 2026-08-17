@@ -1589,7 +1589,8 @@ not module keys** (one app can own several keys — `printing`/`machines`/`machi
   Both apps own **feature** keys or no key at all, so `available_modules` has nothing to drop and
   `unavailable_apps()` is what tells the console to hide the tabs — the same reason it exists for
   `warranty` and `presence`. `TOMBSTONE_PROFILE_APPS` in `tests/tombstone/conftest.py` was extended
-  in step, and the profile is now nine apps.
+  in step, and the profile is now **ten** apps — `tenant_migration` joined it in Phase 5B, whose
+  whole superadmin surface is separable.
 - **Still NOT separable, with reasons:** `integrations` (platform mail carries password reset and
   email verification — removing it locks users out of their own accounts), `encryption` (the
   `ScopedPiiModelMixin` substrate six models depend on), `operations` (owns six module keys and the
@@ -1622,8 +1623,8 @@ not module keys** (one app can own several keys — `printing`/`machines`/`machi
   has no urlconf to import.
 - **The tombstone suite is a separate pytest run** (`tests/tombstone/`), because import-time surfaces
   cannot be re-derived in-process and the all-active suite asserts the opposite for the same objects:
-  `TOMBSTONED_APPS=bookings,events,maintenance,notifications,payments,presence,procurement,updates,warranty
-  pytest tests/tombstone` — the conftest demands the **whole nine-app profile** and names the exact
+  `TOMBSTONED_APPS=bookings,events,maintenance,notifications,payments,presence,procurement,tenant_migration,updates,warranty
+  pytest tests/tombstone` — the conftest demands the **whole ten-app profile** and names the exact
   string it wants, so a single app (this line said `procurement` alone until 2026-08-11) is a hard
   `UsageError`, not a partial run. A whole-tree run skips the directory; an
   explicit run without the profile is a hard `UsageError`, never a green no-op. `TOMBSTONE_PROFILE_APPS`
