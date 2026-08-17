@@ -113,7 +113,10 @@ def calls_gate(node):
     return any(
         isinstance(item, ast.Call)
         and (getattr(item.func, "id", None) or getattr(item.func, "attr", None))
-        in {"assert_write_allowed", "source_archive_write", "tenant_write"}
+        in {
+            "assert_write_allowed", "fanout_tenant_write", "source_archive_write",
+            "tenant_write",
+        }
         for item in ast.walk(node)
     )
 

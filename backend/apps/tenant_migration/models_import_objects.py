@@ -28,6 +28,7 @@ class TenantImportObject(models.Model):
     target_key = models.CharField(max_length=1024)
     size = models.PositiveBigIntegerField()
     sha256 = models.CharField(max_length=64)
+    content_type = models.CharField(max_length=255, blank=True, default="")
     state = models.CharField(
         max_length=16,
         choices=State.choices,

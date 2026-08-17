@@ -69,7 +69,7 @@ HTTP_ANONYMOUS_EXEMPTIONS = {
 
 HTTP_ANONYMOUS_PARTICIPANTS = {
     "apps.hardware_requests.cron_views.ReturnReminderCronView.post": (
-        "The fan-out reminder service takes tenant_write once per request."
+        "The fan-out reminder service takes the skip-and-count gate once per request."
     ),
 }
 
@@ -127,14 +127,25 @@ TASK_INTERNAL_PARTICIPANTS = {
         "The source export claims and holds source_archive_write for its full lifecycle."
     ),
     "apps.data_export.tasks.purge_expired_exports_task": (
-        "Each expired export is deleted inside tenant_write."
+        "Each expired export uses the skip-and-count tenant boundary."
     ),
     "apps.hardware_requests.tasks.send_return_reminders_task": (
-        "Each reminder lifecycle runs inside tenant_write."
+        "Each reminder lifecycle uses the skip-and-count tenant boundary."
     ),
     "apps.makerspaces.tasks.refresh_github_contributions_task": (
-        "Each profile refresh runs inside its membership tenant_write."
+        "Each profile refresh uses the skip-and-count tenant boundary."
     ),
+}
+
+
+# Exact function owners for deployment-wide scans that resolve and gate one tenant at
+# a time. The AST guard requires every owner to use the shared skip-and-count boundary.
+FANOUT_GATE_PARTICIPANTS = {
+    "apps.data_export.tasks.purge_expired_exports_task": "Expired export cleanup.",
+    "apps.hardware_requests.services_return_reminders.run_return_reminders": (
+        "Overdue loan reminders."
+    ),
+    "apps.makerspaces.tasks.refresh_github_contributions_task": "GitHub profile refresh.",
 }
 
 

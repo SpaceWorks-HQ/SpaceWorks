@@ -34,22 +34,12 @@ from tests.tenant_migration.object_helpers import (
     memory_objects,
     pairing_and_receipt,
     prepare_source_objects,
+    remove_source_evidence_after_archive,
+    remove_source_object_footprint,
     write_object_bundle,
 )
 from tests.tenant_migration.protocol_helpers import superadmin
 pytestmark = pytest.mark.django_db(transaction=True)
-
-
-def remove_source_evidence_after_archive(photo):
-    with transaction.atomic(), connection.cursor() as cursor:
-        cursor.execute("SET LOCAL app.allow_immutable_delete = 'on'")
-        EvidencePhoto.objects.filter(pk=photo.pk).delete()
-
-
-def remove_source_object_footprint(case, memory_objects):
-    remove_source_evidence_after_archive(case.source_data)
-    memory_objects["private"].pop(PRIVATE_KEY, None)
-    memory_objects["public_image"].pop(PUBLIC_KEY, None)
 
 
 def test_private_and_public_objects_round_trip_and_stay_unservable_until_activation(
@@ -153,10 +143,10 @@ def test_promotion_failure_rolls_back_final_and_staged_then_abort_blocks_activat
 ):
     real_copy = object_storage.copy_from_staging
 
-    def fail_public(staging_key, kind, target_key):
+    def fail_public(staging_key, kind, target_key, content_type=""):
         if kind == "public_image":
             raise object_storage.TenantObjectStorageError("injected promotion failure")
-        real_copy(staging_key, kind, target_key)
+        real_copy(staging_key, kind, target_key, content_type)
 
     monkeypatch.setattr(object_storage, "copy_from_staging", fail_public)
     with enabled_encryption():
@@ -286,6 +276,7 @@ def test_export_layout_streams_opaque_members_and_version_manifest(tmp_path, mon
             "size": len(data),
             "sha256": hashlib.sha256(data).hexdigest(),
             "version_id": "pinned-v1" if versioned else "",
+            "content_type": "application/pdf" if key == PRIVATE_KEY else "image/png",
         }
 
     monkeypatch.setattr(
@@ -308,6 +299,8 @@ def test_export_layout_streams_opaque_members_and_version_manifest(tmp_path, mon
     assert lines == records
     assert records[0]["version_id"] == "pinned-v1"
     assert records[1]["version_id"] is None
+    assert records[0]["content_type"] == "application/pdf"
+    assert records[1]["content_type"] == "image/png"
     assert [call[2] for call in calls] == [True, False]
 
 

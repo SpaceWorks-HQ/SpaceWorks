@@ -39,3 +39,11 @@ class IdentityResolutionError(TenantInsertionError):
 
 class ImportVerificationError(TenantInsertionError):
     """The materialized database state does not satisfy the import contract."""
+
+
+class MaterializationAlreadyCommitted(TenantInsertionError):
+    """A competing delivery committed the one-shot database materialization."""
+
+
+class ImportPromotionInProgress(TenantInsertionError):
+    """Another live delivery owns an object-promotion lease."""

@@ -1766,7 +1766,7 @@ export type ImportJob = {
   "source_retention_notice": string;
 };
 
-export type ImportJobStatusEnum = "pending" | "awaiting_identity" | "ready" | "materializing" | "completed" | "failed" | "abandoned";
+export type ImportJobStatusEnum = "pending" | "awaiting_identity" | "ready" | "materializing" | "finalizing" | "completed" | "failed" | "abandoned";
 
 export type ImportRun = {
   "target_identity"?: {

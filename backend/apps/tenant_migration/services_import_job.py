@@ -146,55 +146,64 @@ def claim_import_job(*, actor, job):
 
 def run_import_job(job_id, *, actor_id, target_identity=None):
     from apps.accounts.models import User
+    from .import_finalization import finalize_import_job
+    from .insertion_errors import (
+        ImportPromotionInProgress,
+        MaterializationAlreadyCommitted,
+    )
     from .materialization import materialize_tenant
 
     actor = User.objects.get(pk=actor_id)
     _require_superadmin(actor)
     job = TenantImportJob.objects.get(pk=job_id)
-    if job.status != TenantImportJob.Status.MATERIALIZING:
+    if job.status == TenantImportJob.Status.COMPLETED:
+        return job
+    if job.status not in {
+        TenantImportJob.Status.MATERIALIZING,
+        TenantImportJob.Status.FINALIZING,
+    }:
         raise ValidationError({"detail": "The import has not been claimed for execution."})
-    from .import_staging import decrypted_archive
 
     try:
-        with decrypted_archive(job.archive_path) as (root, carried):
-            result = materialize_tenant(
-                root, job, carried, target_identity=target_identity
-            )
-        report = {
-            "format_version": 1,
-            "target_makerspace_id": result.target_makerspace_id,
-            "imported": result.imported,
-            "resolved": result.resolved,
-            "dropped": result.dropped,
-            "identities_linked": result.identities_linked,
-            "identities_created": result.identities_created,
-            "external_references_created": result.external_references_created,
-        }
-        TenantImportJob.objects.filter(pk=job.pk).update(
-            status=TenantImportJob.Status.COMPLETED,
-            verification_report=report,
-            terminal_at=timezone.now(),
-        )
+        if job.status == TenantImportJob.Status.MATERIALIZING:
+            from .import_staging import decrypted_archive
+
+            try:
+                with decrypted_archive(job.archive_path) as (root, carried):
+                    materialize_tenant(
+                        root, job, carried, target_identity=target_identity
+                    )
+            except MaterializationAlreadyCommitted:
+                # A concurrent delivery won the database transaction. Its committed
+                # FINALIZING state is the authority for the remaining work.
+                pass
         job.refresh_from_db()
-        audit.record(
-            actor,
-            "tenant_migration.import_completed",
-            makerspace=job.target_makerspace,
-            target=job,
-            meta={
-                "import_id": str(job.pk),
-                "model_count": len(result.imported),
-                "identity_count": result.identities_linked + result.identities_created,
-                "format_version": 1,
-            },
-        )
+        job = finalize_import_job(job, actor=actor)
+    except ImportPromotionInProgress:
+        # The journal's live per-key lease proves another delivery is progressing.
+        # Leaving FINALIZING untouched lets that owner complete or a later delivery
+        # reclaim the lease after expiry.
+        return TenantImportJob.objects.get(pk=job.pk)
     except Exception as exc:
-        TenantImportJob.objects.filter(pk=job.pk).update(
+        failed = TenantImportJob.objects.filter(
+            pk=job.pk,
+            status__in=(
+                TenantImportJob.Status.MATERIALIZING,
+                TenantImportJob.Status.FINALIZING,
+            ),
+        ).update(
             status=TenantImportJob.Status.FAILED,
             failure_code="materialization_failed",
             failure_detail=str(exc)[:500],
             terminal_at=timezone.now(),
         )
+        if failed:
+            from .object_import import rollback_import_objects
+
+            rollback_job = TenantImportJob.objects.select_related(
+                "target_makerspace", "actor"
+            ).get(pk=job.pk)
+            rollback_import_objects(rollback_job)
         raise
     return job
 

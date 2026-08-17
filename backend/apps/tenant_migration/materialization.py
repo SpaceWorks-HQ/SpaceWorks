@@ -20,7 +20,11 @@ from .identity_resolution import (
     resolve_identities,
 )
 from .import_keys import install_carried_deks
-from .insertion_errors import IdentityResolutionError
+from .import_finalization import finalize_import_job
+from .insertion_errors import (
+    ImportPromotionInProgress,
+    MaterializationAlreadyCommitted,
+)
 from .models_import_job import TenantImportJob
 from .object_import import (
     prepare_import_objects,
@@ -81,7 +85,9 @@ def materialize_tenant(
         with transaction.atomic():
             locked_job = TenantImportJob.objects.select_for_update().get(pk=job.pk)
             if locked_job.target_makerspace_id is not None:
-                raise IdentityResolutionError("The import job is already materialized.")
+                raise MaterializationAlreadyCommitted(
+                    "The import database materialization is already committed."
+                )
             target = create_target_makerspace(
                 archive,
                 locked_job,
@@ -155,8 +161,6 @@ def materialize_tenant(
                     identity_report=identities,
                     regenerated_fields=regenerated,
                 )
-            locked_job.status = TenantImportJob.Status.COMPLETED
-            locked_job.save(update_fields=("status", "updated_at"))
             result = MaterializationResult(
                 target_makerspace_id=target.pk,
                 imported=dict(accounting.imported),
@@ -175,13 +179,21 @@ def materialize_tenant(
                 object_key_regenerations=dict(object_plan.regenerated_keys),
                 objects_promoted=0,
             )
+            locked_job.status = TenantImportJob.Status.FINALIZING
+            locked_job.materialization_report = _report_for(result)
+            locked_job.save(
+                update_fields=("status", "materialization_report", "updated_at")
+            )
         promoted = promote_import_objects(locked_job)
+        finalize_import_job(locked_job, actor=locked_job.actor)
         return MaterializationResult(
             **{
                 **result.__dict__,
                 "objects_promoted": promoted,
             }
         )
+    except (MaterializationAlreadyCommitted, ImportPromotionInProgress):
+        raise
     except Exception:
         if target is not None:
             dek_cache.invalidate(target.pk)
@@ -195,6 +207,19 @@ def materialize_tenant(
         ).get(pk=job.pk)
         rollback_import_objects(rollback_job)
         raise
+
+
+def _report_for(result):
+    return {
+        "format_version": 1,
+        "target_makerspace_id": result.target_makerspace_id,
+        "imported": result.imported,
+        "resolved": result.resolved,
+        "dropped": result.dropped,
+        "identities_linked": result.identities_linked,
+        "identities_created": result.identities_created,
+        "external_references_created": result.external_references_created,
+    }
 
 
 def _insert_models(

@@ -29,6 +29,7 @@ def activate_target(*, pairing, import_job, receipt_envelope, actor):
     job = _validated_target_job_unlocked(pairing, import_job)
     if not _already_activated(pairing, job):
         verify_import_objects(job)
+        _require_activation_ready(job)
     result = _activate_target_transaction(
         pairing=pairing,
         import_job=import_job,
@@ -43,6 +44,7 @@ def activate_target(*, pairing, import_job, receipt_envelope, actor):
 def _activate_target_transaction(*, pairing, import_job, receipt_envelope, actor):
     pairing = MigrationPairing.objects.select_for_update().get(pk=pairing.pk)
     job, target = _validated_target_job(pairing, import_job)
+    _require_activation_ready(job)
     receipt = verify_and_persist_peer_receipt(
         pairing,
         receipt_envelope,
@@ -175,6 +177,16 @@ def _already_activated(pairing, job):
     return receipt is not None and target_state.target_has_state(
         job.target_makerspace_id, target_state.ACTIVE
     )
+
+
+def _require_activation_ready(job):
+    if (
+        job.status != job.Status.COMPLETED
+        or not job.verification_report
+    ):
+        raise TransitionConflictError(
+            "Target activation requires a completed, verified import."
+        )
 
 
 def _require_superuser(actor):

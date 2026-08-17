@@ -33,6 +33,7 @@ from .source_gate_ast import (
     trees as _trees,
     url_names as _url_names,
 )
+from .source_gate_fanout_guards import validate_fanout_gate_coverage
 from .source_gate_http_guards import validate_authenticated_http_boundary
 
 
@@ -66,9 +67,7 @@ def validate_task_coverage(
 ):
     entries = discover_tasks(apps_dir)
     actual = {entry.target for entry in entries}
-    declarations = (
-        set(exemptions) | set(resolvers) | set(internal)
-    )
+    declarations = set(exemptions) | set(resolvers) | set(internal)
     _exact("Celery task", actual, declarations)
     broken = [entry.target for entry in entries if not entry.participates]
     if broken:
@@ -288,6 +287,7 @@ def validate_source_gate_coverage(apps_dir=APPS_DIR):
         "http": validate_http_coverage(apps_dir),
         "lifecycle": validate_lifecycle_exemptions(apps_dir),
         "objects": validate_object_mutation_coverage(apps_dir),
+        "fanouts": validate_fanout_gate_coverage(apps_dir, error_class=SourceGateCoverageError),
     }
 
 

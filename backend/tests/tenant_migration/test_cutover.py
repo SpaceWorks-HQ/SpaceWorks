@@ -67,9 +67,9 @@ def test_activation_retry_returns_same_persisted_receipt(monkeypatch):
         pairing=pairing, import_job=job, receipt_envelope=envelope, actor=actor
     )
 
-    job.refresh_from_db()
+    job.target_makerspace.refresh_from_db()
     assert first == second == envelope
-    assert job.status == "active"
+    assert job.target_makerspace.lifecycle_state == Makerspace.LifecycleState.ACTIVE
     assert MigrationReceipt.objects.filter(pairing=pairing).count() == 1
     assert ReceiptConsumption.objects.count() == 1
 
@@ -93,8 +93,8 @@ def test_aborted_target_cannot_activate(monkeypatch):
             ),
             actor=actor,
         )
-    job.refresh_from_db()
-    assert job.status == "aborted"
+    job.target_makerspace.refresh_from_db()
+    assert job.target_makerspace.lifecycle_state == Makerspace.LifecycleState.ABORTED
 
 
 def test_active_target_cannot_abort(monkeypatch):
@@ -116,8 +116,8 @@ def test_active_target_cannot_abort(monkeypatch):
 
     with pytest.raises(TransitionConflictError, match="IMPORTING"):
         cutover.abort_target(pairing=pairing, import_job=job, actor=actor)
-    job.refresh_from_db()
-    assert job.status == "active"
+    job.target_makerspace.refresh_from_db()
+    assert job.target_makerspace.lifecycle_state == Makerspace.LifecycleState.ACTIVE
 
 
 def test_unarchive_refuses_migrated_out_but_allows_ordinary_archive():

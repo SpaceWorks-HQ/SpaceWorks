@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 from io import StringIO
 
@@ -12,6 +13,7 @@ from apps.hardware_requests.models import HardwareRequest, HardwareRequestItem
 from apps.hardware_requests.services_return_reminders import run_return_reminders
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.models import Makerspace
+from tests.tenant_migration.source_gate_helpers import close_gate, make_actor
 
 pytestmark = pytest.mark.django_db
 
@@ -143,6 +145,65 @@ def test_send_return_reminders_skips_superadmin_hidden_space(mailoutbox, monkeyp
     assert mailoutbox == []
     overdue.refresh_from_db()
     assert overdue.return_reminder_sent_at is None
+
+
+def test_frozen_tenant_does_not_stop_return_reminder_fanout(monkeypatch, caplog):
+    now = timezone.now()
+    first_space = make_space("reminder-fanout-first")
+    frozen_space = make_space("reminder-fanout-frozen")
+    last_space = make_space("reminder-fanout-last")
+    first = make_request(
+        first_space,
+        make_product(first_space),
+        status=HardwareRequest.Status.ISSUED,
+        contact_email="first@example.com",
+        due_at=now - timedelta(minutes=3),
+    )
+    frozen = make_request(
+        frozen_space,
+        make_product(frozen_space),
+        status=HardwareRequest.Status.ISSUED,
+        contact_email="frozen@example.com",
+        due_at=now - timedelta(minutes=2),
+    )
+    last = make_request(
+        last_space,
+        make_product(last_space),
+        status=HardwareRequest.Status.ISSUED,
+        contact_email="last@example.com",
+        due_at=now - timedelta(minutes=1),
+    )
+    close_gate(frozen_space, make_actor("reminder-fanout"))
+    delivered = []
+    monkeypatch.setattr(
+        "apps.hardware_requests.services_return_reminders.notifications.notify_return_due",
+        lambda request: delivered.append(request.pk) or True,
+    )
+    monkeypatch.setattr(
+        "apps.hardware_requests.services_return_reminders.emit_notification",
+        lambda *args, **kwargs: None,
+    )
+
+    with caplog.at_level(
+        logging.INFO, logger="apps.tenant_migration.gate_runtime"
+    ):
+        result = run_return_reminders(now=now)
+
+    assert result == {"sent": 2, "skipped": 1}
+    assert delivered == [first.pk, last.pk]
+    assert any(
+        record.msg == "tenant_fanout_skipped_closed_source_gate"
+        and record.makerspace_id == frozen_space.pk
+        and record.operation == "return_reminder"
+        for record in caplog.records
+    )
+    first.refresh_from_db()
+    frozen.refresh_from_db()
+    last.refresh_from_db()
+    assert first.return_reminder_sent_at == now
+    assert frozen.return_reminder_sent_at is None
+    assert last.return_reminder_sent_at == now
+
 
 def test_run_return_reminders_does_not_send_when_request_already_claimed(monkeypatch):
     now = timezone.now()

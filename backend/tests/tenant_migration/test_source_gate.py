@@ -9,7 +9,7 @@ from django.test import RequestFactory
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.models import Makerspace, MakerspaceMembership, MemberProfile
 from apps.tenant_migration import gate_policy
 from apps.tenant_migration.gate_errors import (
     SourceMigrationGateClosed,
@@ -232,6 +232,49 @@ def test_task_external_call_holds_session_lock_without_opening_transaction(
 
         assert observed == [False, False]
         assert _try_session_exclusive(secondary, space.pk) is True
+    finally:
+        secondary.close()
+
+
+def test_github_refresh_fetches_outside_transaction_while_gate_lock_is_held(
+    settings, monkeypatch
+):
+    from apps.makerspaces import github_contributions
+    from apps.makerspaces.tasks import refresh_github_contributions_task
+
+    settings.GITHUB_API_TOKEN = "test-token"
+    space = _space("github-session-lock")
+    membership = MakerspaceMembership.objects.create(
+        makerspace=space,
+        user=_actor("github-session-lock"),
+        role=MakerspaceMembership.Role.CUSTOM,
+    )
+    profile = MemberProfile.objects.create(
+        membership=membership, github_username="octocat"
+    )
+    secondary = connections["default"].copy()
+    observed = []
+
+    def fetch_total(login):
+        assert login == "octocat"
+        observed.append(transaction.get_connection().in_atomic_block)
+        observed.append(_try_session_exclusive(secondary, space.pk))
+        return 42
+
+    monkeypatch.setattr(github_contributions, "fetch_total", fetch_total)
+    try:
+        result = refresh_github_contributions_task()
+
+        assert result == {
+            "configured": True,
+            "updated": 1,
+            "unavailable": 0,
+            "skipped": 0,
+        }
+        assert observed == [False, False]
+        assert _try_session_exclusive(secondary, space.pk) is True
+        profile.refresh_from_db()
+        assert profile.github_contributions == 42
     finally:
         secondary.close()
 

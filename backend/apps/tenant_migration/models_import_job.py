@@ -12,6 +12,7 @@ class TenantImportJob(models.Model):
         AWAITING_IDENTITY = "awaiting_identity", "Awaiting identity decisions"
         READY = "ready", "Ready"
         MATERIALIZING = "materializing", "Materializing"
+        FINALIZING = "finalizing", "Finalizing"
         COMPLETED = "completed", "Completed"
         FAILED = "failed", "Failed"
         ABANDONED = "abandoned", "Abandoned"
@@ -46,6 +47,7 @@ class TenantImportJob(models.Model):
     )
     aggregate_outcome = models.JSONField(default=dict, blank=True)
     archive_path = models.CharField(max_length=1024, blank=True)
+    materialization_report = models.JSONField(default=dict, blank=True)
     verification_report = models.JSONField(default=dict, blank=True)
     failure_code = models.CharField(max_length=64, blank=True)
     failure_detail = models.CharField(max_length=500, blank=True)

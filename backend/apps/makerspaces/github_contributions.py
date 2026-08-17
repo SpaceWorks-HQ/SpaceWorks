@@ -20,6 +20,7 @@ import urllib.request
 from datetime import timedelta
 
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -68,10 +69,11 @@ def refresh(profile):
     # for the new handle, and an unconditional update would then write the OLD account's
     # total straight back onto it. A count under the wrong name is a false claim, not
     # stale data, so the write is dropped rather than applied.
-    return bool(
-        MemberProfile.objects.filter(pk=profile.pk, github_username=login).update(**fields)
-        and total is not None
-    )
+    with transaction.atomic():
+        updated = MemberProfile.objects.filter(
+            pk=profile.pk, github_username=login
+        ).update(**fields)
+    return bool(updated and total is not None)
 
 
 def fetch_total(login):

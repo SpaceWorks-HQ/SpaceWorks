@@ -66,10 +66,11 @@ def source_pairing(actor, makerspace):
     return pairing, target, target_private
 
 
-def import_job(pairing, *, status="importing"):
+def import_job(pairing, *, status=TenantImportJob.Status.COMPLETED):
     target = Makerspace.objects.create(
         name=f"Target {pairing.migration_id}",
         slug=f"target-{str(pairing.migration_id)[:8]}",
+        lifecycle_state=Makerspace.LifecycleState.IMPORTING,
     )
     return TenantImportJob.objects.create(
         id=pairing.migration_id,
@@ -80,6 +81,7 @@ def import_job(pairing, *, status="importing"):
         source_deployment_id=pairing.source_deployment_id,
         target_makerspace=target,
         status=status,
+        verification_report={"format_version": 1},
         expires_at=timezone.now() + timedelta(days=1),
     )
 
@@ -109,13 +111,15 @@ def bind_job_state(monkeypatch, job):
 
     def transition(makerspace_id, expected, new):
         assert makerspace_id == job.target_makerspace_id
-        return TenantImportJob.objects.filter(pk=job.pk, status=expected).update(
-            status=new
+        return Makerspace.objects.filter(pk=makerspace_id, lifecycle_state=expected).update(
+            lifecycle_state=new
         )
 
     def has_state(makerspace_id, expected):
         assert makerspace_id == job.target_makerspace_id
-        return TenantImportJob.objects.filter(pk=job.pk, status=expected).exists()
+        return Makerspace.objects.filter(
+            pk=makerspace_id, lifecycle_state=expected
+        ).exists()
 
     monkeypatch.setattr(target_state, "transition_target", transition)
     monkeypatch.setattr(target_state, "target_has_state", has_state)

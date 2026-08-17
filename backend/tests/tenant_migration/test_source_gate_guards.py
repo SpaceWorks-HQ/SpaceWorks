@@ -9,6 +9,9 @@ from apps.tenant_migration.source_gate_guards import (
     validate_source_gate_coverage,
     validate_task_coverage,
 )
+from apps.tenant_migration.source_gate_fanout_guards import (
+    validate_fanout_gate_coverage,
+)
 from apps.tenant_migration.source_gate_http_guards import (
     validate_authenticated_http_boundary,
 )
@@ -28,6 +31,7 @@ def test_real_application_tree_has_total_source_gate_coverage():
     assert coverage["http"]
     assert coverage["lifecycle"]
     assert coverage["objects"]
+    assert coverage["fanouts"]
 
 
 def test_task_guard_rejects_deliberate_nonparticipant(tmp_path):
@@ -54,6 +58,42 @@ def test_task_guard_rejects_stale_exemption(tmp_path):
             exemptions={"apps.removed.tasks.old_task": "Removed task."},
             resolvers={},
             internal={},
+        )
+
+
+def test_fanout_guard_rejects_a_raw_per_item_tenant_gate(tmp_path):
+    _write(
+        tmp_path,
+        "leak/tasks.py",
+        "def unsafe_fanout(items):\n"
+        "    for item in items:\n"
+        "        with tenant_write(item.makerspace_id):\n"
+        "            item.save()\n",
+    )
+
+    with pytest.raises(SourceGateCoverageError, match="skip-and-count"):
+        validate_fanout_gate_coverage(
+            tmp_path, participants={}, error_class=SourceGateCoverageError
+        )
+
+
+def test_fanout_guard_rejects_an_ignored_frozen_tenant_signal(tmp_path):
+    _write(
+        tmp_path,
+        "leak/tasks.py",
+        "def unsafe_fanout(items, counts):\n"
+        "    for item in items:\n"
+        "        with fanout_tenant_write(\n"
+        "            item.makerspace_id, operation='unsafe', counts=counts\n"
+        "        ) as should_process:\n"
+        "            item.save()\n",
+    )
+
+    with pytest.raises(SourceGateCoverageError, match="ignore"):
+        validate_fanout_gate_coverage(
+            tmp_path,
+            participants={"apps.leak.tasks.unsafe_fanout": "Unsafe."},
+            error_class=SourceGateCoverageError,
         )
 
 

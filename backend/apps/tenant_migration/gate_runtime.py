@@ -1,4 +1,5 @@
-from contextlib import contextmanager
+import logging
+from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
 
 from django.db import transaction
@@ -11,6 +12,7 @@ from apps.tenant_migration.models_source_gate import SourceMigrationGate
 
 _archive_authority = ContextVar("source_migration_archive_authority", default=None)
 _boundary_session_locks = ContextVar("source_gate_boundary_session_locks", default=())
+logger = logging.getLogger(__name__)
 
 
 def assert_write_allowed(makerspace_id):
@@ -61,6 +63,24 @@ def boundary_tenant_write(makerspace_id):
             yield
         finally:
             _boundary_session_locks.reset(token)
+
+
+@contextmanager
+def fanout_tenant_write(makerspace_id, *, operation, counts):
+    """Hold one tenant boundary, or report a frozen item and let the scan continue."""
+    makerspace_id = int(makerspace_id)
+    with ExitStack() as stack:
+        try:
+            stack.enter_context(boundary_tenant_write(makerspace_id))
+        except SourceMigrationGateClosed:
+            counts["skipped"] = counts.get("skipped", 0) + 1
+            logger.info(
+                "tenant_fanout_skipped_closed_source_gate",
+                extra={"makerspace_id": makerspace_id, "operation": operation},
+            )
+            yield False
+            return
+        yield True
 
 
 def assert_request_write_allowed(request):

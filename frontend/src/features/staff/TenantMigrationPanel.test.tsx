@@ -201,11 +201,13 @@ describe("TenantMigrationPanel cutover", () => {
     created_at: "now", expires_at: "later",
   };
 
-  it("keeps a materializing target visibly IMPORTING while objects promote", async () => {
-    installApi({ imports: [{ ...baseJob, status: "materializing" }] });
+  it.each(["materializing", "finalizing"])(
+    "keeps a %s target visibly IMPORTING while finalization runs",
+    async (status) => {
+    installApi({ imports: [{ ...baseJob, status }] });
     renderPanel();
     expect(await screen.findByText("IMPORTING")).toBeVisible();
-    expect(screen.getByText(/Objects are still promoting/)).toBeVisible();
+    expect(screen.getByText(/Import finalization is still running/)).toBeVisible();
     expect(screen.getAllByText(/archives are outside the purge guarantee/i).length).toBeGreaterThan(0);
   });
 

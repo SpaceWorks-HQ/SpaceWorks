@@ -2,7 +2,7 @@
 
 from celery import shared_task
 
-from apps.tenant_migration.gate_runtime import tenant_write
+from apps.tenant_migration.gate_runtime import fanout_tenant_write
 
 
 @shared_task(name="apps.makerspaces.tasks.refresh_github_contributions_task")
@@ -18,7 +18,7 @@ def refresh_github_contributions_task():
 
     if not github_contributions.is_configured():
         return {"configured": False}
-    updated = unavailable = 0
+    counts = {"updated": 0, "unavailable": 0, "skipped": 0}
     profiles = MemberProfile.objects.select_related("membership").exclude(
         github_username=""
     )
@@ -27,9 +27,15 @@ def refresh_github_contributions_task():
             continue
         # `refresh` swallows every failure and keeps the last known count, so one bad
         # handle cannot stop the rest of the run.
-        with tenant_write(profile.membership.makerspace_id):
+        with fanout_tenant_write(
+            profile.membership.makerspace_id,
+            operation="github_contributions_refresh",
+            counts=counts,
+        ) as should_process:
+            if not should_process:
+                continue
             if github_contributions.refresh(profile):
-                updated += 1
+                counts["updated"] += 1
             else:
-                unavailable += 1
-    return {"configured": True, "updated": updated, "unavailable": unavailable}
+                counts["unavailable"] += 1
+    return {"configured": True, **counts}

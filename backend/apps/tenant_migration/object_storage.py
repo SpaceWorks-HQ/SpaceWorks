@@ -40,15 +40,25 @@ def upload_staged(staging_key, path):
         ) from exc
 
 
-def copy_from_staging(staging_key, bucket_kind, target_key):
+def copy_from_staging(staging_key, bucket_kind, target_key, content_type=""):
     try:
-        client().copy_object(
-            Bucket=bucket_name(bucket_kind),
-            CopySource={
+        params = {
+            "Bucket": bucket_name(bucket_kind),
+            "CopySource": {
                 "Bucket": settings.AWS_STORAGE_BUCKET_NAME,
                 "Key": staging_key,
             },
-            Key=target_key,
+            "Key": target_key,
+        }
+        if content_type:
+            params.update(
+                ContentType=content_type,
+                MetadataDirective="REPLACE",
+            )
+        # With no source ContentType, COPY retains the staging upload's
+        # application/octet-stream value: this backend's normal safe default.
+        client().copy_object(
+            **params,
         )
     except (BotoCoreError, ClientError) as exc:
         raise TenantObjectStorageError(

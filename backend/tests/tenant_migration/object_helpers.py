@@ -4,6 +4,7 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet
 import pytest
+from django.db import connection, transaction
 
 from apps.evidence.models import EvidencePhoto
 from apps.tenant_migration import object_storage
@@ -20,6 +21,26 @@ PRIVATE_BYTES = b"private evidence bytes"
 PUBLIC_BYTES = b"public image bytes"
 
 
+def remove_source_evidence_after_archive(photo):
+    with transaction.atomic(), connection.cursor() as cursor:
+        cursor.execute("SET LOCAL app.allow_immutable_delete = 'on'")
+        EvidencePhoto.objects.filter(pk=photo.pk).delete()
+
+
+def remove_source_object_footprint(case, memory_objects):
+    """Model a target deployment that has never seen these keys.
+
+    Source and target share one database and one bucket in this suite, so a carried
+    key otherwise collides with its own source row and object -- preservation and
+    owner-row verification are both unobservable until the source footprint is gone.
+    The archive is already built by this point, so removing it changes nothing that
+    travels.
+    """
+    remove_source_evidence_after_archive(case.source_data)
+    memory_objects["private"].pop(PRIVATE_KEY, None)
+    memory_objects["public_image"].pop(PUBLIC_KEY, None)
+
+
 @pytest.fixture(autouse=True)
 def encryption_key(settings):
     settings.API_CLIENT_ENC_KEY = Fernet.generate_key().decode("ascii")
@@ -27,31 +48,42 @@ def encryption_key(settings):
 
 @pytest.fixture
 def memory_objects(monkeypatch):
-    buckets = {"private": {}, "public_image": {}, "quota": []}
+    buckets = {
+        "private": {},
+        "public_image": {},
+        "content_types": {"private": {}, "public_image": {}},
+        "quota": [],
+    }
     monkeypatch.setattr(
         object_storage, "object_exists", lambda kind, key: key in buckets[kind]
     )
-    monkeypatch.setattr(
-        object_storage,
-        "upload_staged",
-        lambda key, path: buckets["private"].__setitem__(
-            key, Path(path).read_bytes()
-        ),
-    )
+    def upload(key, path):
+        buckets["private"][key] = Path(path).read_bytes()
+        buckets["content_types"]["private"][key] = "application/octet-stream"
+
+    monkeypatch.setattr(object_storage, "upload_staged", upload)
 
     def digest(kind, key):
         data = buckets[kind][key]
         return len(data), hashlib.sha256(data).hexdigest()
 
-    def copy(staging_key, kind, target_key):
+    def copy(staging_key, kind, target_key, content_type=""):
         buckets[kind][target_key] = buckets["private"][staging_key]
+        buckets["content_types"][kind][target_key] = (
+            content_type
+            or buckets["content_types"]["private"][staging_key]
+        )
+
+    def delete(kind, key):
+        buckets[kind].pop(key, None)
+        buckets["content_types"][kind].pop(key, None)
 
     monkeypatch.setattr(object_storage, "digest_object", digest)
     monkeypatch.setattr(object_storage, "copy_from_staging", copy)
     monkeypatch.setattr(
         object_storage,
         "delete_object",
-        lambda kind, key: buckets[kind].pop(key, None),
+        delete,
     )
     monkeypatch.setattr(
         object_storage,
@@ -102,6 +134,9 @@ def write_object_bundle(root):
                 "size": len(data),
                 "sha256": hashlib.sha256(data).hexdigest(),
                 "version_id": "source-version" if kind == "private" else None,
+                "content_type": (
+                    "application/pdf" if kind == "private" else "image/png"
+                ),
             }
         )
     Path(root, "objects", "manifest.jsonl").write_text(

@@ -1,0 +1,134 @@
+import hashlib
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+from django.utils import timezone
+import pytest
+
+from apps.makerspaces.models import Makerspace
+from apps.tenant_migration import object_storage
+from apps.tenant_migration.models import TenantImportJob, TenantImportObject
+from apps.tenant_migration.object_export import object_member_path
+from apps.tenant_migration.object_import import (
+    prepare_import_objects,
+    promote_import_objects,
+)
+from tests.tenant_migration.object_helpers import memory_objects
+from tests.tenant_migration.protocol_helpers import superadmin
+
+
+pytestmark = pytest.mark.django_db(transaction=True)
+
+
+def _write_bundle(root, records):
+    for record, data in records:
+        member = Path(root) / object_member_path(
+            record["bucket_kind"], record["source_key"]
+        )
+        member.parent.mkdir(parents=True, exist_ok=True)
+        member.write_bytes(data)
+        record.update(
+            size=len(data),
+            sha256=hashlib.sha256(data).hexdigest(),
+            version_id=None,
+        )
+    manifest = Path(root, "objects", "manifest.jsonl")
+    manifest.write_text(
+        "".join(json.dumps(record, sort_keys=True) + "\n" for record, _ in records),
+        encoding="utf-8",
+    )
+
+
+def _import_job(name):
+    target = Makerspace.objects.create(name=name, slug=name)
+    return TenantImportJob.objects.create(
+        source_archive_digest="c" * 64,
+        target_makerspace=target,
+        actor=superadmin(f"{name}-actor"),
+        expires_at=timezone.now(),
+    )
+
+
+def test_promotion_restores_public_image_and_private_document_content_types(
+    tmp_path, memory_objects
+):
+    records = [
+        (
+            {
+                "bucket_kind": "private",
+                "source_key": "machine-documents/source/manual.pdf",
+                "content_type": "application/pdf",
+            },
+            b"private document",
+        ),
+        (
+            {
+                "bucket_kind": "public_image",
+                "source_key": "makerspace/source/logo.png",
+                "content_type": "image/png",
+            },
+            b"public image",
+        ),
+    ]
+    _write_bundle(tmp_path, records)
+    job = _import_job("mime-roundtrip")
+
+    prepare_import_objects(SimpleNamespace(root=tmp_path), job)
+    assert list(
+        job.import_objects.order_by("bucket_kind").values_list("content_type", flat=True)
+    ) == ["application/pdf", "image/png"]
+    assert promote_import_objects(job) == 2
+
+    assert memory_objects["content_types"]["private"][
+        "machine-documents/source/manual.pdf"
+    ] == "application/pdf"
+    assert memory_objects["content_types"]["public_image"][
+        "makerspace/source/logo.png"
+    ] == "image/png"
+
+
+def test_promotion_without_source_content_type_uses_storage_default(
+    tmp_path, memory_objects
+):
+    source_key = "machine-documents/source/legacy"
+    records = [
+        (
+            {"bucket_kind": "private", "source_key": source_key},
+            b"legacy document",
+        )
+    ]
+    _write_bundle(tmp_path, records)
+    job = _import_job("mime-fallback")
+
+    prepare_import_objects(SimpleNamespace(root=tmp_path), job)
+    row = TenantImportObject.objects.get(job=job)
+    assert row.content_type == ""
+    assert promote_import_objects(job) == 1
+    assert (
+        memory_objects["content_types"]["private"][source_key]
+        == "application/octet-stream"
+    )
+
+
+def test_storage_copy_replaces_only_known_content_type(settings, monkeypatch):
+    calls = []
+    fake_client = SimpleNamespace(copy_object=lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(object_storage, "client", lambda: fake_client)
+    settings.AWS_STORAGE_BUCKET_NAME = "private-bucket"
+    settings.PUBLIC_IMAGE_BUCKET = "public-bucket"
+
+    object_storage.copy_from_staging(
+        "staged-private", "private", "manual.pdf", "application/pdf"
+    )
+    object_storage.copy_from_staging(
+        "staged-public", "public_image", "logo.png", "image/png"
+    )
+    object_storage.copy_from_staging("staged-legacy", "private", "legacy")
+
+    assert calls[0]["ContentType"] == "application/pdf"
+    assert calls[0]["MetadataDirective"] == "REPLACE"
+    assert calls[1]["ContentType"] == "image/png"
+    assert calls[1]["MetadataDirective"] == "REPLACE"
+    assert "ContentType" not in calls[2]
+    assert "MetadataDirective" not in calls[2]

@@ -38186,12 +38186,13 @@
                     "awaiting_identity",
                     "ready",
                     "materializing",
+                    "finalizing",
                     "completed",
                     "failed",
                     "abandoned"
                 ],
                 "type": "string",
-                "description": "* `pending` - Pending\n* `awaiting_identity` - Awaiting identity decisions\n* `ready` - Ready\n* `materializing` - Materializing\n* `completed` - Completed\n* `failed` - Failed\n* `abandoned` - Abandoned"
+                "description": "* `pending` - Pending\n* `awaiting_identity` - Awaiting identity decisions\n* `ready` - Ready\n* `materializing` - Materializing\n* `finalizing` - Finalizing\n* `completed` - Completed\n* `failed` - Failed\n* `abandoned` - Abandoned"
             },
             "ImportRun": {
                 "type": "object",

@@ -6,16 +6,19 @@ import hmac
 from pathlib import Path
 import re
 
-from django.db import transaction
 from django.utils import timezone
 
 from apps.audit import services as audit
 from apps.backup.digests import sha256_file
 from apps.makerspaces import limits
 
-from .insertion_errors import ArchiveFormatError, ImportVerificationError
+from .insertion_errors import (
+    ArchiveFormatError,
+    ImportVerificationError,
+)
 from .models_import_objects import TenantImportObject
 from .object_export import object_member_path
+from .object_promotion import promote_import_objects
 from . import object_storage
 
 
@@ -71,6 +74,7 @@ def prepare_import_objects(archive, job):
             target_key=target_key,
             size=record["size"],
             sha256=record["sha256"],
+            content_type=record["content_type"],
         )
         target_keys[record["source_key"]] = target_key
         regenerated += changed
@@ -79,82 +83,6 @@ def prepare_import_objects(archive, job):
     _audit_staged(job, len(records), records)
     return ObjectImportPlan(
         target_keys, len(records), regenerated, regenerated_keys
-    )
-
-
-def promote_import_objects(job):
-    promoted = 0
-    rows = list(job.import_objects.order_by("pk"))
-    for row in rows:
-        if row.state == TenantImportObject.State.VERIFIED:
-            continue
-        if row.state != TenantImportObject.State.STAGED or row.claimed_at is not None:
-            raise ImportVerificationError(
-                f"Object {row.source_key!r} is not available for promotion."
-            )
-        claimed_at = timezone.now()
-        claimed = TenantImportObject.objects.filter(
-            pk=row.pk,
-            state=TenantImportObject.State.STAGED,
-            claimed_at__isnull=True,
-        ).update(claimed_at=claimed_at)
-        if claimed != 1:
-            raise ImportVerificationError(
-                f"Object {row.source_key!r} was claimed concurrently."
-            )
-        try:
-            object_storage.copy_from_staging(
-                row.staging_key, row.bucket_kind, row.target_key
-            )
-            _mark_promoted_and_charge(row.pk, job.target_makerspace)
-            size, digest = object_storage.digest_object(row.bucket_kind, row.target_key)
-            if size != row.size or not hmac.compare_digest(digest, row.sha256):
-                raise ImportVerificationError(
-                    f"Promoted object checksum mismatch for {row.source_key!r}."
-                )
-            TenantImportObject.objects.filter(
-                pk=row.pk, state=TenantImportObject.State.PROMOTED
-            ).update(state=TenantImportObject.State.VERIFIED, updated_at=timezone.now())
-            promoted += 1
-        except Exception:
-            _clean_failed_promotion(row.pk, job.target_makerspace)
-            raise
-    _audit_promoted(job, promoted, rows)
-    return promoted
-
-
-@transaction.atomic
-def _mark_promoted_and_charge(row_id, makerspace):
-    row = TenantImportObject.objects.get(pk=row_id)
-    if row.state != TenantImportObject.State.STAGED or row.claimed_at is None:
-        raise ImportVerificationError("The object promotion claim is no longer valid.")
-    limits.add_storage(makerspace, row.size)
-    updated = TenantImportObject.objects.filter(
-        pk=row_id,
-        state=TenantImportObject.State.STAGED,
-        claimed_at=row.claimed_at,
-        quota_charged_at__isnull=True,
-    ).update(
-        state=TenantImportObject.State.PROMOTED,
-        quota_charged_at=timezone.now(),
-        updated_at=timezone.now(),
-    )
-    if updated != 1:
-        raise ImportVerificationError("The object promotion claim was lost.")
-    # Object copy happened before this transaction. A crash before this commit can
-    # leave an unjournaled target copy, but the durable STAGED claim lets rollback
-    # identify and delete it; quota and PROMOTED now either both commit or both roll back.
-
-
-def _clean_failed_promotion(row_id, makerspace):
-    row = TenantImportObject.objects.get(pk=row_id)
-    object_storage.delete_object(row.bucket_kind, row.target_key)
-    if row.quota_charged_at is not None:
-        limits.free_storage(makerspace, row.size)
-    TenantImportObject.objects.filter(pk=row_id).update(
-        state=TenantImportObject.State.FAILED,
-        quota_charged_at=None,
-        updated_at=timezone.now(),
     )
 
 
@@ -205,6 +133,7 @@ def _manifest_records(root):
                     f"Invalid object manifest line {line_number}."
                 ) from exc
             _validate_record(record, line_number)
+            record["content_type"] = record.get("content_type") or ""
             if record["source_key"] in seen:
                 raise ArchiveFormatError("Object manifest source keys must be unique.")
             seen.add(record["source_key"])
@@ -213,8 +142,13 @@ def _manifest_records(root):
 
 
 def _validate_record(record, line_number):
-    expected = {"bucket_kind", "source_key", "size", "sha256", "version_id"}
-    if not isinstance(record, dict) or set(record) != expected:
+    required = {"bucket_kind", "source_key", "size", "sha256", "version_id"}
+    allowed = required | {"content_type"}
+    if (
+        not isinstance(record, dict)
+        or not required.issubset(record)
+        or not set(record).issubset(allowed)
+    ):
         raise ArchiveFormatError(f"Invalid object manifest shape at line {line_number}.")
     if record["bucket_kind"] not in {"private", "public_image"}:
         raise ArchiveFormatError(f"Invalid object bucket at line {line_number}.")
@@ -226,6 +160,11 @@ def _validate_record(record, line_number):
         raise ArchiveFormatError(f"Invalid object checksum at line {line_number}.")
     if record["version_id"] is not None and not isinstance(record["version_id"], str):
         raise ArchiveFormatError(f"Invalid object version at line {line_number}.")
+    content_type = record.get("content_type")
+    if content_type is not None and (
+        not isinstance(content_type, str) or len(content_type) > 255
+    ):
+        raise ArchiveFormatError(f"Invalid object content type at line {line_number}.")
 
 
 def _verify_local_member(path, record):
@@ -236,8 +175,13 @@ def _verify_local_member(path, record):
 
 
 def _require_matching_journal(row, record):
-    actual = (row.bucket_kind, row.size, row.sha256)
-    expected = (record["bucket_kind"], record["size"], record["sha256"])
+    actual = (row.bucket_kind, row.size, row.sha256, row.content_type)
+    expected = (
+        record["bucket_kind"],
+        record["size"],
+        record["sha256"],
+        record["content_type"],
+    )
     if actual != expected or row.state == TenantImportObject.State.ROLLED_BACK:
         raise ImportVerificationError(
             f"Existing object journal conflicts with {record['source_key']!r}."
@@ -260,20 +204,6 @@ def _audit_staged(job, count, rows):
     audit.record(
         job.actor,
         "tenant_migration.objects_staged",
-        makerspace=job.target_makerspace,
-        target=job,
-        meta={
-            "job_id": str(job.pk),
-            "object_count": count,
-            "sha256": _aggregate_sha256(rows),
-        },
-    )
-
-
-def _audit_promoted(job, count, rows):
-    audit.record(
-        job.actor,
-        "tenant_migration.objects_promoted",
         makerspace=job.target_makerspace,
         target=job,
         meta={

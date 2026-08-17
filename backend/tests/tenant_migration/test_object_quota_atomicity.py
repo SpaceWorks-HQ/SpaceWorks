@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.makerspaces.models import Makerspace
 from apps.tenant_migration.models import TenantImportJob, TenantImportObject
-from apps.tenant_migration.object_import import _mark_promoted_and_charge
+from apps.tenant_migration.object_promotion import _mark_promoted_and_charge
 
 
 pytestmark = pytest.mark.django_db(transaction=True)

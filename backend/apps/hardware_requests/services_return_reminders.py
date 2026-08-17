@@ -5,7 +5,7 @@ from apps.accounts import rbac
 from apps.hardware_requests import notifications
 from apps.hardware_requests.models import HardwareRequest
 from apps.notifications.emit import emit_notification
-from apps.tenant_migration.gate_runtime import tenant_write
+from apps.tenant_migration.gate_runtime import fanout_tenant_write
 
 
 def run_return_reminders(*, now=None, limit=200) -> dict:
@@ -27,10 +27,15 @@ def run_return_reminders(*, now=None, limit=200) -> dict:
         .exclude(makerspace_id__in=excluded_makerspace_ids)
         .order_by("return_due_at", "id")[:limit]
     )
-    sent_count = 0
-    skipped_count = 0
+    counts = {"sent": 0, "skipped": 0}
     for hardware_request in queryset:
-        with tenant_write(hardware_request.makerspace_id):
+        with fanout_tenant_write(
+            hardware_request.makerspace_id,
+            operation="return_reminder",
+            counts=counts,
+        ) as should_process:
+            if not should_process:
+                continue
             with transaction.atomic():
                 claimed = HardwareRequest.objects.filter(
                     pk=hardware_request.pk,
@@ -46,7 +51,7 @@ def run_return_reminders(*, now=None, limit=200) -> dict:
                 )
                 raise
             if sent:
-                sent_count += 1
+                counts["sent"] += 1
                 emit_notification(
                     hardware_request.makerspace,
                     level="warning",
@@ -58,6 +63,6 @@ def run_return_reminders(*, now=None, limit=200) -> dict:
             HardwareRequest.objects.filter(pk=hardware_request.pk).update(
                 return_reminder_sent_at=None
             )
-            skipped_count += 1
+            counts["skipped"] += 1
 
-    return {"sent": sent_count, "skipped": skipped_count}
+    return counts

@@ -63,6 +63,7 @@ def capture_tenant_objects(root, makerspace, storage_modes):
                     "size": captured["size"],
                     "sha256": captured["sha256"],
                     "version_id": captured["version_id"] or None,
+                    "content_type": captured.get("content_type") or "",
                 }
             )
     manifest_path = root / "objects" / "manifest.jsonl"

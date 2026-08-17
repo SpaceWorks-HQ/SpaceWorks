@@ -111,8 +111,9 @@ function ImportJobCard({ job: listedJob, pairing }: { job: ImportJob; pairing?: 
     },
   });
   const cutoverPending = activate.isPending || abort.isPending;
+  const importFinalizing = job.status === "materializing" || job.status === "finalizing";
   const lifecycle = job.target_lifecycle_state?.toUpperCase()
-    ?? (job.status === "materializing" ? "IMPORTING" : (job.status ?? "pending").toUpperCase());
+    ?? (importFinalizing ? "IMPORTING" : (job.status ?? "pending").toUpperCase());
   const tone: "success" | "danger" | "warn" = lifecycle === "ACTIVE" ? "success" : lifecycle === "ABORTED" || job.status === "failed" ? "danger" : "warn";
 
   return (
@@ -124,7 +125,7 @@ function ImportJobCard({ job: listedJob, pairing }: { job: ImportJob; pairing?: 
         </div>
         <StatusPill tone={tone}>{lifecycle}</StatusPill>
       </div>
-      {lifecycle === "IMPORTING" ? <p className="mt-2 text-sm text-warn-ink">{job.status === "materializing" ? "Objects are still promoting. The tenant is not active." : "Materialized and verified, but not activated. The tenant remains IMPORTING."}</p> : null}
+      {lifecycle === "IMPORTING" ? <p className="mt-2 text-sm text-warn-ink">{importFinalizing ? "Import finalization is still running. The tenant is not active." : "Materialized and verified, but not activated. The tenant remains IMPORTING."}</p> : null}
       {lifecycle === "ACTIVE" ? <p className="mt-2 text-sm text-success-ink">Target is ACTIVE. The source cutover receipt was consumed.</p> : null}
       {lifecycle === "ABORTED" ? <p className="mt-2 text-sm text-danger">Target is ABORTED. Transfer its signed abort receipt to recover the archived source.</p> : null}
       {job.failure_detail ? <p className="mt-2 text-sm text-danger" role="alert">{job.failure_detail}</p> : null}
@@ -193,5 +194,5 @@ function VerificationReportView({ report, loading, error }: { report?: Verificat
 }
 
 function importRunning(job: ImportJob) {
-  return job.status === "pending" || job.status === "materializing";
+  return job.status === "pending" || job.status === "materializing" || job.status === "finalizing";
 }
