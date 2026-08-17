@@ -5,6 +5,7 @@ from .schemas import validate_snapshot
 # Re-exported so Django registers the split models and callers retain the stable
 # `apps.tenant_migration.models` import path.
 from .models_import_job import ImportIdentityDecision, TenantImportJob  # noqa: F401,E402
+from .models_import_objects import TenantImportObject  # noqa: F401,E402
 from .models_protocol import (  # noqa: F401,E402
     DeploymentSigningKey,
     MigratedOutHandoff,

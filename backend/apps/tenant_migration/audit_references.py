@@ -227,6 +227,9 @@ _SOURCE_LOCAL_EDGES = {
     ("tenant_migration.source_gate_recovery_command", "owner_id"),
     ("tenant_migration.source_gate_migrated_out", "owner_id"),
     ("tenant_migration.source_quiesced", "owner_id"),
+    ("tenant_migration.objects_staged", "job_id"),
+    ("tenant_migration.objects_promoted", "job_id"),
+    ("tenant_migration.objects_rolled_back", "job_id"),
 }
 AUDIT_META_REFERENCES.update(_reference(S, None, *_SOURCE_LOCAL_EDGES))
 AUDIT_META_REFERENCES.update(

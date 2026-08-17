@@ -73,6 +73,11 @@ SCHEDULED_TASKS = (
         "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task",
         60,
     ),
+    (
+        "cleanup-abandoned-tenant-import-objects",
+        "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task",
+        60,
+    ),
 )
 
 

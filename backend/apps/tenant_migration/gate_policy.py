@@ -84,6 +84,7 @@ TASK_EXEMPTIONS = {
     "apps.backup.tasks.purge_expired_backup_archives_task": "Platform backup retention.",
     "apps.backup.tasks.cleanup_expired_restore_rollbacks_task": "Deployment recovery cleanup.",
     "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task": "Target-side import retention and recovery.",
+    "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task": "Target-side import object rollback.",
 }
 
 

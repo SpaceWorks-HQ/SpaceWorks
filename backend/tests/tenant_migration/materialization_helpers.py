@@ -61,6 +61,7 @@ def portable_import_case(space, source_user, *, rotate=None, prepare_source=None
         source_makerspace_slug=space.slug,
         source_makerspace_name=space.name,
         source_deployment_id="source-test",
+        actor=source_user,
         storage_mode="versioned",
         status=TenantImportJob.Status.READY,
         expires_at=timezone.now() + timedelta(days=1),

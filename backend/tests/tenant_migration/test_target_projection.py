@@ -42,6 +42,7 @@ EXPECTED_TARGET_VALUES = {
     ("makerspaces.Makerspace", "superadmin_access_enabled"): True,
     ("makerspaces.Makerspace", "archived_at"): None,
     ("makerspaces.Makerspace", "resource_limit_overrides"): {},
+    ("makerspaces.Makerspace", "storage_bytes_used"): 0,
     ("makerspaces.Makerspace", "membership_policy"): Makerspace.MembershipPolicy.REQUEST,
     ("makerspaces.Makerspace", "referrals_enabled"): False,
     ("makerspaces.Makerspace", "telegram_group_chat_id"): "",

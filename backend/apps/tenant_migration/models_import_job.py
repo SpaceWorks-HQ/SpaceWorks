@@ -25,6 +25,13 @@ class TenantImportJob(models.Model):
     source_makerspace_name = models.CharField(max_length=200, blank=True)
     source_deployment_id = models.CharField(max_length=128, blank=True)
     storage_mode = models.CharField(max_length=32, blank=True)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="tenant_import_jobs",
+    )
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
     # SET_NULL is deliberate: PROTECT would make tenant purge impossible. CASCADE would
     # not solve the wider lifecycle either, because failed/abandoned pre-tenant jobs have

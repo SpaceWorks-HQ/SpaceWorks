@@ -517,6 +517,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task",
         "schedule": crontab(minute=20),
     },
+    "cleanup-abandoned-tenant-import-objects": {
+        "task": "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task",
+        "schedule": crontab(minute=35),
+    },
 }
 
 CORS_ALLOWED_ORIGINS = env.list(

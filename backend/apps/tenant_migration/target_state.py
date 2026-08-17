@@ -1,10 +1,11 @@
+from django.core.exceptions import FieldDoesNotExist
+
 from apps.makerspaces.models import Makerspace
 from apps.tenant_migration.protocol_errors import TenantStateAdapterError
 
 IMPORTING = "importing"
 ACTIVE = "active"
 ABORTED = "aborted"
-REQUIRED_STATES = {IMPORTING, ACTIVE, ABORTED}
 
 
 def transition_target(makerspace_id, expected, new):
@@ -25,11 +26,11 @@ def target_has_state(makerspace_id, expected):
 
 
 def _state_field_name():
-    """Discover the future lifecycle field by its closed state vocabulary."""
-    for field in Makerspace._meta.concrete_fields:
-        values = {value for value, _label in getattr(field, "choices", ())}
-        if REQUIRED_STATES.issubset(values):
-            return field.name
-    raise TenantStateAdapterError(
-        "Makerspace has no IMPORTING/ACTIVE/ABORTED lifecycle field yet."
-    )
+    """Return the lifecycle field this adapter is deliberately coupled to."""
+    try:
+        Makerspace._meta.get_field("lifecycle_state")
+    except FieldDoesNotExist as exc:
+        raise TenantStateAdapterError(
+            "Makerspace has no lifecycle_state field."
+        ) from exc
+    return "lifecycle_state"

@@ -17,6 +17,10 @@ from apps.data_export.runner import build_archive
 from apps.data_export.types import Fidelity
 from apps.encryption.cache import dek_cache_disabled
 from apps.tenant_migration.keys import collect_source_keys
+from apps.tenant_migration.object_export import (
+    SourceMigrationObjectError,
+    capture_tenant_objects,
+)
 from apps.tenant_migration.preflight import SourcePreflightError, run_source_preflight
 from apps.tenant_migration.source_gate import quiesced_snapshot
 
@@ -65,8 +69,16 @@ def build_tenant_migration_archive(
             )
             try:
                 key_payload = _serialize_keys(keys)
+                object_records = capture_tenant_objects(
+                    export_root, makerspace, preflight.storage_mode
+                )
                 manifest = _manifest(
-                    makerspace, preflight, export_manifest, export_root, key_payload
+                    makerspace,
+                    preflight,
+                    export_manifest,
+                    export_root,
+                    key_payload,
+                    object_records,
                 )
                 manifest["source"]["gate"] = {
                     "owner_id": str(gate_lease.owner_id),
@@ -80,7 +92,7 @@ def build_tenant_migration_archive(
                 return output, manifest, sha256_file(output)
             finally:
                 tempdir.cleanup()
-        except (MigrationArchiveError, SourcePreflightError):
+        except (MigrationArchiveError, SourcePreflightError, SourceMigrationObjectError):
             raise
         except Exception as exc:
             output.unlink(missing_ok=True)
@@ -111,7 +123,9 @@ def _serialize_keys(keys):
     return _json_bytes({"keys": records})
 
 
-def _manifest(makerspace, preflight, export_manifest, root, key_payload):
+def _manifest(
+    makerspace, preflight, export_manifest, root, key_payload, object_records
+):
     # As in Phase 5A, the ledger covers every payload member and intentionally
     # excludes the manifest itself, whose inclusion would be self-referential.
     contents = build_content_ledger(root)
@@ -140,6 +154,7 @@ def _manifest(makerspace, preflight, export_manifest, root, key_payload):
             {"version": version, "status": status}
             for version, status in preflight.carried_key_versions
         ],
+        "objects": {"count": len(object_records)},
         "contents": contents,
         "age_encrypted": True,
     }
