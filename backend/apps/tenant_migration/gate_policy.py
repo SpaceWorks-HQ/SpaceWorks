@@ -84,6 +84,7 @@ TASK_EXEMPTIONS = {
     "apps.backup.tasks.purge_expired_backup_archives_task": "Platform backup retention.",
     "apps.backup.tasks.cleanup_expired_restore_rollbacks_task": "Deployment recovery cleanup.",
     "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task": "Target-side import retention and recovery.",
+    "apps.tenant_migration.tasks.run_import_job_task": "Target-side tenant materialization does not mutate the frozen source.",
 }
 
 
@@ -108,6 +109,9 @@ TASK_TENANT_RESOLVERS = {
 # Fan-out tasks must take one tenant lock per item; holding an unscoped lock for a
 # whole scan would let an unrelated tenant delay quiescence.
 TASK_INTERNAL_PARTICIPANTS = {
+    "apps.tenant_migration.tasks.run_migration_export_job_task": (
+        "The source export claims and holds source_archive_write for its full lifecycle."
+    ),
     "apps.data_export.tasks.purge_expired_exports_task": (
         "Each expired export is deleted inside tenant_write."
     ),

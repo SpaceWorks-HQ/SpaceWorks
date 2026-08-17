@@ -11,6 +11,7 @@ from .closure_references import (
     MOVABLE_ROW_REFERENCES,
     MissingReferenceDisposition,
 )
+from .row_conditions import condition_matches
 from .target_projection import ROW_POLICIES, RowDisposition, SEEDED_RESOLUTIONS
 
 
@@ -36,7 +37,7 @@ class ImportAccounting:
 
 def row_disposition(model_label, row, references):
     policy = ROW_POLICIES.get(model_label)
-    if policy is not None and _condition_matches(policy.condition, row):
+    if policy is not None and condition_matches(policy.condition, row):
         if policy.disposition is RowDisposition.KEEP_TARGET:
             return "resolve"
         if policy.disposition is RowDisposition.DROP:
@@ -172,13 +173,3 @@ def _seeded_target_pk(label, row, target):
                 f"Seeded definition mismatch for {label} source row {row['id']}."
             )
     return match.pk
-
-
-def _condition_matches(condition, row):
-    if condition is None:
-        return True
-    actual = str(row.get(condition[0], "")).lower()
-    expected = condition[1]
-    if isinstance(expected, (set, frozenset, tuple, list)):
-        return actual in {str(value).lower() for value in expected}
-    return actual == str(expected).lower()

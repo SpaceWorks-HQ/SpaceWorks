@@ -15,6 +15,63 @@ class DeploymentSigningKey(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class DisclosureClosureApproval(models.Model):
+    """A source-superadmin decision bound to one exact PORTABLE identity closure."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    makerspace = models.ForeignKey(
+        "makerspaces.Makerspace",
+        on_delete=models.CASCADE,
+        related_name="migration_disclosure_approvals",
+    )
+    closure_digest = models.CharField(max_length=64)
+    identity_ids = models.JSONField(default=list)
+    approved_identity_ids = models.JSONField(default=list)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="approved_migration_disclosures",
+    )
+    approved_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="revoked_migration_disclosures",
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=("makerspace", "closure_digest", "revoked_at"),
+                name="tdisclosure_space_digest_idx",
+            )
+        ]
+
+
+class TenantMigrationExportJob(models.Model):
+    """Migration-only state attached to the existing export/token lifecycle."""
+
+    export_job = models.OneToOneField(
+        "data_export.DataExportJob",
+        primary_key=True,
+        on_delete=models.CASCADE,
+        related_name="migration_export",
+    )
+    disclosure_approval = models.ForeignKey(
+        DisclosureClosureApproval,
+        on_delete=models.PROTECT,
+        related_name="export_jobs",
+    )
+    closure_digest = models.CharField(max_length=64)
+    target_age_recipient = models.CharField(max_length=256)
+    format_version = models.PositiveSmallIntegerField(default=1)
+    archive_digest = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class MigrationPairing(models.Model):
     """Superadmin-approved, locally pinned identities for one migration."""
 

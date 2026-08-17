@@ -4,6 +4,7 @@ import uuid
 from django.db import transaction
 
 from apps.audit import services as audit
+from apps.accounts.models import User
 from apps.tenant_migration.deployment_keys import public_deployment_identity
 from apps.tenant_migration.models_protocol import MigrationPairing
 from apps.tenant_migration.protocol_errors import PairingError
@@ -20,7 +21,10 @@ HEX_64 = re.compile(r"\A[0-9a-f]{64}\Z")
 def approve_pairing(
     *, actor, migration_id, source_tenant_id, archive_digest, source, target
 ):
-    if not getattr(actor, "is_superuser", False):
+    if not (
+        getattr(actor, "is_superuser", False)
+        or getattr(actor, "role", None) == User.Role.SUPERADMIN
+    ):
         raise PairingError("Only a superuser can approve a deployment pairing.")
     migration_id = uuid.UUID(str(migration_id))
     source_tenant_id = str(source_tenant_id).strip()
@@ -72,6 +76,7 @@ def approve_pairing(
                 "source_fingerprint": source["fingerprint"],
                 "target_deployment_id": target["deployment_id"],
                 "target_fingerprint": target["fingerprint"],
+                "format_version": 1,
             },
         )
     return pairing

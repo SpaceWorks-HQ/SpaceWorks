@@ -19,7 +19,7 @@ THEME_KEYS = frozenset({"mode", "primary_color", "accent_color", "logo_url"})
 
 def write_dataset(
     path, dataset, rows, *, dangling_refs=None, pii_collector=None,
-    external_writer=None, reference_writer=None,
+    external_writer=None, reference_writer=None, withheld_user_edges=None,
 ):
     if pii_collector is not None:
         pii_collector.register_model(dataset.model)
@@ -38,13 +38,14 @@ def write_dataset(
                     pii_collector=pii_collector,
                     external_writer=external_writer,
                     reference_writer=reference_writer,
+                    withheld_user_edges=withheld_user_edges or set(),
                 )
             )
 
 
 def project_row(
     dataset, row, dangling_refs, *, pii_collector=None, external_writer=None,
-    reference_writer=None,
+    reference_writer=None, withheld_user_edges=None,
 ):
     projected = {}
     portable_mapped = (
@@ -53,6 +54,7 @@ def project_row(
     )
     for column in dataset.columns:
         source = column.sources[0]
+        withheld = (dataset.model, row.pk, source) in (withheld_user_edges or set())
         if source in portable_mapped:
             if pii_collector is None:
                 raise ExportIntegrityError(
@@ -62,7 +64,12 @@ def project_row(
             value = pii_collector.project(row, source)
         else:
             value = source_value(row, source)
-        if (row.pk, source) in dangling_refs:
+        if withheld:
+            if external_writer is None:
+                raise ExportIntegrityError("Withheld identity provenance requires a writer.")
+            external_writer.withhold_identity(row, source)
+            value = None
+        elif (row.pk, source) in dangling_refs:
             value = None
         if external_writer is not None:
             value = external_writer.project_closure(row, source, value)

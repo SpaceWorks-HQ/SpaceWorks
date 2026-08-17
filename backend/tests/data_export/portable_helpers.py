@@ -24,8 +24,8 @@ def make_space(slug, *, pk=None):
     return Makerspace.objects.create(pk=pk, name=slug.replace("-", " ").title(), slug=slug)
 
 
-def make_job(makerspace, actor, *, fidelity="PORTABLE"):
-    return DataExportJob.objects.create(
+def make_job(makerspace, actor, *, fidelity="PORTABLE", attach_approval=True):
+    job = DataExportJob.objects.create(
         makerspace=makerspace,
         requested_by=actor,
         fidelity=fidelity,
@@ -34,6 +34,29 @@ def make_job(makerspace, actor, *, fidelity="PORTABLE"):
         deadline_at=timezone.now() + timedelta(minutes=5),
         expires_at=timezone.now() + timedelta(days=1),
     )
+    if fidelity == "PORTABLE" and attach_approval:
+        from apps.tenant_migration.admission import compute_pending_closure
+        from apps.tenant_migration.models import (
+            DisclosureClosureApproval,
+            TenantMigrationExportJob,
+        )
+
+        closure = compute_pending_closure(makerspace)
+        identity_ids = [str(item["id"]) for item in closure["identities"]]
+        approval = DisclosureClosureApproval.objects.create(
+            makerspace=makerspace,
+            closure_digest=closure["digest"],
+            identity_ids=identity_ids,
+            approved_identity_ids=identity_ids,
+            approved_by=actor,
+        )
+        TenantMigrationExportJob.objects.create(
+            export_job=job,
+            disclosure_approval=approval,
+            closure_digest=approval.closure_digest,
+            target_age_recipient="age1portablefixture000000000000",
+        )
+    return job
 
 
 def archive_files(job):
