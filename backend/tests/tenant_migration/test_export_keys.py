@@ -115,6 +115,16 @@ def test_archive_stream_is_age_output_with_matching_in_memory_ledger(
     )
     monkeypatch.setattr(
         archive_envelope,
+        "public_deployment_identity",
+        lambda: {
+            "algorithm": "ed25519",
+            "deployment_id": "source-test",
+            "public_key": "p" * 44,
+            "fingerprint": "f" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        archive_envelope,
         "build_archive",
         lambda _job, **_kwargs: (root, export_manifest, tempdir),
     )

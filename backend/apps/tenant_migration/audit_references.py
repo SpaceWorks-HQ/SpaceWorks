@@ -227,6 +227,17 @@ _SOURCE_LOCAL_EDGES = {
     ("tenant_migration.source_gate_recovery_command", "owner_id"),
     ("tenant_migration.source_gate_migrated_out", "owner_id"),
     ("tenant_migration.source_quiesced", "owner_id"),
+    ("tenant_migration.export_requested", "export_id"),
+    ("tenant_migration.export_read", "export_id"),
+    ("data_export.download_url_issued", "export_id"),
+    ("data_export.downloaded", "export_id"),
+    ("tenant_migration.import_created", "import_id"),
+    ("tenant_migration.import_read", "import_id"),
+    ("tenant_migration.import_run_requested", "import_id"),
+    ("tenant_migration.identity_decisions_submitted", "import_id"),
+    ("tenant_migration.identity_decisions_read", "import_id"),
+    ("tenant_migration.import_completed", "import_id"),
+    ("tenant_migration.verification_read", "import_id"),
 }
 AUDIT_META_REFERENCES.update(_reference(S, None, *_SOURCE_LOCAL_EDGES))
 AUDIT_META_REFERENCES.update(

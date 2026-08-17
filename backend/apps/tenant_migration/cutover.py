@@ -2,6 +2,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.audit import services as audit
+from apps.accounts.models import User
 from apps.makerspaces import lifecycle
 from apps.makerspaces.models import Makerspace
 from apps.tenant_migration import target_state
@@ -74,6 +75,7 @@ def retire_source(*, pairing, makerspace, actor):
             "signer_fingerprint": receipt.signer_fingerprint,
             "source_deployment_id": receipt.source_deployment_id,
             "target_deployment_id": receipt.target_deployment_id,
+            "format_version": receipt.format_version,
             "outcome": "migrated_out",
         },
     )
@@ -123,6 +125,7 @@ def activate_target(*, pairing, import_job, receipt_envelope, actor):
             "signer_fingerprint": receipt.signer_fingerprint,
             "source_deployment_id": receipt.source_deployment_id,
             "target_deployment_id": receipt.target_deployment_id,
+            "format_version": receipt.format_version,
             "outcome": "active",
         },
     )
@@ -167,6 +170,7 @@ def abort_target(*, pairing, import_job, actor):
             "signer_fingerprint": receipt.signer_fingerprint,
             "source_deployment_id": receipt.source_deployment_id,
             "target_deployment_id": receipt.target_deployment_id,
+            "format_version": receipt.format_version,
             "outcome": "aborted",
         },
     )
@@ -229,6 +233,7 @@ def reopen_source(*, pairing, makerspace, receipt_envelope, actor):
             "signer_fingerprint": receipt.signer_fingerprint,
             "source_deployment_id": receipt.source_deployment_id,
             "target_deployment_id": receipt.target_deployment_id,
+            "format_version": receipt.format_version,
             "outcome": "reopened",
         },
     )
@@ -261,7 +266,10 @@ def _validated_target_job(pairing, import_job):
 
 
 def _require_superuser(actor):
-    if not getattr(actor, "is_superuser", False):
+    if not (
+        getattr(actor, "is_superuser", False)
+        or getattr(actor, "role", None) == User.Role.SUPERADMIN
+    ):
         raise TransitionConflictError("Only a superuser can run tenant cutover.")
 
 

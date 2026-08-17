@@ -128,6 +128,24 @@ class ExternalReferenceWriter:
             + "\n"
         )
 
+    def withhold_identity(self, row, field_name):
+        """Record a PII-free source identity edge that cannot become a live FK."""
+        field = row._meta.get_field(field_name)
+        source_user_id = getattr(row, field.attname)
+        record = {
+            "source_model_label": row._meta.label,
+            "source_object_id": str(row.pk),
+            "field_name": field_name,
+            "target_model_label": "accounts.User",
+            "target_object_id": str(source_user_id),
+            "snapshot": {"kind": "withheld_identity"},
+        }
+        self._validate_snapshot(row._meta.label, field_name, record["snapshot"])
+        self._handle.write(
+            json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            + "\n"
+        )
+
 
 def _owner_makerspace_id(edge, related):
     if edge in _CONTAINER_EDGES or edge in _EVENT_EDGES:

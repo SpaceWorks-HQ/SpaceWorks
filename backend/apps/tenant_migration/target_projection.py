@@ -198,7 +198,7 @@ ROW_POLICIES = {
     "makerspaces.MembershipRequest": RowPolicy(
         RowDisposition.DROP,
         "Imported invitations are authority the target never authorized and must be re-created.",
-        condition=("state", frozenset({"requested", "invited"})),
+        condition=("state", ("requested", "invited")),
     ),
 }
 

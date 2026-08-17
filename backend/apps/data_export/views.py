@@ -28,6 +28,10 @@ def _authorized_makerspace(actor, makerspace_id):
     return makerspace
 
 
+def _is_superadmin(actor):
+    return actor.is_superuser or actor.role == actor.Role.SUPERADMIN
+
+
 class DataExportListCreateView(APIView):
     permission_classes = (IsActiveStaff,)
 
@@ -38,7 +42,10 @@ class DataExportListCreateView(APIView):
     )
     def get(self, request, makerspace_id):
         _authorized_makerspace(request.user, makerspace_id)
-        jobs = DataExportJob.objects.filter(makerspace_id=makerspace_id)[:20]
+        jobs = DataExportJob.objects.filter(makerspace_id=makerspace_id)
+        if not _is_superadmin(request.user):
+            jobs = jobs.filter(fidelity="REDACTED")
+        jobs = jobs[:20]
         return Response(DataExportJobSerializer(jobs, many=True).data)
 
     @extend_schema(
@@ -82,6 +89,11 @@ class DataExportDetailView(APIView):
         job = get_object_or_404(
             DataExportJob, pk=job_id, makerspace_id=makerspace_id
         )
+        if job.fidelity == "PORTABLE" and not _is_superadmin(request.user):
+            return Response(
+                {"detail": "Source superadmin access is required.", "code": "forbidden"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         return Response(DataExportJobSerializer(job).data)
 
 
@@ -95,7 +107,7 @@ class DataExportDownloadUrlView(APIView):
         responses={
             200: DataExportDownloadUrlSerializer,
             400: OpenApiResponse(description="Export is not available."),
-            403: OpenApiResponse(description="MANAGE_MAKERSPACE is required."),
+            403: OpenApiResponse(description="MANAGE_MAKERSPACE is required; PORTABLE additionally requires source superadmin."),
             404: OpenApiResponse(description="Export job not found in this makerspace."),
         },
     )
@@ -104,6 +116,11 @@ class DataExportDownloadUrlView(APIView):
         job = get_object_or_404(
             DataExportJob, pk=job_id, makerspace_id=makerspace_id
         )
+        if job.fidelity == "PORTABLE" and not _is_superadmin(request.user):
+            return Response(
+                {"detail": "Source superadmin access is required.", "code": "forbidden"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         raw, expires_at = services.issue_download_token(job, request.user)
         path = reverse(
             "data-export-download",
@@ -123,6 +140,7 @@ class DataExportDownloadView(APIView):
         auth=[],
         responses={
             (200, "application/zip"): bytes,
+            (200, "application/octet-stream"): bytes,
             404: OpenApiResponse(description="Download link is invalid, expired, or used."),
             503: OpenApiResponse(description="Archive storage is unavailable."),
         },
@@ -139,9 +157,14 @@ class DataExportDownloadView(APIView):
                 {"detail": "The export archive is temporarily unavailable."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-        filename = f"spaceworks-{job.makerspace.slug}-redacted-export.zip"
-        response = FileResponse(body, content_type="application/zip", as_attachment=True, filename=filename)
+        portable = job.fidelity == "PORTABLE"
+        suffix = "tenant-migration.tar.age" if portable else "redacted-export.zip"
+        content_type = "application/octet-stream" if portable else "application/zip"
+        filename = f"spaceworks-{job.makerspace.slug}-{suffix}"
+        response = FileResponse(body, content_type=content_type, as_attachment=True, filename=filename)
         if job.accounted_size_bytes:
             response["Content-Length"] = str(job.accounted_size_bytes)
         response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Referrer-Policy"] = "no-referrer"
         return response
