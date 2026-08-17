@@ -10470,7 +10470,7 @@
                         "description": "Export is not available."
                     },
                     "403": {
-                        "description": "MANAGE_MAKERSPACE is required."
+                        "description": "MANAGE_MAKERSPACE is required; PORTABLE additionally requires source superadmin."
                     },
                     "404": {
                         "description": "Export job not found in this makerspace."
@@ -15179,6 +15179,1111 @@
                 }
             }
         },
+        "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/disclosure-approvals": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_tenant_migration_disclosure_approvals_list",
+                "summary": "List disclosure approvals",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ClosureApproval"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspace_tenant_migration_disclosure_approvals_create",
+                "summary": "Approve each identity in one exact disclosure closure",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ClosureApprovalCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ClosureApprovalCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ClosureApprovalCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ClosureApproval"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FieldValidationError"
+                                }
+                            }
+                        },
+                        "description": "Field-keyed validation errors."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/disclosure-approvals/{approval_id}/revoke": {
+            "post": {
+                "operationId": "api_v1_admin_makerspace_tenant_migration_disclosure_approvals_revoke_create",
+                "summary": "Revoke a disclosure approval",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "approval_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ClosureApproval"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/disclosure-closure": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_tenant_migration_disclosure_closure_retrieve",
+                "summary": "Compute the pending PORTABLE disclosure closure",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PendingClosure"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/exports": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_tenant_migration_exports_list",
+                "summary": "List PORTABLE migration export jobs",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/MigrationExportJob"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspace_tenant_migration_exports_create",
+                "summary": "Create a target-recipient-encrypted PORTABLE export",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MigrationExportCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MigrationExportCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MigrationExportCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MigrationExportJob"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FieldValidationError"
+                                }
+                            }
+                        },
+                        "description": "Field-keyed validation errors."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "503": {
+                        "description": "Migration worker unavailable."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/exports/{job_id}": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_tenant_migration_exports_retrieve",
+                "summary": "Read a PORTABLE migration export job",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "job_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MigrationExportJob"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/exports/{job_id}/download-url": {
+            "post": {
+                "operationId": "api_v1_admin_makerspace_tenant_migration_exports_download_url_create",
+                "summary": "Issue the one-use PORTABLE archive download URL",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "job_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DataExportDownloadUrl"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/exports/{job_id}/quiesce": {
+            "post": {
+                "operationId": "api_v1_admin_makerspace_tenant_migration_exports_quiesce_create",
+                "summary": "Reassert a completed export's source gate lease",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "job_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CutoverOutcome"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/pairings/{pairing_id}/archive-source": {
+            "post": {
+                "operationId": "api_v1_admin_makerspace_tenant_migration_pairings_archive_source_create",
+                "summary": "Archive the quiesced source and issue its signed cutover receipt",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "pairing_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CutoverOutcome"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/pairings/{pairing_id}/recover": {
+            "post": {
+                "operationId": "api_v1_admin_makerspace_tenant_migration_pairings_recover_create",
+                "summary": "Recover an archived source with the target abort receipt",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "pairing_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CutoverReceiptRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CutoverReceiptRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CutoverReceiptRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CutoverOutcome"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FieldValidationError"
+                                }
+                            }
+                        },
+                        "description": "Field-keyed validation errors."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspace/{makerspace_id}/verify-domain": {
             "post": {
                 "operationId": "api_v1_admin_makerspace_verify_domain_create",
@@ -19702,6 +20807,1198 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/tenant-migrations/deployment-identity": {
+            "get": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_deployment_identity_retrieve",
+                "summary": "Read this deployment's signing identity and target age recipient",
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeploymentIdentity"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/tenant-migrations/imports": {
+            "get": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_imports_list",
+                "summary": "List tenant import jobs",
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ImportJob"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_imports_create",
+                "summary": "Create an import job from an age-encrypted archive upload",
+                "tags": [
+                    "Tenant migration"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportJob"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FieldValidationError"
+                                }
+                            }
+                        },
+                        "description": "Field-keyed validation errors."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/tenant-migrations/imports/{job_id}": {
+            "get": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_imports_retrieve",
+                "summary": "Read a tenant import job",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "job_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportJob"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/identity-decisions": {
+            "get": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_imports_identity_decisions_list",
+                "summary": "Read the exact archived identity decision list",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "job_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ClosureIdentity"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_imports_identity_decisions_create",
+                "summary": "Submit all per-person import identity decisions",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "job_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportDecisionList"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportDecisionList"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportDecisionList"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportJob"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FieldValidationError"
+                                }
+                            }
+                        },
+                        "description": "Field-keyed validation errors."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/pairings/{pairing_id}/abort": {
+            "post": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_imports_pairings_abort_create",
+                "summary": "Abort an importing target and issue its signed proof",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "job_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "pairing_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CutoverOutcome"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/pairings/{pairing_id}/activate": {
+            "post": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_imports_pairings_activate_create",
+                "summary": "Activate an imported target with the source receipt",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "job_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "pairing_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CutoverReceiptRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CutoverReceiptRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CutoverReceiptRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CutoverOutcome"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FieldValidationError"
+                                }
+                            }
+                        },
+                        "description": "Field-keyed validation errors."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/run": {
+            "post": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_imports_run_create",
+                "summary": "Run an identity-decided tenant import",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "job_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportRun"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportRun"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportRun"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportJob"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FieldValidationError"
+                                }
+                            }
+                        },
+                        "description": "Field-keyed validation errors."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "503": {
+                        "description": "Import worker unavailable."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/verification": {
+            "get": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_imports_verification_retrieve",
+                "summary": "Read the import verification report",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "job_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VerificationReport"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/platform/tenant-migrations/pairings": {
+            "get": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_pairings_list",
+                "summary": "List pinned migration pairings",
+                "tags": [
+                    "Tenant migration"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Pairing"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_platform_tenant_migrations_pairings_create",
+                "summary": "Approve and pin source/target deployment identities",
+                "tags": [
+                    "Tenant migration"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PairingCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PairingCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PairingCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Pairing"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FieldValidationError"
+                                }
+                            }
+                        },
+                        "description": "Field-keyed validation errors."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "State conflict."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin access required."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Throttle limit exceeded."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TypedError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected migration failure."
                     }
                 }
             }
@@ -24948,6 +27245,12 @@
                     "200": {
                         "content": {
                             "application/zip": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
+                            "application/octet-stream": {
                                 "schema": {
                                     "type": "string",
                                     "format": "binary"
@@ -32862,6 +35165,114 @@
                 "type": "string",
                 "description": "* `browser` - Browser\n* `server` - Server"
             },
+            "ClosureApproval": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "closure_digest": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "identity_count": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "approved_count": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "approved_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "revoked_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "approved_at",
+                    "approved_count",
+                    "closure_digest",
+                    "id",
+                    "identity_count"
+                ]
+            },
+            "ClosureApprovalCreate": {
+                "type": "object",
+                "properties": {
+                    "digest": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "minLength": 64
+                    },
+                    "decisions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/IdentityDisclosureDecision"
+                        }
+                    }
+                },
+                "required": [
+                    "decisions",
+                    "digest"
+                ]
+            },
+            "ClosureIdentity": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "username": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "email"
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
+                    },
+                    "first_name": {
+                        "type": "string"
+                    },
+                    "last_name": {
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string"
+                    },
+                    "date_joined": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "date_joined",
+                    "display_name",
+                    "email",
+                    "first_name",
+                    "id",
+                    "last_name",
+                    "phone",
+                    "username"
+                ]
+            },
             "CollaborativeEvent": {
                 "type": "object",
                 "properties": {
@@ -33221,6 +35632,31 @@
                     "makerspace_id"
                 ]
             },
+            "CutoverOutcome": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    },
+                    "receipt": {
+                        "$ref": "#/components/schemas/ReceiptEnvelope"
+                    }
+                },
+                "required": [
+                    "message"
+                ]
+            },
+            "CutoverReceiptRequest": {
+                "type": "object",
+                "properties": {
+                    "receipt": {
+                        "$ref": "#/components/schemas/ReceiptEnvelope"
+                    }
+                },
+                "required": [
+                    "receipt"
+                ]
+            },
             "DamagedLostReport": {
                 "type": "object",
                 "properties": {
@@ -33417,7 +35853,7 @@
                     "status": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/DataExportJobStatusEnum"
+                                "$ref": "#/components/schemas/StatusE1dEnum"
                             }
                         ],
                         "readOnly": true
@@ -33490,16 +35926,6 @@
                     "status"
                 ]
             },
-            "DataExportJobStatusEnum": {
-                "enum": [
-                    "pending",
-                    "running",
-                    "available",
-                    "failed"
-                ],
-                "type": "string",
-                "description": "* `pending` - Pending\n* `running` - Running\n* `available` - Available\n* `failed` - Failed"
-            },
             "DeliveryEnum": {
                 "enum": [
                     "web",
@@ -33507,6 +35933,33 @@
                 ],
                 "type": "string",
                 "description": "* `web` - Web\n* `device` - Device"
+            },
+            "DeploymentIdentity": {
+                "type": "object",
+                "properties": {
+                    "algorithm": {
+                        "type": "string"
+                    },
+                    "deployment_id": {
+                        "type": "string"
+                    },
+                    "public_key": {
+                        "type": "string"
+                    },
+                    "fingerprint": {
+                        "type": "string"
+                    },
+                    "age_recipient": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "age_recipient",
+                    "algorithm",
+                    "deployment_id",
+                    "fingerprint",
+                    "public_key"
+                ]
             },
             "DestinationScope": {
                 "type": "object",
@@ -35397,6 +37850,66 @@
                 "type": "string",
                 "description": "* `REDACTED` - Redacted"
             },
+            "FieldValidationError": {
+                "type": "object",
+                "description": "DRF's field-keyed boundary errors; deliberately not the typed service shape.",
+                "properties": {
+                    "non_field_errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "digest": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "decisions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "approval_id": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "target_age_recipient": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "archive": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "source_archive_digest": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "target_identity": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "receipt": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
             "ForgotPasswordRequest": {
                 "type": "object",
                 "properties": {
@@ -35493,6 +38006,195 @@
                 "required": [
                     "detail"
                 ]
+            },
+            "IdentityDisclosureDecision": {
+                "type": "object",
+                "properties": {
+                    "user_id": {
+                        "type": "integer"
+                    },
+                    "approved": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "approved",
+                    "user_id"
+                ]
+            },
+            "IdentityResolutionEnum": {
+                "enum": [
+                    "link_existing",
+                    "create_walk_in"
+                ],
+                "type": "string",
+                "description": "* `link_existing` - Link existing account\n* `create_walk_in` - Create walk-in account"
+            },
+            "ImportCreate": {
+                "type": "object",
+                "properties": {
+                    "archive": {
+                        "type": "string",
+                        "format": "uri",
+                        "writeOnly": true
+                    },
+                    "source_archive_digest": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                    }
+                },
+                "required": [
+                    "archive",
+                    "source_archive_digest"
+                ]
+            },
+            "ImportDecisionList": {
+                "type": "object",
+                "properties": {
+                    "decisions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ImportIdentityDecision"
+                        }
+                    }
+                },
+                "required": [
+                    "decisions"
+                ]
+            },
+            "ImportIdentityDecision": {
+                "type": "object",
+                "properties": {
+                    "source_user_id": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "identity_resolution": {
+                        "$ref": "#/components/schemas/IdentityResolutionEnum"
+                    },
+                    "membership_disposition": {
+                        "$ref": "#/components/schemas/MembershipDispositionEnum"
+                    },
+                    "target_user_id": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "identity_resolution",
+                    "membership_disposition",
+                    "source_user_id"
+                ]
+            },
+            "ImportJob": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "source_archive_digest": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "source_makerspace_id": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "source_makerspace_slug": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "source_makerspace_name": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "source_deployment_id": {
+                        "type": "string",
+                        "maxLength": 128
+                    },
+                    "storage_mode": {
+                        "type": "string",
+                        "maxLength": 32
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/ImportJobStatusEnum"
+                    },
+                    "identity_count": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "source_deployment_identity": {},
+                    "aggregate_outcome": {},
+                    "failure_code": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "failure_detail": {
+                        "type": "string",
+                        "maxLength": 500
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "terminal_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "scrubbed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "source_retention_notice": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "expires_at",
+                    "id",
+                    "identity_count",
+                    "source_archive_digest",
+                    "source_retention_notice",
+                    "updated_at"
+                ]
+            },
+            "ImportJobStatusEnum": {
+                "enum": [
+                    "pending",
+                    "awaiting_identity",
+                    "ready",
+                    "materializing",
+                    "completed",
+                    "failed",
+                    "abandoned"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `awaiting_identity` - Awaiting identity decisions\n* `ready` - Ready\n* `materializing` - Materializing\n* `completed` - Completed\n* `failed` - Failed\n* `abandoned` - Abandoned"
+            },
+            "ImportRun": {
+                "type": "object",
+                "properties": {
+                    "target_identity": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    }
+                }
             },
             "IntegrationConfiguredHealth": {
                 "type": "object",
@@ -39549,6 +42251,14 @@
                     "username"
                 ]
             },
+            "MembershipDispositionEnum": {
+                "enum": [
+                    "import_membership",
+                    "no_membership"
+                ],
+                "type": "string",
+                "description": "* `import_membership` - Import membership\n* `no_membership` - Do not import membership"
+            },
             "MembershipList": {
                 "type": "object",
                 "properties": {
@@ -39816,6 +42526,93 @@
                 ],
                 "type": "string",
                 "description": "* `PUT` - PUT"
+            },
+            "MigrationExportCreate": {
+                "type": "object",
+                "properties": {
+                    "approval_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "target_age_recipient": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "maxLength": 256
+                    }
+                },
+                "required": [
+                    "approval_id",
+                    "target_age_recipient"
+                ]
+            },
+            "MigrationExportJob": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/StatusE1dEnum"
+                    },
+                    "failure_code": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/FailureCodeEnum"
+                            },
+                            {
+                                "$ref": "#/components/schemas/BlankEnum"
+                            }
+                        ]
+                    },
+                    "failure_detail": {
+                        "type": "string",
+                        "maxLength": 500
+                    },
+                    "manifest": {},
+                    "closure_digest": {
+                        "type": "string"
+                    },
+                    "archive_digest": {
+                        "type": "string"
+                    },
+                    "format_version": {
+                        "type": "integer"
+                    },
+                    "source_retention_notice": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "started_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "completed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "archive_digest",
+                    "closure_digest",
+                    "created_at",
+                    "expires_at",
+                    "format_version",
+                    "id",
+                    "source_retention_notice"
+                ]
             },
             "MobilePaymentIntentResponse": {
                 "type": "object",
@@ -41451,6 +44248,92 @@
                         }
                     }
                 }
+            },
+            "Pairing": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "migration_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "source_tenant_id": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "archive_digest": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "source_deployment_id": {
+                        "type": "string",
+                        "maxLength": 128
+                    },
+                    "source_fingerprint": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "target_deployment_id": {
+                        "type": "string",
+                        "maxLength": 128
+                    },
+                    "target_fingerprint": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "approved_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "approved_at",
+                    "archive_digest",
+                    "id",
+                    "migration_id",
+                    "source_deployment_id",
+                    "source_fingerprint",
+                    "source_tenant_id",
+                    "target_deployment_id",
+                    "target_fingerprint"
+                ]
+            },
+            "PairingCreate": {
+                "type": "object",
+                "properties": {
+                    "migration_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "source_tenant_id": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "archive_digest": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "source": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "target": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    }
+                },
+                "required": [
+                    "archive_digest",
+                    "migration_id",
+                    "source",
+                    "source_tenant_id",
+                    "target"
+                ]
             },
             "PasswordResetAcknowledgement": {
                 "type": "object",
@@ -43188,6 +46071,25 @@
                 },
                 "required": [
                     "detail"
+                ]
+            },
+            "PendingClosure": {
+                "type": "object",
+                "properties": {
+                    "digest": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "identities": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ClosureIdentity"
+                        }
+                    }
+                },
+                "required": [
+                    "digest",
+                    "identities"
                 ]
             },
             "PhoneConfirm": {
@@ -46368,6 +49270,28 @@
                     "status"
                 ]
             },
+            "ReceiptEnvelope": {
+                "type": "object",
+                "properties": {
+                    "payload": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "signer_fingerprint": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "signature": {
+                        "type": "string",
+                        "maxLength": 88
+                    }
+                },
+                "required": [
+                    "payload",
+                    "signature",
+                    "signer_fingerprint"
+                ]
+            },
             "RecentlyAddedReport": {
                 "type": "object",
                 "properties": {
@@ -48326,6 +51250,16 @@
                 "type": "string",
                 "description": "* `invited` - Invited\n* `accepted` - Accepted\n* `declined` - Declined"
             },
+            "StatusE1dEnum": {
+                "enum": [
+                    "pending",
+                    "running",
+                    "available",
+                    "failed"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `running` - Running\n* `available` - Available\n* `failed` - Failed"
+            },
             "StatusE94Enum": {
                 "enum": [
                     "pending",
@@ -49446,6 +52380,21 @@
                 "type": "string",
                 "description": "* `box` - box\n* `asset` - asset\n* `product` - product"
             },
+            "TypedError": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "detail"
+                ]
+            },
             "TypedManualUsage": {
                 "type": "object",
                 "properties": {
@@ -49695,6 +52644,48 @@
                 ],
                 "type": "string",
                 "description": "* `superadmin` - Super Admin\n* `space_manager` - Space Manager\n* `requester` - Requester"
+            },
+            "VerificationReport": {
+                "type": "object",
+                "properties": {
+                    "format_version": {
+                        "type": "integer"
+                    },
+                    "target_makerspace_id": {
+                        "type": "integer"
+                    },
+                    "imported": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "resolved": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "dropped": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "identities_linked": {
+                        "type": "integer"
+                    },
+                    "identities_created": {
+                        "type": "integer"
+                    },
+                    "external_references_created": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "dropped",
+                    "external_references_created",
+                    "format_version",
+                    "identities_created",
+                    "identities_linked",
+                    "imported",
+                    "resolved",
+                    "target_makerspace_id"
+                ]
             },
             "WaiverAcceptResponse": {
                 "type": "object",

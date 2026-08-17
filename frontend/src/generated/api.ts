@@ -64,6 +64,7 @@ export const openApiTags = [
   "Stocktake",
   "Telegram",
   "Tenant bootstrap",
+  "Tenant migration",
   "api"
 ] as const;
 
@@ -248,6 +249,15 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/stock-transfers",
   "/api/v1/admin/makerspace/{makerspace_id}/stocktakes",
   "/api/v1/admin/makerspace/{makerspace_id}/subdomain-request",
+  "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/disclosure-approvals",
+  "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/disclosure-approvals/{approval_id}/revoke",
+  "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/disclosure-closure",
+  "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/exports",
+  "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/exports/{job_id}",
+  "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/exports/{job_id}/download-url",
+  "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/exports/{job_id}/quiesce",
+  "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/pairings/{pairing_id}/archive-source",
+  "/api/v1/admin/makerspace/{makerspace_id}/tenant-migration/pairings/{pairing_id}/recover",
   "/api/v1/admin/makerspace/{makerspace_id}/verify-domain",
   "/api/v1/admin/makerspace/{makerspace_id}/warranties",
   "/api/v1/admin/makerspaces",
@@ -290,6 +300,15 @@ export const openApiPaths = [
   "/api/v1/admin/platform/restores/{restore_id}",
   "/api/v1/admin/platform/restores/{restore_id}/decision",
   "/api/v1/admin/platform/social-auth-settings",
+  "/api/v1/admin/platform/tenant-migrations/deployment-identity",
+  "/api/v1/admin/platform/tenant-migrations/imports",
+  "/api/v1/admin/platform/tenant-migrations/imports/{job_id}",
+  "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/identity-decisions",
+  "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/pairings/{pairing_id}/abort",
+  "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/pairings/{pairing_id}/activate",
+  "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/run",
+  "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/verification",
+  "/api/v1/admin/platform/tenant-migrations/pairings",
   "/api/v1/admin/platform/update-settings",
   "/api/v1/admin/platform/update-settings/update-now",
   "/api/v1/admin/products/{id}/assets/generate",
@@ -993,6 +1012,31 @@ export type ClientPlatformEnum = "web" | "ios" | "android";
 
 export type ClientTypeEnum = "browser" | "server";
 
+export type ClosureApproval = {
+  "id": string;
+  "closure_digest": string;
+  "identity_count": string;
+  "approved_count": string;
+  "approved_at": string;
+  "revoked_at"?: string | null;
+};
+
+export type ClosureApprovalCreate = {
+  "digest": string;
+  "decisions": Array<IdentityDisclosureDecision>;
+};
+
+export type ClosureIdentity = {
+  "id": number;
+  "username": string;
+  "email": string;
+  "first_name": string;
+  "last_name": string;
+  "display_name": string;
+  "phone": string;
+  "date_joined": string;
+};
+
 export type CollaborativeEvent = {
   "id": number;
   "title": string;
@@ -1085,6 +1129,15 @@ export type CreateToolQr = {
   "asset_id"?: number;
 };
 
+export type CutoverOutcome = {
+  "message": string;
+  "receipt"?: ReceiptEnvelope;
+};
+
+export type CutoverReceiptRequest = {
+  "receipt": ReceiptEnvelope;
+};
+
 export type DamagedLostReport = {
   "rows": Array<Array<unknown>>;
   "typed_rows": Array<DamagedLostReportRow>;
@@ -1138,7 +1191,7 @@ export type DataExportDownloadUrl = {
 export type DataExportJob = {
   "id": string;
   "fidelity": string;
-  "status": DataExportJobStatusEnum;
+  "status": StatusE1dEnum;
   "manifest": unknown;
   "failure_code": FailureCodeEnum | BlankEnum;
   "failure_detail": string;
@@ -1150,9 +1203,15 @@ export type DataExportJob = {
   "created_at": string;
 };
 
-export type DataExportJobStatusEnum = "pending" | "running" | "available" | "failed";
-
 export type DeliveryEnum = "web" | "device";
+
+export type DeploymentIdentity = {
+  "algorithm": string;
+  "deployment_id": string;
+  "public_key": string;
+  "fingerprint": string;
+  "age_recipient": string;
+};
 
 export type DestinationScope = {
   "machine_type_ids"?: Array<number>;
@@ -1618,6 +1677,18 @@ export type FeatureEnum = "hardware_requests" | "printing" | "events" | "booking
 
 export type FidelityEnum = "REDACTED";
 
+export type FieldValidationError = {
+  "non_field_errors"?: Array<string>;
+  "digest"?: Array<string>;
+  "decisions"?: Array<string>;
+  "approval_id"?: Array<string>;
+  "target_age_recipient"?: Array<string>;
+  "archive"?: Array<string>;
+  "source_archive_digest"?: Array<string>;
+  "target_identity"?: Array<string>;
+  "receipt"?: Array<string>;
+};
+
 export type ForgotPasswordRequest = {
   "email": string;
 };
@@ -1648,6 +1719,59 @@ export type HostWaiver = {
 };
 
 export type HostWaiverStateEnum = "not_required" | "on_file" | "missing";
+
+export type IdentityDisclosureDecision = {
+  "user_id": number;
+  "approved": boolean;
+};
+
+export type IdentityResolutionEnum = "link_existing" | "create_walk_in";
+
+export type ImportCreate = {
+  "archive": string;
+  "source_archive_digest": string;
+};
+
+export type ImportDecisionList = {
+  "decisions": Array<ImportIdentityDecision>;
+};
+
+export type ImportIdentityDecision = {
+  "source_user_id": string;
+  "identity_resolution": IdentityResolutionEnum;
+  "membership_disposition": MembershipDispositionEnum;
+  "target_user_id"?: number | null;
+};
+
+export type ImportJob = {
+  "id": string;
+  "source_archive_digest": string;
+  "source_makerspace_id"?: string;
+  "source_makerspace_slug"?: string;
+  "source_makerspace_name"?: string;
+  "source_deployment_id"?: string;
+  "storage_mode"?: string;
+  "status"?: ImportJobStatusEnum;
+  "identity_count": string;
+  "source_deployment_identity"?: unknown;
+  "aggregate_outcome"?: unknown;
+  "failure_code"?: string;
+  "failure_detail"?: string;
+  "created_at": string;
+  "updated_at": string;
+  "expires_at": string;
+  "terminal_at"?: string | null;
+  "scrubbed_at"?: string | null;
+  "source_retention_notice": string;
+};
+
+export type ImportJobStatusEnum = "pending" | "awaiting_identity" | "ready" | "materializing" | "completed" | "failed" | "abandoned";
+
+export type ImportRun = {
+  "target_identity"?: {
+  [key: string]: unknown;
+};
+};
 
 export type IntegrationConfiguredHealth = {
   "status"?: Status83eEnum;
@@ -2593,6 +2717,8 @@ export type MembershipCreate = {
   "role_id": number;
 };
 
+export type MembershipDispositionEnum = "import_membership" | "no_membership";
+
 export type MembershipList = {
   "id": number;
   "user": User;
@@ -2672,6 +2798,27 @@ export type MemberWaiverResponse = {
 };
 
 export type MethodEnum = "PUT";
+
+export type MigrationExportCreate = {
+  "approval_id": string;
+  "target_age_recipient": string;
+};
+
+export type MigrationExportJob = {
+  "id": string;
+  "status"?: StatusE1dEnum;
+  "failure_code"?: FailureCodeEnum | BlankEnum;
+  "failure_detail"?: string;
+  "manifest"?: unknown;
+  "closure_digest": string;
+  "archive_digest": string;
+  "format_version": number;
+  "source_retention_notice": string;
+  "created_at": string;
+  "started_at"?: string | null;
+  "completed_at"?: string | null;
+  "expires_at": string;
+};
 
 export type MobilePaymentIntentResponse = {
   "payment_id": number;
@@ -3076,6 +3223,30 @@ export type PaginatedWarrantyReportRowList = {
   "next"?: string | null;
   "previous"?: string | null;
   "results": Array<WarrantyReportRow>;
+};
+
+export type Pairing = {
+  "id": string;
+  "migration_id": string;
+  "source_tenant_id": string;
+  "archive_digest": string;
+  "source_deployment_id": string;
+  "source_fingerprint": string;
+  "target_deployment_id": string;
+  "target_fingerprint": string;
+  "approved_at": string;
+};
+
+export type PairingCreate = {
+  "migration_id": string;
+  "source_tenant_id": string;
+  "archive_digest": string;
+  "source": {
+  [key: string]: unknown;
+};
+  "target": {
+  [key: string]: unknown;
+};
 };
 
 export type PasswordResetAcknowledgement = {
@@ -3529,6 +3700,11 @@ export type PaymentReconciliationReportRow = {
 
 export type PaymentSettingsError = {
   "detail": string;
+};
+
+export type PendingClosure = {
+  "digest": string;
+  "identities": Array<ClosureIdentity>;
 };
 
 export type PhoneConfirm = {
@@ -4334,6 +4510,14 @@ export type Readiness = {
   "database": string;
 };
 
+export type ReceiptEnvelope = {
+  "payload": {
+  [key: string]: unknown;
+};
+  "signer_fingerprint": string;
+  "signature": string;
+};
+
 export type RecentlyAddedReport = {
   "rows": Array<Array<unknown>>;
   "typed_rows": Array<RecentlyAddedReportRow>;
@@ -4850,6 +5034,8 @@ export type StatusA39Enum = "pending" | "verified" | "failed";
 
 export type StatusB9dEnum = "invited" | "accepted" | "declined";
 
+export type StatusE1dEnum = "pending" | "running" | "available" | "failed";
+
 export type StatusE94Enum = "pending" | "approved" | "rejected";
 
 export type Stocktake = {
@@ -5138,6 +5324,11 @@ export type TopBorrowersReportRow = {
 
 export type TrackingModeB86Enum = "quantity" | "individual";
 
+export type TypedError = {
+  "detail": string;
+  "code": string;
+};
+
 export type TypedManualUsage = {
   "machine_id": number;
   "consumable_pool_id"?: number | null;
@@ -5192,6 +5383,23 @@ export type User = {
 };
 
 export type UserRoleEnum = "superadmin" | "space_manager" | "requester";
+
+export type VerificationReport = {
+  "format_version": number;
+  "target_makerspace_id": number;
+  "imported": {
+  [key: string]: unknown;
+};
+  "resolved": {
+  [key: string]: unknown;
+};
+  "dropped": {
+  [key: string]: unknown;
+};
+  "identities_linked": number;
+  "identities_created": number;
+  "external_references_created": number;
+};
 
 export type WaiverAcceptResponse = {
   "accepted": boolean;
