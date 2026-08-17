@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from apps.data_export.models import DataExportJob
 from apps.data_export.services import run_export_job
+from apps.tenant_migration.gate_runtime import tenant_write
 
 
 @shared_task(bind=True, max_retries=0)
@@ -16,5 +17,6 @@ def purge_expired_exports_task(self):
         DataExportJob.objects.filter(expires_at__lte=timezone.now()).order_by("pk")[:100]
     )
     for job in expired:
-        job.delete()
+        with tenant_write(job.makerspace_id):
+            job.delete()
     return len(expired)

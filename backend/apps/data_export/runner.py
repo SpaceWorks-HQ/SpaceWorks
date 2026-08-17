@@ -4,6 +4,7 @@ import logging
 import shutil
 import tempfile
 import time
+from contextlib import nullcontext
 from pathlib import Path
 
 from django.apps import apps
@@ -34,13 +35,11 @@ class ExportDeadlineExceeded(RuntimeError):
         )
 
 
-def build_archive(job, *, page_size=None, monotonic=time.monotonic, package=True):
-    """Project an export and optionally package it as a ZIP.
-
-    The normal export path returns ``(zip_path, manifest, tempdir)``. Callers that
-    must provide their own secure packaging can pass ``package=False`` and receive
-    the projected directory in the same tuple instead.
-    """
+def build_archive(
+    job, *, page_size=None, monotonic=time.monotonic, package=True,
+    existing_snapshot=False,
+):
+    """Project an export; ``package=False`` returns its directory instead of a ZIP."""
     fidelity = Fidelity(job.fidelity)
     page_size = page_size or settings.DATA_EXPORT_PAGE_SIZE
     remaining = max(0.0, (job.deadline_at - timezone.now()).total_seconds())
@@ -56,15 +55,20 @@ def build_archive(job, *, page_size=None, monotonic=time.monotonic, package=True
     external_writer = None
     reference_writer = None
     try:
+        if existing_snapshot and not connection.in_atomic_block:
+            raise ExportIntegrityError(
+                "An existing export snapshot requires an active transaction."
+            )
         if fidelity is Fidelity.PORTABLE:
             pii_collector = PiiAadCollector(job.makerspace_id)
             external_writer = ExternalReferenceWriter(root, job.makerspace_id)
             reference_writer = ReferenceProvenanceWriter(root, job.makerspace_id)
-        with transaction.atomic():
+        with nullcontext() if existing_snapshot else transaction.atomic():
             with connection.cursor() as cursor:
-                cursor.execute(
-                    "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"
-                )
+                if not existing_snapshot:
+                    cursor.execute(
+                        "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"
+                    )
                 timeout_ms = max(1, int(remaining * 1000))
                 cursor.execute("SET LOCAL statement_timeout = %s", [timeout_ms])
                 cursor.execute("SET LOCAL lock_timeout = %s", [timeout_ms])

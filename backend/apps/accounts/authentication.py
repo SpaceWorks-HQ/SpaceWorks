@@ -44,6 +44,7 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
         if grant_id is None:
             if request.headers.get("X-Makerspace-Id") is not None:
                 raise PermissionDenied("Native makerspace selection requires a device grant.")
+            _assert_source_gate(request)
             return authenticated
         family_id = token.get("device_family_id")
         if not family_id:
@@ -62,6 +63,7 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
         from apps.makerspaces.origin_scope import validate_native_makerspace_scope
 
         validate_native_makerspace_scope(request, user, grant)
+        _assert_source_gate(request)
         DeviceGrant.objects.filter(pk=grant.pk).update(last_used_at=timezone.now())
         return user, token
 
@@ -104,6 +106,8 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
 
         assert_principal_allowed(user)
         request.claim_session = claim
+        request.selected_makerspace_id = claim.membership.makerspace_id
+        _assert_source_gate(request)
         return user, token
 
 
@@ -120,6 +124,12 @@ class SpaceWorksJWTScheme(SimpleJWTScheme):
 
 def _member_surface_path_allowed(path):
     return path.startswith(CLAIM_REACHABLE_PREFIXES)
+
+
+def _assert_source_gate(request):
+    from apps.tenant_migration.gate_runtime import assert_request_write_allowed
+
+    assert_request_write_allowed(request)
 
 
 def _validate_staff_surface(request, token):

@@ -6,6 +6,8 @@ from django.db import models
 from django.http import HttpResponseForbidden
 from django.urls import reverse
 
+from config.admin_source_gate import AdminSourceGateMixin
+
 
 # Models whose makerspace is reached via a nested relation (no direct `makerspace` FK).
 # Keyed by "app_label.model_name" (lowercase) -> ORM lookup ending in _id.
@@ -198,7 +200,7 @@ class AdminCspEvalMiddleware:
         return response
 
 
-class SuperuserOnlyModelAdmin:
+class SuperuserOnlyModelAdmin(AdminSourceGateMixin):
     def resolve_hidden_lookup(self):
         from apps.makerspaces.models import Makerspace
 

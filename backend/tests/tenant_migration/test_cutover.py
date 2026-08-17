@@ -1,6 +1,10 @@
+import uuid
+from datetime import timedelta
+
 import pytest
 from cryptography.fernet import Fernet
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from apps.makerspaces import lifecycle
 from apps.makerspaces.models import Makerspace
@@ -9,6 +13,7 @@ from apps.tenant_migration.models import (
     MigratedOutHandoff,
     MigrationReceipt,
     ReceiptConsumption,
+    SourceMigrationGate,
 )
 from apps.tenant_migration.protocol_errors import TransitionConflictError
 from tests.tenant_migration.protocol_helpers import (
@@ -26,6 +31,21 @@ pytestmark = pytest.mark.django_db(transaction=True)
 @pytest.fixture(autouse=True)
 def encryption_key(settings):
     settings.API_CLIENT_ENC_KEY = Fernet.generate_key().decode("ascii")
+
+
+def _quiesce_source(source, actor):
+    now = timezone.now()
+    return SourceMigrationGate.objects.create(
+        makerspace=source,
+        state=SourceMigrationGate.State.QUIESCED,
+        owner_id=uuid.uuid4(),
+        fencing_token=1,
+        actor=actor,
+        heartbeat_at=now,
+        lease_expires_at=now + timedelta(hours=1),
+        presign_drain_until=now,
+        quiesced_at=now,
+    )
 
 
 def test_activation_retry_returns_same_persisted_receipt(monkeypatch):
@@ -104,6 +124,7 @@ def test_unarchive_refuses_migrated_out_but_allows_ordinary_archive():
     actor = superadmin("unarchive")
     migrated = Makerspace.objects.create(name="Migrated", slug="migrated-out")
     pairing, _target, _target_private = source_pairing(actor, migrated)
+    _quiesce_source(migrated, actor)
     cutover.retire_source(pairing=pairing, makerspace=migrated, actor=actor)
 
     with pytest.raises(ValidationError, match="signed abort receipt"):
@@ -119,6 +140,7 @@ def test_source_cutover_rolls_back_archive_receipt_and_handoff(monkeypatch):
     actor = superadmin("cutover-rollback")
     source = Makerspace.objects.create(name="Rollback", slug="cutover-rollback")
     pairing, _target, _target_private = source_pairing(actor, source)
+    gate = _quiesce_source(source, actor)
 
     def fail_handoff(**_kwargs):
         raise RuntimeError("injected handoff persistence failure")
@@ -128,8 +150,23 @@ def test_source_cutover_rolls_back_archive_receipt_and_handoff(monkeypatch):
         cutover.retire_source(pairing=pairing, makerspace=source, actor=actor)
 
     source.refresh_from_db()
+    gate.refresh_from_db()
     assert source.archived_at is None
+    assert gate.state == SourceMigrationGate.State.QUIESCED
     assert not MigratedOutHandoff.objects.filter(pairing=pairing).exists()
+    assert not MigrationReceipt.objects.filter(pairing=pairing).exists()
+
+
+def test_source_cutover_requires_the_quiesced_gate():
+    actor = superadmin("cutover-gate")
+    source = Makerspace.objects.create(name="Gate", slug="cutover-gate")
+    pairing, _target, _target_private = source_pairing(actor, source)
+
+    with pytest.raises(TransitionConflictError, match="quiesced source migration gate"):
+        cutover.retire_source(pairing=pairing, makerspace=source, actor=actor)
+
+    source.refresh_from_db()
+    assert source.archived_at is None
     assert not MigrationReceipt.objects.filter(pairing=pairing).exists()
 
 
@@ -137,7 +174,10 @@ def test_reopen_retry_consumes_one_abort_receipt(monkeypatch):
     actor = superadmin("reopen-retry")
     source = Makerspace.objects.create(name="Reopen", slug="reopen-retry")
     pairing, target, target_private = source_pairing(actor, source)
+    gate = _quiesce_source(source, actor)
     cutover.retire_source(pairing=pairing, makerspace=source, actor=actor)
+    gate.refresh_from_db()
+    assert gate.state == SourceMigrationGate.State.MIGRATED_OUT
     abort_envelope = signed_envelope(
         pairing,
         MigrationReceipt.Operation.TARGET_ABORT,
@@ -159,8 +199,11 @@ def test_reopen_retry_consumes_one_abort_receipt(monkeypatch):
     )
 
     source.refresh_from_db()
+    gate.refresh_from_db()
     assert first == second == abort_envelope
     assert source.archived_at is None
+    assert gate.state == SourceMigrationGate.State.OPEN
+    assert gate.fencing_token == 2
     assert ReceiptConsumption.objects.filter(
         purpose=ReceiptConsumption.Purpose.REOPEN_SOURCE
     ).count() == 1

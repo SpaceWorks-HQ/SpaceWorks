@@ -76,9 +76,14 @@ def _decode(value: str) -> bytes:
         raise PiiMalformedEnvelope()
     try:
         raw = value.encode("ascii")
-        return base64.b64decode(raw + b"=" * (-len(raw) % 4), altchars=b"-_", validate=True)
+        decoded = base64.b64decode(
+            raw + b"=" * (-len(raw) % 4), altchars=b"-_", validate=True
+        )
     except (UnicodeEncodeError, ValueError, binascii.Error) as exc:
         raise PiiMalformedEnvelope() from exc
+    if _encode(decoded) != value:
+        raise PiiMalformedEnvelope()
+    return decoded
 
 
 def parse_envelope(raw):

@@ -15,11 +15,16 @@ from apps.tenant_migration.protocol_errors import (
     ReceiptReplayError,
     TransitionConflictError,
 )
+from apps.tenant_migration.models_source_gate import SourceMigrationGate
 from apps.tenant_migration.receipts import (
     consume_once,
     issue_local_receipt,
     persisted_envelope,
     verify_and_persist_peer_receipt,
+)
+from apps.tenant_migration.source_gate import (
+    mark_migrated_out,
+    reopen_after_verified_abort,
 )
 
 
@@ -38,6 +43,17 @@ def retire_source(*, pairing, makerspace, actor):
     if existing is not None:
         return persisted_envelope(existing.source_cutover_receipt)
 
+    gate = SourceMigrationGate.objects.filter(makerspace=locked_space).first()
+    if gate is None or gate.state != SourceMigrationGate.State.QUIESCED:
+        raise TransitionConflictError(
+            "Source cutover requires a quiesced source migration gate."
+        )
+    mark_migrated_out(
+        locked_space.pk,
+        gate.owner_id,
+        gate.fencing_token,
+        actor=actor,
+    )
     lifecycle._archive_locked(locked_space, actor, archived_at=timezone.now())
     receipt = issue_local_receipt(pairing, MigrationReceipt.Operation.SOURCE_CUTOVER)
     handoff = MigratedOutHandoff.objects.create(
@@ -200,6 +216,7 @@ def reopen_source(*, pairing, makerspace, receipt_envelope, actor):
         archived_at__isnull=False,
     ).update(archived_at=None, archived_by=None) != 1:
         raise TransitionConflictError("The source makerspace is no longer archived.")
+    reopen_after_verified_abort(locked_space, actor)
     consume_once(receipt, ReceiptConsumption.Purpose.REOPEN_SOURCE, actor)
     audit.record(
         actor,
@@ -251,4 +268,3 @@ def _require_superuser(actor):
 def _require_idempotent_consumption(consumption, expected_purpose):
     if consumption.purpose != expected_purpose:
         raise ReceiptReplayError("The receipt was consumed for a different transition.")
-

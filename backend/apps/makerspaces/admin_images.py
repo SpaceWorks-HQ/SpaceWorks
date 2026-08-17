@@ -114,7 +114,7 @@ class MakerspaceImageAdminMixin:
         for name, field, key in uploads:
             old_key = old_logo if field == "logo_key" else old_cover
             if old_key and old_key != key:
-                public_image_storage.delete_public_image_on_commit(old_key)
+                public_image_storage.delete_public_image_on_commit(obj, old_key)
             audit.record(
                 request.user,
                 f"makerspace.{name if name == 'logo' else 'cover'}_attached",
@@ -125,7 +125,7 @@ class MakerspaceImageAdminMixin:
     def _finish_image_clears(self, request, obj, clears):
         for name, old_key in clears:
             if old_key:
-                public_image_storage.delete_public_image_on_commit(old_key)
+                public_image_storage.delete_public_image_on_commit(obj, old_key)
             audit.record(
                 request.user,
                 f"makerspace.{name if name == 'logo' else 'cover'}_cleared",

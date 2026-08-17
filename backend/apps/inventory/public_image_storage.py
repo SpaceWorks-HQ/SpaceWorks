@@ -116,14 +116,16 @@ def release_public_image(makerspace, object_key, storage=None):
 
 def release_public_image_on_commit(makerspace, object_key, storage=None):
     """Schedule release_public_image for after the current transaction commits."""
-    transaction.on_commit(
-        lambda key=object_key: release_public_image(makerspace, key, storage)
-    )
+    from apps.inventory.tenant_object_callbacks import release_public_image
+
+    transaction.on_commit(lambda: release_public_image(makerspace, object_key, storage))
 
 
-def delete_public_image_on_commit(object_key):
+def delete_public_image_on_commit(makerspace, object_key):
     """Defer a public-image delete to after commit, without touching the quota."""
-    transaction.on_commit(lambda key=object_key: delete_object(key))
+    from apps.inventory.tenant_object_callbacks import delete_public_image
+
+    transaction.on_commit(lambda: delete_public_image(makerspace.pk, object_key))
 
 
 def put_bytes(object_key, data, content_type):

@@ -16,10 +16,20 @@ def delete_to_buy_receipt_object(sender, instance, **kwargs):
 
     if not instance.object_key:
         return
+    makerspace_id = instance.to_buy_item.makerspace_id
 
     def delete_after_commit(key):
+        from apps.tenant_migration.gate_errors import SourceMigrationGateClosed
+        from apps.tenant_migration.gate_runtime import tenant_write
+
         try:
-            storage.delete_object(key)
+            with tenant_write(makerspace_id):
+                storage.delete_object(key)
+        except SourceMigrationGateClosed:
+            logger.info(
+                "procurement_object_delete_skipped_closed_source_gate",
+                extra={"makerspace_id": makerspace_id},
+            )
         except Exception:  # pragma: no cover - delete_object is already best-effort
             logger.exception("Failed to delete procurement receipt object %s.", key)
 
