@@ -1,7 +1,7 @@
 const ALL_TABS = [
   "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "bookings", "members", "tobuy", "transfers",
   "stocktake", "containers", "ledger", "reports", "accountability", "warranty", "bulk", "qr", "scanner", "api", "settings", "emailtemplates", "users", "platform", "audit",
-  "email-logs", "payments", "modules", "exports", "backups",
+  "email-logs", "payments", "modules", "exports", "backups", "migration",
 ] as const;
 
 export const STAFF_TAB_KEYS: readonly string[] = ALL_TABS;
@@ -41,6 +41,7 @@ export const TAB_LABELS: Record<string, string> = {
   modules: "Modules",
   exports: "Data export",
   backups: "Backup & restore",
+  migration: "Tenant migration",
 };
 
 export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
@@ -51,7 +52,7 @@ export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
   { label: "Bookings", tabs: ["bookings"] },
   { label: "Members", tabs: ["members"] },
   { label: "Insights", tabs: ["reports", "accountability", "warranty", "audit"] },
-  { label: "Admin", tabs: ["users", "settings", "emailtemplates", "email-logs", "api", "exports", "backups", "modules", "platform"] },
+  { label: "Admin", tabs: ["users", "settings", "emailtemplates", "email-logs", "api", "exports", "backups", "migration", "modules", "platform"] },
 ];
 
 // Permissions only. Module availability is decided in exactly one place --
@@ -135,6 +136,7 @@ export function getStaffAccess(
     if (tabName === "payments") return canManageMakerspace;
     if (tabName === "exports") return canManageMakerspace;
     if (tabName === "backups") return canManageMakerspace;
+    if (tabName === "migration") return isSuperadmin;
     if (tabName === "requests") return canSeeHardware;
     return true;
   });
