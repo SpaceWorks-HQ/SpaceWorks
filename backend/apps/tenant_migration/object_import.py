@@ -6,6 +6,7 @@ import hmac
 from pathlib import Path
 import re
 
+from django.db import transaction
 from django.utils import timezone
 
 from apps.audit import services as audit
@@ -122,6 +123,7 @@ def promote_import_objects(job):
     return promoted
 
 
+@transaction.atomic
 def _mark_promoted_and_charge(row_id, makerspace):
     row = TenantImportObject.objects.get(pk=row_id)
     if row.state != TenantImportObject.State.STAGED or row.claimed_at is None:
@@ -138,8 +140,10 @@ def _mark_promoted_and_charge(row_id, makerspace):
         updated_at=timezone.now(),
     )
     if updated != 1:
-        limits.free_storage(makerspace, row.size)
         raise ImportVerificationError("The object promotion claim was lost.")
+    # Object copy happened before this transaction. A crash before this commit can
+    # leave an unjournaled target copy, but the durable STAGED claim lets rollback
+    # identify and delete it; quota and PROMOTED now either both commit or both roll back.
 
 
 def _clean_failed_promotion(row_id, makerspace):

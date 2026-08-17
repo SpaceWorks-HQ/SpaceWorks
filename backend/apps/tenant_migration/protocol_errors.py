@@ -37,3 +37,7 @@ class ClosureChangedError(ClosureAdmissionError):
 
 class ImportStateError(TenantMigrationProtocolError):
     code = "import_state_conflict"
+
+
+class MembershipDependencyError(TenantMigrationProtocolError):
+    code = "membership_dependency_conflict"

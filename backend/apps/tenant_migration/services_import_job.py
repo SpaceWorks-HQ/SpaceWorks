@@ -1,20 +1,18 @@
 from collections import Counter
-from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 
-from apps.operations.models import PeriodicTaskRun
 from apps.tenant_migration.models import ImportIdentityDecision, TenantImportJob
 from apps.audit import services as audit
 
-
-CLEANUP_LEASE_NAME = "tenant-import-expiry-cleanup-work"
-CLEANUP_OBJECTS_LEASE_NAME = "tenant-import-object-cleanup-work"
-CLEANUP_LEASE_DURATION = timedelta(minutes=15)
-DEFAULT_CLEANUP_BATCH_SIZE = 100
+from .import_job_cleanup import (
+    CLEANUP_LEASE_NAME,
+    CLEANUP_OBJECTS_LEASE_NAME,
+    cleanup_abandoned_import_objects,
+    cleanup_expired_import_jobs,
+)
 
 
 def create_import_job(*, actor, archive, source_archive_digest, expires_at):
@@ -81,12 +79,16 @@ def submit_identity_decisions(*, actor, job, decisions):
     from .import_staging import decrypted_archive
 
     with decrypted_archive(job.archive_path) as (root, _carried):
+        portable = PortableArchive(root)
         source_rows = {
             str(row["id"]): row
-            for row in PortableArchive(root).rows("accounts.User")
+            for row in portable.rows("accounts.User")
         }
-    if {str(item["source_user_id"]) for item in decisions} != set(source_rows):
-        raise ValidationError({"detail": "A decision is required for every archived identity."})
+        if {str(item["source_user_id"]) for item in decisions} != set(source_rows):
+            raise ValidationError({"detail": "A decision is required for every archived identity."})
+        from .identity_decision_validation import validate_membership_dispositions
+
+        validate_membership_dispositions(portable, decisions)
     with transaction.atomic():
         locked = TenantImportJob.objects.select_for_update().get(pk=job.pk)
         if locked.status not in {
@@ -254,74 +256,3 @@ def scrub_terminal_job(job):
         )
     )
     return locked
-
-
-def cleanup_expired_import_jobs(*, now=None, batch_size=DEFAULT_CLEANUP_BATCH_SIZE):
-    """Delete one bounded batch of expired jobs that never acquired a tenant."""
-    cleanup_at = now or timezone.now()
-    if not _claim_cleanup_lease(cleanup_at):
-        return 0
-
-    # The lease transaction has committed before this potentially large cascade. This
-    # mirrors the beat-less scheduler's claim-then-work shape and keeps row locks short.
-    job_ids = list(
-        TenantImportJob.objects.filter(
-            target_makerspace__isnull=True,
-            expires_at__lte=cleanup_at,
-        )
-        .order_by("expires_at", "pk")
-        .values_list("pk", flat=True)[:batch_size]
-    )
-    if job_ids:
-        from .object_import import rollback_import_objects
-
-        for job in TenantImportJob.objects.filter(pk__in=job_ids):
-            rollback_import_objects(job)
-        TenantImportJob.objects.filter(pk__in=job_ids).delete()
-    return len(job_ids)
-
-
-def cleanup_abandoned_import_objects(*, now=None, batch_size=DEFAULT_CLEANUP_BATCH_SIZE):
-    """Roll back a bounded batch of failed/abandoned object journals."""
-    cleanup_at = now or timezone.now()
-    if not _claim_named_cleanup_lease(CLEANUP_OBJECTS_LEASE_NAME, cleanup_at):
-        return 0
-    job_ids = list(
-        TenantImportJob.objects.filter(
-            Q(status__in=(TenantImportJob.Status.FAILED, TenantImportJob.Status.ABANDONED))
-            | Q(
-                expires_at__lte=cleanup_at,
-                target_makerspace__lifecycle_state__in=("importing", "aborted"),
-            ),
-            import_objects__state__in=("staged", "promoted", "verified", "failed"),
-        )
-        .order_by("updated_at", "pk")
-        .values_list("pk", flat=True)
-        .distinct()[:batch_size]
-    )
-    from .object_import import rollback_import_objects
-
-    for job in TenantImportJob.objects.filter(pk__in=job_ids).select_related(
-        "target_makerspace", "actor"
-    ):
-        rollback_import_objects(job)
-    return len(job_ids)
-
-
-@transaction.atomic
-def _claim_cleanup_lease(now):
-    return _claim_named_cleanup_lease(CLEANUP_LEASE_NAME, now)
-
-
-@transaction.atomic
-def _claim_named_cleanup_lease(name, now):
-    row, created = PeriodicTaskRun.objects.select_for_update().get_or_create(
-        name=name,
-        defaults={"last_run_at": now},
-    )
-    if not created and now - row.last_run_at < CLEANUP_LEASE_DURATION:
-        return False
-    if not created:
-        row.last_run_at = now
-        row.save(update_fields=("last_run_at",))
-    return True

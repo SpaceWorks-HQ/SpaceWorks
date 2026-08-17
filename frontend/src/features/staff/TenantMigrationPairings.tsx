@@ -5,6 +5,7 @@ import {
   createPairing,
   getDeploymentIdentity,
   tenantMigrationKeys,
+  type DeploymentIdentity,
   type Pairing,
 } from "./tenantMigrationApi";
 import { ErrorText } from "./tenantMigrationUi";
@@ -21,7 +22,8 @@ export function TenantMigrationPairings({ pairings }: { pairings: Pairing[] }) {
     queryKey: tenantMigrationKeys.deploymentIdentity,
     queryFn: getDeploymentIdentity,
   });
-  const effectiveTarget = targetText || (identity.data ? JSON.stringify(identity.data, null, 2) : "");
+  const localPairingIdentity = identity.data ? pairingIdentity(identity.data) : null;
+  const effectiveTarget = targetText || (localPairingIdentity ? JSON.stringify(localPairingIdentity, null, 2) : "");
   const create = useMutation({
     mutationFn: (payload: Parameters<typeof createPairing>[0]) => createPairing(payload),
     onSuccess: () => client.invalidateQueries({ queryKey: tenantMigrationKeys.pairings }),
@@ -59,9 +61,9 @@ export function TenantMigrationPairings({ pairings }: { pairings: Pairing[] }) {
           <p className="mt-1 break-all font-mono text-xs text-muted">Age recipient: {identity.data.age_recipient}</p>
           <label className="mt-2 block text-sm font-semibold text-ink">
             This deployment identity JSON
-            <textarea className="desk-input mt-1 min-h-32 w-full font-mono text-xs" readOnly value={JSON.stringify(identity.data, null, 2)} />
+            <textarea className="desk-input mt-1 min-h-32 w-full font-mono text-xs" readOnly value={JSON.stringify(localPairingIdentity, null, 2)} />
           </label>
-          <button className="desk-button mt-2" type="button" onClick={() => setSourceText(JSON.stringify(identity.data, null, 2))}>Use this deployment as source</button>
+          <button className="desk-button mt-2" type="button" onClick={() => setSourceText(JSON.stringify(localPairingIdentity, null, 2))}>Use this deployment as source</button>
         </div>
       ) : null}
       {identity.isLoading ? <p className="mt-3 text-sm text-muted">Loading this deployment identity…</p> : null}
@@ -94,4 +96,9 @@ export function TenantMigrationPairings({ pairings }: { pairings: Pairing[] }) {
       </div>
     </section>
   );
+}
+
+function pairingIdentity(identity: DeploymentIdentity) {
+  const { algorithm, deployment_id, public_key, fingerprint } = identity;
+  return { algorithm, deployment_id, public_key, fingerprint };
 }

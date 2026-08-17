@@ -38125,6 +38125,11 @@
                         "type": "string",
                         "readOnly": true
                     },
+                    "target_lifecycle_state": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
                     "source_deployment_identity": {},
                     "aggregate_outcome": {},
                     "failure_code": {
@@ -38171,6 +38176,7 @@
                     "identity_count",
                     "source_archive_digest",
                     "source_retention_notice",
+                    "target_lifecycle_state",
                     "updated_at"
                 ]
             },

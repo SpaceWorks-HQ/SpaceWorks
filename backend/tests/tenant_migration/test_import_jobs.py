@@ -179,6 +179,56 @@ def test_cleanup_removes_only_expired_pre_tenant_jobs_and_is_idempotent():
     assert TenantImportJob.objects.filter(pk=materialized.pk).exists()
 
 
+def test_cleanup_unlinks_deleted_and_terminal_target_archives_after_commit(tmp_path):
+    now = timezone.now()
+    paths = [tmp_path / name for name in ("pending.age", "completed.age", "failed.age")]
+    for path in paths:
+        path.write_bytes(b"encrypted")
+    pending = make_job(expires_at=now - timedelta(seconds=1), archive_path=str(paths[0]))
+    completed_target = Makerspace.objects.create(name="Completed Target", slug="completed-target")
+    completed = make_job(
+        source_archive_digest="c" * 64, target_makerspace=completed_target,
+        status=TenantImportJob.Status.COMPLETED,
+        expires_at=now - timedelta(seconds=1), archive_path=str(paths[1]),
+    )
+    failed_target = Makerspace.objects.create(name="Failed Target", slug="failed-target")
+    failed = make_job(
+        source_archive_digest="d" * 64, target_makerspace=failed_target,
+        status=TenantImportJob.Status.FAILED,
+        expires_at=now - timedelta(seconds=1), archive_path=str(paths[2]),
+    )
+
+    assert cleanup_expired_import_jobs(now=now) == 3
+
+    assert not TenantImportJob.objects.filter(pk=pending.pk).exists()
+    completed.refresh_from_db()
+    failed.refresh_from_db()
+    assert completed.archive_path == ""
+    assert failed.archive_path == ""
+    assert not any(path.exists() for path in paths)
+
+
+def test_import_archive_unlink_failure_is_logged_and_cannot_rollback_delete(
+    tmp_path, monkeypatch, caplog,
+):
+    path = tmp_path / "undeletable.age"
+    path.write_bytes(b"encrypted")
+    job = make_job(archive_path=str(path))
+
+    def fail_unlink(*_args, **_kwargs):
+        raise OSError("injected unlink failure")
+
+    monkeypatch.setattr("apps.tenant_migration.archive_retention.Path.unlink", fail_unlink)
+    with caplog.at_level("ERROR"):
+        with transaction.atomic():
+            job.delete()
+            assert path.exists()
+
+    assert not TenantImportJob.objects.filter(pk=job.pk).exists()
+    assert path.exists()
+    assert "tenant_import_archive_unlink_failed" in caplog.text
+
+
 def test_cleanup_task_is_registered_in_both_schedulers():
     task = "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task"
 

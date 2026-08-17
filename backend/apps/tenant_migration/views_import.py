@@ -35,7 +35,7 @@ def _job(job_id):
 class TenantImportListCreateView(MigrationAPIView):
     @extend_schema(tags=["Tenant migration"], summary="List tenant import jobs", responses={200: ImportJobSerializer(many=True), **AUTH_ERRORS})
     def get(self, request):
-        rows = TenantImportJob.objects.all()[:20]
+        rows = TenantImportJob.objects.select_related("target_makerspace").all()[:20]
         audit.record(
             request.user, "tenant_migration.imports_read", target=request.user,
             meta={"import_count": len(rows), "format_version": 1},
@@ -62,7 +62,9 @@ class TenantImportListCreateView(MigrationAPIView):
 class TenantImportDetailView(MigrationAPIView):
     @extend_schema(tags=["Tenant migration"], summary="Read a tenant import job", responses={200: ImportJobSerializer, 404: NOT_FOUND, **AUTH_ERRORS})
     def get(self, request, job_id):
-        job = _job(job_id)
+        job = get_object_or_404(
+            TenantImportJob.objects.select_related("target_makerspace"), pk=job_id
+        )
         audit.record(
             request.user, "tenant_migration.import_read", target=job,
             meta={"import_id": str(job.pk), "format_version": 1},

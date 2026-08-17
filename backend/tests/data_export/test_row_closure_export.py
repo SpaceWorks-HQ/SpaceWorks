@@ -75,8 +75,12 @@ def test_moved_asset_edges_are_dropped_or_nulled_with_anchored_provenance(
     assert moved_adjustment_ref["target_object_id"] == str(
         scenario.moved_adjustment.pk
     )
+    # Matched on the model label as well as the id: a source pk is unique only WITHIN
+    # a model, so an id-only predicate matches an unrelated model's row of the same pk
+    # and reports provenance that was never written for this adjustment.
     assert not any(
-        item["source_object_id"] == str(scenario.blank_adjustment.pk)
+        item["source_model_label"] == "operations.InventoryAdjustment"
+        and item["source_object_id"] == str(scenario.blank_adjustment.pk)
         and item["field_name"] == "asset"
         for item in _references(case)
     )

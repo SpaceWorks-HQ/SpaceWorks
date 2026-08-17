@@ -4,6 +4,19 @@
 # These URL names either mutate no tenant-owned state, or are the recovery/import
 # control plane that must remain operable while a source tenant is frozen.
 HTTP_EXEMPTIONS = {
+    "tenant-migration-source-quiesce": (
+        "A completed export has already quiesced the source; reasserting its fenced "
+        "lease must remain reachable."
+    ),
+    "tenant-migration-export-download-url": (
+        "The encrypted archive can only be downloaded after its export quiesces the source."
+    ),
+    "tenant-migration-source-archive": (
+        "Source cutover must archive the tenant while its gate is quiesced."
+    ),
+    "tenant-migration-source-recover": (
+        "Verified abort recovery must reopen a migrated-out source while its gate is closed."
+    ),
     "backup-recovery-state": "Deployment recovery must be able to quarantine/recover the deployment.",
     "stripe-connect-webhook": "Connect account events are platform routing state, not one source tenant.",
     "auth-login": "Global user session state is excluded from tenant quiescence.",

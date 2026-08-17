@@ -153,8 +153,48 @@ describe("TenantMigrationPanel identity decisions", () => {
   });
 });
 
+describe("TenantMigrationPanel deployment pairing", () => {
+  it("submits the prefilled target identity unchanged without age_recipient", async () => {
+    installApi({ post: (path) => path.endsWith("/pairings") ? Promise.resolve(pairing) : undefined });
+    renderPanel();
+
+    await screen.findByText(/This deployment: target-deployment/);
+    fireEvent.click(screen.getByRole("button", { name: "Use this deployment as source" }));
+    const sourceInput = screen.getByLabelText("Source deployment identity JSON");
+    expect(JSON.parse((sourceInput as HTMLTextAreaElement).value)).not.toHaveProperty("age_recipient");
+    fireEvent.change(sourceInput, { target: { value: JSON.stringify({
+      algorithm: "ed25519", deployment_id: "source-deployment", public_key: "source-key",
+      fingerprint: "s".repeat(64),
+    }) } });
+    fireEvent.change(screen.getByLabelText("Migration/import job ID"), { target: { value: baseJob.id } });
+    fireEvent.change(screen.getByLabelText("Source tenant ID"), { target: { value: "7" } });
+    fireEvent.change(screen.getByLabelText("Archive digest"), { target: { value: digest } });
+    fireEvent.click(screen.getByRole("button", { name: "Pin this deployment pairing" }));
+
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(
+      "/admin/platform/tenant-migrations/pairings",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          migration_id: baseJob.id,
+          source_tenant_id: "7",
+          archive_digest: digest,
+          source: {
+            algorithm: "ed25519", deployment_id: "source-deployment",
+            public_key: "source-key", fingerprint: "s".repeat(64),
+          },
+          target: {
+            algorithm: "ed25519", deployment_id: "target-deployment",
+            public_key: "public-key", fingerprint: "f".repeat(64),
+          },
+        }),
+      },
+    ));
+  });
+});
+
 describe("TenantMigrationPanel cutover", () => {
-  const completed = { ...baseJob, status: "completed" };
+  const completed = { ...baseJob, status: "completed", target_lifecycle_state: "importing" };
   const exportJob = {
     id: "export-1", status: "available", closure_digest: digest, archive_digest: digest,
     format_version: 1, source_retention_notice: "Archives are outside the purge guarantee.",
@@ -186,7 +226,12 @@ describe("TenantMigrationPanel cutover", () => {
   });
 
   it("shows IMPORTING before cutover and ACTIVE only after activation", async () => {
-    installApi({ imports: [completed], pairings: [pairing], post: (path) => path.endsWith("/activate") ? Promise.resolve({ message: "active", receipt }) : undefined });
+    const activated = { ...completed };
+    installApi({ imports: [activated], pairings: [pairing], post: (path) => {
+      if (!path.endsWith("/activate")) return undefined;
+      activated.target_lifecycle_state = "active";
+      return Promise.resolve({ message: "active", receipt });
+    } });
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPanel();
     expect(await screen.findByText("IMPORTING")).toBeVisible();
@@ -199,11 +244,28 @@ describe("TenantMigrationPanel cutover", () => {
   });
 
   it("shows ABORTED distinctly and exposes the target abort receipt", async () => {
-    installApi({ imports: [completed], pairings: [pairing], post: (path) => path.endsWith("/abort") ? Promise.resolve({ message: "aborted", receipt }) : undefined });
+    const aborted = { ...completed };
+    installApi({ imports: [aborted], pairings: [pairing], post: (path) => {
+      if (!path.endsWith("/abort")) return undefined;
+      aborted.target_lifecycle_state = "aborted";
+      return Promise.resolve({ message: "aborted", receipt });
+    } });
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPanel();
     fireEvent.click(await screen.findByRole("button", { name: "Abort target Forge" }));
     expect(await screen.findByText("ABORTED")).toBeVisible();
     expect(screen.getByLabelText(/Target abort receipt/)).toHaveValue(JSON.stringify(receipt, null, 2));
+  });
+
+  it("uses persisted ACTIVE state after reload and hides one-way cutover actions", async () => {
+    installApi({
+      imports: [{ ...completed, target_lifecycle_state: "active" }],
+      pairings: [pairing],
+    });
+    renderPanel();
+
+    expect(await screen.findByText("ACTIVE")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Activate target/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Abort target/ })).not.toBeInTheDocument();
   });
 });

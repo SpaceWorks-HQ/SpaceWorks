@@ -1753,6 +1753,7 @@ export type ImportJob = {
   "storage_mode"?: string;
   "status"?: ImportJobStatusEnum;
   "identity_count": string;
+  "target_lifecycle_state": string | null;
   "source_deployment_identity"?: unknown;
   "aggregate_outcome"?: unknown;
   "failure_code"?: string;

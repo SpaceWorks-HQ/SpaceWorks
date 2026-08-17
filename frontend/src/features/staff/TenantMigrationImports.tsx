@@ -91,21 +91,28 @@ function ImportJobCard({ job: listedJob, pairing }: { job: ImportJob; pairing?: 
   });
   const activate = useMutation({
     mutationFn: (receipt: ReceiptEnvelope) => activateTarget(job.id, pairing!.id, { receipt }),
-    onSuccess: () => {
-      client.invalidateQueries({ queryKey: tenantMigrationKeys.imports });
-      client.invalidateQueries({ queryKey: tenantMigrationKeys.verification(job.id) });
-      client.invalidateQueries({ queryKey: ["staff", "makerspaces"] });
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: tenantMigrationKeys.imports }),
+        client.invalidateQueries({ queryKey: tenantMigrationKeys.import(job.id) }),
+        client.invalidateQueries({ queryKey: tenantMigrationKeys.verification(job.id) }),
+        client.invalidateQueries({ queryKey: ["staff", "makerspaces"] }),
+      ]);
     },
   });
   const abort = useMutation({
     mutationFn: () => abortTarget(job.id, pairing!.id),
-    onSuccess: () => {
-      client.invalidateQueries({ queryKey: tenantMigrationKeys.imports });
-      client.invalidateQueries({ queryKey: ["staff", "makerspaces"] });
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: tenantMigrationKeys.imports }),
+        client.invalidateQueries({ queryKey: tenantMigrationKeys.import(job.id) }),
+        client.invalidateQueries({ queryKey: ["staff", "makerspaces"] }),
+      ]);
     },
   });
-  const lifecycle = activate.data ? "ACTIVE" : abort.data ? "ABORTED" :
-    (job.status === "materializing" || job.status === "completed") ? "IMPORTING" : (job.status ?? "pending").toUpperCase();
+  const cutoverPending = activate.isPending || abort.isPending;
+  const lifecycle = job.target_lifecycle_state?.toUpperCase()
+    ?? (job.status === "materializing" ? "IMPORTING" : (job.status ?? "pending").toUpperCase());
   const tone: "success" | "danger" | "warn" = lifecycle === "ACTIVE" ? "success" : lifecycle === "ABORTED" || job.status === "failed" ? "danger" : "warn";
 
   return (
@@ -153,10 +160,10 @@ function ImportJobCard({ job: listedJob, pairing }: { job: ImportJob; pairing?: 
           <p className="mt-1 text-sm text-ink">Activation and abort are mutually exclusive. Activation cannot be undone from this screen.</p>
           <label className="mt-2 block text-sm text-ink">Source cutover receipt<textarea className="desk-input mt-1 min-h-28 w-full font-mono text-xs" value={sourceReceiptText} onChange={(event) => setSourceReceiptText(event.target.value)} /></label>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button className="desk-button-danger" type="button" disabled={!sourceReceipt || !verification.data || activate.isPending} onClick={() => {
+            <button className="desk-button-danger" type="button" disabled={!sourceReceipt || !verification.data || cutoverPending} onClick={() => {
               if (sourceReceipt && window.confirm(`Activate ${tenantName}? This target cutover cannot be undone from this screen.`)) activate.mutate(sourceReceipt);
             }}>Activate target {tenantName}</button>
-            <button className="desk-button-danger" type="button" disabled={abort.isPending} onClick={() => {
+            <button className="desk-button-danger" type="button" disabled={cutoverPending} onClick={() => {
               if (window.confirm(`Abort ${tenantName}? Imported target objects will be rolled back.`)) abort.mutate();
             }}>Abort target {tenantName}</button>
           </div>

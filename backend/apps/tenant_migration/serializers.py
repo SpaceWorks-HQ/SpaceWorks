@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.data_export.models import DataExportJob
@@ -117,6 +118,7 @@ class ImportCreateSerializer(serializers.Serializer):
 class ImportJobSerializer(serializers.ModelSerializer):
     identity_count = serializers.SerializerMethodField()
     source_retention_notice = serializers.SerializerMethodField()
+    target_lifecycle_state = serializers.SerializerMethodField()
 
     class Meta:
         model = TenantImportJob
@@ -124,6 +126,7 @@ class ImportJobSerializer(serializers.ModelSerializer):
             "id", "source_archive_digest", "source_makerspace_id",
             "source_makerspace_slug", "source_makerspace_name",
             "source_deployment_id", "storage_mode", "status", "identity_count",
+            "target_lifecycle_state",
             "source_deployment_identity",
             "aggregate_outcome", "failure_code", "failure_detail", "created_at",
             "updated_at", "expires_at", "terminal_at", "scrubbed_at",
@@ -132,6 +135,11 @@ class ImportJobSerializer(serializers.ModelSerializer):
 
     def get_identity_count(self, obj):
         return obj.identity_decisions.count()
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_target_lifecycle_state(self, obj):
+        target = obj.target_makerspace
+        return target.lifecycle_state if target is not None else None
 
     def get_source_retention_notice(self, obj):
         return (
