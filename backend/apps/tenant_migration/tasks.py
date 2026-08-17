@@ -3,6 +3,7 @@ from celery import shared_task
 from apps.tenant_migration.services_import_job import (
     cleanup_abandoned_import_objects,
     cleanup_expired_import_jobs,
+    resume_expired_finalizing_import_jobs,
     run_import_job,
 )
 from apps.tenant_migration.services_export_job import run_migration_export_job
@@ -16,6 +17,11 @@ def cleanup_expired_import_jobs_task():
 @shared_task(name="apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task")
 def cleanup_abandoned_import_objects_task():
     return cleanup_abandoned_import_objects()
+
+
+@shared_task(name="apps.tenant_migration.tasks.resume_expired_finalizing_import_jobs_task")
+def resume_expired_finalizing_import_jobs_task():
+    return resume_expired_finalizing_import_jobs()
 
 
 @shared_task(name="apps.tenant_migration.tasks.run_migration_export_job_task")

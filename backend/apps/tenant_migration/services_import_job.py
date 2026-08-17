@@ -10,8 +10,10 @@ from apps.audit import services as audit
 from .import_job_cleanup import (
     CLEANUP_LEASE_NAME,
     CLEANUP_OBJECTS_LEASE_NAME,
+    FINALIZATION_SWEEP_LEASE_NAME,
     cleanup_abandoned_import_objects,
     cleanup_expired_import_jobs,
+    resume_expired_finalizing_import_jobs,
 )
 
 
@@ -148,6 +150,7 @@ def run_import_job(job_id, *, actor_id, target_identity=None):
     from apps.accounts.models import User
     from .import_finalization import finalize_import_job
     from .insertion_errors import (
+        ImportCompletionAuditError,
         ImportPromotionInProgress,
         MaterializationAlreadyCommitted,
     )
@@ -180,12 +183,16 @@ def run_import_job(job_id, *, actor_id, target_identity=None):
         job.refresh_from_db()
         job = finalize_import_job(job, actor=actor)
     except ImportPromotionInProgress:
-        # The journal's live per-key lease proves another delivery is progressing.
-        # Leaving FINALIZING untouched lets that owner complete or a later delivery
-        # reclaim the lease after expiry.
+        # A periodic, idempotently leased sweep requeues FINALIZING after this object
+        # lease expires. It deliberately excludes jobs with any still-live claim.
         return TenantImportJob.objects.get(pk=job.pk)
+    except ImportCompletionAuditError:
+        # Completion and its audit entry share one transaction. Keep FINALIZING and
+        # its verified objects intact so the scheduled sweep can retry that transaction.
+        raise
     except Exception as exc:
-        failed = TenantImportJob.objects.filter(
+        failure_detail = str(exc).strip()[:500] or type(exc).__name__
+        failed_active = TenantImportJob.objects.filter(
             pk=job.pk,
             status__in=(
                 TenantImportJob.Status.MATERIALIZING,
@@ -194,16 +201,28 @@ def run_import_job(job_id, *, actor_id, target_identity=None):
         ).update(
             status=TenantImportJob.Status.FAILED,
             failure_code="materialization_failed",
-            failure_detail=str(exc)[:500],
+            failure_detail=failure_detail,
             terminal_at=timezone.now(),
         )
-        if failed:
+        if failed_active:
             from .object_import import rollback_import_objects
 
             rollback_job = TenantImportJob.objects.select_related(
                 "target_makerspace", "actor"
             ).get(pk=job.pk)
             rollback_import_objects(rollback_job)
+        else:
+            # materialize_tenant() records FAILED before re-raising. Annotate only
+            # that still-unexplained failure and never overwrite a competing reason.
+            TenantImportJob.objects.filter(
+                pk=job.pk,
+                status=TenantImportJob.Status.FAILED,
+                failure_code="",
+                failure_detail="",
+            ).update(
+                failure_code="materialization_failed",
+                failure_detail=failure_detail,
+            )
         raise
     return job
 

@@ -79,6 +79,11 @@ SCHEDULED_TASKS = (
         "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task",
         60,
     ),
+    (
+        "resume-expired-tenant-import-finalizations",
+        "apps.tenant_migration.tasks.resume_expired_finalizing_import_jobs_task",
+        5,
+    ),
 )
 if "tenant_migration" in settings.TOMBSTONED_APPS:
     SCHEDULED_TASKS = tuple(

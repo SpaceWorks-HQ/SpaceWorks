@@ -527,6 +527,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task",
         "schedule": crontab(minute=35),
     },
+    "resume-expired-tenant-import-finalizations": {
+        "task": "apps.tenant_migration.tasks.resume_expired_finalizing_import_jobs_task",
+        "schedule": crontab(minute="*/5"),
+    },
 }
 if "tenant_migration" in TOMBSTONED_APPS:
     CELERY_BEAT_SCHEDULE = {

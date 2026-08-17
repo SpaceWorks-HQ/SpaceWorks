@@ -18,6 +18,7 @@ from apps.operations.models import PeriodicTaskRun
 from apps.tenant_migration.services_import_job import (
     CLEANUP_LEASE_NAME,
     CLEANUP_OBJECTS_LEASE_NAME,
+    FINALIZATION_SWEEP_LEASE_NAME,
 )
 
 pytestmark = pytest.mark.django_db
@@ -59,7 +60,11 @@ def test_running_records_a_row_per_task():
 
     assert set(PeriodicTaskRun.objects.values_list("name", flat=True)) == {
         name for name, _, _ in SCHEDULED_TASKS
-    } | {CLEANUP_LEASE_NAME, CLEANUP_OBJECTS_LEASE_NAME}
+    } | {
+        CLEANUP_LEASE_NAME,
+        CLEANUP_OBJECTS_LEASE_NAME,
+        FINALIZATION_SWEEP_LEASE_NAME,
+    }
 
 
 def test_due_only_skips_a_task_that_just_ran():

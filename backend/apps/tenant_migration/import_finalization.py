@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from apps.audit import services as audit
 
-from .insertion_errors import ImportVerificationError
+from .insertion_errors import ImportCompletionAuditError, ImportVerificationError
 from .models_import_job import TenantImportJob
 from .object_import import promote_import_objects
 from .object_verification import verify_import_objects
@@ -22,28 +22,12 @@ def finalize_import_job(job, *, actor):
     promote_import_objects(job)
     job.refresh_from_db()
     verify_import_objects(job)
-    job, completed_now = _commit_completion(job.pk)
-    if completed_now:
-        report = job.verification_report
-        audit.record(
-            actor,
-            "tenant_migration.import_completed",
-            makerspace=job.target_makerspace,
-            target=job,
-            meta={
-                "import_id": str(job.pk),
-                "model_count": len(report["imported"]),
-                "identity_count": (
-                    report["identities_linked"] + report["identities_created"]
-                ),
-                "format_version": 1,
-            },
-        )
+    job, _completed_now = _commit_completion(job.pk, actor=actor)
     return job
 
 
 @transaction.atomic
-def _commit_completion(job_id):
+def _commit_completion(job_id, *, actor):
     # No `select_related("target_makerspace")` here: that FK is NULLABLE, and Postgres
     # rejects `FOR UPDATE` on the nullable side of an outer join. It lazy-loads in one
     # extra query, which is free next to the writes this transaction already performs.
@@ -60,4 +44,24 @@ def _commit_completion(job_id):
     job.save(
         update_fields=("verification_report", "status", "terminal_at", "updated_at")
     )
+    report = job.verification_report
+    try:
+        audit.record(
+            actor,
+            "tenant_migration.import_completed",
+            makerspace=job.target_makerspace,
+            target=job,
+            meta={
+                "import_id": str(job.pk),
+                "model_count": len(report["imported"]),
+                "identity_count": (
+                    report["identities_linked"] + report["identities_created"]
+                ),
+                "format_version": 1,
+            },
+        )
+    except Exception as exc:
+        raise ImportCompletionAuditError(
+            "The import completion audit entry could not be recorded."
+        ) from exc
     return job, True

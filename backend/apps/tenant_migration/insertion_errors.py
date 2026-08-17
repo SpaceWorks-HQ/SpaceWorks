@@ -47,3 +47,7 @@ class MaterializationAlreadyCommitted(TenantInsertionError):
 
 class ImportPromotionInProgress(TenantInsertionError):
     """Another live delivery owns an object-promotion lease."""
+
+
+class ImportCompletionAuditError(TenantInsertionError):
+    """The atomic completion transition could not write its audit entry."""

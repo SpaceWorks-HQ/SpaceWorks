@@ -22,6 +22,7 @@ from .identity_resolution import (
 from .import_keys import install_carried_deks
 from .import_finalization import finalize_import_job
 from .insertion_errors import (
+    ImportCompletionAuditError,
     ImportPromotionInProgress,
     MaterializationAlreadyCommitted,
 )
@@ -192,7 +193,11 @@ def materialize_tenant(
                 "objects_promoted": promoted,
             }
         )
-    except (MaterializationAlreadyCommitted, ImportPromotionInProgress):
+    except (
+        ImportCompletionAuditError,
+        ImportPromotionInProgress,
+        MaterializationAlreadyCommitted,
+    ):
         raise
     except Exception:
         if target is not None:
