@@ -2,8 +2,10 @@ from datetime import timedelta
 
 import pytest
 from django.contrib.sessions.models import Session
+from django.urls import reverse
 from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied, ValidationError
+from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.accounts.tokens import SpaceWorksRefreshToken, validate_auth_generation
@@ -17,6 +19,7 @@ from apps.backup.recovery import (
     enter_quarantine,
     set_recovery_principal,
 )
+from apps.makerspaces.models import Makerspace, MakerspaceMembership
 
 
 pytestmark = pytest.mark.django_db
@@ -41,6 +44,12 @@ def recovery_fixture():
         requested_by=admin,
     )
     return admin, other, restore
+
+
+def authenticated(user):
+    client = APIClient()
+    client.force_authenticate(user)
+    return client
 
 
 def test_quarantine_rotates_generation_and_tears_down_credentials():
@@ -97,3 +106,35 @@ def test_only_durable_recovery_principal_can_authenticate_and_acknowledge():
     assert state.acknowledged_by_id == recovered.pk
     assert state.acknowledgement == RESIDUAL_RISK
     assert AuditLog.objects.filter(action="backup.quarantine_acknowledged").exists()
+
+
+def test_recovery_state_is_limited_to_superadmin_or_recovery_principal():
+    admin, member, restore = recovery_fixture()
+    url = reverse("backup-recovery-state")
+    makerspace = Makerspace.objects.create(name="Recovery scope", slug="recovery-scope")
+    MakerspaceMembership.objects.create(user=member, makerspace=makerspace)
+    staff = User.objects.create_user(
+        username="recovery-staff",
+        role=User.Role.SPACE_MANAGER,
+        access_status=User.AccessStatus.ACTIVE,
+    )
+    MakerspaceMembership.objects.create(
+        user=staff,
+        makerspace=makerspace,
+        role=MakerspaceMembership.Role.SPACE_MANAGER,
+    )
+
+    assert authenticated(member).get(url).status_code == 403
+    assert authenticated(staff).get(url).status_code == 403
+    assert authenticated(admin).get(url).status_code == 200
+
+    enter_quarantine(restore, "disaster restore")
+    principal = set_recovery_principal(admin, "one-time-recovery-password")
+    principal_client = authenticated(principal)
+
+    assert principal_client.get(url).status_code == 200
+    acknowledged = principal_client.post(
+        url, {"acknowledgement": RESIDUAL_RISK}, format="json"
+    )
+    assert acknowledged.status_code == 200
+    assert acknowledged.data["mode"] == DeploymentRecoveryState.Mode.NORMAL

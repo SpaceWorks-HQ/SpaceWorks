@@ -19,12 +19,33 @@ RESIDUAL_RISK = (
 )
 
 
+def is_recovery_principal(user, state=None):
+    if not getattr(user, "is_authenticated", False):
+        return False
+    state = state or DeploymentRecoveryState.objects.filter(pk=1).only(
+        "recovery_principal_id"
+    ).first()
+    return bool(state and user.pk == state.recovery_principal_id)
+
+
+def can_read_recovery_state(user):
+    if not getattr(user, "is_authenticated", False):
+        return False
+    is_active_superadmin = bool(
+        user.is_active
+        and user.access_status == user.AccessStatus.ACTIVE
+        and not getattr(user, "must_change_password", False)
+        and (user.is_superuser or user.role == user.Role.SUPERADMIN)
+    )
+    return is_active_superadmin or is_recovery_principal(user)
+
+
 def assert_principal_allowed(user):
     state = DeploymentRecoveryState.objects.filter(pk=1).only(
         "mode", "recovery_principal_id"
     ).first()
     if state and state.mode == DeploymentRecoveryState.Mode.QUARANTINED:
-        if not user or user.pk != state.recovery_principal_id:
+        if not is_recovery_principal(user, state):
             raise AuthenticationFailed(
                 "Only the out-of-band recovery superadmin may authenticate during quarantine.",
                 code="deployment_quarantined",
@@ -146,7 +167,7 @@ def acknowledge_quarantine(actor, acknowledgement):
     state = _locked_state()
     if state.mode != DeploymentRecoveryState.Mode.QUARANTINED:
         raise ValidationError("The deployment is not quarantined.")
-    if actor.pk != state.recovery_principal_id:
+    if not is_recovery_principal(actor, state):
         raise PermissionDenied("Only the recovered superadmin may acknowledge quarantine.")
     if acknowledgement != RESIDUAL_RISK:
         raise ValidationError({"acknowledgement": "The residual-risk acknowledgement must match exactly."})
