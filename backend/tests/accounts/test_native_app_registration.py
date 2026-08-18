@@ -166,3 +166,51 @@ def test_challenge_registration_cannot_be_rebound_during_grant_creation(
     grant = DeviceGrant.objects.get(user=user)
     assert grant.registration_id == registration_a.pk
     assert grant.registration_id != registration_b.pk
+
+
+def test_purging_a_makerspace_does_not_trip_protected_registrations(monkeypatch):
+    """A tenant registration with a live grant must not block the purge.
+
+    NativeAppRegistration.makerspace is CASCADE while DeviceGrant.registration and
+    DeviceAttestationChallenge.registration are PROTECT, so a bare cascade from the
+    makerspace raises ProtectedError and the whole purge fails. The purge clears those
+    dependent authentication rows first; a GLOBAL registration must survive untouched.
+    """
+    from apps.accounts.models_devices import DeviceEnvironment, DevicePlatform
+    from apps.makerspaces import lifecycle
+
+    actor = make_user("purge-native-super")
+    actor.is_superuser = True
+    actor.role = User.Role.SUPERADMIN
+    actor.save(update_fields=["is_superuser", "role"])
+    monkeypatch.setattr(lifecycle, "_delete_storage_keys", lambda keys: None)
+
+    makerspace = make_space("purge-native-space")
+    tenant_registration = make_native_app_registration(makerspace=makerspace)
+    global_registration = NativeAppRegistration.objects.create(
+        makerspace=None,
+        app_id="org.spaceworks.global",
+        platform=DevicePlatform.APPLE,
+        environment=DeviceEnvironment.DEVELOPMENT,
+        verifier_config_key="org.spaceworks.global",
+        status=NativeAppRegistration.Status.APPROVED,
+    )
+    member = make_user("purge-native-member")
+    now = timezone.now()
+    DeviceGrant.objects.create(
+        registration=tenant_registration,
+        user=member,
+        platform=DevicePlatform.APPLE,
+        environment=DeviceEnvironment.DEVELOPMENT,
+        app_id=tenant_registration.app_id,
+        signing_identity="TEAMID.org.spaceworks.app",
+        attestation_subject_fingerprint="a" * 64,
+        attested_at=now,
+        last_used_at=now,
+    )
+
+    lifecycle.purge(lifecycle.archive(makerspace, actor), actor)
+
+    assert not NativeAppRegistration.objects.filter(pk=tenant_registration.pk).exists()
+    assert not DeviceGrant.objects.filter(registration=tenant_registration).exists()
+    assert NativeAppRegistration.objects.filter(pk=global_registration.pk).exists()
