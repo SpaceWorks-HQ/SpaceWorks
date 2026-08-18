@@ -196,7 +196,11 @@ class Command(BaseCommand):
             raise CommandError("The authenticated archive manifest does not match the restore intent.")
         if bundle_path:
             try:
-                verify_content_ledger(bundle_path, manifest.get("contents"))
+                verify_content_ledger(
+                    bundle_path,
+                    manifest.get("contents"),
+                    require_ledger=manifest.get("format") == "spaceworks-phase5a-v2",
+                )
             except ArchiveDigestError as exc:
                 raise CommandError(str(exc)) from exc
         source_major = int(manifest.get("postgres", {}).get("source_server_major", 0))

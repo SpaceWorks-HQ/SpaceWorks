@@ -3,6 +3,7 @@
 from datetime import timedelta
 import hmac
 import os
+import re
 import uuid
 
 from django.db import transaction
@@ -16,6 +17,13 @@ from apps.backup.models import BackupArchive, PlatformBackupSettings, RestoreOpe
 
 
 def import_disaster_archive(actor, encrypted_path, manifest, *, expected_sha256=None):
+    if not isinstance(expected_sha256, str) or re.fullmatch(
+        r"[0-9a-f]{64}", expected_sha256
+    ) is None:
+        raise ValidationError(
+            "A valid expected sha256 digest is required "
+            "(64 lowercase hexadecimal characters)."
+        )
     try:
         archive_id = uuid.UUID(str(manifest["archive_id"]))
     except (KeyError, TypeError, ValueError) as exc:
@@ -32,9 +40,7 @@ def import_disaster_archive(actor, encrypted_path, manifest, *, expected_sha256=
     if size <= 0:
         raise ValidationError("The imported archive is empty.")
     archive_sha256 = sha256_file(path)
-    if expected_sha256 is not None and not hmac.compare_digest(
-        str(expected_sha256), archive_sha256
-    ):
+    if not hmac.compare_digest(expected_sha256, archive_sha256):
         raise ValidationError("The imported archive sha256 does not match the expected digest.")
     if BackupArchive.objects.filter(pk=archive_id).exists():
         raise ValidationError("This archive is already registered on the target deployment.")

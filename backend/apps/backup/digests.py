@@ -45,12 +45,15 @@ def build_content_ledger(root):
     return entries
 
 
-def verify_content_ledger(bundle_root, contents):
+def verify_content_ledger(bundle_root, contents, *, require_ledger=False):
+    if require_ledger and (not isinstance(contents, list) or not contents):
+        raise ArchiveDigestError("Archive content ledger is required.")
     if not contents:
         return
     if not isinstance(contents, list):
         raise ArchiveDigestError("Archive content ledger is invalid.")
     root = Path(bundle_root).resolve()
+    declared_paths = set()
     for entry in contents:
         relative = str(entry.get("path", "")) if isinstance(entry, dict) else ""
         pure_path = PurePosixPath(relative)
@@ -58,6 +61,12 @@ def verify_content_ledger(bundle_root, contents):
             raise ArchiveDigestError(
                 f"Archive content verification failed for {relative or '<missing path>'}."
             )
+        normalized_relative = pure_path.as_posix()
+        if normalized_relative in declared_paths:
+            raise ArchiveDigestError(
+                f"Archive content ledger contains duplicate path {relative}."
+            )
+        declared_paths.add(normalized_relative)
         path = root.joinpath(*pure_path.parts)
         try:
             resolved = path.resolve(strict=True)
@@ -81,3 +90,16 @@ def verify_content_ledger(bundle_root, contents):
             raise ArchiveDigestError(
                 f"Archive content verification failed for {relative}."
             )
+
+    payload_paths = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and path.relative_to(root).as_posix() != "manifest.json"
+    }
+    unlisted_paths = payload_paths - declared_paths
+    if unlisted_paths:
+        raise ArchiveDigestError(
+            "Archive content ledger does not list payload file(s): "
+            + ", ".join(sorted(unlisted_paths))
+            + "."
+        )

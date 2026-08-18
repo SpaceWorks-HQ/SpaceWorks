@@ -14,7 +14,7 @@ class Command(BaseCommand):
         parser.add_argument("--username", required=True)
         parser.add_argument("--encrypted-file", required=True)
         parser.add_argument("--manifest", required=True)
-        parser.add_argument("--expected-sha256")
+        parser.add_argument("--expected-sha256", required=True)
 
     def handle(self, *args, **options):
         actor = User.objects.filter(username=options["username"]).first()
@@ -30,7 +30,7 @@ class Command(BaseCommand):
                 actor,
                 encrypted,
                 manifest,
-                expected_sha256=options.get("expected_sha256"),
+                expected_sha256=options["expected_sha256"],
             )
         except Exception as exc:
             raise CommandError(str(exc)) from exc
