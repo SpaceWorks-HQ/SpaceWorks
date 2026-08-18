@@ -195,7 +195,8 @@ def test_code_is_single_use_and_expiry_refusal_persists_consumption_and_audit():
         action="member.claim_code_redemption_refused",
         target_id=str(expired.membership_id),
     )
-    assert refusal.meta["redemption_ip"] == "203.0.113.12"
+    assert refusal.meta["redemption_ip"].startswith("hmac-sha256:")
+    assert refusal.meta["redemption_ip"] != "203.0.113.12"
     assert refusal.meta["outcome"] == "expired"
 
 

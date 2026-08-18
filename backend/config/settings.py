@@ -6,6 +6,8 @@ from celery.schedules import crontab
 import environ
 from corsheaders.defaults import default_headers
 
+from config.storage_validation import assert_distinct_storage_buckets
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env(
@@ -304,6 +306,7 @@ PROCUREMENT_RECEIPT_ALLOWED_MIME = env.list(
     default=["application/pdf", "image/jpeg", "image/png", "image/webp"],
 )
 PUBLIC_IMAGE_BUCKET = env("PUBLIC_IMAGE_BUCKET", default="public-images")
+assert_distinct_storage_buckets(AWS_STORAGE_BUCKET_NAME, PUBLIC_IMAGE_BUCKET)
 PUBLIC_IMAGE_BASE_URL = env("PUBLIC_IMAGE_BASE_URL", default="")
 PUBLIC_IMAGE_MAX_BYTES = env.int("PUBLIC_IMAGE_MAX_BYTES", default=10485760)
 PUBLIC_IMAGE_URL_TTL_SECONDS = env.int("PUBLIC_IMAGE_URL_TTL_SECONDS", default=300)
