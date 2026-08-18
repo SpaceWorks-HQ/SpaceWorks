@@ -76,6 +76,10 @@ services:
     entrypoint: |
       /bin/sh -c '
       set -e;
+      if [ "$$AWS_STORAGE_BUCKET_NAME" = "$$PUBLIC_IMAGE_BUCKET" ]; then
+        echo "Private and public storage bucket names must be different." >&2;
+        exit 1;
+      fi;
       until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do sleep 1; done;
       mc mb --ignore-existing "local/$$AWS_STORAGE_BUCKET_NAME";
       mc version enable "local/$$AWS_STORAGE_BUCKET_NAME";

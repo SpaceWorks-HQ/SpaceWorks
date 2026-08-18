@@ -89,9 +89,10 @@ def test_put_attach_failure_compensates_final_object(monkeypatch, settings):
     settings.STORAGE_PRESIGN_METHOD = "put"
     space = make_space("service-file-put")
     row, machine = service_request(space)
+    actor = manager(space)
     file = ServiceRequestFile.objects.create(
         machine=machine, kind="attachment", object_key="machine/key", content_type="application/pdf",
-        original_filename="report.pdf", owner_user_id=manager(space).pk,
+        original_filename="report.pdf", owner_user_id=actor.pk,
     )
     monkeypatch.setattr(service_storage, "finalize_upload", lambda *args: 4)
     monkeypatch.setattr(service_storage, "validate_service_object", lambda *args: fake_result())
@@ -100,9 +101,64 @@ def test_put_attach_failure_compensates_final_object(monkeypatch, settings):
     monkeypatch.setattr(service_storage, "cleanup_upload", cleanup)
 
     with pytest.raises(ValidationError):
-        service_storage.finalize_file(row, file_id=file.pk, actor=manager(space))
+        service_storage.finalize_file(row, file_id=file.pk, actor=actor)
     cleanup.assert_called_once_with(file.object_key)
     assert ServiceRequestFile.objects.get(pk=file.pk).service_request_id is None
+
+
+def test_finalize_refuses_another_users_staged_file_before_storage(monkeypatch):
+    space = make_space("service-file-owner-initial")
+    row, machine = service_request(space)
+    actor, owner = manager(space), manager(space)
+    file = ServiceRequestFile.objects.create(
+        machine=machine,
+        kind="attachment",
+        object_key="machine/other-owner",
+        content_type="application/pdf",
+        original_filename="private.pdf",
+        owner_user_id=owner.pk,
+    )
+    promote, cleanup = Mock(return_value=4), Mock()
+    monkeypatch.setattr(service_storage, "finalize_upload", promote)
+    monkeypatch.setattr(service_storage, "cleanup_upload", cleanup)
+
+    with pytest.raises(ValidationError):
+        service_storage.finalize_file(row, file_id=file.pk, actor=actor)
+
+    promote.assert_not_called()
+    cleanup.assert_not_called()
+    assert ServiceRequestFile.objects.get(pk=file.pk).service_request_id is None
+
+
+def test_finalize_rechecks_staged_file_owner_under_lock(monkeypatch):
+    space = make_space("service-file-owner-locked")
+    row, machine = service_request(space)
+    actor, new_owner = manager(space), manager(space)
+    file = ServiceRequestFile.objects.create(
+        machine=machine,
+        kind="attachment",
+        object_key="machine/owner-race",
+        content_type="application/pdf",
+        original_filename="private.pdf",
+        owner_user_id=actor.pk,
+    )
+
+    def change_owner_during_promotion(*args):
+        ServiceRequestFile.objects.filter(pk=file.pk).update(owner_user_id=new_owner.pk)
+        return 4
+
+    cleanup = Mock()
+    monkeypatch.setattr(service_storage, "finalize_upload", change_owner_during_promotion)
+    monkeypatch.setattr(service_storage, "validate_service_object", lambda *args: fake_result())
+    monkeypatch.setattr(service_storage, "cleanup_upload", cleanup)
+
+    with pytest.raises(ValidationError):
+        service_storage.finalize_file(row, file_id=file.pk, actor=actor)
+
+    file.refresh_from_db()
+    assert file.owner_user_id == new_owner.pk
+    assert file.service_request_id is None
+    cleanup.assert_called_once_with(file.object_key)
 
 
 def test_policy_snapshot_ignores_later_machine_policy_edit(monkeypatch):
