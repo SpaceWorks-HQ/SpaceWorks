@@ -6,6 +6,8 @@ notifications at all. The assertions worth reading twice are the ones about cred
 a webhook URL is a bearer secret and must never come back out of the API.
 """
 
+import socket
+
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
@@ -18,6 +20,22 @@ from apps.makerspaces.models import Makerspace, MakerspaceMembership, Makerspace
 from apps.makerspaces.roles import ensure_default_roles
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def public_webhook_dns(monkeypatch):
+    monkeypatch.setattr(
+        "apps.integrations.webhook_validation.socket.getaddrinfo",
+        lambda _host, port, **_kwargs: [
+            (
+                socket.AF_INET,
+                socket.SOCK_STREAM,
+                socket.IPPROTO_TCP,
+                "",
+                ("93.184.216.34", port),
+            )
+        ],
+    )
 
 
 def make_space(slug):

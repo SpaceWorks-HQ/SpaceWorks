@@ -46,6 +46,15 @@ def is_active_member(user, makerspace_id):
     ).exists()
 
 
+def _active_membership_makerspace_ids(user):
+    scope = set(
+        user.makerspace_memberships.filter(status="active").values_list(
+            "makerspace_id", flat=True
+        )
+    )
+    return rbac._exclude_archived_ids(scope)
+
+
 def operator_level(actor, machine):
     """The actor's access level on this machine, or None. Inert without live membership."""
     if not is_active_member(actor, machine.makerspace_id):
@@ -268,9 +277,7 @@ def scope_machines_for_actor(actor, queryset):
         elif tscope:
             q |= Q(machine_type__managing_action=action, makerspace_id__in=tscope)
 
-    member_ms = rbac._exclude_archived_ids(
-        set(actor.makerspace_memberships.values_list("makerspace_id", flat=True))
-    )
+    member_ms = _active_membership_makerspace_ids(actor)
     if member_ms:
         op_ids = MachineOperator.objects.filter(
             user=actor, machine__makerspace_id__in=member_ms
@@ -314,9 +321,7 @@ def scope_manageable_machines_for_actor(actor, queryset):
         getattr(actor, "is_active", False)
         and getattr(actor, "access_status", None) == User.AccessStatus.ACTIVE
     ):
-        member_ms = rbac._exclude_archived_ids(
-            set(actor.makerspace_memberships.values_list("makerspace_id", flat=True))
-        )
+        member_ms = _active_membership_makerspace_ids(actor)
         operator_ids = MachineOperator.objects.filter(
             user=actor,
             access_level__in=(MANAGE, FULL),

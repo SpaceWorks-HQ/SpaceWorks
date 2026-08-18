@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts import rbac
+from apps.accounts.models import User
 from apps.admin_api.permissions import IsActiveStaff
 from apps.admin_api.serializers_machine_service import (
     MachineServiceRequestSerializer,
@@ -92,8 +93,10 @@ class MachineServiceRequestListCreateView(APIView):
         member = get_object_or_404(
             MakerspaceMembership.objects.select_related("user").filter(
                 makerspace=makerspace,
+                status="active",
                 user_id=data["requester_id"],
                 user__is_active=True,
+                user__access_status=User.AccessStatus.ACTIVE,
             )
         )
         machine = get_object_or_404(
