@@ -2066,12 +2066,18 @@ export type LogError = {
 export type LoginRequest = {
   "username": string;
   "password": string;
+  "surface"?: LoginRequestSurfaceEnum;
 };
+
+export type LoginRequestSurfaceEnum = "member" | "staff";
 
 export type LoginResponse = {
   "user": AuthUserPayload;
   "access": string;
+  "surface": LoginResponseSurfaceEnum;
 };
+
+export type LoginResponseSurfaceEnum = "member" | "staff" | "verification_only";
 
 export type LogMachineConsumption = {
   "quantity": string;
@@ -4939,7 +4945,7 @@ export type SocialLink = {
 export type SocialLogin = {
   "id_token": string;
   "nonce": string;
-  "surface": SurfaceEnum;
+  "surface": Surface356Enum;
   "delivery": DeliveryEnum;
   "client_platform": ClientPlatformEnum;
   "apple_name"?: string;
@@ -4959,7 +4965,7 @@ export type SocialLoginResponse = {
 
 export type SocialNonce = {
   "provider": string;
-  "surface": SurfaceEnum;
+  "surface": Surface356Enum;
   "delivery": DeliveryEnum;
   "client_platform": ClientPlatformEnum;
 };
@@ -5161,7 +5167,7 @@ export type SubdomainRequestError = {
 
 export type SubjectTypeEnum = "machine_service_request" | "booking" | "event_registration" | "makerspace_membership";
 
-export type SurfaceEnum = "member" | "staff";
+export type Surface356Enum = "member" | "staff";
 
 export type TakenItemsReport = {
   "rows": Array<Array<unknown>>;

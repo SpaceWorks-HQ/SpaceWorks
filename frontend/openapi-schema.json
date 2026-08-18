@@ -3,7 +3,7 @@
     "info": {
         "title": "Space Works API",
         "version": "0.7.5",
-        "description": "Multi-tenant makerspace hardware loan system.\n\nPublic flow: browse inventory, search with `q`, page with `page`, sign in as a member, submit a borrow request, then track it by public token.\n\nAdmin flow: authenticate with JWT, manage makerspaces, inventory, staff, QR labels, bulk imports, request review, issue, and return.\n\nAuthentication: staff/admin endpoints use `Authorization: Bearer <access>`. Public browser endpoints can use `X-Publishable-Key` when public key hardening is enabled."
+        "description": "Multi-tenant makerspace hardware loan system.\n\nPublic flow: browse inventory, search with `q`, page with `page`, sign in as a member, submit a borrow request, then track it by public token.\n\nAdmin flow: authenticate with JWT, manage makerspaces, inventory, staff, QR labels, bulk imports, request review, issue, and return.\n\nAuthentication: staff/admin endpoints use `Authorization: Bearer <access>`. Public browser endpoints can use `X-Publishable-Key` when public key hardening is enabled. Server API clients send `X-Client-Id`, `X-Timestamp`, `X-Nonce`, and `X-Signature`. Generate a unique, unpredictable `X-Nonce` for every request and sign the byte sequence `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY` with HMAC-SHA256. The nonce uses 1-128 characters from `A-Z`, `a-z`, `0-9`, `.`, `_`, `~`, and `-`. A deployment may temporarily accept the legacy nonce-less signed format while `APICLIENT_REQUIRE_NONCE` is disabled."
     },
     "paths": {
         "/api/public/{makerspace_slug}/inventory/": {
@@ -12,6 +12,14 @@
                 "description": "List public inventory products for a public makerspace.",
                 "summary": "List public inventory products",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
                     {
                         "in": "header",
                         "name": "X-Publishable-Key",
@@ -98,6 +106,14 @@
                 "parameters": [
                     {
                         "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
+                    {
+                        "in": "header",
                         "name": "X-Publishable-Key",
                         "schema": {
                             "type": "string"
@@ -151,6 +167,14 @@
                 "parameters": [
                     {
                         "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
+                    {
+                        "in": "header",
                         "name": "X-Publishable-Key",
                         "schema": {
                             "type": "string"
@@ -200,6 +224,14 @@
                 "parameters": [
                     {
                         "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
+                    {
+                        "in": "header",
                         "name": "X-Publishable-Key",
                         "schema": {
                             "type": "string"
@@ -245,6 +277,14 @@
                 "description": "List makerspaces that have public inventory enabled.",
                 "summary": "List public makerspaces",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
                     {
                         "in": "header",
                         "name": "X-Publishable-Key",
@@ -25951,7 +25991,7 @@
             "post": {
                 "operationId": "api_v1_auth_login_create",
                 "description": "Takes a set of user credentials and returns an access and refresh JSON web\ntoken pair to prove the authentication of those credentials.",
-                "summary": "Log in staff user",
+                "summary": "Log in with a password",
                 "tags": [
                     "Auth"
                 ],
@@ -25965,7 +26005,8 @@
                                 "StaffLogin": {
                                     "value": {
                                         "username": "admin",
-                                        "password": "secret-password"
+                                        "password": "secret-password",
+                                        "surface": "staff"
                                     },
                                     "summary": "Staff login"
                                 }
@@ -30762,6 +30803,14 @@
                 "parameters": [
                     {
                         "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
+                    {
+                        "in": "header",
                         "name": "X-Publishable-Key",
                         "schema": {
                             "type": "string"
@@ -30846,6 +30895,14 @@
                 "parameters": [
                     {
                         "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
+                    {
+                        "in": "header",
                         "name": "X-Publishable-Key",
                         "schema": {
                             "type": "string"
@@ -30897,6 +30954,14 @@
                 "operationId": "api_v1_public_inventory_categories_list",
                 "summary": "List public inventory categories",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
                     {
                         "in": "header",
                         "name": "X-Publishable-Key",
@@ -31238,6 +31303,14 @@
                 "description": "List active machines published by a public makerspace.",
                 "summary": "List public machines",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
                     {
                         "in": "header",
                         "name": "X-Publishable-Key",
@@ -31619,6 +31692,14 @@
                 "operationId": "api_v1_public_requests_create",
                 "summary": "Submit public borrow request",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
                     {
                         "in": "header",
                         "name": "X-Publishable-Key",
@@ -32056,6 +32137,14 @@
                 "parameters": [
                     {
                         "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
+                    {
+                        "in": "header",
                         "name": "X-Publishable-Key",
                         "schema": {
                             "type": "string"
@@ -32100,6 +32189,14 @@
                 "operationId": "api_v1_public_tools_checkout_create",
                 "summary": "Check out a public tool by QR",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
                     {
                         "in": "header",
                         "name": "X-Publishable-Key",
@@ -32249,6 +32346,14 @@
                 "parameters": [
                     {
                         "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
+                    {
+                        "in": "header",
                         "name": "X-Publishable-Key",
                         "schema": {
                             "type": "string"
@@ -32381,6 +32486,14 @@
                 "operationId": "api_v1_public_tools_return_create",
                 "summary": "Return a public tool by QR",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
                     {
                         "in": "header",
                         "name": "X-Publishable-Key",
@@ -32560,6 +32673,14 @@
                 "parameters": [
                     {
                         "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
+                    {
+                        "in": "header",
                         "name": "X-Publishable-Key",
                         "schema": {
                             "type": "string"
@@ -32598,6 +32719,14 @@
                 "operationId": "api_v1_public_requests_status_retrieve",
                 "summary": "Get request status by public token",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Nonce",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Unique, unpredictable nonce for HMAC-authenticated server API clients (1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it between `X-Timestamp` and the raw body in the signed bytes: `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for publishable-key/browser authentication and during the temporary legacy rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+                    },
                     {
                         "in": "header",
                         "name": "X-Publishable-Key",
@@ -39385,12 +39514,28 @@
                     "password": {
                         "type": "string",
                         "writeOnly": true
+                    },
+                    "surface": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/LoginRequestSurfaceEnum"
+                            }
+                        ],
+                        "default": "member"
                     }
                 },
                 "required": [
                     "password",
                     "username"
                 ]
+            },
+            "LoginRequestSurfaceEnum": {
+                "enum": [
+                    "member",
+                    "staff"
+                ],
+                "type": "string",
+                "description": "* `member` - member\n* `staff` - staff"
             },
             "LoginResponse": {
                 "type": "object",
@@ -39400,12 +39545,25 @@
                     },
                     "access": {
                         "type": "string"
+                    },
+                    "surface": {
+                        "$ref": "#/components/schemas/LoginResponseSurfaceEnum"
                     }
                 },
                 "required": [
                     "access",
+                    "surface",
                     "user"
                 ]
+            },
+            "LoginResponseSurfaceEnum": {
+                "enum": [
+                    "member",
+                    "staff",
+                    "verification_only"
+                ],
+                "type": "string",
+                "description": "* `member` - member\n* `staff` - staff\n* `verification_only` - verification_only"
             },
             "LogoutResponse": {
                 "type": "object",
@@ -50914,7 +51072,7 @@
                         "maxLength": 512
                     },
                     "surface": {
-                        "$ref": "#/components/schemas/SurfaceEnum"
+                        "$ref": "#/components/schemas/Surface356Enum"
                     },
                     "delivery": {
                         "$ref": "#/components/schemas/DeliveryEnum"
@@ -50970,7 +51128,7 @@
                         "maxLength": 64
                     },
                     "surface": {
-                        "$ref": "#/components/schemas/SurfaceEnum"
+                        "$ref": "#/components/schemas/Surface356Enum"
                     },
                     "delivery": {
                         "$ref": "#/components/schemas/DeliveryEnum"
@@ -51738,7 +51896,7 @@
                 "type": "string",
                 "description": "* `machine_service_request` - Machine service request\n* `booking` - Booking\n* `event_registration` - Event registration\n* `makerspace_membership` - Makerspace membership"
             },
-            "SurfaceEnum": {
+            "Surface356Enum": {
                 "enum": [
                     "member",
                     "staff"

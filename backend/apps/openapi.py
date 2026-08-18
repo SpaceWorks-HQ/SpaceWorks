@@ -27,10 +27,13 @@ API_CLIENT_NONCE_PARAMETER = OpenApiParameter(
     ),
 )
 
-PUBLIC_API_AUTH_PARAMETERS = (
+# A LIST, not a tuple: drf-spectacular's get_override_parameters does
+# `super().get_override_parameters() + parameters`, so a tuple raises
+# "can only concatenate list (not tuple) to list" and breaks schema generation outright.
+PUBLIC_API_AUTH_PARAMETERS = [
     PUBLISHABLE_KEY_PARAMETER,
     API_CLIENT_NONCE_PARAMETER,
-)
+]
 
 PUBLIC_REQUEST_SUBMIT_EXAMPLE = OpenApiExample(
     "Submit public equipment request",
