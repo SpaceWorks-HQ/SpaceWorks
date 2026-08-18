@@ -65,7 +65,7 @@ export function AddStaffModal({
           </Field>
         </div>
         <Field label="Password" hint="Required - share it with the new staff member." error={errors.password}>
-          <input className="desk-input w-full" type="password" value={form.password} onChange={(event) => onChange({ ...form, password: event.target.value })} />
+          <input className="desk-input w-full" type="password" autoComplete="new-password" value={form.password} onChange={(event) => onChange({ ...form, password: event.target.value })} />
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Role" error={errors.role_id}>
