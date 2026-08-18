@@ -10,7 +10,11 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import UntypedToken
 
 from apps.accounts import audit_events
-from apps.accounts.models_devices import DeviceRefreshFamily, DeviceRefreshToken
+from apps.accounts.models_devices import (
+    DeviceRefreshFamily,
+    DeviceRefreshToken,
+    NativeAppRegistration,
+)
 from apps.accounts.services_tokens import blacklist_device_family
 from apps.accounts.tokens import SpaceWorksRefreshToken
 
@@ -55,7 +59,7 @@ def rotate_device_refresh(raw):
     with transaction.atomic():
         row = (
             DeviceRefreshToken.objects.select_for_update()
-            .select_related("family__grant", "family__user")
+            .select_related("family__grant__registration", "family__user")
             .filter(jti=jti, token_fingerprint=token_fingerprint(raw))
             .first()
         )
@@ -71,7 +75,10 @@ def rotate_device_refresh(raw):
             replay = True
         elif not user.is_active or user.access_status != user.AccessStatus.ACTIVE:
             blacklist_device_family(family, revoke_grant=True)
-        elif grant.status != grant.Status.ACTIVE:
+        elif (
+            grant.status != grant.Status.ACTIVE
+            or grant.registration.status != NativeAppRegistration.Status.APPROVED
+        ):
             blacklist_device_family(family)
         else:
             try:

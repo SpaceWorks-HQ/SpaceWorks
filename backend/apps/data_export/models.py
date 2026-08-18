@@ -112,6 +112,9 @@ OMITTED_MODELS = {
     # code is a short-lived bearer credential stored only as a digest, and a browser
     # attempt holds a live PKCE verifier and two more secrets.
     "accounts.MemberClaimCode": "Transient authentication state.",
+    "accounts.NativeAppRegistration": (
+        "Live application authorization and deployment-local verifier binding."
+    ),
     "accounts.OidcBrowserAttempt": "Transient authentication state.",
     # Phase 8. One row per submitted address -- including addresses that belong to
     # nobody, since anyone can create one by asking for a reset -- holding a live OTP

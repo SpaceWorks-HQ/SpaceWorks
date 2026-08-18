@@ -15,7 +15,7 @@ from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from rest_framework.exceptions import APIException
 
-from apps.accounts.models import User
+from apps.accounts.models import NativeAppRegistration, User
 from apps.accounts.transition_services import (
     WalkInTransitionError,
     transition_walk_in_to_account,
@@ -223,6 +223,17 @@ class UserAdmin(SuperuserOnlyModelAdmin, DjangoUserAdmin, ModelAdmin):
                 f"Restored access for {success_count} user(s).",
                 level=messages.SUCCESS,
             )
+
+
+@admin.register(NativeAppRegistration)
+class NativeAppRegistrationAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    list_display = (
+        "app_id", "platform", "environment", "makerspace", "status", "updated_at",
+    )
+    list_filter = ("status", "platform", "environment", "makerspace")
+    search_fields = ("app_id", "verifier_config_key", "makerspace__name")
+    autocomplete_fields = ("makerspace", "approved_by")
+    readonly_fields = ("created_at", "updated_at")
 
 
 admin.site.unregister(Group)

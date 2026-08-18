@@ -21,6 +21,7 @@ from apps.accounts.transition_services import (
     unregister_walk_in_revocation_hook,
 )
 from apps.audit.models import AuditLog
+from tests.device_helpers import make_native_app_registration
 
 pytestmark = pytest.mark.django_db(transaction=True)
 PASSWORD = "Safe transition password 947!"
@@ -76,6 +77,7 @@ def test_transition_revokes_every_token_and_fires_hooks_in_one_transaction():
     user = make_walk_in()
     SpaceWorksRefreshToken.for_user(user)
     grant = DeviceGrant.objects.create(
+        registration=make_native_app_registration(app_id="test.app"),
         user=user,
         platform="apple",
         app_id="test.app",
@@ -140,6 +142,7 @@ def test_transition_failure_rolls_back_marker_hook_and_token_revocation():
     user = make_walk_in("transition-rollback", "")
     SpaceWorksRefreshToken.for_user(user)
     grant = DeviceGrant.objects.create(
+        registration=make_native_app_registration(app_id="rollback.app"),
         user=user,
         platform="apple",
         app_id="rollback.app",

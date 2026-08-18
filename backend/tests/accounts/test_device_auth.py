@@ -7,6 +7,7 @@ from apps.accounts.models import DeviceGrant, User
 from apps.accounts.services_tokens import blacklist_outstanding_tokens
 from apps.audit.models import AuditLog
 from apps.makerspaces.models import MakerspaceMembership
+from tests.device_helpers import make_native_app_registration
 from tests.return_helpers import make_space, make_user
 
 
@@ -30,22 +31,10 @@ def configure_apple(settings):
     }
     settings.DEVICE_APPLE_ATTESTATION_VERIFY_URL = "https://attest.example.test/verify"
     settings.DEVICE_APPLE_ATTESTATION_VERIFY_TOKEN = "provider-secret"
+    return make_native_app_registration()
 
 
-def attested_login(client, user, settings, monkeypatch):
-    configure_apple(settings)
-    challenge_response = client.post(
-        CHALLENGE,
-        {
-            "platform": "apple",
-            "app_id": "org.spaceworks.app",
-            "environment": "development",
-        },
-        format="json",
-    )
-    assert challenge_response.status_code == 200
-    challenge = challenge_response.data["challenge"]
-
+def mock_apple_provider(monkeypatch, challenge):
     class ProviderResponse:
         status_code = 200
 
@@ -64,6 +53,23 @@ def attested_login(client, user, settings, monkeypatch):
         "apps.accounts.attestation_apple.requests.post",
         lambda *args, **kwargs: ProviderResponse(),
     )
+
+
+def attested_login(client, user, settings, monkeypatch):
+    configure_apple(settings)
+    challenge_response = client.post(
+        CHALLENGE,
+        {
+            "platform": "apple",
+            "app_id": "org.spaceworks.app",
+            "environment": "development",
+        },
+        format="json",
+    )
+    assert challenge_response.status_code == 200
+    challenge = challenge_response.data["challenge"]
+
+    mock_apple_provider(monkeypatch, challenge)
     payload = {
         "username": user.username,
         "password": "strong-device-password",

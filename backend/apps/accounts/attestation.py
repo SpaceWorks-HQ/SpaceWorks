@@ -6,9 +6,13 @@ from datetime import timedelta
 from urllib.parse import urlsplit
 
 from django.conf import settings
+from django.db.models import F
 from django.utils import timezone
 
-from apps.accounts.models_devices import DeviceAttestationChallenge
+from apps.accounts.models_devices import (
+    DeviceAttestationChallenge,
+    NativeAppRegistration,
+)
 
 
 class AttestationUnavailable(Exception):
@@ -28,8 +32,12 @@ def challenge_digest(raw):
     return hmac.new(settings.SECRET_KEY.encode(), str(raw).encode(), hashlib.sha256).hexdigest()
 
 
-def configured_app(platform, app_id, environment):
-    entry = getattr(settings, "DEVICE_ATTESTATION_APPS", {}).get(platform, {}).get(app_id)
+def configured_app(platform, verifier_config_key, environment):
+    entry = (
+        getattr(settings, "DEVICE_ATTESTATION_APPS", {})
+        .get(platform, {})
+        .get(verifier_config_key)
+    )
     if not isinstance(entry, dict):
         raise AttestationUnavailable("Device attestation is unavailable.")
     signing_identity = str(entry.get("signing_identity") or "")
@@ -49,13 +57,46 @@ def configured_app(platform, app_id, environment):
     return signing_identity
 
 
+def _approved_registration(*, platform, app_id, environment):
+    registrations = list(
+        NativeAppRegistration.objects.filter(
+            platform=platform,
+            app_id=app_id,
+            environment=environment,
+            status=NativeAppRegistration.Status.APPROVED,
+        ).order_by(F('makerspace_id').asc(nulls_first=True))[:2]
+    )
+    if not registrations:
+        raise AttestationUnavailable('Device attestation is unavailable.')
+    global_registration = next(
+        (row for row in registrations if row.makerspace_id is None),
+        None,
+    )
+    if global_registration is not None:
+        return global_registration
+    if len(registrations) != 1:
+        # The unauthenticated challenge route has no trustworthy tenant context.
+        raise AttestationUnavailable('Device attestation is unavailable.')
+    return registrations[0]
+
+
 def create_challenge(*, platform, app_id, environment):
-    signing_identity = configured_app(platform, app_id, environment)
+    registration = _approved_registration(
+        platform=platform,
+        app_id=app_id,
+        environment=environment,
+    )
+    signing_identity = configured_app(
+        platform,
+        registration.verifier_config_key,
+        environment,
+    )
     ttl = settings.DEVICE_ATTESTATION_CHALLENGE_TTL_SECONDS
     if ttl <= 0:
         raise AttestationUnavailable('Device attestation is unavailable.')
     raw = secrets.token_urlsafe(48)
     DeviceAttestationChallenge.objects.create(
+        registration=registration,
         platform=platform, app_id=app_id, signing_identity=signing_identity,
         environment=environment, challenge_digest=challenge_digest(raw),
         expires_at=timezone.now() + timedelta(

@@ -18,6 +18,7 @@ from apps.accounts.social_google import verify_google_token
 from apps.accounts.social_jwt import SocialTokenError
 from apps.accounts.services_device_tokens import issue_device_token_pair
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.device_helpers import make_native_app_registration
 from tests.return_helpers import make_member, make_space, make_user
 
 
@@ -425,6 +426,7 @@ def test_device_social_login_reuses_attested_device_grant_format(monkeypatch):
     )
     now = timezone.now()
     grant = DeviceGrant.objects.create(
+        registration=make_native_app_registration(),
         user=user,
         platform="apple",
         app_id="org.spaceworks.app",
