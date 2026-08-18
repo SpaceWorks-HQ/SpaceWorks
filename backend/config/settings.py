@@ -569,6 +569,7 @@ CORS_ALLOWED_ORIGINS = env.list(
 CORS_ALLOW_HEADERS = (
     *default_headers,
     "x-client-id",
+    "x-nonce",
     "x-signature",
     "x-timestamp",
     "x-refresh-csrf",
@@ -579,6 +580,7 @@ CORS_ALLOW_CREDENTIALS = True
 HMAC_CLIENT_ID = env("HMAC_CLIENT_ID", default="")
 HMAC_SECRET = env("HMAC_SECRET", default="")
 HMAC_MAX_CLOCK_SKEW_SECONDS = env.int("HMAC_MAX_CLOCK_SKEW_SECONDS", default=300)
+APICLIENT_REQUIRE_NONCE = env.bool("APICLIENT_REQUIRE_NONCE", default=False)
 HMAC_PROTECTED_PATH_PREFIXES = env.list(
     "HMAC_PROTECTED_PATH_PREFIXES",
     default=["/api/public/", "/api/v1/public/"],
@@ -821,7 +823,13 @@ SPECTACULAR_SETTINGS = {
         "staff, QR labels, bulk imports, request review, issue, and return.\n\n"
         "Authentication: staff/admin endpoints use `Authorization: Bearer <access>`. "
         "Public browser endpoints can use `X-Publishable-Key` when public key "
-        "hardening is enabled."
+        "hardening is enabled. Server API clients send `X-Client-Id`, `X-Timestamp`, "
+        "`X-Nonce`, and `X-Signature`. Generate a unique, unpredictable `X-Nonce` "
+        "for every request and sign the byte sequence "
+        "`METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY` with HMAC-SHA256. "
+        "The nonce uses 1-128 characters from `A-Z`, `a-z`, `0-9`, `.`, `_`, `~`, "
+        "and `-`. A deployment may temporarily accept the legacy nonce-less signed "
+        "format while `APICLIENT_REQUIRE_NONCE` is disabled."
     ),
     # Kept in step with the root `VERSION` file by
     # `tests/test_version_consistency.py`. It cannot simply READ that file: the backend

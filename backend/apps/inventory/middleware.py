@@ -1,13 +1,19 @@
 import hashlib
 import hmac
 import logging
+import re
 import time
 from urllib.parse import urlsplit
 
 from django.conf import settings
+from django.core.cache import cache
 from django.http import JsonResponse
 
 logger = logging.getLogger(__name__)
+
+NONCE_MAX_LENGTH = 128
+NONCE_PATTERN = re.compile(r"\A[A-Za-z0-9._~-]+\Z")
+LEGACY_NONCE_WARNING_EVENT = "api_client_nonce_missing_legacy"
 
 
 class FrontendHMACMiddleware:
@@ -20,14 +26,28 @@ class FrontendHMACMiddleware:
         is_valid = True
         if self._is_protected_path(request):
             is_valid = self._is_valid(request)
-        if self._should_validate(request) and not is_valid:
+        if self._should_reject_invalid(request) and not is_valid:
             return JsonResponse({"detail": "Invalid client signature."}, status=401)
         return self.get_response(request)
 
-    def _should_validate(self, request):
-        if request.method == "OPTIONS" or not settings.API_CLIENT_AUTH_REQUIRED:
+    def _should_reject_invalid(self, request):
+        if request.method == "OPTIONS" or not self._is_protected_path(request):
             return False
-        return self._is_protected_path(request)
+        if settings.API_CLIENT_AUTH_REQUIRED:
+            return True
+        # Authentication remains optional during rollout, but credentials that opt in
+        # to the nonce protocol must fail closed. Otherwise a replay would merely fall
+        # through as anonymous while API_CLIENT_AUTH_REQUIRED is disabled.
+        if request.headers.get("X-Nonce"):
+            return True
+        return settings.APICLIENT_REQUIRE_NONCE and self._has_hmac_credentials(request)
+
+    def _has_hmac_credentials(self, request):
+        return bool(
+            request.headers.get("X-Timestamp")
+            or request.headers.get("X-Signature")
+            or request.headers.get("X-Nonce")
+        )
 
     def _is_protected_path(self, request):
         return any(
@@ -35,16 +55,21 @@ class FrontendHMACMiddleware:
         )
 
     def _is_valid(self, request):
-        if self._publishable_key_is_valid(request):
-            return True
-        if self._frontend_client_is_valid(request):
-            return True
+        # X-Nonce selects the signed protocol. It must never be accepted through the
+        # publishable-key or browser-client paths, where it would be replay decoration
+        # rather than authenticated input.
+        if not self._has_hmac_credentials(request):
+            if self._publishable_key_is_valid(request):
+                return True
+            if self._frontend_client_is_valid(request):
+                return True
         try:
             from apps.apiclients.models import ApiClient
 
             client_id = request.headers.get("X-Client-Id", "")
             timestamp = request.headers.get("X-Timestamp", "")
             signature = request.headers.get("X-Signature", "")
+            nonce = request.headers.get("X-Nonce", "")
             if not (client_id and timestamp and signature):
                 return False
 
@@ -68,22 +93,54 @@ class FrontendHMACMiddleware:
             if skew > settings.HMAC_MAX_CLOCK_SKEW_SECONDS:
                 return False
 
-            message = b"\n".join([
+            if nonce:
+                if not self._nonce_is_valid(nonce):
+                    return False
+            elif settings.APICLIENT_REQUIRE_NONCE:
+                return False
+
+            message_parts = [
                 request.method.upper().encode(),
                 request.get_full_path().encode(),
                 timestamp.encode(),
-                request.body,
-            ])
+            ]
+            if nonce:
+                message_parts.append(nonce.encode())
+            message_parts.append(request.body)
+            message = b"\n".join(message_parts)
             expected = hmac.new(
                 client.get_secret().encode(), message, hashlib.sha256
             ).hexdigest()
             if not hmac.compare_digest(signature, expected):
                 return False
+            if nonce:
+                if not self._claim_nonce(client_id, nonce):
+                    return False
+            else:
+                logger.warning(
+                    LEGACY_NONCE_WARNING_EVENT,
+                    extra={"client_id": client_id},
+                )
             request.api_client = client
             return True
         except Exception:  # fail safe - never 500 the request flow
             logger.exception("ApiClient signature validation failed")
             return False
+
+    def _nonce_is_valid(self, nonce):
+        return len(nonce) <= NONCE_MAX_LENGTH and bool(NONCE_PATTERN.fullmatch(nonce))
+
+    def _claim_nonce(self, client_id, nonce):
+        # Hash the validated pair to keep backend keys fixed-size and unambiguous while
+        # preserving per-client nonce namespaces. cache.add is the atomic primitive on
+        # both RedisCache (SET NX) and DatabaseCache (conditional insert).
+        pair = f"{client_id}\0{nonce}".encode()
+        key = f"apiclient-hmac-nonce:{hashlib.sha256(pair).hexdigest()}"
+        # A timestamp may be up to one skew window in the future when first accepted,
+        # then remain valid for another full window. Two windows therefore cover its
+        # entire remaining acceptance lifetime, not merely the usual past-timestamp case.
+        timeout = max(1, settings.HMAC_MAX_CLOCK_SKEW_SECONDS * 2 + 1)
+        return cache.add(key, True, timeout=timeout)
 
     def _publishable_key_is_valid(self, request):
         key = request.headers.get("X-Publishable-Key") or request.GET.get("key")

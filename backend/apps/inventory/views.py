@@ -15,14 +15,14 @@ from apps.makerspaces.models import Makerspace
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.platform import module_enabled
 from apps.makerspaces.servability import servable_queryset
-from apps.openapi import PUBLISHABLE_KEY_PARAMETER
+from apps.openapi import PUBLIC_API_AUTH_PARAMETERS
 
 
 @extend_schema(
     tags=["Public inventory"],
     summary="List public makerspaces",
     description="List makerspaces that have public inventory enabled.",
-    parameters=[PUBLISHABLE_KEY_PARAMETER],
+    parameters=PUBLIC_API_AUTH_PARAMETERS,
     responses=PublicMakerspaceSerializer(many=True),
 )
 class PublicMakerspaceListView(ListAPIView):
@@ -43,7 +43,7 @@ class PublicMakerspaceListView(ListAPIView):
     summary="List public inventory products",
     description="List public inventory products for a public makerspace.",
     parameters=[
-        PUBLISHABLE_KEY_PARAMETER,
+        *PUBLIC_API_AUTH_PARAMETERS,
         OpenApiParameter(
             name="makerspace_slug",
             type=str,
@@ -128,7 +128,7 @@ class PublicInventoryListView(ListAPIView):
 @extend_schema(
     tags=["Public inventory"],
     summary="List public inventory categories",
-    parameters=[PUBLISHABLE_KEY_PARAMETER],
+    parameters=PUBLIC_API_AUTH_PARAMETERS,
     responses=PublicCategorySerializer(many=True),
 )
 class PublicCategoryListView(ListAPIView):
@@ -160,7 +160,7 @@ class PublicCategoryListView(ListAPIView):
 @extend_schema(
     tags=["Public inventory"],
     summary="Get public inventory product detail",
-    parameters=[PUBLISHABLE_KEY_PARAMETER],
+    parameters=PUBLIC_API_AUTH_PARAMETERS,
     responses=PublicProductSerializer,
 )
 class PublicInventoryDetailView(RetrieveAPIView):
