@@ -88,6 +88,31 @@ def retrieve_payment_intent(makerspace_or_settings, intent_id):
     )
 
 
+def cancel_payment_intent(makerspace_or_settings, intent_id):
+    """Return whether Stripe authoritatively canceled the PaymentIntent."""
+    try:
+        source = _source(makerspace_or_settings)
+        if source is None:
+            return False
+        options = (
+            {"stripe_account": source.connected_account_id}
+            if source.provider == "connect" and source.connected_account_id
+            else None
+        )
+        build_client(source).v1.payment_intents.cancel(
+            intent_id, **({"options": options} if options else {})
+        )
+        return True
+    except Exception:
+        # Cancellation can race confirmation; retrieve before reporting failure.
+        try:
+            intent = retrieve_payment_intent(makerspace_or_settings, intent_id)
+            status = intent.get("status") if isinstance(intent, dict) else intent.status
+            return status == "canceled"
+        except Exception:
+            return False
+
+
 def expire_checkout_session(makerspace_or_settings, session_id):
     """Return whether Stripe authoritatively expired the Checkout Session."""
     try:

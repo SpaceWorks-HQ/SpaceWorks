@@ -118,7 +118,7 @@ class RazorpayProvider:
         except PaymentsUnavailable:
             # Best effort by contract: the reconciliation that called this must still
             # succeed. A link that outlives its payment is caught by the webhook, which
-            # audits `payment.paid_after_terminal` rather than double-settling.
+            # corrects a waiver or raises an explicit refund-required audit condition.
             logger.info("razorpay_link_cancel_failed", extra={"order_id": order_id})
 
     def verify_webhook(self, source, *, payload: bytes, headers) -> WebhookEvent:

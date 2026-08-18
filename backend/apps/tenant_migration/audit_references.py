@@ -195,6 +195,7 @@ _SOURCE_LOCAL_EDGES = {
     ("encryption.write_fence_opened", "operation_id"),
     ("payment.checkout_created", "subject_id"),
     ("payment.created", "subject_id"),
+    ("payment.double_paid_refund_required", "event_id"),
     ("payment.paid_after_terminal", "event_id"),
     ("payment.paid_online", "event_id"),
     ("payments.connect_authorization_revoked", "connect_account_id"),
@@ -282,6 +283,7 @@ AUDIT_META_REFERENCES.update(
     _reference(
         S, "payments.ProcessedStripeEvent",
         ("payment.checkout_expired", "stripe_event_id"),
+        ("payment.double_paid_refund_required", "stripe_event_id"),
         ("payment.paid_after_terminal", "stripe_event_id"),
         ("payment.paid_online", "stripe_event_id"),
     )

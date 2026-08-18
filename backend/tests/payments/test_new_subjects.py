@@ -130,7 +130,7 @@ def test_webhook_is_idempotent_for_each_new_subject(subject_type):
         Payment.SubjectType.MAKERSPACE_MEMBERSHIP,
     ],
 )
-def test_webhook_does_not_overwrite_terminal_new_subject(subject_type):
+def test_webhook_corrects_waived_new_subject_after_payment(subject_type):
     makerspace = make_space(f"terminal-new-subject-{subject_type}")
     member = make_member(f"terminal-new-subject-user-{subject_type}", makerspace)
     subject = subjects(makerspace, member)[subject_type]
@@ -152,8 +152,10 @@ def test_webhook_does_not_overwrite_terminal_new_subject(subject_type):
     )
 
     result.refresh_from_db()
-    assert result.status == Payment.Status.WAIVED
-    assert AuditLog.objects.filter(
+    assert result.status == Payment.Status.PAID_ONLINE
+    anomaly = AuditLog.objects.get(
         action="payment.paid_after_terminal",
         target_id=str(payment.pk),
-    ).exists()
+    )
+    assert anomaly.meta["prior_status"] == Payment.Status.WAIVED
+    assert anomaly.meta["resolved_status"] == Payment.Status.PAID_ONLINE
