@@ -89,7 +89,14 @@ class NotificationDestinationWriteSerializer(serializers.Serializer):
                     {"telegram_chat_id": "Only Telegram destinations carry a chat id."}
                 )
             if webhook:
-                attrs["webhook_url"] = validate_webhook_url(webhook)
+                # Key the SSRF/format failure to the field, like every other error in
+                # this method: the console derives its per-field prompts from the error
+                # body, and a bare ValidationError here lands in non_field_errors with
+                # the field name stripped.
+                try:
+                    attrs["webhook_url"] = validate_webhook_url(webhook)
+                except serializers.ValidationError as exc:
+                    raise serializers.ValidationError({"webhook_url": exc.detail}) from exc
         if existing is not None and existing.channel != channel:
             # Changing a room's channel would leave a credential of the wrong shape and
             # silently repoint an operator's scope links at a different provider.
