@@ -75,6 +75,14 @@ def test_seed_and_backfill_migration_round_trip():
     executor = MigrationExecutor(connection)
     makerspace_id = None
 
+    # Build the users BEFORE rewinding. Rewinding makerspaces to 0037 cascade-unapplies
+    # 107 migrations, taking accounts back to 0017, so the CURRENT User model cannot be
+    # inserted afterwards -- and the historical model cannot either without supplying
+    # every column that later migrations made nullable. This passed for as long as
+    # accounts 0018-0021 only added new TABLES; accounts/0022 added a User COLUMN and
+    # broke it. Creating the rows first is immune to any future column addition.
+    users = [make_user(f"migration-role-{index}") for index in range(len(HISTORICAL_ROLE_VALUES))]
+
     try:
         executor.migrate(from_target)
         old_apps = executor.loader.project_state(from_target).apps
@@ -86,7 +94,7 @@ def test_seed_and_backfill_migration_round_trip():
         makerspace_id = makerspace.id
         memberships = {}
         for index, legacy_role in enumerate(HISTORICAL_ROLE_VALUES):
-            user = make_user(f"migration-role-{index}")
+            user = users[index]
             membership = OldMembership.objects.create(
                 makerspace_id=makerspace.id,
                 user_id=user.id,
