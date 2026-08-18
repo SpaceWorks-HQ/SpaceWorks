@@ -8,6 +8,10 @@ from apps.payments.models import (
     Payment,
     ProcessedStripeEvent,
 )
+from apps.payments.terminal_settlement import (
+    handle_razorpay_paid_after_terminal,
+    handle_stripe_paid_after_terminal,
+)
 from apps.makerspaces.servability import is_servable
 
 
@@ -87,14 +91,11 @@ def apply_webhook_event(
             )
             return payment
         if payment.status != Payment.Status.PENDING:
-            audit.record(
-                None,
-                "payment.paid_after_terminal",
-                makerspace=makerspace,
-                target=payment,
-                meta={"stripe_event_id": event_id, "prior_status": payment.status},
+            return handle_stripe_paid_after_terminal(
+                payment,
+                event_id=event_id,
+                intent_id=intent_id,
             )
-            return payment
         payment.status = Payment.Status.PAID_ONLINE
         if intent_id:
             payment.stripe_payment_intent_id = intent_id
@@ -246,8 +247,8 @@ def apply_razorpay_webhook_event(makerspace, event):
       supplied, and is locked before it is read.
     * Settlement happens **regardless of the live capability toggle**. A real charge must
       never be stranded because someone unticked a feature between checkout and callback.
-    * A paid event for an already-terminal row is audited as `payment.paid_after_terminal`
-      rather than dropped or re-applied, so a double charge is visible instead of silent.
+    * A paid event after waiver corrects the ledger; one after offline settlement raises
+      an explicit refund-required audit condition instead of silently double-settling.
     """
     if not is_servable(makerspace, allow_archived=True) or not event.event_id or not event.is_paid:
         # Non-payment events are not recorded: claiming their id would make a later
@@ -272,14 +273,10 @@ def apply_razorpay_webhook_event(makerspace, event):
         if not _record_once(makerspace, event.event_id, Payment.Provider.RAZORPAY):
             return None
         if payment.status != Payment.Status.PENDING:
-            audit.record(
-                None,
-                "payment.paid_after_terminal",
-                makerspace=makerspace,
-                target=payment,
-                meta={"provider": "razorpay", "event_id": event.event_id, "prior_status": payment.status},
+            return handle_razorpay_paid_after_terminal(
+                payment,
+                event_id=event.event_id,
             )
-            return payment
         payment.status = Payment.Status.PAID_ONLINE
         fields = ["status", "updated_at"]
         if event.payment_id and not payment.external_payment_id:
