@@ -35,6 +35,7 @@ from apps.hardware_requests.workflow_errors import (
 from apps.hardware_requests.direct_loan_returns import validate_evidence_upload
 from apps.inventory import availability
 from apps.inventory.models import InventoryAsset, InventoryProduct
+from apps.makerspaces.guards import require_feature_locked
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.servability import is_servable
 from apps.notifications.emit import emit_notification
@@ -43,6 +44,7 @@ from apps.notifications.emit import emit_notification
 def checkout_tool(makerspace, requester, payload, *, evidence_id, remark=""):
     with transaction.atomic():
         makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+        makerspace = require_feature_locked(makerspace, "inventory.self_checkout")
         if not is_servable(makerspace):
             raise RequestValidationError("Makerspace is not available.")
         due_at = timezone.now() + timedelta(days=(makerspace.default_loan_days or 7))

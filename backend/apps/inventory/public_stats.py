@@ -19,6 +19,9 @@ def build_public_stats(makerspace) -> dict:
 
 
 def _printing_stats(makerspace):
-    if not module_enabled(makerspace, "machine_service"):
+    if not (
+        module_enabled(makerspace, "machine_service")
+        and module_enabled(makerspace, "printing")
+    ):
         return None
     return build_public_printer_stats(makerspace)

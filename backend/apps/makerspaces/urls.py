@@ -15,9 +15,6 @@ from apps.makerspaces.profile_views import (
     MemberDirectoryView,
     MemberProfileView,
 )
-from apps.payments.views_member import MemberPaymentCheckoutView, MemberPaymentHistoryView
-from apps.payments.views_member_mobile import MemberMobilePaymentIntentView
-
 urlpatterns = [
     path("bootstrap", BootstrapView.as_view(), name="tenant-bootstrap"),
     path("config", PublicConfigView.as_view(), name="public-config"),
@@ -33,13 +30,6 @@ urlpatterns = [
     # must be withdrawn by an events tombstone, so it lives in `apps/events/urls_member.py`
     # and is spliced in by `config.urls.separable`. Declared here it would keep resolving,
     # and stay in the OpenAPI schema, on a deployment that ships no events app.
-    path("member/makerspaces/<int:makerspace_id>/payments", MemberPaymentHistoryView.as_view(), name="member-payment-history"),
-    path("member/makerspaces/<int:makerspace_id>/payments/<int:payment_id>/checkout", MemberPaymentCheckoutView.as_view(), name="member-payment-checkout"),
-    path(
-        'member/makerspaces/<int:makerspace_id>/payments/<int:payment_id>/mobile-intent',
-        MemberMobilePaymentIntentView.as_view(),
-        name='member-payment-mobile-intent',
-    ),
     path("member/makerspaces/<int:makerspace_id>/referrals", MemberReferralView.as_view(), name="member-referrals"),
     path("member/makerspaces/<int:makerspace_id>/profile", MemberProfileView.as_view(), name="member-profile"),
     path("member/makerspaces/<int:makerspace_id>/profile/image", MemberProfileImageView.as_view(), name="member-profile-image"),
