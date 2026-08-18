@@ -20,6 +20,93 @@ docker compose version >/dev/null 2>&1 || die "The 'docker compose' plugin is mi
 rand_key()   { ( set +o pipefail; LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-50}" ); }
 fernet_key() { head -c 32 /dev/urandom | base64 | tr '+/' '-_'; }
 
+# Per-module tick review. Runs AFTER the app is up so it can read the real module
+# registry via `list_modules` -- hardcoding the key list here would silently drift
+# from apps/makerspaces/module_registry.py, which is the single source of truth.
+# Core modules are shown but never toggleable: the loan flow IS the system.
+choose_modules() {
+  local raw line mark rest key desc i input tok changed
+  local keys=() descs=() state=() orig=()
+
+  raw="$("${COMPOSE[@]}" exec -T backend python manage.py list_modules 2>/dev/null)" || {
+    warn "Could not read the module list; keeping the '$MSPROFILE' profile as installed."
+    return 0
+  }
+
+  while IFS= read -r line; do
+    case "$line" in
+      "  + "*|"  - "*)
+        mark="${line:2:1}"; rest="${line:4}"
+        key="${rest%% *}"
+        desc="${rest#"$key"}"; desc="${desc#"${desc%%[![:space:]]*}"}"
+        keys[${#keys[@]}]="$key"; descs[${#descs[@]}]="$desc"
+        if [ "$mark" = "+" ]; then state[${#state[@]}]="x"; else state[${#state[@]}]=" "; fi
+        ;;
+    esac
+  done <<EOFMODS
+$raw
+EOFMODS
+
+  [ "${#keys[@]}" -gt 0 ] || { warn "No optional modules reported; keeping the profile."; return 0; }
+  orig=("${state[@]}")
+
+  echo
+  echo "The '$MSPROFILE' profile installed these optional modules. Tick what you want."
+  echo "Core modules (public catalogue, requests, evidence, QR, scanner) are always on."
+  while :; do
+    echo
+    i=0
+    while [ "$i" -lt "${#keys[@]}" ]; do
+      printf '  [%s] %2d) %-20s %s\n' "${state[$i]}" "$((i + 1))" "${keys[$i]}" "${descs[$i]}"
+      i=$((i + 1))
+    done
+    echo
+    echo "  Numbers toggle (e.g. '3 7 11').  a = all,  n = none,  Enter = done."
+    read -r -p "  Toggle: " input || input=""
+    [ -n "$input" ] || break
+    case "$input" in
+      a|A) i=0; while [ "$i" -lt "${#keys[@]}" ]; do state[$i]="x"; i=$((i + 1)); done; continue ;;
+      n|N) i=0; while [ "$i" -lt "${#keys[@]}" ]; do state[$i]=" "; i=$((i + 1)); done; continue ;;
+    esac
+    for tok in $input; do
+      case "$tok" in
+        ''|*[!0-9]*) warn "  '$tok' is not a number."; continue ;;
+      esac
+      i=$((tok - 1))
+      if [ "$i" -lt 0 ] || [ "$i" -ge "${#keys[@]}" ]; then warn "  $tok is out of range."; continue; fi
+      if [ "${state[$i]}" = "x" ]; then state[$i]=" "; else state[$i]="x"; fi
+    done
+  done
+
+  # Apply. Installing resolves prerequisites transitively; uninstalling refuses a module
+  # another installed module still requires, so a refusal is reported, never forced.
+  # Two passes: an uninstall blocked by a dependent may succeed once that dependent is gone.
+  changed=0
+  for _pass in 1 2; do
+    i=0
+    while [ "$i" -lt "${#keys[@]}" ]; do
+      if [ "${state[$i]}" != "${orig[$i]}" ]; then
+        if [ "${state[$i]}" = "x" ]; then
+          if "${COMPOSE[@]}" exec -T backend python manage.py install_module "${keys[$i]}" >/dev/null 2>&1; then
+            say "  installed ${keys[$i]}"; orig[$i]="x"; changed=1
+          elif [ "$_pass" = 2 ]; then
+            warn "  could not install ${keys[$i]} (see: manage.py install_module ${keys[$i]})"
+          fi
+        else
+          if "${COMPOSE[@]}" exec -T backend python manage.py uninstall_module "${keys[$i]}" >/dev/null 2>&1; then
+            say "  removed ${keys[$i]}"; orig[$i]=" "; changed=1
+          elif [ "$_pass" = 2 ]; then
+            warn "  kept ${keys[$i]} — another installed module still requires it."
+          fi
+        fi
+      fi
+      i=$((i + 1))
+    done
+  done
+  [ "$changed" = 1 ] || say "  No module changes."
+  echo "  Data is never deleted by turning a module off; re-enabling restores its screens."
+}
+
 FIRST_RUN=0
 if [ -f .env ]; then
   say "Found an existing .env — keeping your settings and secrets."
@@ -71,7 +158,11 @@ else
   read -r -p "Stripe secret key (optional; leave blank to skip): " STRIPE_SECRET_KEY
   read -r -s -p "Stripe webhook secret (optional; leave blank to skip): " STRIPE_WEBHOOK_SECRET; echo
   read -r -p "Stripe default currency [usd]: " STRIPE_DEFAULT_CURRENCY; STRIPE_DEFAULT_CURRENCY="${STRIPE_DEFAULT_CURRENCY:-usd}"
-  if [ -n "$STRIPE_SECRET_KEY" ] && [ -z "$STRIPE_WEBHOOK_SECRET" ] || [ -z "$STRIPE_SECRET_KEY" ] && [ -n "$STRIPE_WEBHOOK_SECRET" ]; then
+  # Braces are load-bearing: && and || have EQUAL precedence in bash and associate left,
+  # so the unbraced form parsed as ((A && B) || C) && D and silently accepted a secret key
+  # with no webhook secret -- writing a half-configured Stripe account with no warning.
+  if { [ -n "$STRIPE_SECRET_KEY" ] && [ -z "$STRIPE_WEBHOOK_SECRET" ]; } \
+     || { [ -z "$STRIPE_SECRET_KEY" ] && [ -n "$STRIPE_WEBHOOK_SECRET" ]; }; then
     warn "Stripe needs both secrets; leaving payments unconfigured."
     STRIPE_SECRET_KEY=""; STRIPE_WEBHOOK_SECRET=""
   fi
@@ -137,6 +228,8 @@ if [ "$FIRST_RUN" = 1 ]; then
     --username "$ADMINUSER" --email "$ADMINEMAIL" --password "$ADMINPASS" \
     --makerspace-name "$MSNAME" --profile "$MSPROFILE"
 
+  choose_modules
+
   if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
     say "Enabling Google sign-in..."
     if ! "${COMPOSE[@]}" exec -T backend python manage.py configure_social_auth \
@@ -169,7 +262,9 @@ settings.save()
 
   read -r -p "Enable automatic production updates from main? [Y/n]: " AUTOUPDATE
   AUTOUPDATE="${AUTOUPDATE:-Y}"
-  if [[ "$AUTOUPDATE" =~ ^[Yy]$ ]]; then
+  # ^[Yy] not ^[Yy]$: typing "yes" at a [Y/n] prompt previously fell through to the
+  # off branch, which is the opposite of what the operator asked for.
+  if [[ "$AUTOUPDATE" =~ ^[Yy] ]]; then
     if ! bash scripts/install-auto-update.sh; then
       warn "Could not install the seven-day updater. Run bash scripts/install-auto-update.sh later."
     fi
