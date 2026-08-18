@@ -248,7 +248,11 @@ def scope_machines_for_actor(actor, queryset):
 
     manage_scope = rbac.makerspaces_for_action(actor, Action.MANAGE_MACHINES)
     if manage_scope is rbac.ALL:
-        return queryset  # global superadmin (no hidden/archived) — unrestricted
+        # ALL is only the action-level tenant scope. A superadmin who is an explicit
+        # member of a hard-hidden makerspace may still have a machine-scoped role there,
+        # so resolve every tenant represented by this multi-makerspace queryset through
+        # role_scope.manage_scopes_for (via scoped_q) instead of treating ALL as exempt.
+        manage_scope = set(queryset.values_list("makerspace_id", flat=True).distinct())
 
     # Was `Q(makerspace_id__in=manage_scope)`: holding MANAGE_MACHINES listed every machine
     # in the space. Now the grant only reaches the linked types/machines, resolved at query
@@ -290,7 +294,10 @@ def scope_manageable_machines_for_actor(actor, queryset):
     queryset = rbac.scope_by_makerspace(actor, queryset)
     manage_scope = rbac.makerspaces_for_action(actor, Action.MANAGE_MACHINES)
     if manage_scope is rbac.ALL:
-        return queryset
+        # This queryset may span makerspaces. Normalize the action-level ALL sentinel to
+        # its concrete tenant ids, then let scoped_q's plural resolver decide EXEMPT vs
+        # role-linked machine scope independently for each one.
+        manage_scope = set(queryset.values_list("makerspace_id", flat=True).distinct())
 
     q = role_scope.scoped_q(actor, manage_scope) if manage_scope else Q(pk__in=[])
     for action in _managing_actions():
