@@ -2,7 +2,7 @@
 
 from django.conf import settings
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -213,22 +213,20 @@ class RefreshView(TokenRefreshView):
         try:
             serializer.is_valid(raise_exception=True)
         except InvalidToken:
-            actor = audit_events.user_from_refresh_token(cookie)
-            audit_events.record_auth_event(
-                actor,
-                "auth.refresh_rejected",
-                target=actor,
-                meta={"reason": "invalid_token"},
+            # InvalidToken subclasses AuthenticationFailed, so it must be caught first
+            # or the device-refresh arm below would swallow every malformed token.
+            audit_events.record_refresh_rejected(cookie, "invalid_token")
+            raise
+        except AuthenticationFailed as exc:
+            audit_events.record_refresh_rejected(
+                cookie,
+                "device_refresh_wrong_endpoint"
+                if exc.get_codes() == "device_refresh_wrong_endpoint"
+                else "invalid_token",
             )
             raise
         except TokenError as exc:
-            actor = audit_events.user_from_refresh_token(cookie)
-            audit_events.record_auth_event(
-                actor,
-                "auth.refresh_rejected",
-                target=actor,
-                meta={"reason": "invalid_token"},
-            )
+            audit_events.record_refresh_rejected(cookie, "invalid_token")
             raise InvalidToken(str(exc)) from exc
         data = serializer.validated_data
         response = Response({"access": data["access"]})

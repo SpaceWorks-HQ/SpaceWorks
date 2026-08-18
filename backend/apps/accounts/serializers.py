@@ -10,6 +10,7 @@ from apps.accounts.models_social import SocialSurface
 
 
 VERIFICATION_ONLY_SURFACE = "verification_only"
+DEVICE_REFRESH_CLAIMS = ("device_grant_id", "device_family_id")
 
 
 def user_payload(user, request=None):
@@ -235,6 +236,11 @@ class SpaceWorksTokenRefreshSerializer(TokenRefreshSerializer):
 
     def validate(self, attrs):
         def validate_token(refresh):
+            if any(claim in refresh.payload for claim in DEVICE_REFRESH_CLAIMS):
+                raise AuthenticationFailed(
+                    "Device refresh tokens must use the device refresh endpoint.",
+                    code="device_refresh_wrong_endpoint",
+                )
             validate_auth_generation(refresh)
             user_id = refresh.payload.get(api_settings.USER_ID_CLAIM)
             if not user_id:
