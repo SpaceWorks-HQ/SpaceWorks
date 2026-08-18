@@ -49,5 +49,9 @@ class ImportPromotionInProgress(TenantInsertionError):
     """Another live delivery owns an object-promotion lease."""
 
 
+class ImportPromotionClaimLost(ImportPromotionInProgress):
+    """This delivery was fenced out by a replacement promotion worker."""
+
+
 class ImportCompletionAuditError(TenantInsertionError):
     """The atomic completion transition could not write its audit entry."""

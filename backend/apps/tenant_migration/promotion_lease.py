@@ -1,0 +1,72 @@
+"""Renewable, fenced leases for slow tenant-object promotion calls."""
+
+import logging
+from threading import Event, Lock, Thread
+
+from django.db import close_old_connections
+from django.utils import timezone
+
+from .insertion_errors import ImportPromotionClaimLost
+from .models_import_objects import TenantImportObject
+
+
+logger = logging.getLogger(__name__)
+
+
+class PromotionClaimHeartbeat:
+    """Keep one claim live while object storage performs a blocking copy."""
+
+    def __init__(self, row_id, claimed_at, *, lease_duration):
+        self.row_id = row_id
+        self.claimed_at = claimed_at
+        self.interval = max(lease_duration.total_seconds() / 3, 0.01)
+        self._stop = Event()
+        self._lock = Lock()
+        self._lost = False
+        self._error = None
+        self._thread = Thread(
+            target=self._run,
+            name=f"tenant-import-promotion-{row_id}",
+            daemon=True,
+        )
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, _exc, _traceback):
+        self._stop.set()
+        self._thread.join()
+        if self._lost:
+            raise ImportPromotionClaimLost(
+                f"Object promotion claim {self.row_id} was superseded."
+            )
+        if self._error is not None and exc_type is None:
+            raise self._error
+        return False
+
+    def _run(self):
+        close_old_connections()
+        try:
+            while not self._stop.wait(self.interval):
+                with self._lock:
+                    expected = self.claimed_at
+                renewed_at = timezone.now()
+                updated = TenantImportObject.objects.filter(
+                    pk=self.row_id,
+                    state=TenantImportObject.State.STAGED,
+                    claimed_at=expected,
+                ).update(claimed_at=renewed_at, updated_at=renewed_at)
+                if updated != 1:
+                    self._lost = True
+                    logger.warning(
+                        "tenant_import_promotion_claim_lost",
+                        extra={"tenant_import_object_id": self.row_id},
+                    )
+                    return
+                with self._lock:
+                    self.claimed_at = renewed_at
+        except Exception as exc:  # surfaced to the owning worker after the copy
+            self._error = exc
+        finally:
+            close_old_connections()

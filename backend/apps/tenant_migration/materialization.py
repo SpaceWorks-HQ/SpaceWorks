@@ -23,6 +23,7 @@ from .import_keys import install_carried_deks
 from .import_finalization import finalize_import_job
 from .insertion_errors import (
     ImportCompletionAuditError,
+    ImportPromotionClaimLost,
     ImportPromotionInProgress,
     MaterializationAlreadyCommitted,
 )
@@ -193,20 +194,42 @@ def materialize_tenant(
                 "objects_promoted": promoted,
             }
         )
-    except (
-        ImportCompletionAuditError,
-        ImportPromotionInProgress,
-        MaterializationAlreadyCommitted,
-    ):
+    except ImportPromotionClaimLost:
+        # The replacement owns finalization; this worker must not mutate its work.
         raise
-    except Exception:
-        if target is not None:
-            dek_cache.invalidate(target.pk)
-        TenantImportJob.objects.filter(pk=job.pk).update(
+    except (ImportCompletionAuditError, ImportPromotionInProgress):
+        raise
+    except MaterializationAlreadyCommitted:
+        raise
+    except Exception as exc:
+        failed_active = TenantImportJob.objects.filter(
+            pk=job.pk,
+            status__in=(
+                TenantImportJob.Status.MATERIALIZING,
+                TenantImportJob.Status.FINALIZING,
+            ),
+        ).update(
             status=TenantImportJob.Status.FAILED,
             terminal_at=timezone.now(),
             updated_at=timezone.now(),
         )
+        if not failed_active:
+            # Matching no row means this worker did not own an in-flight job -- but that
+            # covers two very different situations, and only ONE of them is a lost race.
+            # A replacement that carried the import to COMPLETED must not have its work
+            # rolled back. Anything else (a failure before materialization even began, or
+            # a job already marked FAILED) is an ordinary failure, and reporting it as
+            # "superseded" would mask the real error from the operator -- which is exactly
+            # what it did to every materialization-failure test.
+            if TenantImportJob.objects.filter(
+                pk=job.pk, status=TenantImportJob.Status.COMPLETED
+            ).exists():
+                raise ImportPromotionClaimLost(
+                    "The import execution was superseded before failure cleanup."
+                ) from exc
+            raise
+        if target is not None:
+            dek_cache.invalidate(target.pk)
         rollback_job = TenantImportJob.objects.select_related(
             "target_makerspace", "actor"
         ).get(pk=job.pk)

@@ -151,6 +151,7 @@ def run_import_job(job_id, *, actor_id, target_identity=None):
     from .import_finalization import finalize_import_job
     from .insertion_errors import (
         ImportCompletionAuditError,
+        ImportPromotionClaimLost,
         ImportPromotionInProgress,
         MaterializationAlreadyCommitted,
     )
@@ -182,6 +183,10 @@ def run_import_job(job_id, *, actor_id, target_identity=None):
                 pass
         job.refresh_from_db()
         job = finalize_import_job(job, actor=actor)
+    except ImportPromotionClaimLost:
+        # A replacement delivery owns finalization. Its status and objects are
+        # authoritative, so this stale worker exits without changing either.
+        return TenantImportJob.objects.get(pk=job.pk)
     except ImportPromotionInProgress:
         # A periodic, idempotently leased sweep requeues FINALIZING after this object
         # lease expires. It deliberately excludes jobs with any still-live claim.

@@ -20,6 +20,8 @@ from tests.encryption.conftest import enabled_encryption
 from tests.tenant_migration.materialization_helpers import portable_import_case
 from tests.tenant_migration.object_helpers import (
     PRIVATE_BYTES,
+    WorkerExit,
+    materialize_until_crash,
     memory_objects,
     pairing_and_receipt,
     prepare_source_objects,
@@ -30,36 +32,6 @@ from tests.tenant_migration.protocol_helpers import superadmin
 
 
 pytestmark = pytest.mark.django_db(transaction=True)
-
-
-class WorkerExit(BaseException):
-    pass
-
-
-def _crash_before_claim(monkeypatch, claim_number):
-    real_claim = object_promotion._claim_staged_object
-    calls = 0
-
-    def claim(row):
-        nonlocal calls
-        calls += 1
-        if calls == claim_number:
-            raise WorkerExit("simulated worker exit")
-        return real_claim(row)
-
-    monkeypatch.setattr(object_promotion, "_claim_staged_object", claim)
-    return real_claim
-
-
-def _materialize_until_crash(case, monkeypatch, *, claim_number):
-    real_claim = _crash_before_claim(monkeypatch, claim_number)
-    with pytest.raises(WorkerExit, match="worker exit"):
-        materialize_tenant(case.root, case.job, case.carried)
-    monkeypatch.setattr(object_promotion, "_claim_staged_object", real_claim)
-    case.job.refresh_from_db()
-    assert case.job.status == TenantImportJob.Status.FINALIZING
-    assert case.job.materialization_report
-    assert not case.job.verification_report
 
 
 def test_redelivery_resumes_partial_promotion_without_rematerializing(
@@ -74,7 +46,7 @@ def test_redelivery_resumes_partial_promotion_without_rematerializing(
             case.decide_walk_in(source_user)
             write_object_bundle(case.root)
             remove_source_object_footprint(case, memory_objects)
-            _materialize_until_crash(case, monkeypatch, claim_number=2)
+            materialize_until_crash(case, monkeypatch, claim_number=2)
 
             states = list(case.job.import_objects.order_by("pk").values_list(
                 "state", flat=True
@@ -160,7 +132,7 @@ def test_concurrent_redelivery_cannot_double_promote(memory_objects, monkeypatch
             case.decide_walk_in(source_user)
             write_object_bundle(case.root)
             remove_source_object_footprint(case, memory_objects)
-            _materialize_until_crash(case, monkeypatch, claim_number=1)
+            materialize_until_crash(case, monkeypatch, claim_number=1)
             actor = superadmin("resume-concurrent")
             real_copy = object_import.object_storage.copy_from_staging
             copies = []
@@ -198,7 +170,7 @@ def test_rollback_from_partial_promotion_removes_all_objects_and_quota(
             case.decide_walk_in(source_user)
             write_object_bundle(case.root)
             remove_source_object_footprint(case, memory_objects)
-            _materialize_until_crash(case, monkeypatch, claim_number=2)
+            materialize_until_crash(case, monkeypatch, claim_number=2)
 
             assert rollback_import_objects(case.job) == 2
             assert not memory_objects["private"]

@@ -7,8 +7,10 @@ import pytest
 from django.db import connection, transaction
 
 from apps.evidence.models import EvidencePhoto
-from apps.tenant_migration import object_storage
+from apps.tenant_migration import object_promotion, object_storage
 from apps.tenant_migration.deployment_keys import public_deployment_identity
+from apps.tenant_migration.materialization import materialize_tenant
+from apps.tenant_migration.models import TenantImportJob
 from apps.tenant_migration.object_export import object_member_path
 from apps.tenant_migration.pairing import approve_pairing
 from apps.tenant_migration.receipt_crypto import ALGORITHM, generate_key_material
@@ -19,6 +21,36 @@ PRIVATE_KEY = "evidence/source/issue.jpg"
 PUBLIC_KEY = "makerspace/source/logo.png"
 PRIVATE_BYTES = b"private evidence bytes"
 PUBLIC_BYTES = b"public image bytes"
+
+
+class WorkerExit(BaseException):
+    pass
+
+
+def _crash_before_claim(monkeypatch, claim_number):
+    real_claim = object_promotion._claim_staged_object
+    calls = 0
+
+    def claim(row):
+        nonlocal calls
+        calls += 1
+        if calls == claim_number:
+            raise WorkerExit("simulated worker exit")
+        return real_claim(row)
+
+    monkeypatch.setattr(object_promotion, "_claim_staged_object", claim)
+    return real_claim
+
+
+def materialize_until_crash(case, monkeypatch, *, claim_number):
+    real_claim = _crash_before_claim(monkeypatch, claim_number)
+    with pytest.raises(WorkerExit, match="worker exit"):
+        materialize_tenant(case.root, case.job, case.carried)
+    monkeypatch.setattr(object_promotion, "_claim_staged_object", real_claim)
+    case.job.refresh_from_db()
+    assert case.job.status == TenantImportJob.Status.FINALIZING
+    assert case.job.materialization_report
+    assert not case.job.verification_report
 
 
 def remove_source_evidence_after_archive(photo):

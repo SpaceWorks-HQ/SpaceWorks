@@ -1,5 +1,6 @@
 """Bounded retention jobs for tenant-import rows, archives, and object journals."""
 
+import logging
 from datetime import timedelta
 
 from django.db import transaction
@@ -20,6 +21,9 @@ FINALIZATION_SWEEP_LEASE_NAME = "tenant-import-finalization-sweep-work"
 CLEANUP_LEASE_DURATION = timedelta(minutes=15)
 FINALIZATION_SWEEP_LEASE_DURATION = timedelta(minutes=5)
 DEFAULT_CLEANUP_BATCH_SIZE = 100
+
+
+logger = logging.getLogger(__name__)
 
 
 def cleanup_expired_import_jobs(*, now=None, batch_size=DEFAULT_CLEANUP_BATCH_SIZE):
@@ -116,8 +120,21 @@ def resume_expired_finalizing_import_jobs(
     )
     from .tasks import run_import_job_task
 
+    failures = 0
     for job in jobs:
-        run_import_job_task.delay(str(job["pk"]), job["actor_id"])
+        try:
+            run_import_job_task.delay(str(job["pk"]), job["actor_id"])
+        except Exception:
+            failures += 1
+            logger.exception(
+                "tenant_import_finalization_recovery_failed",
+                extra={"tenant_import_job_id": str(job["pk"])},
+            )
+    if failures:
+        logger.error(
+            "tenant_import_finalization_recovery_batch_failed",
+            extra={"candidate_count": len(jobs), "failure_count": failures},
+        )
     return len(jobs)
 
 

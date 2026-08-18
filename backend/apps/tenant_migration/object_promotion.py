@@ -1,8 +1,9 @@
 """Lease-claimed, resumable promotion of staged tenant objects."""
 
-from datetime import timedelta
 import hashlib
 import hmac
+import logging
+from datetime import timedelta
 
 from django.db import transaction
 from django.db.models import Q
@@ -12,11 +13,19 @@ from apps.audit import services as audit
 from apps.makerspaces import limits
 
 from . import object_storage
-from .insertion_errors import ImportPromotionInProgress, ImportVerificationError
+from .insertion_errors import (
+    ImportPromotionClaimLost,
+    ImportPromotionInProgress,
+    ImportVerificationError,
+)
 from .models_import_objects import TenantImportObject
+from .promotion_lease import PromotionClaimHeartbeat
 
 
 PROMOTION_LEASE_DURATION = timedelta(minutes=15)
+
+
+logger = logging.getLogger(__name__)
 
 
 def promote_import_objects(job):
@@ -35,18 +44,31 @@ def promote_import_objects(job):
             )
         claimed_at = _claim_staged_object(row)
         try:
-            object_storage.copy_from_staging(
-                row.staging_key,
-                row.bucket_kind,
-                row.target_key,
-                row.content_type,
+            heartbeat = PromotionClaimHeartbeat(
+                row.pk,
+                claimed_at,
+                lease_duration=PROMOTION_LEASE_DURATION,
             )
+            try:
+                with heartbeat:
+                    object_storage.copy_from_staging(
+                        row.staging_key,
+                        row.bucket_kind,
+                        row.target_key,
+                        row.content_type,
+                    )
+            finally:
+                claimed_at = heartbeat.claimed_at
             _mark_promoted_and_charge(
                 row.pk, job.target_makerspace, claimed_at=claimed_at
             )
             row.refresh_from_db()
             _verify_promoted_object(row)
             promoted += 1
+        except ImportPromotionClaimLost:
+            # Ownership has moved. Even inspecting and conditionally cleaning the
+            # target object here would race the replacement worker's promotion.
+            raise
         except Exception:
             _clean_failed_promotion(
                 row.pk, job.target_makerspace, claimed_at=claimed_at
@@ -88,7 +110,13 @@ def _mark_promoted_and_charge(row_id, makerspace, *, claimed_at=None):
     row = TenantImportObject.objects.get(pk=row_id)
     claimed_at = row.claimed_at if claimed_at is None else claimed_at
     if row.state != TenantImportObject.State.STAGED or row.claimed_at != claimed_at:
-        raise ImportVerificationError("The object promotion claim is no longer valid.")
+        logger.warning(
+            "tenant_import_promotion_claim_lost",
+            extra={"tenant_import_object_id": row_id},
+        )
+        raise ImportPromotionClaimLost(
+            "The object promotion claim is no longer valid."
+        )
     limits.add_storage(makerspace, row.size)
     updated = TenantImportObject.objects.filter(
         pk=row_id,
@@ -101,23 +129,41 @@ def _mark_promoted_and_charge(row_id, makerspace, *, claimed_at=None):
         updated_at=timezone.now(),
     )
     if updated != 1:
-        raise ImportVerificationError("The object promotion claim was lost.")
+        logger.warning(
+            "tenant_import_promotion_claim_lost",
+            extra={"tenant_import_object_id": row_id},
+        )
+        raise ImportPromotionClaimLost("The object promotion claim was lost.")
 
 
 def _clean_failed_promotion(row_id, makerspace, *, claimed_at):
-    row = TenantImportObject.objects.get(pk=row_id)
-    if row.claimed_at != claimed_at or row.state == TenantImportObject.State.VERIFIED:
-        return
-    object_storage.delete_object(row.bucket_kind, row.target_key)
+    failed = _fence_failed_promotion(row_id, makerspace, claimed_at=claimed_at)
+    if failed is None:
+        logger.warning(
+            "tenant_import_promotion_claim_lost",
+            extra={"tenant_import_object_id": row_id},
+        )
+        raise ImportPromotionClaimLost(
+            "The failed object promotion is now owned by another worker."
+        )
+    bucket_kind, target_key = failed
+    object_storage.delete_object(bucket_kind, target_key)
+
+
+@transaction.atomic
+def _fence_failed_promotion(row_id, makerspace, *, claimed_at):
+    row = TenantImportObject.objects.select_for_update().get(pk=row_id)
+    if row.claimed_at != claimed_at or row.state not in {
+        TenantImportObject.State.STAGED,
+        TenantImportObject.State.PROMOTED,
+    }:
+        return None
     if row.quota_charged_at is not None:
         limits.free_storage(makerspace, row.size)
-    TenantImportObject.objects.filter(pk=row_id, claimed_at=claimed_at).exclude(
-        state=TenantImportObject.State.VERIFIED
-    ).update(
-        state=TenantImportObject.State.FAILED,
-        quota_charged_at=None,
-        updated_at=timezone.now(),
-    )
+    row.state = TenantImportObject.State.FAILED
+    row.quota_charged_at = None
+    row.save(update_fields=("state", "quota_charged_at", "updated_at"))
+    return row.bucket_kind, row.target_key
 
 
 def _audit_promoted(job, count, rows):
