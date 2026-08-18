@@ -7,6 +7,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from apps.accounts.tokens import SpaceWorksAccessToken, SpaceWorksRefreshToken
 
 from apps.accounts.claim_sessions import attach_claim_context, validated_claim_session
+from apps.accounts.services_refresh_tokens import rotate_refresh_token
 
 
 class ClaimAccessToken(SpaceWorksAccessToken):
@@ -29,12 +30,13 @@ def mint_claim_tokens(claim):
 
 
 def rotate_claim_refresh(raw_refresh):
-    old = ClaimRefreshToken(raw_refresh)
-    claim = validated_claim_session(old)
-    old.blacklist()
-    return _tokens_for_claim(claim), attach_claim_context(
-        claim.membership.user, claim
+    pair, claim = rotate_refresh_token(
+        raw_refresh,
+        token_class=ClaimRefreshToken,
+        validate=validated_claim_session,
+        mint=lambda _old, validated: (_tokens_for_claim(validated), validated),
     )
+    return pair, attach_claim_context(claim.membership.user, claim)
 
 
 def claim_user_from_refresh(raw_refresh, *, require_active=True):
