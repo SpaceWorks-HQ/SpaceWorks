@@ -16,6 +16,7 @@ from apps.presence.serializers import (
     PresenceSessionSerializer,
     PresenceStartSerializer,
 )
+from apps.presence.throttles import PresenceStartThrottle
 
 
 ERRORS = {
@@ -29,6 +30,8 @@ ERRORS = {
 
 class PresenceStartView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [PresenceStartThrottle]
+    throttle_scope = "presence_start"
 
     @extend_schema(tags=["Presence"], request=PresenceStartSerializer, responses={201: PresenceSessionSerializer, **ERRORS})
     def post(self, request, makerspace_slug):

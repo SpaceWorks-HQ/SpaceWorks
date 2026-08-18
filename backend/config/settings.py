@@ -5,6 +5,7 @@ import sys
 from celery.schedules import crontab
 import environ
 from corsheaders.defaults import default_headers
+from django.core.exceptions import ImproperlyConfigured
 
 from config.storage_validation import assert_distinct_storage_buckets
 
@@ -22,6 +23,20 @@ from config.unfold import UNFOLD
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+
+_configured_trusted_proxy_count = env.int("TRUSTED_PROXY_COUNT", default=None)
+if not DEBUG and _configured_trusted_proxy_count is None:
+    raise ImproperlyConfigured(
+        "TRUSTED_PROXY_COUNT must be explicitly set when DEBUG is False. "
+        "Use 0 for direct access or the exact number of trusted reverse proxies."
+    )
+if _configured_trusted_proxy_count is not None and _configured_trusted_proxy_count < 0:
+    raise ImproperlyConfigured("TRUSTED_PROXY_COUNT cannot be negative.")
+# Direct development access has no trusted proxy. Production may never reach this
+# fallback because the guard above forces its topology to be declared explicitly.
+TRUSTED_PROXY_COUNT = (
+    0 if _configured_trusted_proxy_count is None else _configured_trusted_proxy_count
+)
 
 
 def normalize_platform_domain_suffix(raw):
@@ -246,6 +261,11 @@ AXES_RESET_ON_SUCCESS = True
 # against a known username from other IPs can't lock that account out (no username DoS).
 AXES_LOCKOUT_PARAMETERS = [["ip_address", "username"]]
 AXES_ENABLED = env.bool("AXES_ENABLED", default=True)
+# django-axes 8 names this setting AXES_IPWARE_PROXY_COUNT. Keep its declared
+# topology tied to DRF's and use the shared resolver below so the two protections
+# cannot interpret an X-Forwarded-For chain differently.
+AXES_IPWARE_PROXY_COUNT = TRUSTED_PROXY_COUNT
+AXES_CLIENT_IP_CALLABLE = "config.client_ip.get_throttle_client_ip"
 
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
 AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
@@ -666,6 +686,7 @@ REST_FRAMEWORK = {
         "client_trusted": env("THROTTLE_CLIENT_TRUSTED", default="600/min"),
         'booking_submit': env('THROTTLE_BOOKING_SUBMIT', default='10/hour'),
         "membership_request": env("THROTTLE_MEMBERSHIP_REQUEST", default="10/hour"),
+        "presence_start": env("THROTTLE_PRESENCE_START", default="10/hour"),
         # A presigned upload can be requested and never attached, stranding an object
         # that no row names and no quota counts. Generous for the real workflow -- an
         # avatar plus a handful of project images -- and a hard ceiling on how much one
@@ -679,14 +700,10 @@ REST_FRAMEWORK = {
             "THROTTLE_TENANT_MIGRATION_WRITE", default="30/hour"
         ),
     },
-    # Proxy-aware client IP for throttling. Default None = DRF's legacy behavior
-    # (REMOTE_ADDR, or the raw X-Forwarded-For string if present). Behind a CDN/reverse
-    # proxy that collapses all traffic to one source IP (or lets clients spoof XFF), set
-    # TRUSTED_PROXY_COUNT to the number of trusted proxies in front of the backend so
-    # throttles key on the real client IP (the Nth-from-last XFF entry). Mirrors the
-    # TRUST_X_FORWARDED_PROTO posture: only trust forwarded headers when a real proxy is
-    # the sole path to the backend.
-    "NUM_PROXIES": env.int("TRUSTED_PROXY_COUNT", default=None),
+    # Proxy-aware client IP for throttling. Production must declare its topology at
+    # settings import above; direct DEBUG development defaults to zero trusted proxies.
+    # A positive count selects the Nth-from-last XFF entry appended by trusted proxies.
+    "NUM_PROXIES": TRUSTED_PROXY_COUNT,
     "URL_FORMAT_OVERRIDE": None,
 }
 

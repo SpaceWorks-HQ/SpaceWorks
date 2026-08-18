@@ -10,6 +10,7 @@ from apps.makerspaces import membership_services
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
 from apps.presence import services
 from apps.presence.models import PresenceSession
+from apps.presence.throttles import PresenceStartThrottle
 
 
 def member(space, username="member"):
@@ -66,3 +67,39 @@ def test_presence_api_and_roster_minimize_pii():
     staff = APIClient(); staff.force_authenticate(manager)
     roster = staff.get(f"/api/v1/admin/makerspace/{space.id}/presence-sessions/current")
     assert roster.status_code == 200 and user.email not in str(roster.data)
+
+
+@pytest.mark.django_db
+def test_presence_start_throttles_replacements_but_not_idempotent_replays(
+    monkeypatch,
+):
+    space = Makerspace.objects.create(name="Throttle", slug="presence-throttle")
+    user, _ = member(space, "throttled-member")
+    client = APIClient()
+    client.force_authenticate(user)
+    monkeypatch.setattr(
+        PresenceStartThrottle,
+        "THROTTLE_RATES",
+        {**PresenceStartThrottle.THROTTLE_RATES, "presence_start": "2/hour"},
+    )
+    url = f"/api/v1/public/{space.slug}/presence-sessions"
+
+    assert (
+        client.post(url, {"duration_minutes": 60}, format="json").status_code
+        == 201
+    )
+    for _ in range(3):
+        # Exact replays return the existing row and do not consume the create budget.
+        assert (
+            client.post(url, {"duration_minutes": 60}, format="json").status_code
+            == 201
+        )
+    assert (
+        client.post(url, {"duration_minutes": 120}, format="json").status_code
+        == 201
+    )
+
+    blocked = client.post(url, {"duration_minutes": 60}, format="json")
+
+    assert blocked.status_code == 429
+    assert PresenceSession.objects.filter(member=user, makerspace=space).count() == 2
