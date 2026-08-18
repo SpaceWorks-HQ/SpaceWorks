@@ -23,7 +23,6 @@ class PromotionClaimHeartbeat:
         self._stop = Event()
         self._lock = Lock()
         self._lost = False
-        self._error = None
         self._thread = Thread(
             target=self._run,
             name=f"tenant-import-promotion-{row_id}",
@@ -34,15 +33,13 @@ class PromotionClaimHeartbeat:
         self._thread.start()
         return self
 
-    def __exit__(self, exc_type, _exc, _traceback):
+    def __exit__(self, _exc_type, _exc, _traceback):
         self._stop.set()
         self._thread.join()
         if self._lost:
             raise ImportPromotionClaimLost(
                 f"Object promotion claim {self.row_id} was superseded."
             )
-        if self._error is not None and exc_type is None:
-            raise self._error
         return False
 
     def _run(self):
@@ -66,7 +63,13 @@ class PromotionClaimHeartbeat:
                     return
                 with self._lock:
                     self.claimed_at = renewed_at
-        except Exception as exc:  # surfaced to the owning worker after the copy
-            self._error = exc
+        except Exception:
+            # Renewal keeps a live worker out of stale-claim recovery, but the
+            # fenced promotion write remains the authority on claim ownership.
+            logger.warning(
+                "tenant_import_promotion_heartbeat_failed",
+                extra={"tenant_import_object_id": self.row_id},
+                exc_info=True,
+            )
         finally:
             close_old_connections()

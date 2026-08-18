@@ -1,13 +1,16 @@
+from datetime import timedelta
 import hashlib
 import json
 from pathlib import Path
+from threading import Event
 from types import SimpleNamespace
 
+from django.db import OperationalError
 from django.utils import timezone
 import pytest
 
 from apps.makerspaces.models import Makerspace
-from apps.tenant_migration import object_storage
+from apps.tenant_migration import object_promotion, object_storage, promotion_lease
 from apps.tenant_migration.models import TenantImportJob, TenantImportObject
 from apps.tenant_migration.object_export import object_member_path
 from apps.tenant_migration.object_import import (
@@ -109,6 +112,66 @@ def test_promotion_without_source_content_type_uses_storage_default(
         memory_objects["content_types"]["private"][source_key]
         == "application/octet-stream"
     )
+
+
+def test_promotion_heartbeat_database_error_defers_to_claim_fence(
+    tmp_path, memory_objects, monkeypatch, caplog
+):
+    source_key = "machine-documents/source/heartbeat.pdf"
+    _write_bundle(
+        tmp_path,
+        [
+            (
+                {
+                    "bucket_kind": "private",
+                    "source_key": source_key,
+                    "content_type": "application/pdf",
+                },
+                b"heartbeat survives",
+            ),
+        ],
+    )
+    job = _import_job("heartbeat-database-error")
+    prepare_import_objects(SimpleNamespace(root=tmp_path), job)
+    heartbeat_failed = Event()
+
+    class FailedRenewal:
+        def update(self, **_kwargs):
+            heartbeat_failed.set()
+            raise OperationalError("transient heartbeat failure")
+
+    class FailedRenewalManager:
+        @staticmethod
+        def filter(**_kwargs):
+            return FailedRenewal()
+
+    class HeartbeatImportObject:
+        State = TenantImportObject.State
+        objects = FailedRenewalManager()
+
+    real_copy = object_storage.copy_from_staging
+
+    def copy_after_failed_heartbeat(*args):
+        assert heartbeat_failed.wait(timeout=2)
+        return real_copy(*args)
+
+    monkeypatch.setattr(
+        promotion_lease, "TenantImportObject", HeartbeatImportObject
+    )
+    monkeypatch.setattr(
+        object_promotion, "PROMOTION_LEASE_DURATION", timedelta(milliseconds=30)
+    )
+    monkeypatch.setattr(
+        object_storage, "copy_from_staging", copy_after_failed_heartbeat
+    )
+
+    with caplog.at_level("WARNING"):
+        assert promote_import_objects(job) == 1
+
+    row = TenantImportObject.objects.get(job=job)
+    assert row.state == TenantImportObject.State.VERIFIED
+    assert memory_objects["private"][source_key] == b"heartbeat survives"
+    assert "tenant_import_promotion_heartbeat_failed" in caplog.text
 
 
 def test_storage_copy_replaces_only_known_content_type(settings, monkeypatch):
