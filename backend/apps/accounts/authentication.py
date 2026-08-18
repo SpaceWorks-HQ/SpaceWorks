@@ -24,7 +24,15 @@ VERIFICATION_ONLY_SURFACE = "verification_only"
 # is absent outright. During this release they receive member authority, never the old
 # unrestricted behavior; staff with an old token must sign in again.
 TREAT_MISSING_SURFACE_AS_MEMBER_FOR_ONE_RELEASE = True
-_KNOWN_SESSION_SURFACES = {"member", "staff", VERIFICATION_ONLY_SURFACE}
+# A staff PASSWORD session. `staff` carries a mandatory trusted-origin binding, because
+# it was defined for browser social sessions -- so reusing it for password login would
+# break every origin-less staff caller (management commands, server-to-server, tests).
+# This surface is behaviourally what a staff password session already was, only now
+# stated explicitly, so the shim above can start rejecting an absent claim next release.
+# It is NOT weaker than `member` for these users: it is only ever minted for an actor who
+# already passed assert_staff_authority, and RBAC still authorises every request.
+STAFF_API_SURFACE = "staff_api"
+_KNOWN_SESSION_SURFACES = {"member", "staff", STAFF_API_SURFACE, VERIFICATION_ONLY_SURFACE}
 
 
 class SpaceWorksJWTAuthentication(JWTAuthentication):
@@ -146,8 +154,17 @@ class SpaceWorksJWTScheme(SimpleJWTScheme):
     target_class = "apps.accounts.authentication.SpaceWorksJWTAuthentication"
 
 
+# An ordinary member session is BROADER than a bounded claim session, so it needs its own
+# allowlist rather than borrowing the claim prefixes. Reusing CLAIM_REACHABLE_PREFIXES was
+# invisible while only social member logins carried this surface; once every member
+# password login carries it, a legitimate member-owned action outside those prefixes --
+# registering a phone for push -- starts 403ing. Anything added here must be an action the
+# member performs on their OWN records; staff APIs never belong.
+MEMBER_SURFACE_PREFIXES = CLAIM_REACHABLE_PREFIXES + ("/api/v1/integrations/push/",)
+
+
 def _member_surface_path_allowed(path):
-    return path.startswith(CLAIM_REACHABLE_PREFIXES)
+    return path.startswith(MEMBER_SURFACE_PREFIXES)
 
 
 def _verification_path_allowed(path):

@@ -150,14 +150,16 @@ def _legacy_role_name(role):
 
 class LoginSerializer(TokenObtainPairSerializer):
     token_class = SpaceWorksRefreshToken
+    # No default: an omitted surface means "the server decides". Defaulting to member
+    # would silently demote every staff client that has not been updated to send the
+    # field, which is a lockout, not a hardening.
     surface = serializers.ChoiceField(
         choices=SocialSurface.choices,
-        default=SocialSurface.MEMBER,
         required=False,
     )
 
     def validate(self, attrs):
-        requested_surface = attrs.pop("surface", SocialSurface.MEMBER)
+        requested_surface = attrs.pop("surface", None)
         supplied_username = attrs.get(self.username_field, "")
         if supplied_username and not User.objects.filter(username=supplied_username).exists():
             email_matches = User.objects.filter(
@@ -173,7 +175,12 @@ class LoginSerializer(TokenObtainPairSerializer):
             raise AuthenticationFailed("Account access is restricted.", code="access_denied")
         request = self.context.get("request")
         staff_scope = None
-        if requested_surface == SocialSurface.STAFF:
+        surface = requested_surface
+        if requested_surface != SocialSurface.MEMBER:
+            # Derived server-side. A caller may narrow itself to `member`, but it may not
+            # be *demoted* to member merely by not sending the field, and it cannot
+            # promote itself: assert_staff_authority is the gate either way.
+            from apps.accounts.authentication import STAFF_API_SURFACE
             from apps.accounts.services_social_identity import SocialResolutionError
             from apps.accounts.services_social_login import assert_staff_authority
             from apps.accounts.social_nonces import request_origin
@@ -183,18 +190,29 @@ class LoginSerializer(TokenObtainPairSerializer):
                 staff_origin_scope,
             )
 
-            if request is None or not staff_origin_is_registered(request_origin(request)):
-                raise PermissionDenied("Staff login requires a trusted staff origin.")
+            has_staff_origin = request is not None and staff_origin_is_registered(
+                request_origin(request)
+            )
             try:
                 # Password and social login deliberately share this authority decision;
                 # a second staff definition would drift from RBAC and tenant scoping.
                 assert_staff_authority(self.user, request)
-            except SocialResolutionError as exc:
-                raise PermissionDenied("Staff access is required.") from exc
-            scope = staff_origin_scope(request)
-            staff_scope = "platform" if scope is NO_STAFF_ORIGIN_SCOPE else str(scope)
-
-        surface = requested_surface
+                is_staff_actor = True
+            except SocialResolutionError:
+                is_staff_actor = False
+                if requested_surface == SocialSurface.STAFF:
+                    raise PermissionDenied("Staff access is required.") from None
+            if is_staff_actor and has_staff_origin:
+                # Browser staff session: bind it to the origin it was minted on.
+                surface = SocialSurface.STAFF
+                scope = staff_origin_scope(request)
+                staff_scope = "platform" if scope is NO_STAFF_ORIGIN_SCOPE else str(scope)
+            elif is_staff_actor:
+                # Origin-less staff caller: `staff` would be unusable, since its
+                # per-request check demands a registered origin.
+                surface = STAFF_API_SURFACE
+            else:
+                surface = SocialSurface.MEMBER
         if (
             self.user.self_registered_at is not None
             and self.user.email_verified_at is None
