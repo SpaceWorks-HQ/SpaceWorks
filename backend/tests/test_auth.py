@@ -180,10 +180,12 @@ def test_refresh_rejects_unregistered_origin_with_csrf_header():
 def test_refresh_rotates_and_returns_new_access():
     client = APIClient()
     _login(client)
+    old_refresh = client.cookies["refresh_token"].value
     resp = client.post(REFRESH, **_csrf_headers())
     assert resp.status_code == 200
     assert "access" in resp.data
     assert "refresh_token" in resp.cookies  # rotated
+    assert resp.cookies["refresh_token"].value != old_refresh
 
 
 def test_old_refresh_rejected_after_rotation():

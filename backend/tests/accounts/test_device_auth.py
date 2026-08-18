@@ -1,9 +1,11 @@
 import pytest
 from django.utils import timezone
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 
 from apps.accounts.models import DeviceGrant, User
 from apps.accounts.services_tokens import blacklist_outstanding_tokens
+from apps.audit.models import AuditLog
 from apps.makerspaces.models import MakerspaceMembership
 from tests.return_helpers import make_space, make_user
 
@@ -13,6 +15,7 @@ pytestmark = pytest.mark.django_db
 CHALLENGE = "/api/v1/auth/device/attestation-challenge"
 LOGIN = "/api/v1/auth/device/login"
 REFRESH = "/api/v1/auth/device/refresh"
+BROWSER_REFRESH = "/api/v1/auth/refresh"
 ME = "/api/v1/auth/me"
 
 
@@ -156,6 +159,48 @@ def test_refresh_reuse_revokes_entire_device_grant(settings, monkeypatch):
     assert APIClient().post(
         REFRESH, {"refresh": rotated.data["refresh"]}, format="json"
     ).status_code == 401
+
+
+def test_browser_refresh_rejects_device_token_without_minting(
+    settings, monkeypatch
+):
+    settings.CORS_ALLOWED_ORIGINS = ["http://localhost:5000"]
+    user = make_user(
+        "native-wrong-refresh-route",
+        password="strong-device-password",
+        access_status=User.AccessStatus.ACTIVE,
+    )
+    login, _ = attested_login(APIClient(), user, settings, monkeypatch)
+    assert login.status_code == 200
+    device_refresh = login.data["refresh"]
+    token_count = OutstandingToken.objects.filter(user=user).count()
+
+    browser = APIClient()
+    browser.cookies["refresh_token"] = device_refresh
+    rejected = browser.post(
+        BROWSER_REFRESH,
+        HTTP_X_REFRESH_CSRF="1",
+        HTTP_ORIGIN="http://localhost:5000",
+    )
+
+    assert rejected.status_code == 401
+    assert rejected.data["detail"] == (
+        "Device refresh tokens must use the device refresh endpoint."
+    )
+    assert "access" not in rejected.data
+    assert "refresh_token" not in rejected.cookies
+    assert OutstandingToken.objects.filter(user=user).count() == token_count
+    assert AuditLog.objects.filter(
+        action="auth.refresh_rejected",
+        actor=user,
+        meta__reason="device_refresh_wrong_endpoint",
+    ).exists()
+
+    rotated = APIClient().post(
+        REFRESH, {"refresh": device_refresh}, format="json"
+    )
+    assert rotated.status_code == 200
+    assert rotated.data["refresh"] != device_refresh
 
 
 def test_password_invalidation_revokes_native_access(settings, monkeypatch):
