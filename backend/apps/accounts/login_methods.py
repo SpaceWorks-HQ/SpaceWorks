@@ -15,17 +15,52 @@ twins: disabling *all* social sign-in strands somebody a single provider never w
 disabling passwords strands the administrators.
 """
 
+import logging
+
+from django.core.cache import cache
 from django.db.models import Exists, OuterRef
 
 from apps.accounts.models import PlatformLoginMethods, User
 from apps.accounts.models_social import SocialIdentity
 
+logger = logging.getLogger(__name__)
+
+LOGIN_METHODS_CACHE_KEY = "accounts:login_methods:last_known_good:v1"
+_SWITCH_FIELDS = (
+    "password_enabled",
+    "social_enabled",
+    "phone_enabled",
+    "self_registration_enabled",
+)
+
+
+def _values(switches):
+    return {field: bool(getattr(switches, field)) for field in _SWITCH_FIELDS}
+
+
+def _cached_switches():
+    try:
+        values = cache.get(LOGIN_METHODS_CACHE_KEY)
+    except Exception:  # pragma: no cover - a cache outage must not block authentication
+        logger.exception("login_methods_cache_read_failed")
+        return None
+    if values is None:
+        return None
+    return PlatformLoginMethods(**values)
+
 
 def _switches():
     try:
-        return PlatformLoginMethods.load()
-    except Exception:  # pragma: no cover - defensive, mirrors the other capability reads
-        return PlatformLoginMethods()
+        switches = PlatformLoginMethods.load()
+    except Exception:
+        logger.exception("login_methods_read_failed")
+        return _cached_switches() or PlatformLoginMethods()
+
+    try:
+        cache.set(LOGIN_METHODS_CACHE_KEY, _values(switches), timeout=None)
+    except Exception:  # pragma: no cover - preserve the successfully resolved policy
+        logger.exception("login_methods_cache_write_failed")
+    return switches
 
 
 def password_login_enabled():
