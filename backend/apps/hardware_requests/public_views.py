@@ -27,9 +27,9 @@ from apps.makerspaces.servability import servable_queryset
 from apps.makerspaces.platform import module_enabled
 from apps.presence.guard import require_active_member_presence
 from apps.openapi import (
+    PUBLIC_API_AUTH_PARAMETERS,
     PUBLIC_REQUEST_STATUS_EXAMPLE,
     PUBLIC_REQUEST_SUBMIT_EXAMPLE,
-    PUBLISHABLE_KEY_PARAMETER,
 )
 
 
@@ -41,7 +41,7 @@ class RequestSubmitView(APIView):
     @extend_schema(
         tags=["Public requests"],
         summary="Submit public borrow request",
-        parameters=[PUBLISHABLE_KEY_PARAMETER],
+        parameters=PUBLIC_API_AUTH_PARAMETERS,
         request=RequestSubmitSerializer,
         responses={201: RequestSubmitResponseSerializer, **PUBLIC_ERROR_RESPONSES},
         examples=[PUBLIC_REQUEST_SUBMIT_EXAMPLE],
@@ -108,7 +108,7 @@ class RequestStatusView(generics.RetrieveAPIView):
         tags=["Public requests"],
         summary="Get request status by public token",
         auth=[],
-        parameters=[PUBLISHABLE_KEY_PARAMETER],
+        parameters=PUBLIC_API_AUTH_PARAMETERS,
         responses={200: PublicRequestStatusSerializer, 404: ERROR_404},
         examples=[PUBLIC_REQUEST_STATUS_EXAMPLE],
     )

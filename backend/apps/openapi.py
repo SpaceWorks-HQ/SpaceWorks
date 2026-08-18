@@ -12,6 +12,26 @@ PUBLISHABLE_KEY_PARAMETER = OpenApiParameter(
     ),
 )
 
+API_CLIENT_NONCE_PARAMETER = OpenApiParameter(
+    name="X-Nonce",
+    type=str,
+    location=OpenApiParameter.HEADER,
+    required=False,
+    description=(
+        "Unique, unpredictable nonce for HMAC-authenticated server API clients "
+        "(1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it "
+        "between `X-Timestamp` and the raw body in the signed bytes: "
+        "`METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for "
+        "publishable-key/browser authentication and during the temporary legacy "
+        "rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+    ),
+)
+
+PUBLIC_API_AUTH_PARAMETERS = (
+    PUBLISHABLE_KEY_PARAMETER,
+    API_CLIENT_NONCE_PARAMETER,
+)
+
 PUBLIC_REQUEST_SUBMIT_EXAMPLE = OpenApiExample(
     "Submit public equipment request",
     value={

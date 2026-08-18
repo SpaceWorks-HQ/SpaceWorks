@@ -23,9 +23,9 @@ from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.guards import require_feature
 from apps.presence.guard import require_active_member_presence
 from apps.openapi import (
+    PUBLIC_API_AUTH_PARAMETERS,
     PUBLIC_TOOL_CHECKOUT_EXAMPLE,
     PUBLIC_TOOL_SCAN_EXAMPLE,
-    PUBLISHABLE_KEY_PARAMETER,
 )
 from rest_framework.exceptions import ValidationError
 
@@ -38,7 +38,7 @@ class PublicToolEvidenceUploadUrlView(APIView):
     @extend_schema(
         tags=["Public requests"],
         summary="Create a public self-checkout evidence upload URL",
-        parameters=[PUBLISHABLE_KEY_PARAMETER],
+        parameters=PUBLIC_API_AUTH_PARAMETERS,
         request=PublicToolEvidenceUrlRequestSerializer,
         responses={201: EvidenceUrlResponseSerializer, **PUBLIC_ERROR_RESPONSES},
     )
@@ -91,7 +91,7 @@ class PublicToolCheckoutView(APIView):
     @extend_schema(
         tags=["Public requests"],
         summary="Check out a public tool by QR",
-        parameters=[PUBLISHABLE_KEY_PARAMETER],
+        parameters=PUBLIC_API_AUTH_PARAMETERS,
         request=PublicToolCheckoutSerializer,
         responses={201: PublicToolLoanSerializer, **PUBLIC_ERROR_RESPONSES},
         examples=[PUBLIC_TOOL_CHECKOUT_EXAMPLE],
@@ -120,7 +120,7 @@ class PublicToolReturnView(APIView):
     @extend_schema(
         tags=["Public requests"],
         summary="Return a public tool by QR",
-        parameters=[PUBLISHABLE_KEY_PARAMETER],
+        parameters=PUBLIC_API_AUTH_PARAMETERS,
         request=PublicToolScanSerializer,
         responses={200: PublicToolLoanSerializer, **PUBLIC_ERROR_RESPONSES},
         examples=[PUBLIC_TOOL_SCAN_EXAMPLE],

@@ -9,7 +9,7 @@ from apps.inventory.public_stats import build_public_stats
 from apps.inventory.serializers import PublicStatsSerializer
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.platform import module_enabled
-from apps.openapi import PUBLISHABLE_KEY_PARAMETER
+from apps.openapi import PUBLIC_API_AUTH_PARAMETERS
 
 
 @extend_schema(
@@ -17,7 +17,7 @@ from apps.openapi import PUBLISHABLE_KEY_PARAMETER
     summary="Get public makerspace stats",
     description="Get public activity stats for a public makerspace.",
     parameters=[
-        PUBLISHABLE_KEY_PARAMETER,
+        *PUBLIC_API_AUTH_PARAMETERS,
         OpenApiParameter(
             name="makerspace_slug",
             type=str,

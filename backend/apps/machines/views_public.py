@@ -12,7 +12,7 @@ from apps.machines.models import Machine
 from apps.machines.serializers_public_machines import PublicMachineSerializer
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.platform import module_enabled
-from apps.openapi import PUBLISHABLE_KEY_PARAMETER
+from apps.openapi import PUBLIC_API_AUTH_PARAMETERS
 
 
 @extend_schema(
@@ -20,7 +20,7 @@ from apps.openapi import PUBLISHABLE_KEY_PARAMETER
     summary='List public machines',
     description='List active machines published by a public makerspace.',
     parameters=[
-        PUBLISHABLE_KEY_PARAMETER,
+        *PUBLIC_API_AUTH_PARAMETERS,
         OpenApiParameter(
             name='makerspace_slug',
             type=str,
