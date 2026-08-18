@@ -88,30 +88,30 @@ def assert_request_write_allowed(request):
     if request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}:
         return
     from apps.makerspaces.origin_scope import origin_scoped_makerspace_id
-    from apps.makerspaces.origin_scope_routes import request_route_targets
+    from apps.makerspaces.origin_scope_routes import authoritative_route_resolution
     from apps.tenant_migration.gate_policy import HTTP_EXEMPTIONS
 
     match = getattr(request, "resolver_match", None)
     if getattr(match, "view_name", None) in HTTP_EXEMPTIONS:
         return
-    try:
-        _name, targets, invalid, _recognized = request_route_targets(request)
-    except Exception:
-        # Resolution is advisory to the gate. The view remains responsible for
-        # deciding whether the route exists and whether its caller is authorized.
-        return
-    if invalid:
-        return
-    if len(targets) == 1:
-        assert_write_allowed(next(iter(targets)))
-        return
-    if not targets:
-        try:
-            makerspace_id = origin_scoped_makerspace_id(request)
-        except Exception:
-            return
-        if isinstance(makerspace_id, int):
+    targets, route_recognized = authoritative_route_resolution(request)
+    if targets:
+        # URL/model ownership is authoritative. Client hints are intentionally not
+        # consulted here: a conflicting hint remains the view's validation error, but
+        # cannot select a different tenant lock or bypass a closed source gate.
+        for makerspace_id in sorted(targets):
             assert_write_allowed(makerspace_id)
+        return
+    if route_recognized:
+        # Known-but-unresolvable routes are not tenant writes yet. Preserve the
+        # eventual view error and rely on the unscoped request-boundary lock.
+        return
+    try:
+        makerspace_id = origin_scoped_makerspace_id(request)
+    except Exception:
+        return
+    if isinstance(makerspace_id, int):
+        assert_write_allowed(makerspace_id)
 
 
 @contextmanager
