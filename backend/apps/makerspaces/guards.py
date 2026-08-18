@@ -46,3 +46,12 @@ def require_feature(makerspace_or_id, feature_key):
     if not feature_enabled(makerspace, feature_key):
         raise ValidationError({"feature": f"{feature_key} is disabled for this makerspace."})
     return makerspace
+
+
+def require_feature_locked(makerspace_or_id, feature_key):
+    """Re-check a feature gate while holding the makerspace row lock."""
+    pk = makerspace_or_id.pk if isinstance(makerspace_or_id, Makerspace) else makerspace_or_id
+    locked = Makerspace.objects.select_for_update().get(pk=pk)
+    if not feature_enabled(locked, feature_key):
+        raise ValidationError({"feature": f"{feature_key} is disabled for this makerspace."})
+    return locked

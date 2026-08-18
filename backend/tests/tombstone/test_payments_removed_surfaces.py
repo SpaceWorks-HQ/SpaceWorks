@@ -49,6 +49,25 @@ def test_no_payment_route_resolves(path):
         resolve(path)
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/member/makerspaces/1/payments",
+        "/api/v1/member/makerspaces/1/payments/2/checkout",
+        "/api/v1/member/makerspaces/1/payments/2/mobile-intent",
+    ],
+)
+def test_no_member_payment_route_resolves(path):
+    with pytest.raises(Resolver404):
+        resolve(path)
+
+
+def test_neighbouring_member_route_still_resolves():
+    match = resolve("/api/v1/member/makerspaces/1/referrals")
+
+    assert match.url_name == "member-referrals"
+
+
 def test_the_stripe_webhook_does_not_answer():
     """The one that matters: a live webhook would settle charges nothing can reconcile."""
     response = APIClient().post("/api/v1/webhooks/stripe/abc123", {}, format="json")

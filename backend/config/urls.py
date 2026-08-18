@@ -129,6 +129,7 @@ urlpatterns = [
     # while /api/v1/public/... is reachable directly (and via "v1:public-inventory").
     path("api/v1/", include(("apps.inventory.urls", "inventory"), namespace="v1")),
     path("api/v1/", include("apps.makerspaces.urls")),
+    *separable("payments", "api/v1/member/", "apps.payments.urls_member"),
     path("api/v1/", include("apps.hardware_requests.urls")),
     path("api/v1/auth/", include("apps.accounts.urls")),   # staff auth surface
     path("api/v1/admin/", include("apps.admin_api.urls")),
