@@ -51,8 +51,10 @@ EOFMODS
   orig=("${state[@]}")
 
   echo
-  echo "The '$MSPROFILE' profile installed these optional modules. Tick what you want."
+  say "Choose your modules"
+  echo "Ticked modules are installed. This is the only module question -- adjust freely."
   echo "Core modules (public catalogue, requests, evidence, QR, scanner) are always on."
+  echo "Presets: a = everything, n = core only. Or toggle individual numbers."
   while :; do
     echo
     i=0
@@ -118,17 +120,11 @@ else
   WEBHOST="${WEBADDR#*://}"; WEBHOST="${WEBHOST%%/*}"; WEBHOST="${WEBHOST%%:*}"
   [ -n "$WEBHOST" ] || WEBHOST="localhost"
   read -r -p "Name of your makerspace [My Makerspace]: "                   MSNAME;   MSNAME="${MSNAME:-My Makerspace}"
-  echo "Which modules should be installed?"
-  echo "  minimal     - core only (nothing published publicly)"
-  echo "  lending     - a tool library: the hardware lending lifecycle, no machines"
-  echo "  workshop    - a machine shop: machines, the service queue and maintenance"
-  echo "  recommended - core plus the inventory lifecycle, reports and machines"
-  echo "  everything  - all modules"
-  read -r -p "Module profile [recommended]: " MSPROFILE; MSPROFILE="${MSPROFILE:-recommended}"
-  case "$MSPROFILE" in
-    minimal|lending|workshop|recommended|everything) ;;
-    *) warn "Unknown profile '$MSPROFILE'; using recommended."; MSPROFILE="recommended" ;;
-  esac
+  # Modules are NOT asked here. The question moved to the end of setup, where the app is
+  # running and the real registry can be read, so the operator ticks actual module names
+  # instead of memorising profile words. `recommended` is only the starting point the tick
+  # list opens with; nothing is final until that step.
+  MSPROFILE="recommended"
   read -r -p "Admin login username [admin]: "                             ADMINUSER; ADMINUSER="${ADMINUSER:-admin}"
   read -r -p "Admin email [admin@example.com]: "                          ADMINEMAIL; ADMINEMAIL="${ADMINEMAIL:-admin@example.com}"
   read -r -s -p "Admin password (leave blank to auto-generate): "         ADMINPASS; echo
