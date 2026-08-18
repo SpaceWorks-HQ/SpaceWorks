@@ -83,6 +83,7 @@ services:
       DISABLE_SERVER_SIDE_CURSORS: ${DISABLE_SERVER_SIDE_CURSORS:-False}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://localhost:5173}
       API_CLIENT_ENC_KEY: ${API_CLIENT_ENC_KEY:-}
+      AUDIT_MAC_MASTER_KEY: ${AUDIT_MAC_MASTER_KEY:-}
       # Dev serves the frontend same-origin behind nginx over plain http://localhost, where a
       # SameSite=None/Secure=True cookie (the prod default) is silently dropped by browsers,
       # so the 7-day refresh session never persists. Lax + non-secure makes it stick in dev.

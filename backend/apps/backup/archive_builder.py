@@ -32,6 +32,9 @@ OBJECT_FIELD_NAMES = frozenset({
 CONTINUITY_KEYS = (
     "SECRET_KEY", "API_CLIENT_ENC_KEY", "PII_MASTER_KEY", "PII_MASTER_KEY_PREVIOUS",
     "PII_SEARCH_HASH_KEY", "HMAC_SECRET", "PUSH_TOKEN_HMAC_KEY", "CRON_SECRET",
+    # The database carries AuditMacKey.wrapped_key, which is useless without the
+    # master key that wrapped it -- so it travels with the other continuity secrets.
+    "AUDIT_MAC_MASTER_KEY",
 )
 
 

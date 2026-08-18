@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from django.apps import apps
 from django.db import connection, transaction
 
+from apps.audit.keys import advance_attestation_cutover
 from apps.encryption.models import PiiMakerspaceWriteFence
 from apps.encryption.write_fence import fence_operation
 
@@ -141,6 +142,11 @@ def materialize_tenant(
                     batch_size,
                     object_plan.target_keys,
                 )
+                # Imported audit rows have no target MAC (see
+                # advance_attestation_cutover). Move this tenant's attestation cutover
+                # past them so verification reports them as unattested history rather
+                # than as MACs this deployment stripped.
+                advance_attestation_cutover(target.pk)
                 external_count = materialize_external_references(
                     archive, locked_job, target, pk_map, batch_size=batch_size
                 )

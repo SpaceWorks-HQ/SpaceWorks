@@ -591,6 +591,11 @@ HMAC_PROTECTED_PATH_PREFIXES = env.list(
 # _fernet() raises ImproperlyConfigured only when a key is actually needed. Tests/CI get a
 # real key from .env / docker-compose (added below).
 API_CLIENT_ENC_KEY = env("API_CLIENT_ENC_KEY", default="")
+# Wraps the per-scope audit row-MAC keys. Independent of PII_MASTER_KEY on purpose: the
+# audit domain gets its own key so a PII key rotation cannot invalidate integrity
+# evidence. Empty means row-MAC attestation is OFF and new audit rows are stored
+# unattested (see apps.audit.checks, which warns at startup).
+AUDIT_MAC_MASTER_KEY = env("AUDIT_MAC_MASTER_KEY", default="")
 # Scoped requester/contact PII encryption is intentionally dormant by default.  These
 # values are read lazily by the encryption broker so a disabled installation needs no
 # key material or optional KMS dependency.

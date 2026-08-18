@@ -116,6 +116,7 @@ services:
       # paths (e.g. "/reset-password?...") and password reset is unusable.
       PUBLIC_APP_BASE_URL: ${PUBLIC_APP_BASE_URL:-}
       API_CLIENT_ENC_KEY: ${API_CLIENT_ENC_KEY:-}
+      AUDIT_MAC_MASTER_KEY: ${AUDIT_MAC_MASTER_KEY:-}
       # Security hardening. Keep ENABLE_HTTPS=false for this HTTP-behind-nginx stack;
       # set it true only when a TLS proxy forwards X-Forwarded-Proto: https.
       ENABLE_HTTPS: ${ENABLE_HTTPS:-false}
