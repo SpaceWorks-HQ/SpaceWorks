@@ -71,7 +71,7 @@ target, source = map(Path, sys.argv[1:])
 required = {
     "SECRET_KEY", "API_CLIENT_ENC_KEY", "PII_MASTER_KEY",
     "PII_MASTER_KEY_PREVIOUS", "PII_SEARCH_HASH_KEY", "HMAC_SECRET",
-    "PUSH_TOKEN_HMAC_KEY", "CRON_SECRET",
+    "PUSH_TOKEN_HMAC_KEY", "CRON_SECRET", "AUDIT_MAC_MASTER_KEY",
 }
 values = json.loads(source.read_text(encoding="utf-8"))
 if set(values) != required or not isinstance(values.get("SECRET_KEY"), str) or not values["SECRET_KEY"]:

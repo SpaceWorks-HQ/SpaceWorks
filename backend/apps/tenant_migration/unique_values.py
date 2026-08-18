@@ -91,6 +91,10 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
         UniqueValueDisposition.DROP_ROW,
         "API clients are dropped with their omitted credentials.",
     ),
+    ("audit.AuditLog", "field:event_uuid"): _policy(
+        NULL,
+        "Audit integrity identity is omitted; the target reseals its own rows.",
+    ),
     ("bookings.BookableSpace", "field:public_token"): _policy(
         FRESH, "Source bearer tokens are replaced."
     ),
