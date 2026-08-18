@@ -46,30 +46,46 @@ class PromotionClaimHeartbeat:
         close_old_connections()
         try:
             while not self._stop.wait(self.interval):
-                with self._lock:
-                    expected = self.claimed_at
-                renewed_at = timezone.now()
-                updated = TenantImportObject.objects.filter(
-                    pk=self.row_id,
-                    state=TenantImportObject.State.STAGED,
-                    claimed_at=expected,
-                ).update(claimed_at=renewed_at, updated_at=renewed_at)
-                if updated != 1:
-                    self._lost = True
-                    logger.warning(
-                        "tenant_import_promotion_claim_lost",
-                        extra={"tenant_import_object_id": self.row_id},
-                    )
+                if not self._renew_once():
                     return
-                with self._lock:
-                    self.claimed_at = renewed_at
+        finally:
+            close_old_connections()
+
+    def _renew_once(self):
+        """Renew the claim. Return False only when the claim is genuinely gone.
+
+        A renewal error is NOT a lost claim: the fenced compare-and-swap in the
+        promotion write remains the authority on ownership. But it must not end the
+        heartbeat either -- abandoning renewal lets the recovery sweep treat this
+        live worker as stale and start a second one, which duplicates the object
+        copy. The fence still keeps the journal correct; the wasted external work is
+        what retrying here avoids. So a transient failure drops one beat and the
+        loop keeps going until the copy finishes or the claim is really taken.
+        """
+        with self._lock:
+            expected = self.claimed_at
+        renewed_at = timezone.now()
+        try:
+            updated = TenantImportObject.objects.filter(
+                pk=self.row_id,
+                state=TenantImportObject.State.STAGED,
+                claimed_at=expected,
+            ).update(claimed_at=renewed_at, updated_at=renewed_at)
         except Exception:
-            # Renewal keeps a live worker out of stale-claim recovery, but the
-            # fenced promotion write remains the authority on claim ownership.
             logger.warning(
                 "tenant_import_promotion_heartbeat_failed",
                 extra={"tenant_import_object_id": self.row_id},
                 exc_info=True,
             )
-        finally:
             close_old_connections()
+            return True
+        if updated != 1:
+            self._lost = True
+            logger.warning(
+                "tenant_import_promotion_claim_lost",
+                extra={"tenant_import_object_id": self.row_id},
+            )
+            return False
+        with self._lock:
+            self.claimed_at = renewed_at
+        return True

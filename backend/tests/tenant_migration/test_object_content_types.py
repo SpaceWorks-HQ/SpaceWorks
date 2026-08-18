@@ -195,3 +195,79 @@ def test_storage_copy_replaces_only_known_content_type(settings, monkeypatch):
     assert calls[1]["MetadataDirective"] == "REPLACE"
     assert "ContentType" not in calls[2]
     assert "MetadataDirective" not in calls[2]
+
+
+def test_promotion_heartbeat_keeps_renewing_after_a_transient_failure(
+    tmp_path, memory_objects, monkeypatch, caplog
+):
+    """One bad renewal must drop a beat, not abandon the lease.
+
+    Abandoning renewal leaves a live worker looking stale to the recovery sweep,
+    which then starts a second worker and duplicates the object copy. The fenced
+    promotion write still keeps the journal correct, so the damage is wasted
+    external work rather than corruption -- which is exactly what retrying avoids.
+    """
+    source_key = "machine-documents/source/retry.pdf"
+    _write_bundle(
+        tmp_path,
+        [
+            (
+                {
+                    "bucket_kind": "private",
+                    "source_key": source_key,
+                    "content_type": "application/pdf",
+                },
+                b"heartbeat retries",
+            ),
+        ],
+    )
+    job = _import_job("heartbeat-retry")
+    prepare_import_objects(SimpleNamespace(root=tmp_path), job)
+
+    real_manager = TenantImportObject.objects
+    attempts = []
+    renewed_again = Event()
+
+    class RetryingRenewal:
+        def __init__(self, filters):
+            self.filters = filters
+
+        def update(self, **kwargs):
+            attempts.append(1)
+            if len(attempts) == 1:
+                raise OperationalError("transient heartbeat failure")
+            result = real_manager.filter(**self.filters).update(**kwargs)
+            renewed_again.set()
+            return result
+
+    class RetryingManager:
+        @staticmethod
+        def filter(**filters):
+            return RetryingRenewal(filters)
+
+    class HeartbeatImportObject:
+        State = TenantImportObject.State
+        objects = RetryingManager()
+
+    real_copy = object_storage.copy_from_staging
+
+    def copy_after_second_renewal(*args):
+        assert renewed_again.wait(timeout=5), "heartbeat stopped after one failure"
+        return real_copy(*args)
+
+    monkeypatch.setattr(promotion_lease, "TenantImportObject", HeartbeatImportObject)
+    monkeypatch.setattr(
+        object_promotion, "PROMOTION_LEASE_DURATION", timedelta(milliseconds=30)
+    )
+    monkeypatch.setattr(
+        object_storage, "copy_from_staging", copy_after_second_renewal
+    )
+
+    with caplog.at_level("WARNING"):
+        assert promote_import_objects(job) == 1
+
+    assert len(attempts) >= 2
+    assert TenantImportObject.objects.get(job=job).state == (
+        TenantImportObject.State.VERIFIED
+    )
+    assert "tenant_import_promotion_heartbeat_failed" in caplog.text
