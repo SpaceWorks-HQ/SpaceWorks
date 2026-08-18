@@ -31,7 +31,23 @@ lookup must never lock people out of signing in. The access rules elsewhere fail
 that difference is deliberate, and this must not be "fixed" to match them.
 """
 
+import logging
+
+from django.core.cache import cache
+
 from apps.accounts.models_oidc import slug_from_provider_key
+
+logger = logging.getLogger(__name__)
+
+MEMBER_ACCOUNTS_CACHE_KEY = "accounts:member_accounts:last_known_good:v1"
+
+
+def _cached_member_accounts_enabled():
+    try:
+        return cache.get(MEMBER_ACCOUNTS_CACHE_KEY)
+    except Exception:  # pragma: no cover - a cache outage must not block authentication
+        logger.exception("member_accounts_cache_read_failed")
+        return None
 
 
 def member_accounts_enabled():
@@ -46,9 +62,17 @@ def member_accounts_enabled():
     try:
         from apps.makerspaces.deployment_modules import member_accounts_enabled as read
 
-        return read()
-    except Exception:  # pragma: no cover - defensive, mirrors the other capability reads
-        return True
+        enabled = bool(read())
+    except Exception:
+        logger.exception("member_accounts_read_failed")
+        cached = _cached_member_accounts_enabled()
+        return True if cached is None else bool(cached)
+
+    try:
+        cache.set(MEMBER_ACCOUNTS_CACHE_KEY, enabled, timeout=None)
+    except Exception:  # pragma: no cover - preserve the successfully resolved policy
+        logger.exception("member_accounts_cache_write_failed")
+    return enabled
 
 
 def is_external_provider(provider):
