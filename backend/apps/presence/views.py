@@ -16,7 +16,7 @@ from apps.presence.serializers import (
     PresenceSessionSerializer,
     PresenceStartSerializer,
 )
-from apps.presence.throttles import PresenceStartThrottle
+from apps.apiclients.throttling import MemberPrincipalRateThrottle
 
 
 ERRORS = {
@@ -30,7 +30,7 @@ ERRORS = {
 
 class PresenceStartView(APIView):
     permission_classes = [IsAuthenticated]
-    throttle_classes = [PresenceStartThrottle]
+    throttle_classes = [MemberPrincipalRateThrottle]
     throttle_scope = "presence_start"
 
     @extend_schema(tags=["Presence"], request=PresenceStartSerializer, responses={201: PresenceSessionSerializer, **ERRORS})
