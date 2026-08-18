@@ -141,6 +141,6 @@ PUBLIC_TOOL_CHECKOUT_EXAMPLE = OpenApiExample(
 
 LOGIN_EXAMPLE = OpenApiExample(
     "Staff login",
-    value={"username": "admin", "password": "secret-password"},
+    value={"username": "admin", "password": "secret-password", "surface": "staff"},
     request_only=True,
 )

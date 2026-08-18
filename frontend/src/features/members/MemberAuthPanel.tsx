@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
-import { publicV1Request, setAccessToken } from "../../lib/api";
+import {
+  publicV1Request,
+  setAccessToken,
+  staffRequest,
+  type PasswordLoginRequest,
+  type PasswordLoginResponse,
+} from "../../lib/api";
 import { SocialSignInButtons } from "../auth/SocialSignInButtons";
 
 export function MemberAuthPanel({
@@ -19,6 +25,8 @@ export function MemberAuthPanel({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [verificationOnly, setVerificationOnly] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
   // Each of these appears in the public config only when it has been switched off, so
   // an absent key — and a failed request — mean available.
   const [selfServeAccounts, setSelfServeAccounts] = useState(true);
@@ -60,13 +68,23 @@ export function MemberAuthPanel({
         setMode("login");
         setNotice("Check your email to verify the new account, then sign in.");
       } else {
-        const result = await publicV1Request<{ access: string }>("/auth/login", {
+        const request = {
+          username: email,
+          password,
+          surface: "member",
+        } satisfies PasswordLoginRequest;
+        const result = await publicV1Request<PasswordLoginResponse>("/auth/login", {
           method: "POST",
           credentials: "include",
-          body: JSON.stringify({ username: email, password }),
+          body: JSON.stringify(request),
         });
         setAccessToken(result.access);
-        onAuthenticated();
+        if (result.surface === "verification_only") {
+          setVerificationOnly(true);
+          setNotice("Enter the verification code sent to your email.");
+        } else {
+          onAuthenticated();
+        }
       }
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to continue.");
@@ -74,6 +92,75 @@ export function MemberAuthPanel({
       setPending(false);
     }
   };
+
+  const confirmVerification = async () => {
+    setPending(true);
+    setError("");
+    try {
+      await staffRequest("/auth/email-verification/confirm", {
+        method: "POST",
+        body: JSON.stringify({ code: verificationCode }),
+      });
+      onAuthenticated();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to verify email.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    setPending(true);
+    setError("");
+    try {
+      await staffRequest("/auth/email-verification/resend", { method: "POST" });
+      setNotice("If the details are valid, a verification email has been sent.");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to resend the code.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  if (verificationOnly) {
+    return (
+      <main className="desk-shell grid place-items-center px-5 py-8">
+        <form
+          className="desk-panel w-full max-w-md p-6"
+          onSubmit={(event) => { event.preventDefault(); void confirmVerification(); }}
+        >
+          <SpaceWorksBadge className="mb-5" />
+          <h1 className="title-page">Verify your email</h1>
+          <p className="mt-2 text-sm text-muted">
+            This session can only verify the address until email ownership is confirmed.
+          </p>
+          <label className="eyebrow mt-5 block" htmlFor="member-verification-code">Verification code</label>
+          <input
+            id="member-verification-code"
+            className="desk-input mt-1 w-full"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={verificationCode}
+            onChange={(event) => setVerificationCode(event.target.value)}
+            required
+          />
+          {notice ? <p className="mt-3 text-sm text-success-ink">{notice}</p> : null}
+          {error ? <p className="mt-3 text-sm text-danger" role="alert">{error}</p> : null}
+          <button className="desk-button-secondary mt-5 w-full" type="submit" disabled={pending}>
+            {pending ? "Please wait…" : "Verify email"}
+          </button>
+          <button
+            className="desk-button-ghost mt-3 w-full"
+            type="button"
+            disabled={pending}
+            onClick={() => { void resendVerification(); }}
+          >
+            Resend code
+          </button>
+        </form>
+      </main>
+    );
+  }
 
   return (
     <main className="desk-shell grid place-items-center px-5 py-8">

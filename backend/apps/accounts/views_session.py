@@ -44,7 +44,7 @@ class LoginView(TokenObtainPairView):
 
     @extend_schema(
         tags=["Auth"],
-        summary="Log in staff user",
+        summary="Log in with a password",
         auth=[],
         request=LoginRequestSerializer,
         responses={
@@ -81,7 +81,7 @@ class LoginView(TokenObtainPairView):
             target=serializer.user,
             meta={"username_hash": audit_events.fingerprint(username)},
         )
-        response = Response({"access": data["access"], "user": data["user"]})
+        response = Response({"access": data["access"], "surface": data["surface"], "user": data["user"]})
         set_refresh_cookies(response, refresh, request)
         return response
 
@@ -108,7 +108,10 @@ def _refresh_surface(token_str):
     except TokenError:
         pass
     try:
-        return SpaceWorksRefreshToken(token_str).get("surface")
+        surface = SpaceWorksRefreshToken(token_str).get("surface")
+        # Verification-only and legacy surface-less browser sessions use the member
+        # origin policy. Neither may inherit staff-origin trust while refreshing.
+        return surface if surface == "staff" else "member"
     except TokenError:
         return None
 

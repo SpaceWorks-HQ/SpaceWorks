@@ -19,6 +19,14 @@ from apps.accounts.models_devices import DeviceGrant, DeviceRefreshFamily
 from apps.accounts.tokens import validate_auth_generation
 
 
+VERIFICATION_ONLY_SURFACE = "verification_only"
+# One-release compatibility shim: the next release rejects tokens whose surface claim
+# is absent outright. During this release they receive member authority, never the old
+# unrestricted behavior; staff with an old token must sign in again.
+TREAT_MISSING_SURFACE_AS_MEMBER_FOR_ONE_RELEASE = True
+_KNOWN_SESSION_SURFACES = {"member", "staff", VERIFICATION_ONLY_SURFACE}
+
+
 class SpaceWorksJWTAuthentication(JWTAuthentication):
     """Adds immediate device-grant checks while preserving ordinary JWT behavior."""
 
@@ -34,9 +42,25 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
         from apps.backup.recovery import assert_principal_allowed
 
         assert_principal_allowed(user)
-        if token.get("surface") == "staff":
+        surface = _effective_session_surface(token)
+        if surface == "staff":
             _validate_staff_surface(request, token)
-        if token.get("surface") == "member" and not _member_surface_path_allowed(
+        if user.self_registered_at is not None and user.email_verified_at is None:
+            # Enforce provenance at authentication too: an older device/phone issuer
+            # cannot bypass verification merely because its token says member (or, for
+            # the one-release legacy case, has no surface claim).
+            surface = VERIFICATION_ONLY_SURFACE
+        elif surface == VERIFICATION_ONLY_SURFACE:
+            # Confirmation updates the user row, so the same already-issued session
+            # becomes an ordinary member session immediately after ownership is proven.
+            surface = "member"
+        if surface == VERIFICATION_ONLY_SURFACE and not _verification_path_allowed(
+            request.path
+        ):
+            raise PermissionDenied(
+                "Verify the account email before accessing member APIs."
+            )
+        if surface == "member" and not _member_surface_path_allowed(
             request.path
         ):
             raise PermissionDenied("Member sessions cannot access staff APIs.")
@@ -124,6 +148,23 @@ class SpaceWorksJWTScheme(SimpleJWTScheme):
 
 def _member_surface_path_allowed(path):
     return path.startswith(CLAIM_REACHABLE_PREFIXES)
+
+
+def _verification_path_allowed(path):
+    return path.rstrip("/") in {
+        "/api/v1/auth/me",
+        "/api/v1/auth/email-verification/resend",
+        "/api/v1/auth/email-verification/confirm",
+    }
+
+
+def _effective_session_surface(token):
+    surface = token.get("surface")
+    if surface is None and TREAT_MISSING_SURFACE_AS_MEMBER_FOR_ONE_RELEASE:
+        return "member"
+    if surface not in _KNOWN_SESSION_SURFACES:
+        raise AuthenticationFailed("Invalid session surface.")
+    return surface
 
 
 def _assert_source_gate(request):

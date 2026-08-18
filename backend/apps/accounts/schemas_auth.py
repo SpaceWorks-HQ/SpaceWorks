@@ -42,12 +42,18 @@ LoginRequestSerializer = inline_serializer(
     fields={
         "username": serializers.CharField(),
         "password": serializers.CharField(write_only=True),
+        "surface": serializers.ChoiceField(
+            choices=("member", "staff"), default="member", required=False
+        ),
     },
 )
 LoginResponseSerializer = inline_serializer(
     name="LoginResponse",
     fields={
         "access": serializers.CharField(),
+        "surface": serializers.ChoiceField(
+            choices=("member", "staff", "verification_only")
+        ),
         "user": UserPayloadSerializer,
     },
 )
