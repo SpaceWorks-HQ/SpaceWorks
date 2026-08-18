@@ -1,16 +1,30 @@
-﻿import pytest
+﻿import os
+
+import pytest
+from cryptography.fernet import Fernet
 from django.core.cache import cache
 from django.db import connection
+
+
+# Reuse the deployment key when the environment supplies one: migration 0004
+# provisions the global scope key WRAPPED WITH IT, so generating a different key here
+# would make that row un-unwrappable and every audit row silently unattested.
+_TEST_AUDIT_MAC_MASTER_KEY = (
+    os.environ.get("AUDIT_MAC_MASTER_KEY")
+    or Fernet.generate_key().decode("ascii")
+)
 
 
 @pytest.fixture(autouse=True)
 def disable_axes_by_default(settings, request):
     settings.AXES_ENABLED = False
     settings.CELERY_TASK_ALWAYS_EAGER = True
+    settings.AUDIT_MAC_MASTER_KEY = _TEST_AUDIT_MAC_MASTER_KEY
     _reset_axes_state(request)
     yield
     settings.AXES_ENABLED = False
     settings.CELERY_TASK_ALWAYS_EAGER = True
+    settings.AUDIT_MAC_MASTER_KEY = _TEST_AUDIT_MAC_MASTER_KEY
     _reset_axes_state(request)
 
 
@@ -53,6 +67,28 @@ def ensure_global_pii_write_fence(request):
     from apps.encryption.models import PiiGlobalWriteFence
 
     PiiGlobalWriteFence.objects.get_or_create(pk=1)
+
+
+@pytest.fixture(autouse=True)
+def ensure_global_audit_mac_key(request, settings):
+    """Mirror the deploy-time global-key provisioning invariant in DB tests."""
+    settings.AUDIT_MAC_MASTER_KEY = _TEST_AUDIT_MAC_MASTER_KEY
+    # This is a GENERATOR fixture, so every path must yield exactly once. A bare return
+    # here raises "did not yield a value" and errors the test at setup -- which hits every
+    # test that is not marked django_db, i.e. most of the suite.
+    if (
+        not request.node.get_closest_marker("django_db")
+        or connection.needs_rollback
+    ):
+        yield
+        return
+    request.getfixturevalue("db")
+    from apps.audit.keys import audit_mac_key_cache, provision_audit_mac_key
+
+    audit_mac_key_cache.clear()
+    provision_audit_mac_key()
+    yield
+    audit_mac_key_cache.clear()
 
 
 @pytest.fixture(autouse=True)

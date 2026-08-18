@@ -61,6 +61,10 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         # The importer owns this outright: the row is created IMPORTING and only the
         # activation transition may make it ACTIVE, so no archived value may travel.
         ("makerspaces.Makerspace", "lifecycle_state"),
+        # semantic_remap rewrites actor/target/meta on import, so a source MAC
+        # cannot survive: the target recomputes it under the TARGET key after all
+        # remapping. Never carry the source value.
+        ("audit.AuditLog", "row_mac"),
     ),
     **_rules(
         EMPTY_STRING,
@@ -81,6 +85,10 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
     ),
     **_rules(
         NULL,
+        # Nullable AND globally unique, so the guard requires NULL: a freshly
+        # generated identity would claim provenance the target has not attested. The
+        # target reseals its own rows (row_mac is DERIVED above).
+        ("audit.AuditLog", "event_uuid"),
         ("machines.Machine", "legacy_print_printer_id"),
         ("machines.MachineConsumableAdjustment", "legacy_filament_adjustment_id"),
         ("machines.MachineConsumablePool", "legacy_filament_spool_id"),

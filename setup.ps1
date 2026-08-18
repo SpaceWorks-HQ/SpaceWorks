@@ -94,6 +94,7 @@ MINIO_ROOT_USER=$(New-Key 24)
 MINIO_ROOT_PASSWORD=$(New-Key 40)
 SECRET_KEY=$(New-Key 50)
 API_CLIENT_ENC_KEY=$(New-FernetKey)
+AUDIT_MAC_MASTER_KEY=$(New-FernetKey)
 ALLOWED_HOSTS=$webhost,localhost,127.0.0.1,backend
 CORS_ALLOWED_ORIGINS=http://$webhost
 # Absolute base for links in outbound email (password reset, invitations). Without it
