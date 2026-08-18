@@ -1,8 +1,6 @@
-import json
 import logging
 from datetime import timedelta
-from urllib import error as urllib_error
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pytest
 from django.utils import timezone
@@ -46,13 +44,6 @@ def configure(space, channel):
     return space
 
 
-def response(status=204):
-    result = MagicMock()
-    result.status = status
-    result.__enter__.return_value = result
-    return result
-
-
 def dispatch(space, channel="slack", **kwargs):
     """The single log for a space with no destination rows.
 
@@ -82,30 +73,32 @@ def dispatch_all(space, channel="slack", **kwargs):
 )
 def test_send_webhook_posts_exact_json(channel, url, monkeypatch):
     space = configure(make_space(f"webhook-{channel}"), channel)
-    urlopen = Mock(return_value=response())
-    monkeypatch.setattr("apps.integrations.webhooks.urllib_request.urlopen", urlopen)
+    target = object()
+    resolver = Mock(return_value=target)
+    post = Mock(return_value=(204, None))
+    monkeypatch.setattr("apps.integrations.webhooks.resolve_webhook_target", resolver)
+    monkeypatch.setattr("apps.integrations.webhooks._post_to_target", post)
 
     assert send_webhook(space, channel=channel, text="Hello ✓") is True
 
-    request = urlopen.call_args.args[0]
-    assert request.full_url == url
-    assert request.method == "POST"
-    assert request.data == json.dumps({"text": "Hello ✓"}).encode("utf-8")
-    assert request.get_header("Content-type") == "application/json"
-    assert urlopen.call_args.kwargs == {"timeout": 5}
+    resolver.assert_called_once_with(url)
+    post.assert_called_once_with(target, b'{"text": "Hello \\u2713"}')
 
 
 @pytest.mark.parametrize(
     "failure",
-    [503, TimeoutError("timeout"), urllib_error.URLError("dns")],
+    [503, TimeoutError("timeout"), OSError("network")],
 )
 def test_send_webhook_wraps_transport_failures(failure, monkeypatch):
     space = configure(make_space(f"webhook-fail-{type(failure).__name__}"), "slack")
+    monkeypatch.setattr(
+        "apps.integrations.webhooks.resolve_webhook_target", Mock(return_value=object())
+    )
     if isinstance(failure, int):
-        urlopen = Mock(return_value=response(failure))
+        post = Mock(return_value=(failure, None))
     else:
-        urlopen = Mock(side_effect=failure)
-    monkeypatch.setattr("apps.integrations.webhooks.urllib_request.urlopen", urlopen)
+        post = Mock(side_effect=failure)
+    monkeypatch.setattr("apps.integrations.webhooks._post_to_target", post)
 
     with pytest.raises(WebhookDeliveryError, match="Webhook delivery failed"):
         send_webhook(space, channel="slack", text="Hello")
@@ -113,17 +106,17 @@ def test_send_webhook_wraps_transport_failures(failure, monkeypatch):
 
 def test_send_webhook_blank_and_malformed_secrets(monkeypatch):
     blank = make_space("webhook-blank")
-    urlopen = Mock()
-    monkeypatch.setattr("apps.integrations.webhooks.urllib_request.urlopen", urlopen)
+    post = Mock()
+    monkeypatch.setattr("apps.integrations.webhooks._post_to_target", post)
     assert send_webhook(blank, channel="slack", text="Hello") is False
-    urlopen.assert_not_called()
+    post.assert_not_called()
 
     malformed = make_space("webhook-malformed")
     malformed.set_slack_webhook_url("not-a-url")
     malformed.save(update_fields=["slack_webhook_url"])
-    urlopen.side_effect = ValueError("unknown url type")
     with pytest.raises(WebhookDeliveryError):
         send_webhook(malformed, channel="slack", text="Hello")
+    post.assert_not_called()
 
 
 def test_unconfigured_dispatch_fails_without_send_or_quota(monkeypatch):
@@ -250,8 +243,11 @@ def test_managed_channel_cap_blocks_second_send(monkeypatch):
     space = configure(make_space("notification-cap"), "slack")
     monkeypatch.setattr(limits, "is_self_host", lambda: False)
     monkeypatch.setattr(limits, "resource_limit", lambda makerspace, channel: 1)
-    urlopen = Mock(return_value=response())
-    monkeypatch.setattr("apps.integrations.webhooks.urllib_request.urlopen", urlopen)
+    monkeypatch.setattr(
+        "apps.integrations.webhooks.resolve_webhook_target", Mock(return_value=object())
+    )
+    post = Mock(return_value=(204, None))
+    monkeypatch.setattr("apps.integrations.webhooks._post_to_target", post)
 
     first = dispatch(space, sync=True)
     second = dispatch(space, sync=True)
@@ -259,7 +255,7 @@ def test_managed_channel_cap_blocks_second_send(monkeypatch):
     assert first.status == NotificationDeliveryStatus.SENT
     assert second.status == NotificationDeliveryStatus.FAILED
     assert second.error == "Daily slack notification limit reached for this space."
-    assert urlopen.call_count == 1
+    assert post.call_count == 1
     counter = DailyNotificationCounter.objects.get()
     assert (counter.channel, counter.count) == ("slack", 1)
     assert not DailyEmailCounter.objects.exists()

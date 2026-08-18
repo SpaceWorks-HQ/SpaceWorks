@@ -33,6 +33,7 @@ class MachineOperatorCandidatesView(APIView):
         memberships = (
             MakerspaceMembership.objects.filter(
                 makerspace_id=machine.makerspace_id,
+                status="active",
                 user__is_active=True,
                 user__access_status=User.AccessStatus.ACTIVE,
             )

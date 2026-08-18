@@ -10,6 +10,10 @@ from apps.integrations.models_destinations import (
     WEBHOOK_CHANNELS,
 )
 from apps.integrations.notification_enums import ChatNotificationChannel
+from apps.integrations.webhook_validation import (
+    UnsafeWebhookUrl,
+    resolve_webhook_target,
+)
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -52,6 +56,13 @@ class NotificationDestinationAdminForm(forms.ModelForm):
                 raise forms.ValidationError(
                     {"telegram_chat_id": "Only Telegram destinations carry a chat id."}
                 )
+            if raw_webhook:
+                try:
+                    resolve_webhook_target(raw_webhook)
+                except UnsafeWebhookUrl as exc:
+                    raise forms.ValidationError(
+                        {"new_webhook_url": str(exc)}
+                    ) from exc
         return cleaned
 
     def save(self, commit=True):

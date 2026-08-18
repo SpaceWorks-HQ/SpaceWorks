@@ -75,20 +75,10 @@ def test_discord_payload_uses_content_not_text(monkeypatch):
 
     captured = {}
 
-    class FakeResponse:
-        status = 200
+    def fake_deliver(url, payload):
+        captured[url] = json.loads(payload.decode("utf-8"))
 
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-    def fake_urlopen(req, timeout=None):
-        captured[req.full_url] = json.loads(req.data.decode("utf-8"))
-        return FakeResponse()
-
-    monkeypatch.setattr(webhooks.urllib_request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(webhooks, "_deliver", fake_deliver)
 
     space = make_space("p10-payload")
     space.set_discord_webhook_url(DISCORD_WEBHOOK)
@@ -107,22 +97,10 @@ def test_discord_messages_are_trimmed_to_the_provider_limit(monkeypatch):
 
     captured = {}
 
-    class FakeResponse:
-        status = 200
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
     monkeypatch.setattr(
-        webhooks.urllib_request,
-        "urlopen",
-        lambda req, timeout=None: (
-            captured.update(json.loads(req.data.decode("utf-8"))),
-            FakeResponse(),
-        )[1],
+        webhooks,
+        "_deliver",
+        lambda _url, payload: captured.update(json.loads(payload.decode("utf-8"))),
     )
     space = space_with_discord("p10-trim")
     webhooks.send_webhook(space, channel="discord", text="x" * 2500)

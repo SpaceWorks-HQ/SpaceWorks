@@ -5,6 +5,7 @@ from apps.integrations.models_destinations import (
     WEBHOOK_CHANNELS,
 )
 from apps.integrations.notification_enums import ChatNotificationChannel
+from apps.integrations.webhook_validation import validate_webhook_url
 
 
 class DestinationScopeSerializer(serializers.Serializer):
@@ -87,6 +88,8 @@ class NotificationDestinationWriteSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     {"telegram_chat_id": "Only Telegram destinations carry a chat id."}
                 )
+            if webhook:
+                attrs["webhook_url"] = validate_webhook_url(webhook)
         if existing is not None and existing.channel != channel:
             # Changing a room's channel would leave a credential of the wrong shape and
             # silently repoint an operator's scope links at a different provider.
