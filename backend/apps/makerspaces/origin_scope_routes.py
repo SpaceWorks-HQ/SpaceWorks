@@ -1,8 +1,6 @@
 from django.apps import apps
 
-
 MAKERSPACE_KWARG_ROUTES = {
-    'admin-memberships-roster': 'makerspace_id',
     'admin-maintenance-schedule-list-create': 'makerspace_id',
     'admin-maintenance-log-list-create': 'makerspace_id',
     'admin-bookable-space-list-create': 'makerspace_id',
@@ -19,7 +17,17 @@ MAKERSPACE_KWARG_ROUTES = {
     'admin-notification-rules': 'makerspace_id',
     'admin-machine-service-request-list-create': 'makerspace_id',
 }
-
+# These routes have no tenant-bearing path segment by design: each is a listing whose
+# queryset is explicitly narrowed by the named makerspace query parameter.
+QUERY_SCOPED_ROUTES = {
+    'admin-api-key-requests',       # requester-owned API-key requests; ?makerspace=
+    'admin-audit-logs',             # tenant audit-log listing; ?makerspace=
+    'admin-membership-requests',    # tenant join-request queue; ?makerspace_id=
+    'admin-memberships-roster',     # tenant membership roster; ?makerspace_id=
+    'admin-needs-fix-shelf',        # tenant repair shelf; ?makerspace=
+    'ledger-aggregate',             # superadmin aggregate listing; ?makerspace=
+    'ledger-export-aggregate',      # matching aggregate export; ?makerspace=
+}
 NATIVE_HEADER_GLOBAL_ROUTES = {
     'auth-me',
     'device-grants',
@@ -27,7 +35,6 @@ NATIVE_HEADER_GLOBAL_ROUTES = {
     'push-device-list-create',
     'push-device-detail',
 }
-
 REQUEST_ACTIONS = {
     'request-accept',
     'request-reject',
@@ -54,6 +61,7 @@ MODEL_LOOKUPS = {
     'admin-membership-request-revoke': ('makerspaces.MembershipRequest', 'makerspace_id'),
     'admin-membership-revoke-m2': ('makerspaces.MakerspaceMembership', 'makerspace_id'),
     'admin-membership-role-m2': ('makerspaces.MakerspaceMembership', 'makerspace_id'),
+    'admin-membership-capabilities': ('makerspaces.MakerspaceMembership', 'makerspace_id'),
     'admin-membership-revoke': ('makerspaces.MakerspaceMembership', 'makerspace_id'),
     'admin-presence-sessions-current': ('makerspaces.Makerspace', 'id'),
     'admin-maintenance-schedule-detail': ('maintenance.MaintenanceSchedule', 'machine__makerspace_id'),
@@ -154,27 +162,83 @@ MODEL_LOOKUPS = {
     'admin-machine-document-detail': ('machines.MachineDocument', 'machine__makerspace_id'),
     'admin-machine-service-file-url': ('machines.ServiceRequestFile', 'makerspace_id'),
     'admin-machine-service-file-detail': ('machines.ServiceRequestFile', 'makerspace_id'),
+    'admin-machine-service-request-reprint': ('machines.MachineServiceRequest', 'makerspace_id'),
+    'admin-machine-service-payment-mark-offline': ('payments.Payment', 'makerspace_id'),
+    'admin-machine-service-payment-waive': ('payments.Payment', 'makerspace_id'),
     **{name: ('hardware_requests.HardwareRequest', 'makerspace_id') for name in REQUEST_ACTIONS},
     **{name: ('machines.MachineServiceRequest', 'makerspace_id') for name in MACHINE_SERVICE_ACTIONS},
+}
+# A password belongs to a User, not one membership. Keep this set-valued lookup out of
+# MODEL_LOOKUPS so a multi-membership user can never be reduced to one arbitrary tenant.
+TARGET_SET_LOOKUPS = {
+    'admin-user-reset-password': (
+        'makerspaces.MakerspaceMembership', 'user_id', 'makerspace_id'),
 }
 
 
 def request_route_targets(request, view=None):
+    url_name, targets, invalid, route_recognized = _authoritative_route_targets(
+        request, view
+    )
+    hints = []
+
+    query = getattr(request, 'query_params', None)
+    if query is None:
+        query = getattr(request, 'GET', {})
+    for key in ('makerspace', 'makerspace_id'):
+        value = query.get(key)
+        if value in (None, ''):
+            continue
+        parsed = _positive_int(value)
+        invalid = invalid or parsed is None
+        if parsed is not None:
+            hints.append(parsed)
+
+    if getattr(request, "method", "GET") not in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+        body = getattr(request, "data", {})
+        if hasattr(body, "get"):
+            for key in ("makerspace", "makerspace_id"):
+                value = body.get(key)
+                if value in (None, ""):
+                    continue
+                parsed = _positive_int(value)
+                invalid = invalid or parsed is None
+                if parsed is not None:
+                    hints.append(parsed)
+
+    hint_set = set(hints)
+    if url_name in TARGET_SET_LOOKUPS:
+        invalid = invalid or bool(hint_set - targets)
+    else:
+        invalid = invalid or len(targets | hint_set) > 1
+    target_set = targets | hint_set
+    return url_name, target_set, invalid, route_recognized
+
+
+def authoritative_route_resolution(request, view=None):
+    """Return non-raising authoritative targets plus whether the route is known."""
+    try:
+        _name, targets, invalid, recognized = _authoritative_route_targets(
+            request, view
+        )
+    except Exception:
+        return set(), False
+    return (targets if recognized and not invalid else set()), recognized
+
+
+def _authoritative_route_targets(request, view=None):
     match = getattr(request, 'resolver_match', None)
     url_name = getattr(match, 'url_name', '')
     kwargs = dict(getattr(match, 'kwargs', {}) or {})
     kwargs.update(getattr(view, 'kwargs', {}) or {})
-    targets = []
+    targets = set()
     invalid = False
-
     registered = MAKERSPACE_KWARG_ROUTES.get(url_name)
     route_recognized = bool(
-        registered
-        or 'makerspace_id' in kwargs
+        registered or 'makerspace_id' in kwargs
         or (url_name == 'admin-makerspace' and 'pk' in kwargs)
-        or url_name in MODEL_LOOKUPS
-        or url_name in NATIVE_HEADER_GLOBAL_ROUTES
-    )
+        or url_name in MODEL_LOOKUPS or url_name in TARGET_SET_LOOKUPS
+        or url_name in QUERY_SCOPED_ROUTES or url_name in NATIVE_HEADER_GLOBAL_ROUTES)
     route_value = None
     if registered:
         route_value = kwargs.get(registered)
@@ -187,50 +251,20 @@ def request_route_targets(request, view=None):
         parsed = _positive_int(route_value)
         invalid = invalid or parsed is None
         if parsed is not None:
-            targets.append(parsed)
-
-    query = getattr(request, 'query_params', None)
-    if query is None:
-        query = getattr(request, 'GET', {})
-    for key in ('makerspace', 'makerspace_id'):
-        value = query.get(key)
-        if value in (None, ''):
-            continue
-        parsed = _positive_int(value)
-        invalid = invalid or parsed is None
-        if parsed is not None:
-            targets.append(parsed)
-
-    if getattr(request, "method", "GET") not in {"GET", "HEAD", "OPTIONS", "TRACE"}:
-        body = getattr(request, "data", {})
-        if hasattr(body, "get"):
-            for key in ("makerspace", "makerspace_id"):
-                value = body.get(key)
-                if value in (None, ""):
-                    continue
-                parsed = _positive_int(value)
-                invalid = invalid or parsed is None
-                if parsed is not None:
-                    targets.append(parsed)
+            targets.add(parsed)
 
     if url_name in MODEL_LOOKUPS:
         pk = kwargs.get('pk')
-        if pk is None:
-            invalid = True
-        else:
-            resolved = _lookup_makerspace_id(url_name, pk)
-            invalid = invalid or resolved is None
-            if resolved is not None:
-                targets.append(resolved)
-
-    target_set = set(targets)
-    invalid = invalid or len(target_set) > 1
-    return (
-        url_name,
-        target_set,
-        invalid,
-        route_recognized,
-    )
+        resolved = _lookup_makerspace_id(url_name, pk) if pk is not None else None
+        invalid = invalid or resolved is None
+        if resolved is not None:
+            targets.add(resolved)
+    elif url_name in TARGET_SET_LOOKUPS:
+        pk = kwargs.get('pk')
+        invalid = invalid or pk is None
+        if pk is not None:
+            targets.update(_lookup_makerspace_ids(url_name, pk))
+    return url_name, targets, invalid, route_recognized
 
 
 def _positive_int(value):
@@ -248,3 +282,12 @@ def _lookup_makerspace_id(url_name, pk):
         return model.objects.values_list(field, flat=True).get(pk=pk)
     except model.DoesNotExist:
         return None
+
+
+def _lookup_makerspace_ids(url_name, pk):
+    model_path, owner_field, tenant_field = TARGET_SET_LOOKUPS[url_name]
+    model = apps.get_model(model_path)
+    return set(
+        model.objects.filter(**{owner_field: pk})
+        .values_list(tenant_field, flat=True)
+    )
