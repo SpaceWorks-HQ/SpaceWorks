@@ -54,7 +54,10 @@ def scoped_pools(actor, queryset):
     )
     manage_scope = rbac.makerspaces_for_action(actor, rbac.Action.MANAGE_MACHINES)
     if manage_scope is rbac.ALL:
-        return queryset
+        # Detail lookups can span makerspaces even though the list route supplies one.
+        # Resolve role scope per represented tenant instead of using action-level ALL as
+        # proof that every machine-bound pool is reachable.
+        manage_scope = set(queryset.values_list("makerspace_id", flat=True).distinct())
     scoped = role_scope.scoped_related_q(
         actor,
         manage_scope,

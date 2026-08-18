@@ -65,7 +65,10 @@ def _manageable_file(actor, pk, *, attached=False):
 def _narrow_files_to_machine_scope(actor, queryset):
     manage_scope = rbac.makerspaces_for_action(actor, rbac.Action.MANAGE_MACHINES)
     if manage_scope is rbac.ALL:
-        return queryset
+        # Files from multiple makerspaces can reach this helper. ALL describes the
+        # action-level tenant grant, not whether a hidden-space membership's role is
+        # machine-scoped, so give scoped_related_q concrete ids for its plural resolver.
+        manage_scope = set(queryset.values_list("makerspace_id", flat=True).distinct())
     return queryset.filter(
         role_scope.scoped_related_q(
             actor,
