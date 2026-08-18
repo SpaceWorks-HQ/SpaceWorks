@@ -68,6 +68,19 @@ export type StaffAuthUser = {
   }[];
 };
 
+export type PasswordLoginRequestedSurface = "member" | "staff";
+export type PasswordLoginSurface = PasswordLoginRequestedSurface | "verification_only";
+export type PasswordLoginRequest = {
+  username: string;
+  password: string;
+  surface: PasswordLoginRequestedSurface;
+};
+export type PasswordLoginResponse<TUser = unknown> = {
+  access: string;
+  surface: PasswordLoginSurface;
+  user: TUser;
+};
+
 export type ApiErrorBody = Record<string, unknown> & {
   detail?: unknown;
   code?: unknown;
@@ -372,4 +385,3 @@ export async function downloadStaffFile(path: string, filename: string) {
   link.click();
   URL.revokeObjectURL(url);
 }
-

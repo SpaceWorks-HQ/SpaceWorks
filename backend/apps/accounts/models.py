@@ -30,6 +30,10 @@ class User(AbstractUser):
     phone_verified_at = models.DateTimeField(null=True, blank=True)
     display_name = models.CharField(max_length=200, blank=True)
     email_verified_at = models.DateTimeField(null=True, blank=True)
+    # Provenance matters for login: only accounts created by the anonymous signup
+    # flow must remain verification-only until they prove ownership of their email.
+    # Staff-created users may legitimately start without an email verification stamp.
+    self_registered_at = models.DateTimeField(null=True, blank=True)
     external_checkin_user_id = models.CharField(max_length=128, blank=True)
     telegram_user_id = models.CharField(max_length=64, blank=True)
     must_change_password = models.BooleanField(default=False)

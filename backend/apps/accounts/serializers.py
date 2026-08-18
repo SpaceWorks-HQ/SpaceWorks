@@ -1,11 +1,15 @@
 from rest_framework import serializers
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings
 
 from apps.accounts.models import User
 from apps.accounts.services_refresh_tokens import rotate_refresh_token
 from apps.accounts.tokens import SpaceWorksRefreshToken, validate_auth_generation
+from apps.accounts.models_social import SocialSurface
+
+
+VERIFICATION_ONLY_SURFACE = "verification_only"
 
 
 def user_payload(user, request=None):
@@ -146,8 +150,14 @@ def _legacy_role_name(role):
 
 class LoginSerializer(TokenObtainPairSerializer):
     token_class = SpaceWorksRefreshToken
+    surface = serializers.ChoiceField(
+        choices=SocialSurface.choices,
+        default=SocialSurface.MEMBER,
+        required=False,
+    )
 
     def validate(self, attrs):
+        requested_surface = attrs.pop("surface", SocialSurface.MEMBER)
         supplied_username = attrs.get(self.username_field, "")
         if supplied_username and not User.objects.filter(username=supplied_username).exists():
             email_matches = User.objects.filter(
@@ -161,7 +171,44 @@ class LoginSerializer(TokenObtainPairSerializer):
         assert_token_issuance_allowed(self.user)
         if self.user.access_status != User.AccessStatus.ACTIVE:
             raise AuthenticationFailed("Account access is restricted.", code="access_denied")
-        data["user"] = user_payload(self.user, request=self.context.get("request"))
+        request = self.context.get("request")
+        staff_scope = None
+        if requested_surface == SocialSurface.STAFF:
+            from apps.accounts.services_social_identity import SocialResolutionError
+            from apps.accounts.services_social_login import assert_staff_authority
+            from apps.accounts.social_nonces import request_origin
+            from apps.makerspaces.cors import staff_origin_is_registered
+            from apps.makerspaces.origin_scope import (
+                NO_STAFF_ORIGIN_SCOPE,
+                staff_origin_scope,
+            )
+
+            if request is None or not staff_origin_is_registered(request_origin(request)):
+                raise PermissionDenied("Staff login requires a trusted staff origin.")
+            try:
+                # Password and social login deliberately share this authority decision;
+                # a second staff definition would drift from RBAC and tenant scoping.
+                assert_staff_authority(self.user, request)
+            except SocialResolutionError as exc:
+                raise PermissionDenied("Staff access is required.") from exc
+            scope = staff_origin_scope(request)
+            staff_scope = "platform" if scope is NO_STAFF_ORIGIN_SCOPE else str(scope)
+
+        surface = requested_surface
+        if (
+            self.user.self_registered_at is not None
+            and self.user.email_verified_at is None
+        ):
+            surface = VERIFICATION_ONLY_SURFACE
+
+        refresh = self.token_class(data["refresh"])
+        refresh["surface"] = surface
+        if surface == SocialSurface.STAFF:
+            refresh["staff_scope"] = staff_scope
+        data["refresh"] = str(refresh)
+        data["access"] = str(refresh.access_token)
+        data["surface"] = surface
+        data["user"] = user_payload(self.user, request=request)
         return data
 
 

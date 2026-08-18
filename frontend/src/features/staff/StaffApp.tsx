@@ -10,6 +10,8 @@ import {
   refreshAccessToken,
   setAccessToken,
   staffRequest,
+  type PasswordLoginRequest,
+  type PasswordLoginResponse,
   type StaffAuthUser,
 } from "../../lib/api";
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
@@ -134,10 +136,10 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
 
   const login = useMutation({
     mutationFn: (payload: { username: string; password: string }) =>
-      staffRequest<{ access: string; user: StaffAuthUser }>("/auth/login", {
+      staffRequest<PasswordLoginResponse<StaffAuthUser>>("/auth/login", {
         method: "POST",
         credentials: "include",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, surface: "staff" } satisfies PasswordLoginRequest),
       }),
     onSuccess: (data) => {
       setAccessToken(data.access);
