@@ -40,6 +40,10 @@ REVIEWED_NON_CREDENTIAL = {
         "tenant_migration.ExternalTenantReference",
         "source_archive_digest",
     ): "Archive integrity identifier, not an authentication credential.",
+    (
+        "apiclients.ApiClient",
+        "previous_secret_valid_until",
+    ): "Expiry timestamp for the rotation grace window; the secret itself is omitted.",
 }
 
 

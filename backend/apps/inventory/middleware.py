@@ -6,7 +6,9 @@ from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.http import JsonResponse
+from django.utils import timezone
 
+from apps.apiclients.crypto import decrypt_secret
 from apps.inventory.middleware_nonce import (
     NONCE_MAX_LENGTH,
     body_could_re_encode_nonce,
@@ -140,10 +142,25 @@ class FrontendHMACMiddleware:
                 message_parts.append(nonce.encode())
             message_parts.append(request.body)
             message = b"\n".join(message_parts)
-            expected = hmac.new(
-                client.get_secret().encode(), message, hashlib.sha256
+            current_secret = client.get_secret()
+            previous_secret_is_active = bool(
+                client.previous_secret_encrypted and client.previous_secret_valid_until
+                and client.previous_secret_valid_until > timezone.now()
+            )
+            previous_token = (
+                client.previous_secret_encrypted if previous_secret_is_active
+                else client.secret_encrypted
+            )
+            previous_secret = decrypt_secret(previous_token)
+            current_expected = hmac.new(
+                current_secret.encode(), message, hashlib.sha256
             ).hexdigest()
-            if not hmac.compare_digest(signature, expected):
+            previous_expected = hmac.new(
+                previous_secret.encode(), message, hashlib.sha256
+            ).hexdigest()
+            current_matches = hmac.compare_digest(signature, current_expected)
+            previous_matches = hmac.compare_digest(signature, previous_expected)
+            if not (current_matches | previous_matches):
                 set_failure_reason(request, BAD_SIGNATURE)
                 return False
             if nonce:
