@@ -88,8 +88,14 @@ def test_return_put_mode_rejects_invalid_evidence_size(monkeypatch, settings, si
     product = make_product(makerspace)
     hardware_request = make_issued_request(makerspace, admin, [(product, 1)])
     evidence = make_return_evidence(makerspace, admin)
-    monkeypatch.setattr("apps.evidence.storage.object_exists", Mock(return_value=True))
-    monkeypatch.setattr("apps.evidence.storage.object_size", Mock(return_value=size))
+    from apps.evidence.storage import EvidenceObjectValidationError, EvidenceValidationResult
+
+    def validate(key):
+        if key == evidence.object_key:
+            raise EvidenceObjectValidationError("missing", "missing")
+        return EvidenceValidationResult(size=size, content_type="image/png")
+
+    monkeypatch.setattr("apps.evidence.storage.validate_evidence_object", validate)
 
     response = authenticated_client(admin).post(
         return_url(hardware_request),

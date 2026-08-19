@@ -171,6 +171,7 @@ LIFECYCLE_EXEMPTIONS = {
 OBJECT_MUTATION_PARTICIPANTS = {
     "apps.data_export.services._fail_job": "Called only by the task-resolved run_export_job lifecycle.",
     "apps.data_export.services._finalize_job": "Called only by the task-resolved run_export_job lifecycle.",
+    "apps.evidence.finalization.finalize_upload": "Reached only through the already-declared handover, return and direct-loan entry points.",
     "apps.events.services_images.remove_image": "Called by the tenant-resolved event image route.",
     "apps.events.services_images.update_image": "Called by the tenant-resolved event image route.",
     "apps.hardware_requests.direct_loan_returns.validate_evidence_upload": "Runs inside the guarded direct-loan return transaction.",

@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import pytest
 from django.test import override_settings
 from rest_framework.test import APIClient
@@ -6,6 +8,7 @@ from apps.accounts.models import User
 from apps.audit.models import AuditLog
 from apps.boxes.models import Box, QrCode, QrScanEvent
 from apps.evidence.models import EvidencePhoto
+from apps.evidence.storage import EvidenceValidationResult
 from apps.hardware_requests.models import HardwareRequest, PublicToolLoan
 from apps.inventory.models import InventoryAsset, InventoryProduct, TrackingMode
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
@@ -271,7 +274,16 @@ def test_public_checkout_rejects_box_qr_fallback_for_individual_tracked_product(
 
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=False)
-def test_public_checkout_and_return_move_inventory_and_record_scans():
+def test_public_checkout_and_return_move_inventory_and_record_scans(
+    monkeypatch, settings
+):
+    settings.STORAGE_PRESIGN_METHOD = "post"
+    finalize = Mock(
+        side_effect=lambda evidence, max_bytes: EvidenceValidationResult(
+            size=123, content_type="image/png"
+        )
+    )
+    monkeypatch.setattr("apps.evidence.storage.finalize_upload", finalize)
     makerspace = make_space("checkout-return")
     user = eligible_member(makerspace)
     product = make_product(makerspace, public_self_checkout_enabled=True)
@@ -315,6 +327,15 @@ def test_public_checkout_and_return_move_inventory_and_record_scans():
     request.refresh_from_db()
     assert request.status == HardwareRequest.Status.RETURNED
     assert QrScanEvent.objects.filter(context=QrScanEvent.Context.RETURN).count() == 1
+    loan.refresh_from_db()
+    assert [call.args[0] for call in finalize.call_args_list] == [
+        request.issue_evidence,
+        loan.return_evidence,
+    ]
+    assert all(
+        call.args[1] == settings.EVIDENCE_MAX_BYTES
+        for call in finalize.call_args_list
+    )
 
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=False)

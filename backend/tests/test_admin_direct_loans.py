@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import Mock
 
 import pytest
 from django.test import override_settings
@@ -8,6 +9,7 @@ from apps.accounts.models import User
 from apps.audit.models import AuditLog
 from apps.boxes.models import Box, QrCode, QrScanEvent
 from apps.evidence.models import EvidencePhoto
+from apps.evidence.storage import EvidenceValidationResult
 from apps.hardware_requests.models import HardwareRequest, PublicToolLoan
 from apps.inventory.models import InventoryAsset, InventoryProduct, TrackingMode
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
@@ -168,7 +170,14 @@ def set_staff_domain(makerspace, domain):
 
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=False)
-def test_admin_direct_manual_handout_and_return_logs_product(monkeypatch):
+def test_admin_direct_manual_handout_and_return_logs_product(monkeypatch, settings):
+    settings.STORAGE_PRESIGN_METHOD = "post"
+    finalize = Mock(
+        side_effect=lambda evidence, max_bytes: EvidenceValidationResult(
+            size=123, content_type="image/png"
+        )
+    )
+    monkeypatch.setattr("apps.evidence.storage.finalize_upload", finalize)
     makerspace = make_space()
     makerspace.default_loan_days = 10
     makerspace.save(update_fields=["default_loan_days"])
@@ -244,6 +253,14 @@ def test_admin_direct_manual_handout_and_return_logs_product(monkeypatch):
         target_type="evidence.evidencephoto",
         target_id=str(evidence.id),
     ).exists()
+    assert [call.args[0] for call in finalize.call_args_list] == [
+        request.issue_evidence,
+        evidence,
+    ]
+    assert all(
+        call.args[1] == settings.EVIDENCE_MAX_BYTES
+        for call in finalize.call_args_list
+    )
 
     logs = client.get(
         "/api/v1/admin/audit-logs",

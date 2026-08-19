@@ -10,6 +10,9 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+# Shared by every uploader: apps.*.storage.staging_key() is f"staging/{final_key}".
+STAGING_PREFIX = "staging/"
+
 RESTORABLE_HEADERS = (
     "CacheControl", "ContentDisposition", "ContentEncoding", "ContentLanguage",
     "ContentType", "Expires", "WebsiteRedirectLocation",
@@ -113,6 +116,33 @@ def ensure_versioning_or_quiescence(bucket):
 
 
 def download_object(bucket, key, destination, *, versioned):
+    """Capture one object, falling back to its staging copy.
+
+    Every uploader presigns `staging/{key}` and only promotes the bytes to `key`
+    when a workflow consumes them, so an uploaded-but-unconsumed object exists
+    ONLY in staging while its row already names the final key. Capture used to
+    treat that as fatal, meaning a single pending upload could block a tenant
+    backup or migration. The staged bytes are recorded under the FINAL key so a
+    restore lands them where every app's read path looks first; promotion still
+    validates them, because each finalizer validates the final object when it
+    finds one.
+    """
+    try:
+        return _download_object(bucket, key, destination, versioned=versioned)
+    except BackupStorageError:
+        if key.startswith(STAGING_PREFIX):
+            raise
+        staged = _download_object(
+            bucket, f"{STAGING_PREFIX}{key}", destination, versioned=versioned
+        )
+        logger.warning(
+            "backup_captured_staged_object",
+            extra={"bucket": bucket, "key": key},
+        )
+        return {**staged, "key": key}
+
+
+def _download_object(bucket, key, destination, *, versioned):
     s3 = client()
     params = {"Bucket": bucket, "Key": key}
     version_id = ""

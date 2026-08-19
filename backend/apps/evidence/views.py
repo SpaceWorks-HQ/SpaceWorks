@@ -27,6 +27,7 @@ from apps.evidence.storage import (
     evidence_object_key,
     object_exists,
     presigned_get_url,
+    staging_key,
     presigned_upload,
 )
 from apps.makerspaces.models import Makerspace
@@ -141,8 +142,16 @@ class EvidenceDetailView(generics.RetrieveAPIView):
         photo = self.get_object()
         require_module(photo.makerspace, "evidence_uploads")
 
+        # A presigned upload lands on the staging key and only becomes the final,
+        # never-client-writable object when a workflow promotes it. So an uploaded but
+        # not-yet-consumed photo lives in staging, and a read that only ever HEADs the
+        # final key would report it as never uploaded.
         try:
-            exists = object_exists(photo.object_key)
+            readable_key = None
+            if object_exists(photo.object_key):
+                readable_key = photo.object_key
+            elif object_exists(staging_key(photo.object_key)):
+                readable_key = staging_key(photo.object_key)
         except StorageUnavailable:
             logger.warning(
                 "evidence_head_storage_unavailable",
@@ -150,11 +159,11 @@ class EvidenceDetailView(generics.RetrieveAPIView):
                 exc_info=True,
             )
             return storage_unavailable_response()
-        if not exists:
+        if readable_key is None:
             return Response(status=409)
 
         try:
-            url = presigned_get_url(photo.object_key)
+            url = presigned_get_url(readable_key)
         except StorageUnavailable:
             logger.warning(
                 "evidence_get_url_storage_unavailable",
