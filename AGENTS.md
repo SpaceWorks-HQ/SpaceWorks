@@ -123,6 +123,7 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   makerspace settings.
 - Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks
   active status.
+- **Every presigned upload lands on the staging key; the final object key is never client-writable.** A workflow promotes it exactly once, so an accepted evidence photo cannot be replaced through a still-valid presign. Read paths — the evidence endpoint, the admin preview, and backup/tenant-migration object capture — therefore fall back to the staging key, or an uploaded-but-unconsumed photo reads as missing.
 - Evidence photos and QR scan records are **immutable**; audit logs are **append-only**.
 - Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos,
   requester history, or hidden counts. Public visibility is governed per-item by `is_public`,
@@ -199,8 +200,12 @@ provider seam, a superadmin modules console, cloud/full deploy profiles and a be
 **opt-in maker profiles and a member directory**, **staff-side event registration** — its security and
 loophole audit is **done and pushed**, `a465a2d`); the **events program** (presence split out of
 registration, opt-in attended-events on the maker profile, QR event check-in, cross-makerspace
-collaborative events with a host-waiver acceptance); and **phases 8, 7, 4 and 5A** (emailed-OTP recovery,
-account-less member surfaces, Space-Manager data export, deployment backup/restore).
+collaborative events with a host-waiver acceptance); **phases 8, 7, 4 and 5A** (emailed-OTP recovery,
+account-less member surfaces, Space-Manager data export, deployment backup/restore); and the
+**audit-attestation / API-scope / organizations program** of 2026-08-19 (per-row audit MACs plus signed
+Merkle batches, organizations conferring actions across their makerspaces, and a frozen registry of every
+protected route behind a `legacy:v1` cutover) — its rules are the two newest sections of
+`docs/INVARIANTS.md`.
 
 **Codex is AVAILABLE — verified 2026-08-15: `codex doctor` reports `auth is configured` (ChatGPT tokens,
 standalone runtime 0.147.0, all checks green) — so the Stage-1/2/4 gates in `~/.claude/CLAUDE.md` are LIVE
@@ -460,6 +465,8 @@ because none are quoted here — this index is a router, not a summary.
 | **Machine scoping** | `MANAGE_MACHINES`, `machines/role_scope.py`, the Machines console, machine-service surfaces, procurement narrowing, dashboard scoping, delegated recipient rules |
 | **Events program invariants** | `apps/events/`, registration vs presence, member history and provenance, collaborative events, host waivers, QR check-in |
 | **Backup, restore and tenant migration** | `apps/backup/`, `apps/data_export/`, `apps/tenant_migration/`, the deployment recovery gate, the source gate lock protocol, archive projection |
+| **Organization accounts and organization-derived authority** | `apps/organizations/`, `OrganizationMembership`, the rbac org branch, `resolve_scope` vs `scope_by_action`, the auth payload `source` field, `EventOrganizer`, org purge scoping |
+| **API client scopes and the protected-route registry** | `apps/apiclients/scope_registry*.py`, `legacy:v1`, unknown-route denial, target resolution, the system check, the HMAC signed message and nonce namespace |
 | **Container / deployment invariants** | `Dockerfile`, the compose files, Celery beat, MinIO/CORS, browser-facing storage URLs, production compose defaults |
 
 Two rules are repeated here because they bite outside their own area: **a new model must be classified in

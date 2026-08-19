@@ -1868,6 +1868,95 @@ bytes because the difference lives only in discarded padding bits — so roughly
 decoded cleanly and no rollback happened. The decoder now requires canonical base64url. Our own
 encoder always emits canonical output, so stored envelopes are unaffected.
 
+## Organization accounts and organization-derived authority
+
+- **An `Organization` is a platform entity, not a module.** It is creatable before any makerspace
+  exists, spans makerspaces through `OrganizationMakerspace` (`owner | manager | affiliate`, at most
+  one owner per space), and is therefore **not** a `module_registry` key: registry keys are
+  capabilities stored in each makerspace's `enabled_modules`, and per-space enablement of a
+  cross-space entity is incoherent. Always present, inert when unused.
+- **Org grants confer ACTIONS, never IDENTITY.** This is the distinction that makes the whole
+  feature safe, and every part of it is load-bearing:
+  - `OrganizationMembership.granted_actions` is unioned into `rbac.makerspaces_for_action`,
+    `effective_actions` and `can` — and **nowhere else**.
+  - `_membership_for`, `membership_role`, `is_space_manager_identity` and `_membership_is_space_manager`
+    stay membership-only, so an org admin holding `manage_inventory` across the org's spaces becomes a
+    Space Manager nowhere.
+  - `resolve_scope` / `scope_by_makerspace` stay membership-only too. They are **action-agnostic**, so
+    unioning org scope there would let a single org action open every scoped list query in that space.
+    Action-gated surfaces must prefilter with `scope_by_action` instead — that is what the events and
+    bookings helpers now do, and what any other surface must do before org authority can reach it.
+  - Staff-list endpoints keep listing `MakerspaceMembership` only: an org grant must never appear as a
+    local staff row.
+- **Mirroring memberships is impossible — do not try again.** `UniqueConstraint(makerspace, user)`
+  (`uniq_makerspace_user`) allows exactly one membership row per user per space, so a mirrored org row
+  cannot coexist with a local one, two orgs cannot both grant one user access to one space, and
+  deleting one org's grant could strip locally-granted authority.
+- **Org grants never reach a hard-hidden makerspace, and both superadmin branches ignore them.**
+  `OrganizationMembership` has no `makerspace` FK, so it lives in `GLOBAL_ADMIN_MODELS` and the admin
+  hide-scoping never narrows it. Without the exclusion a superadmin could use the global membership
+  admin to grant a third party authority inside a space that is hard-hidden *from that superadmin* and
+  exercise it by proxy. A real local membership in a hidden space still confers authority; an
+  organization grant never does. Excluded in SQL inside `_organization_authority_memberships`, together
+  with `servable_q`, so every present and future consumer inherits it.
+- **`manage_machines` cannot be granted through an organization.** `machines.role_scope.manage_scope_for`
+  derives machine reach from a local membership role and resolves an organization-only actor to
+  `NOTHING`, so the action would read as effective in rbac while every machine list stayed empty. The
+  admin form refuses it rather than granting something inert.
+- **Native device payloads stay membership-only.** `X-Makerspace-Id` selection requires
+  `validate_native_makerspace_scope()` to find an active local membership, so an organization-only
+  space in a device payload would be advertised to the app and rejected on every selected request.
+- **Auth payload contract:** every entry carries `source=membership|organization`. An org-derived entry
+  has `role`, `role_id` and `role_slug` null with `role_name` naming the organization; a makerspace
+  reached both ways appears **once**, as the membership entry, with the actions unioned. `user_payload`
+  is deliberately O(1) in queries — resolve org spaces in one batched query, never per makerspace.
+- **Purge scoping is the cross-tenant footgun.** Purging makerspace C deletes only
+  `OrganizationMakerspace(makerspace=C)` and only `EventOrganizer` rows whose **event is hosted by C**.
+  Never delete organizers via `organization__makerspaces=C`, and never delete the shared `Organization`
+  or its memberships during a makerspace purge, however few links remain.
+- **`Event.makerspace` remains BOTH venue and tenancy anchor.** Payments, PII key custody
+  (`encryption/registry.py` scopes `events.EventRegistration` to `event.makerspace_id`), `host_waiver`,
+  audit scope, storage quota and public venue routing all key on it. An organizer is attribution plus a
+  narrow permission, never tenancy, and no organizer feature may move a number, a key, a quota or a
+  route away from the venue.
+
+## API client scopes and the protected-route registry
+
+- **`apps/apiclients/scope_registry*.py` is the single source of truth for what an `ApiClient` may
+  reach**, and it is keyed on the **fully qualified versioned `view_name`** — never the bare name.
+  Five inventory endpoints are exposed under both `/api/public/` and `/api/v1/public/`, so bare names
+  collide.
+- **Unknown-route denial is evaluated BEFORE any wildcard.** So neither `legacy:v1` nor `public:*` nor
+  `admin:*` can ever authorize a route that is not registered. A protected route with no entry denies.
+- **`legacy:v1` is frozen.** It authorizes exactly the entries marked `legacy_v1=True` at cutover. A
+  route added later defaults to `False`: **legacy authority never auto-extends.** It exists because an
+  empty `scopes` list used to authorize everything and tenant staff cannot set scopes at all (the
+  serializer pops the field for non-superadmins), so flipping empty→deny would have bricked every
+  tenant-created client. `ApiClient.save()` supplies it whenever scopes are empty, because the
+  `/control/` ModelAdmin and `seed_demo` construct rows without going through `issue()`.
+- **Target resolution is independent of scopes, and an unresolved target denies.** The old
+  `_path_makerspace()` returned the same `None` for "this path names no tenant" and "the tenant lookup
+  failed" — a fail-open. `resolve_target` returns `(target, resolved)` so those are distinguishable.
+- **The drift guard is measured per concrete `(view_name, method)` key of the protected routes.**
+  Comparing view names alone would leave an obsolete authorization key behind when a handler drops a
+  method or a route moves out from behind a protected prefix; a protected route whose methods cannot be
+  derived at all is reported as its own drift class rather than silently skipped.
+- **A widened `HMAC_PROTECTED_PATH_PREFIXES` must fail as a misconfiguration, not as blanket 401s.**
+  A Django system check reports unregistered protected routes. Register checks with the
+  **`app_configs` keyword** — Django calls them by keyword, and a mismatched parameter name makes
+  `manage.py check`, `migrate` and `runserver` raise `TypeError` before startup. **pytest does not run
+  system checks**, so a test must call the check the way Django does.
+- **The HMAC signed message must stay unambiguous about the nonce.** The message is
+  `METHOD \n PATH \n TIMESTAMP [\n NONCE] \n BODY`, so the nonce part exists only when `X-Nonce` is
+  sent — which made a nonced request and a nonce-less request whose body is `NONCE + "\n" + body`
+  encode to **identical bytes**, letting a captured signature be replayed without ever claiming the
+  nonce. A nonce-less request whose first line is itself a well-formed nonce followed by a newline is
+  therefore refused. The real fix is a fixed part count (always sign an empty nonce slot); it is
+  specified as **protocol v2** because it changes the message for every existing nonce-less client,
+  i.e. the default deployment.
+- **The nonce namespace is `(client_id, nonce)` and is claimed exactly once per request**, shared
+  across secrets. Never clear nonces on rotation.
+
 ## Container / deployment invariants
 
 **The images run unprivileged.** `backend/Dockerfile` creates uid 10001 `app`, uses `COPY --chown`

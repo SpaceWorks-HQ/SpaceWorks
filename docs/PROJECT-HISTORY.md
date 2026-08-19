@@ -9,6 +9,22 @@
 One line per shipped batch. The rules these introduced live in `docs/INVARIANTS.md`; use
 `git log --oneline`/`git blame` for the implementing commits and per-file history.
 
+- **Audit attestation, API-client scopes, organizations** (2026-08-19, `dev`, local): three tracks off
+  the plans in `docs/superpowers/specs/2026-08-19-audit-api-org/`. **AUD-1/AUD-2** — a keyed per-row MAC
+  over every audit row with a bound, signed cutover, then signed Merkle batches over sets of rows
+  (`AuditBatchLeaf`, anti-join for unbatched rows) because the `pg_snapshot_xmin` watermark was
+  provably wrong: xids and sequence values are independent. **ORG-1/2/2b/3** — `Organization` as a
+  platform entity spanning makerspaces, `OrganizationMembership` conferring ACTIONS (never identity)
+  through an rbac branch, then the staff-login gate, auth payload and action-gated prefilters that make
+  that authority reachable, and `EventOrganizer` attribution. **APIB-1/2/3** — native app registration
+  and revocation across every device-token path, then a frozen registry of all 31 protected routes keyed
+  on the versioned `view_name`, made authoritative behind a frozen `legacy:v1` cutover grant.
+  Alongside them: **F4** made every presigned upload land in staging so an accepted evidence photo can
+  no longer be replaced through a still-valid presign, and a **proven** HMAC replay was closed — the
+  optional nonce slot let a captured signature be replayed with the nonce moved into the request body.
+  The full-suite gate then caught 42 failures from three root causes (an undeclared audit-meta id path,
+  a self-checkout gate ordering, and an audit key cache consulted before the configured check), all
+  fixed. Rules in `docs/INVARIANTS.md` under **Organization accounts** and **API client scopes**.
 - **Phase 5B — per-makerspace tenant migration, managed → self-host** (2026-08-17/18, `dev`, local):
   `apps/tenant_migration/`. `ExternalTenantReference` + export transform, PORTABLE raw-column PII reads,
   reference dispositions, DEK carry with the archive streamed into `age`, import job + per-person identity

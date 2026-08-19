@@ -20,6 +20,15 @@
   CORS, module guards, `module_registry.py` (canonical module definitions — all module lists derive from
   it), `platform.py` (origin helpers), `limits.py` (fair-use quotas), `lifecycle.py` (archive/purge),
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
+- `backend/apps/organizations/` — `Organization` (platform entity, creatable before any makerspace, NOT a
+  module_registry key), `OrganizationMakerspace` (the many-to-many link, at most one `owner` per space) and
+  `OrganizationMembership` (org-level `granted_actions`). Authority is resolved in `accounts/rbac.py`, never
+  mirrored into `MakerspaceMembership`; `accounts/org_payload.py` projects it into the auth payload.
+- `backend/apps/apiclients/` — `ApiClient` (client_id + Fernet-encrypted HMAC secret), `ApiKeyRequest`, and
+  `scope_registry.py`/`scope_registry_routes.py` — the single source of truth for which protected route each
+  scope authorizes, keyed on the versioned `view_name`. `checks.py` is the deployment-time guard that a
+  widened `HMAC_PROTECTED_PATH_PREFIXES` has no unregistered routes. Verification itself lives in
+  `apps/inventory/middleware.py`.
 - `backend/apps/audit/` — append-only `AuditLog` + `audit.record(...)` (Postgres-trigger immutable).
 - `backend/apps/evidence/` — immutable evidence photos, S3 storage helpers, signed upload/view URLs gated by
   per-makerspace `UPLOAD_EVIDENCE` + active status.
