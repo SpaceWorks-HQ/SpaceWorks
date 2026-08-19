@@ -141,6 +141,10 @@ TASK_INTERNAL_PARTICIPANTS = {
     "apps.makerspaces.tasks.refresh_github_contributions_task": (
         "Each profile refresh uses the skip-and-count tenant boundary."
     ),
+    "apps.apiclients.tasks.flush_api_client_usage_task": (
+        "Writes only deployment-local last-seen telemetry on ApiClient rows; it moves no "
+        "tenant data and so needs no per-tenant gate."
+    ),
 }
 
 

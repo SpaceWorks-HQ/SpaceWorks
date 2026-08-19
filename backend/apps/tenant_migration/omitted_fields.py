@@ -36,6 +36,9 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         DROP_ROW,
         ("apiclients.ApiClient", "client_id"),
         ("apiclients.ApiClient", "secret_encrypted"),
+        # The retained rotation-grace secret goes with the current one: a client the
+        # target cannot authenticate is a client the target must re-issue.
+        ("apiclients.ApiClient", "previous_secret_encrypted"),
         # Webhook destinations cannot satisfy their credential check constraint after
         # the encrypted webhook is removed, even when the source row is inactive.
         ("integrations.NotificationDestination", "webhook_url"),
