@@ -67,6 +67,7 @@ def test_user_payload_scopes_memberships_to_branded_staff_origin_and_excludes_ar
                 "can_verify": False,
                 "verified_at": None,
                 "referrals_enabled": False,
+                "source": "membership",
             }
         ]
 

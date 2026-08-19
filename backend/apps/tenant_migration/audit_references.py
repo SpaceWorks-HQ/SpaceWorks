@@ -259,6 +259,17 @@ AUDIT_META_REFERENCES.update(
         ("encryption.write_fence_opened", "actor_id"),
     )
 )
+# Revoking an organization membership names the person it revoked. SOURCE_LOCAL_SNAPSHOT
+# rather than REMAP because the membership itself is an omitted model that never travels
+# with a tenant, so asserting a live binding for the id it mentions would be a claim the
+# archive cannot keep. Sibling created/updated events emit the same key but pick their
+# action with a conditional expression, so the AST guard reports them as dynamic rather
+# than as declared paths.
+AUDIT_META_REFERENCES.update(
+    _reference(
+        S, "accounts.User", ("organization.membership_deleted", "user_id"),
+    )
+)
 AUDIT_META_REFERENCES.update(
     _reference(
         S, "makerspaces.Makerspace",

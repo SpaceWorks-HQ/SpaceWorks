@@ -45,10 +45,11 @@ class _SpacePagination(PageNumberPagination):
 
 def _visible_makerspace(actor, makerspace_id):
     makerspace = get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_action(
             actor,
+            rbac.Action.MANAGE_BOOKINGS,
             Makerspace.objects.all(),
-            makerspace_field='id',
+            field='id',
         ),
         pk=makerspace_id,
     )
@@ -60,10 +61,11 @@ def _visible_makerspace(actor, makerspace_id):
 
 def manageable_space(actor, pk):
     space = get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_action(
             actor,
+            rbac.Action.MANAGE_BOOKINGS,
             BookableSpace.objects.select_related('makerspace'),
-            makerspace_field='makerspace_id',
+            field='makerspace_id',
         ),
         pk=pk,
     )

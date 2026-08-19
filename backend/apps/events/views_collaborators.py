@@ -32,10 +32,11 @@ COLLABORATION_ERRORS = {
 
 def _collaborator_makerspace(actor, makerspace_id):
     makerspace = get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_action(
             actor,
+            rbac.Action.MANAGE_EVENTS,
             Makerspace.objects.all(),
-            makerspace_field="id",
+            field="id",
         ),
         pk=makerspace_id,
     )
@@ -53,8 +54,9 @@ def _manageable_collaboration(actor, pk):
     its own `origin_scope_routes` entry rather than sharing one with the host's remove.
     """
     collaborator = get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_action(
             actor,
+            rbac.Action.MANAGE_EVENTS,
             servable_queryset(EventCollaborator.objects.filter(
                 # An archived host's invitation must not remain answerable: accepting it
                 # would grant eligibility for an event that is invisible everywhere but
@@ -64,7 +66,7 @@ def _manageable_collaboration(actor, pk):
                 # withdrawn, so its invitation must not stay answerable either.
                 event__makerspace__enabled_modules__contains=["events"],
             ), relation="event__makerspace").select_related("makerspace", "event__makerspace"),
-            makerspace_field="makerspace_id",
+            field="makerspace_id",
         ),
         pk=pk,
     )
@@ -125,10 +127,11 @@ class EventCollaborationRemoveView(APIView):
     )
     def post(self, request, pk, *args, **kwargs):
         collaboration = get_object_or_404(
-            rbac.scope_by_makerspace(
+            rbac.scope_by_action(
                 request.user,
+                rbac.Action.MANAGE_EVENTS,
                 EventCollaborator.objects.only("id", "event_id"),
-                makerspace_field="event__makerspace_id",
+                field="event__makerspace_id",
             ),
             pk=pk,
         )
@@ -151,8 +154,9 @@ class EventCollaborationInboxView(APIView):
     )
     def get(self, request, makerspace_id, *args, **kwargs):
         makerspace = _collaborator_makerspace(request.user, makerspace_id)
-        collaborations = rbac.scope_by_makerspace(
+        collaborations = rbac.scope_by_action(
             request.user,
+            rbac.Action.MANAGE_EVENTS,
             servable_queryset(EventCollaborator.objects.filter(
                 makerspace=makerspace,
                 # Archiving the HOST -- or its disabling `events` -- does not remove its
@@ -162,7 +166,7 @@ class EventCollaborationInboxView(APIView):
                 # appearing in a partner's inbox.
                 event__makerspace__enabled_modules__contains=["events"],
             ), relation="event__makerspace").select_related("event__makerspace"),
-            makerspace_field="makerspace_id",
+            field="makerspace_id",
         ).order_by("-created_at", "-id")
         return Response(
             EventCollaborationInboxSerializer(collaborations, many=True).data

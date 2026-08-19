@@ -45,10 +45,11 @@ class _BookingPagination(PageNumberPagination):
 
 def _manageable_booking(actor, pk):
     booking = get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_action(
             actor,
+            rbac.Action.MANAGE_BOOKINGS,
             Booking.objects.select_related('space__makerspace'),
-            makerspace_field='space__makerspace_id',
+            field='space__makerspace_id',
         ),
         pk=pk,
     )

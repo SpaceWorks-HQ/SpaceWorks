@@ -9,10 +9,14 @@ AuthMembershipSerializer = inline_serializer(
     fields={
         "id": serializers.IntegerField(),
         "slug": serializers.CharField(),
-        "role": serializers.CharField(),
+        # An organization-derived entry claims no role: organization grants confer
+        # actions, never identity, so role/role_id/role_slug are null there and
+        # role_name carries the organization's name.
+        "role": serializers.CharField(allow_null=True),
         "role_id": serializers.IntegerField(allow_null=True),
         "role_name": serializers.CharField(),
-        "role_slug": serializers.CharField(),
+        "role_slug": serializers.CharField(allow_null=True),
+        "source": serializers.ChoiceField(choices=["membership", "organization"]),
         "actions": serializers.ListField(child=serializers.CharField()),
         "can_configure_machine_types": serializers.BooleanField(),
         "is_machine_only": serializers.BooleanField(),

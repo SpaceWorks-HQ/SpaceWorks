@@ -54,10 +54,11 @@ class _RegistrationPagination(PageNumberPagination):
 
 def _visible_makerspace(actor, makerspace_id):
     makerspace = get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_action(
             actor,
+            rbac.Action.MANAGE_EVENTS,
             Makerspace.objects.all(),
-            makerspace_field='id',
+            field='id',
         ),
         pk=makerspace_id,
     )
@@ -69,10 +70,11 @@ def _visible_makerspace(actor, makerspace_id):
 
 def _manageable_event(actor, pk):
     event = get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_action(
             actor,
+            rbac.Action.MANAGE_EVENTS,
             Event.objects.select_related('makerspace'),
-            makerspace_field='makerspace_id',
+            field='makerspace_id',
         ),
         pk=pk,
     )
@@ -84,10 +86,11 @@ def _manageable_event(actor, pk):
 
 def _manageable_registration(actor, pk):
     registration = get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_action(
             actor,
+            rbac.Action.MANAGE_EVENTS,
             EventRegistration.objects.select_related('event__makerspace'),
-            makerspace_field='event__makerspace_id',
+            field='event__makerspace_id',
         ),
         pk=pk,
     )

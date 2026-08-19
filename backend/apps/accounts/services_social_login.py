@@ -40,6 +40,11 @@ def assert_staff_authority(user, request):
         memberships = memberships.filter(makerspace_id=scope)
     if any(rbac.actions_for_membership(row) for row in memberships):
         return
+    if scope is NO_STAFF_ORIGIN_SCOPE:
+        if rbac.has_any_org_authority(user):
+            return
+    elif rbac.effective_actions(user, scope):
+        return
     raise SocialResolutionError("staff_access_required", 403)
 
 
