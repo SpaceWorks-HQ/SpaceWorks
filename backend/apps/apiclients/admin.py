@@ -25,6 +25,8 @@ class ApiClientAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         "makerspace",
         "makerspace_public_code",
         "is_active",
+        "last_seen_at",
+        "last_seen_ip",
         "created_at",
     )
     list_filter = ("is_active", "makerspace")
@@ -33,6 +35,8 @@ class ApiClientAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         "makerspace_public_code",
         "makerspace_public_api_key",
         "created_by",
+        "last_seen_at",
+        "last_seen_ip",
         "created_at",
         "updated_at",
     )
@@ -54,6 +58,8 @@ class ApiClientAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         "makerspace_public_code",
         "makerspace_public_api_key",
         "created_by",
+        "last_seen_at",
+        "last_seen_ip",
         "created_at",
         "updated_at",
     )
@@ -273,4 +279,3 @@ class ApiKeyRequestAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
                 f"Skipped {skipped_count} non-pending API key request(s).",
                 level=messages.WARNING,
             )
-

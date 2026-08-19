@@ -504,6 +504,10 @@ BACKUP_PRESIGN_DRAIN_SECONDS = env.int(
 BACKUP_OPS_DIR = env("BACKUP_OPS_DIR", default="/var/lib/spaceworks/ops")
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
 CELERY_BEAT_SCHEDULE = {
+    "flush-api-client-usage": {
+        "task": "apps.apiclients.tasks.flush_api_client_usage_task",
+        "schedule": crontab(minute="*"),
+    },
     "audit-attestation": {
         "task": "apps.audit.tasks.run_audit_attestation_task",
         "schedule": crontab(minute="*/5"),

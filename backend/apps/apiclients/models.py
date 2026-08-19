@@ -58,6 +58,8 @@ class ApiClient(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    last_seen_ip = models.GenericIPAddressField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         # Centralised here, not only in issue(): the /control/ ModelAdmin and

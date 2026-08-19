@@ -10,7 +10,7 @@ from .types import Exported, GlobalReference, NotTenantData, OmittedModel
 # Field names are deliberately literal.  Building this from ``_meta`` would make a new
 # database column export itself before a security review could classify it.
 EXPORTED_MODEL_FIELDS = {
-    "apiclients.ApiClient": "id label client_id secret_encrypted previous_secret_encrypted previous_secret_valid_until client_type scopes rate_limit_tier makerspace allowed_origins is_active created_by created_at updated_at",
+    "apiclients.ApiClient": "id label client_id secret_encrypted previous_secret_encrypted previous_secret_valid_until client_type scopes rate_limit_tier makerspace allowed_origins is_active last_seen_at last_seen_ip created_by created_at updated_at",
     "apiclients.ApiKeyRequest": "id makerspace requester label reason allowed_origins status resolution_note resolved_by resolved_at created_at updated_at",
     "audit.AuditLog": "id actor action target_type target_id makerspace meta event_uuid row_mac created_at",
     "bookings.BookableSpace": "id public_token makerspace name kind description capacity location image_key is_public show_public_availability show_public_booker_names approval_mode custom_form requester_notifications_enabled payment_amount min_booking_duration_minutes max_booking_duration_minutes booking_lead_time_minutes max_booking_advance_days is_active created_by created_at updated_at",

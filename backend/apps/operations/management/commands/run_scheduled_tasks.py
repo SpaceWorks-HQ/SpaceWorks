@@ -33,6 +33,11 @@ from django.utils import timezone
 # from the beat-less one.
 SCHEDULED_TASKS = (
     (
+        "flush-api-client-usage",
+        "apps.apiclients.tasks.flush_api_client_usage_task",
+        1,
+    ),
+    (
         "audit-attestation",
         "apps.audit.tasks.run_audit_attestation_task",
         5,
