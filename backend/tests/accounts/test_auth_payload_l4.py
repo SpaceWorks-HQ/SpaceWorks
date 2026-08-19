@@ -64,6 +64,7 @@ def test_seeded_default_role_includes_metadata_and_effective_actions():
         "can_verify": False,
         "verified_at": None,
         "referrals_enabled": False,
+        "source": "membership",
     }
     assert payload["actions"] == sorted(membership.assigned_role.granted_actions)
 

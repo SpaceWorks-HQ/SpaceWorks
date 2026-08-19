@@ -183,6 +183,39 @@ def actions_for_membership(membership) -> set:
     return expand_implied_actions(_MEMBERSHIP_ROLE_ACTIONS.get(membership.role, set()))
 
 
+def _organization_authority_memberships(actor, *, makerspace_ids=None):
+    """Active organization grants whose linked makerspace may serve traffic."""
+    from apps.makerspaces.servability import servable_q
+    from apps.organizations.models import OrganizationMembership
+
+    filters = (
+        Q(
+            user=actor,
+            status=OrganizationMembership.Status.ACTIVE,
+            organization__is_active=True,
+            organization__makerspace_links__makerspace__superadmin_access_enabled=True,
+        )
+        & servable_q("organization__makerspace_links__makerspace")
+    )
+    if makerspace_ids is not None:
+        filters &= Q(
+            organization__makerspace_links__makerspace_id__in=makerspace_ids
+        )
+    return OrganizationMembership.objects.filter(filters)
+
+
+def has_any_org_authority(actor) -> bool:
+    """Return whether one indexed query finds any usable organization grant."""
+    if actor is None or not getattr(actor, "is_authenticated", False):
+        return False
+    granted_filter = Q()
+    for action in ROLE_GRANTABLE_ACTIONS:
+        granted_filter |= Q(granted_actions__contains=[action])
+    return _organization_authority_memberships(actor).filter(
+        granted_filter
+    ).exists()
+
+
 def _org_actions_for(actor, makerspace_id) -> set:
     """Return actions active organization grants confer in one makerspace.
 
@@ -197,16 +230,9 @@ def _org_actions_for(actor, makerspace_id) -> set:
     """
     if actor is None or not getattr(actor, "is_authenticated", False):
         return set()
-    if _id_in(makerspace_id, superadmin_hidden_makerspace_ids()):
-        return set()
-    from apps.organizations.models import OrganizationMembership
-
     granted = set()
-    values = OrganizationMembership.objects.filter(
-        user=actor,
-        status=OrganizationMembership.Status.ACTIVE,
-        organization__is_active=True,
-        organization__makerspace_links__makerspace_id=makerspace_id,
+    values = _organization_authority_memberships(
+        actor, makerspace_ids=[makerspace_id]
     ).values_list("granted_actions", flat=True)
     for value in values:
         if not isinstance(value, list):
@@ -229,31 +255,19 @@ def _org_scope_for_action(actor, action) -> set:
     satisfying = actions_satisfying(action) & ROLE_GRANTABLE_ACTIONS
     if not satisfying:
         return set()
-    from apps.organizations.models import OrganizationMembership
-
     granted_filter = Q()
     for granted_action in satisfying:
         granted_filter |= Q(granted_actions__contains=[granted_action])
     rows = (
-        OrganizationMembership.objects.filter(
-            user=actor,
-            status=OrganizationMembership.Status.ACTIVE,
-            organization__is_active=True,
-            organization__makerspace_links__isnull=False,
-        )
+        _organization_authority_memberships(actor)
         .filter(granted_filter)
         .values_list(
             "granted_actions",
             "organization__makerspace_links__makerspace_id",
         )
     )
-    hidden = superadmin_hidden_makerspace_ids()
     scope = set()
     for value, makerspace_id in rows:
-        if _id_in(makerspace_id, hidden):
-            # See _org_actions_for: organization grants never reach a hard-hidden
-            # makerspace, or the global membership admin becomes a way around the hide.
-            continue
         if not isinstance(value, list):
             logging.getLogger(__name__).warning(
                 "Ignoring malformed granted actions on an organization membership."

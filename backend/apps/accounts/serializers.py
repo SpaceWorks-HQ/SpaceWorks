@@ -4,6 +4,10 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, Toke
 from rest_framework_simplejwt.settings import api_settings
 
 from apps.accounts.models import User
+from apps.accounts.org_payload import (
+    membership_makerspace_entry,
+    organization_makerspace_entries,
+)
 from apps.accounts.services_refresh_tokens import rotate_refresh_token
 from apps.accounts.tokens import SpaceWorksRefreshToken, validate_auth_generation
 from apps.accounts.models_social import SocialSurface
@@ -25,12 +29,21 @@ def user_payload(user, request=None):
     if archived_ids:
         memberships = memberships.exclude(makerspace_id__in=archived_ids)
     memberships = rbac.hide_from_superadmin(user, memberships, field="makerspace_id")
+    org_space_ids = None
+    include_organizations = True
     if request is not None and getattr(request, 'device_grant', None):
         memberships = memberships.filter(status='active')
+        # Native device payloads stay membership-only. X-Makerspace-Id selection requires
+        # validate_native_makerspace_scope() to find an ACTIVE LOCAL membership, so an
+        # organization-only space would be advertised to the app and then rejected on
+        # every selected request. Advertising unusable workspaces is worse than omitting
+        # them; supporting them means teaching native scoping about org authority first.
+        include_organizations = False
     elif request is not None:
         scoped_makerspace_id = origin_scoped_makerspace_id(request)
         if scoped_makerspace_id is not None:
             memberships = memberships.filter(makerspace_id=scoped_makerspace_id)
+            org_space_ids = {scoped_makerspace_id}
 
     # Resolve effective actions from the already select_related-loaded membership rows so
     # /auth/login and /auth/me stay O(1) queries — calling rbac.effective_actions() per row
@@ -45,7 +58,10 @@ def user_payload(user, request=None):
     def _membership_actions(m):
         if is_superadmin and not rbac._id_in(m.makerspace_id, hidden_ids):
             return sorted(rbac.ROLE_GRANTABLE_ACTIONS)
-        return sorted(rbac.actions_for_membership(m))
+        return sorted(
+            rbac.actions_for_membership(m)
+            | organization_actions.get(m.makerspace_id, set())
+        )
 
     def _can_configure_machine_types(m):
         if is_superadmin and not rbac._id_in(m.makerspace_id, hidden_ids):
@@ -58,12 +74,22 @@ def user_payload(user, request=None):
             )
         return m.role == "space_manager"
 
-    # Resolved in ONE batch (two link queries total) rather than per membership: the
-    # per-actor `role_scope.manage_scope_for` would put an N+1 behind /auth/me and
-    # /auth/login, which is the query budget the block above exists to protect.
+    # Resolve machine scopes in one batch rather than calling the per-actor helper for
+    # each membership, which would put an N+1 behind /auth/me and /auth/login.
     from apps.machines import role_scope
 
     memberships = list(memberships)
+    if claim_context is not None:
+        org_space_ids = {membership.makerspace_id for membership in memberships}
+    organization_entries = (
+        organization_makerspace_entries(user, makerspace_ids=org_space_ids)
+        if include_organizations
+        else {}
+    )
+    organization_actions = {
+        makerspace_id: set(entry["actions"])
+        for makerspace_id, entry in organization_entries.items()
+    }
     machine_scopes = role_scope.manage_scopes_for_memberships(memberships)
 
     def _is_machine_only(m):
@@ -101,6 +127,22 @@ def user_payload(user, request=None):
         granted = role.granted_actions if isinstance(role.granted_actions, list) else []
         return rbac.Action.MANAGE_PRINTING in granted
 
+    membership_entries = [
+        membership_makerspace_entry(
+            m,
+            actions=_membership_actions(m),
+            can_configure_machine_types=_can_configure_machine_types(m),
+            is_machine_only=_is_machine_only(m),
+        )
+        for m in memberships
+    ]
+    membership_space_ids = {membership.makerspace_id for membership in memberships}
+    org_only_entries = [
+        entry
+        for makerspace_id, entry in organization_entries.items()
+        if makerspace_id not in membership_space_ids
+    ]
+
     return {
         "id": user.id,
         "username": user.username,
@@ -111,42 +153,8 @@ def user_payload(user, request=None):
         "role": user.role,
         "is_superuser": user.is_superuser,
         "must_change_password": user.must_change_password,
-        "makerspaces": [
-            {
-                "id": m.makerspace_id,
-                "slug": m.makerspace.slug,
-                "role": m.role,
-                "role_id": m.assigned_role_id,
-                "role_name": (
-                    m.assigned_role.name
-                    if m.assigned_role_id is not None
-                    else _legacy_role_name(m.role)
-                ),
-                "role_slug": (
-                    m.assigned_role.slug
-                    if m.assigned_role_id is not None
-                    else m.role
-                ),
-                "actions": _membership_actions(m),
-                "can_configure_machine_types": _can_configure_machine_types(m),
-                "is_machine_only": _is_machine_only(m),
-                "can_refer": m.can_refer,
-                "can_verify": m.can_verify,
-                "verified_at": m.verified_at,
-                "referrals_enabled": m.makerspace.referrals_enabled,
-            }
-            for m in memberships
-        ],
+        "makerspaces": membership_entries + org_only_entries,
     }
-
-
-def _legacy_role_name(role):
-    from apps.makerspaces.models import MakerspaceMembership
-
-    try:
-        return MakerspaceMembership.Role(role).label
-    except ValueError:
-        return role.replace("_", " ").title()
 
 
 class LoginSerializer(TokenObtainPairSerializer):

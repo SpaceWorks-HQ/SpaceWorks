@@ -54,10 +54,11 @@ export type StaffAuthUser = {
   makerspaces: {
     id: number;
     slug: string;
-    role: string;
+    role: string | null;
     role_id: number | null;
     role_name: string;
-    role_slug: string;
+    role_slug: string | null;
+    source: "membership" | "organization";
     actions: string[];
     can_configure_machine_types: boolean;
     is_machine_only: boolean;
