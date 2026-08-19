@@ -34,16 +34,21 @@ class Command(BaseCommand):
                 if not isinstance(entry, dict):
                     continue
                 for environment in entry.get("environments") or []:
-                    match = {
+                    # Look up by the UNIQUE identity only. verifier_config_key is
+                    # editable indirection and is NOT part of
+                    # uniq_native_app_registration_scope, so including it here would
+                    # report a row with a re-pointed verifier as absent and then violate
+                    # the constraint on create() -- breaking the idempotency contract.
+                    identity = {
                         "makerspace": None,
                         "app_id": verifier_config_key,
                         "platform": platform,
                         "environment": environment,
-                        "verifier_config_key": verifier_config_key,
                     }
-                    if NativeAppRegistration.objects.filter(**match).exists():
+                    if NativeAppRegistration.objects.filter(**identity).exists():
                         existing += 1
                         continue
+                    match = {**identity, "verifier_config_key": verifier_config_key}
                     created += 1
                     label = f"{platform}/{verifier_config_key}/{environment}"
                     if options["dry_run"]:

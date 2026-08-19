@@ -6,7 +6,6 @@ from datetime import timedelta
 from urllib.parse import urlsplit
 
 from django.conf import settings
-from django.db.models import F
 from django.utils import timezone
 
 from apps.accounts.models_devices import (
@@ -58,26 +57,29 @@ def configured_app(platform, verifier_config_key, environment):
 
 
 def _approved_registration(*, platform, app_id, environment):
-    registrations = list(
-        NativeAppRegistration.objects.filter(
-            platform=platform,
-            app_id=app_id,
-            environment=environment,
-            status=NativeAppRegistration.Status.APPROVED,
-        ).order_by(F('makerspace_id').asc(nulls_first=True))[:2]
-    )
-    if not registrations:
+    """Resolve the DEPLOYMENT-GLOBAL approved registration for an app identity.
+
+    Tenant-scoped registrations are deliberately NOT resolvable here. The challenge route
+    is unauthenticated, so it carries no trustworthy makerspace context, and picking a
+    tenant registration because it happens to be the only one would (a) hand one tenant's
+    approved app to any user, and (b) let the resulting grant later select a DIFFERENT
+    makerspace where that user has membership, bypassing that tenant's approval boundary.
+    Falling back on row count is resolving authority by coincidence.
+
+    Tenant-scoped registrations therefore remain inert until the phase that carries a
+    verified makerspace context into this path. The column and its uniqueness rules exist
+    now so that phase does not need a second migration.
+    """
+    registration = NativeAppRegistration.objects.filter(
+        makerspace__isnull=True,
+        platform=platform,
+        app_id=app_id,
+        environment=environment,
+        status=NativeAppRegistration.Status.APPROVED,
+    ).first()
+    if registration is None:
         raise AttestationUnavailable('Device attestation is unavailable.')
-    global_registration = next(
-        (row for row in registrations if row.makerspace_id is None),
-        None,
-    )
-    if global_registration is not None:
-        return global_registration
-    if len(registrations) != 1:
-        # The unauthenticated challenge route has no trustworthy tenant context.
-        raise AttestationUnavailable('Device attestation is unavailable.')
-    return registrations[0]
+    return registration
 
 
 def create_challenge(*, platform, app_id, environment):

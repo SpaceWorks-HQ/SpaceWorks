@@ -214,3 +214,50 @@ def test_purging_a_makerspace_does_not_trip_protected_registrations(monkeypatch)
     assert not NativeAppRegistration.objects.filter(pk=tenant_registration.pk).exists()
     assert not DeviceGrant.objects.filter(registration=tenant_registration).exists()
     assert NativeAppRegistration.objects.filter(pk=global_registration.pk).exists()
+
+
+def test_revoking_an_app_permanently_revokes_its_grants(monkeypatch):
+    """Re-approving a revoked app must NOT resurrect old device authority.
+
+    Suspending access via a status check alone leaves the grant and its seven-day refresh
+    token intact, so a device that never refreshed during the revocation would come back
+    to life on re-approval. Revocation has to be settled on the grants themselves.
+    """
+    from apps.accounts.models_devices import (
+        DeviceEnvironment,
+        DevicePlatform,
+        DeviceRefreshFamily,
+    )
+    from apps.accounts.services_native_apps import revoke_registration
+
+    admin = make_user("native-revoke-admin")
+    member = make_user("native-revoke-member")
+    registration = make_native_app_registration(app_id="org.spaceworks.revoke")
+    now = timezone.now()
+    grant = DeviceGrant.objects.create(
+        registration=registration,
+        user=member,
+        platform=DevicePlatform.APPLE,
+        environment=DeviceEnvironment.DEVELOPMENT,
+        app_id=registration.app_id,
+        signing_identity="TEAMID.org.spaceworks.revoke",
+        attestation_subject_fingerprint="b" * 64,
+        attested_at=now,
+        last_used_at=now,
+    )
+    family = DeviceRefreshFamily.objects.create(grant=grant, user=member)
+
+    revoke_registration(registration, actor=admin)
+
+    grant.refresh_from_db()
+    family.refresh_from_db()
+    assert grant.status == DeviceGrant.Status.REVOKED
+    assert grant.revoked_at is not None
+    assert family.revoked_at is not None
+
+    # Re-approval must not bring the old grant back.
+    registration.refresh_from_db()
+    registration.status = NativeAppRegistration.Status.APPROVED
+    registration.save(update_fields=["status"])
+    grant.refresh_from_db()
+    assert grant.status == DeviceGrant.Status.REVOKED

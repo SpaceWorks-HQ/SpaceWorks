@@ -14,6 +14,20 @@ def bind_existing_device_authority(apps, schema_editor):
     identities.update(
         Challenge.objects.values_list("app_id", "platform", "environment")
     )
+    # Also seed from deployment configuration. Deriving only from EXISTING grants leaves a
+    # fresh install (and any upgrade that has never issued a challenge) with no
+    # registrations at all, so every challenge would 503 until someone ran a command by
+    # hand -- while `up` is documented to complete initialization. Configuring an app in
+    # DEVICE_ATTESTATION_APPS is the deployment-level approval act.
+    configured = getattr(settings, "DEVICE_ATTESTATION_APPS", {}) or {}
+    for platform, apps_for_platform in configured.items():
+        if not isinstance(apps_for_platform, dict):
+            continue
+        for verifier_config_key, entry in apps_for_platform.items():
+            if not isinstance(entry, dict):
+                continue
+            for environment in entry.get("environments") or []:
+                identities.add((verifier_config_key, platform, environment))
     for app_id, platform, environment in identities:
         registration, _ = Registration.objects.get_or_create(
             makerspace_id=None,
