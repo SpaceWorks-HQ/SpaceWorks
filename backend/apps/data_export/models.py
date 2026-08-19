@@ -97,7 +97,10 @@ EXPORTED_MODELS = frozenset(EXPORTED_MODEL_FIELDS)
 GLOBAL_MODELS = {
     "accounts.User": GlobalReference(
         "Only the user closure is projected; the platform-global table is never tenant-owned."
-    )
+    ),
+    "organizations.Organization": GlobalReference(
+        "Platform-level organizations are referenced by tenant links but are never tenant-owned."
+    ),
 }
 
 OMITTED_MODELS = {
@@ -112,6 +115,9 @@ OMITTED_MODELS = {
     # code is a short-lived bearer credential stored only as a digest, and a browser
     # attempt holds a live PKCE verifier and two more secrets.
     "accounts.MemberClaimCode": "Transient authentication state.",
+    "accounts.NativeAppRegistration": (
+        "Live application authorization and deployment-local verifier binding."
+    ),
     "accounts.OidcBrowserAttempt": "Transient authentication state.",
     # Phase 8. One row per submitted address -- including addresses that belong to
     # nobody, since anyone can create one by asking for a reset -- holding a live OTP
@@ -154,6 +160,9 @@ OMITTED_MODELS = {
     "makerspaces.ImportedUserReconciliation": "Target-side operator reconciliation input.",
     "makerspaces.SubdomainRequest": "Source-deployment routing request.",
     "operations.PeriodicTaskRun": "Deployment scheduler state.",
+    "organizations.OrganizationMakerspace": (
+        "Source-deployment organization links do not travel with tenant exports."
+    ),
     "tenant_migration.TenantImportJob": "Target-side tenant import coordination state.",
     "tenant_migration.TenantImportObject": (
         "Deployment-scoped import promotion journal; it names a target makerspace "

@@ -48,6 +48,7 @@ NESTED_MAKERSPACE_LOOKUPS = {
 # Registered admin models that are intentionally NOT makerspace-scoped (account/global).
 GLOBAL_ADMIN_MODELS = {
     "accounts.user",
+    "organizations.organization",
     "accounts.platformsocialauthsettings",
     # The login-method switches govern credentials, and credentials resolve before a
     # makerspace is selected — the same reason social auth is platform-scoped.

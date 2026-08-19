@@ -37,6 +37,7 @@ RELATIONAL_USER_FIELDS = frozenset(
     {
         ("accounts.DeviceGrant", "user"),
         ("accounts.DeviceRefreshFamily", "user"),
+        ("accounts.NativeAppRegistration", "approved_by"),
         ("accounts.EmailVerificationChallenge", "user"),
         ("accounts.PhoneVerificationChallenge", "user"),
         ("accounts.SocialIdentity", "user"),
@@ -148,6 +149,8 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("operations.StocktakeSession", "started_by"),
         ("operations.StocktakeSession", "approved_by"),
         ("operations.StockTransfer", "created_by"),
+        ("organizations.Organization", "created_by"),
+        ("organizations.OrganizationMakerspace", "created_by"),
         ("payments.Payment", "member"),
         ("payments.Payment", "created_by"),
         ("payments.StripeConnectOAuthState", "initiated_by"),

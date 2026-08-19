@@ -133,6 +133,7 @@ INSTALLED_APPS = [
     "storages",
     "apps.accounts",
     "apps.makerspaces",
+    "apps.organizations",
     "apps.payments",
     "apps.presence",
     "apps.encryption",

@@ -17,7 +17,11 @@ from apps.accounts.attestation import (
 )
 from apps.accounts.login_methods import password_login_enabled
 from apps.accounts.models import User
-from apps.accounts.models_devices import DeviceAttestationChallenge, DeviceGrant
+from apps.accounts.models_devices import (
+    DeviceAttestationChallenge,
+    DeviceGrant,
+    NativeAppRegistration,
+)
 from apps.accounts.serializers import user_payload
 from apps.accounts.serializers_device import (
     DeviceChallengeResponseSerializer, DeviceGrantSerializer,
@@ -99,9 +103,12 @@ class DeviceAttestationChallengeView(APIView):
 def _consume_challenge(data):
     now = timezone.now()
     with transaction.atomic():
-        challenge = DeviceAttestationChallenge.objects.select_for_update().filter(
-            challenge_digest=challenge_digest(data["challenge"])
-        ).first()
+        challenge = (
+            DeviceAttestationChallenge.objects.select_for_update()
+            .select_related("registration")
+            .filter(challenge_digest=challenge_digest(data["challenge"]))
+            .first()
+        )
         if challenge is None or challenge.consumed_at is not None:
             return None
         challenge.consumed_at = now
@@ -154,14 +161,35 @@ class DeviceLoginView(APIView):
             raise AuthenticationFailed("Invalid device credentials or attestation.")
         _require_mobile_module()
         now = timezone.now()
-        with transaction.atomic():
-            grant = DeviceGrant.objects.create(
-                user=user, platform=challenge.platform, app_id=challenge.app_id,
-                signing_identity=challenge.signing_identity, environment=challenge.environment,
-                attestation_subject_fingerprint=audit_events.fingerprint(verified.subject),
-                attested_at=now, last_used_at=now,
+        try:
+            with transaction.atomic():
+                registration = (
+                    NativeAppRegistration.objects.select_for_update()
+                    .filter(
+                        pk=challenge.registration_id,
+                        status=NativeAppRegistration.Status.APPROVED,
+                    )
+                    .first()
+                )
+                if registration is None:
+                    # Raise a marker instead of auditing here: this raise rolls the
+                    # transaction back, which would take the audit row with it and leave
+                    # the rejection with no trace at all.
+                    raise _RegistrationNotApproved()
+                grant = DeviceGrant.objects.create(
+                    registration=registration,
+                    user=user, platform=challenge.platform, app_id=challenge.app_id,
+                    signing_identity=challenge.signing_identity, environment=challenge.environment,
+                    attestation_subject_fingerprint=audit_events.fingerprint(verified.subject),
+                    attested_at=now, last_used_at=now,
+                )
+                access, refresh, _ = issue_device_token_pair(user, grant)
+        except _RegistrationNotApproved:
+            # Outside the rolled-back transaction, so this one survives.
+            _audit_login_failure(data, 'registration_not_approved')
+            raise AuthenticationFailed(
+                "Invalid device credentials or attestation."
             )
-            access, refresh, _ = issue_device_token_pair(user, grant)
         request.device_grant = grant
         audit_events.record_auth_event(user, "auth.device_login_succeeded", target=user,
             meta={"grant_hash": audit_events.fingerprint(grant.pk)})
@@ -224,6 +252,10 @@ class DeviceGrantDetailView(APIView):
         audit_events.record_auth_event(request.user, "auth.device_grant_revoked", target=request.user,
             meta={"grant_hash": audit_events.fingerprint(grant.pk)})
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class _RegistrationNotApproved(Exception):
+    """Internal marker: roll back the grant transaction, then audit outside it."""
 
 
 def _audit_login_failure(data, reason):

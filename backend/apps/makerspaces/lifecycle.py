@@ -125,6 +125,13 @@ def _audit_meta(makerspace):
 def _delete_object_graph(makerspace):
     from apps.backup.models import RestoreRollbackObject
     from apps.apiclients.models import ApiClient, ApiKeyRequest
+    from apps.accounts.models_devices import (
+        DeviceAttestationChallenge,
+        DeviceGrant,
+        DeviceRefreshFamily,
+        DeviceRefreshToken,
+        NativeAppRegistration,
+    )
     from apps.audit.models import AuditLog
     from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
     from apps.evidence.models import EvidencePhoto
@@ -138,6 +145,7 @@ def _delete_object_graph(makerspace):
     from apps.makerspaces.models import MakerspaceMembership
     from apps.operations.models import InventoryAdjustment, QrPrintBatch
     from apps.operations.models import StocktakeSession, StockTransfer
+    from apps.organizations.models import OrganizationMakerspace
     from apps.machines.models import Machine, MachineType, MakerspaceMachineTypePricing
     from apps.machines.service_lifecycle import delete_for_makerspace
     from apps.payments.models import Payment, ProcessedStripeEvent
@@ -174,7 +182,9 @@ def _delete_object_graph(makerspace):
         ).distinct().delete()
         StocktakeSession.objects.filter(makerspace=makerspace).delete()
         InventoryAdjustment.objects.filter(makerspace=makerspace).delete()
-
+        # Organizations are platform-level and may be shared by other tenants. Remove
+        # only this tenant's through rows; never traverse from the organization side.
+        OrganizationMakerspace.objects.filter(makerspace=makerspace).delete()
 
         delete_for_makerspace(makerspace, cursor)
 
@@ -205,6 +215,25 @@ def _delete_object_graph(makerspace):
         MachineTypeEmailTemplate.objects.filter(makerspace=makerspace).delete()
         ApiClient.objects.filter(makerspace=makerspace).delete()
         ApiKeyRequest.objects.filter(makerspace=makerspace).delete()
+
+        # Native app registrations are makerspace-scoped, but DeviceGrant.registration and
+        # DeviceAttestationChallenge.registration are PROTECT, so letting the makerspace
+        # CASCADE into them raises ProtectedError and the whole purge fails -- the same
+        # shape as MachineConsumable.product below. Clear the dependent authentication
+        # rows first. Grants are deliberately destroyed: they are authority to act inside
+        # a space that no longer exists.
+        registrations = NativeAppRegistration.objects.filter(makerspace=makerspace)
+        DeviceRefreshToken.objects.filter(
+            family__grant__registration__in=registrations
+        ).delete()
+        DeviceRefreshFamily.objects.filter(
+            grant__registration__in=registrations
+        ).delete()
+        DeviceGrant.objects.filter(registration__in=registrations).delete()
+        DeviceAttestationChallenge.objects.filter(
+            registration__in=registrations
+        ).delete()
+        registrations.delete()
         MakerspaceMembership.objects.filter(makerspace=makerspace).delete()
         AuditLog.objects.filter(makerspace=makerspace).delete()
         Payment.objects.filter(makerspace=makerspace).delete()
