@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import type { ArchivedPaymentSummary, MembershipOutcome, MembershipPolicyEnum } from "../../generated/api";
-import { bootstrapTenant, fetchMe, refreshAccessToken, StructuredApiError, staffRequest } from "../../lib/api";
+import { bootstrapTenant, memberRequest, refreshAccessToken, StructuredApiError } from "../../lib/api";
 import { MemberAuthPanel } from "./MemberAuthPanel";
 import { JoinMembershipCta } from "./JoinMembershipCta";
 import { presenceStartLocation } from "./geolocation";
@@ -19,6 +19,7 @@ type Memberships = { memberships: Membership[]; requests: { makerspace: { slug: 
 type Waiver = { has_waiver: boolean; body?: string; version?: string };
 type Presence = { active: boolean; session: { expires_at: string } | null };
 type Invitations = { invitations: ClaimableInvitation[] };
+type Profile = { email_verified: boolean };
 type ReferralOutcome = { state: "invited" };
 type ClaimOutcome = { id: number; outcome: "active" | "pending_approval" };
 function message(error: unknown) {
@@ -37,39 +38,39 @@ export function MemberArea() {
   const bootstrap = useQuery({ queryKey: ["member", slug, "bootstrap"], queryFn: () => bootstrapTenant({ slug: slug || undefined }), retry: false });
   const resolvedSlug = slug || bootstrap.data?.makerspace.slug || "";
   const makerspaceId = bootstrap.data?.makerspace.id ?? -1;
-  const memberships = useQuery({ queryKey: ["member", "memberships"], queryFn: () => staffRequest<Memberships>("/memberships/me"), retry: false });
+  const memberships = useQuery({ queryKey: ["member", "memberships"], queryFn: () => memberRequest<Memberships>("/memberships/me"), retry: false });
   const unauthenticated = memberships.error instanceof StructuredApiError && memberships.error.status === 401;
   const membership = memberships.data?.memberships.find((row) => row.makerspace.slug === resolvedSlug);
   const requested = memberships.data?.requests.some((row) => row.makerspace.slug === resolvedSlug && row.state === "requested");
-  const profile = useQuery({ queryKey: ["member", "profile"], queryFn: fetchMe, enabled: Boolean(memberships.data), retry: false });
-  const invitations = useQuery({ queryKey: ["member", "invitations"], queryFn: () => staffRequest<Invitations>("/memberships/invitations"), enabled: Boolean(memberships.data), retry: false });
-  const waiver = useQuery({ queryKey: ["member", resolvedSlug, "waiver"], queryFn: () => staffRequest<Waiver>(`/member/makerspaces/${makerspaceId}/waiver`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
-  const presence = useQuery({ queryKey: ["member", resolvedSlug, "presence"], queryFn: () => staffRequest<Presence>(`/public/${resolvedSlug}/presence-sessions/current`), enabled: Boolean(resolvedSlug) && membership?.membership_status === "active", retry: false });
-  const activity = useQuery({ queryKey: ["member", resolvedSlug, "activity"], queryFn: () => staffRequest<MemberActivity>(`/member/makerspaces/${makerspaceId}/activity`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
-  const payments = useQuery({ queryKey: ["member", resolvedSlug, "payments"], queryFn: () => staffRequest<MemberPayment[]>(`/member/makerspaces/${makerspaceId}/payments`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
+  const profile = useQuery({ queryKey: ["member", "profile"], queryFn: () => memberRequest<Profile>("/auth/me"), enabled: Boolean(memberships.data), retry: false });
+  const invitations = useQuery({ queryKey: ["member", "invitations"], queryFn: () => memberRequest<Invitations>("/memberships/invitations"), enabled: Boolean(memberships.data), retry: false });
+  const waiver = useQuery({ queryKey: ["member", resolvedSlug, "waiver"], queryFn: () => memberRequest<Waiver>(`/member/makerspaces/${makerspaceId}/waiver`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
+  const presence = useQuery({ queryKey: ["member", resolvedSlug, "presence"], queryFn: () => memberRequest<Presence>(`/public/${resolvedSlug}/presence-sessions/current`), enabled: Boolean(resolvedSlug) && membership?.membership_status === "active", retry: false });
+  const activity = useQuery({ queryKey: ["member", resolvedSlug, "activity"], queryFn: () => memberRequest<MemberActivity>(`/member/makerspaces/${makerspaceId}/activity`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
+  const payments = useQuery({ queryKey: ["member", resolvedSlug, "payments"], queryFn: () => memberRequest<MemberPayment[]>(`/member/makerspaces/${makerspaceId}/payments`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
   // Deliberately NOT gated on `memberships.data`. A member whose only makerspace is archived
   // gets an empty `/memberships/me`, and a signed-out one gets a 401 -- gating on it meant the
   // people this recovery route exists for were exactly the people who never saw the link.
-  const archivedPayments = useQuery({ queryKey: ["member", "archived-payments"], queryFn: () => staffRequest<ArchivedPaymentSummary[]>("/member/archived-payments"), retry: false });
+  const archivedPayments = useQuery({ queryKey: ["member", "archived-payments"], queryFn: () => memberRequest<ArchivedPaymentSummary[]>("/member/archived-payments"), retry: false });
   // A 404 means the payments app is TOMBSTONED on this deployment, so the recovery route is
   // genuinely gone -- advertising it would hand the member a link straight to a not-found
   // page. Every other error (401 signed-out, network) still warrants the fallback.
   const archivedRemoved = archivedPayments.error instanceof StructuredApiError && archivedPayments.error.status === 404;
   const archivedUnknown = !archivedRemoved && (archivedPayments.isError || (bootstrap.isError && !archivedPayments.data?.length));
   const refresh = () => client.invalidateQueries({ queryKey: ["member"] });
-  const request = useMutation({ mutationFn: () => staffRequest<MembershipOutcome>(`/public/${resolvedSlug}/membership-requests`, { method: "POST", body: JSON.stringify({}) }), onSuccess: refresh });
-  const accept = useMutation({ mutationFn: () => staffRequest(`/member/makerspaces/${makerspaceId}/waiver/accept`, { method: "POST" }), onSuccess: refresh });
+  const request = useMutation({ mutationFn: () => memberRequest<MembershipOutcome>(`/public/${resolvedSlug}/membership-requests`, { method: "POST", body: JSON.stringify({}) }), onSuccess: refresh });
+  const accept = useMutation({ mutationFn: () => memberRequest(`/member/makerspaces/${makerspaceId}/waiver/accept`, { method: "POST" }), onSuccess: refresh });
   const start = useMutation({ mutationFn: async () => {
     const location = await presenceStartLocation(Boolean(bootstrap.data?.makerspace.geofence_enabled));
-    return staffRequest(`/public/${resolvedSlug}/presence-sessions`, {
+    return memberRequest(`/public/${resolvedSlug}/presence-sessions`, {
       method: "POST",
       body: JSON.stringify({ duration_minutes: 120, ...(location ?? {}) }),
     });
   }, onSuccess: refresh });
-  const end = useMutation({ mutationFn: () => staffRequest(`/public/${resolvedSlug}/presence-sessions/current/end`, { method: "POST" }), onSuccess: refresh });
-  const refer = useMutation({ mutationFn: (inviteEmail: string) => staffRequest<ReferralOutcome>(`/member/makerspaces/${makerspaceId}/referrals`, { method: "POST", body: JSON.stringify({ invite_email: inviteEmail }) }), onSuccess: refresh });
-  const claim = useMutation({ mutationFn: (id: number) => staffRequest<ClaimOutcome>(`/memberships/invitations/${id}/claim`, { method: "POST" }), onSuccess: refresh });
-  const generatePaymentLink = useMutation({ mutationFn: (id: number) => staffRequest<{ checkout_url: string }>(`/member/makerspaces/${makerspaceId}/payments/${id}/checkout`, { method: "POST" }), onSuccess: (data) => { refresh(); window.location.assign(data.checkout_url); } });
+  const end = useMutation({ mutationFn: () => memberRequest(`/public/${resolvedSlug}/presence-sessions/current/end`, { method: "POST" }), onSuccess: refresh });
+  const refer = useMutation({ mutationFn: (inviteEmail: string) => memberRequest<ReferralOutcome>(`/member/makerspaces/${makerspaceId}/referrals`, { method: "POST", body: JSON.stringify({ invite_email: inviteEmail }) }), onSuccess: refresh });
+  const claim = useMutation({ mutationFn: (id: number) => memberRequest<ClaimOutcome>(`/memberships/invitations/${id}/claim`, { method: "POST" }), onSuccess: refresh });
+  const generatePaymentLink = useMutation({ mutationFn: (id: number) => memberRequest<{ checkout_url: string }>(`/member/makerspaces/${makerspaceId}/payments/${id}/checkout`, { method: "POST" }), onSuccess: (data) => { refresh(); window.location.assign(data.checkout_url); } });
   const spaceInvitations = invitations.data?.invitations.filter((item) => item.makerspace.slug === resolvedSlug) ?? [];
   const error = bootstrap.error ?? (!unauthenticated ? memberships.error : null) ?? request.error ?? accept.error ?? start.error ?? end.error ?? activity.error ?? generatePaymentLink.error;
   const policy: MembershipPolicyEnum | undefined = bootstrap.data?.makerspace.membership_policy;

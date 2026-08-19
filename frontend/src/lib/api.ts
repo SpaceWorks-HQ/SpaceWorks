@@ -4,13 +4,17 @@ import { configuredApiUrl } from "./runtimeConfig";
 export const API_URL = configuredApiUrl();
 
 export const API_V1_URL = API_URL.replace(/\/api$/, "/api/v1");
-const PUBLIC_CLIENT_ID = import.meta.env.VITE_PUBLIC_CLIENT_ID ?? "";
+const PUBLIC_CLIENT_ID = (import.meta.env.VITE_PUBLIC_CLIENT_ID ?? "").trim();
 const ACCESS_TOKEN_KEY = "makerspace.access";
 const REFRESH_CSRF_HEADER = "X-Refresh-CSRF";
-let runtimePublishableKey = import.meta.env.VITE_PUBLIC_API_KEY ?? "";
+let runtimePublishableKey = (import.meta.env.VITE_PUBLIC_API_KEY ?? "").trim();
 let accessToken = "";
 let accessRefreshPromise: Promise<boolean> | null = null;
 const tenantPublishableKeys = new Map<string, string>();
+// The tenant most recently bootstrapped in this session. Member and status requests
+// carry no slug of their own, so without this they would send no client credential at
+// all on the central /m/:slug routes -- fine today, a 401 the moment enforcement is on.
+let activeTenantSlug = "";
 const authExpiredListeners = new Set<() => void>();
 
 export type TenantBootstrap = {
@@ -137,18 +141,24 @@ async function publicHeaders(publishableKey?: string): Promise<HeadersInit> {
   if (PUBLIC_CLIENT_ID) {
     return { "X-Client-Id": PUBLIC_CLIENT_ID };
   }
-  const key = publishableKey || runtimePublishableKey;
+  const key =
+    publishableKey?.trim() ||
+    runtimePublishableKey ||
+    tenantPublishableKeys.get(activeTenantSlug) ||
+    "";
   return key ? { "X-Publishable-Key": key } : {};
 }
 
 export function setRuntimePublishableKey(key: string) {
-  runtimePublishableKey = key;
+  runtimePublishableKey = key.trim();
 }
 
 export function cacheTenantPublishableKey(slug: string, key: string) {
   const normalized = slug.trim();
-  if (normalized && key) {
-    tenantPublishableKeys.set(normalized, key);
+  const normalizedKey = key.trim();
+  if (normalized && normalizedKey) {
+    tenantPublishableKeys.set(normalized, normalizedKey);
+    activeTenantSlug = normalized;
   }
 }
 
@@ -310,13 +320,18 @@ export async function fetchMe(): Promise<StaffAuthUser> {
  * behaviour rather than carrying a second copy of it. A duplicated refresh path is how one
  * caller silently stops recovering from an expired token.
  */
-async function staffFetch(path: string, options: RequestInit = {}): Promise<Response> {
+async function staffFetch(
+  path: string,
+  options: RequestInit = {},
+  includePublicCredentials = false,
+): Promise<Response> {
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
-  const makeRequest = () =>
+  const makeRequest = async () =>
     fetch(`${API_V1_URL}${path}`, {
       ...options,
       headers: {
         ...(isFormData ? {} : { "Content-Type": "application/json" }),
+        ...(includePublicCredentials ? await publicHeaders() : {}),
         ...authHeaders(),
         ...(options.headers ?? {}),
       },
@@ -368,6 +383,18 @@ export async function staffRequest<T>(
   if (response.status === 204) {
     return undefined as T;
   }
+  return (await response.json()) as T;
+}
+
+export async function memberRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const response = await staffFetch(path, options, true);
+  if (!response.ok) {
+    throw apiError(response.status, await response.json().catch(() => ({})));
+  }
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
