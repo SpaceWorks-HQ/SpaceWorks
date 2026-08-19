@@ -100,6 +100,9 @@ the scanner). The rest are **opt-in**.
 Core is not negotiable because the hardware-handover rules depend on it: issuing a tool requires a box
 QR scan *and* a photo, so a machines-only workshop still carries the request/QR/evidence spine.
 
+Per-module detail — what each key is and what you lose without it — is in
+[**docs/MODULES.md**](docs/MODULES.md).
+
 You do not have to think in 32 switches. They are grouped into **twelve areas**, which is what the
 console shows you:
 
@@ -173,41 +176,46 @@ cannot be removed. **Default** means it is on when you install without choosing 
 
 | Area | Module | Core | Default | What it adds |
 |---|---|:--:|:--:|---|
-| **Inventory** | `public_inventory` | ● | ● | The public catalogue |
-| | `request_workflow` | ● | ● | Borrow requests and the state machine |
-| | `staff_admin` | ● | ● | The staff console |
-| | `evidence_uploads` | ● | ● | Issue/return photos |
-| | `qr_management` | ● | ● | QR codes for boxes, tools and assets |
-| | `scanner` | ● | ● | The camera scanner |
-| | `asset_units` | | | Individually tracked units of a product |
-| | `containers` | | | Boxes and storage containers |
-| | `bulk_import` | | | Spreadsheet import |
-| | `stock_transfers` | | | Moving stock, including between makerspaces |
-| | `qr_print_batches` | | | Printable QR sheets and ZIP export |
-| | `guest_handover` | | | Front-desk direct handouts |
-| | `procurement` | | | The "to buy" list |
-| **Stocktake** | `stocktake` | | | Scan-first stock counts and variance |
-| **Machines** | `machines` | | | The machine registry |
-| | `machine_service` | | | The service/job queue |
-| | `printing` | | | 3D printing on top of `machine_service` |
-| | `maintenance` | | | Scheduled and reactive maintenance |
-| **Events** | `events` | | | Scheduling, registrations, QR check-in, collaborative events |
-| **Bookings** | `bookings` | | | Resource booking and public self-booking |
-| **Membership** | `membership` | | | Join requests, waivers, referrals, maker profiles |
-| **Notifications** | `notifications` | | | The in-app inbox |
-| | `email` | | | Outbound email |
-| | `telegram` | | | Telegram alerts and accept/reject buttons |
-| | `slack` | | | Slack alerts |
-| | `mattermost` | | | Mattermost alerts |
-| | `discord` | | | Discord alerts |
-| **Reports** | `reports` | | | Analytics, the ledger and CSV/XLSX export |
-| **Payments** | `payments` | | ● | Taking money online (Stripe or Razorpay) |
-| **Accounts** | `accounts` | | ● | The member identity ecosystem — sign-up and member sign-in |
-| **Mobile apps** | `mobile` | | ● | Attested device sessions, native push, payment sheet |
-| **Updates** | `updates` | | ● | In-app release control |
+| **Inventory** | [`public_inventory`](docs/MODULES.md#public_inventory) | ● | ● | The public catalogue |
+| | [`request_workflow`](docs/MODULES.md#request_workflow) | ● | ● | Borrow requests and the state machine |
+| | [`staff_admin`](docs/MODULES.md#staff_admin) | ● | ● | The staff console |
+| | [`evidence_uploads`](docs/MODULES.md#evidence_uploads) | ● | ● | Issue/return photos |
+| | [`qr_management`](docs/MODULES.md#qr_management) | ● | ● | QR codes for boxes, tools and assets |
+| | [`scanner`](docs/MODULES.md#scanner) | ● | ● | The camera scanner |
+| | [`asset_units`](docs/MODULES.md#asset_units) | | | Individually tracked units of a product |
+| | [`containers`](docs/MODULES.md#containers) | | | Boxes and storage containers |
+| | [`bulk_import`](docs/MODULES.md#bulk_import) | | | Spreadsheet import |
+| | [`stock_transfers`](docs/MODULES.md#stock_transfers) | | | Moving stock, including between makerspaces |
+| | [`qr_print_batches`](docs/MODULES.md#qr_print_batches) | | | Printable QR sheets and ZIP export |
+| | [`guest_handover`](docs/MODULES.md#guest_handover) | | | Front-desk direct handouts |
+| | [`procurement`](docs/MODULES.md#procurement) | | | The "to buy" list |
+| **Stocktake** | [`stocktake`](docs/MODULES.md#stocktake) | | | Scan-first stock counts and variance |
+| **Machines** | [`machines`](docs/MODULES.md#machines) | | | The machine registry |
+| | [`machine_service`](docs/MODULES.md#machine_service) | | | The service/job queue |
+| | [`printing`](docs/MODULES.md#printing) | | | 3D printing on top of `machine_service` |
+| | [`maintenance`](docs/MODULES.md#maintenance) | | | Scheduled and reactive maintenance |
+| **Events** | [`events`](docs/MODULES.md#events) | | | Scheduling, registrations, QR check-in, collaborative events |
+| **Bookings** | [`bookings`](docs/MODULES.md#bookings) | | | Resource booking and public self-booking |
+| **Membership** | [`membership`](docs/MODULES.md#membership) | | | Join requests, waivers, referrals, maker profiles |
+| **Notifications** | [`notifications`](docs/MODULES.md#notifications) | | | The in-app inbox |
+| | [`email`](docs/MODULES.md#email) | | | Outbound email |
+| | [`telegram`](docs/MODULES.md#telegram) | | | Telegram alerts and accept/reject buttons |
+| | [`slack`](docs/MODULES.md#slack) | | | Slack alerts |
+| | [`mattermost`](docs/MODULES.md#mattermost) | | | Mattermost alerts |
+| | [`discord`](docs/MODULES.md#discord) | | | Discord alerts |
+| **Reports** | [`reports`](docs/MODULES.md#reports) | | | Analytics, the ledger and CSV/XLSX export |
+| **Payments** | [`payments`](docs/MODULES.md#payments) | | ● | Taking money online (Stripe or Razorpay) |
+| **Accounts** | [`accounts`](docs/MODULES.md#accounts) | | ● | The member identity ecosystem — sign-up and member sign-in |
+| **Mobile apps** | [`mobile`](docs/MODULES.md#mobile) | | ● | Attested device sessions, native push, payment sheet |
+| **Updates** | [`updates`](docs/MODULES.md#updates) | | ● | In-app release control |
 
-`membership` requires `accounts`; `mobile` requires `accounts`; `printing` requires
-`machine_service`. Installing one pulls in what it needs.
+`mobile` requires `accounts`; `printing` requires `machine_service`. Installing one pulls in what it
+needs. `membership` deliberately does **not** require `accounts` — identity can come from an external
+identity provider or a staff-created walk-in record instead.
+
+**Every module has a page.** [**docs/MODULES.md**](docs/MODULES.md) covers each of the 32 keys in turn:
+what it is, what it puts on screen, **what happens if you do not install it**, and what becomes of its
+data if you later purge it.
 
 ### Features: the second level
 
@@ -358,6 +366,7 @@ suggested when **no** makerspace on the deployment uses any of its modules.
 
 | I want… | Go to |
 |---|---|
+| What a **module** is and what happens without it | **[docs/MODULES.md](docs/MODULES.md)** |
 | A **plain-language, non-technical** walkthrough | **[docs/setup-for-makerspaces.md](docs/setup-for-makerspaces.md)** |
 | **Production** reference (env vars, TLS, upgrades, releases) | **[docs/self-hosting.md](docs/self-hosting.md)** |
 | **Advanced** config (Telegram, HMAC, Supabase, cron) | **[.github/ADVANCED.md](.github/ADVANCED.md)** |
