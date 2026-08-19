@@ -190,6 +190,16 @@ def provision_audit_mac_key(makerspace_id=None):
 
 def get_audit_mac_key(makerspace_id=None):
     """Fetch and unwrap a provisioned key without writes, transactions, or row locks."""
+    if not audit_mac_configured():
+        # Checked BEFORE the cache. A warm process that has already unwrapped a key would
+        # otherwise keep verifying with it after the master key was removed, while
+        # record() -- which asks audit_mac_configured() per write -- had already started
+        # storing NULL MACs. The verifier then reported those rows as MAC_MISSING, i.e.
+        # accused the deployment of stripping MACs, when the honest answer is that
+        # without the master key nothing can be verified, not even the cutover.
+        raise AuditMacKeyUnavailable(
+            "Audit row-MAC attestation is not configured for this deployment."
+        )
     scope_id = _scope_id(makerspace_id)
     cached = audit_mac_key_cache.get(scope_id)
     if cached is not None:

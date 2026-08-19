@@ -36,13 +36,25 @@ from apps.hardware_requests.workflow_errors import (
 from apps.hardware_requests.direct_loan_returns import validate_evidence_upload
 from apps.inventory import availability
 from apps.inventory.models import InventoryAsset, InventoryProduct
-from apps.makerspaces.guards import require_feature_locked
+from apps.makerspaces.guards import require_feature, require_feature_locked
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.servability import is_servable
 from apps.notifications.emit import emit_notification
 
 
 def checkout_tool(makerspace, requester, payload, *, evidence_id, remark=""):
+    # Gate on the feature and on servability BEFORE touching evidence. Promotion moved
+    # out of the transaction so its row locks never span S3 I/O, and moving the evidence
+    # work up with it put it ahead of the feature check -- so a makerspace with
+    # self-checkout disabled reported an evidence error instead of the feature error, and
+    # promoted an upload on the way there. The locked recheck below is still the
+    # authority; this is the cheap pre-check that keeps the ordering honest.
+    # By pk, not by the instance the caller handed us: require_feature() trusts a
+    # Makerspace argument as-is, so a stale in-memory copy would pass a gate the stored
+    # row has already closed.
+    current = require_feature(makerspace.pk, "inventory.self_checkout")
+    if not is_servable(current):
+        raise RequestValidationError("Makerspace is not available.")
     evidence = _public_evidence(
         makerspace, requester, evidence_id, EvidencePhoto.EvidenceType.ISSUE
     )
@@ -116,6 +128,11 @@ def return_tool(
     remark = str(remark or "").strip()
     if not remark:
         raise RequestValidationError("Return remark is required.")
+    # Same ordering rule as checkout_tool: an unservable makerspace must not reach
+    # evidence handling. Re-read for the same stale-instance reason; the locked recheck
+    # inside the transaction remains the authority.
+    if not is_servable(Makerspace.objects.get(pk=makerspace.pk)):
+        raise RequestValidationError("Makerspace is not available.")
     evidence = _public_evidence(
         makerspace, requester, evidence_id, EvidencePhoto.EvidenceType.RETURN
     )
