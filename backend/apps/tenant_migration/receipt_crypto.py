@@ -1,14 +1,15 @@
-import base64
-import hashlib
 import json
 import re
 import uuid
 
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import (
-    Ed25519PrivateKey,
-    Ed25519PublicKey,
+from apps.ed25519 import (
+    Ed25519Error,
+    decode_key,
+    encode_key,
+    fingerprint_public_key as _fingerprint_public_key,
+    generate_keypair,
+    sign_bytes,
+    verify_bytes,
 )
 
 from apps.tenant_migration.models_protocol import MigrationReceipt
@@ -31,33 +32,26 @@ HEX_64 = re.compile(r"\A[0-9a-f]{64}\Z")
 
 
 def generate_key_material():
-    private_key = Ed25519PrivateKey.generate()
-    private_raw = private_key.private_bytes(
-        serialization.Encoding.Raw,
-        serialization.PrivateFormat.Raw,
-        serialization.NoEncryption(),
-    )
-    public_raw = private_key.public_key().public_bytes(
-        serialization.Encoding.Raw,
-        serialization.PublicFormat.Raw,
-    )
+    private_raw, public_raw = generate_keypair()
     return {
-        "private_key": _encode(private_raw),
-        "public_key": _encode(public_raw),
+        "private_key": encode_key(private_raw),
+        "public_key": encode_key(public_raw),
         "fingerprint": fingerprint_public_key(public_raw),
     }
 
 
 def fingerprint_public_key(public_key):
-    raw = decode_public_key(public_key) if isinstance(public_key, str) else public_key
-    return hashlib.sha256(raw).hexdigest()
+    try:
+        return _fingerprint_public_key(public_key)
+    except Ed25519Error as exc:
+        raise ReceiptValidationError(str(exc)) from exc
 
 
 def decode_public_key(value):
-    raw = _decode(value, "public key")
-    if len(raw) != 32:
-        raise ReceiptValidationError("An Ed25519 public key must be 32 bytes.")
-    return raw
+    try:
+        return decode_key(value, label="public key", length=32)
+    except Ed25519Error as exc:
+        raise ReceiptValidationError(str(exc)) from exc
 
 
 def canonical_payload(payload):
@@ -97,25 +91,21 @@ def validate_payload(payload):
 
 
 def sign_payload(payload, private_key):
-    raw = _decode(private_key, "private key")
-    if len(raw) != 32:
-        raise ReceiptValidationError("An Ed25519 private key must be 32 bytes.")
-    signature = Ed25519PrivateKey.from_private_bytes(raw).sign(
-        canonical_payload(payload)
-    )
-    return _encode(signature)
+    try:
+        raw = decode_key(private_key, label="private key", length=32)
+        return encode_key(sign_bytes(canonical_payload(payload), raw))
+    except Ed25519Error as exc:
+        raise ReceiptValidationError(str(exc)) from exc
 
 
 def verify_signature(payload, signature, public_key):
-    signature_raw = _decode(signature, "signature")
-    if len(signature_raw) != 64:
-        raise ReceiptValidationError("An Ed25519 signature must be 64 bytes.")
     try:
-        Ed25519PublicKey.from_public_bytes(decode_public_key(public_key)).verify(
-            signature_raw,
+        verify_bytes(
             canonical_payload(payload),
+            decode_key(signature, label="signature", length=64),
+            decode_key(public_key, label="public key", length=32),
         )
-    except (InvalidSignature, ValueError) as exc:
+    except Ed25519Error as exc:
         raise ReceiptValidationError("The signed receipt signature is invalid.") from exc
 
 
@@ -151,16 +141,3 @@ def _canonical_uuid(value, field):
     if str(parsed) != value:
         raise ReceiptValidationError(f"The signed receipt {field} is not canonical.")
     return value
-
-
-def _encode(raw):
-    return base64.b64encode(raw).decode("ascii")
-
-
-def _decode(value, label):
-    if not isinstance(value, str):
-        raise ReceiptValidationError(f"The {label} encoding is invalid.")
-    try:
-        return base64.b64decode(value.encode("ascii"), validate=True)
-    except (ValueError, UnicodeEncodeError) as exc:
-        raise ReceiptValidationError(f"The {label} encoding is invalid.") from exc

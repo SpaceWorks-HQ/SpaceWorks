@@ -92,6 +92,11 @@ ADMIN_ACTION_EXEMPTIONS = {
 TASK_EXEMPTIONS = {
     "apps.accounts.tasks.purge_auth_challenges_task": "Platform-global auth retention.",
     "apps.accounts.tasks.drain_password_reset_envelopes_task": "Platform-global account recovery.",
+    "apps.audit.tasks.run_audit_attestation_task": (
+        "Deployment-local audit attestation: batches and leaves are deployment "
+        "state (OMITTED_MODELS), not tenant domain data, and sealing appends only "
+        "to that state."
+    ),
     "apps.backup.tasks.run_backup_archive_task": "Deployment/tenant backup control plane.",
     "apps.backup.tasks.scheduled_deployment_backup_task": "Deployment backup control plane.",
     "apps.backup.tasks.purge_expired_backup_archives_task": "Platform backup retention.",

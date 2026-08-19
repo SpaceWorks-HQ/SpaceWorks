@@ -33,6 +33,11 @@ from django.utils import timezone
 # from the beat-less one.
 SCHEDULED_TASKS = (
     (
+        "audit-attestation",
+        "apps.audit.tasks.run_audit_attestation_task",
+        5,
+    ),
+    (
         "drain-password-reset-envelopes",
         "apps.accounts.tasks.drain_password_reset_envelopes_task",
         1,

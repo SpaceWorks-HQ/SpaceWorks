@@ -1,16 +1,8 @@
-"""Read-only verification for stored audit row MACs.
+"""Read-only verification for row MACs and signed batch membership.
 
-KNOWN LIMITATION, closed by the next phase. Missing-MAC detection keys off the row's
-primary key against its scope's cutover, and the MAC does not bind the id (it is unknown
-before insert). An attacker with raw SQL who can bypass the append-only trigger can
-therefore rewrite a row's `id` to sit at or below the cutover, clear `row_mac`, and have
-the row read as ordinary pre-cutover history. Content edits are still detected, and
-forging the cutover itself now requires the master key, so this is a SQL-only attacker
-with the ability to rewrite primary keys.
-
-Closing it needs a cutoff that does not depend on mutable row coordinates: the
-authenticated batch chain (AuditBatchLeaf binding the id, signed and anchored off-box)
-planned for the following phase. Documented rather than silently assumed.
+AUD-2 closes the mutable-coordinate limitation from AUD-1. Once a row has an
+AuditBatchLeaf, clearing its MAC or changing its id changes the signed Merkle membership
+and is a mismatch, irrespective of the older id-based cutover classification.
 """
 
 import hmac
@@ -43,8 +35,20 @@ class AuditMacStatus(StrEnum):
     KEY_UNAVAILABLE = "key_unavailable"
 
 
-def classify_audit_row(row, *, cutover_cache=None) -> AuditMacStatus:
+def classify_audit_row(row, *, cutover_cache=None, verify_batch=True) -> AuditMacStatus:
+    batch = None
+    if verify_batch:
+        from apps.audit.models import AuditBatchLeaf
+
+        leaf = (
+            AuditBatchLeaf.objects.filter(audit_log_id=row.pk)
+            .select_related("batch")
+            .first()
+        )
+        batch = leaf.batch if leaf is not None else None
     if row.row_mac is None:
+        if batch is not None:
+            return AuditMacStatus.MISMATCH
         # No MAC. Legitimate for history from before this scope's cutover, for rows
         # written while attestation was switched off, and for imported rows. But a row
         # ABOVE the cutover should have been sealed, so a missing MAC there is either a
@@ -96,9 +100,16 @@ def classify_audit_row(row, *, cutover_cache=None) -> AuditMacStatus:
         # The stored payload cannot even be canonicalized, so it cannot be the payload
         # that was signed. That IS a mismatch.
         return AuditMacStatus.MISMATCH
-    if hmac.compare_digest(bytes(row.row_mac), expected):
-        return AuditMacStatus.ATTESTED
-    return AuditMacStatus.MISMATCH
+    if not hmac.compare_digest(bytes(row.row_mac), expected):
+        return AuditMacStatus.MISMATCH
+    if batch is not None and verify_batch:
+        # A scope's first batch can hold its entire history, so re-verifying it per row
+        # makes a full scan quadratic. verify_audit_log checks batches once, separately.
+        from apps.audit.batch_verification import verify_batch_local
+
+        if verify_batch_local(batch) is not None:
+            return AuditMacStatus.MISMATCH
+    return AuditMacStatus.ATTESTED
 
 
 def verify_audit_mac(row, *, cutover_cache=None) -> bool:

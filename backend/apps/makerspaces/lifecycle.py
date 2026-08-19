@@ -132,7 +132,7 @@ def _delete_object_graph(makerspace):
         DeviceRefreshToken,
         NativeAppRegistration,
     )
-    from apps.audit.models import AuditLog
+    from apps.audit.models import AuditBatch, AuditBatchLeaf, AuditLog
     from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
     from apps.evidence.models import EvidencePhoto
     from apps.events.models import EventRegistration
@@ -235,6 +235,11 @@ def _delete_object_graph(makerspace):
         ).delete()
         registrations.delete()
         MakerspaceMembership.objects.filter(makerspace=makerspace).delete()
+        # AuditBatchLeaf.audit_log PROTECTs the audit rows deleted just below, and the
+        # batch FK PROTECTs the makerspace itself, so both must go first. Attestation is
+        # deployment-local state about rows that are being destroyed anyway.
+        AuditBatchLeaf.objects.filter(batch__makerspace=makerspace).delete()
+        AuditBatch.objects.filter(makerspace=makerspace).delete()
         AuditLog.objects.filter(makerspace=makerspace).delete()
         Payment.objects.filter(makerspace=makerspace).delete()
         ProcessedStripeEvent.objects.filter(makerspace=makerspace).delete()

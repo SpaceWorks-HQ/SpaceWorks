@@ -1,7 +1,13 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
-from apps.audit.models import AuditLog, AuditMacKey
+from apps.audit.models import (
+    AuditBatch,
+    AuditBatchLeaf,
+    AuditLog,
+    AuditMacKey,
+    AuditSigningKey,
+)
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -62,3 +68,57 @@ class AuditMacKeyAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+class _ReadOnlyAuditAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AuditSigningKey)
+class AuditSigningKeyAdmin(_ReadOnlyAuditAdmin):
+    list_display = ("makerspace", "fingerprint", "created_at", "activated_at")
+    list_filter = ("makerspace", "created_at", "activated_at")
+    exclude = ("wrapped_private_key", "activation_signature")
+    readonly_fields = (
+        "makerspace",
+        "public_key",
+        "fingerprint",
+        "activation_payload",
+        "created_at",
+        "activated_at",
+    )
+
+
+@admin.register(AuditBatch)
+class AuditBatchAdmin(_ReadOnlyAuditAdmin):
+    list_display = ("makerspace", "batch_seq", "leaf_count", "created_at")
+    list_filter = ("makerspace", "created_at")
+    readonly_fields = (
+        "makerspace",
+        "batch_seq",
+        "leaf_count",
+        "merkle_root",
+        "prev_batch_root",
+        "created_at",
+        "signature",
+        "signer_fingerprint",
+    )
+
+
+@admin.register(AuditBatchLeaf)
+class AuditBatchLeafAdmin(_ReadOnlyAuditAdmin):
+    list_display = ("batch", "audit_log", "leaf_position")
+    list_filter = ("batch__makerspace",)
+    readonly_fields = ("batch", "audit_log", "leaf_position")
+
+    def resolve_hidden_lookup(self):
+        # The leaf intentionally stores only exact membership coordinates. Scope comes
+        # from its batch; keep that fact local instead of growing the global registry.
+        return "batch__makerspace_id"

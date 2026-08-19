@@ -31,7 +31,9 @@ class Command(BaseCommand):
         first_bad = {}
         cutover_cache = {}
         for row in queryset.iterator(chunk_size=2_000):
-            status = classify_audit_row(row, cutover_cache=cutover_cache)
+            status = classify_audit_row(
+                row, cutover_cache=cutover_cache, verify_batch=False
+            )
             tally[status] += 1
             if status in (
                 AuditMacStatus.MISMATCH,
