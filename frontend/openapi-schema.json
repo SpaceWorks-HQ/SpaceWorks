@@ -34117,13 +34117,11 @@
                     "meta": {},
                     "created_at": {
                         "type": "string",
-                        "format": "date-time",
-                        "readOnly": true
+                        "format": "date-time"
                     }
                 },
                 "required": [
                     "action",
-                    "created_at",
                     "id"
                 ]
             },
@@ -34137,7 +34135,8 @@
                         "type": "string"
                     },
                     "role": {
-                        "type": "string"
+                        "type": "string",
+                        "nullable": true
                     },
                     "role_id": {
                         "type": "integer",
@@ -34147,7 +34146,11 @@
                         "type": "string"
                     },
                     "role_slug": {
-                        "type": "string"
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "source": {
+                        "$ref": "#/components/schemas/AuthMembershipSourceEnum"
                     },
                     "actions": {
                         "type": "array",
@@ -34189,8 +34192,17 @@
                     "role_name",
                     "role_slug",
                     "slug",
+                    "source",
                     "verified_at"
                 ]
+            },
+            "AuthMembershipSourceEnum": {
+                "enum": [
+                    "membership",
+                    "organization"
+                ],
+                "type": "string",
+                "description": "* `membership` - membership\n* `organization` - organization"
             },
             "AuthUserPayload": {
                 "type": "object",

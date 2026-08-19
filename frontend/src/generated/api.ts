@@ -735,16 +735,17 @@ export type AuditLog = {
   "target_type"?: string;
   "target_id"?: string;
   "meta"?: unknown;
-  "created_at": string;
+  "created_at"?: string;
 };
 
 export type AuthMembership = {
   "id": number;
   "slug": string;
-  "role": string;
+  "role": string | null;
   "role_id": number | null;
   "role_name": string;
-  "role_slug": string;
+  "role_slug": string | null;
+  "source": AuthMembershipSourceEnum;
   "actions": Array<string>;
   "can_configure_machine_types": boolean;
   "is_machine_only": boolean;
@@ -753,6 +754,8 @@ export type AuthMembership = {
   "verified_at": string | null;
   "referrals_enabled": boolean;
 };
+
+export type AuthMembershipSourceEnum = "membership" | "organization";
 
 export type AuthUserPayload = {
   "id": number;
