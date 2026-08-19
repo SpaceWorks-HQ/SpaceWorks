@@ -6,6 +6,7 @@ from datetime import timedelta
 from urllib.parse import urlsplit
 
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models_devices import (
@@ -106,6 +107,68 @@ def create_challenge(*, platform, app_id, environment):
         ),
     )
     return raw
+
+
+def live_approved_challenge(raw_challenge):
+    """Return an unspent challenge whose app registration remains approved."""
+    now = timezone.now()
+    challenge = (
+        DeviceAttestationChallenge.objects.select_related("registration")
+        .filter(
+            challenge_digest=challenge_digest(raw_challenge),
+            consumed_at__isnull=True,
+            expires_at__gt=now,
+            registration__status=NativeAppRegistration.Status.APPROVED,
+        )
+        .first()
+    )
+    return challenge if challenge and _authority_matches(challenge) else None
+
+
+def consume_attestation_challenge(
+    raw_challenge, *, expected_id=None, platform=None, app_id=None, environment=None
+):
+    """Burn and validate a challenge, optionally against a nonce-bound row."""
+    now = timezone.now()
+    with transaction.atomic():
+        rows = DeviceAttestationChallenge.objects.select_for_update().select_related(
+            "registration"
+        )
+        if expected_id is None:
+            challenge = rows.filter(
+                challenge_digest=challenge_digest(raw_challenge)
+            ).first()
+        else:
+            challenge = rows.filter(pk=expected_id).first()
+        if challenge is None or challenge.consumed_at is not None:
+            return None
+        challenge.consumed_at = now
+        challenge.save(update_fields=["consumed_at"])
+
+    expected = (platform, app_id, environment)
+    actual = (challenge.platform, challenge.app_id, challenge.environment)
+    supplied_identity_matches = all(
+        wanted is None or wanted == observed
+        for wanted, observed in zip(expected, actual)
+    )
+    return challenge if (
+        challenge.expires_at > now
+        and hmac.compare_digest(
+            challenge.challenge_digest, challenge_digest(raw_challenge)
+        )
+        and supplied_identity_matches
+        and challenge.registration.status == NativeAppRegistration.Status.APPROVED
+        and _authority_matches(challenge)
+    ) else None
+
+
+def _authority_matches(challenge):
+    registration = challenge.registration
+    return not (
+        challenge.platform != registration.platform
+        or challenge.app_id != registration.app_id
+        or challenge.environment != registration.environment
+    )
 
 
 def verify_attestation(challenge, raw_challenge, payload):

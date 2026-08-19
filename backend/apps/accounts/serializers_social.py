@@ -28,11 +28,24 @@ class SocialNonceSerializer(serializers.Serializer):
     surface = serializers.ChoiceField(choices=SocialSurface.choices)
     delivery = serializers.ChoiceField(choices=SocialDelivery.choices)
     client_platform = serializers.ChoiceField(choices=SocialClientPlatform.choices)
+    challenge = serializers.CharField(
+        max_length=512, required=False, write_only=True, trim_whitespace=False
+    )
 
     def validate(self, attrs):
         if (attrs["delivery"] == "web") != (attrs["client_platform"] == "web"):
             raise serializers.ValidationError(
                 "Web delivery requires the web client platform."
+            )
+        grant = getattr(self.context.get("request"), "device_grant", None)
+        has_challenge = bool(attrs.get("challenge"))
+        if attrs["delivery"] == SocialDelivery.WEB and has_challenge:
+            raise serializers.ValidationError("Web social login cannot use attestation.")
+        if attrs["delivery"] == SocialDelivery.DEVICE and (
+            (grant is None) != has_challenge
+        ):
+            raise serializers.ValidationError(
+                "A first device login requires an attestation challenge."
             )
         return attrs
 
@@ -46,10 +59,35 @@ class SocialLoginSerializer(serializers.Serializer):
     apple_name = serializers.CharField(
         max_length=200, required=False, allow_blank=True, trim_whitespace=True
     )
+    challenge = serializers.CharField(
+        max_length=512, required=False, write_only=True, trim_whitespace=False
+    )
+    attestation = serializers.JSONField(required=False, write_only=True)
+
+    def validate_attestation(self, value):
+        if not isinstance(value, dict) or not value or len(value) > 16:
+            raise serializers.ValidationError("Invalid attestation payload.")
+        return value
 
     def validate(self, attrs):
         if (attrs["delivery"] == "web") != (attrs["client_platform"] == "web"):
             raise serializers.ValidationError("Invalid social delivery platform.")
+        grant = getattr(self.context.get("request"), "device_grant", None)
+        has_attestation = bool(attrs.get("challenge")) and bool(
+            attrs.get("attestation")
+        )
+        if bool(attrs.get("challenge")) != bool(attrs.get("attestation")):
+            raise serializers.ValidationError(
+                "The challenge and attestation must be presented together."
+            )
+        if attrs["delivery"] == SocialDelivery.WEB and has_attestation:
+            raise serializers.ValidationError("Web social login cannot use attestation.")
+        if attrs["delivery"] == SocialDelivery.DEVICE and (
+            (grant is None) != has_attestation
+        ):
+            raise serializers.ValidationError(
+                "A first device login requires attestation."
+            )
         return attrs
 
 

@@ -12,13 +12,12 @@ from rest_framework.views import APIView
 
 from apps.accounts import audit_events
 from apps.accounts.attestation import (
-    AttestationRejected, AttestationUnavailable, challenge_digest,
-    create_challenge, verify_attestation,
+    AttestationRejected, AttestationUnavailable,
+    consume_attestation_challenge, create_challenge, verify_attestation,
 )
 from apps.accounts.login_methods import password_login_enabled
 from apps.accounts.models import User
 from apps.accounts.models_devices import (
-    DeviceAttestationChallenge,
     DeviceGrant,
     NativeAppRegistration,
 )
@@ -29,7 +28,11 @@ from apps.accounts.serializers_device import (
     DeviceLogoutResponseSerializer, DeviceRefreshResponseSerializer,
     DeviceRefreshSerializer, DeviceTokenResponseSerializer,
 )
-from apps.accounts.services_device_tokens import issue_device_token_pair, rotate_device_refresh
+from apps.accounts.services_device_tokens import (
+    assert_mobile_grant_creation_enabled,
+    issue_device_token_pair,
+    rotate_device_refresh,
+)
 from apps.accounts.services_tokens import revoke_device_grant
 from apps.accounts.throttles import DeviceLoginThrottle, DeviceLoginUserThrottle
 from apps.hardware_requests.exceptions import ErrorSerializer
@@ -44,10 +47,7 @@ def _require_mobile_module():
     a member's pocket. AuthenticationFailed rather than 404 so the native client's
     existing failure path handles it.
     """
-    from apps.makerspaces.deployment_modules import mobile_module_enabled
-
-    if not mobile_module_enabled():
-        raise AuthenticationFailed("Mobile device sessions are not enabled.")
+    assert_mobile_grant_creation_enabled()
 
 
 def _reject_browser_headers(request):
@@ -101,21 +101,12 @@ class DeviceAttestationChallengeView(APIView):
 
 
 def _consume_challenge(data):
-    now = timezone.now()
-    with transaction.atomic():
-        challenge = (
-            DeviceAttestationChallenge.objects.select_for_update()
-            .select_related("registration")
-            .filter(challenge_digest=challenge_digest(data["challenge"]))
-            .first()
-        )
-        if challenge is None or challenge.consumed_at is not None:
-            return None
-        challenge.consumed_at = now
-        challenge.save(update_fields=["consumed_at"])
-    expected = (challenge.platform, challenge.app_id, challenge.environment)
-    actual = (data["platform"], data["app_id"], data["environment"])
-    return challenge if challenge.expires_at > now and expected == actual else None
+    return consume_attestation_challenge(
+        data["challenge"],
+        platform=data["platform"],
+        app_id=data["app_id"],
+        environment=data["environment"],
+    )
 
 
 class DeviceLoginView(APIView):

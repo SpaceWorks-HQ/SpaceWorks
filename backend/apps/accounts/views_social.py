@@ -7,6 +7,11 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts import audit_events
+from apps.accounts.attestation import (
+    AttestationRejected,
+    AttestationUnavailable,
+    verify_attestation,
+)
 from apps.accounts.auth_cookies import set_refresh_cookies
 from apps.accounts.login_methods import self_registration_enabled, social_login_enabled
 from apps.accounts.member_identity import member_login_allowed
@@ -28,6 +33,7 @@ from apps.accounts.services_social_identity import (
     unlink_social_identity,
 )
 from apps.accounts.services_social_login import (
+    SocialDeviceGrantRetryRequired,
     assert_staff_authority,
     issue_social_session,
     social_audit_meta,
@@ -35,6 +41,7 @@ from apps.accounts.services_social_login import (
 from apps.accounts.social_jwt import SocialProviderUnavailable, SocialTokenError
 from apps.accounts.social_nonces import (
     SocialAuthUnavailable,
+    SocialDeviceRestartRequired,
     SocialNonceRejected,
     consume_social_nonce,
     create_social_nonce,
@@ -58,6 +65,7 @@ def _error(code, status_code):
         "identity_not_found": "That provider is not linked.",
         "access_denied": "Account access is restricted.",
         "registration_disabled": "Account registration is not available.",
+        "social_device_restart_required": "Restart device sign-in with a fresh nonce and attestation challenge.",
     }
     return Response({"detail": messages.get(code, messages["social_invalid"]), "code": code}, status=status_code)
 
@@ -70,7 +78,7 @@ class SocialNonceView(APIView):
     @extend_schema(tags=["Social auth"], auth=[], request=SocialNonceSerializer,
         responses={200: SocialNonceResponseSerializer, 400: OpenApiResponse(ErrorSerializer), 404: OpenApiResponse(ErrorSerializer), 429: OpenApiResponse(ErrorSerializer)})
     def post(self, request):
-        serializer = SocialNonceSerializer(data=request.data)
+        serializer = SocialNonceSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         try:
             raw = create_social_nonce(request, **serializer.validated_data)
@@ -88,9 +96,9 @@ class SocialLoginView(APIView):
     provider = None
 
     @extend_schema(tags=["Social auth"], auth=[], request=SocialLoginSerializer,
-        responses={200: SocialLoginResponseSerializer, 401: OpenApiResponse(ErrorSerializer), 403: OpenApiResponse(ErrorSerializer), 404: OpenApiResponse(ErrorSerializer), 409: OpenApiResponse(ErrorSerializer), 429: OpenApiResponse(ErrorSerializer)})
+        responses={200: SocialLoginResponseSerializer, 401: OpenApiResponse(ErrorSerializer), 403: OpenApiResponse(ErrorSerializer), 404: OpenApiResponse(ErrorSerializer), 409: OpenApiResponse(ErrorSerializer, description="Includes `social_device_restart_required` when burned pre-grant inputs must be replaced."), 429: OpenApiResponse(ErrorSerializer)})
     def post(self, request):
-        serializer = SocialLoginSerializer(data=request.data)
+        serializer = SocialLoginSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         # A member-surface login through a built-in consumer provider is part of the
@@ -106,10 +114,22 @@ class SocialLoginView(APIView):
         # the distinction.
         if not social_login_enabled():
             return _error("social_unavailable", 404)
+        nonce_row = None
         try:
             _settings, audience = provider_settings(self.provider, data["client_platform"])
-            nonce_row = consume_social_nonce(request, raw=data["nonce"], provider=self.provider,
-                surface=data["surface"], delivery=data["delivery"], client_platform=data["client_platform"])
+            nonce_row, attestation_challenge = consume_social_nonce(
+                request, raw=data["nonce"], provider=self.provider,
+                surface=data["surface"], delivery=data["delivery"],
+                client_platform=data["client_platform"],
+                raw_challenge=data.get("challenge"), provider_audience=audience,
+            )
+            verified_attestation = None
+            if attestation_challenge is not None:
+                verified_attestation = verify_attestation(
+                    attestation_challenge,
+                    data["challenge"],
+                    data["attestation"],
+                )
             claims = _verify(self.provider, data["id_token"], data["nonce"], audience)
             validator = (
                 lambda user: assert_staff_authority(user, request)
@@ -122,27 +142,49 @@ class SocialLoginView(APIView):
                 # Only an OIDC provider can forbid auto-linking; the built-ins always
                 # verify email ownership, so `claims` carries no such key for them.
                 allow_auto_link=claims.get("allow_auto_link", True))
-            if data["delivery"] == "device" and nonce_row.device_grant.user_id != user.pk:
+            if (
+                data["delivery"] == "device"
+                and nonce_row.device_grant_id is not None
+                and nonce_row.device_grant.user_id != user.pk
+            ):
                 raise SocialResolutionError("access_denied", 403)
             adopt_pending_memberships_for_user(user)
             scope = staff_origin_scope(request)
-            staff_scope = (
-                None if scope is NO_STAFF_ORIGIN_SCOPE else str(scope)
-            )
+            staff_scope = None if scope is NO_STAFF_ORIGIN_SCOPE else str(scope)
             tokens = issue_social_session(
                 user,
                 surface=data["surface"],
                 delivery=data["delivery"],
                 nonce_row=nonce_row,
                 staff_scope=staff_scope,
+                verified_attestation=verified_attestation,
             )
+            if data["delivery"] == "device":
+                request.device_grant = tokens["device_grant"]
         except SocialAuthUnavailable:
             return _error("social_unavailable", 404)
-        except (SocialNonceRejected, SocialTokenError):
+        except SocialDeviceRestartRequired:
+            _audit_failure(self.provider, "device_restart_required")
+            return _error("social_device_restart_required", 409)
+        except SocialTokenError:
+            _audit_failure(self.provider, "invalid")
+            if nonce_row is not None and nonce_row.attestation_challenge_id:
+                return _error("social_device_restart_required", 409)
+            return _error("social_invalid", 401)
+        except SocialNonceRejected:
             _audit_failure(self.provider, "invalid")
             return _error("social_invalid", 401)
+        except (AttestationRejected, AttestationUnavailable):
+            _audit_failure(self.provider, "attestation_failed")
+            return _error("social_device_restart_required", 409)
         except SocialProviderUnavailable:
+            if nonce_row is not None and nonce_row.attestation_challenge_id:
+                _audit_failure(self.provider, "provider_unavailable")
+                return _error("social_device_restart_required", 409)
             return _error("social_unavailable", 503)
+        except SocialDeviceGrantRetryRequired:
+            _audit_failure(self.provider, "device_grant_failed")
+            return _error("social_device_restart_required", 409)
         except SocialResolutionError as exc:
             # The nonce is already consumed by the time resolution can refuse, so this is
             # a state-changing path and has to leave a trace -- the same rule the phone
@@ -163,7 +205,6 @@ class SocialLoginView(APIView):
 
 class GoogleSocialLoginView(SocialLoginView):
     provider = SocialProvider.GOOGLE
-
 
 class AppleSocialLoginView(SocialLoginView):
     provider = SocialProvider.APPLE

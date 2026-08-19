@@ -19,6 +19,14 @@ from apps.accounts.services_tokens import blacklist_device_family
 from apps.accounts.tokens import SpaceWorksRefreshToken
 
 
+def assert_mobile_grant_creation_enabled():
+    """Refuse new grants while preserving already-issued device sessions."""
+    from apps.makerspaces.deployment_modules import mobile_module_enabled
+
+    if not mobile_module_enabled():
+        raise AuthenticationFailed("Mobile device sessions are not enabled.")
+
+
 def token_fingerprint(raw):
     return hmac.new(settings.SECRET_KEY.encode(), raw.encode(), hashlib.sha256).hexdigest()
 
