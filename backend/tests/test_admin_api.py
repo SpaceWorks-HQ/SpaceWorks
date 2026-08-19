@@ -770,11 +770,16 @@ def test_api_client_makerspace_admin_cannot_escalate_privileged_fields():
     )
     assert created.status_code == 201
     assert created.data["rate_limit_tier"] == "standard"  # ignored, not "trusted"
-    assert created.data["scopes"] == []  # ignored, not the admin-supplied scopes
+    # The admin-supplied scopes are still IGNORED -- that is the property this test
+    # guards. What an ignored value resolves to changed: an empty list used to mean
+    # "allow everything", so a tenant-created client is now issued the FROZEN legacy
+    # capability instead, which authorizes only the registered routes it could already
+    # reach and can never authorize an unregistered one.
+    assert created.data["scopes"] == ["legacy:v1"]
 
     obj = ApiClient.objects.get(id=created.data["id"])
     assert obj.rate_limit_tier == "standard"
-    assert obj.scopes == []
+    assert obj.scopes == ["legacy:v1"]
 
     # A PATCH attempting escalation is also ignored.
     patched = admin_client.patch(
@@ -785,7 +790,7 @@ def test_api_client_makerspace_admin_cannot_escalate_privileged_fields():
     assert patched.status_code == 200
     obj.refresh_from_db()
     assert obj.rate_limit_tier == "standard"
-    assert obj.scopes == []
+    assert obj.scopes == ["legacy:v1"]
 
     # A superadmin may still set the privileged knobs.
     superadmin = make_user(
@@ -842,7 +847,9 @@ def test_hidden_makerspace_superadmin_member_cannot_escalate_api_client_fields()
     assert patched.status_code == 200
     obj = ApiClient.objects.get(id=created.data["id"])
     assert obj.rate_limit_tier == "standard"
-    assert obj.scopes == []
+    # Escalation is still refused; an ignored scopes value now resolves to the frozen
+    # legacy capability rather than the empty list that used to allow everything.
+    assert obj.scopes == ["legacy:v1"]
 
 
 def test_member_can_request_api_key_without_secret_exposure():

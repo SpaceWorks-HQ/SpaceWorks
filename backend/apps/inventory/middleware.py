@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 NONCE_MAX_LENGTH = 128
 NONCE_PATTERN = re.compile(r"\A[A-Za-z0-9._~-]+\Z")
 LEGACY_NONCE_WARNING_EVENT = "api_client_nonce_missing_legacy"
-SCOPE_REGISTRY_MISMATCH_EVENT = "api_client_scope_registry_mismatch"
+AMBIGUOUS_NONCE_BODY_EVENT = "api_client_nonce_ambiguous_body"
 
 
 class FrontendHMACMiddleware:
@@ -97,6 +97,11 @@ class FrontendHMACMiddleware:
                     return False
             elif settings.APICLIENT_REQUIRE_NONCE:
                 return False
+            elif self._body_could_re_encode_a_nonce(request.body):
+                logger.warning(
+                    AMBIGUOUS_NONCE_BODY_EVENT, extra={"client_id": client_id}
+                )
+                return False
 
             message_parts = [
                 request.method.upper().encode(),
@@ -128,6 +133,32 @@ class FrontendHMACMiddleware:
 
     def _nonce_is_valid(self, nonce):
         return len(nonce) <= NONCE_MAX_LENGTH and bool(NONCE_PATTERN.fullmatch(nonce))
+
+    def _body_could_re_encode_a_nonce(self, body):
+        """Refuse a nonce-less request whose body re-encodes a nonced message.
+
+        The signed message is METHOD \n PATH \n TIMESTAMP [\n NONCE] \n BODY, so the
+        nonce part exists ONLY when X-Nonce is sent. That makes a nonced request and a
+        nonce-less request whose body is NONCE + "\n" + body serialize to IDENTICAL
+        bytes -- the same signature verifies, and `_claim_nonce` is never reached, so a
+        captured nonced request replays freely for the whole clock-skew window. Proven
+        against a live request, not theorised.
+
+        The unambiguous fix is a fixed part count (always sign an empty nonce slot), but
+        that changes the message for every existing nonce-less client -- the default
+        deployment -- so it is specified as protocol v2 instead. This refuses exactly
+        the ambiguous shape: a first line that is itself a well-formed nonce followed by
+        a newline. Real callers are unaffected because a JSON body starts with '{',
+        which is not in NONCE_PATTERN.
+        """
+        head, separator, _rest = body[: NONCE_MAX_LENGTH + 1].partition(b"\n")
+        if not separator or not head:
+            return False
+        try:
+            candidate = head.decode("ascii")
+        except UnicodeDecodeError:
+            return False
+        return bool(NONCE_PATTERN.fullmatch(candidate))
 
     def _claim_nonce(self, client_id, nonce):
         # Hash the validated pair to keep backend keys fixed-size and unambiguous while
@@ -215,84 +246,34 @@ class FrontendHMACMiddleware:
             return False
 
     def _client_scope_ok(self, request, client):
-        if client.makerspace_id is None:
-            return True
-        target = self._path_makerspace(request)
-        request._api_client_legacy_target = target
-        return target is None or target.pk == client.makerspace_id
+        from apps.apiclients import scope_registry
+
+        entry = scope_registry.lookup(
+            scope_registry.resolve_view_name(request), request.method
+        )
+        if entry is None:
+            return False
+        target, resolved = scope_registry.resolve_target_once(request, entry)
+        return scope_registry.target_allows(entry, client, target, resolved)
 
     def _makerspace_scope_ok(self, request, makerspace):
-        target = self._path_makerspace(request)
-        return target is None or target.pk == makerspace.pk
+        from apps.apiclients import scope_registry
+
+        entry = scope_registry.lookup(
+            scope_registry.resolve_view_name(request), request.method
+        )
+        if entry is None:
+            return False
+        target, resolved = scope_registry.resolve_target_once(request, entry)
+        if entry.target_mode == scope_registry.TARGET_GLOBAL:
+            return True
+        return resolved and getattr(target, "pk", None) == makerspace.pk
 
     def _request_scope_ok(self, request, client):
-        scopes = set(client.scopes or [])
-        if not scopes:
-            return True
-        path = request.path
-        method = request.method.upper()
-        if "/public/" in path:
-            required = "public:write" if method not in {"GET", "HEAD", "OPTIONS"} else "public:read"
-            return required in scopes or "public:*" in scopes
-        if "/admin/" in path:
-            if "/reports/" in path or "/analytics/" in path:
-                return "reports:read" in scopes or "admin:read" in scopes or "admin:*" in scopes
-            required = "admin:write" if method not in {"GET", "HEAD", "OPTIONS"} else "admin:read"
-            return required in scopes or "admin:*" in scopes
-        return True
+        from apps.apiclients import scope_registry
+
+        return scope_registry.classify(request, client).verdict
 
     def _scope_checks_ok(self, request, client):
-        client_scope_ok = self._client_scope_ok(request, client)
-        if not client_scope_ok:
-            self._observe_scope_registry(request, client, legacy_verdict=False)
-            return False
         request_scope_ok = self._request_scope_ok(request, client)
-        self._observe_scope_registry(
-            request, client, legacy_verdict=request_scope_ok
-        )
-        return request_scope_ok
-
-    def _observe_scope_registry(self, request, client, *, legacy_verdict):
-        if getattr(request, "_api_client_scope_registry_observed", False):
-            return
-        request._api_client_scope_registry_observed = True
-        try:
-            from apps.apiclients import scope_registry
-
-            observation = scope_registry.classify(
-                request,
-                client,
-                cached_target=getattr(request, "_api_client_legacy_target", None),
-            )
-            if observation.verdict != legacy_verdict:
-                logger.warning(
-                    SCOPE_REGISTRY_MISMATCH_EVENT,
-                    extra={
-                        "view_name": observation.view_name,
-                        "method": observation.method,
-                        "client_id": client.client_id,
-                        "scopes_empty": not bool(client.scopes or []),
-                        "registry_verdict": observation.verdict,
-                        "legacy_verdict": legacy_verdict,
-                        "target_resolution": observation.target_resolution,
-                        "target_resolved": observation.target_resolved,
-                        "target_makerspace_id": observation.target_makerspace_id,
-                    },
-                )
-        except Exception:
-            logger.exception("ApiClient scope registry observation failed")
-
-    def _path_makerspace(self, request):
-        marker = "/public/"
-        if marker not in request.path:
-            return None
-        tail = request.path.split(marker, 1)[1]
-        identifier = tail.split("/", 1)[0]
-        if not identifier or identifier == "makerspaces" or identifier == "requests":
-            return None
-        try:
-            from apps.makerspaces.lookup import get_public_makerspace
-
-            return get_public_makerspace(identifier)
-        except Exception:
-            return None
+        return request_scope_ok and self._client_scope_ok(request, client)
