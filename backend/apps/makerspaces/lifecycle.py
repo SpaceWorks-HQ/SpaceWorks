@@ -125,6 +125,13 @@ def _audit_meta(makerspace):
 def _delete_object_graph(makerspace):
     from apps.backup.models import RestoreRollbackObject
     from apps.apiclients.models import ApiClient, ApiKeyRequest
+    from apps.accounts.models_devices import (
+        DeviceAttestationChallenge,
+        DeviceGrant,
+        DeviceRefreshFamily,
+        DeviceRefreshToken,
+        NativeAppRegistration,
+    )
     from apps.audit.models import AuditLog
     from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
     from apps.evidence.models import EvidencePhoto
@@ -205,6 +212,25 @@ def _delete_object_graph(makerspace):
         MachineTypeEmailTemplate.objects.filter(makerspace=makerspace).delete()
         ApiClient.objects.filter(makerspace=makerspace).delete()
         ApiKeyRequest.objects.filter(makerspace=makerspace).delete()
+
+        # Native app registrations are makerspace-scoped, but DeviceGrant.registration and
+        # DeviceAttestationChallenge.registration are PROTECT, so letting the makerspace
+        # CASCADE into them raises ProtectedError and the whole purge fails -- the same
+        # shape as MachineConsumable.product below. Clear the dependent authentication
+        # rows first. Grants are deliberately destroyed: they are authority to act inside
+        # a space that no longer exists.
+        registrations = NativeAppRegistration.objects.filter(makerspace=makerspace)
+        DeviceRefreshToken.objects.filter(
+            family__grant__registration__in=registrations
+        ).delete()
+        DeviceRefreshFamily.objects.filter(
+            grant__registration__in=registrations
+        ).delete()
+        DeviceGrant.objects.filter(registration__in=registrations).delete()
+        DeviceAttestationChallenge.objects.filter(
+            registration__in=registrations
+        ).delete()
+        registrations.delete()
         MakerspaceMembership.objects.filter(makerspace=makerspace).delete()
         AuditLog.objects.filter(makerspace=makerspace).delete()
         Payment.objects.filter(makerspace=makerspace).delete()

@@ -19,6 +19,7 @@ from apps.accounts.services_claim import (
 from apps.accounts.transition_services import transition_walk_in_to_account
 from apps.audit.models import AuditLog
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.device_helpers import make_native_app_registration
 from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
@@ -84,6 +85,7 @@ def test_issue_refuses_every_account_or_identity_bearing_state(state):
         )
     elif state == "device_grant":
         DeviceGrant.objects.create(
+            registration=make_native_app_registration(app_id="claim.test"),
             user=target,
             platform="apple",
             app_id="claim.test",

@@ -37,6 +37,7 @@ RELATIONAL_USER_FIELDS = frozenset(
     {
         ("accounts.DeviceGrant", "user"),
         ("accounts.DeviceRefreshFamily", "user"),
+        ("accounts.NativeAppRegistration", "approved_by"),
         ("accounts.EmailVerificationChallenge", "user"),
         ("accounts.PhoneVerificationChallenge", "user"),
         ("accounts.SocialIdentity", "user"),

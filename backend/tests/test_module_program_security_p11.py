@@ -30,6 +30,7 @@ from apps.makerspaces.models import (
     MemberProfile,
 )
 from apps.makerspaces.walk_in_services import create_walk_in_member
+from tests.device_helpers import make_native_app_registration
 
 pytestmark = pytest.mark.django_db
 
@@ -1005,6 +1006,11 @@ def test_the_backfill_revokes_durable_identities_not_just_the_password():
         user=user, provider="google", provider_sub="walkin-subject"
     )
     grant = DeviceGrant.objects.create(
+        registration=make_native_app_registration(
+            app_id="test.app",
+            platform="ios",
+            environment="production",
+        ),
         user=user, platform="ios", app_id="test.app", signing_identity="sig",
         environment="production", attestation_subject_fingerprint="f" * 64,
         attested_at=timezone.now(), last_used_at=timezone.now(),

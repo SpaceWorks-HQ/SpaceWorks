@@ -11,6 +11,7 @@ from apps.payments.models import MakerspacePaymentSettings, Payment
 from apps.payments.resolution import PaymentSource
 from apps.payments.services import PaymentRailConflict, create_checkout_url, create_payment
 from apps.payments.services_mobile import create_mobile_intent
+from tests.device_helpers import make_native_app_registration
 from tests.payments.test_machine_payments import service_request
 from tests.return_helpers import make_member, make_space
 
@@ -41,6 +42,7 @@ def configured_payment(makerspace, member):
 def device_client(user, makerspace):
     now = timezone.now()
     grant = DeviceGrant.objects.create(
+        registration=make_native_app_registration(),
         user=user,
         platform="apple",
         app_id="org.spaceworks.app",

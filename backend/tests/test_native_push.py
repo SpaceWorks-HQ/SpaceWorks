@@ -14,6 +14,7 @@ from apps.integrations.models import (
 )
 from apps.integrations.notification_catalog import DEFAULT_CHANNEL_STATE, default_state
 from apps.integrations.push_fcm import PushProviderError
+from tests.device_helpers import make_native_app_registration
 from tests.return_helpers import make_member, make_space
 
 
@@ -23,6 +24,10 @@ pytestmark = pytest.mark.django_db
 def device_client(user, makerspace, *, platform="apple", environment="development"):
     now = timezone.now()
     grant = DeviceGrant.objects.create(
+        registration=make_native_app_registration(
+            platform=platform,
+            environment=environment,
+        ),
         user=user,
         platform=platform,
         app_id="org.spaceworks.app",
