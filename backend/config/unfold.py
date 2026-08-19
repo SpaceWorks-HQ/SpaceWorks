@@ -98,6 +98,11 @@ UNFOLD = {
                         "corporate_fare",
                         "admin:organizations_organization_changelist",
                     ),
+                    _item(
+                        "Organization memberships",
+                        "group",
+                        "admin:organizations_organizationmembership_changelist",
+                    ),
                     _item("Makerspaces", "store", "admin:makerspaces_makerspace_changelist"),
                     _item("Archive requests", "archive", "admin:makerspaces_makerspacearchiverequest_changelist"),
                     _item("Inventory", "inventory_2", "admin:inventory_inventoryproduct_changelist"),

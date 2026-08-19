@@ -1,10 +1,15 @@
+from django import forms
 from django.contrib import admin
 from django.core.exceptions import PermissionDenied
 from unfold.admin import ModelAdmin, TabularInline
 
 from apps.accounts import rbac
 from apps.audit import services as audit
-from apps.organizations.models import Organization, OrganizationMakerspace
+from apps.organizations.models import (
+    Organization,
+    OrganizationMakerspace,
+    OrganizationMembership,
+)
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -169,5 +174,109 @@ class OrganizationMakerspaceAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
             meta={
                 "organization_slug": obj.organization.slug,
                 "relationship": obj.relationship,
+            },
+        )
+
+
+class OrganizationMembershipForm(forms.ModelForm):
+    class Meta:
+        model = OrganizationMembership
+        fields = "__all__"
+
+    def clean_granted_actions(self):
+        """Reject actions rbac would silently drop.
+
+        `rbac._org_actions_for` filters unknown and forbidden values out before
+        granting anything, so an unvalidated typo here would save cleanly and then
+        confer nothing -- the operator has no way to tell a granted action from an
+        ignored one. Same three rules as `role_services._clean_actions`.
+        """
+        actions = self.cleaned_data.get("granted_actions")
+        if not isinstance(actions, list) or any(
+            not isinstance(item, str) for item in actions
+        ):
+            raise forms.ValidationError("Use a list of action values.")
+        values = set(actions)
+        if values & rbac.ROLE_FORBIDDEN_ACTIONS:
+            raise forms.ValidationError(
+                "This action cannot be granted through an organization."
+            )
+        unknown = values - rbac.ALL_ACTIONS
+        if unknown:
+            raise forms.ValidationError(f"Unknown action value: {sorted(unknown)[0]}.")
+        if rbac.Action.MANAGE_MACHINES in values:
+            # machines.role_scope.manage_scope_for() derives machine reach from a local
+            # MakerspaceMembership role and resolves an organization-only actor to
+            # NOTHING, so this action would read as effective in rbac while every
+            # machine list and mutation stayed empty or denied. Refuse it rather than
+            # grant something inert; machine scope for organization grants has to be
+            # defined before it can be offered.
+            raise forms.ValidationError(
+                "manage_machines cannot be granted through an organization yet: "
+                "machine scope is derived from a makerspace membership."
+            )
+        return sorted(values)
+
+
+@admin.register(OrganizationMembership)
+class OrganizationMembershipAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    form = OrganizationMembershipForm
+    list_display = (
+        "organization",
+        "user",
+        "status",
+        "created_by",
+        "updated_at",
+    )
+    list_filter = ("status", "organization")
+    search_fields = (
+        "organization__name",
+        "organization__slug",
+        "user__username",
+        "user__email",
+    )
+    autocomplete_fields = ("organization", "user")
+    readonly_fields = ("created_by", "created_at", "updated_at")
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+        audit.record(
+            request.user,
+            (
+                "organization.membership_updated"
+                if change
+                else "organization.membership_created"
+            ),
+            target=obj,
+            meta={
+                "organization_slug": obj.organization.slug,
+                "user_id": obj.user_id,
+                "status": obj.status,
+            },
+        )
+
+    # Deleting a membership revokes authority across every makerspace the organization
+    # reaches, so it is a state-changing control-plane operation and must be audited.
+    # Overriding save_model alone would leave both admin delete paths silent.
+    def delete_model(self, request, obj):
+        self._record_deletion(request, obj)
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            self._record_deletion(request, obj)
+        super().delete_queryset(request, queryset)
+
+    def _record_deletion(self, request, obj):
+        audit.record(
+            request.user,
+            "organization.membership_deleted",
+            target=obj,
+            meta={
+                "organization_slug": obj.organization.slug,
+                "user_id": obj.user_id,
+                "granted_actions": sorted(obj.granted_actions or []),
             },
         )
