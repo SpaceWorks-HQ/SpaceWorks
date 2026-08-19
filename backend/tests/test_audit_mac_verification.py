@@ -149,3 +149,26 @@ def test_advancing_the_cutover_without_its_mac_is_detected():
     row.refresh_from_db()
 
     assert classify_audit_row(row) is AuditMacStatus.MISMATCH
+
+
+def test_a_cached_key_does_not_survive_removing_the_master_key(settings):
+    """Switching attestation off must bite a WARM process, not just a cold one.
+
+    `get_audit_mac_key` caches the unwrapped key. If the cache were consulted before the
+    configured check, a running process would keep verifying with the cached key after
+    the operator removed AUDIT_MAC_MASTER_KEY -- while `record()`, which asks per write,
+    had already started storing NULL MACs. The verifier would then accuse the deployment
+    of stripping MACs it never wrote.
+    """
+    from apps.audit.keys import AuditMacKeyUnavailable, get_audit_mac_key
+
+    makerspace = make_space("audit-mac-warm-cache")
+    attested = record(make_user("audit-mac-warm-cache-user"), "audit.warm", makerspace=makerspace)
+    assert classify_audit_row(attested) is AuditMacStatus.ATTESTED
+    # The key is now cached for this scope.
+
+    settings.AUDIT_MAC_MASTER_KEY = ""
+
+    with pytest.raises(AuditMacKeyUnavailable):
+        get_audit_mac_key(makerspace.pk)
+    assert classify_audit_row(attested) is AuditMacStatus.KEY_UNAVAILABLE
