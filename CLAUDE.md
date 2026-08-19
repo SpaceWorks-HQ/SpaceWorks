@@ -244,6 +244,11 @@ place request state transitions happen, `apps/inventory/availability.py` is the 
 counts change, `apps/makerspaces/module_registry.py` is the single source of truth for module keys, and
 `apps/accounts/rbac.py` is the Auth & RBAC module every scoped query must go through.
 
+**Adding or changing a module key means editing `docs/MODULES.md` in the same commit** — it is the
+user-facing page the README links every module name into (what the module is, what it adds, what
+happens without it, what a purge deletes), and it is hand-written prose over the registry's facts, so
+nothing regenerates it for you.
+
 ## Public availability rule (resolves PRD §5's two overlapping fields)
 
 `public_availability_mode` is the master display switch; `show_public_count` is a safety gate for exact
