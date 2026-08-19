@@ -19,6 +19,30 @@ from apps.apiclients.scope_registry_routes import (
     ScopeRegistryEntry,
 )
 
+LEGACY_SCOPE = "legacy:v1"
+SCOPE_VOCABULARY = frozenset(
+    {
+        LEGACY_SCOPE,
+        PUBLIC_READ,
+        PUBLIC_WRITE,
+        PUBLIC_ALL,
+        ADMIN_READ,
+        ADMIN_WRITE,
+        ADMIN_ALL,
+        REPORTS_READ,
+    }
+)
+BROWSER_SCOPES = frozenset(
+    {
+        LEGACY_SCOPE,
+        PUBLIC_READ,
+        PUBLIC_WRITE,
+        PUBLIC_ALL,
+        ADMIN_READ,
+        REPORTS_READ,
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ScopeObservation:
@@ -40,13 +64,12 @@ def _request_match(request):
     match = getattr(request, "resolver_match", None)
     if match is not None:
         return match
-    cached = getattr(request, "_scope_registry_resolver_match", None)
-    if cached is not None:
-        return cached
+    if hasattr(request, "_scope_registry_resolver_match"):
+        return request._scope_registry_resolver_match
     try:
         match = resolve(request.path_info)
     except Exception:
-        return None
+        match = None
     request._scope_registry_resolver_match = match
     return match
 
@@ -98,32 +121,50 @@ def resolve_target(request, entry):
         return None, False
 
 
-def classify(request, client, *, cached_target=None):
+def resolve_target_once(request, entry):
+    if hasattr(request, "_api_client_scope_target"):
+        return request._api_client_scope_target
+    result = resolve_target(request, entry)
+    request._api_client_scope_target = result
+    return result
+
+
+def target_allows(entry, client, target, resolved):
+    if entry.target_mode == TARGET_GLOBAL:
+        return client.makerspace_id is None or entry.tenant_apps_admitted
+    if not resolved:
+        return False
+    target_id = getattr(target, "pk", None)
+    return client.makerspace_id is None or target_id == client.makerspace_id
+
+
+def scope_allows(entry, scopes):
+    scopes = frozenset(scopes or ())
+    if LEGACY_SCOPE in scopes and entry.legacy_v1:
+        return True
+    return not scopes.isdisjoint(entry.scopes)
+
+
+def classify(request, client):
     view_name = resolve_view_name(request)
     method = request.method.upper()
     entry = lookup(view_name, method)
     if entry is None:
         return ScopeObservation(view_name, method, False, "no_registry_entry", None, None)
 
-    client_scopes = frozenset(client.scopes or ())
-    if not client_scopes:
-        return ScopeObservation(view_name, method, False, "not_attempted", None, None)
-    if client_scopes.isdisjoint(entry.scopes):
-        return ScopeObservation(view_name, method, False, "not_attempted", None, None)
-
-    if entry.target_mode == TARGET_GLOBAL:
-        admitted = client.makerspace_id is None or entry.tenant_apps_admitted
-        return ScopeObservation(view_name, method, admitted, "global", True, None)
-
-    if entry.target_mode == TARGET_TENANT_SLUG and cached_target is not None:
-        target, resolved = cached_target, True
-    else:
-        target, resolved = resolve_target(request, entry)
+    target, resolved = resolve_target_once(request, entry)
     target_id = getattr(target, "pk", None)
+    target_resolution = "global" if entry.target_mode == TARGET_GLOBAL else "resolved"
     if not resolved:
         return ScopeObservation(view_name, method, False, "unresolved", False, None)
-    verdict = client.makerspace_id is None or target_id == client.makerspace_id
-    return ScopeObservation(view_name, method, verdict, "resolved", True, target_id)
+    if not target_allows(entry, client, target, resolved):
+        return ScopeObservation(
+            view_name, method, False, target_resolution, True, target_id
+        )
+    verdict = scope_allows(entry, client.scopes)
+    return ScopeObservation(
+        view_name, method, verdict, target_resolution, True, target_id
+    )
 
 
 def _concrete_methods(callback):
@@ -147,9 +188,9 @@ def _urlconf_routes(patterns, route="", namespaces=()):
             child_namespaces = namespaces + ((pattern.namespace,) if pattern.namespace else ())
             yield from _urlconf_routes(pattern.url_patterns, full_route, child_namespaces)
             continue
-        if not isinstance(pattern, URLPattern) or not pattern.name:
+        if not isinstance(pattern, URLPattern):
             continue
-        view_name = ":".join((*namespaces, pattern.name))
+        view_name = ":".join((*namespaces, pattern.name)) if pattern.name else None
         yield full_route, view_name, _concrete_methods(pattern.callback)
 
 
@@ -176,19 +217,33 @@ def validate_registry():
     # Report it as its own drift class: today every protected route is a class-based
     # view, and a future function-based one must fail this test rather than slip
     # through it. `(view_name, "")` marks the method set as undetermined.
-    missing = sorted(
+    missing = sorted([
         (view_name, method)
         for _route, view_name, methods in protected
         for method in (methods or {""})
         if (view_name, method) not in SCOPE_REGISTRY
-    )
+    ], key=lambda item: (item[0] or "", item[1]))
     return stale, missing
 
 
+def unregistered_protected_routes():
+    prefixes = tuple(prefix.lstrip("/") for prefix in settings.HMAC_PROTECTED_PATH_PREFIXES)
+    missing = [
+        (route, view_name, method)
+        for route, view_name, methods in _urlconf_routes(get_resolver().url_patterns)
+        if route.startswith(prefixes)
+        for method in (methods or {""})
+        if (view_name, method) not in SCOPE_REGISTRY
+    ]
+    return sorted(missing, key=lambda item: (item[0], item[1] or "", item[2]))
+
+
 __all__ = [
-    "ADMIN_ALL", "ADMIN_READ", "ADMIN_WRITE", "PUBLIC_ALL", "PUBLIC_READ",
-    "PUBLIC_WRITE", "REPORTS_READ", "SCOPE_REGISTRY", "TARGET_GLOBAL",
-    "TARGET_MODES", "TARGET_TENANT_SLUG", "TARGET_TENANT_TOKEN",
-    "ScopeObservation", "ScopeRegistryEntry", "classify", "lookup",
-    "resolve_target", "resolve_view_name", "validate_registry",
+    "ADMIN_ALL", "ADMIN_READ", "ADMIN_WRITE", "BROWSER_SCOPES", "LEGACY_SCOPE",
+    "PUBLIC_ALL", "PUBLIC_READ", "PUBLIC_WRITE", "REPORTS_READ", "SCOPE_REGISTRY",
+    "SCOPE_VOCABULARY", "TARGET_GLOBAL", "TARGET_MODES", "TARGET_TENANT_SLUG",
+    "TARGET_TENANT_TOKEN", "ScopeObservation", "ScopeRegistryEntry", "classify",
+    "lookup", "resolve_target", "resolve_target_once", "resolve_view_name",
+    "scope_allows", "target_allows", "unregistered_protected_routes",
+    "validate_registry",
 ]

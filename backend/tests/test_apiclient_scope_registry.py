@@ -11,16 +11,17 @@ from rest_framework.test import APIClient
 from apps.apiclients import scope_registry
 from apps.apiclients.models import ApiClient
 from apps.apiclients.scope_registry import (
+    LEGACY_SCOPE,
     SCOPE_REGISTRY,
     TARGET_GLOBAL,
     TARGET_TENANT_SLUG,
     TARGET_TENANT_TOKEN,
+    ScopeRegistryEntry,
     lookup,
     resolve_target,
     validate_registry,
 )
 from apps.hardware_requests.models import HardwareRequest
-from apps.inventory.middleware import SCOPE_REGISTRY_MISMATCH_EVENT
 from apps.machines.models import MachineServiceRequest, MachineType, ServiceQueue
 from tests.return_helpers import make_space, make_user
 
@@ -63,6 +64,13 @@ def test_registry_has_no_urlconf_drift():
 
     assert not stale, f"Registry entries reference missing URL names: {stale}"
     assert not missing, f"Protected routes missing registry entries: {missing}"
+
+
+def test_legacy_cutover_is_explicit_and_new_entries_default_to_excluded():
+    assert all(entry.legacy_v1 for entry in SCOPE_REGISTRY.values())
+    new_entry = ScopeRegistryEntry(frozenset({"public:read"}), TARGET_GLOBAL)
+
+    assert new_entry.legacy_v1 is False
 
 
 @pytest.mark.parametrize("prefix", PUBLIC_PREFIXES)
@@ -177,39 +185,25 @@ def test_resolve_target_handles_both_opaque_status_tokens(monkeypatch):
 
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=True, CORS_ALLOWED_ORIGINS=[ORIGIN])
-def test_empty_scopes_keep_legacy_response_and_log_registry_mismatch(caplog):
+def test_empty_scope_issue_uses_frozen_legacy_capability():
     api_client, raw_secret = ApiClient.issue(
-        label="empty scope observer",
+        label="legacy cutover client",
         allowed_origins=[ORIGIN],
         client_type="server",
         scopes=[],
     )
 
-    with caplog.at_level("WARNING", logger="apps.inventory.middleware"):
-        response = APIClient().get(
-            PUBLIC_DIRECTORY,
-            **_signed_headers(api_client, raw_secret),
-        )
+    response = APIClient().get(
+        PUBLIC_DIRECTORY,
+        **_signed_headers(api_client, raw_secret),
+    )
 
+    assert api_client.scopes == [LEGACY_SCOPE]
     assert response.status_code == 200
-    records = [
-        record
-        for record in caplog.records
-        if record.getMessage() == SCOPE_REGISTRY_MISMATCH_EVENT
-    ]
-    assert len(records) == 1
-    record = records[0]
-    assert record.view_name == "v1:public-makerspaces"
-    assert record.method == "GET"
-    assert record.client_id == api_client.client_id
-    assert record.scopes_empty is True
-    assert record.registry_verdict is False
-    assert record.legacy_verdict is True
-    assert record.target_resolution == "not_attempted"
 
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=True, CORS_ALLOWED_ORIGINS=[ORIGIN])
-def test_registry_exception_cannot_change_legacy_response(monkeypatch):
+def test_registry_exception_fails_closed(monkeypatch):
     api_client, raw_secret = ApiClient.issue(
         label="broken registry observer",
         allowed_origins=[ORIGIN],
@@ -227,7 +221,7 @@ def test_registry_exception_cannot_change_legacy_response(monkeypatch):
         **_signed_headers(api_client, raw_secret),
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 401
 
 
 def test_undetectable_methods_on_a_protected_route_count_as_drift(monkeypatch):

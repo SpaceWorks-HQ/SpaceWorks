@@ -53,6 +53,17 @@ class ApiClient(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        # Centralised here, not only in issue(): the /control/ ModelAdmin and
+        # seed_demo._sync_legacy_hmac_client() construct rows directly, and an empty
+        # scopes list is now DENIED by the authoritative registry -- those clients would
+        # 401 on every protected route with no way to repair them from the admin.
+        if not self.scopes:
+            from apps.apiclients.scope_registry import LEGACY_SCOPE
+
+            self.scopes = [LEGACY_SCOPE]
+        super().save(*args, **kwargs)
+
     def set_secret(self, raw):
         self.secret_encrypted = encrypt_secret(raw)
 
@@ -80,14 +91,20 @@ class ApiClient(models.Model):
         scopes=None,
         rate_limit_tier="standard",
     ):
+        from apps.apiclients.scope_registry import LEGACY_SCOPE
+
         raw = secrets.token_urlsafe(32)
+        # Deliberate temporary carry-over: tenant staff cannot select scopes through
+        # their serializer yet. Until that surface exists, an omitted/empty value must
+        # receive the frozen legacy capability or tenant-created clients would be bricked.
+        issued_scopes = list(scopes) if scopes else [LEGACY_SCOPE]
         obj = cls(
             label=label,
             makerspace=makerspace,
             allowed_origins=allowed_origins or [],
             created_by=created_by,
             client_type=client_type,
-            scopes=scopes or [],
+            scopes=issued_scopes,
             rate_limit_tier=rate_limit_tier,
         )
         obj.set_secret(raw)

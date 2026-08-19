@@ -24,55 +24,78 @@ class ScopeRegistryEntry:
     scopes: frozenset[str]
     target_mode: str
     tenant_apps_admitted: bool = False
+    legacy_v1: bool = False
 
 
 _READ = ("GET", "HEAD")
 _WRITE = ("POST",)
 
 # Each definition is (fully-qualified resolver view_name, concrete methods, scopes,
-# target mode, tenant-app admission). Expanding the method tuple keeps the public table
-# keyed exactly by (view_name, method) without repeating identical route metadata.
+# target mode, tenant-app admission, legacy-v1 admission). Legacy admission is explicit
+# so adding a route cannot silently widen the frozen cutover capability.
 _ROUTE_DEFINITIONS = (
-    ("public-makerspaces", _READ, PUBLIC_READ_SCOPES, TARGET_GLOBAL, False),
-    ("v1:public-makerspaces", _READ, PUBLIC_READ_SCOPES, TARGET_GLOBAL, False),
-    ("public-inventory", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-makerspace-stats", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-inventory-categories", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-inventory-detail", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("v1:public-inventory", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("v1:public-makerspace-stats", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("v1:public-inventory-categories", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("v1:public-inventory-detail", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-machines", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-machine-service-request-submit", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-printer-service-queues", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-printer-service-pools", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-printer-service-upload", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-printer-service-request", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-event-list", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-event-register", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-bookable-space-list", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-space-availability", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-booking-submit", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("presence-start", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("presence-current", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False),
-    ("presence-end", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-membership-request", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("hardware_requests:request-submit", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("hardware_requests:public-tool-evidence-url", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("hardware_requests:public-tool-checkout", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("hardware_requests:public-tool-return", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False),
-    ("public-printer-service-status", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_TOKEN, False),
-    ("hardware_requests:request-status", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_TOKEN, False),
+    ("public-makerspaces", _READ, PUBLIC_READ_SCOPES, TARGET_GLOBAL, True, True),
+    ("v1:public-makerspaces", _READ, PUBLIC_READ_SCOPES, TARGET_GLOBAL, True, True),
+    ("public-inventory", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-makerspace-stats", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-inventory-categories", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-inventory-detail", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("v1:public-inventory", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("v1:public-makerspace-stats", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("v1:public-inventory-categories", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("v1:public-inventory-detail", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-machines", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    (
+        "public-machine-service-request-submit", _WRITE, PUBLIC_WRITE_SCOPES,
+        TARGET_TENANT_SLUG, False, True,
+    ),
+    ("public-printer-service-queues", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-printer-service-pools", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-printer-service-upload", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
+    (
+        "public-printer-service-request", _WRITE, PUBLIC_WRITE_SCOPES,
+        TARGET_TENANT_SLUG, False, True,
+    ),
+    ("public-event-list", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-event-register", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-bookable-space-list", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-space-availability", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-booking-submit", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("presence-start", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("presence-current", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("presence-end", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-membership-request", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
+    (
+        "hardware_requests:request-submit", _WRITE, PUBLIC_WRITE_SCOPES,
+        TARGET_TENANT_SLUG, False, True,
+    ),
+    (
+        "hardware_requests:public-tool-evidence-url", _WRITE, PUBLIC_WRITE_SCOPES,
+        TARGET_TENANT_SLUG, False, True,
+    ),
+    (
+        "hardware_requests:public-tool-checkout", _WRITE, PUBLIC_WRITE_SCOPES,
+        TARGET_TENANT_SLUG, False, True,
+    ),
+    (
+        "hardware_requests:public-tool-return", _WRITE, PUBLIC_WRITE_SCOPES,
+        TARGET_TENANT_SLUG, False, True,
+    ),
+    ("public-printer-service-status", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_TOKEN, False, True),
+    (
+        "hardware_requests:request-status", _READ, PUBLIC_READ_SCOPES,
+        TARGET_TENANT_TOKEN, False, True,
+    ),
 )
 
 
 def _build_registry():
     registry = {}
-    for view_name, methods, scopes, target_mode, tenant_apps_admitted in _ROUTE_DEFINITIONS:
+    for definition in _ROUTE_DEFINITIONS:
+        view_name, methods, scopes, target_mode, tenant_apps_admitted, legacy_v1 = definition
         if target_mode not in TARGET_MODES:
             raise ValueError(f"Unknown API-client target mode: {target_mode}")
-        entry = ScopeRegistryEntry(scopes, target_mode, tenant_apps_admitted)
+        entry = ScopeRegistryEntry(scopes, target_mode, tenant_apps_admitted, legacy_v1)
         for method in methods:
             key = (view_name, method)
             if key in registry:
