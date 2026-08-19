@@ -24,6 +24,9 @@ USER_PROJECTIONS = {
 ALWAYS_OMITTED = {
     ("apiclients.ApiClient", "client_id"): "A rebuild issues a fresh client identifier.",
     ("apiclients.ApiClient", "secret_encrypted"): "API client credential.",
+    ("apiclients.ApiClient", "previous_secret_encrypted"): (
+        "API client credential retained for the rotation grace window."
+    ),
     ("audit.AuditLog", "event_uuid"): "Source-deployment audit integrity identity.",
     ("audit.AuditLog", "row_mac"): "Source-deployment audit integrity evidence.",
     ("bookings.BookableSpace", "public_token"): "Source bearer/status token.",

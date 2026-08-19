@@ -1,8 +1,10 @@
 import secrets
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -23,6 +25,9 @@ from apps.audit import services as audit
 from apps.makerspaces import limits
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.makerspaces.servability import is_servable
+
+
+API_CLIENT_SECRET_ROTATION_GRACE_PERIOD = timedelta(hours=24)
 
 
 @extend_schema(tags=["API clients"], summary="List or create makerspace API clients")
@@ -150,19 +155,42 @@ class ApiClientRotateSecretView(generics.GenericAPIView):
         )
 
     def post(self, request, *args, **kwargs):
-        client = self.get_object()
-        raw_secret = secrets.token_urlsafe(32)
-        client.set_secret(raw_secret)
-        client.save(update_fields=["secret_encrypted", "updated_at"])
-        audit.record(
-            request.user,
-            "api_client.secret_rotated",
-            makerspace=client.makerspace,
-            target=client,
-        )
+        with transaction.atomic():
+            client = get_object_or_404(
+                self.get_queryset().select_for_update(of=("self",)),
+                pk=self.kwargs["pk"],
+            )
+            self.check_object_permissions(request, client)
+            current_secret = client.get_secret()
+            raw_secret = secrets.token_urlsafe(32)
+            while secrets.compare_digest(raw_secret, current_secret):
+                raw_secret = secrets.token_urlsafe(32)
+            grace_expires_at = timezone.now() + API_CLIENT_SECRET_ROTATION_GRACE_PERIOD
+            client.previous_secret_encrypted = client.secret_encrypted
+            client.previous_secret_valid_until = grace_expires_at
+            client.set_secret(raw_secret)
+            client.save(
+                update_fields=[
+                    "secret_encrypted",
+                    "previous_secret_encrypted",
+                    "previous_secret_valid_until",
+                    "updated_at",
+                ]
+            )
+            audit.record(
+                request.user,
+                "api_client.secret_rotated",
+                makerspace=client.makerspace,
+                target=client,
+                meta={
+                    "grace_window_opened": True,
+                    "previous_secret_valid_until": grace_expires_at.isoformat(),
+                },
+            )
         data = ApiClientSerializer(client, context=self.get_serializer_context()).data
         data["client_secret"] = raw_secret
         return Response(data)
+
 
 @extend_schema(
     tags=["API key requests"],

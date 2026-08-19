@@ -22,6 +22,12 @@ class ApiClient(models.Model):
         max_length=64, unique=True, default=generate_client_id, editable=False
     )
     secret_encrypted = models.BinaryField(editable=False)
+    previous_secret_encrypted = models.BinaryField(
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    previous_secret_valid_until = models.DateTimeField(null=True, blank=True)
     client_type = models.CharField(
         max_length=20,
         choices=[
