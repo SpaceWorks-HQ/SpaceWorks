@@ -1,18 +1,36 @@
 import hashlib
 import hmac
 import logging
-import re
 import time
 from urllib.parse import urlsplit
 
 from django.conf import settings
-from django.core.cache import cache
 from django.http import JsonResponse
+
+from apps.inventory.middleware_nonce import (
+    NONCE_MAX_LENGTH,
+    body_could_re_encode_nonce,
+    claim_nonce,
+    nonce_is_valid,
+)
+from apps.inventory.middleware_observability import (
+    BAD_SIGNATURE,
+    NONCE_MISSING,
+    NONCE_REPLAY,
+    NO_CREDENTIALS,
+    ORIGIN_DENIED,
+    SKEW,
+    TARGET_UNRESOLVED,
+    TENANT_MISMATCH,
+    UNKNOWN_CLIENT,
+    WOULD_REJECT_EVENT as WOULD_REJECT_EVENT,
+    log_would_reject,
+    scope_failure_reason,
+    set_failure_reason,
+)
 
 logger = logging.getLogger(__name__)
 
-NONCE_MAX_LENGTH = 128
-NONCE_PATTERN = re.compile(r"\A[A-Za-z0-9._~-]+\Z")
 LEGACY_NONCE_WARNING_EVENT = "api_client_nonce_missing_legacy"
 AMBIGUOUS_NONCE_BODY_EVENT = "api_client_nonce_ambiguous_body"
 
@@ -27,6 +45,8 @@ class FrontendHMACMiddleware:
         is_valid = True
         if self._is_protected_path(request):
             is_valid = self._is_valid(request)
+            if not is_valid and not settings.API_CLIENT_AUTH_REQUIRED:
+                log_would_reject(request)
         if self._should_reject_invalid(request) and not is_valid:
             return JsonResponse({"detail": "Invalid client signature."}, status=401)
         return self.get_response(request)
@@ -56,6 +76,7 @@ class FrontendHMACMiddleware:
         )
 
     def _is_valid(self, request):
+        set_failure_reason(request, NO_CREDENTIALS)
         # X-Nonce selects the signed protocol. It must never be accepted through the
         # publishable-key or browser-client paths, where it would be replay decoration
         # rather than authenticated input.
@@ -78,9 +99,11 @@ class FrontendHMACMiddleware:
                 client_id=client_id, is_active=True
             ).first()
             if client is None:
+                set_failure_reason(request, UNKNOWN_CLIENT)
                 return False
 
             if not self._origin_ok(request, client):
+                set_failure_reason(request, ORIGIN_DENIED)
                 return False
             if not self._scope_checks_ok(request, client):
                 return False
@@ -88,19 +111,24 @@ class FrontendHMACMiddleware:
             try:
                 skew = abs(int(time.time()) - int(timestamp))
             except ValueError:
+                set_failure_reason(request, SKEW)
                 return False
             if skew > settings.HMAC_MAX_CLOCK_SKEW_SECONDS:
+                set_failure_reason(request, SKEW)
                 return False
 
             if nonce:
-                if not self._nonce_is_valid(nonce):
+                if not nonce_is_valid(nonce):
+                    set_failure_reason(request, BAD_SIGNATURE)
                     return False
             elif settings.APICLIENT_REQUIRE_NONCE:
+                set_failure_reason(request, NONCE_MISSING)
                 return False
-            elif self._body_could_re_encode_a_nonce(request.body):
+            elif body_could_re_encode_nonce(request.body):
                 logger.warning(
                     AMBIGUOUS_NONCE_BODY_EVENT, extra={"client_id": client_id}
                 )
+                set_failure_reason(request, BAD_SIGNATURE)
                 return False
 
             message_parts = [
@@ -116,9 +144,11 @@ class FrontendHMACMiddleware:
                 client.get_secret().encode(), message, hashlib.sha256
             ).hexdigest()
             if not hmac.compare_digest(signature, expected):
+                set_failure_reason(request, BAD_SIGNATURE)
                 return False
             if nonce:
-                if not self._claim_nonce(client_id, nonce):
+                if not claim_nonce(client_id, nonce):
+                    set_failure_reason(request, NONCE_REPLAY)
                     return False
             else:
                 logger.warning(
@@ -128,49 +158,9 @@ class FrontendHMACMiddleware:
             request.api_client = client
             return True
         except Exception:  # fail safe - never 500 the request flow
+            set_failure_reason(request, BAD_SIGNATURE)
             logger.exception("ApiClient signature validation failed")
             return False
-
-    def _nonce_is_valid(self, nonce):
-        return len(nonce) <= NONCE_MAX_LENGTH and bool(NONCE_PATTERN.fullmatch(nonce))
-
-    def _body_could_re_encode_a_nonce(self, body):
-        """Refuse a nonce-less request whose body re-encodes a nonced message.
-
-        The signed message is METHOD \n PATH \n TIMESTAMP [\n NONCE] \n BODY, so the
-        nonce part exists ONLY when X-Nonce is sent. That makes a nonced request and a
-        nonce-less request whose body is NONCE + "\n" + body serialize to IDENTICAL
-        bytes -- the same signature verifies, and `_claim_nonce` is never reached, so a
-        captured nonced request replays freely for the whole clock-skew window. Proven
-        against a live request, not theorised.
-
-        The unambiguous fix is a fixed part count (always sign an empty nonce slot), but
-        that changes the message for every existing nonce-less client -- the default
-        deployment -- so it is specified as protocol v2 instead. This refuses exactly
-        the ambiguous shape: a first line that is itself a well-formed nonce followed by
-        a newline. Real callers are unaffected because a JSON body starts with '{',
-        which is not in NONCE_PATTERN.
-        """
-        head, separator, _rest = body[: NONCE_MAX_LENGTH + 1].partition(b"\n")
-        if not separator or not head:
-            return False
-        try:
-            candidate = head.decode("ascii")
-        except UnicodeDecodeError:
-            return False
-        return bool(NONCE_PATTERN.fullmatch(candidate))
-
-    def _claim_nonce(self, client_id, nonce):
-        # Hash the validated pair to keep backend keys fixed-size and unambiguous while
-        # preserving per-client nonce namespaces. cache.add is the atomic primitive on
-        # both RedisCache (SET NX) and DatabaseCache (conditional insert).
-        pair = f"{client_id}\0{nonce}".encode()
-        key = f"apiclient-hmac-nonce:{hashlib.sha256(pair).hexdigest()}"
-        # A timestamp may be up to one skew window in the future when first accepted,
-        # then remain valid for another full window. Two windows therefore cover its
-        # entire remaining acceptance lifetime, not merely the usual past-timestamp case.
-        timeout = max(1, settings.HMAC_MAX_CLOCK_SKEW_SECONDS * 2 + 1)
-        return cache.add(key, True, timeout=timeout)
 
     def _publishable_key_is_valid(self, request):
         key = request.headers.get("X-Publishable-Key") or request.GET.get("key")
@@ -184,10 +174,14 @@ class FrontendHMACMiddleware:
                 public_inventory_enabled=True,
             ).first()
             if makerspace is None:
+                set_failure_reason(request, UNKNOWN_CLIENT)
                 return False
             if not self._makerspace_scope_ok(request, makerspace):
                 return False
-            return self._publishable_origin_ok(request, makerspace)
+            valid = self._publishable_origin_ok(request, makerspace)
+            if not valid:
+                set_failure_reason(request, ORIGIN_DENIED)
+            return valid
         except Exception:
             logger.exception("Publishable key validation failed")
             return False
@@ -206,13 +200,10 @@ class FrontendHMACMiddleware:
         return candidate in origins
 
     def _origin_ok(self, request, client):
-        # Fail closed (review fix #4): a client with no configured origins is rejected,
-        # so the exact-origin check can never be skipped by omission. The model + admin
-        # also require at least one origin (ApiClient.clean).
-        if not client.allowed_origins:
-            return False
         raw = request.headers.get("Origin") or request.headers.get("Referer", "")
         if not raw:
+            return client.client_type == "server"
+        if not client.allowed_origins:
             return False
         parts = urlsplit(raw)
         candidate = f"{parts.scheme}://{parts.netloc}" if parts.scheme else ""
@@ -232,15 +223,13 @@ class FrontendHMACMiddleware:
                 is_active=True,
             ).first()
             if client is None:
+                set_failure_reason(request, UNKNOWN_CLIENT)
                 return False
-            # NOTE: a browser client is identified only by client_id + Origin, both
-            # of which are public frontend config and forgeable by a non-browser
-            # caller. So this path verifies access but is NOT a trust anchor for
-            # rate-limit elevation — we deliberately do NOT attach request.api_client
-            # here. Only the HMAC-signed server path (in _is_valid) grants a tier.
-            return client.client_type == "browser" and self._origin_ok(
-                request, client
-            ) and self._scope_checks_ok(request, client)
+            # Browser identity is public config, so this path never grants a rate tier.
+            if client.client_type != "browser" or not self._origin_ok(request, client):
+                set_failure_reason(request, ORIGIN_DENIED)
+                return False
+            return self._scope_checks_ok(request, client)
         except Exception:
             logger.exception("Frontend ApiClient validation failed")
             return False
@@ -252,9 +241,14 @@ class FrontendHMACMiddleware:
             scope_registry.resolve_view_name(request), request.method
         )
         if entry is None:
+            set_failure_reason(request, TARGET_UNRESOLVED)
             return False
         target, resolved = scope_registry.resolve_target_once(request, entry)
-        return scope_registry.target_allows(entry, client, target, resolved)
+        allowed = scope_registry.target_allows(entry, client, target, resolved)
+        if not allowed:
+            reason = TARGET_UNRESOLVED if not resolved else TENANT_MISMATCH
+            set_failure_reason(request, reason)
+        return allowed
 
     def _makerspace_scope_ok(self, request, makerspace):
         from apps.apiclients import scope_registry
@@ -263,16 +257,26 @@ class FrontendHMACMiddleware:
             scope_registry.resolve_view_name(request), request.method
         )
         if entry is None:
+            set_failure_reason(request, TARGET_UNRESOLVED)
             return False
         target, resolved = scope_registry.resolve_target_once(request, entry)
         if entry.target_mode == scope_registry.TARGET_GLOBAL:
             return True
-        return resolved and getattr(target, "pk", None) == makerspace.pk
+        if not resolved:
+            set_failure_reason(request, TARGET_UNRESOLVED)
+            return False
+        allowed = getattr(target, "pk", None) == makerspace.pk
+        if not allowed:
+            set_failure_reason(request, TENANT_MISMATCH)
+        return allowed
 
     def _request_scope_ok(self, request, client):
         from apps.apiclients import scope_registry
 
-        return scope_registry.classify(request, client).verdict
+        observation = scope_registry.classify(request, client)
+        if not observation.verdict:
+            set_failure_reason(request, scope_failure_reason(observation, client))
+        return observation.verdict
 
     def _scope_checks_ok(self, request, client):
         request_scope_ok = self._request_scope_ok(request, client)
