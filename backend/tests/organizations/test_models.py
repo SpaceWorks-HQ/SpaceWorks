@@ -75,8 +75,12 @@ def test_many_to_many_relationship_works_in_both_directions():
     link(organization, second_space, OrganizationMakerspace.Relationship.MANAGER)
     link(second_organization, first_space, OrganizationMakerspace.Relationship.AFFILIATE)
 
+    # Forward accessor is kept for convenience; the makerspace side is reached through
+    # the link model, so Makerspace gains no extra tenant-export surface.
     assert set(organization.makerspaces.all()) == {first_space, second_space}
-    assert set(first_space.organizations.all()) == {organization, second_organization}
+    assert {
+        row.organization for row in first_space.organization_links.all()
+    } == {organization, second_organization}
 
 
 def test_one_relationship_per_organization_makerspace_pair():

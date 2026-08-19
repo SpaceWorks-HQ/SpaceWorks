@@ -107,7 +107,7 @@ class Migration(migrations.Migration):
             name="makerspaces",
             field=models.ManyToManyField(
                 blank=True,
-                related_name="organizations",
+                related_name="+",
                 through="organizations.OrganizationMakerspace",
                 to="makerspaces.makerspace",
             ),

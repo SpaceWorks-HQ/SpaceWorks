@@ -17,7 +17,13 @@ class Organization(models.Model):
     makerspaces = models.ManyToManyField(
         "makerspaces.Makerspace",
         through="OrganizationMakerspace",
-        related_name="organizations",
+        # related_name="+" on purpose: the reverse accessor would add an
+        # `organizations` relation to Makerspace, which the data-export drift guard
+        # then demands a disposition for. The link is already reachable from either
+        # side through OrganizationMakerspace (makerspace_links /
+        # organization_links), so the extra accessor buys nothing and widens the
+        # tenant-export surface.
+        related_name="+",
         blank=True,
     )
     created_by = models.ForeignKey(
