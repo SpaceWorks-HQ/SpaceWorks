@@ -1041,6 +1041,30 @@ from `index.css` and `tailwind.config.ts`.
 **Console parity principle.** Every backend lifecycle capability reachable in the Django `/control/` admin
 must have a React staff-console surface — a capability with no console surface is a latent dead/broken
 feature for normal staff. New workflow actions ship their staff UI in the same batch.
+## Handover roles and the retired Guest Admin
+
+**Guest Admin is no longer a built-in role** (migration `makerspaces/0052`); handover staff get a **custom
+role** holding the handout actions. `rbac.HANDOUT_ACTIONS` is no longer a cap on what a role may hold
+(`role_services._validate_actions` dropped that branch) and now only defines what counts as handover-only
+for `rbac.is_handout_only`, which decides how narrow the console is. A handout role issues accepted
+requests, creates **direct handouts** (`ISSUE_DIRECT_LOAN` is in the set, pinned by
+`test_guest_admin_can_create_direct_loan`), processes scoped returns, and uploads evidence — through the
+same evidence/QR/remark/audit workflow as staff. It still cannot accept/reject requests, edit inventory,
+or manage QR unless granted those actions. **Both enum members are gone**: `makerspaces/0053` moved every
+remaining `role="guest_admin"` membership onto a real role row (reusing the space's untouched handover
+role only when its actions still equal the frozen six, else creating a collision-safe "Front Desk" role)
+and `0054` dropped the choice; `accounts/0009`/`0010` did the same for `User.Role.GUEST_ADMIN`. The
+`_MEMBERSHIP_ROLE_ACTIONS` fallback entry went with them, so `print_manager` is the only frozen legacy
+string left. Tests build a front-desk staffer through `tests/handout_roles.py`
+(`handout_role`/`grant_handout`/`make_handout_member`), whose default action set
+is deliberately the exact six the built-in granted. The `guest-admin/` **URL paths** in
+`hardware_requests/urls.py` are untouched: they are the handover API surface (module key
+`guest_handover`), not the role, and renaming them would break clients.
+
+**Print Manager is retired too** — migration `makerspaces/0046` reassigned its memberships to Machine
+Manager, whose `MANAGE_MACHINES` implies `MANAGE_PRINTING`. The string survives only in
+`_MEMBERSHIP_ROLE_ACTIONS` as the frozen legacy fallback for a null-FK membership.
+
 ## Separability and tombstoning
 
 **Separability: two registries, and the gap that fails OPEN (Phase 7, `apps/separability/`).**
