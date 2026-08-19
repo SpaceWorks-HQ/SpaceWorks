@@ -66,6 +66,13 @@ class SocialLoginNonce(models.Model):
         on_delete=models.CASCADE,
         related_name="social_login_nonces",
     )
+    attestation_challenge = models.ForeignKey(
+        "accounts.DeviceAttestationChallenge",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="social_login_nonces",
+    )
     expires_at = models.DateTimeField()
     consumed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -74,6 +81,28 @@ class SocialLoginNonce(models.Model):
         indexes = [
             models.Index(
                 fields=["expires_at", "consumed_at"], name="social_nonce_use_idx"
+            )
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        delivery=SocialDelivery.WEB,
+                        device_grant__isnull=True,
+                        attestation_challenge__isnull=True,
+                    )
+                    | models.Q(
+                        delivery=SocialDelivery.DEVICE,
+                        device_grant__isnull=False,
+                        attestation_challenge__isnull=True,
+                    )
+                    | models.Q(
+                        delivery=SocialDelivery.DEVICE,
+                        device_grant__isnull=True,
+                        attestation_challenge__isnull=False,
+                    )
+                ),
+                name="social_nonce_delivery_anchor_ck",
             )
         ]
 
