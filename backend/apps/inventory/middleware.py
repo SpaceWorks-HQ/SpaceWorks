@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 NONCE_MAX_LENGTH = 128
 NONCE_PATTERN = re.compile(r"\A[A-Za-z0-9._~-]+\Z")
 LEGACY_NONCE_WARNING_EVENT = "api_client_nonce_missing_legacy"
+SCOPE_REGISTRY_MISMATCH_EVENT = "api_client_scope_registry_mismatch"
 
 
 class FrontendHMACMiddleware:
@@ -81,9 +82,7 @@ class FrontendHMACMiddleware:
 
             if not self._origin_ok(request, client):
                 return False
-            if not self._client_scope_ok(request, client):
-                return False
-            if not self._request_scope_ok(request, client):
+            if not self._scope_checks_ok(request, client):
                 return False
 
             try:
@@ -208,12 +207,9 @@ class FrontendHMACMiddleware:
             # caller. So this path verifies access but is NOT a trust anchor for
             # rate-limit elevation — we deliberately do NOT attach request.api_client
             # here. Only the HMAC-signed server path (in _is_valid) grants a tier.
-            return (
-                client.client_type == "browser"
-                and self._origin_ok(request, client)
-                and self._client_scope_ok(request, client)
-                and self._request_scope_ok(request, client)
-            )
+            return client.client_type == "browser" and self._origin_ok(
+                request, client
+            ) and self._scope_checks_ok(request, client)
         except Exception:
             logger.exception("Frontend ApiClient validation failed")
             return False
@@ -222,6 +218,7 @@ class FrontendHMACMiddleware:
         if client.makerspace_id is None:
             return True
         target = self._path_makerspace(request)
+        request._api_client_legacy_target = target
         return target is None or target.pk == client.makerspace_id
 
     def _makerspace_scope_ok(self, request, makerspace):
@@ -243,6 +240,47 @@ class FrontendHMACMiddleware:
             required = "admin:write" if method not in {"GET", "HEAD", "OPTIONS"} else "admin:read"
             return required in scopes or "admin:*" in scopes
         return True
+
+    def _scope_checks_ok(self, request, client):
+        client_scope_ok = self._client_scope_ok(request, client)
+        if not client_scope_ok:
+            self._observe_scope_registry(request, client, legacy_verdict=False)
+            return False
+        request_scope_ok = self._request_scope_ok(request, client)
+        self._observe_scope_registry(
+            request, client, legacy_verdict=request_scope_ok
+        )
+        return request_scope_ok
+
+    def _observe_scope_registry(self, request, client, *, legacy_verdict):
+        if getattr(request, "_api_client_scope_registry_observed", False):
+            return
+        request._api_client_scope_registry_observed = True
+        try:
+            from apps.apiclients import scope_registry
+
+            observation = scope_registry.classify(
+                request,
+                client,
+                cached_target=getattr(request, "_api_client_legacy_target", None),
+            )
+            if observation.verdict != legacy_verdict:
+                logger.warning(
+                    SCOPE_REGISTRY_MISMATCH_EVENT,
+                    extra={
+                        "view_name": observation.view_name,
+                        "method": observation.method,
+                        "client_id": client.client_id,
+                        "scopes_empty": not bool(client.scopes or []),
+                        "registry_verdict": observation.verdict,
+                        "legacy_verdict": legacy_verdict,
+                        "target_resolution": observation.target_resolution,
+                        "target_resolved": observation.target_resolved,
+                        "target_makerspace_id": observation.target_makerspace_id,
+                    },
+                )
+        except Exception:
+            logger.exception("ApiClient scope registry observation failed")
 
     def _path_makerspace(self, request):
         marker = "/public/"
