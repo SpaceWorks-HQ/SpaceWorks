@@ -33597,6 +33597,17 @@
                     "is_active": {
                         "type": "boolean"
                     },
+                    "last_seen_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "last_seen_ip": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -33615,6 +33626,8 @@
                     "created_at",
                     "id",
                     "label",
+                    "last_seen_at",
+                    "last_seen_ip",
                     "makerspace",
                     "public_api_base_url",
                     "public_makerspace_code",
@@ -33678,6 +33691,17 @@
                     "is_active": {
                         "type": "boolean"
                     },
+                    "last_seen_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "last_seen_ip": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -33697,6 +33721,8 @@
                     "created_at",
                     "id",
                     "label",
+                    "last_seen_at",
+                    "last_seen_ip",
                     "makerspace",
                     "public_api_base_url",
                     "public_makerspace_code",
@@ -44676,6 +44702,17 @@
                     },
                     "is_active": {
                         "type": "boolean"
+                    },
+                    "last_seen_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "last_seen_ip": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
                     },
                     "created_at": {
                         "type": "string",

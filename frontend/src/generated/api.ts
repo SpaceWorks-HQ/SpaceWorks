@@ -601,6 +601,8 @@ export type ApiClient = {
   "backend_base_url": string;
   "public_api_base_url": string;
   "is_active"?: boolean;
+  "last_seen_at": string | null;
+  "last_seen_ip": string | null;
   "created_at": string;
   "updated_at": string;
 };
@@ -619,6 +621,8 @@ export type ApiClientCreateResponse = {
   "backend_base_url": string;
   "public_api_base_url": string;
   "is_active"?: boolean;
+  "last_seen_at": string | null;
+  "last_seen_ip": string | null;
   "created_at": string;
   "updated_at": string;
 };
@@ -3298,6 +3302,8 @@ export type PatchedApiClient = {
   "backend_base_url"?: string;
   "public_api_base_url"?: string;
   "is_active"?: boolean;
+  "last_seen_at"?: string | null;
+  "last_seen_ip"?: string | null;
   "created_at"?: string;
   "updated_at"?: string;
 };
