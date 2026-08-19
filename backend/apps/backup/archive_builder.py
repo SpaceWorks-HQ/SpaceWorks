@@ -28,6 +28,10 @@ class BackupBuildError(RuntimeError):
 
 OBJECT_FIELD_NAMES = frozenset({
     "object_key", "image_key", "avatar_key", "cover_image_key", "copy_key",
+    # logo_key was missing, so a backup captured the DB value but not the object:
+    # restoring left Makerspace.logo_key (and now Organization.logo_key) pointing at an
+    # image that does not exist in storage.
+    "logo_key",
 })
 CONTINUITY_KEYS = (
     "SECRET_KEY", "API_CLIENT_ENC_KEY", "PII_MASTER_KEY", "PII_MASTER_KEY_PREVIOUS",

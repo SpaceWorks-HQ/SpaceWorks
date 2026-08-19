@@ -145,6 +145,7 @@ def _delete_object_graph(makerspace):
     from apps.makerspaces.models import MakerspaceMembership
     from apps.operations.models import InventoryAdjustment, QrPrintBatch
     from apps.operations.models import StocktakeSession, StockTransfer
+    from apps.organizations.models import OrganizationMakerspace
     from apps.machines.models import Machine, MachineType, MakerspaceMachineTypePricing
     from apps.machines.service_lifecycle import delete_for_makerspace
     from apps.payments.models import Payment, ProcessedStripeEvent
@@ -181,7 +182,9 @@ def _delete_object_graph(makerspace):
         ).distinct().delete()
         StocktakeSession.objects.filter(makerspace=makerspace).delete()
         InventoryAdjustment.objects.filter(makerspace=makerspace).delete()
-
+        # Organizations are platform-level and may be shared by other tenants. Remove
+        # only this tenant's through rows; never traverse from the organization side.
+        OrganizationMakerspace.objects.filter(makerspace=makerspace).delete()
 
         delete_for_makerspace(makerspace, cursor)
 

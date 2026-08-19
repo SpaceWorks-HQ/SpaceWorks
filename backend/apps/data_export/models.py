@@ -97,7 +97,10 @@ EXPORTED_MODELS = frozenset(EXPORTED_MODEL_FIELDS)
 GLOBAL_MODELS = {
     "accounts.User": GlobalReference(
         "Only the user closure is projected; the platform-global table is never tenant-owned."
-    )
+    ),
+    "organizations.Organization": GlobalReference(
+        "Platform-level organizations are referenced by tenant links but are never tenant-owned."
+    ),
 }
 
 OMITTED_MODELS = {
@@ -154,6 +157,9 @@ OMITTED_MODELS = {
     "makerspaces.ImportedUserReconciliation": "Target-side operator reconciliation input.",
     "makerspaces.SubdomainRequest": "Source-deployment routing request.",
     "operations.PeriodicTaskRun": "Deployment scheduler state.",
+    "organizations.OrganizationMakerspace": (
+        "Source-deployment organization links do not travel with tenant exports."
+    ),
     "tenant_migration.TenantImportJob": "Target-side tenant import coordination state.",
     "tenant_migration.TenantImportObject": (
         "Deployment-scoped import promotion journal; it names a target makerspace "
