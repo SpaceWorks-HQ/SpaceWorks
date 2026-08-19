@@ -35,3 +35,29 @@ class EvidencePhoto(models.Model):
 
     def __str__(self):
         return f"{self.evidence_type} evidence {self.pk}"
+
+
+class EvidenceUploadFinalization(models.Model):
+    """Mutable coordination state kept separate from immutable evidence metadata."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        PROMOTING = "promoting", "Promoting"
+        FINALIZED = "finalized", "Finalized"
+
+    evidence = models.OneToOneField(
+        EvidencePhoto,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="upload_finalization",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    claim_token = models.UUIDField(null=True, blank=True)
+    size_bytes = models.PositiveBigIntegerField(null=True, blank=True)
+    content_type = models.CharField(max_length=128, blank=True)
+    quota_charged = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)

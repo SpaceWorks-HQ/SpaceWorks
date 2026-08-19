@@ -8,6 +8,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.boxes.models import Box, QrCode, QrScanEvent
 from apps.evidence.models import EvidencePhoto
+from apps.evidence.finalization import charge_storage_once
 from apps.hardware_requests.models import (
     HardwareRequest,
     HardwareRequestItem,
@@ -42,15 +43,18 @@ from apps.notifications.emit import emit_notification
 
 
 def checkout_tool(makerspace, requester, payload, *, evidence_id, remark=""):
+    evidence = _public_evidence(
+        makerspace, requester, evidence_id, EvidencePhoto.EvidenceType.ISSUE
+    )
+    finalized = validate_evidence_upload(evidence, label="Issue")
     with transaction.atomic():
         makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
         makerspace = require_feature_locked(makerspace, "inventory.self_checkout")
         if not is_servable(makerspace):
             raise RequestValidationError("Makerspace is not available.")
         due_at = timezone.now() + timedelta(days=(makerspace.default_loan_days or 7))
-        evidence = _public_evidence(makerspace, requester, evidence_id, EvidencePhoto.EvidenceType.ISSUE)
         _lock_unused_evidence(evidence, issue=True)
-        validate_evidence_upload(evidence, label="Issue")
+        charge_storage_once(evidence, finalized.size)
         qr = _locked_qr(makerspace, payload)
         if qr_has_active_loan(makerspace, qr):
             raise InvalidTransition("This QR code is already checked out.")
@@ -112,13 +116,16 @@ def return_tool(
     remark = str(remark or "").strip()
     if not remark:
         raise RequestValidationError("Return remark is required.")
+    evidence = _public_evidence(
+        makerspace, requester, evidence_id, EvidencePhoto.EvidenceType.RETURN
+    )
+    finalized = validate_evidence_upload(evidence, label="Return")
     with transaction.atomic():
         makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
         if not is_servable(makerspace):
             raise RequestValidationError("Makerspace is not available.")
-        evidence = _public_evidence(makerspace, requester, evidence_id, EvidencePhoto.EvidenceType.RETURN)
         _lock_unused_evidence(evidence, issue=False)
-        validate_evidence_upload(evidence, label="Return")
+        charge_storage_once(evidence, finalized.size)
         qr = _locked_qr(makerspace, payload)
         loan = (
             PublicToolLoan.objects.select_for_update()

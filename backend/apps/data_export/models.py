@@ -139,6 +139,10 @@ OMITTED_MODELS = {
     "encryption.PiiGlobalWriteFence": "Platform coordination state.",
     "encryption.PiiMakerspaceWriteFence": "Deployment coordination state.",
     "encryption.SearchKeyGeneration": "Deployment-local cryptographic state.",
+    "evidence.EvidenceUploadFinalization": (
+        "Upload promotion coordination state; the evidence row and its object carry "
+        "everything that outlives one upload."
+    ),
     "integrations.DailyEmailCounter": "Delivery telemetry.",
     "integrations.DailyNotificationCounter": "Delivery telemetry.",
     "integrations.DailyOtpSmsCounter": "Platform delivery telemetry.",

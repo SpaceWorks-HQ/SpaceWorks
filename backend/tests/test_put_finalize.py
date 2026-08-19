@@ -1,171 +1,174 @@
+import threading
+from unittest.mock import Mock
+
 import pytest
+from django.contrib.auth import get_user_model
+from django.db import close_old_connections, connection
 
 from apps.evidence import storage as evidence_storage
+from apps.evidence.finalization import charge_storage_once
+from apps.evidence.models import EvidencePhoto, EvidenceUploadFinalization
 from apps.inventory import public_image_storage
+from apps.makerspaces.models import Makerspace
 
-@pytest.mark.parametrize(
-    ("module", "finalize_name", "size_name"),
-    [
-        (evidence_storage, "finalize_upload", "object_size"),
-    ],
-)
-def test_put_finalize_promotes_valid_staging_upload(
-    monkeypatch, settings, module, finalize_name, size_name
-):
-    settings.STORAGE_PRESIGN_METHOD = "put"
-    final_key = "evidence/1/issue/object"
-    staging_key = f"staging/{final_key}"
-    copied = []
-    deleted = []
 
-    def fake_size(key):
-        if key == final_key and not copied:
-            return None
-        return 123
+def _photo(slug="post-finalize"):
+    makerspace = Makerspace.objects.create(name=slug, slug=slug)
+    uploader = get_user_model().objects.create_user(username=f"{slug}-uploader")
+    return EvidencePhoto.objects.create(
+        makerspace=makerspace,
+        evidence_type=EvidencePhoto.EvidenceType.ISSUE,
+        object_key=f"evidence/{makerspace.id}/issue/object",
+        uploaded_by=uploader,
+    )
 
-    _block_object_exists(monkeypatch, module)
-    monkeypatch.setattr(module, size_name, fake_size)
-    monkeypatch.setattr(module, "copy_object", lambda source, dest: copied.append((source, dest)))
-    monkeypatch.setattr(module, "delete_object", lambda key: deleted.append(key))
 
-    size = getattr(module, finalize_name)(final_key, max_bytes=500)
-
-    assert size == 123
-    assert copied == [(staging_key, final_key)]
-    assert deleted == [staging_key]
-
-@pytest.mark.parametrize(
-    ("module", "finalize_name", "size_name"),
-    [
-        (evidence_storage, "finalize_upload", "object_size"),
-    ],
-)
-def test_put_finalize_rejects_and_deletes_final_when_staging_raced_oversized(
-    monkeypatch, settings, module, finalize_name, size_name
-):
-    settings.STORAGE_PRESIGN_METHOD = "put"
-    final_key = "evidence/1/issue/object"
-    staging_key = f"staging/{final_key}"
-    copied = []
-    deleted = []
-
-    def fake_size(key):
-        if key == final_key and not copied:
-            return None
-        return 100 if key == staging_key else 999
-
-    _block_object_exists(monkeypatch, module)
-    monkeypatch.setattr(module, size_name, fake_size)
-    monkeypatch.setattr(module, "copy_object", lambda source, dest: copied.append((source, dest)))
-    monkeypatch.setattr(module, "delete_object", lambda key: deleted.append(key))
-
-    size = getattr(module, finalize_name)(final_key, max_bytes=500)
-
-    assert size == 999
-    assert copied == [(staging_key, final_key)]
-    assert staging_key in deleted
-    assert final_key in deleted
-
-@pytest.mark.parametrize(
-    ("module", "finalize_name", "size_name"),
-    [
-        (evidence_storage, "finalize_upload", "object_size"),
-    ],
-)
-def test_put_finalize_is_write_once_when_final_exists(
-    monkeypatch, settings, module, finalize_name, size_name
-):
-    settings.STORAGE_PRESIGN_METHOD = "put"
-    final_key = "evidence/1/issue/object"
-    staging_key = f"staging/{final_key}"
-    copied = []
-    deleted = []
-
-    _block_object_exists(monkeypatch, module)
-    monkeypatch.setattr(module, size_name, lambda key: 456 if key == final_key else None)
-    monkeypatch.setattr(module, "copy_object", lambda source, dest: copied.append((source, dest)))
-    monkeypatch.setattr(module, "delete_object", lambda key: deleted.append(key))
-
-    size = getattr(module, finalize_name)(final_key, max_bytes=500)
-
-    assert size == 456
-    assert copied == []
-    assert deleted == [staging_key]
-
-@pytest.mark.parametrize(
-    ("module", "finalize_name", "size_name"),
-    [
-        (evidence_storage, "finalize_upload", "object_size"),
-    ],
-)
-def test_put_finalize_returns_oversized_staging_size_without_promoting(
-    monkeypatch, settings, module, finalize_name, size_name
-):
-    settings.STORAGE_PRESIGN_METHOD = "put"
-    final_key = "evidence/1/issue/object"
-    staging_key = f"staging/{final_key}"
+def _fake_evidence_store(monkeypatch, objects):
     copied = []
 
-    _block_object_exists(monkeypatch, module)
-    monkeypatch.setattr(module, size_name, lambda key: 501 if key == staging_key else None)
-    monkeypatch.setattr(module, "copy_object", lambda source, dest: copied.append((source, dest)))
-    monkeypatch.setattr(module, "delete_object", lambda key: None)
+    def validate(key):
+        data = objects.get(key)
+        if data is None:
+            raise evidence_storage.EvidenceObjectValidationError("missing", "missing")
+        return evidence_storage.EvidenceValidationResult(
+            size=len(data), content_type="image/png"
+        )
 
-    size = getattr(module, finalize_name)(final_key, max_bytes=500)
+    def copy(source, destination):
+        copied.append((source, destination))
+        objects[destination] = objects[source]
 
-    assert size == 501
-    assert copied == []
+    monkeypatch.setattr(evidence_storage, "validate_evidence_object", validate)
+    monkeypatch.setattr(evidence_storage, "copy_object", copy)
+    monkeypatch.setattr(evidence_storage, "delete_object", objects.pop)
+    return copied
 
-@pytest.mark.parametrize(
-    ("module", "finalize_name", "size_name"),
-    [
-        (evidence_storage, "finalize_upload", "object_size"),
-    ],
-)
-def test_put_finalize_returns_none_for_missing_upload(
-    monkeypatch, settings, module, finalize_name, size_name
-):
-    settings.STORAGE_PRESIGN_METHOD = "put"
-    copied = []
-    deleted = []
 
-    _block_object_exists(monkeypatch, module)
-    monkeypatch.setattr(module, size_name, lambda key: None)
-    monkeypatch.setattr(module, "copy_object", lambda source, dest: copied.append((source, dest)))
-    monkeypatch.setattr(module, "delete_object", lambda key: deleted.append(key))
-
-    size = getattr(module, finalize_name)("evidence/1/issue/object", max_bytes=500)
-
-    assert size is None
-    assert copied == []
-    assert deleted == []
-
-@pytest.mark.parametrize(
-    ("module", "finalize_name", "size_name"),
-    [
-        (evidence_storage, "finalize_upload", "object_size"),
-    ],
-)
-def test_non_put_finalize_reads_final_object_only(
-    monkeypatch, settings, module, finalize_name, size_name
+@pytest.mark.django_db
+def test_post_presign_targets_staging_and_replay_cannot_replace_final(
+    monkeypatch, settings
 ):
     settings.STORAGE_PRESIGN_METHOD = "post"
-    final_key = "evidence/1/issue/object"
-    sized = []
+    photo = _photo()
+
+    class FakePublicClient:
+        def generate_presigned_post(self, *, Bucket, Key, Fields, Conditions, ExpiresIn):
+            assert Bucket == settings.AWS_STORAGE_BUCKET_NAME
+            assert Key == evidence_storage.staging_key(photo.object_key)
+            assert Fields == {"Content-Type": "image/png"}
+            assert {"Content-Type": "image/png"} in Conditions
+            assert ["content-length-range", 1, settings.EVIDENCE_MAX_BYTES] in Conditions
+            assert ExpiresIn == settings.EVIDENCE_URL_TTL_SECONDS
+            return {"url": "http://minio/upload", "fields": {"key": Key, **Fields}}
+
+    monkeypatch.setattr(evidence_storage, "_public_client", lambda: FakePublicClient())
+    upload = evidence_storage.presigned_upload(photo.object_key, "image/png")
+    assert upload["fields"]["key"] != photo.object_key
+
+    objects = {upload["fields"]["key"]: b"original-image"}
+    copied = _fake_evidence_store(monkeypatch, objects)
+    first = evidence_storage.finalize_upload(photo, max_bytes=500)
+
+    assert first.size == len(b"original-image")
+    assert objects == {photo.object_key: b"original-image"}
+    assert copied == [(evidence_storage.staging_key(photo.object_key), photo.object_key)]
+
+    # The still-valid POST can only recreate staging. Idempotent finalization cleans
+    # that replay and never copies it over the accepted final object.
+    objects[upload["fields"]["key"]] = b"replacement-image"
+    second = evidence_storage.finalize_upload(photo, max_bytes=500)
+
+    assert second == first
+    assert objects == {photo.object_key: b"original-image"}
+    assert len(copied) == 1
+    state = EvidenceUploadFinalization.objects.get(evidence=photo)
+    assert state.status == EvidenceUploadFinalization.Status.FINALIZED
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_post_finalization_promotes_exactly_once(monkeypatch, settings):
+    settings.STORAGE_PRESIGN_METHOD = "post"
+    photo = _photo("post-concurrent")
+    staged_key = evidence_storage.staging_key(photo.object_key)
+    objects = {staged_key: b"concurrent-image"}
+    objects_lock = threading.Lock()
+    copy_started = threading.Event()
+    contender_checked = threading.Event()
+    release_copy = threading.Event()
     copied = []
-    deleted = []
 
-    _block_object_exists(monkeypatch, module)
-    monkeypatch.setattr(module, size_name, lambda key: sized.append(key) or 321)
-    monkeypatch.setattr(module, "copy_object", lambda source, dest: copied.append((source, dest)))
-    monkeypatch.setattr(module, "delete_object", lambda key: deleted.append(key))
+    def validate(key):
+        with objects_lock:
+            data = objects.get(key)
+        if data is None:
+            if threading.current_thread().name == "contender" and key == photo.object_key:
+                contender_checked.set()
+            raise evidence_storage.EvidenceObjectValidationError("missing", "missing")
+        return evidence_storage.EvidenceValidationResult(
+            size=len(data), content_type="image/png"
+        )
 
-    size = getattr(module, finalize_name)(final_key, max_bytes=500)
+    def copy(source, destination):
+        assert connection.in_atomic_block is False
+        copied.append((source, destination))
+        copy_started.set()
+        assert release_copy.wait(timeout=2)
+        with objects_lock:
+            objects[destination] = objects[source]
 
-    assert size == 321
-    assert sized == [final_key]
-    assert copied == []
-    assert deleted == []
+    def delete(key):
+        with objects_lock:
+            objects.pop(key, None)
+
+    monkeypatch.setattr(evidence_storage, "validate_evidence_object", validate)
+    monkeypatch.setattr(evidence_storage, "copy_object", copy)
+    monkeypatch.setattr(evidence_storage, "delete_object", delete)
+    results = []
+    errors = []
+
+    def run():
+        close_old_connections()
+        try:
+            current = EvidencePhoto.objects.get(pk=photo.pk)
+            results.append(evidence_storage.finalize_upload(current, max_bytes=500))
+        except Exception as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+        finally:
+            close_old_connections()
+
+    owner = threading.Thread(target=run, name="owner")
+    contender = threading.Thread(target=run, name="contender")
+    owner.start()
+    assert copy_started.wait(timeout=2)
+    contender.start()
+    assert contender_checked.wait(timeout=2)
+    release_copy.set()
+    owner.join(timeout=3)
+    contender.join(timeout=3)
+
+    assert errors == []
+    assert len(results) == 2
+    assert copied == [(staged_key, photo.object_key)]
+    assert objects == {photo.object_key: b"concurrent-image"}
+
+
+@pytest.mark.django_db
+def test_put_evidence_quota_is_charged_once(monkeypatch, settings):
+    settings.STORAGE_PRESIGN_METHOD = "put"
+    photo = _photo("put-quota-once")
+    EvidenceUploadFinalization.objects.create(
+        evidence=photo,
+        status=EvidenceUploadFinalization.Status.FINALIZED,
+        size_bytes=321,
+        content_type="image/png",
+    )
+    add_storage = Mock()
+    monkeypatch.setattr("apps.makerspaces.limits.add_storage", add_storage)
+
+    charge_storage_once(photo, 321)
+    charge_storage_once(photo, 321)
+
+    add_storage.assert_called_once_with(photo.makerspace, 321)
 
 
 def test_public_image_post_finalize_retries_transient_missing_object(monkeypatch, settings):

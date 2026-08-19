@@ -1,7 +1,11 @@
+from unittest.mock import Mock
+
 import pytest
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.evidence.models import EvidencePhoto
+from apps.evidence.storage import EvidenceValidationResult
 from apps.hardware_requests.models import (
     HardwareRequest,
     HardwareRequestItem,
@@ -120,6 +124,33 @@ def test_missing_triage_moves_quantity_stock_to_lost_and_creates_accountability(
     assert accountability.issue_type == RequesterAccountability.IssueType.MISSING
     assert accountability.quantity == 1
     assert accountability.description == "Confirmed by staff."
+
+
+def test_problem_report_evidence_is_finalized_in_post_mode(monkeypatch, settings):
+    settings.STORAGE_PRESIGN_METHOD = "post"
+    makerspace = make_space("problem-evidence-finalize")
+    manager = make_member("problem-evidence-finalize-manager", makerspace)
+    product = make_product(makerspace, total_quantity=1, available_quantity=1)
+    report, item = _returned_report(makerspace, product)
+    evidence = EvidencePhoto.objects.create(
+        makerspace=makerspace,
+        evidence_type=EvidencePhoto.EvidenceType.RETURN,
+        object_key=f"evidence/{makerspace.id}/return/triage",
+        uploaded_by=manager,
+    )
+    finalize = Mock(
+        return_value=EvidenceValidationResult(size=123, content_type="image/png")
+    )
+    monkeypatch.setattr("apps.evidence.storage.finalize_upload", finalize)
+    payload = _payload("damaged", item)
+    payload["evidence_id"] = evidence.id
+
+    response = authenticated_client(manager).post(
+        _triage_url(makerspace, report), payload, format="json"
+    )
+
+    assert response.status_code == 200
+    finalize.assert_called_once_with(evidence, settings.EVIDENCE_MAX_BYTES)
 
 
 def test_no_issue_triage_moves_no_stock_and_creates_no_accountability():

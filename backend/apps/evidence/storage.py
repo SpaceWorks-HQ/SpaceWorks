@@ -82,33 +82,14 @@ def copy_object(source_key, dest_key):
         raise StorageUnavailable from exc
 
 
-def finalize_upload(object_key, max_bytes):
-    if settings.STORAGE_PRESIGN_METHOD != "put":
-        return object_size(object_key)
+def finalize_upload(evidence, max_bytes):
+    from apps.evidence.finalization import FinalizationInProgress
+    from apps.evidence.finalization import finalize_upload as finalize_evidence_upload
 
-    final_size = object_size(object_key)
-    if final_size is not None:
-        delete_object(staging_key(object_key))
-        return final_size
-
-    upload_staging_key = staging_key(object_key)
-    size = object_size(upload_staging_key)
-    if size is None:
-        return None
-    if not (1 <= size <= max_bytes):
-        return size
-
-    copy_object(upload_staging_key, object_key)
-    delete_object(upload_staging_key)
-    # Re-validate the ACTUAL finalized object. The staging key stays client-writable
-    # until its presigned PUT URL expires, so a racing oversized PUT between the size
-    # HEAD above and this copy could promote an oversized object while the small size
-    # was recorded (Codex Stage-4 P2 TOCTOU). The final key is never client-writable,
-    # so its post-copy size is authoritative; reject + delete it if it drifted.
-    final_size = object_size(object_key)
-    if final_size is None or not (1 <= final_size <= max_bytes):
-        delete_object(object_key)
-    return final_size
+    try:
+        return finalize_evidence_upload(evidence, max_bytes)
+    except FinalizationInProgress as exc:
+        raise StorageUnavailable from exc
 
 
 def presigned_upload(object_key, content_type):
@@ -131,7 +112,7 @@ def presigned_upload(object_key, content_type):
             }
         return _public_client().generate_presigned_post(
             Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-            Key=object_key,
+            Key=staging_key(object_key),
             Fields={"Content-Type": content_type},
             Conditions=[
                 {"Content-Type": content_type},

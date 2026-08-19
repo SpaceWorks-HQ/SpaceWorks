@@ -4,6 +4,7 @@ from django.db import IntegrityError, transaction
 from apps.audit import services as audit
 from apps.boxes.models import Box, BoxScan
 from apps.evidence import storage
+from apps.evidence.finalization import charge_storage_once
 from apps.evidence.models import EvidencePhoto
 from apps.hardware_requests import notifications
 from apps.hardware_requests.models import (
@@ -24,7 +25,6 @@ from apps.hardware_requests.workflow_errors import (
 )
 from apps.hardware_requests.workflow_utils import locked_request
 from apps.inventory import availability
-from apps.makerspaces.limits import add_storage
 
 
 def return_items(actor, request, evidence_id, remark, box_code, resolutions):
@@ -33,6 +33,17 @@ def return_items(actor, request, evidence_id, remark, box_code, resolutions):
         raise ReturnValidationError("Return remark is required.")
 
     evidence = _return_evidence(request, evidence_id)
+    _require_returnable(request)
+    try:
+        finalized = storage.finalize_upload(evidence, settings.EVIDENCE_MAX_BYTES)
+    except storage.EvidenceObjectValidationError as exc:
+        if exc.code == "missing":
+            raise EvidenceNotUploaded("Return evidence has not been uploaded.") from exc
+        raise ReturnValidationError(
+            "Return evidence is invalid or exceeds the size limit."
+        ) from exc
+    if finalized is None:
+        raise EvidenceNotUploaded("Return evidence has not been uploaded.")
 
     with transaction.atomic():
         locked = locked_request(request)
@@ -44,29 +55,7 @@ def return_items(actor, request, evidence_id, remark, box_code, resolutions):
         EvidencePhoto.objects.select_for_update().get(pk=evidence.pk)
         if PublicToolLoan.objects.filter(return_evidence=evidence).exists():
             raise ReturnValidationError("Return evidence has already been used.")
-        # Finalize evidence UNDER the request row lock so concurrent finalizers can't both
-        # promote the staging upload over an already-finalized immutable key (Codex Stage-4
-        # P2). PUT mode promotes staging->final + validates size; both PUT and POST
-        # then HEAD size and sniff bytes to prove the immutable final object is an image.
-        if settings.STORAGE_PRESIGN_METHOD == "put":
-            size = storage.finalize_upload(evidence.object_key, settings.EVIDENCE_MAX_BYTES)
-            if size is None:
-                raise EvidenceNotUploaded("Return evidence has not been uploaded.")
-            if not (1 <= size <= settings.EVIDENCE_MAX_BYTES):
-                raise ReturnValidationError(
-                    "Return evidence is invalid or exceeds the size limit."
-                )
-            # Charge managed storage with the size finalize already computed (no extra
-            # HEAD); recompute_storage reconciles POST-mode + other object types.
-            add_storage(locked.makerspace, size)
-        try:
-            storage.validate_evidence_object(evidence.object_key)
-        except storage.EvidenceObjectValidationError as exc:
-            if exc.code == "missing":
-                raise EvidenceNotUploaded("Return evidence has not been uploaded.") from exc
-            raise ReturnValidationError(
-                "Return evidence is invalid or exceeds the size limit."
-            ) from exc
+        charge_storage_once(evidence, finalized.size)
         box = _matching_box(locked, box_code)
         scan = _record_scan(actor, locked, box)
         validated_resolutions = build_resolutions(locked, resolutions)
