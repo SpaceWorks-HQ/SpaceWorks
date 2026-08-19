@@ -17,6 +17,7 @@ type ApiClient = {
   id: number;
   label: string;
   client_id: string;
+  last_seen_at: string | null;
   allowed_origins: string[];
   is_active: boolean;
   created_at: string;
@@ -241,7 +242,16 @@ export function ApiClientsPanel({
                       <p className="mt-2 text-xs text-muted">No browser origins configured.</p>
                     )}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs text-muted">{formatDate(client.created_at)}</p>
+                      {/* Last seen, not just created: deciding whether a client is stale is
+                          the whole reason the usage telemetry exists, and an operator reading
+                          only a creation date cannot make that call. */}
+                      <p className="text-xs text-muted">
+                        {formatDate(client.created_at)}
+                        {" · "}
+                        {client.last_seen_at
+                          ? `last used ${formatDate(client.last_seen_at)}`
+                          : "never used"}
+                      </p>
                       <div className="desk-actions flex flex-wrap gap-2">
                         <button
                           className="desk-button"

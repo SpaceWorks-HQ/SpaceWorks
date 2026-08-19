@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 from django.conf import settings
 from django.http import JsonResponse
 from django.utils import timezone
-
+from apps.apiclients import telemetry
 from apps.apiclients.crypto import decrypt_secret
 from apps.inventory.middleware_nonce import (
     NONCE_MAX_LENGTH,
@@ -32,7 +32,6 @@ from apps.inventory.middleware_observability import (
 )
 
 logger = logging.getLogger(__name__)
-
 LEGACY_NONCE_WARNING_EVENT = "api_client_nonce_missing_legacy"
 AMBIGUOUS_NONCE_BODY_EVENT = "api_client_nonce_ambiguous_body"
 
@@ -96,20 +95,17 @@ class FrontendHMACMiddleware:
             nonce = request.headers.get("X-Nonce", "")
             if not (client_id and timestamp and signature):
                 return False
-
             client = ApiClient.objects.filter(
                 client_id=client_id, is_active=True
             ).first()
             if client is None:
                 set_failure_reason(request, UNKNOWN_CLIENT)
                 return False
-
             if not self._origin_ok(request, client):
                 set_failure_reason(request, ORIGIN_DENIED)
                 return False
             if not self._scope_checks_ok(request, client):
                 return False
-
             try:
                 skew = abs(int(time.time()) - int(timestamp))
             except ValueError:
@@ -173,6 +169,7 @@ class FrontendHMACMiddleware:
                     extra={"client_id": client_id},
                 )
             request.api_client = client
+            telemetry.record_signed_client_observation(request, client)
             return True
         except Exception:  # fail safe - never 500 the request flow
             set_failure_reason(request, BAD_SIGNATURE)
@@ -246,7 +243,10 @@ class FrontendHMACMiddleware:
             if client.client_type != "browser" or not self._origin_ok(request, client):
                 set_failure_reason(request, ORIGIN_DENIED)
                 return False
-            return self._scope_checks_ok(request, client)
+            valid = self._scope_checks_ok(request, client)
+            if valid:
+                telemetry.record_browser_client_observation(request, client)
+            return valid
         except Exception:
             logger.exception("Frontend ApiClient validation failed")
             return False

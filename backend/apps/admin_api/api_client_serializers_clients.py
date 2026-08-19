@@ -28,11 +28,12 @@ class ApiClientSerializer(serializers.ModelSerializer):
             "id", "label", "client_id", "client_type", "scopes",
             "rate_limit_tier", "makerspace", "public_makerspace_code",
             "allowed_origins", "backend_base_url", "public_api_base_url",
-            "is_active", "created_at", "updated_at",
+            "is_active", "last_seen_at", "last_seen_ip", "created_at", "updated_at",
         ]
         read_only_fields = [
             "id", "client_id", "makerspace", "public_makerspace_code",
             "backend_base_url", "public_api_base_url", "created_at", "updated_at",
+            "last_seen_at", "last_seen_ip",
         ]
 
     def validate_allowed_origins(self, value):
@@ -120,7 +121,7 @@ class ApiClientCreateResponseSerializer(ApiClientSerializer):
             "id", "label", "client_id", "client_secret", "client_type", "scopes",
             "rate_limit_tier", "makerspace", "public_makerspace_code",
             "allowed_origins", "backend_base_url", "public_api_base_url",
-            "is_active", "created_at", "updated_at",
+            "is_active", "last_seen_at", "last_seen_ip", "created_at", "updated_at",
         ]
         read_only_fields = [
             *ApiClientSerializer.Meta.read_only_fields,
