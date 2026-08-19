@@ -430,6 +430,15 @@ create or assign a role carrying `manage_makerspace` (superadmin only), and you 
 membership that already holds it. `transfer_stock` and `manage_staff` are superadmin-only and are
 never grantable to any role.
 
+**Organizations reach across makerspaces.** A network, a university or a chain can be registered as an
+organization, linked to any number of makerspaces as owner, manager or affiliate, and given staff whose
+authority applies in every one of them — without a separate login or a membership row per space. An
+organization grant confers **actions, never identity**: an organization administrator can hold
+`manage_events` across the network's spaces while being Space Manager of none of them, and staff lists
+still show only that space's own people, with a separate read-only view of which organizations reach in.
+A makerspace that has hidden itself from the platform superadmin stays hidden — authority cannot be
+routed in through an organization.
+
 Outside this system entirely: **Public** users browse, submit requests, and — where enabled —
 self-checkout and return eligible QR tools, gated on member presence and photo evidence.
 
