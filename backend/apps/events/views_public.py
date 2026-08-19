@@ -62,6 +62,7 @@ class PublicEventListView(APIView):
         require_module(makerspace, 'events')
         events = (
             _public_events(makerspace)
+            .prefetch_related('organizers__organization')
             .annotate(
                 confirmed_count=Count(
                     'registrations',

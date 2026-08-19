@@ -112,6 +112,21 @@ AUDIT_META_REFERENCES = {
     ),
     **_reference(R, "hardware_requests.ReturnEvent", ("evidence.attached", "return_event_id")),
     **_reference(R, "events.EventRegistration", ("event.host_waiver_accepted", "registration_id")),
+    # Removing an organizer names the event it was removed from. REMAP, matching the
+    # sibling above: an Event is tenant-owned and travels with the export, so the id is
+    # remappable. The created/updated siblings pick their action with a conditional, so
+    # the AST guard reports them as dynamic rather than as declared paths.
+    **_reference(
+        R, "events.Event",
+        # All three organizer actions, not just the one the AST guard can see. The guard
+        # only discovers literal action strings, and created/updated are chosen with a
+        # conditional -- but portable import remaps meta ids by EXACT action/path, so an
+        # undeclared action would carry a SOURCE event id into the target and could point
+        # an append-only audit row at an unrelated event.
+        ("event.organizer_created", "event_id"),
+        ("event.organizer_updated", "event_id"),
+        ("event.organizer_deleted", "event_id"),
+    ),
     **_reference(
         R, "makerspaces.MakerspaceWaiver",
         ("event.host_waiver_accepted", "host_waiver_id"),

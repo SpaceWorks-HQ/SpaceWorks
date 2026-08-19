@@ -25,6 +25,7 @@ class EventAttendanceRowSerializer(TypedReportBaseSerializer):
     cancelled = serializers.IntegerField()
     attended = serializers.IntegerField()
     attendance_rate_percent = serializers.FloatField(allow_null=True)
+    organizers = serializers.CharField(allow_blank=True)
 
 
 class BookingUtilizationRowSerializer(TypedReportBaseSerializer):

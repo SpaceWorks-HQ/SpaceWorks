@@ -7,30 +7,9 @@ from django.utils import timezone
 from apps.encryption.write_fence import assert_mapped_write_allowed
 from apps.events.capacity import fresh_registration_status
 from apps.events.exceptions import DuplicateRegistration, EventInvalidTransition
-from apps.events.models import EventCollaborator, EventRegistration
+from apps.events.models import EventRegistration
 from apps.forms_schema.validation import validate_answers
 from apps.makerspaces.guards import require_module_locked
-from apps.makerspaces.platform import module_enabled
-from apps.makerspaces.servability import servable_queryset
-
-
-def collaborator_makerspace_ids(event):
-    """Return eligible accepted collaborator makerspace IDs for an event."""
-    collaborators = (
-        servable_queryset(EventCollaborator.objects.filter(
-            event=event,
-            status=EventCollaborator.Status.ACCEPTED,
-        ), relation="makerspace")
-        # Model validation prevents this relation; excluding it here is the
-        # service-level defense because clean() is not invoked by every write path.
-        .exclude(makerspace_id=event.makerspace_id)
-        .select_related("makerspace")
-    )
-    return {
-        collaborator.makerspace_id
-        for collaborator in collaborators
-        if module_enabled(collaborator.makerspace, "events")
-    }
 
 
 @transaction.atomic
@@ -47,6 +26,10 @@ def register(
     the public. Every other rule (published, not ended, capacity, duplicates, the
     custom form, the write fence, and payment) is identical, because this is the same
     service and the state machine has one home.
+
+    `collaborative=True` is a trusted internal capability restricted to the enforcing
+    member view. That view proves an accepted EventCollaborator exists; this service
+    deliberately does not re-derive the actor's makerspace membership.
     """
     from apps.events.services import _audit, _locked_event, _refresh, _validate
 

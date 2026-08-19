@@ -28,6 +28,7 @@ EXPECTED_FIELDS = {
     'availability',
     'image_url',
     'status',
+    'organizers',
 }
 FORBIDDEN_KEYS = {
     'id',

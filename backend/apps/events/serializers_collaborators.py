@@ -3,7 +3,10 @@ from rest_framework import serializers
 
 from apps.events.capacity import availability_label
 from apps.events.models import Event, EventCollaborator
-from apps.events.serializers_public import PublicEventRegistrationInputSerializer
+from apps.events.serializers_public import (
+    EventOrganizerSummarySerializer,
+    PublicEventRegistrationInputSerializer,
+)
 from apps.inventory import public_image_storage
 from apps.makerspaces.models import MakerspaceWaiver
 
@@ -95,6 +98,7 @@ class CollaborativeEventSerializer(serializers.Serializer):
     host_name = serializers.CharField(source="makerspace.name", read_only=True)
     host_slug = serializers.SlugField(source="makerspace.slug", read_only=True)
     host_waiver = serializers.SerializerMethodField()
+    organizers = EventOrganizerSummarySerializer(many=True, read_only=True)
 
     @extend_schema_field(
         {"type": "string", "enum": ["Available", "Limited", "Full"]}

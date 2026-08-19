@@ -183,6 +183,27 @@ def actions_for_membership(membership) -> set:
     return expand_implied_actions(_MEMBERSHIP_ROLE_ACTIONS.get(membership.role, set()))
 
 
+def actions_for_organization_membership(membership) -> set:
+    """Resolve one organization grant with the same fail-closed action rules."""
+    if (
+        membership is None
+        or getattr(membership, "status", "active") != "active"
+        or not getattr(getattr(membership, "organization", None), "is_active", False)
+    ):
+        return set()
+    value = membership.granted_actions
+    if not isinstance(value, list):
+        logging.getLogger(__name__).warning(
+            "Ignoring malformed granted actions on an organization membership."
+        )
+        return set()
+    return expand_implied_actions({
+        action
+        for action in value
+        if isinstance(action, str) and action in ROLE_GRANTABLE_ACTIONS
+    })
+
+
 def _organization_authority_memberships(actor, *, makerspace_ids=None):
     """Active organization grants whose linked makerspace may serve traffic."""
     from apps.makerspaces.servability import servable_q
@@ -231,21 +252,12 @@ def _org_actions_for(actor, makerspace_id) -> set:
     if actor is None or not getattr(actor, "is_authenticated", False):
         return set()
     granted = set()
-    values = _organization_authority_memberships(
+    memberships = _organization_authority_memberships(
         actor, makerspace_ids=[makerspace_id]
-    ).values_list("granted_actions", flat=True)
-    for value in values:
-        if not isinstance(value, list):
-            logging.getLogger(__name__).warning(
-                "Ignoring malformed granted actions on an organization membership."
-            )
-            continue
-        granted.update(
-            action
-            for action in value
-            if isinstance(action, str) and action in ROLE_GRANTABLE_ACTIONS
-        )
-    return expand_implied_actions(granted)
+    ).select_related("organization")
+    for membership in memberships:
+        granted.update(actions_for_organization_membership(membership))
+    return granted
 
 
 def _org_scope_for_action(actor, action) -> set:
@@ -357,6 +369,32 @@ def scope_by_action(actor, action, queryset, field="makerspace_id"):
     if not scope:
         return queryset.none()
     return queryset.filter(**{f"{field}__in": scope})
+
+
+def scope_by_visibility_or_action(actor, action, queryset, field="makerspace_id"):
+    """Admit rows the actor can SEE, leaving 403-vs-404 to the permission check.
+
+    This repo deliberately distinguishes two denials: a makerspace you are not in at all
+    returns 404 (the object is invisible), while a makerspace you ARE in but lack the
+    action for returns 403. Prefiltering an action-gated handler with `scope_by_action`
+    alone collapses the second into the first, so a member of the space who lacks the
+    action starts getting 404 -- which is what `test_visible_underprivileged_roles_get_403`
+    pins. Prefiltering with membership scope alone excludes organization-derived
+    authority, which is the whole point of the org branch.
+
+    So: visible = local membership scope UNION the action's scope (which includes org
+    grants). The handler still calls `can(...)` afterwards and returns 403 from there.
+    """
+    scope = resolve_scope(actor)
+    if scope is ALL:
+        return queryset
+    action_scope = makerspaces_for_action(actor, action)
+    if action_scope is ALL:
+        return queryset
+    visible = scope | action_scope
+    if not visible:
+        return queryset.none()
+    return queryset.filter(**{f"{field}__in": visible})
 
 
 def membership_role(actor, makerspace_id):

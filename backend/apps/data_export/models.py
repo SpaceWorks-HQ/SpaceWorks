@@ -164,6 +164,10 @@ OMITTED_MODELS = {
     "makerspaces.ImportedUserReconciliation": "Target-side operator reconciliation input.",
     "makerspaces.SubdomainRequest": "Source-deployment routing request.",
     "operations.PeriodicTaskRun": "Deployment scheduler state.",
+    "events.EventOrganizer": (
+        "It references a deployment-global organization that does not travel with "
+        "a tenant export."
+    ),
     "organizations.OrganizationMakerspace": (
         "Source-deployment organization links do not travel with tenant exports."
     ),

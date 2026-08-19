@@ -45,7 +45,7 @@ class _BookingPagination(PageNumberPagination):
 
 def _manageable_booking(actor, pk):
     booking = get_object_or_404(
-        rbac.scope_by_action(
+        rbac.scope_by_visibility_or_action(
             actor,
             rbac.Action.MANAGE_BOOKINGS,
             Booking.objects.select_related('space__makerspace'),

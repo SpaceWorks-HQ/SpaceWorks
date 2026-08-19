@@ -4,9 +4,9 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
-from apps.encryption.mappers import ScopedPiiModelMixin
 from django.db.models import F, Q
-
+from apps.encryption.mappers import ScopedPiiModelMixin
+from apps.events.organizer_models import EventOrganizer  # noqa: F401
 from apps.forms_schema.validation import validate_form_schema
 
 

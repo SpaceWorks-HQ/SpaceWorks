@@ -20,6 +20,7 @@ from apps.events.views_admin import (
     EventRegistrationListView,
     EventRegistrationMarkAttendedView,
 )
+from apps.events.views_admin_organized import OrganizedEventListView
 from apps.events.views_admin_image import EventImageView
 from apps.events.views_checkin import EventCheckInResolveView
 from apps.events.views_collaborators import (
@@ -101,5 +102,10 @@ urlpatterns = [
         'event-registrations/<int:pk>/mark-attended/',
         EventRegistrationMarkAttendedView.as_view(),
         name='admin-event-registration-mark-attended',
+    ),
+    path(
+        'organized-events/',
+        OrganizedEventListView.as_view(),
+        name='admin-organized-event-list',
     ),
 ]
