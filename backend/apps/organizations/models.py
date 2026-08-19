@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.db.models import Q
 
@@ -86,3 +87,51 @@ class OrganizationMakerspace(models.Model):
     def __str__(self):
         return f"{self.organization} {self.get_relationship_display().lower()} of {self.makerspace}"
 
+
+class OrganizationMembership(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        SUSPENDED = "suspended", "Suspended"
+
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="memberships",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="organization_memberships",
+    )
+    granted_actions = models.JSONField(default=list, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("organization", "user"),
+                name="uniq_org_membership_user",
+            ),
+        ]
+        indexes = [
+            GinIndex(
+                fields=["granted_actions"],
+                name="orgmembership_actions_gin",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} in {self.organization}"

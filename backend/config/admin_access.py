@@ -49,6 +49,7 @@ NESTED_MAKERSPACE_LOOKUPS = {
 GLOBAL_ADMIN_MODELS = {
     "accounts.user",
     "organizations.organization",
+    "organizations.organizationmembership",
     "accounts.platformsocialauthsettings",
     # The login-method switches govern credentials, and credentials resolve before a
     # makerspace is selected — the same reason social auth is platform-scoped.

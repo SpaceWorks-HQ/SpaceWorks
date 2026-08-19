@@ -15,6 +15,8 @@ def resolve_scope(actor):
         return set()
     if actor.is_superuser or actor.role == User.Role.SUPERADMIN:
         return _superadmin_visible_ids(actor, None)
+    # Organization grants confer actions, not identity, so they never widen this
+    # action-agnostic scope (or scope_by_makerspace(), which derives from it).
     scope = set(actor.makerspace_memberships.filter(status="active").values_list("makerspace_id", flat=True))
     return _exclude_archived_ids(scope)
 
@@ -181,6 +183,95 @@ def actions_for_membership(membership) -> set:
     return expand_implied_actions(_MEMBERSHIP_ROLE_ACTIONS.get(membership.role, set()))
 
 
+def _org_actions_for(actor, makerspace_id) -> set:
+    """Return actions active organization grants confer in one makerspace.
+
+    Hard-hidden makerspaces are excluded here, not at the call sites, so every
+    consumer of organization authority inherits the exclusion. Reason: an
+    OrganizationMembership has no makerspace FK, so it sits in
+    `GLOBAL_ADMIN_MODELS` and the admin hide-scoping never narrows it. Without
+    this a superadmin could use the global membership admin to grant a third
+    party authority inside a makerspace that is hard-hidden FROM that superadmin
+    -- a proxy around the hide invariant. A real local MakerspaceMembership in a
+    hidden space still confers authority; an organization grant never does.
+    """
+    if actor is None or not getattr(actor, "is_authenticated", False):
+        return set()
+    if _id_in(makerspace_id, superadmin_hidden_makerspace_ids()):
+        return set()
+    from apps.organizations.models import OrganizationMembership
+
+    granted = set()
+    values = OrganizationMembership.objects.filter(
+        user=actor,
+        status=OrganizationMembership.Status.ACTIVE,
+        organization__is_active=True,
+        organization__makerspace_links__makerspace_id=makerspace_id,
+    ).values_list("granted_actions", flat=True)
+    for value in values:
+        if not isinstance(value, list):
+            logging.getLogger(__name__).warning(
+                "Ignoring malformed granted actions on an organization membership."
+            )
+            continue
+        granted.update(
+            action
+            for action in value
+            if isinstance(action, str) and action in ROLE_GRANTABLE_ACTIONS
+        )
+    return expand_implied_actions(granted)
+
+
+def _org_scope_for_action(actor, action) -> set:
+    """Return makerspace ids where an active organization grant satisfies action."""
+    if actor is None or not getattr(actor, "is_authenticated", False):
+        return set()
+    satisfying = actions_satisfying(action) & ROLE_GRANTABLE_ACTIONS
+    if not satisfying:
+        return set()
+    from apps.organizations.models import OrganizationMembership
+
+    granted_filter = Q()
+    for granted_action in satisfying:
+        granted_filter |= Q(granted_actions__contains=[granted_action])
+    rows = (
+        OrganizationMembership.objects.filter(
+            user=actor,
+            status=OrganizationMembership.Status.ACTIVE,
+            organization__is_active=True,
+            organization__makerspace_links__isnull=False,
+        )
+        .filter(granted_filter)
+        .values_list(
+            "granted_actions",
+            "organization__makerspace_links__makerspace_id",
+        )
+    )
+    hidden = superadmin_hidden_makerspace_ids()
+    scope = set()
+    for value, makerspace_id in rows:
+        if _id_in(makerspace_id, hidden):
+            # See _org_actions_for: organization grants never reach a hard-hidden
+            # makerspace, or the global membership admin becomes a way around the hide.
+            continue
+        if not isinstance(value, list):
+            logging.getLogger(__name__).warning(
+                "Ignoring malformed granted actions on an organization membership."
+            )
+            continue
+        expanded = expand_implied_actions({
+            granted_action
+            for granted_action in value
+            if (
+                isinstance(granted_action, str)
+                and granted_action in ROLE_GRANTABLE_ACTIONS
+            )
+        })
+        if action in expanded:
+            scope.add(makerspace_id)
+    return scope
+
+
 def _action_scope_filters(action):
     """Build assigned-role and legacy-role filters for an action scope query."""
     satisfying = actions_satisfying(action)
@@ -199,6 +290,8 @@ def makerspaces_for_action(actor, action):
     """Return makerspace ids where actor's membership role grants action, or ALL."""
     if actor is None or not getattr(actor, "is_authenticated", False):
         return set()
+    # Organization grants never enter this superadmin branch: hidden-space authority
+    # must continue to come only from an explicit makerspace membership.
     if actor.is_superuser or actor.role == User.Role.SUPERADMIN:
         return _superadmin_visible_ids(actor, action)
     if action in ROLE_FORBIDDEN_ACTIONS:
@@ -222,7 +315,8 @@ def makerspaces_for_action(actor, action):
         if legacy_roles
         else set()
     )
-    return _exclude_archived_ids(assigned_scope | legacy_scope)
+    org_scope = _org_scope_for_action(actor, action)
+    return _exclude_archived_ids(assigned_scope | legacy_scope | org_scope)
 
 
 def makerspaces_for_actions(actor, *actions):
@@ -273,11 +367,15 @@ def effective_actions(actor, makerspace_id) -> set:
         return set()
     if _id_in(makerspace_id, archived_makerspace_ids()):
         return set()
+    # Organization grants never enter this superadmin branch: hidden-space authority
+    # must continue to come only from an explicit makerspace membership.
     if actor.is_superuser or actor.role == User.Role.SUPERADMIN:
         if _id_in(makerspace_id, superadmin_hidden_makerspace_ids()):
             return actions_for_membership(_membership_for(actor, makerspace_id))
         return set(ROLE_GRANTABLE_ACTIONS)
-    return actions_for_membership(_membership_for(actor, makerspace_id))
+    return actions_for_membership(
+        _membership_for(actor, makerspace_id)
+    ) | _org_actions_for(actor, makerspace_id)
 
 
 def is_space_manager_identity(actor, makerspace_id) -> bool:
@@ -325,6 +423,8 @@ def can(actor, action, makerspace_id=None):
         return False
     if makerspace_id is not None and _id_in(makerspace_id, archived_makerspace_ids()):
         return False
+    # Organization grants never enter this superadmin branch: hidden-space authority
+    # must continue to come only from an explicit makerspace membership.
     if actor.is_superuser or actor.role == User.Role.SUPERADMIN:
         if makerspace_id is None:
             return True
@@ -337,7 +437,9 @@ def can(actor, action, makerspace_id=None):
         return True
     if makerspace_id is None:
         return False
-    return action in actions_for_membership(_membership_for(actor, makerspace_id))
+    if action in actions_for_membership(_membership_for(actor, makerspace_id)):
+        return True
+    return action in _org_actions_for(actor, makerspace_id)
 
 
 def superadmin_hidden_makerspace_ids():

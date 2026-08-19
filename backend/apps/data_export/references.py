@@ -151,6 +151,8 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("operations.StockTransfer", "created_by"),
         ("organizations.Organization", "created_by"),
         ("organizations.OrganizationMakerspace", "created_by"),
+        ("organizations.OrganizationMembership", "user"),
+        ("organizations.OrganizationMembership", "created_by"),
         ("payments.Payment", "member"),
         ("payments.Payment", "created_by"),
         ("payments.StripeConnectOAuthState", "initiated_by"),
