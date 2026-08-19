@@ -63,6 +63,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("events.Event", "created_by"),
         ("events.EventCollaborator", "invited_by"),
         ("events.EventCollaborator", "responded_by"),
+        ("events.EventOrganizer", "created_by"),
         ("events.EventRegistration", "member"),
         ("evidence.EvidencePhoto", "uploaded_by"),
         ("hardware_requests.HardwareRequest", "requester"),

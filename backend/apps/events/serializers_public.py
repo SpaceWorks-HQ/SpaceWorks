@@ -20,7 +20,13 @@ PUBLIC_EVENT_FIELDS = (
     'availability',
     'image_url',
     'status',
+    'organizers',
 )
+
+
+class EventOrganizerSummarySerializer(serializers.Serializer):
+    slug = serializers.SlugField(source='organization.slug', read_only=True)
+    name = serializers.CharField(source='organization.name', read_only=True)
 
 
 class PublicEventSerializer(serializers.Serializer):
@@ -42,6 +48,7 @@ class PublicEventSerializer(serializers.Serializer):
         choices=[Event.Status.PUBLISHED],
         read_only=True,
     )
+    organizers = EventOrganizerSummarySerializer(many=True, read_only=True)
 
     @extend_schema_field(
         {

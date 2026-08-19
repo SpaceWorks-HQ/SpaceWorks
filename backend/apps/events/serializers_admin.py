@@ -6,6 +6,7 @@ from apps.events.models import Event, EventRegistration
 from apps.forms_schema.serializers import CustomFormSchemaField
 from apps.inventory import public_image_storage
 from apps.admin_api.serializers_payment_summary import PaymentSummaryMixin
+from apps.events.serializers_public import EventOrganizerSummarySerializer
 
 
 class EventWriteSerializer(serializers.Serializer):
@@ -57,6 +58,7 @@ class EventAdminSerializer(serializers.ModelSerializer):
     created_by_id = serializers.IntegerField(allow_null=True, read_only=True)
     registration_counts = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    organizers = EventOrganizerSummarySerializer(many=True, read_only=True)
 
     class Meta:
         model = Event
@@ -79,6 +81,7 @@ class EventAdminSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
             'registration_counts',
+            'organizers',
         )
         read_only_fields = fields
 

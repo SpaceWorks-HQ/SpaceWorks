@@ -23,6 +23,7 @@ from apps.events.serializers_admin import (
 from apps.admin_api.serializers_payment_summary import scoped_payment_context
 from apps.events import services
 from apps.events.models import Event, EventRegistration
+from apps.events.organizer_authority import can_manage_event, organizer_event_q
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
@@ -54,7 +55,7 @@ class _RegistrationPagination(PageNumberPagination):
 
 def _visible_makerspace(actor, makerspace_id):
     makerspace = get_object_or_404(
-        rbac.scope_by_action(
+        rbac.scope_by_visibility_or_action(
             actor,
             rbac.Action.MANAGE_EVENTS,
             Makerspace.objects.all(),
@@ -69,37 +70,46 @@ def _visible_makerspace(actor, makerspace_id):
 
 
 def _manageable_event(actor, pk):
+    venue_scoped = rbac.scope_by_visibility_or_action(
+        actor,
+        rbac.Action.MANAGE_EVENTS,
+        Event.objects.all(),
+        field='makerspace_id',
+    )
     event = get_object_or_404(
-        rbac.scope_by_action(
-            actor,
-            rbac.Action.MANAGE_EVENTS,
-            Event.objects.select_related('makerspace'),
-            field='makerspace_id',
-        ),
+        Event.objects.select_related('makerspace')
+        .prefetch_related('organizers__organization')
+        .filter(
+            Q(pk__in=venue_scoped.values('pk'))
+            | organizer_event_q(actor)
+        )
+        .distinct(),
         pk=pk,
     )
     require_module(event.makerspace, 'events')
-    if not rbac.can(actor, rbac.Action.MANAGE_EVENTS, event.makerspace_id):
+    if not can_manage_event(actor, event):
         raise PermissionDenied()
     return event
 
 
 def _manageable_registration(actor, pk):
+    venue_scoped = rbac.scope_by_visibility_or_action(
+        actor,
+        rbac.Action.MANAGE_EVENTS,
+        EventRegistration.objects.all(),
+        field='event__makerspace_id',
+    )
     registration = get_object_or_404(
-        rbac.scope_by_action(
-            actor,
-            rbac.Action.MANAGE_EVENTS,
-            EventRegistration.objects.select_related('event__makerspace'),
-            field='event__makerspace_id',
-        ),
+        EventRegistration.objects.select_related('event__makerspace')
+        .filter(
+            Q(pk__in=venue_scoped.values('pk'))
+            | organizer_event_q(actor, event_prefix='event__')
+        )
+        .distinct(),
         pk=pk,
     )
     require_module(registration.event.makerspace, 'events')
-    if not rbac.can(
-        actor,
-        rbac.Action.MANAGE_EVENTS,
-        registration.event.makerspace_id,
-    ):
+    if not can_manage_event(actor, registration.event):
         raise PermissionDenied()
     return registration
 
@@ -149,7 +159,11 @@ class EventListCreateView(APIView):
             Event.objects.filter(makerspace=makerspace),
             field='makerspace_id',
         )
-        queryset = _annotate_registration_counts(queryset).order_by('starts_at', 'id')
+        queryset = (
+            _annotate_registration_counts(queryset)
+            .prefetch_related('organizers__organization')
+            .order_by('starts_at', 'id')
+        )
         paginator = _EventPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
         return _paginated_response(paginator, page, EventAdminSerializer)

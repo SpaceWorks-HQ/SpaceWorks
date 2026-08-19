@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
@@ -9,6 +10,7 @@ from rest_framework.views import APIView
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.events import collaborator_services
+from apps.events.organizer_authority import organizer_event_q
 from apps.events.models import Event, EventCollaborator
 from apps.events.serializers_collaborators import (
     EventCollaborationInboxSerializer,
@@ -32,7 +34,7 @@ COLLABORATION_ERRORS = {
 
 def _collaborator_makerspace(actor, makerspace_id):
     makerspace = get_object_or_404(
-        rbac.scope_by_action(
+        rbac.scope_by_visibility_or_action(
             actor,
             rbac.Action.MANAGE_EVENTS,
             Makerspace.objects.all(),
@@ -54,7 +56,7 @@ def _manageable_collaboration(actor, pk):
     its own `origin_scope_routes` entry rather than sharing one with the host's remove.
     """
     collaborator = get_object_or_404(
-        rbac.scope_by_action(
+        rbac.scope_by_visibility_or_action(
             actor,
             rbac.Action.MANAGE_EVENTS,
             servable_queryset(EventCollaborator.objects.filter(
@@ -126,13 +128,23 @@ class EventCollaborationRemoveView(APIView):
         responses={204: None, **COLLABORATION_ERRORS},
     )
     def post(self, request, pk, *args, **kwargs):
+        # Admit rows whose EVENT the actor organizes as well as those in venue scope, or an
+        # organizer at an unlinked venue 404s here before _manageable_event can apply the
+        # exact-event authority -- so it could list and replace collaborators but not
+        # remove one.
+        venue_scoped = rbac.scope_by_visibility_or_action(
+            request.user,
+            rbac.Action.MANAGE_EVENTS,
+            EventCollaborator.objects.only("id", "event_id"),
+            field="event__makerspace_id",
+        )
         collaboration = get_object_or_404(
-            rbac.scope_by_action(
-                request.user,
-                rbac.Action.MANAGE_EVENTS,
-                EventCollaborator.objects.only("id", "event_id"),
-                field="event__makerspace_id",
-            ),
+            EventCollaborator.objects.only("id", "event_id")
+            .filter(
+                Q(pk__in=venue_scoped.values("pk"))
+                | organizer_event_q(request.user, event_prefix="event__")
+            )
+            .distinct(),
             pk=pk,
         )
         _manageable_event(request.user, collaboration.event_id)

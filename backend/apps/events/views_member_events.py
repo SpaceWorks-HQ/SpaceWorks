@@ -90,6 +90,7 @@ class MemberCollaborativeEventListView(APIView):
         events = (
             _collaborative_events(membership.makerspace)
             .select_related("makerspace")
+            .prefetch_related("organizers__organization")
             .annotate(
                 confirmed_count=Count(
                     "registrations",
