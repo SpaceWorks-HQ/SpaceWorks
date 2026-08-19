@@ -4952,6 +4952,8 @@ export type SocialLogin = {
   "delivery": DeliveryEnum;
   "client_platform": ClientPlatformEnum;
   "apple_name"?: string;
+  "challenge"?: string;
+  "attestation"?: unknown;
 };
 
 export type SocialLoginResponse = {
@@ -4971,6 +4973,7 @@ export type SocialNonce = {
   "surface": Surface356Enum;
   "delivery": DeliveryEnum;
   "client_platform": ClientPlatformEnum;
+  "challenge"?: string;
 };
 
 export type SocialNonceResponse = {

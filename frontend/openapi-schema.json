@@ -26555,7 +26555,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Includes `social_device_restart_required` when burned pre-grant inputs must be replaced."
                     },
                     "429": {
                         "content": {
@@ -26645,7 +26645,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Includes `social_device_restart_required` when burned pre-grant inputs must be replaced."
                     },
                     "429": {
                         "content": {
@@ -26816,7 +26816,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Includes `social_device_restart_required` when burned pre-grant inputs must be replaced."
                     },
                     "429": {
                         "content": {
@@ -51095,6 +51095,14 @@
                     "apple_name": {
                         "type": "string",
                         "maxLength": 200
+                    },
+                    "challenge": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "maxLength": 512
+                    },
+                    "attestation": {
+                        "writeOnly": true
                     }
                 },
                 "required": [
@@ -51147,6 +51155,11 @@
                     },
                     "client_platform": {
                         "$ref": "#/components/schemas/ClientPlatformEnum"
+                    },
+                    "challenge": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "maxLength": 512
                     }
                 },
                 "required": [
