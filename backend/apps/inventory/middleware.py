@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 NONCE_MAX_LENGTH = 128
 NONCE_PATTERN = re.compile(r"\A[A-Za-z0-9._~-]+\Z")
 LEGACY_NONCE_WARNING_EVENT = "api_client_nonce_missing_legacy"
+AMBIGUOUS_NONCE_BODY_EVENT = "api_client_nonce_ambiguous_body"
 
 
 class FrontendHMACMiddleware:
@@ -96,6 +97,12 @@ class FrontendHMACMiddleware:
                     return False
             elif settings.APICLIENT_REQUIRE_NONCE:
                 return False
+            elif self._body_could_re_encode_a_nonce(request.body):
+                logger.warning(
+                    AMBIGUOUS_NONCE_BODY_EVENT, extra={"client_id": client_id}
+                )
+                return False
+
             message_parts = [
                 request.method.upper().encode(),
                 request.get_full_path().encode(),
@@ -126,6 +133,32 @@ class FrontendHMACMiddleware:
 
     def _nonce_is_valid(self, nonce):
         return len(nonce) <= NONCE_MAX_LENGTH and bool(NONCE_PATTERN.fullmatch(nonce))
+
+    def _body_could_re_encode_a_nonce(self, body):
+        """Refuse a nonce-less request whose body re-encodes a nonced message.
+
+        The signed message is METHOD \n PATH \n TIMESTAMP [\n NONCE] \n BODY, so the
+        nonce part exists ONLY when X-Nonce is sent. That makes a nonced request and a
+        nonce-less request whose body is NONCE + "\n" + body serialize to IDENTICAL
+        bytes -- the same signature verifies, and `_claim_nonce` is never reached, so a
+        captured nonced request replays freely for the whole clock-skew window. Proven
+        against a live request, not theorised.
+
+        The unambiguous fix is a fixed part count (always sign an empty nonce slot), but
+        that changes the message for every existing nonce-less client -- the default
+        deployment -- so it is specified as protocol v2 instead. This refuses exactly
+        the ambiguous shape: a first line that is itself a well-formed nonce followed by
+        a newline. Real callers are unaffected because a JSON body starts with '{',
+        which is not in NONCE_PATTERN.
+        """
+        head, separator, _rest = body[: NONCE_MAX_LENGTH + 1].partition(b"\n")
+        if not separator or not head:
+            return False
+        try:
+            candidate = head.decode("ascii")
+        except UnicodeDecodeError:
+            return False
+        return bool(NONCE_PATTERN.fullmatch(candidate))
 
     def _claim_nonce(self, client_id, nonce):
         # Hash the validated pair to keep backend keys fixed-size and unambiguous while
