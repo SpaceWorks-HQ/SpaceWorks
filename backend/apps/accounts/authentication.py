@@ -15,7 +15,11 @@ from apps.accounts.claim_tenants import claim_tenant_matches
 from apps.accounts.claim_tokens import ClaimAccessToken
 from apps.accounts.claim_routes import CLAIM_REACHABLE_PREFIXES
 from apps.accounts.models import User
-from apps.accounts.models_devices import DeviceGrant, DeviceRefreshFamily
+from apps.accounts.models_devices import (
+    DeviceGrant,
+    DeviceRefreshFamily,
+    NativeAppRegistration,
+)
 from apps.accounts.tokens import validate_auth_generation
 
 
@@ -81,9 +85,14 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
         family_id = token.get("device_family_id")
         if not family_id:
             raise AuthenticationFailed("Invalid device authorization.")
-        grant = DeviceGrant.objects.filter(pk=grant_id, user=user).first()
+        grant = (
+            DeviceGrant.objects.select_related("registration")
+            .filter(pk=grant_id, user=user)
+            .first()
+        )
         valid = bool(
             grant and grant.status == DeviceGrant.Status.ACTIVE
+            and grant.registration.status == NativeAppRegistration.Status.APPROVED
             and user.is_active and user.access_status == User.AccessStatus.ACTIVE
             and DeviceRefreshFamily.objects.filter(
                 pk=family_id, grant=grant, user=user, revoked_at__isnull=True
@@ -92,6 +101,7 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
         if not valid:
             raise AuthenticationFailed("Device authorization is no longer active.")
         request.device_grant = grant
+        request.native_app_registration = grant.registration
         from apps.makerspaces.origin_scope import validate_native_makerspace_scope
 
         validate_native_makerspace_scope(request, user, grant)
