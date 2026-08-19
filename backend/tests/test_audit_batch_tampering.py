@@ -82,6 +82,14 @@ def test_rewriting_batched_row_id_is_detected_by_missing_signed_membership():
     assert failure.failure_class is AuditFailureClass.LEAF_MEMBERSHIP
     assert failure.batch_seq == 1
 
+    # AuditBatchLeaf.audit_log_id is a real FK, so this rewrite is only reachable with FK
+    # checks suspended -- outside replica mode the database refuses it outright, which is
+    # a stronger guarantee than detection. Restore the id so the FK holds at teardown.
+    _raw_update(
+        "UPDATE audit_auditlog SET id = %s WHERE id = %s",
+        [old_id, new_id],
+    )
+
 
 def test_prev_batch_root_rewrite_reports_chain_continuity_first():
     actor = make_user("audit-batch-chain")
@@ -128,3 +136,30 @@ def test_signed_root_cannot_be_replayed_into_another_scope():
             bytes(batch.signature),
             bytes(key.public_key),
         )
+
+
+def test_deleting_the_newest_local_batch_is_detected_via_the_anchor():
+    """A contiguous local prefix proves nothing about the tail.
+
+    Removing the newest batch and its leaves leaves a chain that verifies end to end, so
+    the anchor is the only witness that the batch ever existed.
+    """
+    actor = make_user("audit-batch-tail")
+    space = make_space("audit-batch-tail")
+    sink = MemoryAnchorSink()
+    activate_and_seal(None, sink)
+    key, _empty = activate_and_seal(space.pk, sink)
+    record(actor, "audit.tail", makerspace=space)
+    batch = seal_scope(space.pk, key)
+    sink.publish(batch_envelope(batch))
+
+    assert verify_audit_integrity(sink=sink) is None
+
+    # The batch tables carry append-only triggers too, so removal is only reachable with
+    # them suspended -- the same bypass the other tamper tests use.
+    _raw_update("DELETE FROM audit_auditbatchleaf WHERE batch_id = %s", [batch.pk])
+    _raw_update("DELETE FROM audit_auditbatch WHERE id = %s", [batch.pk])
+
+    failure = verify_audit_integrity(sink=sink)
+    assert failure is not None
+    assert failure.failure_class is AuditFailureClass.BATCH_MISSING

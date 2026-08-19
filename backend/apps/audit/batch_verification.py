@@ -31,6 +31,8 @@ class AuditFailureClass(StrEnum):
     ANCHOR_MISSING = "anchor_missing"
     ANCHOR_CONFLICT = "anchor_conflict"
     ANCHOR_UNAVAILABLE = "anchor_unavailable"
+    # An anchored batch has no local counterpart: local batches were removed.
+    BATCH_MISSING = "batch_missing"
 
 
 @dataclass(frozen=True)

@@ -504,6 +504,10 @@ BACKUP_PRESIGN_DRAIN_SECONDS = env.int(
 BACKUP_OPS_DIR = env("BACKUP_OPS_DIR", default="/var/lib/spaceworks/ops")
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
 CELERY_BEAT_SCHEDULE = {
+    "audit-attestation": {
+        "task": "apps.audit.tasks.run_audit_attestation_task",
+        "schedule": crontab(minute="*/5"),
+    },
     # Recovery issuance stays entirely off the anonymous request path. One minute keeps
     # user-visible latency bounded while each invocation still claims a bounded batch.
     "drain-password-reset-envelopes": {
@@ -597,6 +601,38 @@ API_CLIENT_ENC_KEY = env("API_CLIENT_ENC_KEY", default="")
 # evidence. Empty means row-MAC attestation is OFF and new audit rows are stored
 # unattested (see apps.audit.checks, which warns at startup).
 AUDIT_MAC_MASTER_KEY = env("AUDIT_MAC_MASTER_KEY", default="")
+
+# Batch attestation (AUD-2). Anchoring is what makes tampering detectable to someone who
+# controls the box, so the sink config lives here rather than in the database.
+AUDIT_ATTESTATION_DEPLOYMENT_ID = env("AUDIT_ATTESTATION_DEPLOYMENT_ID", default="")
+AUDIT_ATTESTATION_ANCHOR_BACKEND = env("AUDIT_ATTESTATION_ANCHOR_BACKEND", default="")
+AUDIT_ATTESTATION_S3_BUCKET = env("AUDIT_ATTESTATION_S3_BUCKET", default="")
+AUDIT_ATTESTATION_S3_PREFIX = env(
+    "AUDIT_ATTESTATION_S3_PREFIX", default="spaceworks-audit/v1"
+)
+AUDIT_ATTESTATION_RETENTION_DAYS = env.int(
+    "AUDIT_ATTESTATION_RETENTION_DAYS", default=2555
+)
+AUDIT_ATTESTATION_S3_OBJECT_LOCK_MODE = env(
+    "AUDIT_ATTESTATION_S3_OBJECT_LOCK_MODE", default="COMPLIANCE"
+)
+AUDIT_ATTESTATION_S3_ENDPOINT_URL = env(
+    "AUDIT_ATTESTATION_S3_ENDPOINT_URL", default=AWS_S3_ENDPOINT_URL
+)
+AUDIT_ATTESTATION_S3_ACCESS_KEY_ID = env(
+    "AUDIT_ATTESTATION_S3_ACCESS_KEY_ID", default=AWS_ACCESS_KEY_ID
+)
+AUDIT_ATTESTATION_S3_SECRET_ACCESS_KEY = env(
+    "AUDIT_ATTESTATION_S3_SECRET_ACCESS_KEY", default=AWS_SECRET_ACCESS_KEY
+)
+AUDIT_ATTESTATION_S3_REGION_NAME = env(
+    "AUDIT_ATTESTATION_S3_REGION_NAME", default=AWS_S3_REGION_NAME
+)
+AUDIT_ATTESTATION_HTTP_URL = env("AUDIT_ATTESTATION_HTTP_URL", default="")
+AUDIT_ATTESTATION_HTTP_BEARER_TOKEN = env(
+    "AUDIT_ATTESTATION_HTTP_BEARER_TOKEN", default=""
+)
+AUDIT_ATTESTATION_HTTP_TIMEOUT = env.float("AUDIT_ATTESTATION_HTTP_TIMEOUT", default=10)
 # Scoped requester/contact PII encryption is intentionally dormant by default.  These
 # values are read lazily by the encryption broker so a disabled installation needs no
 # key material or optional KMS dependency.

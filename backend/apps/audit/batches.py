@@ -232,6 +232,13 @@ def seal_scope(makerspace_id, signing_key):
 
 
 def run_audit_attestation():
+    # Every anchor setting is blank by default, so without this the scheduled job would
+    # raise on configured_sink() every five minutes -- and the beat-less runner records a
+    # swallowed failure as a successful run, which is worse than being noisy.
+    from django.conf import settings as _settings
+
+    if not getattr(_settings, "AUDIT_ATTESTATION_ANCHOR_BACKEND", ""):
+        return None
     """Seal all scopes on a primary; failures are logged for scheduled retry."""
     if not is_writable_primary():
         logger.info("audit_attestation_skipped_non_writable_primary")

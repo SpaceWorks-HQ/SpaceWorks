@@ -6,6 +6,7 @@ from django.db.models import Exists, OuterRef
 
 from apps.audit.anchors import AnchorError, anchors_match, configured_sink
 from apps.audit.batch_format import canonical_payload_bytes, genesis_entry
+from apps.audit.batch_format import scope_name
 from apps.audit.batch_verification import (
     AuditFailureClass,
     AuditIntegrityFailure,
@@ -250,6 +251,29 @@ def _verify_batches(key, sink):
             )
         previous_root = bytes(batch.merkle_root)
         expected_seq += 1
+
+    # The local chain being contiguous proves nothing about its TAIL: an attacker who can
+    # bypass the triggers can delete the newest batch and its leaves and leave a perfectly
+    # consistent prefix. The anchor is the only witness that the batch existed, so ask it.
+    scope_label = scope_name(key.makerspace_id)
+    try:
+        orphan = sink.fetch(
+            (deployment_identity(), scope_label, key.fingerprint, expected_seq)
+        )
+    except AnchorError:
+        return AuditIntegrityFailure(
+            AuditFailureClass.ANCHOR_UNAVAILABLE,
+            "The anchor could not be read, so the local tail cannot be trusted.",
+            key.makerspace_id,
+            expected_seq,
+        )
+    if orphan is not None:
+        return AuditIntegrityFailure(
+            AuditFailureClass.BATCH_MISSING,
+            "An anchored batch is absent locally, so local batches were removed.",
+            key.makerspace_id,
+            expected_seq,
+        )
     return None
 
 

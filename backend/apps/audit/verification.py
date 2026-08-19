@@ -102,7 +102,9 @@ def classify_audit_row(row, *, cutover_cache=None, verify_batch=True) -> AuditMa
         return AuditMacStatus.MISMATCH
     if not hmac.compare_digest(bytes(row.row_mac), expected):
         return AuditMacStatus.MISMATCH
-    if batch is not None:
+    if batch is not None and verify_batch:
+        # A scope's first batch can hold its entire history, so re-verifying it per row
+        # makes a full scan quadratic. verify_audit_log checks batches once, separately.
         from apps.audit.batch_verification import verify_batch_local
 
         if verify_batch_local(batch) is not None:
