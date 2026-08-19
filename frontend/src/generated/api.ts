@@ -35,6 +35,7 @@ export const openApiTags = [
   "Device auth",
   "Email logs",
   "Email templates",
+  "Events",
   "Health",
   "Integration health",
   "Internal",
@@ -292,6 +293,7 @@ export const openApiPaths = [
   "/api/v1/admin/memberships/{id}/unverify",
   "/api/v1/admin/memberships/{id}/verify",
   "/api/v1/admin/memberships/{id}/waiver/witness",
+  "/api/v1/admin/organized-events/",
   "/api/v1/admin/platform/backup-settings",
   "/api/v1/admin/platform/backups",
   "/api/v1/admin/platform/email-settings",
@@ -1055,6 +1057,7 @@ export type CollaborativeEvent = {
   "host_name": string;
   "host_slug": string;
   "host_waiver": HostWaiver | null;
+  "organizers": Array<EventOrganizerSummary>;
 };
 
 export type CollaborativeEventRegistrationInput = {
@@ -1483,6 +1486,7 @@ export type EventAdmin = {
   "created_at": string;
   "updated_at": string;
   "registration_counts": EventRegistrationCounts;
+  "organizers": Array<EventOrganizerSummary>;
 };
 
 export type EventAdminStatusEnum = "draft" | "published" | "cancelled" | "completed";
@@ -1506,6 +1510,7 @@ export type EventAttendanceRow = {
   "cancelled": number;
   "attended": number;
   "attendance_rate_percent": number | null;
+  "organizers": string;
 };
 
 export type EventCheckInResolveRequest = {
@@ -1566,6 +1571,11 @@ export type EventListResponse = {
   "next"?: string | null;
   "previous"?: string | null;
   "results": Array<EventAdmin>;
+};
+
+export type EventOrganizerSummary = {
+  "slug": string;
+  "name": string;
 };
 
 export type EventRegistrationAdmin = {
@@ -4063,6 +4073,7 @@ export type PublicEvent = {
   "availability": AvailabilityEnum;
   "image_url": string | null;
   "status": PublicEventStatusEnum;
+  "organizers": Array<EventOrganizerSummary>;
 };
 
 export type PublicEventRegistrationInput = {

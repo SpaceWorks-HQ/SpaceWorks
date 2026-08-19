@@ -20289,6 +20289,33 @@
                 }
             }
         },
+        "/api/v1/admin/organized-events/": {
+            "get": {
+                "operationId": "api_v1_admin_organized_events_retrieve",
+                "description": "List the events this actor's organizations organize, across venues.\n\nOrganizer authority is deliberately per-event and grants nothing over the venue, so an\norganizer at a venue their organization is not linked to cannot use the venue's event\nlist -- which left the per-event endpoints reachable only by someone who already knew a\ndatabase id. This is the discoverable surface for that authority: it lists exactly the\nevents the organizer predicate matches and confers no venue authority whatsoever.",
+                "summary": "List events organized by the actor's organizations",
+                "tags": [
+                    "Events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EventListResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/admin/platform/backup-settings": {
             "get": {
                 "operationId": "api_v1_admin_platform_backup_settings_retrieve",
@@ -35491,6 +35518,13 @@
                         ],
                         "nullable": true,
                         "readOnly": true
+                    },
+                    "organizers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/EventOrganizerSummary"
+                        },
+                        "readOnly": true
                     }
                 },
                 "required": [
@@ -35506,6 +35540,7 @@
                     "image_url",
                     "location",
                     "location_kind",
+                    "organizers",
                     "starts_at",
                     "title"
                 ]
@@ -37158,6 +37193,13 @@
                             }
                         ],
                         "readOnly": true
+                    },
+                    "organizers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/EventOrganizerSummary"
+                        },
+                        "readOnly": true
                     }
                 },
                 "required": [
@@ -37173,6 +37215,7 @@
                     "location",
                     "location_kind",
                     "makerspace_id",
+                    "organizers",
                     "payment_amount",
                     "registration_counts",
                     "starts_at",
@@ -37257,6 +37300,9 @@
                         "type": "number",
                         "format": "double",
                         "nullable": true
+                    },
+                    "organizers": {
+                        "type": "string"
                     }
                 },
                 "required": [
@@ -37266,6 +37312,7 @@
                     "capacity",
                     "confirmed",
                     "event_id",
+                    "organizers",
                     "registered",
                     "registrations",
                     "starts_at",
@@ -37521,6 +37568,24 @@
                 "required": [
                     "count",
                     "results"
+                ]
+            },
+            "EventOrganizerSummary": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "name",
+                    "slug"
                 ]
             },
             "EventRegistrationAdmin": {
@@ -47642,6 +47707,13 @@
                             }
                         ],
                         "readOnly": true
+                    },
+                    "organizers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/EventOrganizerSummary"
+                        },
+                        "readOnly": true
                     }
                 },
                 "required": [
@@ -47653,6 +47725,7 @@
                     "image_url",
                     "location",
                     "location_kind",
+                    "organizers",
                     "public_token",
                     "starts_at",
                     "status",
