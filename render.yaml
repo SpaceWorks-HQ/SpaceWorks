@@ -10,6 +10,13 @@ envVarGroups:
         sync: false
       - key: API_CLIENT_ENC_KEY
         sync: false
+      # Audit row-MAC attestation. Blank is a valid state and leaves rows honestly
+      # unattested; set it to enable. The anchoring settings (AUDIT_ATTESTATION_*) are
+      # added per deployment when an off-box anchor is actually configured, since an
+      # anchor stored with this deployment's own credentials proves nothing against
+      # someone who holds them.
+      - key: AUDIT_MAC_MASTER_KEY
+        sync: false
       - key: DEBUG
         value: "False"
       - key: ALLOWED_HOSTS
