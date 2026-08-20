@@ -41,7 +41,7 @@ def _verify_rotation_chain(keys, sink):
             or new_key.valid_from_seq != rotation.last_old_batch_seq + 1
         ):
             return _failure(keys, "A transition does not join adjacent key intervals.")
-        states = list(rotation.events.order_by("created_at", "pk").values_list("state", flat=True))
+        states = list(rotation.events.order_by("pk").values_list("state", flat=True))
         if states != ["PREPARED", "PUBLISHED", "FINALIZED"]:
             return _failure(keys, "A transition has no complete append-only state history.")
         expected_root = _root_at(rotation.makerspace_id, rotation.last_old_batch_seq)

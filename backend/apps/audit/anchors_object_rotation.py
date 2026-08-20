@@ -52,6 +52,7 @@ class ObjectStorageRotationMixin:
         if signer is None:
             return sequence, signer, root
         prefix = self._scope_directory(deployment_id, scope) + "/transitions/"
+        transitions = {}
         try:
             paginator = self._client().get_paginator("list_objects_v2")
             for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
@@ -61,12 +62,33 @@ class ObjectStorageRotationMixin:
                     if not separator or not seq_text.isdigit() or int(seq_text) != sequence:
                         continue
                     old_signer, separator, new_signer = fingerprints.partition("-")
-                    if separator and old_signer == signer:
-                        identity = (deployment_id, scope, old_signer, new_signer, sequence)
-                        if self.fetch_rotation(identity) is not None:
-                            signer = new_signer
+                    if not separator:
+                        continue
+                    identity = (deployment_id, scope, old_signer, new_signer, sequence)
+                    transition = self.fetch_rotation(identity)
+                    if transition is None:
+                        continue
+                    transition_root = bytes.fromhex(
+                        transition["payload"]["last_old_batch_root"]
+                    )
+                    if not hmac.compare_digest(transition_root, root):
+                        raise AnchorConflict(
+                            "A key transition does not bind the scope-global root."
+                        )
+                    existing = transitions.get(old_signer)
+                    if existing is not None and existing != new_signer:
+                        raise AnchorConflict(
+                            "The scope-global transition history forks."
+                        )
+                    transitions[old_signer] = new_signer
         except (BotoCoreError, ClientError) as exc:
             raise AnchorError("The scope-global transition head could not be read.") from exc
+        visited = set()
+        while signer in transitions:
+            if signer in visited:
+                raise AnchorConflict("The scope-global transition history cycles.")
+            visited.add(signer)
+            signer = transitions[signer]
         return sequence, signer, root
 
     def fetch_scope_head(self, deployment_id, scope):
@@ -102,7 +124,9 @@ class ObjectStorageRotationMixin:
             if not anchors_match(existing, envelope):
                 raise AnchorConflict("This key transition already has other content.")
             return existing
-        head_seq, head_signer, head_root = self._scope_batch_head(identity[0], identity[1])
+        # A sequence may carry several key handovers before the next batch. Resolve
+        # those immutable transitions first so the signer, not just the batch, is current.
+        head_seq, head_signer, head_root = self._scope_head(identity[0], identity[1])
         expected_root = bytes.fromhex(envelope["payload"]["last_old_batch_root"])
         if (
             head_seq != identity[4]

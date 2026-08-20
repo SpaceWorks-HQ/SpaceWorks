@@ -144,6 +144,7 @@ AUDIT_META_REFERENCES = {
 }
 
 _SOURCE_LOCAL_EDGES = {
+    ("audit.signing_key_rotation_aborted", "rotation_id"),
     ("audit.signing_key_rotation_started", "rotation_id"),
     ("audit.signing_key_rotation_completed", "rotation_id"),
     ("audit.signing_key_rotation_failed", "rotation_id"),

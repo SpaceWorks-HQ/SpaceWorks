@@ -8,13 +8,15 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.audit import services as audit
-from apps.audit.anchors import configured_sink
-from apps.audit.models import AuditSigningKey
+from apps.audit.anchors import AnchorConflict, configured_sink
+from apps.audit.models import AuditSigningKey, AuditSigningKeyRotation
 from apps.audit.rotations import (
+    abort_rotation,
     finalize_rotation,
     latest_rotation_state,
     prepare_rotation,
     publish_rotation,
+    rotation_audit_meta,
     scope_head,
 )
 from apps.makerspaces.models import Makerspace
@@ -36,6 +38,7 @@ class Command(BaseCommand):
         mode = parser.add_mutually_exclusive_group(required=True)
         mode.add_argument("--dry-run", action="store_true")
         mode.add_argument("--execute", action="store_true")
+        mode.add_argument("--abort-pending", action="store_true")
         parser.add_argument("--expected-current-fingerprint")
         parser.add_argument("--expected-head-seq", type=int)
         parser.add_argument("--expected-head-root")
@@ -65,32 +68,23 @@ class Command(BaseCommand):
                 ),
             }, sort_keys=True))
             return
+        if options["abort_pending"]:
+            self._abort_pending(key, actor)
+            return
         fingerprint, expected_seq, expected_root = self._expectations(options)
         rotation = None
+        sink = None
         try:
             sink = configured_sink()
-            rotation, created = prepare_rotation(
+            rotation, _created = prepare_rotation(
                 makerspace_id,
+                actor=actor,
                 expected_fingerprint=fingerprint,
                 expected_head_seq=expected_seq,
                 expected_head_root=expected_root,
             )
-            meta = self._meta(rotation)
-            if created:
-                audit.record(
-                    actor,
-                    "audit.signing_key_rotation_started",
-                    makerspace=rotation.makerspace,
-                    meta=meta,
-                )
             publish_rotation(rotation, sink)
-            finalize_rotation(rotation, sink)
-            audit.record(
-                actor,
-                "audit.signing_key_rotation_completed",
-                makerspace=rotation.makerspace,
-                meta=meta,
-            )
+            finalize_rotation(rotation, sink, actor=actor)
         except Exception as exc:  # noqa: BLE001 - operator gets one typed command error
             logger.exception(
                 "audit_signing_key_rotation_failed",
@@ -99,12 +93,27 @@ class Command(BaseCommand):
                     "rotation_id": str(rotation.pk) if rotation is not None else None,
                 },
             )
+            if (
+                rotation is not None
+                and sink is not None
+                and isinstance(exc, AnchorConflict)
+                and latest_rotation_state(rotation) == "PREPARED"
+            ):
+                try:
+                    abort_rotation(
+                        rotation, sink, actor=actor, record_failure=True
+                    )
+                except Exception:  # noqa: BLE001 - fail closed for roll-forward
+                    logger.exception(
+                        "audit_signing_key_rotation_automatic_abort_refused",
+                        extra={"rotation_id": str(rotation.pk)},
+                    )
             if rotation is not None and latest_rotation_state(rotation) not in TERMINAL_STATES:
                 audit.record(
                     actor,
                     "audit.signing_key_rotation_failed",
                     makerspace=rotation.makerspace,
-                    meta=self._meta(rotation),
+                    meta=rotation_audit_meta(rotation),
                 )
             raise CommandError(str(exc)) from exc
         self.stdout.write(self.style.SUCCESS(
@@ -133,14 +142,20 @@ class Command(BaseCommand):
             raise CommandError("--expected-head-root must be 64 hex characters.")
         return fingerprint.lower(), sequence, bytes.fromhex(root)
 
-    @staticmethod
-    def _meta(rotation):
-        return {
-            "rotation_id": str(rotation.pk),
-            "old_fingerprint": rotation.old_fingerprint,
-            "new_fingerprint": rotation.new_fingerprint,
-            "old_version": rotation.old_version,
-            "new_version": rotation.new_version,
-            "last_old_batch_seq": rotation.last_old_batch_seq,
-            "last_old_batch_root": bytes(rotation.last_old_batch_root).hex(),
-        }
+    def _abort_pending(self, key, actor):
+        if key.pending_rotation_id is None:
+            raise CommandError("The scope has no pending audit signing-key rotation.")
+        rotation = AuditSigningKeyRotation.objects.select_related(
+            "makerspace", "old_key", "new_key"
+        ).get(pk=key.pending_rotation_id)
+        try:
+            abort_rotation(rotation, configured_sink(), actor=actor)
+        except Exception as exc:  # noqa: BLE001 - operator gets one typed command error
+            logger.exception(
+                "audit_signing_key_rotation_operator_abort_failed",
+                extra={"rotation_id": str(rotation.pk)},
+            )
+            raise CommandError(str(exc)) from exc
+        self.stdout.write(self.style.SUCCESS(
+            f"Aborted pending audit signing-key rotation {rotation.pk}."
+        ))

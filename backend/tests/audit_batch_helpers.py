@@ -52,18 +52,11 @@ class MemoryAnchorSink:
             heads = [key[3] for key in self.anchors if key[:3] == identity[:3]]
         latest = max(heads, default=-1)
         if protocol == 2 and heads:
-            latest_signers = {
-                key[2] for key in self.anchors
-                if key[:2] == identity[:2] and key[3] == latest
-            }
-            if identity[2] not in latest_signers:
-                transition = next((item for item in self.rotations if (
-                    item[0] == identity[0] and item[1] == identity[1]
-                    and item[2] in latest_signers and item[3] == identity[2]
-                    and item[4] == latest
-                )), None)
-                if transition is None:
-                    raise AnchorConflict("missing cross-key transition")
+            _seq, current_signer, _root = self.fetch_scope_head(
+                identity[0], identity[1]
+            )
+            if current_signer != identity[2]:
+                raise AnchorConflict("missing cross-key transition")
         if identity[3] != latest + 1:
             raise AnchorConflict("regressing or gapped sequence")
         stored = {**envelope, "anchored_at": timezone.now().isoformat()}
@@ -87,16 +80,14 @@ class MemoryAnchorSink:
             if not anchors_match(existing, envelope):
                 raise AnchorConflict("conflicting transition")
             return existing
-        heads = [key for key in self.anchors if key[:2] == identity[:2]]
-        if not heads:
+        head_seq, head_signer, head_root = self.fetch_scope_head(
+            identity[0], identity[1]
+        )
+        if head_signer is None:
             raise AnchorConflict("scope has no anchor head")
-        head_seq = max(key[3] for key in heads)
-        head_signers = {key[2] for key in heads if key[3] == head_seq}
-        if head_seq != identity[4] or identity[2] not in head_signers:
+        if head_seq != identity[4] or head_signer != identity[2]:
             raise AnchorConflict("transition does not bind scope head")
-        head = self.anchors[(identity[0], identity[1], identity[2], head_seq)]
-        root = head["payload"].get("merkle_root", "00" * 32)
-        if root != envelope["payload"]["last_old_batch_root"]:
+        if head_root.hex() != envelope["payload"]["last_old_batch_root"]:
             raise AnchorConflict("transition root differs from scope head")
         stored = {**envelope, "anchored_at": timezone.now().isoformat()}
         self.rotations[identity] = stored
@@ -111,9 +102,17 @@ class MemoryAnchorSink:
         signer = head[2]
         envelope = self.anchors[head]
         root = bytes.fromhex(envelope["payload"].get("merkle_root", "00" * 32))
-        for identity in self.rotations:
-            if identity[:2] == (deployment_id, scope) and identity[2] == signer and identity[4] == sequence:
-                signer = identity[3]
+        transitions = {
+            identity[2]: identity[3]
+            for identity in self.rotations
+            if identity[:2] == (deployment_id, scope) and identity[4] == sequence
+        }
+        visited = set()
+        while signer in transitions:
+            if signer in visited:
+                raise AnchorConflict("cyclic transition history")
+            visited.add(signer)
+            signer = transitions[signer]
         return sequence, signer, root
 
 
