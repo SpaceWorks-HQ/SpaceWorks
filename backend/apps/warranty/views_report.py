@@ -6,7 +6,7 @@ from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.response import Response
 from rest_framework.utils.urls import replace_query_param
 from rest_framework.views import APIView
@@ -68,13 +68,19 @@ class MakerspaceWarrantyReportView(APIView):
     )
     def get(self, request, makerspace_id, *args, **kwargs):
         makerspace = get_object_or_404(
-            rbac.scope_by_makerspace(
+            rbac.scope_by_visibility_or_action(
                 request.user,
+                rbac.Action.EDIT_INVENTORY,
                 servable_queryset(),
-                "id",
+                field="id",
             ),
             pk=makerspace_id,
         )
+        if not (
+            rbac.can(request.user, rbac.Action.EDIT_INVENTORY, makerspace.id)
+            or machine_access.can_see_machines(request.user, makerspace.id)
+        ):
+            raise PermissionDenied()
         query = WarrantyReportQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         filters = query.validated_data

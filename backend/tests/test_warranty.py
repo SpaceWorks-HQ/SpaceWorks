@@ -645,8 +645,7 @@ def test_warranty_report_gates_rows_by_host_action_and_makerspace_scope():
     space = authenticated_client(space_manager).get(url)
     cross_tenant = authenticated_client(space_manager).get(other_url)
 
-    assert guest.status_code == 200
-    assert response_rows(guest) == []
+    assert guest.status_code == 403
     assert inventory.status_code == 200
     inventory_rows = response_rows(inventory)
     assert [row["host_kind"] for row in inventory_rows] == ["asset", "asset"]

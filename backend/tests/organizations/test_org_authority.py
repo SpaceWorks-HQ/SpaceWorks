@@ -173,18 +173,21 @@ def test_invalid_or_inactive_org_membership_data_confers_nothing():
             assert rbac.makerspaces_for_action(user, action) == set()
 
 
-def test_org_grants_expand_implied_actions():
+def test_org_manage_machines_is_filtered_before_implied_actions_expand():
     user = make_user("org-machine-manager")
     makerspace = make_makerspace("org-machine-space")
     organization = make_organization("org-machine-authority")
     link(organization, makerspace, OrganizationMakerspace.Relationship.MANAGER)
     grant(organization, user, [rbac.Action.MANAGE_MACHINES])
 
-    assert rbac.can(user, rbac.Action.MANAGE_PRINTING, makerspace.id)
-    assert rbac.Action.MANAGE_PRINTING in rbac.effective_actions(user, makerspace.id)
-    assert rbac.makerspaces_for_action(
-        user, rbac.Action.MANAGE_PRINTING
-    ) == {makerspace.id}
+    for action in (
+        rbac.Action.MANAGE_MACHINES,
+        rbac.Action.MANAGE_PRINTING,
+        rbac.Action.COLLECT_SERVICE_REQUEST,
+    ):
+        assert not rbac.can(user, action, makerspace.id)
+        assert action not in rbac.effective_actions(user, makerspace.id)
+        assert rbac.makerspaces_for_action(user, action) == set()
 
 
 def test_admin_form_rejects_actions_rbac_would_silently_drop():
@@ -244,31 +247,6 @@ def test_org_grant_never_reaches_a_hard_hidden_makerspace():
     # exclusion is narrow rather than a blanket disabling of org authority.
     assert visible.id in scope
     assert rbac.can(user, rbac.Action.EDIT_INVENTORY, visible.id)
-
-
-def test_admin_form_refuses_manage_machines():
-    """Refuse an action that rbac would report as effective but that cannot work.
-
-    machines.role_scope.manage_scope_for() derives machine reach from a local
-    MakerspaceMembership role, so an organization-only actor resolves to NOTHING
-    and every machine list stays empty while `can()` says yes.
-    """
-    from apps.organizations.admin import OrganizationMembershipForm
-
-    organization = make_organization("machine-scope-org")
-    user = make_user("machine-scope-user")
-
-    form = OrganizationMembershipForm(
-        data={
-            "organization": organization.pk,
-            "user": user.pk,
-            "status": "active",
-            "granted_actions": [rbac.Action.MANAGE_MACHINES],
-        }
-    )
-
-    assert not form.is_valid()
-    assert "granted_actions" in form.errors
 
 
 def test_deleting_an_org_membership_is_audited():

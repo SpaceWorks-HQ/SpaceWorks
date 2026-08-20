@@ -90,7 +90,10 @@ def organization_makerspace_entries(user, *, makerspace_ids=None):
         actions = rbac.expand_implied_actions({
             action
             for action in value
-            if isinstance(action, str) and action in rbac.ROLE_GRANTABLE_ACTIONS
+            if (
+                isinstance(action, str)
+                and action in rbac.ORGANIZATION_GRANTABLE_ACTIONS
+            )
         })
         if not actions:
             continue

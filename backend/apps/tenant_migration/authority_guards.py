@@ -1,10 +1,10 @@
 """Conservative authorization-input drift guard for portable tenant imports.
 
 The mechanical part scans attribute access, ORM lookup names, ``getattr`` field names,
-and ``values_list``/``only`` field strings in ``accounts/rbac.py`` and
-``machines/access.py``.  It then intersects those names with a reviewed set of exported
-authorization models.  The explicit declarations also cover authority/disclosure inputs
-identified by the migration threat model.
+and ``values_list``/``only`` field strings in the ``accounts/rbac*.py`` implementation
+modules and ``machines/access.py``. It then intersects those names with a reviewed set of
+exported authorization models. The explicit declarations also cover
+authority/disclosure inputs identified by the migration threat model.
 
 This cannot see authorization assembled dynamically, raw SQL, fields consulted only in
 other modules, semantic changes to a declared field, or a new authorization module.  It
@@ -31,6 +31,10 @@ class AuthorityRegistryError(AssertionError):
 APPS_DIR = Path(project_apps.__file__).resolve().parent
 AUTHORIZATION_SOURCES = (
     APPS_DIR / "accounts" / "rbac.py",
+    APPS_DIR / "accounts" / "rbac_actions.py",
+    APPS_DIR / "accounts" / "rbac_memberships.py",
+    APPS_DIR / "accounts" / "rbac_organizations.py",
+    APPS_DIR / "accounts" / "rbac_superadmin.py",
     APPS_DIR / "machines" / "access.py",
 )
 SCANNED_MODEL_LABELS = frozenset({
