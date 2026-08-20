@@ -144,9 +144,18 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   classes/functions into domain submodules (`views_*`, `serializers_*`, `admin_*`, `services_*`) and keep
   the original file as a **thin re-export barrel** (explicit `from .submodule import (...)`, never
   `import *`) so `from app.views import X` and `views.X` keep resolving; for `admin.py` the barrel must
-  still import the admin submodules so the `@admin.register` side effects fire. Every backend code file is
-  within the ceiling **except `backend/config/settings.py`** (accepted exception — Django settings are
-  conventionally a single file).
+  still import the admin submodules so the `@admin.register` side effects fire. **The ceiling is enforced
+  on what you touch, and it is NOT currently met repo-wide: 37 backend files exceed 300 lines** — largest
+  first, `config/settings.py` (929, the accepted exception — Django settings are conventionally a single
+  file), `admin_api/urls.py` (825), `makerspaces/models.py` (682), `accounts/rbac.py` (609),
+  `inventory/availability.py` (596), `admin_api/serializers_makerspaces.py` (561),
+  `makerspaces/module_registry.py` (503), `machines/role_scope.py` (489). Measured 2026-08-20; an earlier
+  version of this line claimed every file but `settings.py` was compliant, which was false by 36 files.
+  **Split an over-ceiling file in its own commit before adding to it**, and when splitting one that other
+  modules import from, check for guards pinned to its path: `tests/makerspaces/test_tenant_servability_guard.py`
+  pins two function *bodies* to `accounts/rbac.py` by `(path, function)`, and
+  `tenant_migration/authority_guards.py` pins whole *files* via `AUTHORIZATION_SOURCES` — the latter goes
+  silently blind rather than failing if you move code out from under it.
 - **Production-level code, not prototype code.** Validate all inputs at the boundary, handle external-service
   failure explicitly (especially outbound integrations — Stripe, Telegram, SMTP, object storage — fail safe,
   never crash a request flow), use structured logging, return consistent typed error responses, and never
