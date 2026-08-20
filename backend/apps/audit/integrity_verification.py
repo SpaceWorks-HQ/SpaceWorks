@@ -27,7 +27,9 @@ def verify_audit_integrity(*, sink=None):
     ).distinct()
     for makerspace_id in scope_ids:
         keys = list(
-            AuditSigningKey.objects.filter(makerspace_id=makerspace_id).order_by("version")
+            AuditSigningKey.objects.filter(makerspace_id=makerspace_id)
+            .exclude(rotation_to__events__state="ABORTED")
+            .order_by("version")
         )
         # Genesis is verified once; rotations extend it, and batches are traversed once
         # with the signer selected from the interval that authorizes that sequence.

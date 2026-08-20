@@ -20,6 +20,7 @@ def _verify_batches(makerspace_id, sink):
     keys = {
         key.fingerprint: key
         for key in AuditSigningKey.objects.filter(makerspace_id=makerspace_id)
+        .exclude(rotation_to__events__state="ABORTED")
     }
     batches = AuditBatch.objects.filter(makerspace_id=makerspace_id).order_by(
         "batch_seq"

@@ -84,7 +84,7 @@ def validate_rotation_envelope(envelope, expected_identity=None):
             fingerprint_public_key(old_public) != payload["old_fingerprint"]
             or fingerprint_public_key(new_public) != payload["new_fingerprint"]
             or payload["new_public_key"] != envelope["new_public_key"]
-            or int(payload["new_version"]) != int(payload["old_version"]) + 1
+            or int(payload["new_version"]) <= int(payload["old_version"])
             or int(payload["last_old_batch_seq"]) < 0
             or len(bytes.fromhex(payload["last_old_batch_root"])) != 32
         ):

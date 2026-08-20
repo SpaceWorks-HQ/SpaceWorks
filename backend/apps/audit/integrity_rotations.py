@@ -14,6 +14,14 @@ from apps.audit.rotations import (
 
 
 def _verify_rotation_chain(keys, sink):
+    # An aborted candidate is attempt evidence, not an interval in the authority chain.
+    aborted_candidate_ids = set(
+        AuditSigningKeyRotation.objects.filter(
+            makerspace_id=keys[0].makerspace_id if keys else None,
+            events__state="ABORTED",
+        ).values_list("new_key_id", flat=True)
+    )
+    keys = [key for key in keys if key.pk not in aborted_candidate_ids]
     if not keys or keys[0].version != 1 or keys[0].valid_from_seq != 0:
         return _failure(keys, "The signing-key chain has no version-1 genesis interval.")
     active = [key for key in keys if key.is_active]
@@ -26,7 +34,8 @@ def _verify_rotation_chain(keys, sink):
         return _failure(keys, "A retired interval still has an open end or live wrapped key.")
     rotations = list(
         AuditSigningKeyRotation.objects.filter(
-            makerspace_id=keys[0].makerspace_id
+            makerspace_id=keys[0].makerspace_id,
+            events__state="FINALIZED",
         ).select_related("old_key", "new_key").order_by("old_version")
     )
     if len(rotations) != len(keys) - 1:
@@ -36,7 +45,7 @@ def _verify_rotation_chain(keys, sink):
         if (
             rotation.old_key_id != old_key.pk
             or rotation.new_key_id != new_key.pk
-            or new_key.version != old_key.version + 1
+            or new_key.version <= old_key.version
             or old_key.valid_to_seq != rotation.last_old_batch_seq
             or new_key.valid_from_seq != rotation.last_old_batch_seq + 1
         ):

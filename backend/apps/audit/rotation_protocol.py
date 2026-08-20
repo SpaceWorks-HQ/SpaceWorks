@@ -79,7 +79,7 @@ def validate_rotation(rotation):
         or rotation.new_fingerprint != new_key.fingerprint
         or rotation.old_version != old_key.version
         or rotation.new_version != new_key.version
-        or new_key.version != old_key.version + 1
+        or new_key.version <= old_key.version
         or new_key.valid_from_seq != rotation.last_old_batch_seq + 1
     ):
         raise AuditSigningKeyRotationError("The rotation key binding is inconsistent.")

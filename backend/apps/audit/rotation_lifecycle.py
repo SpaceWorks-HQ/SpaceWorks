@@ -69,7 +69,15 @@ def prepare_rotation(
         private_key, public_key = generate_keypair()
         fingerprint = fingerprint_public_key(public_key)
         created_at = timezone.now()
-        version = old_key.version + 1
+        # Aborted candidates remain immutable evidence, so their version numbers are
+        # intentional gaps rather than reusable generation identities.
+        version = (
+            AuditSigningKey.objects.filter(makerspace_id=makerspace_id)
+            .order_by("-version")
+            .values_list("version", flat=True)
+            .first()
+            + 1
+        )
         activation = candidate_payload(
             makerspace_id, public_key, fingerprint, version, head_seq + 1, created_at
         )
@@ -216,7 +224,6 @@ def abort_rotation(rotation, sink, *, actor, record_failure=False):
     from apps.audit.batches import _scope_lock
 
     envelope = validate_rotation(rotation)
-    identity = sink.rotation_identity(envelope)
     with transaction.atomic():
         _scope_lock(rotation.makerspace_id)
         old_key = AuditSigningKey.objects.select_for_update().get(pk=rotation.old_key_id)
@@ -225,17 +232,31 @@ def abort_rotation(rotation, sink, *, actor, record_failure=False):
             raise AuditSigningKeyRotationError(
                 "Only a PREPARED signing-key rotation can be aborted."
             )
-        # The external check is inside the same scope lock used by publish_rotation.
-        # If publication won or its outcome is unreadable, fail closed and roll forward.
-        if sink.fetch_rotation(identity) is not None:
+        # This full-head check shares publish_rotation's scope lock. An exact-identity
+        # lookup misses a competing transition or a batch appended outside this gate.
+        payload = envelope["payload"]
+        external_seq, external_fingerprint, external_root = sink.fetch_scope_head(
+            payload["deployment_id"], payload["scope"]
+        )
+        if (
+            external_seq != rotation.last_old_batch_seq
+            or external_fingerprint != rotation.old_fingerprint
+            or external_root is None
+            or not hmac.compare_digest(
+                bytes(external_root), bytes(rotation.last_old_batch_root)
+            )
+        ):
             raise AuditSigningKeyRotationError(
-                "An externally published signing-key rotation cannot be aborted."
+                "The external scope head diverged; the rotation must be rolled forward."
             )
         if not old_key.is_active or old_key.pending_rotation_id != rotation.pk:
             raise AuditSigningKeyRotationError("The pending rotation claim changed.")
         AuditSigningKeyRotationEvent.objects.create(
             rotation=rotation,
             state=AuditSigningKeyRotationEvent.State.ABORTED,
+        )
+        AuditSigningKey.objects.filter(pk=rotation.new_key_id).update(
+            wrapped_private_key=None
         )
         AuditSigningKey.objects.filter(pk=old_key.pk).update(pending_rotation=None)
         meta = rotation_audit_meta(rotation)

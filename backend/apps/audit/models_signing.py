@@ -113,7 +113,7 @@ class AuditSigningKey(models.Model):
 
 
 class AuditSigningKeyRotation(models.Model):
-    """Immutable dual-signed transition between adjacent signing-key generations."""
+    """Immutable dual-signed attempt between increasing key generations."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     makerspace = models.ForeignKey(
@@ -123,8 +123,8 @@ class AuditSigningKeyRotation(models.Model):
         on_delete=models.PROTECT,
         related_name="audit_signing_key_rotations",
     )
-    old_key = models.OneToOneField(
-        AuditSigningKey, on_delete=models.PROTECT, related_name="rotation_from"
+    old_key = models.ForeignKey(
+        AuditSigningKey, on_delete=models.PROTECT, related_name="rotations_from"
     )
     new_key = models.OneToOneField(
         AuditSigningKey, on_delete=models.PROTECT, related_name="rotation_to"
@@ -162,8 +162,8 @@ class AuditSigningKeyRotation(models.Model):
                 name="ck_audit_rotation_new_signature_64_bytes",
             ),
             models.CheckConstraint(
-                condition=models.Q(new_version=models.F("old_version") + 1),
-                name="ck_audit_rotation_adjacent_versions",
+                condition=models.Q(new_version__gt=models.F("old_version")),
+                name="ck_audit_rotation_increasing_versions",
             ),
         ]
 
