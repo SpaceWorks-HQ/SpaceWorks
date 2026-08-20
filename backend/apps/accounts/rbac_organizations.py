@@ -5,7 +5,7 @@ import logging
 from django.db.models import Q
 
 from .rbac_actions import (
-    ROLE_GRANTABLE_ACTIONS,
+    ORGANIZATION_GRANTABLE_ACTIONS,
     actions_for_organization_membership,
     actions_satisfying,
     expand_implied_actions,
@@ -38,7 +38,7 @@ def has_any_org_authority(actor) -> bool:
     if actor is None or not getattr(actor, "is_authenticated", False):
         return False
     granted_filter = Q()
-    for action in ROLE_GRANTABLE_ACTIONS:
+    for action in ORGANIZATION_GRANTABLE_ACTIONS:
         granted_filter |= Q(granted_actions__contains=[action])
     return _organization_authority_memberships(actor).filter(
         granted_filter
@@ -72,7 +72,7 @@ def _org_scope_for_action(actor, action) -> set:
     """Return makerspace ids where an active organization grant satisfies action."""
     if actor is None or not getattr(actor, "is_authenticated", False):
         return set()
-    satisfying = actions_satisfying(action) & ROLE_GRANTABLE_ACTIONS
+    satisfying = actions_satisfying(action) & ORGANIZATION_GRANTABLE_ACTIONS
     if not satisfying:
         return set()
     granted_filter = Q()
@@ -98,7 +98,7 @@ def _org_scope_for_action(actor, action) -> set:
             for granted_action in value
             if (
                 isinstance(granted_action, str)
-                and granted_action in ROLE_GRANTABLE_ACTIONS
+                and granted_action in ORGANIZATION_GRANTABLE_ACTIONS
             )
         })
         if action in expanded:

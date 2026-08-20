@@ -74,10 +74,11 @@ class IntegrationHealthView(APIView):
 
     def get(self, request, makerspace_id, *args, **kwargs):
         makerspace = get_object_or_404(
-            rbac.scope_by_makerspace(
+            rbac.scope_by_visibility_or_action(
                 request.user,
+                rbac.Action.MANAGE_MAKERSPACE,
                 servable_queryset(),
-                makerspace_field="id",
+                field="id",
             ),
             pk=makerspace_id,
         )

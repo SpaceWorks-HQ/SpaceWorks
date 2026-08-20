@@ -62,6 +62,28 @@ def role_grants_directly(actor, makerspace_id, action):
     return action in granted
 
 
+def organization_grants_directly(actor, makerspace_id, action):
+    """Whether a usable organization membership stores ``action`` outright.
+
+    This is intentionally separate from machine/type-manager authority: callers must
+    opt into the narrow organization partition they can safely expose. The shared
+    organization vocabulary rejects ``MANAGE_MACHINES`` before any implication is
+    expanded, and the shared membership query supplies hard-hide/servability filtering.
+    """
+    if (
+        actor is None
+        or not getattr(actor, "is_authenticated", False)
+        or action not in rbac.ORGANIZATION_GRANTABLE_ACTIONS
+    ):
+        return False
+    values = rbac._organization_authority_memberships(
+        actor, makerspace_ids=[makerspace_id]
+    ).filter(granted_actions__contains=[action]).values_list(
+        "granted_actions", flat=True
+    )
+    return any(isinstance(value, list) and action in value for value in values)
+
+
 def makerspaces_granting_directly(actor, action):
     """Query-level twin of :func:`grants_directly`: ids, or ``rbac.ALL``."""
     if actor is None or not getattr(actor, "is_authenticated", False):

@@ -1373,6 +1373,14 @@ Load-bearing details that carried over unchanged:
     design, and `superadmin_hidden_block_applies` resolves through `actions_for_membership`,
     which **expands implied actions** — so `MANAGE_MACHINES` implying collect made the union fire
     for a role that never stored it. The role-only variant reads `granted_actions` directly.
+  - **Organization collection has its own direct-grant predicate and no machine arm.**
+    `organization_grants_directly` uses the filtered organization vocabulary and the centralized
+    hidden/servable organization-membership query, and is ORed only into the makerspace-wide
+    `COMPLETED` collection partition. It never participates in `grants_directly`, type-manager
+    authority, `_manage_queryset`, or service-file access. Thus a direct organization
+    `collect_service_request` grant can list/detail/collect finished jobs, while pending and
+    in-progress jobs and every lifecycle/file operation stay unavailable; organization
+    `manage_printing` likewise grants no machine or machine-type manager authority.
   - **`_machine_partition_q` resolves exemption with `role_scope.manage_scope_for`, NOT with
     `makerspaces_for_action(...) is rbac.ALL`.** Those disagree for exactly that same hidden-space
     superadmin, who still answers `ALL` at the action level — so the `ALL` shortcut (inherited from
@@ -1409,6 +1417,10 @@ Load-bearing details that carried over unchanged:
     machines' warranty rows; a mixed role also keeps asset rows, which machine scoping has nothing
     to say about. Maintenance schedules are always scoped, since a schedule names a machine and
     there is no non-machine remainder.
+  - **Organization-only authority deliberately does not open this dashboard or the notification
+    inbox.** Both remain rooted in local membership visibility: their mixed, makerspace-wide
+    projections have narrower parity than the action-specific surfaces converted for organization
+    reach. This exclusion is intentional, not a missed `scope_by_visibility_or_action` conversion.
 - **The hardware `requests` tab is hidden when `canSeeHardware` is false.** It previously also
   passed for `canSeePrinting`, so a machine-only role got a tab whose panel renders no hardware
   rows at all — only a pointer to Machines. Hardware API authorization is **untouched**; a
@@ -1901,8 +1913,11 @@ encoder always emits canonical output, so stored envelopes are unaffected.
   cross-space entity is incoherent. Always present, inert when unused.
 - **Org grants confer ACTIONS, never IDENTITY.** This is the distinction that makes the whole
   feature safe, and every part of it is load-bearing:
-  - `OrganizationMembership.granted_actions` is unioned into `rbac.makerspaces_for_action`,
-    `effective_actions` and `can` — and **nowhere else**.
+  - `OrganizationMembership.granted_actions` is resolved into
+    `rbac.makerspaces_for_action`, `effective_actions` and `can`; those are the canonical
+    effective-action paths. The auth payload and locked role-service revalidation mirror that
+    same filtered resolver, while completed-job collection alone inspects a direct organization
+    grant for its deliberately narrower partition. None of these turns the grant into identity.
   - `_membership_for`, `membership_role`, `is_space_manager_identity` and `_membership_is_space_manager`
     stay membership-only, so an org admin holding `manage_inventory` across the org's spaces becomes a
     Space Manager nowhere.
@@ -1923,10 +1938,29 @@ encoder always emits canonical output, so stored envelopes are unaffected.
   exercise it by proxy. A real local membership in a hidden space still confers authority; an
   organization grant never does. Excluded in SQL inside `_organization_authority_memberships`, together
   with `servable_q`, so every present and future consumer inherits it.
-- **`manage_machines` cannot be granted through an organization.** `machines.role_scope.manage_scope_for`
-  derives machine reach from a local membership role and resolves an organization-only actor to
-  `NOTHING`, so the action would read as effective in rbac while every machine list stayed empty. The
-  admin form refuses it rather than granting something inert.
+- **`manage_machines` cannot be granted through an organization, at the RBAC layer.**
+  `ORGANIZATION_GRANTABLE_ACTIONS` is `ROLE_GRANTABLE_ACTIONS - {MANAGE_MACHINES}` and every
+  organization consumer filters through it **before** `expand_implied_actions`: `can`,
+  `effective_actions`, action query scopes, staff-authority discovery and auth-payload projection.
+  Therefore even a raw stored `["manage_machines"]` confers neither that action nor its implied
+  `manage_printing` / `collect_service_request`. The organization admin form still rejects it as a
+  second validation layer with an operator-facing error. `machines.role_scope.manage_scope_for`
+  remains local-membership-derived; direct organization `manage_printing` is not type-manager
+  authority.
+- **Action-specific organization reach preserves 404 vs 403.** Role management, machine-service
+  list/detail resolution, integration health, domain verification, asset warranty host/document
+  resolution, the mixed warranty report, and procurement machine-type options resolve the union of
+  local visibility and their explicitly accepted action scope. An unlinked or hidden/unservable
+  tenant remains 404 through `_organization_authority_memberships`; a visible local actor lacking
+  the action reaches the row and receives 403. The warranty report separately checks its accepted
+  union (`EDIT_INVENTORY` or machine-derived authority), so visible actors with neither do not get a
+  misleading 200/empty response. Dashboard and notification inbox remain deliberately
+  membership-only.
+- **Role mutations revalidate organization authority under locks.** After the makerspace and local
+  membership/role are locked, `role_services` locks the relevant organization link, organization,
+  and organization-membership rows and recomputes the filtered effective action set. Create,
+  grant validation, rename/update and delete therefore cannot pass the org-aware view and then fail
+  a local-only service check, nor race a concurrent organization authority change.
 - **Native device payloads stay membership-only.** `X-Makerspace-Id` selection requires
   `validate_native_makerspace_scope()` to find an active local membership, so an organization-only
   space in a device payload would be advertised to the app and rejected on every selected request.

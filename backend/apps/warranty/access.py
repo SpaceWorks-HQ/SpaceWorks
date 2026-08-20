@@ -12,8 +12,9 @@ from apps.warranty.models import Warranty, WarrantyDocument
 
 def resolve_asset_host(user, asset_pk):
     return get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_visibility_or_action(
             user,
+            rbac.Action.EDIT_INVENTORY,
             InventoryAsset.objects.select_related("makerspace"),
         ),
         pk=asset_pk,
@@ -33,10 +34,11 @@ def resolve_machine_host(user, machine_pk):
 
 def resolve_warranty(user, warranty_pk):
     return get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_visibility_or_action(
             user,
+            rbac.Action.EDIT_INVENTORY,
             Warranty.objects.select_related("makerspace", "asset", "machine"),
-            "makerspace_id",
+            field="makerspace_id",
         ),
         pk=warranty_pk,
     )
@@ -44,15 +46,16 @@ def resolve_warranty(user, warranty_pk):
 
 def resolve_document(user, doc_pk):
     return get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_visibility_or_action(
             user,
+            rbac.Action.EDIT_INVENTORY,
             WarrantyDocument.objects.select_related(
                 "warranty",
                 "warranty__asset",
                 "warranty__machine",
                 "warranty__machine__machine_type",
             ),
-            "warranty__makerspace_id",
+            field="warranty__makerspace_id",
         ),
         pk=doc_pk,
     )

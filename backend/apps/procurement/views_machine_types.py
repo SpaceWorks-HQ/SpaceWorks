@@ -29,10 +29,18 @@ class ToBuyMachineTypeOptionsView(APIView):
     def get(self, request, makerspace_id, *args, **kwargs):
         # Scoped like every other makerspace lookup, so an archived or hard-hidden space
         # is a 404 rather than a 403 that confirms it exists.
+        queryset = Makerspace.objects.all()
+        visibility = rbac.resolve_scope(request.user)
+        action_scope = rbac.makerspaces_for_actions(
+            request.user,
+            rbac.Action.EDIT_INVENTORY,
+            rbac.Action.MANAGE_PRINTING,
+            rbac.Action.MANAGE_MAKERSPACE,
+        )
+        if visibility is not rbac.ALL and action_scope is not rbac.ALL:
+            queryset = queryset.filter(id__in=visibility | action_scope)
         makerspace = get_object_or_404(
-            rbac.scope_by_makerspace(
-                request.user, Makerspace.objects.all(), makerspace_field="id"
-            ),
+            queryset,
             pk=makerspace_id,
         )
         require_module(makerspace, MODULE_KEY)

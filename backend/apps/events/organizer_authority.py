@@ -27,7 +27,7 @@ def organizer_event_q(actor, *, event_prefix=""):
     action_filter = Q()
     for action in (
         rbac.actions_satisfying(rbac.Action.MANAGE_EVENTS)
-        & rbac.ROLE_GRANTABLE_ACTIONS
+        & rbac.ORGANIZATION_GRANTABLE_ACTIONS
     ):
         action_filter |= Q(
             **{f"{membership_path}__granted_actions__contains": [action]}

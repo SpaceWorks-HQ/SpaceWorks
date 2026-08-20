@@ -9,6 +9,10 @@ from apps.accounts.models import User
 from apps.audit import services as audit
 from apps.makerspaces import limits
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
+from apps.organizations.models import (
+    Organization,
+    OrganizationMakerspace,
+)
 
 
 class RoleConflict(Exception):
@@ -36,7 +40,38 @@ def _locked_actor_actions(actor, makerspace):
         )
     if _superadmin(actor) and makerspace.superadmin_access_enabled:
         return set(rbac.ROLE_GRANTABLE_ACTIONS)
-    return rbac.actions_for_membership(membership)
+    return rbac.actions_for_membership(membership) | _locked_organization_actions(
+        actor, makerspace
+    )
+
+
+def _locked_organization_actions(actor, makerspace):
+    """Revalidate organization authority under locks before role mutations."""
+    links = list(
+        OrganizationMakerspace.objects.select_for_update()
+        .filter(makerspace=makerspace)
+        .order_by("pk")
+    )
+    organization_ids = {link.organization_id for link in links}
+    if not organization_ids:
+        return set()
+    list(
+        Organization.objects.select_for_update()
+        .filter(pk__in=organization_ids)
+        .order_by("pk")
+    )
+    memberships = (
+        rbac._organization_authority_memberships(
+            actor, makerspace_ids=[makerspace.pk]
+        )
+        .select_for_update(of=("self",))
+        .select_related("organization")
+        .order_by("pk")
+    )
+    actions = set()
+    for membership in memberships:
+        actions.update(rbac.actions_for_organization_membership(membership))
+    return actions
 
 
 def _clean_actions(actions):

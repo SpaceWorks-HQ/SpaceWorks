@@ -45,8 +45,8 @@ def _base_queryset():
 
 def _visible_makerspace(actor, makerspace_id, action=rbac.Action.MANAGE_MACHINES):
     makerspace = get_object_or_404(
-        rbac.scope_by_makerspace(
-            actor, Makerspace.objects.all(), makerspace_field="id"
+        rbac.scope_by_visibility_or_action(
+            actor, action, Makerspace.objects.all(), field="id"
         ),
         pk=makerspace_id,
     )
@@ -122,6 +122,8 @@ def _read_or_collect_queryset(actor, makerspace_id):
         return queryset.distinct()
     if role_scope.role_grants_directly(
         actor, makerspace_id, rbac.Action.COLLECT_SERVICE_REQUEST
+    ) or role_scope.organization_grants_directly(
+        actor, makerspace_id, rbac.Action.COLLECT_SERVICE_REQUEST
     ):
         visible |= Q(status=MachineServiceRequest.Status.COMPLETED)
     return queryset.filter(visible).distinct()
@@ -131,10 +133,11 @@ def _resolve_request(actor, pk, *, action, queryset_builder):
     # Establish tenant visibility first: foreign/hidden rows stay a 404 while an actor
     # who can see the makerspace but lacks the requested action receives a 403.
     row = get_object_or_404(
-        rbac.scope_by_makerspace(
+        rbac.scope_by_visibility_or_action(
             actor,
+            action,
             _base_queryset(),
-            makerspace_field="makerspace_id",
+            field="makerspace_id",
         ),
         pk=pk,
     )

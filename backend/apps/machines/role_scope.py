@@ -10,6 +10,7 @@ from .role_scope_grants import (
     grants_directly,
     is_machine_only,
     makerspaces_granting_directly,
+    organization_grants_directly,
     role_grants_directly,
 )
 from .role_scope_queries import (

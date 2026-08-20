@@ -122,6 +122,9 @@ ROLE_FORBIDDEN_ACTIONS = frozenset({
     Action.MANAGE_STAFF,
 })
 ROLE_GRANTABLE_ACTIONS = frozenset(ALL_ACTIONS - ROLE_FORBIDDEN_ACTIONS)
+ORGANIZATION_GRANTABLE_ACTIONS = frozenset(
+    ROLE_GRANTABLE_ACTIONS - {Action.MANAGE_MACHINES}
+)
 ROLE_SUPERADMIN_ASSIGNABLE_ACTIONS = frozenset({Action.MANAGE_MAKERSPACE})
 # What counts as handover-only work: taking an accepted request or a finished machine job
 # to the counter, handing it over, taking it back, and photographing both ends of that.
@@ -179,7 +182,8 @@ def actions_for_organization_membership(membership) -> set:
     return expand_implied_actions({
         action
         for action in value
-        if isinstance(action, str) and action in ROLE_GRANTABLE_ACTIONS
+        if isinstance(action, str)
+        and action in ORGANIZATION_GRANTABLE_ACTIONS
     })
 
 

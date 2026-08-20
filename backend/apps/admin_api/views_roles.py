@@ -37,7 +37,15 @@ _CATALOG = (
 
 
 def _makerspace(actor, makerspace_id):
-    makerspace = get_object_or_404(rbac.scope_by_makerspace(actor, Makerspace.objects.all(), makerspace_field="id"), pk=makerspace_id)
+    makerspace = get_object_or_404(
+        rbac.scope_by_visibility_or_action(
+            actor,
+            rbac.Action.MANAGE_MAKERSPACE,
+            Makerspace.objects.all(),
+            field="id",
+        ),
+        pk=makerspace_id,
+    )
     if not rbac.can(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk):
         raise PermissionDenied()
     return makerspace
