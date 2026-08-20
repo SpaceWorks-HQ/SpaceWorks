@@ -694,7 +694,11 @@ def test_api_client_rest_allows_makerspace_admin_and_scopes_others():
 
     created = admin_client.post(
         f"/api/v1/admin/makerspace/{makerspace.id}/api-clients",
-        {"label": "Public web", "allowed_origins": ["https://lab.example.com"]},
+        {
+            "label": "Public web",
+            "allowed_origins": ["https://lab.example.com"],
+            "scopes": ["public:read"],
+        },
         format="json",
     )
     assert created.status_code == 201
@@ -722,7 +726,7 @@ def test_api_client_rest_allows_makerspace_admin_and_scopes_others():
         {"label": "X", "allowed_origins": ["https://x.example.com"]},
         format="json",
     )
-    assert denied_create.status_code in (403, 404)
+    assert denied_create.status_code == 404
     assert other_client.get(f"/api/v1/admin/api-clients/{created.data['id']}").status_code == 404
 
     # A non-MANAGE_MAKERSPACE member (guest admin) is denied.
@@ -749,10 +753,7 @@ def test_api_client_rest_allows_makerspace_admin_and_scopes_others():
     assert makerspace.cors_allowed_origins == ["https://lab.example.com"]
 
 
-def test_api_client_makerspace_admin_cannot_escalate_privileged_fields():
-    # Review fix (P2): widening API-client management to MANAGE_MAKERSPACE must NOT let a
-    # makerspace admin set the privileged knobs. Tier/scopes/client_type are forced to safe
-    # defaults on create and preserved (not escalated) on update â€” superadmin-only.
+def test_api_client_makerspace_admin_can_set_only_tenant_scopes():
     makerspace = make_space("client-escalate")
     admin = make_member("client-escalate-admin", makerspace)  # SPACE_MANAGER
     admin_client = authenticated_client(admin)
@@ -763,34 +764,29 @@ def test_api_client_makerspace_admin_cannot_escalate_privileged_fields():
             "label": "Sneaky",
             "allowed_origins": ["https://lab.example.com"],
             "rate_limit_tier": "trusted",
-            "scopes": ["admin:write", "inventory:write"],
+            "scopes": ["public:write"],
             "client_type": "server",
         },
         format="json",
     )
     assert created.status_code == 201
     assert created.data["rate_limit_tier"] == "standard"  # ignored, not "trusted"
-    # The admin-supplied scopes are still IGNORED -- that is the property this test
-    # guards. What an ignored value resolves to changed: an empty list used to mean
-    # "allow everything", so a tenant-created client is now issued the FROZEN legacy
-    # capability instead, which authorizes only the registered routes it could already
-    # reach and can never authorize an unregistered one.
-    assert created.data["scopes"] == ["legacy:v1"]
+    assert created.data["scopes"] == ["public:write"]
 
     obj = ApiClient.objects.get(id=created.data["id"])
     assert obj.rate_limit_tier == "standard"
-    assert obj.scopes == ["legacy:v1"]
+    assert obj.scopes == ["public:write"]
 
-    # A PATCH attempting escalation is also ignored.
+    # Trust knobs remain silently ignored, while a forbidden scope fails closed.
     patched = admin_client.patch(
         f"/api/v1/admin/api-clients/{created.data['id']}",
         {"rate_limit_tier": "trusted", "scopes": ["admin:write"]},
         format="json",
     )
-    assert patched.status_code == 200
+    assert patched.status_code == 400
     obj.refresh_from_db()
     assert obj.rate_limit_tier == "standard"
-    assert obj.scopes == ["legacy:v1"]
+    assert obj.scopes == ["public:write"]
 
     # A superadmin may still set the privileged knobs.
     superadmin = make_user(
@@ -832,7 +828,7 @@ def test_hidden_makerspace_superadmin_member_cannot_escalate_api_client_fields()
             "label": "Hidden web",
             "allowed_origins": ["https://hidden.example.com"],
             "rate_limit_tier": "trusted",
-            "scopes": ["admin:write"],
+            "scopes": ["public:read"],
             "client_type": "server",
         },
         format="json",
@@ -844,12 +840,10 @@ def test_hidden_makerspace_superadmin_member_cannot_escalate_api_client_fields()
     )
 
     assert created.status_code == 201
-    assert patched.status_code == 200
+    assert patched.status_code == 400
     obj = ApiClient.objects.get(id=created.data["id"])
     assert obj.rate_limit_tier == "standard"
-    # Escalation is still refused; an ignored scopes value now resolves to the frozen
-    # legacy capability rather than the empty list that used to allow everything.
-    assert obj.scopes == ["legacy:v1"]
+    assert obj.scopes == ["public:read"]
 
 
 def test_member_can_request_api_key_without_secret_exposure():
@@ -1081,6 +1075,7 @@ def test_api_client_secret_rotation_returns_new_secret_once():
         makerspace=makerspace,
         allowed_origins=["https://lab.example.com"],
         created_by=admin,
+        scopes=["public:read"],
     )
     client = authenticated_client(admin)
 
@@ -1119,7 +1114,7 @@ def test_admin_cannot_manage_other_makerspace_api_clients():
         format="json",
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 404
     assert ApiClient.objects.count() == 0
 
 

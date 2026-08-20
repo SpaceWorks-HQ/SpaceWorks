@@ -2,15 +2,17 @@ from urllib.parse import urlsplit
 
 from rest_framework import serializers
 
-from apps.accounts import rbac
-from apps.accounts.models import User
 from apps.apiclients.models import ApiClient, ApiKeyRequest
-from apps.apiclients.scope_registry import BROWSER_SCOPES, SCOPE_VOCABULARY
+from apps.apiclients.scope_grants import (
+    actor_may_grant_privileged_scopes,
+    validate_grantable_scopes,
+)
+from apps.apiclients.scope_registry import BROWSER_SCOPES
 
 
 class ApiClientSerializer(serializers.ModelSerializer):
     scopes = serializers.ListField(
-        child=serializers.CharField(), required=False, allow_empty=True
+        child=serializers.CharField(), required=True, allow_empty=False
     )
     allowed_origins = serializers.ListField(
         child=serializers.CharField(), allow_empty=False
@@ -45,52 +47,30 @@ class ApiClientSerializer(serializers.ModelSerializer):
         return value
 
     def validate_scopes(self, value):
-        # DRF runs field validation BEFORE the object-level validate() that strips the
-        # privileged fields a non-superadmin may not set. Validating unconditionally would
-        # turn a stale value from a tenant manager into a 400 where the endpoint contract
-        # has always been to ignore the field -- so only the actor who can actually set
-        # scopes is held to the vocabulary.
-        if not self._actor_may_set_privileged_fields():
-            return value
-        unknown = sorted(set(value) - SCOPE_VOCABULARY)
-        if unknown:
-            raise serializers.ValidationError(
-                f"Unknown API-client scope(s): {', '.join(unknown)}."
+        try:
+            return validate_grantable_scopes(
+                value,
+                privileged=self._actor_may_set_privileged_fields(),
             )
-        return value
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
 
     def _actor_may_set_privileged_fields(self):
-        """Whether this actor may set client_type / scopes / rate_limit_tier.
+        """Whether this actor may set globally privileged client fields/scopes.
 
         Shared by field-level and object-level validation so the two layers cannot
         disagree about who is privileged.
         """
         request = self.context.get("request")
         actor = getattr(request, "user", None)
-        is_superadmin = bool(
-            actor and (
-                actor.is_superuser
-                or getattr(actor, "role", None) == User.Role.SUPERADMIN
-            )
-        )
-        if not is_superadmin:
-            return False
         makerspace_id = (
             getattr(self.instance, "makerspace_id", None)
             or self.context.get("makerspace_id")
         )
-        if makerspace_id is None:
-            return True
-        return int(makerspace_id) not in rbac.superadmin_hidden_makerspace_ids()
+        return actor_may_grant_privileged_scopes(actor, makerspace_id)
 
-    def validate(self, attrs):
-        # Non-superadmins cannot set client trust knobs. Until a tenant scope picker
-        # exists, ApiClient.issue supplies the frozen legacy capability after these
-        # fields are removed.
-        has_global_privilege = self._actor_may_set_privileged_fields()
-        if not has_global_privilege:
-            for field in ("client_type", "scopes", "rate_limit_tier"):
-                attrs.pop(field, None)
+    def validate_client_type_scope_ceiling(self, attrs):
+        """Validate the requested state against this serializer's current instance."""
         client_type = attrs.get("client_type") or getattr(
             self.instance, "client_type", "server"
         )
@@ -100,6 +80,14 @@ class ApiClientSerializer(serializers.ModelSerializer):
                 {"scopes": "Browser clients may only use public/read scopes."}
             )
         return attrs
+
+    def validate(self, attrs):
+        # Trust knobs remain global-only. Scope validation instead applies the tenant
+        # grant ceiling, so tenant input is explicit and never silently discarded.
+        if not self._actor_may_set_privileged_fields():
+            for field in ("client_type", "rate_limit_tier"):
+                attrs.pop(field, None)
+        return self.validate_client_type_scope_ceiling(attrs)
 
     def get_backend_base_url(self, _obj) -> str:
         request = self.context.get("request")
@@ -111,6 +99,22 @@ class ApiClientSerializer(serializers.ModelSerializer):
             return ""
         code = obj.makerspace.public_code if obj.makerspace_id else ""
         return request.build_absolute_uri(f"/api/v1/public/{code}/").rstrip("/")
+
+
+class ApiClientScopeOptionSerializer(serializers.Serializer):
+    value = serializers.CharField()
+    label = serializers.CharField()
+    description = serializers.CharField()
+    group = serializers.CharField()
+    grantable = serializers.BooleanField()
+    lock_reason = serializers.CharField(allow_null=True)
+
+
+class ApiClientScopeCatalogResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True, required=False)
+    previous = serializers.CharField(allow_null=True, required=False)
+    results = ApiClientScopeOptionSerializer(many=True)
 
 
 class ApiClientCreateResponseSerializer(ApiClientSerializer):

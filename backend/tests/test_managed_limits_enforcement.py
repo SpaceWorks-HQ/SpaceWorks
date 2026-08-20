@@ -92,10 +92,11 @@ def _attempt_second_row(case, mode):
             label="Existing client",
             makerspace=makerspace,
             allowed_origins=["https://existing.example"],
+            scopes=["public:read"],
         )
         response = client.post(
             f"/api/v1/admin/makerspace/{makerspace.id}/api-clients",
-            {"label": "Second client", "allowed_origins": ["https://second.example"]},
+            {"label": "Second client", "allowed_origins": ["https://second.example"], "scopes": ["public:read"]},
             format="json",
             HTTP_HOST="testserver",
         )

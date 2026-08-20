@@ -4,6 +4,7 @@ import time
 import uuid
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.test import RequestFactory, override_settings
 from django.urls import get_resolver, resolve
 from rest_framework.test import APIClient
@@ -185,21 +186,14 @@ def test_resolve_target_handles_both_opaque_status_tokens(monkeypatch):
 
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=True, CORS_ALLOWED_ORIGINS=[ORIGIN])
-def test_empty_scope_issue_uses_frozen_legacy_capability():
-    api_client, raw_secret = ApiClient.issue(
-        label="legacy cutover client",
-        allowed_origins=[ORIGIN],
-        client_type="server",
-        scopes=[],
-    )
-
-    response = APIClient().get(
-        PUBLIC_DIRECTORY,
-        **_signed_headers(api_client, raw_secret),
-    )
-
-    assert api_client.scopes == [LEGACY_SCOPE]
-    assert response.status_code == 200
+def test_empty_scope_issue_is_rejected():
+    with pytest.raises(ValidationError, match="At least one API-client scope"):
+        ApiClient.issue(
+            label="legacy cutover client",
+            allowed_origins=[ORIGIN],
+            client_type="server",
+            scopes=[],
+        )
 
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=True, CORS_ALLOWED_ORIGINS=[ORIGIN])
@@ -208,7 +202,7 @@ def test_registry_exception_fails_closed(monkeypatch):
         label="broken registry observer",
         allowed_origins=[ORIGIN],
         client_type="server",
-        scopes=[],
+        scopes=[LEGACY_SCOPE],
     )
 
     def broken_lookup(*_args, **_kwargs):

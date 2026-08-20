@@ -71,6 +71,10 @@ Rules that are easy to get wrong:
   authorize a route the registry does not know, and neither can `legacy:v1`.
 - **`legacy:v1` is frozen.** It authorizes exactly the routes it covered at cutover. Routes
   added later are never absorbed into it.
+- Tenant staff may grant exactly `public:read` and `public:write`. Public wildcards,
+  every admin scope, `reports:read`, and `legacy:v1` require a global superadmin; a
+  superadmin acting through membership in a makerspace hidden from global access is
+  tenant-limited.
 - **A browser client may hold only read/public scopes** (plus `legacy:v1`).
 - A client bound to a makerspace may only reach that makerspace's routes; a route that
   addresses no makerspace admits a tenant-bound client only if it explicitly says so.

@@ -1954,10 +1954,11 @@ encoder always emits canonical output, so stored envelopes are unaffected.
   `admin:*` can ever authorize a route that is not registered. A protected route with no entry denies.
 - **`legacy:v1` is frozen.** It authorizes exactly the entries marked `legacy_v1=True` at cutover. A
   route added later defaults to `False`: **legacy authority never auto-extends.** It exists because an
-  empty `scopes` list used to authorize everything and tenant staff cannot set scopes at all (the
-  serializer pops the field for non-superadmins), so flipping empty→deny would have bricked every
-  tenant-created client. `ApiClient.save()` supplies it whenever scopes are empty, because the
-  `/control/` ModelAdmin and `seed_demo` construct rows without going through `issue()`.
+  empty `scopes` list used to authorize everything; migration `0004` preserved those clients without
+  pretending their original read/write intent could be inferred. Tenant staff now explicitly grant only
+  `public:read` and `public:write`; wildcards, every `admin:*`, `reports:read`, and `legacy:v1` remain
+  global-superadmin-only. `ApiClient.issue()` requires a non-empty scope list, while `ApiClient.save()`
+  keeps the compatibility fallback for `/control/` model forms and `seed_demo` direct construction.
 - **Target resolution is independent of scopes, and an unresolved target denies.** The old
   `_path_makerspace()` returned the same `None` for "this path names no tenant" and "the tenant lookup
   failed" — a fail-open. `resolve_target` returns `(target, resolved)` so those are distinguishable.

@@ -40,7 +40,8 @@
   `frontend/src/components/ui/QrScanner.tsx` (native `BarcodeDetector` + `zxing-wasm` fallback).
 - `backend/apps/admin_api/` — staff REST surface: makerspaces, inventory CRUD + per-makerspace category CRUD
   (`EDIT_INVENTORY`), bulk import, staff/membership + role management, user restrict/restore, API-client
-  issuance, audit reads, warranty, email-log, notification-recipient, FabLab report views.
+  issuance (`api_client_views.py`) and access requests (`api_key_request_views.py`), audit reads, warranty,
+  email-log, notification-recipient, FabLab report views.
 - `backend/apps/operations/` — open operations/reporting: health, stock transfers (intra + true
   cross-makerspace), stocktake, adjustments, ledger, `report_registry.py` + `report_scope.py` + `reports_*`
   builders, CSV/XLSX exports, container APIs, QR print batches (`qr_zip.py`), dashboard, accountability.

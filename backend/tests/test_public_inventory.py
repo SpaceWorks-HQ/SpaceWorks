@@ -530,7 +530,7 @@ def test_hmac_allows_signed_public_inventory_request(
     settings.API_CLIENT_AUTH_REQUIRED = True
     settings.HMAC_MAX_CLOCK_SKEW_SECONDS = 300
     settings.HMAC_PROTECTED_PATH_PREFIXES = ["/api/public/"]
-    client, secret = ApiClient.issue(label="web", allowed_origins=["http://testserver"])
+    client, secret = ApiClient.issue(label="web", allowed_origins=["http://testserver"], scopes=["public:read"])
     create_product(public_makerspace)
     path = public_inventory_url(public_makerspace)
 
@@ -554,6 +554,7 @@ def test_frontend_api_client_allows_matching_origin_and_makerspace_code(
         label="frontend",
         makerspace=public_makerspace,
         allowed_origins=["https://lab.example.com"],
+        scopes=["public:read"],
     )
     client = public_makerspace.api_clients.get()
     create_product(public_makerspace)
@@ -585,6 +586,7 @@ def test_frontend_api_client_rejects_other_makerspace_code(
         label="frontend",
         makerspace=public_makerspace,
         allowed_origins=["https://lab.example.com"],
+        scopes=["public:read"],
     )
 
     response = api_client.get(
@@ -608,7 +610,7 @@ def test_hmac_rejects_unsigned_or_invalid_public_inventory_request(
     settings.API_CLIENT_AUTH_REQUIRED = True
     settings.HMAC_MAX_CLOCK_SKEW_SECONDS = 300
     settings.HMAC_PROTECTED_PATH_PREFIXES = ["/api/public/"]
-    client, secret = ApiClient.issue(label="web", allowed_origins=["http://testserver"])
+    client, secret = ApiClient.issue(label="web", allowed_origins=["http://testserver"], scopes=["public:read"])
     create_product(public_makerspace)
     path = public_inventory_url(public_makerspace)
 

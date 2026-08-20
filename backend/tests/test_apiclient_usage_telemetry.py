@@ -75,6 +75,7 @@ def _space_and_client(slug, *, client_type="server"):
         makerspace=makerspace,
         allowed_origins=[ORIGIN],
         client_type=client_type,
+        scopes=["public:read"],
     )
     return makerspace, api_client, secret
 
