@@ -221,9 +221,9 @@ def validate_lifecycle_exemptions(apps_dir=APPS_DIR):
         "apps.encryption.services.rotate_dek",
         "apps.encryption.services.disable_dek",
         "apps.encryption.services.rewrap_dek",
-        "apps.makerspaces.lifecycle.archive",
-        "apps.makerspaces.lifecycle._archive_locked",
-        "apps.makerspaces.lifecycle.purge",
+        "apps.makerspaces.lifecycle_archive.archive",
+        "apps.makerspaces.lifecycle_archive._archive_locked",
+        "apps.makerspaces.lifecycle_purge.purge",
     }
     _exact("lifecycle exemption", actual, expected)
     return frozenset(actual)

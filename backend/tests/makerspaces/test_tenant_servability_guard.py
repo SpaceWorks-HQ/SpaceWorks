@@ -29,8 +29,8 @@ EXEMPTIONS = {
     ("makerspaces/servability.py", "is_servable"),
     ("makerspaces/servability.py", "unservable_makerspace_ids"),
     # Archive recovery must inspect and clear archived_at, and purge must inspect it.
-    ("makerspaces/lifecycle.py", "unarchive"),
-    ("makerspaces/lifecycle.py", "purge"),
+    ("makerspaces/lifecycle_archive.py", "unarchive"),
+    ("makerspaces/lifecycle_purge.py", "purge"),
     # /control/ is the superadmin recovery surface for archived/import-failed rows.
     ("makerspaces/admin.py", "ArchivedFilter.queryset"),
     ("makerspaces/admin.py", "MakerspaceAdmin.has_delete_permission"),

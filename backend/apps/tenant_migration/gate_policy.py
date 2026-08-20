@@ -163,9 +163,9 @@ LIFECYCLE_EXEMPTIONS = {
     "apps.encryption.services.rotate_dek": "DEK rotation is expressly excluded from source quiescence.",
     "apps.encryption.services.disable_dek": "DEK lifecycle is expressly excluded from source quiescence.",
     "apps.encryption.services.rewrap_dek": "DEK rotation is expressly excluded from source quiescence.",
-    "apps.makerspaces.lifecycle.purge": "Tenant purge is expressly excluded from source quiescence.",
-    "apps.makerspaces.lifecycle.archive": "Tenant archive is expressly excluded from source quiescence.",
-    "apps.makerspaces.lifecycle._archive_locked": "Cutover's locked tenant archive is expressly excluded.",
+    "apps.makerspaces.lifecycle_purge.purge": "Tenant purge is expressly excluded from source quiescence.",
+    "apps.makerspaces.lifecycle_archive.archive": "Tenant archive is expressly excluded from source quiescence.",
+    "apps.makerspaces.lifecycle_archive._archive_locked": "Cutover's locked tenant archive is expressly excluded.",
 }
 
 
@@ -188,6 +188,6 @@ OBJECT_MUTATION_PARTICIPANTS = {
     "apps.machines.services.update_image": "Runs inside the model-resolved machine image route.",
     "apps.maintenance.services_documents.delete_log_document": "Runs inside the model-resolved maintenance document route.",
     "apps.maintenance.services_documents.finalize_log_document": "Runs inside the model-resolved maintenance document route.",
-    "apps.makerspaces.lifecycle._delete_public_image_keys": "Tenant purge is an express source-gate exclusion.",
+    "apps.makerspaces.lifecycle_storage._delete_public_image_keys": "Tenant purge is an express source-gate exclusion.",
     "apps.makerspaces.profile_images._swap": "Runs inside the authenticated member profile image route.",
 }

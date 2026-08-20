@@ -18,7 +18,8 @@
 - `backend/apps/makerspaces/` — `Makerspace` model (tenant root; unique `slug`; `frontend_domain`, module
   flags, `resource_limit_overrides`, `archived_at`, `superadmin_access_enabled`), bootstrap views, dynamic
   CORS, module guards, `module_registry.py` (canonical module definitions — all module lists derive from
-  it), `platform.py` (origin helpers), `limits.py` (fair-use quotas), `lifecycle.py` (archive/purge),
+  it), `platform.py` (origin helpers), `limits.py` (fair-use quotas), `lifecycle.py` (archive/purge barrel
+  over `lifecycle_archive.py`, `lifecycle_purge.py` and `lifecycle_storage.py`),
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
 - `backend/apps/organizations/` — `Organization` (platform entity, creatable before any makerspace, NOT a
   module_registry key), `OrganizationMakerspace` (the many-to-many link, at most one `owner` per space) and
@@ -29,7 +30,9 @@
   scope authorizes, keyed on the versioned `view_name`. `checks.py` is the deployment-time guard that a
   widened `HMAC_PROTECTED_PATH_PREFIXES` has no unregistered routes. Verification itself lives in
   `apps/inventory/middleware.py`.
-- `backend/apps/audit/` — append-only `AuditLog` + `audit.record(...)` (Postgres-trigger immutable).
+- `backend/apps/audit/` — append-only `AuditLog` + `audit.record(...)` (Postgres-trigger immutable), with
+  signing/batch models in `models_signing.py`, verification phases behind the `integrity.py` barrel, and
+  object-store/HTTP collector protocols behind the `anchors.py` barrel.
 - `backend/apps/evidence/` — immutable evidence photos, S3 storage helpers, signed upload/view URLs gated by
   per-makerspace `UPLOAD_EVIDENCE` + active status.
 - `backend/apps/boxes/` — `QrCode`/`Box` payloads, immutable `BoxScan`/`QrScanEvent`, `qr_render.py`
@@ -65,7 +68,8 @@
   `archive_envelope.py` + `object_export.py` (streamed into `age`); `admission.py` (the source-superadmin
   closure approval); `materialization.py` + `raw_repository.py` + `row_planning.py`/`row_dispositions.py`
   (one-shot insertion); `target_projection.py` + `unique_values.py` + `closure_references.py`;
-  `verification.py` (pre-commit) and `target_cutover.py` (pre-activation + `IMPORTING → ACTIVE`);
+  `verification.py` (pre-commit), audit-reference domains behind the `audit_references.py` barrel, and
+  `target_cutover.py` (pre-activation + `IMPORTING → ACTIVE`);
   `receipts.py`/`receipt_crypto.py`/`cutover.py` (signed single-use handoff); `views_*.py` (superadmin REST).
 - `backend/apps/inventory/` — `InventoryProduct`/`InventoryAsset`, `availability.py` (**the only place**
   available/reserved/issued/damaged/lost counts change: `reserve_for_request`, `issue_items`/`return_items`,
