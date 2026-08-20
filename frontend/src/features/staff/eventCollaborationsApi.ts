@@ -7,6 +7,7 @@ import type {
 } from "../../generated/api";
 import { staffRequest } from "../../lib/api";
 import { eventKeys } from "./eventsApi";
+import { organizedEventKeys } from "./organizedEventsApi";
 
 const COLLABORATORS_PATH: ApiPath = "/api/v1/admin/events/{id}/collaborators/";
 const COLLABORATION_REMOVE_PATH: ApiPath = "/api/v1/admin/event-collaborations/{id}/remove/";
@@ -49,6 +50,7 @@ export function useReplaceEventCollaborators(makerspaceId: number, eventId: numb
       queryClient.invalidateQueries({ queryKey: collaborationKeys.forEvent(eventId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
+      queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
     ]); },
   });
 }
@@ -65,6 +67,7 @@ export function useRemoveEventCollaborator(makerspaceId: number, eventId: number
     onSuccess: async () => { await Promise.all([
       queryClient.invalidateQueries({ queryKey: collaborationKeys.forEvent(eventId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
+      queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
     ]); },
   });
 }

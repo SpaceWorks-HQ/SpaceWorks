@@ -6,8 +6,10 @@ import { readStorage, removeStorage, writeStorage } from "../../lib/safeStorage"
 // `getStaffAccess` decides permissions and nothing else -- a tab named in both places is
 // how one ends up gated in the sidebar but not on the route.
 //
-// A tab is listed only when a module can genuinely remove it. Three are deliberately
+// A tab is listed only when a module can genuinely remove it. Four are deliberately
 // absent, each for a reason that looks like an oversight:
+//   * `organized`  -- organizer grants are per event and cross-venue, so the currently
+//                     selected makerspace's events switch says nothing about this list.
 //   * `members`    -- the panel mixes the never-gated staff roster and role assignment
 //                     with the membership-gated community queue. Gating the tab would let
 //                     a space lock itself out of its own administration (plan A7), so the
@@ -47,6 +49,7 @@ const TAB_MODULES: Record<string, string[]> = {
 // request. Tabs that do have their own key need no entry: the server already omits a
 // tombstoned app's key from `enabled_modules`.
 const TAB_APPS: Record<string, string> = {
+  organized: "events",
   warranty: "warranty",
   migration: "tenant_migration",
 };
@@ -64,6 +67,7 @@ const TAB_PATHS: Record<string, string> = {
   exports: "data-export",
   backups: "backup-restore",
   migration: "tenant-migration",
+  organized: "organized-events",
 };
 
 const PATH_TABS = Object.fromEntries(

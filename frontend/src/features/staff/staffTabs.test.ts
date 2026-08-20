@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getStaffAccess, TAB_LABELS } from "./staffAccess";
+import { getStaffAccess, TAB_GROUPS, TAB_LABELS } from "./staffAccess";
 import {
   filterTabsByEnabledModules,
   keptStaffSubPath,
@@ -29,6 +29,47 @@ describe("data export authority", () => {
   });
 });
 
+describe("organized events", () => {
+  const coreModules = [
+    "public_inventory", "request_workflow", "staff_admin", "scanner",
+    "qr_management", "evidence_uploads",
+  ];
+
+  it("maps organized-event routes with and without a makerspace slug", () => {
+    expect(staffTabPath("organized", false)).toBe("/admin/organized-events");
+    expect(staffTabPath("organized", false, "forge")).toBe("/m/forge/admin/organized-events");
+    expect(tabFromStaffPath("/admin/organized-events", false)).toBe("organized");
+    expect(tabFromStaffPath("/m/forge/admin/organized-events", false)).toBe("organized");
+  });
+
+  it("places the tab immediately after Events in the Events group", () => {
+    expect(TAB_GROUPS.find((group) => group.label === "Events")?.tabs)
+      .toEqual(["events", "organized"]);
+  });
+
+  it("hides the tab from superadmins and handout-only actors", () => {
+    expect(getStaffAccess([], true, false).allowedTabs).not.toContain("organized");
+    expect(getStaffAccess(["issue_request", "return_request"], false, false).allowedTabs)
+      .not.toContain("organized");
+  });
+
+  it("shows the tab without selected-makerspace manage_events", () => {
+    expect(getStaffAccess(["view_inventory"], false, false).allowedTabs).toContain("organized");
+  });
+
+  it("ignores the selected makerspace's events module switch", () => {
+    const tabs = getStaffAccess(["view_inventory"], false, false).allowedTabs;
+    const filtered = filterTabsByEnabledModules(tabs, { enabled_modules: coreModules });
+    expect(filtered).toContain("organized");
+    expect(filtered).not.toContain("events");
+  });
+
+  it("hides the tab when the events app is unavailable deployment-wide", () => {
+    const tabs = getStaffAccess(["view_inventory"], false, false).allowedTabs;
+    expect(filterTabsByEnabledModules(tabs, { unavailable_apps: ["events"] }))
+      .not.toContain("organized");
+  });
+});
 describe("tenant migration authority", () => {
   it("omits the tab for every non-superadmin and gives it a stable route", () => {
     expect(getStaffAccess(["manage_makerspace"], false, false).allowedTabs).not.toContain("migration");

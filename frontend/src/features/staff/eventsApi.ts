@@ -4,6 +4,7 @@ import type { ApiPath } from "../../generated/api";
 import { staffRequest } from "../../lib/api";
 import type { PaymentSummary } from "./PaymentReconcileActions";
 import type { CustomFormSchema } from "../forms/customFormTypes";
+import { organizedEventKeys } from "./organizedEventsApi";
 
 export type EventStatus = "draft" | "published" | "cancelled" | "completed";
 export type EventRegistrationStatus = "registered" | "waitlisted" | "cancelled" | "attended";
@@ -103,8 +104,13 @@ export function useEventRegistrations(eventId: number, page = 1) {
 export function useEventInvalidation(makerspaceId: number, eventId?: number) {
   const queryClient = useQueryClient();
   return async () => {
-    await queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) });
-    if (eventId !== undefined) await queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
+      queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
+      ...(eventId === undefined ? [] : [
+        queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
+      ]),
+    ]);
   };
 }
 
@@ -117,6 +123,7 @@ export function useCreateEvent(makerspaceId: number) {
     ), onSuccess: async (created) => { await Promise.all([
       queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.detail(created.id) }),
+      queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
     ]); },
   });
 }
@@ -131,6 +138,7 @@ export function useUpdateEvent(makerspaceId: number, eventId: number) {
       queryClient.invalidateQueries({ queryKey: eventKeys.registrations(eventId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
+      queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
     ]); },
   });
 }
@@ -163,6 +171,7 @@ export function useMarkEventAttended(makerspaceId: number, eventId: number) {
       queryClient.invalidateQueries({ queryKey: eventKeys.registrations(eventId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
+      queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
     ]); },
   });
 }
@@ -236,6 +245,7 @@ export function useRegisterMemberForEvent(makerspaceId: number, eventId: number)
       queryClient.invalidateQueries({ queryKey: eligibleMemberKey(eventId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
+      queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
     ]); },
   });
 }
