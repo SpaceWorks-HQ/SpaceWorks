@@ -5,17 +5,20 @@ reasons: the concern is machine-shaped (it validates against `MachineType`/`Mach
 when `machines` is tombstoned the ability to edit machine scope has to disappear with it
 rather than linger as a management surface for an app that no longer has any.
 
-Only a `MANAGE_MAKERSPACE` holder can reach the role API at all, and `MANAGE_MAKERSPACE`
-is exempt from machine scoping — so there is no escalation to guard here the way
-`role_services._validate_actions` guards action grants. An editor cannot narrow themselves
-into a corner either, for the same reason.
+`MANAGE_MAKERSPACE` is exempt from machine scoping, so there is no grant-ceiling check
+here like `role_services._validate_actions` applies to action grants. The service still
+revalidates that management authority under locks: an organization grant may disappear
+after the view resolves the role but before this transaction starts.
 """
 
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
+from apps.accounts import rbac
 from apps.audit import services as audit
+from apps.makerspaces import role_services
 
 from .models import Machine, MachineType
 from .models_role_scope import RoleMachineScope, RoleMachineTypeScope
@@ -86,6 +89,9 @@ def set_role_machine_scope(*, makerspace, role, actor, machine_type_ids, machine
     role = MakerspaceRole.objects.select_for_update().get(
         pk=role.pk, makerspace=makerspace
     )
+    actor_actions = role_services._locked_actor_actions(actor, makerspace)
+    if rbac.Action.MANAGE_MAKERSPACE not in actor_actions:
+        raise PermissionDenied()
 
     type_ids = _validated_ids(
         machine_type_ids, assignable_machine_types(makerspace), "machine_type_ids"
