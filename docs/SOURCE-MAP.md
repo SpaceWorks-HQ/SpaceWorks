@@ -12,9 +12,11 @@
   `config/admin_access.py` holds the `/control/` gating, CSP middleware, and the hidden-scope drift-guard
   registries (`NESTED_MAKERSPACE_LOOKUPS`, `GLOBAL_ADMIN_MODELS`).
 - `backend/apps/accounts/` — custom `User` model (`AUTH_USER_MODEL`), browser JWT auth, attested device
-  grants/rotating refresh families, Google/Apple social identities + nonce/JWKS verification, and `rbac.py`
-  (the Auth & RBAC module: `can(...)`, action-based `actions_for_membership`/`makerspaces_for_action`/
-  `scope_by_action`, makerspace scoping, superadmin hide/archive exclusion).
+  grants/rotating refresh families, Google/Apple social identities + nonce/JWKS verification, and the
+  Auth & RBAC module: thin `rbac.py` import surface/coordinator over `rbac_actions.py`,
+  `rbac_memberships.py`, `rbac_organizations.py`, and `rbac_superadmin.py` (`can(...)`, action-based
+  `actions_for_membership`/`makerspaces_for_action`/`scope_by_action`, makerspace scoping, superadmin
+  hide/archive exclusion).
 - `backend/apps/makerspaces/` — `Makerspace` model (tenant root; unique `slug`; `frontend_domain`, module
   flags, `resource_limit_overrides`, `archived_at`, `superadmin_access_enabled`), bootstrap views, dynamic
   CORS, module guards, `module_registry.py` (canonical module definitions — all module lists derive from
@@ -22,8 +24,9 @@
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
 - `backend/apps/organizations/` — `Organization` (platform entity, creatable before any makerspace, NOT a
   module_registry key), `OrganizationMakerspace` (the many-to-many link, at most one `owner` per space) and
-  `OrganizationMembership` (org-level `granted_actions`). Authority is resolved in `accounts/rbac.py`, never
-  mirrored into `MakerspaceMembership`; `accounts/org_payload.py` projects it into the auth payload.
+  `OrganizationMembership` (org-level `granted_actions`). Authority is resolved through
+  `accounts/rbac.py` with its organization layer in `accounts/rbac_organizations.py`, never mirrored into
+  `MakerspaceMembership`; `accounts/org_payload.py` projects it into the auth payload.
 - `backend/apps/apiclients/` — `ApiClient` (client_id + Fernet-encrypted HMAC secret), `ApiKeyRequest`, and
   `scope_registry.py`/`scope_registry_routes.py` — the single source of truth for which protected route each
   scope authorizes, keyed on the versioned `view_name`. `checks.py` is the deployment-time guard that a
@@ -85,9 +88,13 @@
   inside `apps/machines/` — look there, not here.
 - `backend/apps/roadmap/` — **TOMBSTONED**: `RoadmapItem` retained for migration history only. No URLs,
   serializers, admin surface or frontend; `tests/roadmap/test_removed_surfaces.py` asserts they stay removed.
-- `backend/apps/warranty/`, `apps/machines/`, `apps/maintenance/`, `apps/events/`, `apps/bookings/`,
-  `apps/forms_schema/`, `apps/encryption/`, `apps/procurement/`, `apps/notifications/`,
-  `apps/operations/report_registry.py` — the FabLab + governance modules.
+- `backend/apps/machines/` — machine registry and service workflows. Machine-role authorization keeps a
+  thin `role_scope.py` import surface over `role_scope_resolution.py` (including the identity-sensitive
+  `EXEMPT`/`NOTHING` sentinels), `role_scope_grants.py`, and `role_scope_queries.py`; scope mutations remain
+  in `role_scope_services.py`.
+- `backend/apps/warranty/`, `apps/maintenance/`, `apps/events/`, `apps/bookings/`, `apps/forms_schema/`,
+  `apps/encryption/`, `apps/procurement/`, `apps/notifications/`, `apps/operations/report_registry.py` — the
+  remaining FabLab + governance modules.
 - `backend/tests/` — pytest behavior tests (external behavior, not implementation).
 - `frontend/src/features/inventory/` — public catalog/detail/self-checkout + `ProductCard`/
   `AvailabilityBadge`. `frontend/src/features/staff/` — staff console panels; grouped nav via
