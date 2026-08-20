@@ -307,6 +307,18 @@ holds canonical `ReportDefinition`s (module-gated, `report_scope.eligible_makers
 contract; **aggregate output groups by `makerspace_id` and never flattens cross-tenant data**. Per-makerspace
 report rows are gated by query-level scope (no per-row Python check → no N+1).
 
+**One narrow, deliberate exception to the no-flattening rule, added 2026-08-20 by owner decision** after a
+Stage-4 review correctly flagged the organization dashboard as a regression of it: **a single
+organization's server-resolved OWNER set may carry a combined total, and that total may only ACCOMPANY —
+never replace — the per-makerspace breakdown.** The rule exists to stop unrelated tenants being mixed and
+provenance being lost; a total over one organization's own OWNER-linked makerspaces, resolved server-side
+and always shown beside the per-space rows, does neither. The exception is bounded by four conditions, all
+of which must hold: (1) the id set comes from `operations/org_report_scope.py`'s resolver, never from
+client-supplied ids; (2) `relationship = OWNER` only — MANAGER and AFFILIATE links are excluded; (3) the
+per-makerspace breakdown is always present in the same response; (4) `ReportScopeMode.COMBINED` is the only
+mode permitted to flatten, and only for that resolved set. Anything wider is still a regression. Deployment
+-wide aggregates are unchanged: they stay grouped by `makerspace_id`.
+
 **Scoped PII encryption (Part H, `apps/encryption/`; dormant unless enabled).** Per-makerspace DEK via a
 key broker (local/AWS-KMS), AAD-authenticated envelope crypto, `ScopedPiiModelMixin` on the 6 PII-holding
 models with a save-boundary that single-INSERTs envelopes + dual-read cache. Blind-index search
