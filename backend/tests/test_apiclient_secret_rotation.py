@@ -42,6 +42,7 @@ def rotation_client():
         allowed_origins=[ORIGIN],
         created_by=manager,
         client_type="server",
+        scopes=["public:read"],
     )
     return api_client, secret, authenticated_client(manager)
 

@@ -9635,6 +9635,75 @@
                 }
             }
         },
+        "/api/v1/admin/makerspace/{makerspace_id}/api-client-scopes": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_api_client_scopes_list",
+                "summary": "List API-client scope grant options",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "API clients"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ApiClientScopeOption"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspace/{makerspace_id}/api-clients": {
             "get": {
                 "operationId": "api_v1_admin_makerspace_api_clients_list",
@@ -34141,6 +34210,7 @@
                     "makerspace",
                     "public_api_base_url",
                     "public_makerspace_code",
+                    "scopes",
                     "updated_at"
                 ]
             },
@@ -34236,7 +34306,40 @@
                     "makerspace",
                     "public_api_base_url",
                     "public_makerspace_code",
+                    "scopes",
                     "updated_at"
+                ]
+            },
+            "ApiClientScopeOption": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "group": {
+                        "type": "string"
+                    },
+                    "grantable": {
+                        "type": "boolean"
+                    },
+                    "lock_reason": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "description",
+                    "grantable",
+                    "group",
+                    "label",
+                    "lock_reason",
+                    "value"
                 ]
             },
             "ApiIntegrationSettings": {

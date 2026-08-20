@@ -34,6 +34,7 @@ def server_client():
         label="nonce test client",
         allowed_origins=[ORIGIN],
         client_type="server",
+        scopes=["public:read"],
     )
 
 
@@ -121,10 +122,12 @@ def test_nonce_tampered_in_transit_fails_signature(server_client):
 
 def test_different_clients_may_use_the_same_nonce():
     first_client, first_secret = ApiClient.issue(
-        label="first nonce client", allowed_origins=[ORIGIN], client_type="server"
+        label="first nonce client", allowed_origins=[ORIGIN], client_type="server",
+        scopes=["public:read"],
     )
     second_client, second_secret = ApiClient.issue(
-        label="second nonce client", allowed_origins=[ORIGIN], client_type="server"
+        label="second nonce client", allowed_origins=[ORIGIN], client_type="server",
+        scopes=["public:read"],
     )
 
     first = APIClient().get(

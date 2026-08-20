@@ -1,4 +1,5 @@
-import type { ApiClientCreateResponse } from "./apiClientsApi";
+import { ApiClientScopePicker } from "./ApiClientScopePicker";
+import type { ApiClientCreateResponse, ApiClientScopeOption } from "./apiClientsApi";
 import { splitOrigins } from "./apiClientsApi";
 
 type Props = {
@@ -10,9 +11,14 @@ type Props = {
   oneTimeSecret: ApiClientCreateResponse | null;
   isPending: boolean;
   error: Error | null;
+  scopeOptions: ApiClientScopeOption[];
+  scopes: string[];
+  scopesLoading: boolean;
+  scopesError: Error | null;
   onLabelChange: (value: string) => void;
   onReasonChange: (value: string) => void;
   onOriginsChange: (value: string) => void;
+  onScopesChange: (value: string[]) => void;
   onSubmit: () => void;
   onDismissSecret: () => void;
 };
@@ -26,9 +32,14 @@ export function ApiClientCreateCard({
   oneTimeSecret,
   isPending,
   error,
+  scopeOptions,
+  scopes,
+  scopesLoading,
+  scopesError,
   onLabelChange,
   onReasonChange,
   onOriginsChange,
+  onScopesChange,
   onSubmit,
   onDismissSecret,
 }: Props) {
@@ -49,10 +60,24 @@ export function ApiClientCreateCard({
             value={origins}
             onChange={(event) => onOriginsChange(event.target.value)}
           />
+          <div className="grid gap-2">
+            <span className="eyebrow">Scopes</span>
+            <p className="text-xs text-muted">Choose the exact public API access this client needs.</p>
+            {scopesLoading ? <p className="text-sm text-muted">Loading scope choices...</p> : null}
+            {!scopesLoading && scopeOptions.length ? (
+              <ApiClientScopePicker
+                options={scopeOptions}
+                selected={scopes}
+                onChange={onScopesChange}
+                disabled={isPending}
+              />
+            ) : null}
+            {scopesError ? <p className="text-sm text-danger">{scopesError.message}</p> : null}
+          </div>
         </div>
         <button
           className="desk-button-primary mt-3 w-full"
-          disabled={!label.trim() || !splitOrigins(origins).length || isPending}
+          disabled={!label.trim() || !splitOrigins(origins).length || !scopes.length || scopesLoading || !!scopesError || isPending}
           onClick={onSubmit}
         >
           {isPending ? "Creating..." : "Create API client"}

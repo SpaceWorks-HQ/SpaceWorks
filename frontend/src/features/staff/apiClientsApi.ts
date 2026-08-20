@@ -14,8 +14,18 @@ export type ApiClient = {
   client_id: string;
   last_seen_at: string | null;
   allowed_origins: string[];
+  scopes: string[];
   is_active: boolean;
   created_at: string;
+};
+
+export type ApiClientScopeOption = {
+  value: string;
+  label: string;
+  description: string;
+  group: string;
+  grantable: boolean;
+  lock_reason: string | null;
 };
 
 export type ApiClientCreateResponse = ApiClient & {
@@ -29,6 +39,7 @@ export type ApiSettings = {
 
 export const apiKeyRequestsQueryKey = (makerspaceId: number) => ["api-key-requests", makerspaceId];
 export const apiClientsQueryKey = (makerspaceId: number) => ["api-clients", makerspaceId];
+export const apiClientScopesQueryKey = (makerspaceId: number) => ["api-client-scopes", makerspaceId];
 export const apiSettingsQueryKey = (makerspaceId: number) => ["api-settings", makerspaceId];
 
 export function requestApiKey(
@@ -48,13 +59,26 @@ export function requestApiKey(
   });
 }
 
-export function createApiClient(makerspaceId: number, label: string, allowedOrigins: string[]) {
+export function createApiClient(
+  makerspaceId: number,
+  label: string,
+  allowedOrigins: string[],
+  scopes: string[],
+) {
   return staffRequest<ApiClientCreateResponse>(`/admin/makerspace/${makerspaceId}/api-clients`, {
     method: "POST",
     body: JSON.stringify({
       label,
       allowed_origins: allowedOrigins,
+      scopes,
     }),
+  });
+}
+
+export function updateApiClientScopes(clientId: number, scopes: string[]) {
+  return staffRequest<ApiClient>(`/admin/api-clients/${clientId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ scopes }),
   });
 }
 

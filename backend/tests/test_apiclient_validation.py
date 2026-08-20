@@ -15,12 +15,13 @@ def test_issue_rejects_missing_or_empty_allowed_origins():
     makerspace = make_space("client-validation-model")
 
     with pytest.raises(ValidationError) as missing:
-        ApiClient.issue(label="Missing origins", makerspace=makerspace)
+        ApiClient.issue(label="Missing origins", makerspace=makerspace, scopes=["public:read"])
     with pytest.raises(ValidationError) as empty:
         ApiClient.issue(
             label="Empty origins",
             makerspace=makerspace,
             allowed_origins=[],
+            scopes=["public:read"],
         )
 
     assert "allowed_origins" in missing.value.message_dict
@@ -34,10 +35,12 @@ def test_admin_api_create_rejects_missing_or_empty_allowed_origins():
     client = authenticated_client(admin)
     url = f"/api/v1/admin/makerspace/{makerspace.id}/api-clients"
 
-    missing = client.post(url, {"label": "Missing origins"}, format="json")
+    missing = client.post(
+        url, {"label": "Missing origins", "scopes": ["public:read"]}, format="json"
+    )
     empty = client.post(
         url,
-        {"label": "Empty origins", "allowed_origins": []},
+        {"label": "Empty origins", "allowed_origins": [], "scopes": ["public:read"]},
         format="json",
     )
 
@@ -60,7 +63,11 @@ def test_admin_api_create_maps_model_validation_error_to_400(monkeypatch):
 
     response = client.post(
         url,
-        {"label": "Rejected by model", "allowed_origins": ["https://valid.test"]},
+        {
+            "label": "Rejected by model",
+            "allowed_origins": ["https://valid.test"],
+            "scopes": ["public:read"],
+        },
         format="json",
     )
 

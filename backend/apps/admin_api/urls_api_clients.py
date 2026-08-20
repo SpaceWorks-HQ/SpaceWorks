@@ -1,6 +1,10 @@
 from django.urls import path
 
-from apps.admin_api import api_client_views
+from apps.admin_api import (
+    api_client_scope_views,
+    api_client_settings_views,
+    api_client_views,
+)
 
 
 makerspace_urlpatterns = [
@@ -10,8 +14,13 @@ makerspace_urlpatterns = [
         name="admin-api-clients",
     ),
     path(
+        "makerspace/<int:makerspace_id>/api-client-scopes",
+        api_client_scope_views.ApiClientScopeCatalogView.as_view(),
+        name="admin-api-client-scopes",
+    ),
+    path(
         "makerspace/<int:makerspace_id>/api-settings",
-        api_client_views.ApiIntegrationSettingsView.as_view(),
+        api_client_settings_views.ApiIntegrationSettingsView.as_view(),
         name="admin-api-settings",
     ),
 ]

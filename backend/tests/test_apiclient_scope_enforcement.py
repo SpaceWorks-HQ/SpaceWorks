@@ -120,14 +120,14 @@ def test_tenant_serializer_default_client_reaches_public_route():
     manager = make_member("scope-enforcement-manager", makerspace)
     created = authenticated_client(manager).post(
         f"/api/v1/admin/makerspace/{makerspace.pk}/api-clients",
-        {"label": "Tenant web", "allowed_origins": [ORIGIN]},
+        {"label": "Tenant web", "allowed_origins": [ORIGIN], "scopes": ["public:read"]},
         format="json",
     )
     path = f"/api/v1/public/{makerspace.slug}/inventory/"
 
     assert created.status_code == 201
     stored = ApiClientModel.objects.get(pk=created.data["id"])
-    assert stored.scopes == [LEGACY_SCOPE]
+    assert stored.scopes == ["public:read"]
     response = APIClient().get(
         path,
         **_signed_headers(stored.client_id, created.data["client_secret"], path),

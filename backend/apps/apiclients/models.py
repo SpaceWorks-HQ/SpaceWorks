@@ -1,6 +1,7 @@
 import secrets
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.apiclients.crypto import decrypt_secret, encrypt_secret
@@ -92,20 +93,19 @@ class ApiClient(models.Model):
         cls,
         *,
         label,
+        scopes,
         makerspace=None,
         allowed_origins=None,
         created_by=None,
         client_type="browser",
-        scopes=None,
         rate_limit_tier="standard",
     ):
-        from apps.apiclients.scope_registry import LEGACY_SCOPE
-
         raw = secrets.token_urlsafe(32)
-        # Deliberate temporary carry-over: tenant staff cannot select scopes through
-        # their serializer yet. Until that surface exists, an omitted/empty value must
-        # receive the frozen legacy capability or tenant-created clients would be bricked.
-        issued_scopes = list(scopes) if scopes else [LEGACY_SCOPE]
+        issued_scopes = list(scopes or [])
+        if not issued_scopes:
+            raise ValidationError(
+                {"scopes": "At least one API-client scope is required."}
+            )
         obj = cls(
             label=label,
             makerspace=makerspace,

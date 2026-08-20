@@ -16,7 +16,6 @@ from apps.admin_api.api_client_serializers import (
     ApiClientSerializer,
     ApiClientCreateResponseSerializer,
     ApiKeyRequestSerializer,
-    ApiIntegrationSettingsSerializer,
 )
 from apps.admin_api.permissions import IsActiveStaff, require_action
 from apps.apiclients.models import ApiClient, ApiKeyRequest
@@ -28,8 +27,34 @@ from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.makerspaces.servability import is_servable
 
 
-API_CLIENT_SECRET_ROTATION_GRACE_PERIOD = timedelta(hours=24)
 ERRORS = {401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer}
+
+
+def _visible_makerspace(actor, makerspace_id):
+    makerspace = get_object_or_404(
+        rbac.scope_by_visibility_or_action(
+            actor,
+            rbac.Action.MANAGE_MAKERSPACE,
+            Makerspace.objects.all(),
+            field="id",
+        ),
+        pk=makerspace_id,
+    )
+    if not rbac.can(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk):
+        raise PermissionDenied()
+    return makerspace
+
+
+def _visible_clients(actor):
+    return rbac.scope_by_visibility_or_action(
+        actor, rbac.Action.MANAGE_MAKERSPACE, ApiClient.objects.all()
+    )
+
+
+def _related_makerspace(makerspace_id):
+    if makerspace_id is None:
+        return None
+    return Makerspace.objects.get(pk=makerspace_id)
 
 
 @extend_schema_view(
@@ -47,25 +72,17 @@ class ApiClientListCreateView(generics.ListCreateAPIView):
         return context
 
     def get_queryset(self):
-        makerspace_id = self.kwargs["makerspace_id"]
-        require_action(
-            self.request.user,
-            rbac.Action.MANAGE_MAKERSPACE,
-            makerspace_id,
+        makerspace = _visible_makerspace(
+            self.request.user, self.kwargs["makerspace_id"]
         )
         return (
             ApiClient.objects.select_related("makerspace")
-            .filter(makerspace_id=makerspace_id)
+            .filter(makerspace=makerspace)
             .order_by("label")
         )
 
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)
-
     def create(self, request, *args, **kwargs):
-        makerspace_id = self.kwargs["makerspace_id"]
-        require_action(request.user, rbac.Action.MANAGE_MAKERSPACE, makerspace_id)
-        makerspace = get_object_or_404(Makerspace, pk=makerspace_id)
+        makerspace = _visible_makerspace(request.user, self.kwargs["makerspace_id"])
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -77,7 +94,7 @@ class ApiClientListCreateView(generics.ListCreateAPIView):
                     allowed_origins=serializer.validated_data["allowed_origins"],
                     created_by=request.user,
                     client_type=serializer.validated_data.get("client_type", "server"),
-                    scopes=serializer.validated_data.get("scopes") or [],
+                    scopes=serializer.validated_data["scopes"],
                     rate_limit_tier=serializer.validated_data.get(
                         "rate_limit_tier", "standard"
                     ),
@@ -94,7 +111,10 @@ class ApiClientListCreateView(generics.ListCreateAPIView):
             "api_client.created",
             makerspace=makerspace,
             target=client,
-            meta={"allowed_origins": client.allowed_origins},
+            meta={
+                "allowed_origins": client.allowed_origins,
+                "scopes": client.scopes,
+            },
         )
         return Response(data, status=status.HTTP_201_CREATED)
 
@@ -111,22 +131,47 @@ class ApiClientDetailView(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ["get", "patch", "delete", "head", "options"]
 
     def get_queryset(self):
-        return rbac.scope_by_action(
+        return _visible_clients(self.request.user).select_related("makerspace")
+
+    def get_object(self):
+        instance = super().get_object()
+        if not rbac.can(
             self.request.user,
             rbac.Action.MANAGE_MAKERSPACE,
-            ApiClient.objects.select_related("makerspace"),
-        )
+            instance.makerspace_id,
+        ):
+            raise PermissionDenied()
+        return instance
 
     def perform_update(self, serializer):
-        makerspace = serializer.instance.makerspace
-        reactivating = (
-            not serializer.instance.is_active
-            and serializer.validated_data.get("is_active") is True
-        )
+        previous_scopes = list(serializer.instance.scopes)
+        changing_scopes = "scopes" in serializer.validated_data
         with transaction.atomic():
-            if reactivating:
+            if changing_scopes:
+                # Do not join the nullable makerspace FK in this FOR UPDATE query.
+                serializer.instance = ApiClient.objects.select_for_update().get(
+                    pk=serializer.instance.pk
+                )
+                previous_scopes = list(serializer.instance.scopes)
+                makerspace = _related_makerspace(serializer.instance.makerspace_id)
+                serializer.instance.makerspace = makerspace
+            else:
+                makerspace = serializer.instance.makerspace
+            reactivating = (
+                not serializer.instance.is_active
+                and serializer.validated_data.get("is_active") is True
+            )
+            if reactivating and makerspace is not None:
                 limits.check_quota(makerspace, "api_clients", adding=1)
             instance = serializer.save()
+            if changing_scopes and previous_scopes != instance.scopes:
+                audit.record(
+                    self.request.user,
+                    "api_client.scopes_changed",
+                    makerspace=makerspace,
+                    target=instance,
+                    meta={"previous_scopes": previous_scopes, "scopes": instance.scopes},
+                )
         sync_makerspace_origins(instance.makerspace)
         audit.record(
             self.request.user,
@@ -158,11 +203,7 @@ class ApiClientRotateSecretView(generics.GenericAPIView):
     permission_classes = [IsActiveStaff]
 
     def get_queryset(self):
-        return rbac.scope_by_action(
-            self.request.user,
-            rbac.Action.MANAGE_MAKERSPACE,
-            ApiClient.objects.select_related("makerspace"),
-        )
+        return _visible_clients(self.request.user)
 
     def post(self, request, *args, **kwargs):
         with transaction.atomic():
@@ -170,12 +211,19 @@ class ApiClientRotateSecretView(generics.GenericAPIView):
                 self.get_queryset().select_for_update(of=("self",)),
                 pk=self.kwargs["pk"],
             )
+            if not rbac.can(
+                request.user,
+                rbac.Action.MANAGE_MAKERSPACE,
+                client.makerspace_id,
+            ):
+                raise PermissionDenied()
+            client.makerspace = _related_makerspace(client.makerspace_id)
             self.check_object_permissions(request, client)
             current_secret = client.get_secret()
             raw_secret = secrets.token_urlsafe(32)
             while secrets.compare_digest(raw_secret, current_secret):
                 raw_secret = secrets.token_urlsafe(32)
-            grace_expires_at = timezone.now() + API_CLIENT_SECRET_ROTATION_GRACE_PERIOD
+            grace_expires_at = timezone.now() + timedelta(hours=24)
             client.previous_secret_encrypted = client.secret_encrypted
             client.previous_secret_valid_until = grace_expires_at
             client.set_secret(raw_secret)
@@ -249,25 +297,4 @@ class ApiKeyRequestListCreateView(generics.ListCreateAPIView):
             makerspace=makerspace,
             target=api_key_request,
             meta={"allowed_origins": api_key_request.allowed_origins},
-        )
-
-
-@extend_schema(tags=["API clients"], summary="Retrieve or update API integration settings")
-class ApiIntegrationSettingsView(generics.RetrieveUpdateAPIView):
-    serializer_class = ApiIntegrationSettingsSerializer
-    permission_classes = [IsActiveStaff]
-    http_method_names = ["get", "patch", "head", "options"]
-
-    def get_object(self):
-        makerspace_id = self.kwargs["makerspace_id"]
-        require_action(self.request.user, rbac.Action.MANAGE_MAKERSPACE, makerspace_id)
-        return get_object_or_404(Makerspace, pk=makerspace_id)
-
-    def perform_update(self, serializer):
-        instance = serializer.save()
-        audit.record(
-            self.request.user,
-            "api_integration.updated",
-            makerspace=instance,
-            target=instance,
         )

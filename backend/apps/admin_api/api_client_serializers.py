@@ -1,5 +1,6 @@
 from apps.admin_api.api_client_serializers_clients import (
     ApiClientCreateResponseSerializer,
+    ApiClientScopeOptionSerializer,
     ApiClientSerializer,
     ApiKeyRequestSerializer,
 )
@@ -10,6 +11,7 @@ from apps.admin_api.api_client_serializers_integrations import (
 __all__ = [
     "ApiClientCreateResponseSerializer",
     "ApiClientSerializer",
+    "ApiClientScopeOptionSerializer",
     "ApiIntegrationSettingsSerializer",
     "ApiKeyRequestSerializer",
 ]

@@ -28,7 +28,8 @@ def _guard_v1_public(settings):
 def test_issue_returns_raw_secret_and_stores_it_encrypted():
     s = Makerspace.objects.create(name="Kochi", slug="kochi")
     client, raw = ApiClient.issue(
-        label="Kochi public", makerspace=s, allowed_origins=["http://localhost:5000"]
+        label="Kochi public", makerspace=s, allowed_origins=["http://localhost:5000"],
+        scopes=["public:read"],
     )
     assert client.client_id.startswith("ck_")
     assert client.get_secret() == raw                 # round-trips
@@ -45,10 +46,12 @@ def test_api_client_admin_changelist_is_superadmin_only():
     a = Makerspace.objects.create(name="A", slug="a")
     b = Makerspace.objects.create(name="B", slug="b")
     ApiClient.issue(
-        label="A-client", makerspace=a, allowed_origins=["https://a.example.com"]
+        label="A-client", makerspace=a, allowed_origins=["https://a.example.com"],
+        scopes=["public:read"],
     )
     ApiClient.issue(
-        label="B-client", makerspace=b, allowed_origins=["https://b.example.com"]
+        label="B-client", makerspace=b, allowed_origins=["https://b.example.com"],
+        scopes=["public:read"],
     )
     manager = _admin_user(
         "api-client-manager",
@@ -112,7 +115,7 @@ def _sign(client_obj, raw_secret, path, origin):
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=True)
 def test_valid_signed_client_passes():
-    obj, raw = ApiClient.issue(label="ok", allowed_origins=["http://localhost:5000"])
+    obj, raw = ApiClient.issue(label="ok", allowed_origins=["http://localhost:5000"], scopes=["public:read"])
     resp = APIClient().get(PUBLIC, **_sign(obj, raw, PUBLIC, "http://localhost:5000"))
     assert resp.status_code == 200
 
@@ -126,14 +129,14 @@ def test_unknown_client_rejected():
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=True)
 def test_disallowed_origin_rejected():
-    obj, raw = ApiClient.issue(label="ok2", allowed_origins=["http://localhost:5000"])
+    obj, raw = ApiClient.issue(label="ok2", allowed_origins=["http://localhost:5000"], scopes=["public:read"])
     resp = APIClient().get(PUBLIC, **_sign(obj, raw, PUBLIC, "https://evil.test"))
     assert resp.status_code == 401
 
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=True)
 def test_inactive_client_rejected():
-    obj, raw = ApiClient.issue(label="off", allowed_origins=["http://localhost:5000"])
+    obj, raw = ApiClient.issue(label="off", allowed_origins=["http://localhost:5000"], scopes=["public:read"])
     obj.is_active = False
     obj.save()
     resp = APIClient().get(PUBLIC, **_sign(obj, raw, PUBLIC, "http://localhost:5000"))

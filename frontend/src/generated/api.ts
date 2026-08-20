@@ -184,6 +184,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/analytics/summary",
   "/api/v1/admin/makerspace/{makerspace_id}/analytics/taken-items",
   "/api/v1/admin/makerspace/{makerspace_id}/analytics/top-borrowers",
+  "/api/v1/admin/makerspace/{makerspace_id}/api-client-scopes",
   "/api/v1/admin/makerspace/{makerspace_id}/api-clients",
   "/api/v1/admin/makerspace/{makerspace_id}/api-settings",
   "/api/v1/admin/makerspace/{makerspace_id}/archive-requests",
@@ -593,7 +594,7 @@ export type ApiClient = {
   "label": string;
   "client_id": string;
   "client_type"?: ClientTypeEnum;
-  "scopes"?: Array<string>;
+  "scopes": Array<string>;
   "rate_limit_tier"?: RateLimitTierEnum;
   "makerspace": number | null;
   "public_makerspace_code": string;
@@ -613,7 +614,7 @@ export type ApiClientCreateResponse = {
   "client_id": string;
   "client_secret": string;
   "client_type"?: ClientTypeEnum;
-  "scopes"?: Array<string>;
+  "scopes": Array<string>;
   "rate_limit_tier"?: RateLimitTierEnum;
   "makerspace": number | null;
   "public_makerspace_code": string;
@@ -625,6 +626,15 @@ export type ApiClientCreateResponse = {
   "last_seen_ip": string | null;
   "created_at": string;
   "updated_at": string;
+};
+
+export type ApiClientScopeOption = {
+  "value": string;
+  "label": string;
+  "description": string;
+  "group": string;
+  "grantable": boolean;
+  "lock_reason": string | null;
 };
 
 export type ApiIntegrationSettings = {

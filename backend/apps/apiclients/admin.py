@@ -6,9 +6,11 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from unfold.admin import ModelAdmin
-from apps.apiclients.models import ApiClient, ApiKeyRequest
+
 from apps.apiclients.admin_forms import ApiClientAdminForm
+from apps.apiclients.models import ApiClient, ApiKeyRequest
 from apps.apiclients.notifications import notify_api_key_request_resolved
+from apps.apiclients.scope_registry import LEGACY_SCOPE
 from apps.apiclients.services import sync_makerspace_origins
 from apps.audit import services as audit
 from apps.makerspaces import limits
@@ -167,6 +169,7 @@ class ApiKeyRequestAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
                         allowed_origins=api_key_request.allowed_origins or [],
                         created_by=request.user,
                         client_type="server",
+                        scopes=[LEGACY_SCOPE],
                     )
             except DRFValidationError as exc:
                 self.message_user(

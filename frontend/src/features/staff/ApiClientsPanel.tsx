@@ -5,6 +5,7 @@ import { ApiClientCreateCard } from "./ApiClientCreateCard";
 import { ApiClientListCard } from "./ApiClientListCard";
 import {
   apiClientsQueryKey,
+  apiClientScopesQueryKey,
   apiKeyRequestsQueryKey,
   apiSettingsQueryKey,
   createApiClient,
@@ -16,6 +17,8 @@ import {
   type ApiClientCreateResponse,
   type ApiKeyRequest,
   type ApiSettings,
+  type ApiClientScopeOption,
+  updateApiClientScopes,
 } from "./apiClientsApi";
 import { ApiClientsAccessSummary } from "./ApiClientsAccessSummary";
 import { ApiClientsTelegramSettings } from "./ApiClientsTelegramSettings";
@@ -34,6 +37,7 @@ export function ApiClientsPanel({
   const [label, setLabel] = useState("");
   const [reason, setReason] = useState("");
   const [origins, setOrigins] = useState("");
+  const [scopes, setScopes] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [oneTimeSecret, setOneTimeSecret] = useState<ApiClientCreateResponse | null>(null);
   const requests = useStaffGet<{ results: ApiKeyRequest[] }>(
@@ -44,6 +48,11 @@ export function ApiClientsPanel({
   const apiClients = useStaffGet<{ results: ApiClient[] }>(
     apiClientsQueryKey(makerspace.id),
     `/admin/makerspace/${makerspace.id}/api-clients`,
+    canManageMakerspace,
+  );
+  const scopeOptions = useStaffGet<ApiClientScopeOption[]>(
+    apiClientScopesQueryKey(makerspace.id),
+    `/admin/makerspace/${makerspace.id}/api-client-scopes`,
     canManageMakerspace,
   );
   const settings = useStaffGet<ApiSettings>(
@@ -63,10 +72,11 @@ export function ApiClientsPanel({
     },
   });
   const createClient = useMutation({
-    mutationFn: () => createApiClient(makerspace.id, label, splitOrigins(origins)),
+    mutationFn: () => createApiClient(makerspace.id, label, splitOrigins(origins), scopes),
     onSuccess: (created) => {
       setLabel("");
       setOrigins("");
+      setScopes([]);
       setOneTimeSecret(created);
       queryClient.invalidateQueries({ queryKey: apiClientsQueryKey(makerspace.id) });
     },
@@ -81,6 +91,14 @@ export function ApiClientsPanel({
     mutationFn: rotateApiClient,
     onSuccess: (rotated) => {
       setOneTimeSecret(rotated);
+      queryClient.invalidateQueries({ queryKey: apiClientsQueryKey(makerspace.id) });
+    },
+  });
+  const updateScopes = useMutation({
+    mutationFn: ({ clientId, nextScopes }: { clientId: number; nextScopes: string[] }) => (
+      updateApiClientScopes(clientId, nextScopes)
+    ),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: apiClientsQueryKey(makerspace.id) });
     },
   });
@@ -111,9 +129,14 @@ export function ApiClientsPanel({
             oneTimeSecret={oneTimeSecret}
             isPending={canManageMakerspace ? createClient.isPending : requestKey.isPending}
             error={canManageMakerspace ? createClient.error : requestKey.error}
+            scopeOptions={scopeOptions.data ?? []}
+            scopes={scopes}
+            scopesLoading={scopeOptions.isLoading}
+            scopesError={scopeOptions.error}
             onLabelChange={handleLabelChange}
             onReasonChange={handleReasonChange}
             onOriginsChange={handleOriginsChange}
+            onScopesChange={setScopes}
             onSubmit={() => canManageMakerspace ? createClient.mutate() : requestKey.mutate()}
             onDismissSecret={() => setOneTimeSecret(null)}
           />
@@ -134,8 +157,14 @@ export function ApiClientsPanel({
             deleteError={deleteClient.error}
             rotatePending={rotateClient.isPending}
             rotateError={rotateClient.error}
+            scopeOptions={scopeOptions.data ?? []}
+            scopesLoading={scopeOptions.isLoading}
+            scopesError={scopeOptions.error}
+            scopeUpdatePending={updateScopes.isPending}
+            scopeUpdateError={updateScopes.error}
             onDelete={(clientId) => deleteClient.mutate(clientId)}
             onRotate={(clientId) => rotateClient.mutate(clientId)}
+            onScopesUpdate={(clientId, nextScopes) => updateScopes.mutate({ clientId, nextScopes })}
           />
         </div>
       </div>
