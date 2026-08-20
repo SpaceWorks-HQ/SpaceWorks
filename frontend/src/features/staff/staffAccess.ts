@@ -1,5 +1,5 @@
 const ALL_TABS = [
-  "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "bookings", "members", "tobuy", "transfers",
+  "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "organized", "bookings", "members", "tobuy", "transfers",
   "stocktake", "containers", "ledger", "reports", "accountability", "warranty", "bulk", "qr", "scanner", "api", "settings", "emailtemplates", "users", "platform", "audit",
   "email-logs", "payments", "modules", "exports", "backups", "migration",
 ] as const;
@@ -24,6 +24,7 @@ export const TAB_LABELS: Record<string, string> = {
   scanner: "Scanner",
   machines: "Machines",
   events: "Events",
+  organized: "Organized events",
   bookings: "Bookings",
   members: "Members",
   tobuy: "To Buy",
@@ -48,7 +49,7 @@ export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
   { label: "Operate", tabs: ["dashboard", "notifications", "requests", "direct", "handover", "payments", "ledger", "transfers", "stocktake", "tobuy"] },
   { label: "Inventory", tabs: ["inventory", "categories", "needsfix", "containers", "bulk", "qr", "scanner"] },
   { label: "Machines", tabs: ["machines"] },
-  { label: "Events", tabs: ["events"] },
+  { label: "Events", tabs: ["events", "organized"] },
   { label: "Bookings", tabs: ["bookings"] },
   { label: "Members", tabs: ["members"] },
   { label: "Insights", tabs: ["reports", "accountability", "warranty", "audit"] },
@@ -131,6 +132,13 @@ export function getStaffAccess(
     if (tabName === "modules") return isSuperadmin;
     if (tabName === "machines") return canManageMachines;
     if (tabName === "events") return canManageEvents;
+    // Organizer authority is per event and cross-venue; selected-space actions cannot
+    // describe it. Superadmins are excluded because the organizer endpoint excludes them.
+    // Excluded in a single-tenant deployment too: the organizer list is a TARGETLESS global
+    // route, and origin_scope._global_endpoint_allowed permits only `admin-makerspaces` on a
+    // hard-scoped staff origin, so on a verified custom domain the tab would render and then
+    // 403 on every load. Those users reach it through the central console instead.
+    if (tabName === "organized") return !isSuperadmin && !singleTenantLocked;
     if (tabName === "bookings") return canManageBookings;
     if (tabName === "members") return canManageMakerspace;
     if (tabName === "payments") return canManageMakerspace;

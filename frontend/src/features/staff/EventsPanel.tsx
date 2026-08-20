@@ -148,7 +148,7 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
   );
 }
 
-function EventDrawer({ eventId, makerspaceId, onClose }: { eventId: number; makerspaceId: number; onClose: () => void }) {
+export function EventDrawer({ eventId, makerspaceId, onClose }: { eventId: number; makerspaceId: number; onClose: () => void }) {
   const eventQuery = useEvent(eventId);
   const event = eventQuery.data;
   const [values, setValues] = useState(emptyForm);
