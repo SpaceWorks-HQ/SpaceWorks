@@ -69,13 +69,8 @@ class ApiClientSerializer(serializers.ModelSerializer):
         )
         return actor_may_grant_privileged_scopes(actor, makerspace_id)
 
-    def validate(self, attrs):
-        # Trust knobs remain global-only. Scope validation instead applies the tenant
-        # grant ceiling, so tenant input is explicit and never silently discarded.
-        has_global_privilege = self._actor_may_set_privileged_fields()
-        if not has_global_privilege:
-            for field in ("client_type", "rate_limit_tier"):
-                attrs.pop(field, None)
+    def validate_client_type_scope_ceiling(self, attrs):
+        """Validate the requested state against this serializer's current instance."""
         client_type = attrs.get("client_type") or getattr(
             self.instance, "client_type", "server"
         )
@@ -85,6 +80,14 @@ class ApiClientSerializer(serializers.ModelSerializer):
                 {"scopes": "Browser clients may only use public/read scopes."}
             )
         return attrs
+
+    def validate(self, attrs):
+        # Trust knobs remain global-only. Scope validation instead applies the tenant
+        # grant ceiling, so tenant input is explicit and never silently discarded.
+        if not self._actor_may_set_privileged_fields():
+            for field in ("client_type", "rate_limit_tier"):
+                attrs.pop(field, None)
+        return self.validate_client_type_scope_ceiling(attrs)
 
     def get_backend_base_url(self, _obj) -> str:
         request = self.context.get("request")
@@ -105,6 +108,13 @@ class ApiClientScopeOptionSerializer(serializers.Serializer):
     group = serializers.CharField()
     grantable = serializers.BooleanField()
     lock_reason = serializers.CharField(allow_null=True)
+
+
+class ApiClientScopeCatalogResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True, required=False)
+    previous = serializers.CharField(allow_null=True, required=False)
+    results = ApiClientScopeOptionSerializer(many=True)
 
 
 class ApiClientCreateResponseSerializer(ApiClientSerializer):

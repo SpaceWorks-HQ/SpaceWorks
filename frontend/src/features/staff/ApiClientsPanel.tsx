@@ -17,7 +17,7 @@ import {
   type ApiClientCreateResponse,
   type ApiKeyRequest,
   type ApiSettings,
-  type ApiClientScopeOption,
+  type ApiClientScopeCatalog,
   updateApiClientScopes,
 } from "./apiClientsApi";
 import { ApiClientsAccessSummary } from "./ApiClientsAccessSummary";
@@ -50,7 +50,7 @@ export function ApiClientsPanel({
     `/admin/makerspace/${makerspace.id}/api-clients`,
     canManageMakerspace,
   );
-  const scopeOptions = useStaffGet<ApiClientScopeOption[]>(
+  const scopeOptions = useStaffGet<ApiClientScopeCatalog>(
     apiClientScopesQueryKey(makerspace.id),
     `/admin/makerspace/${makerspace.id}/api-client-scopes`,
     canManageMakerspace,
@@ -60,6 +60,10 @@ export function ApiClientsPanel({
     `/admin/makerspace/${makerspace.id}/api-settings`,
     isSuperadmin,
   );
+  const catalog = scopeOptions.data?.results ?? [];
+  const selectableCreateScopes = scopes.filter((scope) => (
+    catalog.some((option) => option.value === scope && option.grantable)
+  ));
 
   const requestKey = useMutation({
     mutationFn: () => requestApiKey(makerspace.id, label, reason, splitOrigins(origins)),
@@ -72,7 +76,12 @@ export function ApiClientsPanel({
     },
   });
   const createClient = useMutation({
-    mutationFn: () => createApiClient(makerspace.id, label, splitOrigins(origins), scopes),
+    mutationFn: () => createApiClient(
+      makerspace.id,
+      label,
+      splitOrigins(origins),
+      selectableCreateScopes,
+    ),
     onSuccess: (created) => {
       setLabel("");
       setOrigins("");
@@ -129,8 +138,8 @@ export function ApiClientsPanel({
             oneTimeSecret={oneTimeSecret}
             isPending={canManageMakerspace ? createClient.isPending : requestKey.isPending}
             error={canManageMakerspace ? createClient.error : requestKey.error}
-            scopeOptions={scopeOptions.data ?? []}
-            scopes={scopes}
+            scopeOptions={catalog}
+            scopes={selectableCreateScopes}
             scopesLoading={scopeOptions.isLoading}
             scopesError={scopeOptions.error}
             onLabelChange={handleLabelChange}
@@ -157,7 +166,7 @@ export function ApiClientsPanel({
             deleteError={deleteClient.error}
             rotatePending={rotateClient.isPending}
             rotateError={rotateClient.error}
-            scopeOptions={scopeOptions.data ?? []}
+            scopeOptions={catalog}
             scopesLoading={scopeOptions.isLoading}
             scopesError={scopeOptions.error}
             scopeUpdatePending={updateScopes.isPending}

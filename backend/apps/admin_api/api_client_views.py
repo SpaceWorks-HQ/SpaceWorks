@@ -5,26 +5,26 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from apps.accounts import rbac
-from apps.accounts.models import User
 from apps.admin_api.api_client_serializers import (
     ApiClientSerializer,
     ApiClientCreateResponseSerializer,
-    ApiKeyRequestSerializer,
 )
-from apps.admin_api.permissions import IsActiveStaff, require_action
-from apps.apiclients.models import ApiClient, ApiKeyRequest
+from apps.admin_api.api_key_request_views import (
+    ApiKeyRequestListCreateView as ApiKeyRequestListCreateView,
+)
+from apps.admin_api.permissions import IsActiveStaff
+from apps.apiclients.models import ApiClient
 from apps.apiclients.services import sync_makerspace_origins
 from apps.audit import services as audit
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces import limits
-from apps.makerspaces.models import Makerspace, MakerspaceMembership
-from apps.makerspaces.servability import is_servable
+from apps.makerspaces.models import Makerspace
 
 
 ERRORS = {401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer}
@@ -146,8 +146,11 @@ class ApiClientDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_update(self, serializer):
         previous_scopes = list(serializer.instance.scopes)
         changing_scopes = "scopes" in serializer.validated_data
+        changing_scope_ceiling = (
+            changing_scopes or "client_type" in serializer.validated_data
+        )
         with transaction.atomic():
-            if changing_scopes:
+            if changing_scope_ceiling:
                 # Do not join the nullable makerspace FK in this FOR UPDATE query.
                 serializer.instance = ApiClient.objects.select_for_update().get(
                     pk=serializer.instance.pk
@@ -155,6 +158,11 @@ class ApiClientDetailView(generics.RetrieveUpdateDestroyAPIView):
                 previous_scopes = list(serializer.instance.scopes)
                 makerspace = _related_makerspace(serializer.instance.makerspace_id)
                 serializer.instance.makerspace = makerspace
+                # is_valid() ran before the lock. Check the combined incoming values
+                # against the row state that will actually be persisted.
+                serializer.validate_client_type_scope_ceiling(
+                    serializer.validated_data
+                )
             else:
                 makerspace = serializer.instance.makerspace
             reactivating = (
@@ -248,53 +256,3 @@ class ApiClientRotateSecretView(generics.GenericAPIView):
         data = ApiClientSerializer(client, context=self.get_serializer_context()).data
         data["client_secret"] = raw_secret
         return Response(data)
-
-
-@extend_schema(
-    tags=["API key requests"],
-    summary="List or create API key requests",
-    parameters=[OpenApiParameter("makerspace", int, OpenApiParameter.QUERY)],
-)
-class ApiKeyRequestListCreateView(generics.ListCreateAPIView):
-    serializer_class = ApiKeyRequestSerializer
-    permission_classes = [IsActiveStaff]
-
-    def get_queryset(self):
-        queryset = (
-            ApiKeyRequest.objects.select_related("makerspace", "requester")
-            .filter(requester=self.request.user)
-            .order_by("-created_at")
-        )
-        makerspace_id = self.request.query_params.get("makerspace")
-        if makerspace_id:
-            queryset = queryset.filter(makerspace_id=makerspace_id)
-        return queryset
-
-    def perform_create(self, serializer):
-        makerspace = serializer.validated_data["makerspace"]
-        # Any active staff MEMBER of the makerspace may file a request (incl. print/guest
-        # admins who lack VIEW_INVENTORY) - issuance still happens only in the superadmin
-        # /control/ admin. Gate on membership existence, not a specific action.
-        user = self.request.user
-        is_superadmin = user.is_superuser or user.role == User.Role.SUPERADMIN
-        is_member = MakerspaceMembership.objects.filter(
-            user=user, makerspace_id=makerspace.id, status="active"
-        ).exists()
-        if not is_servable(makerspace):
-            raise PermissionDenied()
-        if is_superadmin and not is_member:
-            require_action(user, rbac.Action.MANAGE_MAKERSPACE, makerspace.id)
-        elif not is_member:
-            raise PermissionDenied()
-
-        api_key_request = serializer.save(
-            requester=self.request.user,
-            status=ApiKeyRequest.Status.PENDING,
-        )
-        audit.record(
-            self.request.user,
-            "api_key_request.created",
-            makerspace=makerspace,
-            target=api_key_request,
-            meta={"allowed_origins": api_key_request.allowed_origins},
-        )

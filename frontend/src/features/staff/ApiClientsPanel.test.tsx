@@ -21,6 +21,8 @@ vi.mock("./StaffPanels", async () => {
 const scopes: ApiClientScopeOption[] = [
   { value: "public:read", label: "Public read", description: "Read public routes.", group: "Public API", grantable: true, lock_reason: null },
   { value: "public:write", label: "Public write", description: "Write public routes.", group: "Public API", grantable: true, lock_reason: null },
+  { value: "admin:write", label: "Admin write", description: "Write admin routes.", group: "Operator-only", grantable: true, lock_reason: null },
+  { value: "admin:*", label: "All admin access", description: "All admin routes.", group: "Operator-only", grantable: true, lock_reason: null },
   { value: "legacy:v1", label: "Legacy v1 compatibility", description: "Frozen cutover access.", group: "Legacy", grantable: false, lock_reason: "Only a global superadmin may grant this scope." },
 ];
 
@@ -28,6 +30,7 @@ const legacyClient: ApiClient = {
   id: 9,
   label: "Legacy client",
   client_id: "ck_legacy",
+  client_type: "server",
   last_seen_at: null,
   allowed_origins: ["https://lab.example"],
   scopes: ["legacy:v1"],
@@ -45,13 +48,17 @@ const makerspace = {
   hidden_from_central_directory: false,
 } as Makerspace;
 
-function configureQueries(scopeError: Error | null = null) {
+function configureQueries(scopeError: Error | null = null, clients = [legacyClient]) {
   query.mockImplementation((key: unknown[]) => {
     if (key[0] === "api-clients") {
-      return { data: { results: [legacyClient] }, isLoading: false, error: null };
+      return { data: { results: clients }, isLoading: false, error: null };
     }
     if (key[0] === "api-client-scopes") {
-      return { data: scopeError ? undefined : scopes, isLoading: false, error: scopeError };
+      return {
+        data: scopeError ? undefined : { count: scopes.length, next: null, previous: null, results: scopes },
+        isLoading: false,
+        error: scopeError,
+      };
     }
     if (key[0] === "api-key-requests") {
       return { data: { results: [] }, isLoading: false, error: null };
@@ -87,6 +94,8 @@ describe("ApiClientsPanel scope picker", () => {
     fireEvent.change(create.getByPlaceholderText("Client label"), { target: { value: "Public app" } });
     fireEvent.change(create.getByPlaceholderText(/allowed browser origins/i), { target: { value: "https://app.example" } });
     expect(create.getByRole("button", { name: /create api client/i })).toBeDisabled();
+    expect(create.getByRole("checkbox", { name: /legacy v1/i })).toBeDisabled();
+    fireEvent.click(create.getByRole("checkbox", { name: /legacy v1/i }));
     fireEvent.click(create.getByRole("checkbox", { name: /public read/i }));
     fireEvent.click(create.getByRole("button", { name: /create api client/i }));
 
@@ -112,6 +121,32 @@ describe("ApiClientsPanel scope picker", () => {
       { method: "PATCH", body: JSON.stringify({ scopes: ["public:write"] }) },
     ));
     await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["api-clients", 7] }));
+  });
+
+  it("locks browser-incompatible scopes and PATCHes only selectable scopes", async () => {
+    const browserClient = {
+      ...legacyClient,
+      label: "Browser client",
+      client_type: "browser" as const,
+      scopes: ["public:read"],
+    };
+    configureQueries(null, [browserClient]);
+    staffRequest.mockResolvedValue({ ...browserClient, scopes: ["public:read", "public:write"] });
+    renderPanel();
+    const row = screen.getByText("Browser client").closest("div.rounded-md") as HTMLElement;
+    const editor = within(row);
+
+    expect(editor.getByRole("checkbox", { name: /admin write/i })).toBeDisabled();
+    expect(editor.getByRole("checkbox", { name: /all admin access/i })).toBeDisabled();
+    expect(editor.getAllByText(/browser clients may only use public\/read scopes/i)).toHaveLength(2);
+    fireEvent.click(editor.getByRole("checkbox", { name: /admin write/i }));
+    fireEvent.click(editor.getByRole("checkbox", { name: /public write/i }));
+    fireEvent.click(editor.getByRole("button", { name: /save scopes/i }));
+
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(
+      "/admin/api-clients/9",
+      { method: "PATCH", body: JSON.stringify({ scopes: ["public:read", "public:write"] }) },
+    ));
   });
 
   it("renders catalog errors and leaves create disabled", () => {

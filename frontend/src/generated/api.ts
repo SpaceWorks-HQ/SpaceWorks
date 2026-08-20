@@ -628,6 +628,13 @@ export type ApiClientCreateResponse = {
   "updated_at": string;
 };
 
+export type ApiClientScopeCatalogResponse = {
+  "count": number;
+  "next"?: string | null;
+  "previous"?: string | null;
+  "results": Array<ApiClientScopeOption>;
+};
+
 export type ApiClientScopeOption = {
   "value": string;
   "label": string;

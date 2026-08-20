@@ -9637,7 +9637,7 @@
         },
         "/api/v1/admin/makerspace/{makerspace_id}/api-client-scopes": {
             "get": {
-                "operationId": "api_v1_admin_makerspace_api_client_scopes_list",
+                "operationId": "api_v1_admin_makerspace_api_client_scopes_retrieve",
                 "summary": "List API-client scope grant options",
                 "parameters": [
                     {
@@ -9662,10 +9662,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/ApiClientScopeOption"
-                                    }
+                                    "$ref": "#/components/schemas/ApiClientScopeCatalogResponse"
                                 }
                             }
                         },
@@ -34308,6 +34305,32 @@
                     "public_makerspace_code",
                     "scopes",
                     "updated_at"
+                ]
+            },
+            "ApiClientScopeCatalogResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ApiClientScopeOption"
+                        }
+                    }
+                },
+                "required": [
+                    "count",
+                    "results"
                 ]
             },
             "ApiClientScopeOption": {

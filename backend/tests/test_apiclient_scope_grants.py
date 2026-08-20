@@ -8,7 +8,7 @@ from apps.accounts.models import User
 from apps.admin_api.api_client_serializers import ApiClientSerializer
 from apps.apiclients.models import ApiClient
 from apps.apiclients.scope_grants import TENANT_GRANTABLE_SCOPES
-from apps.apiclients.scope_registry import SCOPE_VOCABULARY
+from apps.apiclients.scope_registry import ADMIN_WRITE, SCOPE_VOCABULARY
 from apps.audit.models import AuditLog
 from apps.makerspaces.models import MakerspaceMembership
 from tests.handout_roles import make_handout_member
@@ -95,7 +95,10 @@ def test_hidden_space_superadmin_is_tenant_limited():
     assert allowed.data["rate_limit_tier"] == "standard"
     assert denied.status_code == 400
     assert catalog.status_code == 200
-    assert {row["value"] for row in catalog.data if row["grantable"]} == TENANT_GRANTABLE_SCOPES
+    grantable = {
+        row["value"] for row in catalog.data["results"] if row["grantable"]
+    }
+    assert grantable == TENANT_GRANTABLE_SCOPES
 
 
 def test_catalog_returns_grantability_and_lock_reasons():
@@ -106,9 +109,14 @@ def test_catalog_returns_grantability_and_lock_reasons():
     )
 
     assert response.status_code == 200
-    by_value = {row["value"]: row for row in response.data}
+    assert set(response.data) == {"count", "next", "previous", "results"}
+    assert response.data["count"] == len(SCOPE_VOCABULARY)
+    assert response.data["next"] is response.data["previous"] is None
+    by_value = {row["value"]: row for row in response.data["results"]}
     assert set(by_value) == SCOPE_VOCABULARY
-    assert {value for value, row in by_value.items() if row["grantable"]} == TENANT_GRANTABLE_SCOPES
+    assert {
+        value for value, row in by_value.items() if row["grantable"]
+    } == TENANT_GRANTABLE_SCOPES
     assert all(by_value[value]["lock_reason"] is None for value in TENANT_GRANTABLE_SCOPES)
     assert all(by_value[value]["lock_reason"] for value in SCOPE_VOCABULARY - TENANT_GRANTABLE_SCOPES)
 
@@ -120,8 +128,8 @@ def test_catalog_returns_grantability_and_lock_reasons():
         f"/api/v1/admin/makerspace/{makerspace.pk}/api-client-scopes"
     )
     assert privileged.status_code == 200
-    assert all(row["grantable"] for row in privileged.data)
-    assert all(row["lock_reason"] is None for row in privileged.data)
+    assert all(row["grantable"] for row in privileged.data["results"])
+    assert all(row["lock_reason"] is None for row in privileged.data["results"])
 
 
 def _operation(client, operation, makerspace, api_client):
@@ -237,3 +245,52 @@ def test_concurrent_scope_changes_lock_and_serialize(monkeypatch):
         {"previous_scopes": ["public:read"], "scopes": ["public:write"]},
         {"previous_scopes": ["public:write"], "scopes": ["public:read", "public:write"]},
     ]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_browser_change_blocks_incompatible_scope_patch(monkeypatch):
+    makerspace = make_space("browser-scope-lock")
+    actor = make_user(
+        "browser-scope-superadmin", role=User.Role.SUPERADMIN,
+        access_status=User.AccessStatus.ACTIVE, is_superuser=True,
+    )
+    api_client, _ = ApiClient.issue(
+        label="Race-safe", makerspace=makerspace, allowed_origins=[ORIGIN],
+        scopes=["public:read"], client_type="server",
+    )
+    browser_locked, release_browser = Event(), Event()
+    original_update = ApiClientSerializer.update
+
+    def hold_browser(serializer, instance, validated_data):
+        if validated_data.get("client_type") == "browser":
+            browser_locked.set()
+            assert release_browser.wait(timeout=5)
+        return original_update(serializer, instance, validated_data)
+
+    monkeypatch.setattr(ApiClientSerializer, "update", hold_browser)
+
+    def patch(payload):
+        close_old_connections()
+        try:
+            response = authenticated_client(User.objects.get(pk=actor.pk)).patch(
+                f"/api/v1/admin/api-clients/{api_client.pk}", payload, format="json"
+            )
+            return response.status_code, response.data
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        browser = pool.submit(patch, {"client_type": "browser"})
+        assert browser_locked.wait(timeout=5)
+        admin_scope = pool.submit(patch, {"scopes": [ADMIN_WRITE]})
+        with pytest.raises(TimeoutError):
+            admin_scope.result(timeout=0.1)
+        release_browser.set()
+        assert browser.result(timeout=5)[0] == 200
+        scope_status, scope_data = admin_scope.result(timeout=5)
+
+    api_client.refresh_from_db()
+    assert scope_status == 400
+    assert "Browser clients may only use public/read scopes" in str(scope_data)
+    assert api_client.client_type == "browser"
+    assert api_client.scopes == ["public:read"]

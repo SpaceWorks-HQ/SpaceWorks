@@ -12,6 +12,7 @@ export type ApiClient = {
   id: number;
   label: string;
   client_id: string;
+  client_type: "server" | "browser";
   last_seen_at: string | null;
   allowed_origins: string[];
   scopes: string[];
@@ -27,6 +28,30 @@ export type ApiClientScopeOption = {
   grantable: boolean;
   lock_reason: string | null;
 };
+
+export type ApiClientScopeCatalog = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: ApiClientScopeOption[];
+};
+
+const browserClientScopes = new Set([
+  "legacy:v1", "public:read", "public:write", "public:*", "admin:read", "reports:read",
+]);
+const browserScopeLockReason = "Browser clients may only use public/read scopes.";
+
+export function scopeOptionsForClient(
+  options: ApiClientScopeOption[],
+  clientType: ApiClient["client_type"],
+) {
+  if (clientType !== "browser") return options;
+  return options.map((option) => browserClientScopes.has(option.value) ? option : {
+    ...option,
+    grantable: false,
+    lock_reason: browserScopeLockReason,
+  });
+}
 
 export type ApiClientCreateResponse = ApiClient & {
   client_secret: string;

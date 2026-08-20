@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { ApiClientScopePicker } from "./ApiClientScopePicker";
-import type { ApiClient, ApiClientScopeOption, ApiKeyRequest } from "./apiClientsApi";
+import {
+  scopeOptionsForClient,
+  type ApiClient,
+  type ApiClientScopeOption,
+  type ApiKeyRequest,
+} from "./apiClientsApi";
 
 type Props = {
   canManageMakerspace: boolean;
@@ -120,9 +125,15 @@ function ApiClientRow({ client, scopeOptions, scopesLoading, updatePending, dele
 }) {
   const [selected, setSelected] = useState<string[]>(client.scopes);
   useEffect(() => setSelected(client.scopes), [client.scopes]);
+  const clientScopeOptions = useMemo(
+    () => scopeOptionsForClient(scopeOptions, client.client_type),
+    [client.client_type, scopeOptions],
+  );
   const grantable = useMemo(
-    () => selected.filter((scope) => scopeOptions.some((option) => option.value === scope && option.grantable)),
-    [scopeOptions, selected],
+    () => selected.filter((scope) => clientScopeOptions.some(
+      (option) => option.value === scope && option.grantable,
+    )),
+    [clientScopeOptions, selected],
   );
   const hasLegacy = client.scopes.includes("legacy:v1");
   const changed = grantable.join("\0") !== client.scopes.join("\0");
@@ -137,7 +148,7 @@ function ApiClientRow({ client, scopeOptions, scopesLoading, updatePending, dele
       <p className="mt-2 text-xs text-muted">Scopes: {client.scopes.join(", ")}</p>
       {hasLegacy ? <p className="mt-2 rounded-md border border-warn/40 bg-warn/10 p-2 text-xs text-warn-ink">Legacy v1 access preserves the frozen cutover capability. Select explicit replacement scopes and save; viewing this client never changes it.</p> : null}
       {scopesLoading ? <p className="mt-2 text-xs text-muted">Loading scope choices...</p> : null}
-      {!scopesLoading && scopeOptions.length ? <div className="mt-2"><ApiClientScopePicker options={scopeOptions} selected={selected} onChange={setSelected} disabled={updatePending} /></div> : null}
+      {!scopesLoading && clientScopeOptions.length ? <div className="mt-2"><ApiClientScopePicker options={clientScopeOptions} selected={selected} onChange={setSelected} disabled={updatePending} /></div> : null}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">{formatDate(client.created_at)} · {client.last_seen_at ? `last used ${formatDate(client.last_seen_at)}` : "never used"}</p>
         <div className="desk-actions flex flex-wrap gap-2">
