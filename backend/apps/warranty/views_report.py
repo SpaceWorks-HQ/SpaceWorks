@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
+from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.warranty.serializers import (
     WarrantyReportQuerySerializer,
     WarrantyReportRowSerializer,
@@ -35,6 +36,7 @@ from apps.warranty.status import (
 )
 
 _VALID_STATUSES = {value for value, _ in STATUS_CHOICES}
+ERRORS = {401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer}
 
 
 class MakerspaceWarrantyReportView(APIView):
@@ -62,7 +64,7 @@ class MakerspaceWarrantyReportView(APIView):
                 description="Only include hosts with warranty expiry on or before this date.",
             ),
         ],
-        responses={200: WarrantyReportRowSerializer(many=True)},
+        responses={200: WarrantyReportRowSerializer(many=True), **ERRORS},
     )
     def get(self, request, makerspace_id, *args, **kwargs):
         makerspace = get_object_or_404(

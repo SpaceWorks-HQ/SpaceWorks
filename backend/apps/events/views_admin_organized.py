@@ -18,6 +18,10 @@ from apps.events.views_admin import (
     _annotate_registration_counts,
     _paginated_response,
 )
+from apps.hardware_requests.exceptions import ErrorSerializer
+
+
+ERRORS = {401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer}
 
 
 class OrganizedEventListView(APIView):
@@ -36,7 +40,7 @@ class OrganizedEventListView(APIView):
         tags=['Events'],
         summary='List events organized by the actor\'s organizations',
         request=None,
-        responses={200: EventListResponseSerializer},
+        responses={200: EventListResponseSerializer, **ERRORS},
     )
     def get(self, request, *args, **kwargs):
         # Resolved as a SUBQUERY, not a join: an actor in two organizations that both

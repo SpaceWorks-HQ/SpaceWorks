@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff, require_action
+from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.warranty.serializers import WarrantySerializer, WarrantyUpsertSerializer
 from apps.warranty.views_report import MakerspaceWarrantyReportView
 from apps.warranty.access import (
@@ -17,6 +18,9 @@ from apps.audit import services as audit
 from apps.makerspaces.guards import require_module
 from apps.machines import access as machine_access
 from apps.warranty.models import Warranty
+
+
+ERRORS = {401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer}
 
 
 class AssetWarrantyView(APIView):
@@ -31,7 +35,7 @@ class AssetWarrantyView(APIView):
     @extend_schema(
         tags=["Admin warranty"],
         summary="Retrieve warranty details for an inventory asset",
-        responses={200: WarrantySerializer},
+        responses={200: WarrantySerializer, **ERRORS},
     )
     def get(self, request, pk, *args, **kwargs):
         asset = self._asset(request, pk)
@@ -47,6 +51,7 @@ class AssetWarrantyView(APIView):
         responses={
             200: WarrantySerializer,
             400: OpenApiResponse(description="Invalid warranty details."),
+            **ERRORS,
         },
     )
     def put(self, request, pk, *args, **kwargs):
@@ -79,7 +84,7 @@ class MachineWarrantyView(APIView):
     @extend_schema(
         tags=["Admin warranty"],
         summary="Retrieve warranty details for a machine",
-        responses={200: WarrantySerializer},
+        responses={200: WarrantySerializer, **ERRORS},
     )
     def get(self, request, pk, *args, **kwargs):
         machine = self._machine(request, pk)
@@ -95,6 +100,7 @@ class MachineWarrantyView(APIView):
         responses={
             200: WarrantySerializer,
             400: OpenApiResponse(description="Invalid warranty details."),
+            **ERRORS,
         },
     )
     def put(self, request, pk, *args, **kwargs):

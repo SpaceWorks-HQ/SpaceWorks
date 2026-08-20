@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
@@ -22,14 +22,20 @@ from apps.admin_api.permissions import IsActiveStaff, require_action
 from apps.apiclients.models import ApiClient, ApiKeyRequest
 from apps.apiclients.services import sync_makerspace_origins
 from apps.audit import services as audit
+from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces import limits
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.makerspaces.servability import is_servable
 
 
 API_CLIENT_SECRET_ROTATION_GRACE_PERIOD = timedelta(hours=24)
+ERRORS = {401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer}
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: ApiClientSerializer(many=True), **ERRORS}),
+    post=extend_schema(responses={201: ApiClientCreateResponseSerializer, **ERRORS}),
+)
 @extend_schema(tags=["API clients"], summary="List or create makerspace API clients")
 class ApiClientListCreateView(generics.ListCreateAPIView):
     serializer_class = ApiClientSerializer
@@ -53,7 +59,6 @@ class ApiClientListCreateView(generics.ListCreateAPIView):
             .order_by("label")
         )
 
-    @extend_schema(responses={201: ApiClientCreateResponseSerializer})
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
@@ -94,6 +99,11 @@ class ApiClientListCreateView(generics.ListCreateAPIView):
         return Response(data, status=status.HTTP_201_CREATED)
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: ApiClientSerializer, **ERRORS}),
+    patch=extend_schema(responses={200: ApiClientSerializer, **ERRORS}),
+    delete=extend_schema(responses={204: None, **ERRORS}),
+)
 @extend_schema(tags=["API clients"], summary="Retrieve, update, or delete API client")
 class ApiClientDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ApiClientSerializer
@@ -141,7 +151,7 @@ class ApiClientDetailView(generics.RetrieveUpdateDestroyAPIView):
     tags=["API clients"],
     summary="Rotate API client secret",
     request=None,
-    responses={200: ApiClientCreateResponseSerializer},
+    responses={200: ApiClientCreateResponseSerializer, **ERRORS},
 )
 class ApiClientRotateSecretView(generics.GenericAPIView):
     serializer_class = ApiClientSerializer

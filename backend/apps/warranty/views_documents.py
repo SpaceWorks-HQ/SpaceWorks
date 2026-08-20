@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.admin_api.permissions import IsActiveStaff
+from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.warranty.serializers import (
     WarrantyDocumentFinalizeSerializer,
     WarrantyDocumentPresignSerializer,
@@ -21,6 +22,9 @@ from apps.warranty import storage
 from apps.warranty.models import WarrantyDocument
 
 
+ERRORS = {401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer}
+
+
 class WarrantyDocumentPresignView(APIView):
     permission_classes = [IsActiveStaff]
 
@@ -31,6 +35,7 @@ class WarrantyDocumentPresignView(APIView):
         responses={
             201: WarrantyDocumentUploadResponseSerializer,
             400: OpenApiResponse(description="Invalid document upload request."),
+            **ERRORS,
             503: OpenApiResponse(description="Warranty document storage is unavailable."),
         },
     )
@@ -58,7 +63,7 @@ class WarrantyDocumentCreateView(APIView):
     @extend_schema(
         tags=["Admin warranty"],
         summary="List documents attached to a warranty",
-        responses={200: WarrantyDocumentSerializer(many=True)},
+        responses={200: WarrantyDocumentSerializer(many=True), **ERRORS},
     )
     def get(self, request, pk, *args, **kwargs):
         warranty = resolve_warranty(request.user, pk)
@@ -73,6 +78,7 @@ class WarrantyDocumentCreateView(APIView):
         responses={
             201: WarrantyDocumentSerializer,
             400: OpenApiResponse(description="Invalid or duplicate warranty document."),
+            **ERRORS,
             503: OpenApiResponse(description="Warranty document storage is unavailable."),
         },
     )
@@ -122,6 +128,7 @@ class WarrantyDocumentUrlView(APIView):
         summary="Create a signed warranty document view URL",
         responses={
             200: WarrantyDocumentUrlSerializer,
+            **ERRORS,
             503: OpenApiResponse(description="Warranty document storage is unavailable."),
         },
     )
@@ -141,7 +148,7 @@ class WarrantyDocumentDeleteView(APIView):
     @extend_schema(
         tags=["Admin warranty"],
         summary="Delete a warranty document",
-        responses={204: None},
+        responses={204: None, **ERRORS},
     )
     def delete(self, request, pk, *args, **kwargs):
         document = resolve_document(request.user, pk)
