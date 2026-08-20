@@ -6,7 +6,10 @@ from .anchors_base import (
     _identity,
     _stable_envelope,
     _validate_fetched,
+    _validate_fetched_rotation,
     anchors_match,
+    rotation_identity,
+    validate_rotation_envelope,
 )
 from .anchors_configuration import configured_sink
 from .anchors_http import HttpCollectorAnchorSink
@@ -21,6 +24,9 @@ __all__ = [
     "_identity",
     "_stable_envelope",
     "_validate_fetched",
+    "_validate_fetched_rotation",
     "anchors_match",
     "configured_sink",
+    "rotation_identity",
+    "validate_rotation_envelope",
 ]

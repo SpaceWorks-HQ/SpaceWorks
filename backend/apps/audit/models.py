@@ -107,7 +107,13 @@ class AuditMacKey(models.Model):
         return f"Audit MAC key for makerspace {self.makerspace_id or 'global'}"
 
 
-from .models_signing import AuditBatch, AuditBatchLeaf, AuditSigningKey  # noqa: E402
+from .models_signing import (  # noqa: E402
+    AuditBatch,
+    AuditBatchLeaf,
+    AuditSigningKey,
+    AuditSigningKeyRotation,
+    AuditSigningKeyRotationEvent,
+)
 
 
 __all__ = [
@@ -116,4 +122,6 @@ __all__ = [
     "AuditLog",
     "AuditMacKey",
     "AuditSigningKey",
+    "AuditSigningKeyRotation",
+    "AuditSigningKeyRotationEvent",
 ]

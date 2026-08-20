@@ -57,7 +57,14 @@ def _delete_object_graph(makerspace):
         DeviceRefreshToken,
         NativeAppRegistration,
     )
-    from apps.audit.models import AuditBatch, AuditBatchLeaf, AuditLog
+    from apps.audit.models import (
+        AuditBatch,
+        AuditBatchLeaf,
+        AuditLog,
+        AuditSigningKey,
+        AuditSigningKeyRotation,
+        AuditSigningKeyRotationEvent,
+    )
     from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
     from apps.evidence.models import EvidencePhoto
     from apps.events.models import EventOrganizer, EventRegistration
@@ -165,6 +172,14 @@ def _delete_object_graph(makerspace):
         # deployment-local state about rows that are being destroyed anyway.
         AuditBatchLeaf.objects.filter(batch__makerspace=makerspace).delete()
         AuditBatch.objects.filter(makerspace=makerspace).delete()
+        AuditSigningKeyRotationEvent.objects.filter(
+            rotation__makerspace=makerspace
+        ).delete()
+        # Break the row-local pending claim before deleting immutable transitions.
+        AuditSigningKey.objects.filter(makerspace=makerspace).update(
+            pending_rotation=None
+        )
+        AuditSigningKeyRotation.objects.filter(makerspace=makerspace).delete()
         AuditLog.objects.filter(makerspace=makerspace).delete()
         Payment.objects.filter(makerspace=makerspace).delete()
         ProcessedStripeEvent.objects.filter(makerspace=makerspace).delete()

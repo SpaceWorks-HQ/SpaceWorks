@@ -134,6 +134,12 @@ OMITTED_MODELS = {
     "audit.AuditBatch": "Deployment-local externally anchored attestation state.",
     "audit.AuditBatchLeaf": "Deployment-local externally anchored attestation membership.",
     "audit.AuditSigningKey": "Deployment-local audit signing authority.",
+    "audit.AuditSigningKeyRotation": (
+        "Deployment-local omitted audit signing-key transition integrity material."
+    ),
+    "audit.AuditSigningKeyRotationEvent": (
+        "Deployment-local omitted audit signing-key lifecycle integrity material."
+    ),
     "encryption.MakerspaceEncryptionKey": "Encryption key material never enters a manager export.",
     "encryption.PiiBlindIndex": "Deployment-local derived identity index.",
     "encryption.PiiGlobalWriteFence": "Platform coordination state.",

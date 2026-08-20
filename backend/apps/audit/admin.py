@@ -7,6 +7,8 @@ from apps.audit.models import (
     AuditLog,
     AuditMacKey,
     AuditSigningKey,
+    AuditSigningKeyRotation,
+    AuditSigningKeyRotationEvent,
 )
 from config.admin_access import SuperuserOnlyModelAdmin
 
@@ -83,17 +85,56 @@ class _ReadOnlyAuditAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
 
 @admin.register(AuditSigningKey)
 class AuditSigningKeyAdmin(_ReadOnlyAuditAdmin):
-    list_display = ("makerspace", "fingerprint", "created_at", "activated_at")
-    list_filter = ("makerspace", "created_at", "activated_at")
+    list_display = (
+        "makerspace", "version", "fingerprint", "is_active", "valid_from_seq",
+        "valid_to_seq", "created_at", "activated_at",
+    )
+    list_filter = ("makerspace", "is_active", "created_at", "activated_at")
     exclude = ("wrapped_private_key", "activation_signature")
     readonly_fields = (
         "makerspace",
         "public_key",
         "fingerprint",
+        "version",
+        "valid_from_seq",
+        "valid_to_seq",
+        "is_active",
+        "pending_rotation",
         "activation_payload",
         "created_at",
         "activated_at",
     )
+
+
+@admin.register(AuditSigningKeyRotation)
+class AuditSigningKeyRotationAdmin(_ReadOnlyAuditAdmin):
+    list_display = (
+        "id", "makerspace", "old_version", "new_version",
+        "last_old_batch_seq", "created_at",
+    )
+    list_filter = ("makerspace", "created_at")
+    readonly_fields = (
+        "id", "makerspace", "old_key", "new_key", "old_fingerprint",
+        "new_fingerprint", "old_version", "new_version", "last_old_batch_seq",
+        "last_old_batch_root", "payload", "old_signature", "new_signature",
+        "created_at",
+    )
+
+
+@admin.register(AuditSigningKeyRotationEvent)
+class AuditSigningKeyRotationEventAdmin(_ReadOnlyAuditAdmin):
+    list_display = ("rotation", "state", "created_at")
+    list_filter = ("state", "created_at")
+    readonly_fields = ("rotation", "state", "created_at")
+
+    def resolve_hidden_lookup(self):
+        # The event row carries only the transition state; scope comes from its rotation.
+        # Without this a superadmin who hid a makerspace would still see that space's
+        # rotation history in /control/ -- the same hide-scoping hole ORG-2b closed for
+        # OrganizationMembership. The model also reaches Makerspace through
+        # rotation__old_key and rotation__new_key; the rotation's own FK is the canonical
+        # one, since both keys belong to that scope by construction.
+        return "rotation__makerspace_id"
 
 
 @admin.register(AuditBatch)

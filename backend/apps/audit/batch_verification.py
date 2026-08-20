@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from apps.audit.batch_format import (
+    ANCHOR_PROTOCOL_VERSION,
     batch_payload,
     canonical_payload_bytes,
     hashes_for_rows,
@@ -14,6 +15,7 @@ from apps.audit.models import AuditSigningKey
 from apps.audit.signing import (
     AuditSigningKeyUnavailable,
     deployment_identity,
+    key_authorizes_sequence,
 )
 from apps.ed25519 import Ed25519Error, verify_bytes
 
@@ -33,6 +35,8 @@ class AuditFailureClass(StrEnum):
     ANCHOR_UNAVAILABLE = "anchor_unavailable"
     # An anchored batch has no local counterpart: local batches were removed.
     BATCH_MISSING = "batch_missing"
+    KEY_INTERVAL = "key_interval"
+    ROTATION_CHAIN = "rotation_chain"
 
 
 @dataclass(frozen=True)
@@ -59,7 +63,7 @@ def ordered_batch_rows(batch):
     return rows
 
 
-def verify_batch_local(batch):
+def verify_batch_local(batch, key=None):
     try:
         rows = ordered_batch_rows(batch)
         calculated_root = merkle_root(hashes_for_rows(rows))
@@ -78,10 +82,17 @@ def verify_batch_local(batch):
             batch.batch_seq,
         )
     try:
-        key = AuditSigningKey.objects.get(
+        key = key or AuditSigningKey.objects.get(
             makerspace_id=batch.makerspace_id,
             fingerprint=batch.signer_fingerprint,
         )
+        if not key_authorizes_sequence(key, batch.batch_seq):
+            return AuditIntegrityFailure(
+                AuditFailureClass.KEY_INTERVAL,
+                "The signer is outside its explicit sequence interval.",
+                batch.makerspace_id,
+                batch.batch_seq,
+            )
         payload = batch_payload(
             deployment_id=deployment_identity(),
             makerspace_id=batch.makerspace_id,
@@ -91,6 +102,9 @@ def verify_batch_local(batch):
             prev_root=batch.prev_batch_root,
             created_at=batch.created_at,
             signer_fingerprint=batch.signer_fingerprint,
+            anchor_protocol_version=(
+                ANCHOR_PROTOCOL_VERSION if key.version > 1 else None
+            ),
         )
         verify_bytes(
             canonical_payload_bytes(payload),

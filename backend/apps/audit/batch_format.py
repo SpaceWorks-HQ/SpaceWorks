@@ -5,11 +5,14 @@ import json
 import struct
 
 from apps.audit.canonical import canonical_timestamp
+from apps.ed25519 import encode_key
 
 
 FORMAT_VERSION = 1
+ANCHOR_PROTOCOL_VERSION = 2
 BATCH_DOMAIN = "spaceworks.audit-batch"
 CUTOVER_DOMAIN = "spaceworks.audit-cutover"
+ROTATION_DOMAIN = "spaceworks.audit-signing-key-rotation"
 LEAF_DOMAIN = b"spaceworks.audit-batch.leaf.v1\x00"
 NODE_DOMAIN = b"spaceworks.audit-batch.node.v1\x00"
 GENESIS_ROW_DOMAIN = b"spaceworks.audit-cutover.row.v1\x00"
@@ -100,8 +103,9 @@ def genesis_membership(rows):
 
 
 def batch_payload(*, deployment_id, makerspace_id, batch_seq, rows, root,
-                  prev_root, created_at, signer_fingerprint):
-    return {
+                  prev_root, created_at, signer_fingerprint,
+                  anchor_protocol_version=None):
+    payload = {
         "format_version": FORMAT_VERSION,
         "domain": BATCH_DOMAIN,
         "deployment_id": deployment_id,
@@ -113,6 +117,30 @@ def batch_payload(*, deployment_id, makerspace_id, batch_seq, rows, root,
         "prev_batch_root": bytes(prev_root).hex() if prev_root is not None else None,
         "created_at": canonical_timestamp(created_at),
         "signer_fingerprint": signer_fingerprint,
+    }
+    if anchor_protocol_version is not None:
+        payload["anchor_protocol_version"] = int(anchor_protocol_version)
+    return payload
+
+
+def rotation_payload(*, deployment_id, makerspace_id, rotation_id, old_key,
+                     new_key, last_old_batch_seq, last_old_batch_root, created_at):
+    return {
+        "format_version": FORMAT_VERSION,
+        "anchor_protocol_version": ANCHOR_PROTOCOL_VERSION,
+        "domain": ROTATION_DOMAIN,
+        "entry_type": "key_rotation",
+        "deployment_id": deployment_id,
+        "scope": scope_name(makerspace_id),
+        "rotation_id": str(rotation_id),
+        "old_fingerprint": old_key.fingerprint,
+        "new_fingerprint": new_key.fingerprint,
+        "old_version": int(old_key.version),
+        "new_version": int(new_key.version),
+        "last_old_batch_seq": int(last_old_batch_seq),
+        "last_old_batch_root": bytes(last_old_batch_root).hex(),
+        "new_public_key": encode_key(bytes(new_key.public_key)),
+        "created_at": canonical_timestamp(created_at),
     }
 
 

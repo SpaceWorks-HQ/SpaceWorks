@@ -17,9 +17,10 @@ from .anchors_base import (
     _validate_fetched,
     anchors_match,
 )
+from .anchors_object_rotation import ObjectStorageRotationMixin
 
 
-class ObjectStorageAnchorSink:
+class ObjectStorageAnchorSink(ObjectStorageRotationMixin):
     """Immutable one-object-per-sequence sink for an object-lock enabled bucket."""
 
     def __init__(self):
@@ -134,14 +135,40 @@ class ObjectStorageAnchorSink:
             if not anchors_match(existing, envelope):
                 raise AnchorConflict("This anchor sequence already has other content.")
             return existing
-        latest = self._latest_sequence(identity)
+        protocol = envelope["payload"].get("anchor_protocol_version", 1)
+        scope_latest, scope_signer, _scope_root = self._scope_head(
+            identity[0], identity[1]
+        )
+        if protocol == 2:
+            if identity[3] != scope_latest + 1:
+                raise AnchorConflict(
+                    "The anchor sequence does not continue the scope-global head."
+                )
+            if scope_signer is not None and scope_signer != identity[2]:
+                transition = self.fetch_rotation(
+                    (
+                        identity[0], identity[1], scope_signer, identity[2],
+                        scope_latest,
+                    )
+                )
+                if transition is None:
+                    raise AnchorConflict(
+                        "The new signer has no anchored cross-key transition."
+                    )
+            latest_for_signer = self._latest_sequence(identity)
+        else:
+            if scope_signer is not None and scope_signer != identity[2]:
+                raise AnchorConflict(
+                    "The signer is not the scope-global anchor authority."
+                )
+            latest_for_signer = self._latest_sequence(identity)
         if identity[3] == 0 and self._scope_has_another_signer(identity):
             raise AnchorConflict(
                 "This deployment scope is already pinned to another signer."
             )
-        if identity[3] <= latest:
+        if identity[3] <= latest_for_signer:
             raise AnchorConflict("The anchor sequence regresses the external head.")
-        if identity[3] != latest + 1:
+        if protocol != 2 and identity[3] != latest_for_signer + 1:
             raise AnchorConflict("The anchor sequence leaves a gap in the external chain.")
         stored = {**envelope, "anchored_at": timezone.now().isoformat()}
         try:
@@ -168,4 +195,3 @@ class ObjectStorageAnchorSink:
         except BotoCoreError as exc:
             raise AnchorError("The object anchor could not be persisted.") from exc
         return _validate_fetched(identity, stored)
-

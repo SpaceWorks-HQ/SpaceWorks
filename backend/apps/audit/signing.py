@@ -55,6 +55,10 @@ def _wrap_private_key(makerspace_id, private_key):
 
 
 def private_key_material(row):
+    if row.wrapped_private_key is None:
+        raise AuditSigningKeyUnavailable(
+            "The retired audit signing key has no live private-key copy."
+        )
     try:
         payload = _fernet_or_unavailable().decrypt(bytes(row.wrapped_private_key))
     except Exception as exc:
@@ -120,7 +124,9 @@ def _activation_payload(makerspace_id, public_key, fingerprint, created_at):
 
 
 def provision_signing_key(makerspace_id=None):
-    existing = AuditSigningKey.objects.filter(makerspace_id=makerspace_id).first()
+    existing = AuditSigningKey.objects.filter(
+        makerspace_id=makerspace_id, is_active=True
+    ).first()
     if existing is not None:
         private_key_material(existing)
         return existing, False
@@ -142,12 +148,25 @@ def provision_signing_key(makerspace_id=None):
                     canonical_payload_bytes(payload), private_key
                 ),
                 created_at=created_at,
+                version=1,
+                valid_from_seq=0,
+                is_active=True,
             )
     except IntegrityError:
-        row = AuditSigningKey.objects.get(makerspace_id=makerspace_id)
+        row = AuditSigningKey.objects.get(
+            makerspace_id=makerspace_id, is_active=True
+        )
         private_key_material(row)
         return row, False
     return row, True
+
+
+def key_authorizes_sequence(row, batch_seq):
+    """Whether a stored public key is the interval-authorized signer for a batch."""
+    sequence = int(batch_seq)
+    return sequence >= row.valid_from_seq and (
+        row.valid_to_seq is None or sequence <= row.valid_to_seq
+    )
 
 
 def activation_envelope(row):

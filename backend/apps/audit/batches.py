@@ -1,13 +1,12 @@
 """Single-writer scheduled construction and external anchoring of audit batches."""
 
-import logging
-
 from django.db import connection, transaction
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
-from apps.audit.anchors import AnchorConflict, anchors_match, configured_sink
+from apps.audit.anchors import AnchorConflict, anchors_match
 from apps.audit.batch_format import (
+    ANCHOR_PROTOCOL_VERSION,
     batch_payload,
     canonical_payload_bytes,
     hashes_for_rows,
@@ -17,13 +16,13 @@ from apps.audit.models import (
     AuditBatch,
     AuditBatchLeaf,
     AuditLog,
-    AuditMacKey,
     AuditSigningKey,
 )
 from apps.audit.signing import (
     AuditSigningKeyUnavailable,
     activation_envelope,
     deployment_identity,
+    key_authorizes_sequence,
     private_key_material,
     provision_signing_key,
     validate_genesis_database,
@@ -31,12 +30,15 @@ from apps.audit.signing import (
 from apps.ed25519 import Ed25519Error, encode_key, sign_bytes, verify_bytes
 
 
-logger = logging.getLogger(__name__)
 LOCK_NAMESPACE = 734_320
 
 
 class AuditBatchError(RuntimeError):
     pass
+
+
+class AuditSigningKeyRotationPending(AuditBatchError):
+    """A durable rotation claim pauses only batch sealing, not audit writes."""
 
 
 def _scope_lock(makerspace_id):
@@ -47,18 +49,6 @@ def _scope_lock(makerspace_id):
             "SELECT pg_advisory_xact_lock(%s, %s)",
             [LOCK_NAMESPACE, int(makerspace_id or 0)],
         )
-
-
-def is_writable_primary():
-    if connection.vendor != "postgresql":
-        return False
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT NOT pg_is_in_recovery(), "
-            "current_setting('transaction_read_only') = 'off'"
-        )
-        primary, writable = cursor.fetchone()
-    return bool(primary and writable)
 
 
 def _ordered_rows(batch):
@@ -82,7 +72,14 @@ def batch_envelope(batch):
             prev_root=batch.prev_batch_root,
             created_at=batch.created_at,
             signer_fingerprint=batch.signer_fingerprint,
+            anchor_protocol_version=(
+                ANCHOR_PROTOCOL_VERSION if key.version > 1 else None
+            ),
         )
+        if not key_authorizes_sequence(key, batch.batch_seq):
+            raise AuditBatchError(
+                "The batch signer is outside its authorized sequence interval."
+            )
         verify_bytes(
             canonical_payload_bytes(payload),
             bytes(batch.signature),
@@ -104,6 +101,10 @@ def batch_envelope(batch):
 
 def activate_scope(makerspace_id, sink):
     key, _created = provision_signing_key(makerspace_id)
+    if key.version > 1:
+        if key.activated_at is None or not key.is_active:
+            raise AuditBatchError("The rotated signing key is not active.")
+        return key
     validate_genesis_database(key)
     envelope = activation_envelope(key)
     try:
@@ -134,16 +135,31 @@ def activate_scope(makerspace_id, sink):
 
 
 def synchronize_anchors(makerspace_id, sink, signing_key):
-    activation = activation_envelope(signing_key)
+    genesis_key = AuditSigningKey.objects.get(
+        makerspace_id=makerspace_id, version=1
+    )
+    activation = activation_envelope(genesis_key)
     activation_identity = (
         activation["payload"]["deployment_id"],
         activation["payload"]["scope"],
-        signing_key.fingerprint,
+        genesis_key.fingerprint,
         0,
     )
     external = sink.fetch(activation_identity)
     if external is None or not anchors_match(external, activation):
         raise AnchorConflict("The active cutover manifest is absent or conflicting.")
+    from apps.audit.models import AuditSigningKeyRotation
+    from apps.audit.rotations import rotation_envelope, validate_rotation
+
+    for rotation in AuditSigningKeyRotation.objects.filter(
+        makerspace_id=makerspace_id,
+        events__state="FINALIZED",
+    ).select_related("old_key", "new_key").distinct().order_by("old_version"):
+        envelope = validate_rotation(rotation)
+        identity = sink.rotation_identity(envelope)
+        anchored = sink.fetch_rotation(identity)
+        if anchored is None or not anchors_match(anchored, rotation_envelope(rotation)):
+            raise AnchorConflict("A finalized signing-key transition is absent or conflicting.")
     for batch in AuditBatch.objects.filter(makerspace_id=makerspace_id).order_by(
         "batch_seq"
     ):
@@ -168,10 +184,20 @@ def seal_scope(makerspace_id, signing_key):
     if (
         signing_key.makerspace_id != makerspace_id
         or signing_key.activated_at is None
+        or not signing_key.is_active
     ):
         raise AuditBatchError("The active signing key belongs to another audit scope.")
     with transaction.atomic():
         _scope_lock(makerspace_id)
+        active_key = AuditSigningKey.objects.select_for_update().get(
+            makerspace_id=makerspace_id, is_active=True
+        )
+        if active_key.pk != signing_key.pk:
+            raise AuditBatchError("The supplied signing key is no longer active.")
+        if active_key.pending_rotation_id is not None:
+            raise AuditSigningKeyRotationPending(
+                "Audit batch sealing is paused by a pending signing-key rotation."
+            )
         previous = (
             AuditBatch.objects.filter(makerspace_id=makerspace_id)
             .order_by("-batch_seq")
@@ -193,6 +219,10 @@ def seal_scope(makerspace_id, signing_key):
         hashes = hashes_for_rows(rows)
         root = merkle_root(hashes)
         batch_seq = previous.batch_seq + 1 if previous else 1
+        if not key_authorizes_sequence(active_key, batch_seq):
+            raise AuditBatchError(
+                "The active signing key does not authorize the next batch sequence."
+            )
         prev_root = bytes(previous.merkle_root) if previous else None
         created_at = timezone.now()
         payload = batch_payload(
@@ -203,7 +233,10 @@ def seal_scope(makerspace_id, signing_key):
             root=root,
             prev_root=prev_root,
             created_at=created_at,
-            signer_fingerprint=signing_key.fingerprint,
+            signer_fingerprint=active_key.fingerprint,
+            anchor_protocol_version=(
+                ANCHOR_PROTOCOL_VERSION if active_key.version > 1 else None
+            ),
         )
         batch = AuditBatch.objects.create(
             makerspace_id=makerspace_id,
@@ -214,9 +247,9 @@ def seal_scope(makerspace_id, signing_key):
             created_at=created_at,
             signature=sign_bytes(
                 canonical_payload_bytes(payload),
-                private_key_material(signing_key),
+                private_key_material(active_key),
             ),
-            signer_fingerprint=signing_key.fingerprint,
+            signer_fingerprint=active_key.fingerprint,
         )
         AuditBatchLeaf.objects.bulk_create(
             [
@@ -231,41 +264,4 @@ def seal_scope(makerspace_id, signing_key):
         return batch
 
 
-def run_audit_attestation():
-    # Every anchor setting is blank by default, so without this the scheduled job would
-    # raise on configured_sink() every five minutes -- and the beat-less runner records a
-    # swallowed failure as a successful run, which is worse than being noisy.
-    from django.conf import settings as _settings
-
-    if not getattr(_settings, "AUDIT_ATTESTATION_ANCHOR_BACKEND", ""):
-        return None
-    """Seal all scopes on a primary; failures are logged for scheduled retry."""
-    if not is_writable_primary():
-        logger.info("audit_attestation_skipped_non_writable_primary")
-        return {"sealed": 0, "failed": 0, "skipped": "non_writable_primary"}
-    try:
-        sink = configured_sink()
-    except Exception:  # noqa: BLE001 - beat retries configuration/provider recovery
-        logger.exception("audit_attestation_sink_unavailable")
-        return {"sealed": 0, "failed": 1}
-    scope_ids = list(
-        AuditMacKey.objects.order_by("makerspace_id").values_list(
-            "makerspace_id", flat=True
-        )
-    )
-    result = {"sealed": 0, "failed": 0}
-    for makerspace_id in scope_ids:
-        try:
-            signing_key = activate_scope(makerspace_id, sink)
-            synchronize_anchors(makerspace_id, sink, signing_key)
-            batch = seal_scope(makerspace_id, signing_key)
-            if batch is not None:
-                sink.publish(batch_envelope(batch))
-                result["sealed"] += 1
-        except Exception:  # noqa: BLE001 - one scope/provider failure must not stop others
-            result["failed"] += 1
-            logger.exception(
-                "audit_attestation_scope_failed",
-                extra={"makerspace_id": makerspace_id},
-            )
-    return result
+from .batch_scheduler import is_writable_primary, run_audit_attestation  # noqa: E402,F401
