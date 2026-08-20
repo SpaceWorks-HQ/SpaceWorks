@@ -134,7 +134,11 @@ export function getStaffAccess(
     if (tabName === "events") return canManageEvents;
     // Organizer authority is per event and cross-venue; selected-space actions cannot
     // describe it. Superadmins are excluded because the organizer endpoint excludes them.
-    if (tabName === "organized") return !isSuperadmin;
+    // Excluded in a single-tenant deployment too: the organizer list is a TARGETLESS global
+    // route, and origin_scope._global_endpoint_allowed permits only `admin-makerspaces` on a
+    // hard-scoped staff origin, so on a verified custom domain the tab would render and then
+    // 403 on every load. Those users reach it through the central console instead.
+    if (tabName === "organized") return !isSuperadmin && !singleTenantLocked;
     if (tabName === "bookings") return canManageBookings;
     if (tabName === "members") return canManageMakerspace;
     if (tabName === "payments") return canManageMakerspace;

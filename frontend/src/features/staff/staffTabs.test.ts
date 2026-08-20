@@ -49,6 +49,10 @@ describe("organized events", () => {
 
   it("hides the tab from superadmins and handout-only actors", () => {
     expect(getStaffAccess([], true, false).allowedTabs).not.toContain("organized");
+    // Single-tenant deployments are excluded too: the organizer list is a targetless global
+    // route and origin_scope._global_endpoint_allowed admits only `admin-makerspaces` on a
+    // hard-scoped staff origin, so the tab would 403 on every load there.
+    expect(getStaffAccess(["view_inventory"], false, true).allowedTabs).not.toContain("organized");
     expect(getStaffAccess(["issue_request", "return_request"], false, false).allowedTabs)
       .not.toContain("organized");
   });
