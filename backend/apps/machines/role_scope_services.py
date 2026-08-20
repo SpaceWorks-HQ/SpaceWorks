@@ -85,7 +85,12 @@ def set_role_machine_scope(*, makerspace, role, actor, machine_type_ids, machine
     """
     from apps.makerspaces.models import Makerspace, MakerspaceRole
 
-    makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+    # FOR NO KEY UPDATE, not FOR UPDATE: this row is locked only to serialise the
+    # authority revalidation below, never to change its key. Plain FOR UPDATE conflicts
+    # with the FOR KEY SHARE that foreign-key checks take, so it deadlocked ABBA against
+    # OrganizationMakerspaceAdmin.save_model -- that path locks the link row and then its
+    # scoped audit.record needs a KEY SHARE lock on this makerspace.
+    makerspace = Makerspace.objects.select_for_update(no_key=True).get(pk=makerspace.pk)
     role = MakerspaceRole.objects.select_for_update().get(
         pk=role.pk, makerspace=makerspace
     )
