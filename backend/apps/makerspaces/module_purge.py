@@ -29,6 +29,7 @@ from django.db import connection, transaction
 from apps.audit import services as audit
 from apps.makerspaces.module_purge_plans import BY_KEY, NOT_SEPARABLE, PLANS
 from apps.makerspaces.module_registry import BY_KEY as MODULE_BY_KEY
+from apps.object_storage import delete_all_versions
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +205,9 @@ def _delete_private_keys(keys):
     deleted = set()
     for key in keys:
         try:
-            client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=key)
+            delete_all_versions(
+                client, bucket=settings.AWS_STORAGE_BUCKET_NAME, key=key
+            )
         except Exception:
             logger.exception("module_purge_storage_delete_failed: %s", key)
         else:

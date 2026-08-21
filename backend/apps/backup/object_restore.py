@@ -10,14 +10,12 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from apps.backup import storage
+from apps.backup import object_restore_versions, storage
 from apps.backup.models import RestoreOperation, RestoreRollbackObject
+from apps.backup.object_restore_versions import ObjectRestoreError
 from apps.makerspaces import limits
 from apps.makerspaces.models import Makerspace
-
-
-class ObjectRestoreError(RuntimeError):
-    pass
+from apps.object_storage import delete_all_versions
 
 
 def restore_objects(restore, bundle_root, manifest, journal_path):
@@ -53,6 +51,11 @@ def _prepare_rollback(restore, item, journal):
     copy_key = ""
     source_version = (current or {}).get("VersionId", "") if versioned else ""
     absent = current is None
+    absent_marker_version = (
+        object_restore_versions.current_delete_marker_version_id(client, bucket, key)
+        if versioned and absent
+        else ""
+    )
     if not versioned and not absent:
         copy_key = f"rollback/{restore.pk}/{kind}/{key}"
     maker_id = item.get("makerspace_id")
@@ -64,6 +67,7 @@ def _prepare_rollback(restore, item, journal):
         source_key=key,
         copy_key=copy_key,
         source_was_absent=absent,
+        source_absent_marker_version_id=absent_marker_version,
         source_version_id=source_version,
         expires_at=timezone.now() + timedelta(days=7),
     )
@@ -72,6 +76,7 @@ def _prepare_rollback(restore, item, journal):
         "bucket_kind": kind, "makerspace_id": maker_id,
         "module_key": row.module_key, "size_bytes": 0,
         "source_key": key, "copy_key": copy_key, "absent": absent,
+        "source_absent_marker_version_id": absent_marker_version,
         "source_version_id": source_version,
     })
     if copy_key:
@@ -88,7 +93,7 @@ def _prepare_rollback(restore, item, journal):
                 try:
                     limits.add_storage(maker, size)
                 except Exception:
-                    client.delete_object(Bucket=bucket, Key=copy_key)
+                    delete_all_versions(client, bucket=bucket, key=copy_key)
                     raise
             row.size_bytes = size
             row.save(update_fields=("size_bytes",))
@@ -132,7 +137,15 @@ def rollback_objects(restore):
                     Bucket=bucket, Key=row.source_key, VersionId=current_version
                 )
         elif row.source_was_absent:
-            client.delete_object(Bucket=bucket, Key=row.source_key)
+            if row.source_absent_marker_version_id:
+                object_restore_versions.delete_versions_newer_than_marker(
+                    client,
+                    bucket=bucket,
+                    key=row.source_key,
+                    marker_version_id=row.source_absent_marker_version_id,
+                )
+            else:
+                delete_all_versions(client, bucket=bucket, key=row.source_key)
         elif row.copy_key:
             client.copy_object(
                 Bucket=bucket,
@@ -146,7 +159,9 @@ def cleanup_rollback_objects(restore):
     client = storage.client()
     for row in restore.rollback_objects.select_related("makerspace"):
         if row.copy_key:
-            client.delete_object(Bucket=_bucket(row.bucket_kind), Key=row.copy_key)
+            delete_all_versions(
+                client, bucket=_bucket(row.bucket_kind), key=row.copy_key
+            )
         elif row.source_version_id:
             client.delete_object(
                 Bucket=_bucket(row.bucket_kind),
@@ -169,8 +184,10 @@ def cleanup_expired_rollback_objects(limit=100):
     for row in rows:
         if row.copy_key:
             try:
-                storage.client().delete_object(
-                    Bucket=_bucket(row.bucket_kind), Key=row.copy_key
+                delete_all_versions(
+                    storage.client(),
+                    bucket=_bucket(row.bucket_kind),
+                    key=row.copy_key,
                 )
             except Exception:
                 continue
@@ -236,6 +253,9 @@ def reconcile_rollback_journal(restore, journal_path):
                 "module_key": event.get("module_key", ""),
                 "copy_key": event.get("copy_key", ""),
                 "source_was_absent": bool(event.get("absent")),
+                "source_absent_marker_version_id": event.get(
+                    "source_absent_marker_version_id", ""
+                ),
                 "source_version_id": event.get("source_version_id", ""),
                 "replacement_version_id": event.get("replacement_version_id", ""),
                 "size_bytes": int(event.get("size_bytes") or 0),
@@ -277,4 +297,3 @@ def _bucket(kind):
     if kind == RestoreRollbackObject.BucketKind.PUBLIC_IMAGE:
         return settings.PUBLIC_IMAGE_BUCKET
     raise ObjectRestoreError(f"Unknown bucket kind: {kind}")
-

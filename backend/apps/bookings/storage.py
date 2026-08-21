@@ -12,6 +12,7 @@ from apps.bookings.models import BookableSpace
 from apps.evidence.image_validation import image_mime_from_bytes
 from apps.evidence.storage import StorageUnavailable
 from apps.inventory import public_image_storage as shared
+from apps.object_storage import delete_all_versions
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +67,8 @@ def delete_object(object_key):
     if not object_key:
         return True
     try:
-        _client().delete_object(
-            Bucket=settings.PUBLIC_IMAGE_BUCKET,
-            Key=object_key,
+        delete_all_versions(
+            _client(), bucket=settings.PUBLIC_IMAGE_BUCKET, key=object_key
         )
     except (BotoCoreError, ClientError):
         logger.exception('Failed to delete space image object %s.', object_key)
