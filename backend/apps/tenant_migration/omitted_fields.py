@@ -71,6 +71,7 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
     ),
     **_rules(
         EMPTY_STRING,
+        ("backup.MakerspaceArchiveRecipient", "challenge_nonce_digest"),
         ("machines.Machine", "camera_feed_url"),
         ("makerspaces.Makerspace", "telegram_bot_token"),
         ("makerspaces.Makerspace", "smtp_password"),
@@ -88,6 +89,8 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
     ),
     **_rules(
         NULL,
+        ("backup.MakerspaceArchiveRecipient", "verified_at"),
+        ("backup.MakerspaceArchiveRecipient", "challenge_issued_at"),
         # Nullable AND globally unique, so the guard requires NULL: a freshly
         # generated identity would claim provenance the target has not attested. The
         # target reseals its own rows (row_mac is DERIVED above).

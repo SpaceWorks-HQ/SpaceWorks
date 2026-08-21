@@ -14,6 +14,10 @@ DATASET_SPECS = {
     "apiclients.ApiClient": ("makerspace/api_clients.csv", P(("makerspace",))),
     "apiclients.ApiKeyRequest": ("makerspace/api_key_requests.csv", P(("makerspace",))),
     "audit.AuditLog": ("audit/audit_log.csv", P(("makerspace",))),
+    "backup.MakerspaceArchiveRecipient": (
+        "makerspace/archive_recipients.csv",
+        P(("makerspace",)),
+    ),
     "bookings.BookableSpace": ("bookings/spaces.csv", P(("makerspace",))),
     "bookings.Booking": ("bookings/bookings.csv", P(("space__makerspace",))),
     "boxes.Box": ("inventory/containers_and_boxes.csv", P(("makerspace",))),

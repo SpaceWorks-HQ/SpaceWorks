@@ -73,6 +73,55 @@ class BackupArchive(models.Model):
         indexes = [models.Index(fields=("scope", "makerspace", "status", "created_at"))]
 
 
+class MakerspaceArchiveRecipient(models.Model):
+    makerspace = models.ForeignKey(
+        "makerspaces.Makerspace",
+        on_delete=models.CASCADE,
+        related_name="archive_recipients",
+    )
+    public_recipient = models.CharField(max_length=200)
+    fingerprint = models.CharField(max_length=64)
+    label = models.CharField(max_length=120)
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="added_archive_recipients",
+    )
+    added_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    compromised_at = models.DateTimeField(null=True, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    challenge_nonce_digest = models.CharField(max_length=64, blank=True)
+    challenge_issued_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("pk",)
+
+
+class ArchiveRecipientReservation(models.Model):
+    class Kind(models.TextChoices):
+        TENANT = "tenant", "Tenant"
+        PLATFORM = "platform", "Platform"
+
+    fingerprint = models.CharField(max_length=64, unique=True)
+    makerspace_id_snapshot = models.BigIntegerField(null=True)
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    reserved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(kind="tenant", makerspace_id_snapshot__isnull=False)
+                    | models.Q(kind="platform", makerspace_id_snapshot__isnull=True)
+                ),
+                name="archive_reservation_kind_matches_tenant",
+            )
+        ]
+
+
 class RestoreOperation(models.Model):
     class Kind(models.TextChoices):
         ROLLBACK_IN_PLACE = "rollback_in_place", "Rollback in place"

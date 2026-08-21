@@ -2,6 +2,7 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin
 
 from apps.backup.models import (
+    ArchiveRecipientReservation,
     BackupArchive,
     BackupLease,
     DeploymentRecoveryState,
@@ -37,6 +38,11 @@ class RestoreOperationAdmin(ReadOnlyBackupAdmin):
     readonly_fields = tuple(field.name for field in RestoreOperation._meta.fields)
 
 
-for model in (PlatformBackupSettings, DeploymentRecoveryState, BackupLease, RestoreRollbackObject):
+for model in (
+    PlatformBackupSettings,
+    DeploymentRecoveryState,
+    BackupLease,
+    RestoreRollbackObject,
+    ArchiveRecipientReservation,
+):
     admin.site.register(model, ReadOnlyBackupAdmin)
-
