@@ -8,10 +8,15 @@ from botocore.client import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.db import transaction
-from rest_framework.exceptions import ValidationError
 
 from apps.evidence.storage import StorageUnavailable
+from apps.inventory.public_image_metadata import (
+    ext_for,
+    public_image_key_in_use,
+    public_url,
+)
 from apps.inventory.public_image_sniff import sniff_is_valid_image
+from apps.object_storage import delete_all_versions
 
 
 logger = logging.getLogger(__name__)
@@ -65,9 +70,8 @@ def delete_object(object_key):
     if not object_key:
         return True
     try:
-        _client().delete_object(
-            Bucket=settings.PUBLIC_IMAGE_BUCKET,
-            Key=object_key,
+        delete_all_versions(
+            _client(), bucket=settings.PUBLIC_IMAGE_BUCKET, key=object_key
         )
     except (BotoCoreError, ClientError):
         logger.exception("Failed to delete public image object %s.", object_key)
@@ -235,57 +239,6 @@ def finalize_error_message(result):
     return ""
 
 
-def public_image_key_in_use(
-    makerspace_id, object_key, *, product_id=None, machine_id=None, event_id=None,
-    profile_id=None, project_id=None, makerspace_field="",
-):
-    from django.db.models import Q
-    from apps.events.models import Event
-    from apps.inventory.models import InventoryProduct
-    from apps.machines.models import Machine
-    from apps.makerspaces.models import Makerspace, MemberProfile, MemberProject
-
-    products = InventoryProduct.objects.filter(makerspace_id=makerspace_id, image_key=object_key)
-    if product_id is not None:
-        products = products.exclude(pk=product_id)
-    if products.exists():
-        return True
-    machines = Machine.objects.filter(makerspace_id=makerspace_id, image_key=object_key)
-    if machine_id is not None:
-        machines = machines.exclude(pk=machine_id)
-    if machines.exists():
-        return True
-    # Events share the bucket, so a key claimed by one must not be attachable to
-    # another: clearing the first object's image deletes the underlying object and
-    # would silently blank the second.
-    events = Event.objects.filter(makerspace_id=makerspace_id, image_key=object_key)
-    if event_id is not None:
-        events = events.exclude(pk=event_id)
-    if events.exists():
-        return True
-    # Member avatars and project images share the bucket too. Both are scoped through
-    # the membership, since the profile carries no makerspace column of its own.
-    profiles = MemberProfile.objects.filter(
-        membership__makerspace_id=makerspace_id, avatar_key=object_key
-    )
-    if profile_id is not None:
-        profiles = profiles.exclude(pk=profile_id)
-    if profiles.exists():
-        return True
-    projects = MemberProject.objects.filter(
-        profile__membership__makerspace_id=makerspace_id, image_key=object_key
-    )
-    if project_id is not None:
-        projects = projects.exclude(pk=project_id)
-    if projects.exists():
-        return True
-    makerspace_query = Makerspace.objects.filter(pk=makerspace_id)
-    if makerspace_field == "logo_key":
-        return makerspace_query.filter(cover_image_key=object_key).exists()
-    if makerspace_field == "cover_image_key":
-        return makerspace_query.filter(logo_key=object_key).exists()
-    return makerspace_query.filter(Q(logo_key=object_key) | Q(cover_image_key=object_key)).exists()
-
 def presigned_upload(object_key, content_type):
     try:
         if settings.STORAGE_PRESIGN_METHOD == "put":
@@ -341,28 +294,3 @@ def finalize_upload(object_key):
     if final_size is None or not (1 <= final_size <= max_bytes):
         delete_object(object_key)
     return _finalize_result(object_key, final_size)
-
-
-def public_url(object_key):
-    if not object_key:
-        return ""
-    if settings.PUBLIC_IMAGE_BASE_URL:
-        return f"{settings.PUBLIC_IMAGE_BASE_URL.rstrip('/')}/{object_key}"
-    return (
-        f"{settings.AWS_S3_PUBLIC_ENDPOINT_URL.rstrip('/')}/"
-        f"{settings.PUBLIC_IMAGE_BUCKET}/{object_key}"
-    )
-
-
-def ext_for(content_type, filename):
-    allowed_exts = settings.PUBLIC_IMAGE_ALLOWED_MIME.get(content_type)
-    if not allowed_exts:
-        raise ValidationError({"content_type": "Unsupported public image content type."})
-
-    safe_name = (filename or "").replace("\\", "/").rsplit("/", 1)[-1]
-    ext = f".{safe_name.rsplit('.', 1)[-1].lower()}" if "." in safe_name else ""
-    if ext not in allowed_exts:
-        raise ValidationError(
-            {"filename": "Filename extension does not match the content type."}
-        )
-    return ext

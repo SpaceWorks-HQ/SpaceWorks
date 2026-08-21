@@ -80,6 +80,11 @@ def _superadmin_hidden_to_exclude(actor, action=None):
     return hidden - member_ok
 
 
+def superadmin_hidden_to_exclude_without_servability(actor, action=None):
+    """Return hard-hide exclusions while deliberately omitting servability."""
+    return _superadmin_hidden_to_exclude(actor, action)
+
+
 def superadmin_hidden_block_applies(actor, makerspace_id, action=None):
     """True when a global superadmin must be HARD-blocked from `makerspace_id`."""
     if not _is_superadmin(actor) or makerspace_id is None:

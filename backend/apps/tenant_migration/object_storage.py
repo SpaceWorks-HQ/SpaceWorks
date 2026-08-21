@@ -8,6 +8,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 
 from apps.backup.storage import client
+from apps.object_storage import delete_all_versions
 
 
 CHUNK_SIZE = 1024 * 1024
@@ -120,7 +121,9 @@ def delete_object(bucket_kind, object_key):
     if not object_key:
         return
     try:
-        client().delete_object(Bucket=bucket_name(bucket_kind), Key=object_key)
+        delete_all_versions(
+            client(), bucket=bucket_name(bucket_kind), key=object_key
+        )
     except (BotoCoreError, ClientError) as exc:
         raise TenantObjectStorageError(
             f"Could not delete tenant import object {object_key!r}."

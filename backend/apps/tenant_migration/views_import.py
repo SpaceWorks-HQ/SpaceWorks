@@ -1,14 +1,18 @@
 from datetime import timedelta
 
 from django.conf import settings
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 
+from apps.admin_api.permissions import require_makerspace_superadmin_access
 from apps.audit import services as audit
+from apps.makerspaces.models import Makerspace
 
+from .import_visibility import scope_import_target_makerspaces
 from .models_import_job import TenantImportJob
 from .serializers import (
     ClosureIdentitySerializer,
@@ -28,14 +32,25 @@ from .views_admission_export import MigrationAPIView
 from .views_common import AUTH_ERRORS, CONFLICT, FIELD_ERRORS, NOT_FOUND, protocol_error
 
 
-def _job(job_id):
-    return get_object_or_404(TenantImportJob, pk=job_id)
+def _job(actor, job_id):
+    job = get_object_or_404(
+        TenantImportJob.objects.select_related("target_makerspace"), pk=job_id
+    )
+    if job.target_makerspace is not None:
+        require_makerspace_superadmin_access(actor, job.target_makerspace)
+    return job
 
 
 class TenantImportListCreateView(MigrationAPIView):
     @extend_schema(tags=["Tenant migration"], summary="List tenant import jobs", responses={200: ImportJobSerializer(many=True), **AUTH_ERRORS})
     def get(self, request):
-        rows = TenantImportJob.objects.select_related("target_makerspace").all()[:20]
+        visible_spaces = scope_import_target_makerspaces(
+            request.user, Makerspace.objects.all()
+        ).values_list("pk", flat=True)
+        rows = TenantImportJob.objects.select_related("target_makerspace").filter(
+            Q(target_makerspace__isnull=True)
+            | Q(target_makerspace_id__in=visible_spaces)
+        )[:20]
         audit.record(
             request.user, "tenant_migration.imports_read", target=request.user,
             meta={"import_count": len(rows), "format_version": 1},
@@ -62,9 +77,7 @@ class TenantImportListCreateView(MigrationAPIView):
 class TenantImportDetailView(MigrationAPIView):
     @extend_schema(tags=["Tenant migration"], summary="Read a tenant import job", responses={200: ImportJobSerializer, 404: NOT_FOUND, **AUTH_ERRORS})
     def get(self, request, job_id):
-        job = get_object_or_404(
-            TenantImportJob.objects.select_related("target_makerspace"), pk=job_id
-        )
+        job = _job(request.user, job_id)
         audit.record(
             request.user, "tenant_migration.import_read", target=job,
             meta={"import_id": str(job.pk), "format_version": 1},
@@ -78,7 +91,7 @@ class TenantImportIdentityDecisionsView(MigrationAPIView):
         from .archive_stream import PortableArchive
         from .import_staging import decrypted_archive
 
-        job = _job(job_id)
+        job = _job(request.user, job_id)
         try:
             with decrypted_archive(job.archive_path) as (root, _carried):
                 rows = list(PortableArchive(root).rows("accounts.User"))
@@ -95,11 +108,12 @@ class TenantImportIdentityDecisionsView(MigrationAPIView):
 
     @extend_schema(tags=["Tenant migration"], summary="Submit all per-person import identity decisions", request=ImportDecisionListSerializer, responses={200: ImportJobSerializer, 400: FIELD_ERRORS, 409: CONFLICT, 404: NOT_FOUND, **AUTH_ERRORS})
     def post(self, request, job_id):
+        job = _job(request.user, job_id)
         serializer = ImportDecisionListSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             job = submit_identity_decisions(
-                actor=request.user, job=_job(job_id),
+                actor=request.user, job=job,
                 decisions=serializer.validated_data["decisions"],
             )
         except Exception as exc:
@@ -110,10 +124,11 @@ class TenantImportIdentityDecisionsView(MigrationAPIView):
 class TenantImportRunView(MigrationAPIView):
     @extend_schema(tags=["Tenant migration"], summary="Run an identity-decided tenant import", request=ImportRunSerializer, responses={202: ImportJobSerializer, 400: FIELD_ERRORS, 409: CONFLICT, 404: NOT_FOUND, 503: OpenApiResponse(description="Import worker unavailable."), **AUTH_ERRORS})
     def post(self, request, job_id):
+        job = _job(request.user, job_id)
         serializer = ImportRunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            job = claim_import_job(actor=request.user, job=_job(job_id))
+            job = claim_import_job(actor=request.user, job=job)
         except Exception as exc:
             return protocol_error(exc)
         try:
@@ -137,7 +152,7 @@ class TenantImportRunView(MigrationAPIView):
 class TenantImportVerificationView(MigrationAPIView):
     @extend_schema(tags=["Tenant migration"], summary="Read the import verification report", responses={200: VerificationReportSerializer, 404: NOT_FOUND, 409: CONFLICT, **AUTH_ERRORS})
     def get(self, request, job_id):
-        job = _job(job_id)
+        job = _job(request.user, job_id)
         if not job.verification_report:
             return Response(
                 {"detail": "The verification report is not available.", "code": "report_unavailable"},

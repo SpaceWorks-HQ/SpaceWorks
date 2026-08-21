@@ -7,6 +7,8 @@ from botocore.client import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 
+from apps.object_storage import delete_all_versions
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,9 +79,8 @@ def delete_object(object_key):
     if not object_key:
         return True
     try:
-        _client().delete_object(
-            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-            Key=object_key,
+        delete_all_versions(
+            _client(), bucket=settings.AWS_STORAGE_BUCKET_NAME, key=object_key
         )
         return True
     except (BotoCoreError, ClientError):

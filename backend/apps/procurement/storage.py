@@ -10,6 +10,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.evidence.image_validation import image_mime_from_bytes
 from apps.evidence.storage import StorageUnavailable
+from apps.object_storage import delete_all_versions
 
 
 logger = logging.getLogger(__name__)
@@ -118,7 +119,9 @@ def presigned_upload(object_key, content_type):
 
 def delete_object(object_key):
     try:
-        _client().delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=object_key)
+        delete_all_versions(
+            _client(), bucket=settings.AWS_STORAGE_BUCKET_NAME, key=object_key
+        )
     except (BotoCoreError, ClientError):
         logger.exception("Failed to delete procurement receipt %s.", object_key)
 
