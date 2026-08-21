@@ -60,8 +60,16 @@ def build_maintenance_activity(makerspace_id, *, limit=None, date_range=None):
 
 def _record(row, aggregate):
     interval = None
+    interval_total_days = None
+    interval_gap_count = max(row["logs"] - 1, 0)
     if row["logs"] >= 2:
-        interval = round((row["last"] - row["first"]).total_seconds() / 86400 / (row["logs"] - 1), 2)
+        elapsed = row["last"] - row["first"]
+        interval_total_days = (
+            Decimal(elapsed.days)
+            + Decimal(elapsed.seconds) / Decimal(86400)
+            + Decimal(elapsed.microseconds) / Decimal(86_400_000_000)
+        )
+        interval = round(float(interval_total_days / interval_gap_count), 2)
     record = {
         "machine_id": row["id"], "machine_name": row["name"],
         "machine_type": row["machine_type__name"], "is_active": row["is_active"],
@@ -70,6 +78,10 @@ def _record(row, aggregate):
         "average_cost": row["average"].quantize(CENT, rounding=ROUND_HALF_UP) if row["average"] is not None else None,
         "last_performed_at": row["last"], "average_interval_days": interval,
         "active_schedules": row["active"], "overdue_schedules": row["overdue"],
+        # Internal aggregation inputs deliberately stay outside FIELDS. Existing
+        # single-space API and export schemas therefore remain byte-for-byte stable.
+        "_interval_total_days": interval_total_days,
+        "_interval_gap_count": interval_gap_count,
     }
     if aggregate:
         record["makerspace_id"] = row["makerspace_id"]
