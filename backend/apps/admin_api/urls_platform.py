@@ -27,6 +27,14 @@ from apps.backup.views_restore import (
     RestoreOperationListCreateView,
     RestoreOperationView,
 )
+from apps.backup.views_recipients import (
+    ArchiveRecipientCompromiseView,
+    ArchiveRecipientListCreateView,
+    ArchiveRecipientReactivateView,
+    ArchiveRecipientReissueView,
+    ArchiveRecipientRevokeView,
+    ArchiveRecipientVerifyView,
+)
 from apps.data_export.views import (
     DataExportDetailView,
     DataExportDownloadUrlView,
@@ -71,6 +79,36 @@ urlpatterns = [
         "makerspace/<int:makerspace_id>/backups",
         MakerspaceArchiveListCreateView.as_view(),
         name="admin-makerspace-backups",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/archive-recipients",
+        ArchiveRecipientListCreateView.as_view(),
+        name="admin-archive-recipient-list-create",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/archive-recipients/<int:pk>/verify",
+        ArchiveRecipientVerifyView.as_view(),
+        name="admin-archive-recipient-verify",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/archive-recipients/<int:pk>/reissue-challenge",
+        ArchiveRecipientReissueView.as_view(),
+        name="admin-archive-recipient-reissue",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/archive-recipients/<int:pk>/revoke",
+        ArchiveRecipientRevokeView.as_view(),
+        name="admin-archive-recipient-revoke",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/archive-recipients/<int:pk>/compromise",
+        ArchiveRecipientCompromiseView.as_view(),
+        name="admin-archive-recipient-compromise",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/archive-recipients/<int:pk>/reactivate",
+        ArchiveRecipientReactivateView.as_view(),
+        name="admin-archive-recipient-reactivate",
     ),
     path(
         "backups/<uuid:archive_id>/download-url",

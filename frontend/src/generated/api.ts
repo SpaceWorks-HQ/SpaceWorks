@@ -27,6 +27,7 @@ export const openApiTags = [
   "Asset units",
   "Auth",
   "Backup",
+  "Backup recipients",
   "Backup recovery",
   "Bulk import",
   "Containers",
@@ -187,6 +188,12 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/api-client-scopes",
   "/api/v1/admin/makerspace/{makerspace_id}/api-clients",
   "/api/v1/admin/makerspace/{makerspace_id}/api-settings",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients/{id}/compromise",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients/{id}/reactivate",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients/{id}/reissue-challenge",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients/{id}/revoke",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients/{id}/verify",
   "/api/v1/admin/makerspace/{makerspace_id}/archive-requests",
   "/api/v1/admin/makerspace/{makerspace_id}/archive-requests/{id}/withdraw",
   "/api/v1/admin/makerspace/{makerspace_id}/backups",
@@ -692,6 +699,39 @@ export type ArchivedPaymentSummary = {
   "makerspace": ArchivedPaymentMakerspace;
   "pending_count": number;
   "total_count": number;
+};
+
+export type ArchiveRecipient = {
+  "id": number;
+  "public_recipient": string;
+  "fingerprint": string;
+  "label": string;
+  "added_by": number | null;
+  "added_at": string;
+  "revoked_at": string | null;
+  "compromised_at": string | null;
+  "verified_at": string | null;
+  "challenge_issued_at": string | null;
+};
+
+export type ArchiveRecipientChallenge = {
+  "recipient": ArchiveRecipient;
+  "encrypted_challenge": string;
+  "nonce_encoding"?: string;
+};
+
+export type ArchiveRecipientCreate = {
+  "public_recipient": string;
+  "label": string;
+};
+
+export type ArchiveRecipientError = {
+  "detail": string;
+  "code": string;
+};
+
+export type ArchiveRecipientVerify = {
+  "nonce": string;
 };
 
 export type ArchiveRequestError = {

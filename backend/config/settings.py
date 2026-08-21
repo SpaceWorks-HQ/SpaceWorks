@@ -497,6 +497,9 @@ TENANT_MIGRATION_AGE_IDENTITY_FILE = env(
 BACKUP_DOWNLOAD_TTL_SECONDS = env.int("BACKUP_DOWNLOAD_TTL_SECONDS", default=5 * 60)
 BACKUP_LEASE_SECONDS = env.int("BACKUP_LEASE_SECONDS", default=2 * 60 * 60)
 BACKUP_DECISION_SECONDS = env.int("BACKUP_DECISION_SECONDS", default=5 * 60)
+BACKUP_RECIPIENT_CHALLENGE_TTL_SECONDS = env.int(
+    "BACKUP_RECIPIENT_CHALLENGE_TTL_SECONDS", default=15 * 60
+)
 BACKUP_PRESIGN_DRAIN_SECONDS = env.int(
     "BACKUP_PRESIGN_DRAIN_SECONDS",
     default=max(EVIDENCE_URL_TTL_SECONDS, PUBLIC_IMAGE_URL_TTL_SECONDS, PRINT_URL_TTL_SECONDS),
@@ -741,6 +744,9 @@ REST_FRAMEWORK = {
         # member can strand. See `makerspaces.throttles.MemberImagePresignThrottle`.
         "member_image_presign": env("THROTTLE_MEMBER_IMAGE_PRESIGN", default="20/hour"),
         "data_export_create": env("THROTTLE_DATA_EXPORT_CREATE", default="3/hour"),
+        "archive_recipient_verify": env(
+            "THROTTLE_ARCHIVE_RECIPIENT_VERIFY", default="10/min"
+        ),
         "tenant_migration_read": env(
             "THROTTLE_TENANT_MIGRATION_READ", default="120/min"
         ),
