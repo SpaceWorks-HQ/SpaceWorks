@@ -14,6 +14,7 @@ const Ledger = lazy(() => import("./panels/Ledger").then((m) => ({ default: m.Le
 const MachinesPanel = lazy(() => import("./panels/MachinesPanel").then((m) => ({ default: m.MachinesPanel })));
 const EventsPanel = lazy(() => import("./EventsPanel").then((m) => ({ default: m.EventsPanel })));
 const OrganizedEventsPanel = lazy(() => import("./panels/OrganizedEventsPanel").then((m) => ({ default: m.OrganizedEventsPanel })));
+const OrganizationAnalyticsPanel = lazy(() => import("./panels/OrganizationAnalyticsPanel").then((m) => ({ default: m.OrganizationAnalyticsPanel })));
 const BookingsPanel = lazy(() => import("./BookingsPanel").then((m) => ({ default: m.BookingsPanel })));
 const MembersPanel = lazy(() => import("./MembersPanel").then((m) => ({ default: m.MembersPanel })));
 const QrTools = lazy(() => import("./panels/QrTools").then((m) => ({ default: m.QrTools })));
@@ -95,8 +96,7 @@ export function StaffTabContent({
   canSeeHardware: boolean;
   canSeePrinting: boolean;
   canViewAudit: boolean;
-  // Needed by the machines tab alone, to build its per-machine-type subpage links in the
-  // same shape `staffTabPath` produces for every other route.
+  // Machines needs this for links; targetless organization panels need it as a mount gate.
   singleTenantLocked?: boolean;
 }) {
   if (!activeMakerspace) {
@@ -154,6 +154,9 @@ export function StaffTabContent({
       ) : null}
       {activeTab === "events" && canManageEvents ? <EventsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}
       {activeTab === "organized" && !isSuperadmin ? <OrganizedEventsPanel /> : null}
+      {activeTab === "organization-analytics" && !isSuperadmin && !singleTenantLocked ? (
+        <OrganizationAnalyticsPanel makerspaces={makerspaces} />
+      ) : null}
       {activeTab === "bookings" && canManageBookings ? <BookingsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}
       {activeTab === "members" && canManageMakerspace ? (
         <MembersPanel

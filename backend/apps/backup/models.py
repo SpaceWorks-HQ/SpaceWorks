@@ -228,6 +228,7 @@ class RestoreRollbackObject(models.Model):
     source_key = models.CharField(max_length=1024)
     copy_key = models.CharField(max_length=1024, blank=True)
     source_was_absent = models.BooleanField(default=False)
+    source_absent_marker_version_id = models.CharField(max_length=512, blank=True)
     source_version_id = models.CharField(max_length=512, blank=True)
     replacement_version_id = models.CharField(max_length=512, blank=True)
     size_bytes = models.PositiveBigIntegerField(default=0)

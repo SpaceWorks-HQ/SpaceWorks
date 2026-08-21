@@ -73,6 +73,7 @@ from apps.operations.views_problem_reports import (
     ProblemReportResolveView,
     ProblemReportTriageView,
 )
+from apps.operations.views_org_reports import OrganizationAnalyticsView
 from apps.operations.views_reports import (
     AccountabilityReportView,
     AggregateAnalyticsView,

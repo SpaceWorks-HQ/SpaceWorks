@@ -25,6 +25,7 @@ urlpatterns = [
     path("admin/ledger/export", views.AggregateLedgerExportView.as_view(), name="ledger-export-aggregate"),
     path("admin/ledger", views.AggregateLedgerView.as_view(), name="ledger-aggregate"),
     path("admin/analytics/<slug:report_key>", views.AggregateAnalyticsView.as_view(), name="analytics-aggregate"),
+    path("admin/organizations/<int:organization_id>/analytics/<slug:report_key>", views.OrganizationAnalyticsView.as_view(), name="organization-analytics"),
     path("admin/reports/<slug:report_key>/export", views.AggregateReportExportView.as_view(), name="report-export-aggregate"),
     path("admin/makerspace/<int:makerspace_id>/ledger/export", views.LedgerExportView.as_view(), name="ledger-export"),
     path("admin/makerspace/<int:makerspace_id>/ledger", views.LedgerView.as_view(), name="ledger"),

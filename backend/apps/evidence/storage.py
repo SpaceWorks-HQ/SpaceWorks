@@ -8,6 +8,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 
 from apps.evidence.image_validation import image_mime_from_bytes
+from apps.object_storage import delete_all_versions
 
 
 logger = logging.getLogger(__name__)
@@ -60,9 +61,8 @@ def staging_key(final_key):
 
 def delete_object(object_key):
     try:
-        _client().delete_object(
-            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-            Key=object_key,
+        delete_all_versions(
+            _client(), bucket=settings.AWS_STORAGE_BUCKET_NAME, key=object_key
         )
     except (BotoCoreError, ClientError):
         logger.exception("Failed to delete storage object %s.", object_key)

@@ -4,11 +4,9 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 
 from apps.audit import services as audit
-from apps.makerspaces.models import Makerspace
 
 from . import cutover, pairing
 from .deployment_keys import public_deployment_identity
-from .models_import_job import TenantImportJob
 from .models_protocol import MigrationPairing, TenantMigrationExportJob
 from .serializers import (
     CutoverOutcomeSerializer,
@@ -20,6 +18,7 @@ from .serializers import (
 from .services_export_job import claim_completed_export
 from .views_admission_export import MigrationAPIView
 from .views_common import AUTH_ERRORS, CONFLICT, FIELD_ERRORS, NOT_FOUND, protocol_error
+from .views_import import _job
 
 ARCHIVE_WARNING = (
     "Migration does not delete the source tenant. Cutover archives it through the "
@@ -88,7 +87,7 @@ class SourceQuiesceView(MigrationAPIView):
 class SourceArchiveView(MigrationAPIView):
     @extend_schema(tags=["Tenant migration"], summary="Archive the quiesced source and issue its signed cutover receipt", request=None, responses={200: CutoverOutcomeSerializer, 404: NOT_FOUND, 409: CONFLICT, **AUTH_ERRORS})
     def post(self, request, makerspace_id, pairing_id):
-        space = get_object_or_404(Makerspace, pk=makerspace_id)
+        space = self.makerspace
         pair = get_object_or_404(MigrationPairing, pk=pairing_id)
         get_object_or_404(
             TenantMigrationExportJob.objects.select_related("export_job"),
@@ -104,12 +103,13 @@ class SourceArchiveView(MigrationAPIView):
 class TargetActivateView(MigrationAPIView):
     @extend_schema(tags=["Tenant migration"], summary="Activate an imported target with the source receipt", request=CutoverReceiptRequestSerializer, responses={200: CutoverOutcomeSerializer, 400: FIELD_ERRORS, 404: NOT_FOUND, 409: CONFLICT, **AUTH_ERRORS})
     def post(self, request, job_id, pairing_id):
+        import_job = _job(request.user, job_id)
         serializer = CutoverReceiptRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             receipt = cutover.activate_target(
                 pairing=get_object_or_404(MigrationPairing, pk=pairing_id),
-                import_job=get_object_or_404(TenantImportJob, pk=job_id),
+                import_job=import_job,
                 receipt_envelope=serializer.validated_data["receipt"], actor=request.user,
             )
         except Exception as exc:
@@ -120,10 +120,11 @@ class TargetActivateView(MigrationAPIView):
 class TargetAbortView(MigrationAPIView):
     @extend_schema(tags=["Tenant migration"], summary="Abort an importing target and issue its signed proof", request=None, responses={200: CutoverOutcomeSerializer, 404: NOT_FOUND, 409: CONFLICT, **AUTH_ERRORS})
     def post(self, request, job_id, pairing_id):
+        import_job = _job(request.user, job_id)
         try:
             receipt = cutover.abort_target(
                 pairing=get_object_or_404(MigrationPairing, pk=pairing_id),
-                import_job=get_object_or_404(TenantImportJob, pk=job_id), actor=request.user,
+                import_job=import_job, actor=request.user,
             )
         except Exception as exc:
             return protocol_error(exc)
@@ -138,7 +139,7 @@ class SourceRecoverView(MigrationAPIView):
         try:
             receipt = cutover.reopen_source(
                 pairing=get_object_or_404(MigrationPairing, pk=pairing_id),
-                makerspace=get_object_or_404(Makerspace, pk=makerspace_id),
+                makerspace=self.makerspace,
                 receipt_envelope=serializer.validated_data["receipt"], actor=request.user,
             )
         except Exception as exc:

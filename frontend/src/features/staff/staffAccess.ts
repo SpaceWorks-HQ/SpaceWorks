@@ -1,7 +1,7 @@
 const ALL_TABS = [
   "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "organized", "bookings", "members", "tobuy", "transfers",
   "stocktake", "containers", "ledger", "reports", "accountability", "warranty", "bulk", "qr", "scanner", "api", "settings", "emailtemplates", "users", "platform", "audit",
-  "email-logs", "payments", "modules", "exports", "backups", "migration",
+  "email-logs", "payments", "organization-analytics", "modules", "exports", "backups", "migration",
 ] as const;
 
 export const STAFF_TAB_KEYS: readonly string[] = ALL_TABS;
@@ -29,6 +29,7 @@ export const TAB_LABELS: Record<string, string> = {
   members: "Members",
   tobuy: "To Buy",
   reports: "Reports",
+  "organization-analytics": "Organization analytics",
   accountability: "Accountability",
   warranty: "Warranties",
   audit: "Audit log",
@@ -52,7 +53,7 @@ export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
   { label: "Events", tabs: ["events", "organized"] },
   { label: "Bookings", tabs: ["bookings"] },
   { label: "Members", tabs: ["members"] },
-  { label: "Insights", tabs: ["reports", "accountability", "warranty", "audit"] },
+  { label: "Insights", tabs: ["reports", "organization-analytics", "accountability", "warranty", "audit"] },
   { label: "Admin", tabs: ["users", "settings", "emailtemplates", "email-logs", "api", "exports", "backups", "migration", "modules", "platform"] },
 ];
 
@@ -139,6 +140,9 @@ export function getStaffAccess(
     // hard-scoped staff origin, so on a verified custom domain the tab would render and then
     // 403 on every load. Those users reach it through the central console instead.
     if (tabName === "organized") return !isSuperadmin && !singleTenantLocked;
+    // Like organized events, organization analytics is targetless and cross-makerspace.
+    // A hard-scoped tenant origin rejects it before application authorization runs.
+    if (tabName === "organization-analytics") return !isSuperadmin && !singleTenantLocked;
     if (tabName === "bookings") return canManageBookings;
     if (tabName === "members") return canManageMakerspace;
     if (tabName === "payments") return canManageMakerspace;

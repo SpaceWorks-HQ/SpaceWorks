@@ -301,6 +301,7 @@ export const openApiPaths = [
   "/api/v1/admin/memberships/{id}/unverify",
   "/api/v1/admin/memberships/{id}/verify",
   "/api/v1/admin/memberships/{id}/waiver/witness",
+  "/api/v1/admin/organizations/{organization_id}/analytics/{report_key}",
   "/api/v1/admin/organized-events/",
   "/api/v1/admin/platform/backup-settings",
   "/api/v1/admin/platform/backups",
@@ -3146,6 +3147,26 @@ export type OperatorCandidate = {
   "display_name": string;
 };
 
+export type OrganizationReportBreakdown = {
+  "rows": Array<{
+  [key: string]: unknown;
+}>;
+  "makerspace_id": number;
+};
+
+export type OrganizationReportResponse = {
+  "report_key": string;
+  "strategy": StrategyEnum;
+  "breakdown": Array<OrganizationReportBreakdown>;
+  "total": OrganizationReportRows;
+};
+
+export type OrganizationReportRows = {
+  "rows": Array<{
+  [key: string]: unknown;
+}>;
+};
+
 export type OtpResetPasswordConfirm = {
   "email": string;
   "code": string;
@@ -5227,6 +5248,8 @@ export type StockTransferLineInput = {
 };
 
 export type StockTransferStatusEnum = "applied" | "cancelled";
+
+export type StrategyEnum = "sum" | "group_sum" | "row_union" | "weighted_rate" | "global_rank" | "distinct_person";
 
 export type StripeConnectOnboarding = {
   "authorize_url": string;

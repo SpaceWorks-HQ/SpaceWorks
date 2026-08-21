@@ -4,6 +4,8 @@ import logging
 
 from django.conf import settings
 
+from apps.object_storage import delete_all_versions
+
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +24,9 @@ def _delete_storage_keys(storage_keys):
 
     for key in storage_keys:
         try:
-            client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=key)
+            delete_all_versions(
+                client, bucket=settings.AWS_STORAGE_BUCKET_NAME, key=key
+            )
         except Exception:
             logger.exception("Failed to delete makerspace purge storage key: %s", key)
 

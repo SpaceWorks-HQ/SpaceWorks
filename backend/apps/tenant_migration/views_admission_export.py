@@ -6,7 +6,10 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from apps.admin_api.permissions import IsActiveSuperAdmin
+from apps.admin_api.permissions import (
+    IsActiveSuperAdmin,
+    require_makerspace_superadmin_access,
+)
 from apps.audit import services as audit
 from apps.data_export import services as export_services
 from apps.data_export.models import DataExportJob
@@ -30,6 +33,13 @@ from .views_common import AUTH_ERRORS, CONFLICT, FIELD_ERRORS, NOT_FOUND, protoc
 class MigrationAPIView(APIView):
     permission_classes = [IsActiveSuperAdmin]
     throttle_classes = [ScopedRateThrottle]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        makerspace_id = self.kwargs.get("makerspace_id")
+        if makerspace_id is not None:
+            self.makerspace = get_object_or_404(Makerspace, pk=makerspace_id)
+            require_makerspace_superadmin_access(request.user, self.makerspace)
 
     def get_throttles(self):
         self.throttle_scope = (
@@ -62,7 +72,7 @@ class MigrationAPIView(APIView):
 class DisclosureClosureView(MigrationAPIView):
     @extend_schema(tags=["Tenant migration"], summary="Compute the pending PORTABLE disclosure closure", responses={200: PendingClosureSerializer, **AUTH_ERRORS})
     def get(self, request, makerspace_id):
-        space = get_object_or_404(Makerspace, pk=makerspace_id)
+        space = self.makerspace
         closure = admission.compute_pending_closure(space)
         audit.record(
             request.user, "tenant_migration.disclosure_computed", makerspace=space,
@@ -77,7 +87,7 @@ class DisclosureClosureView(MigrationAPIView):
 class DisclosureApprovalListCreateView(MigrationAPIView):
     @extend_schema(tags=["Tenant migration"], summary="List disclosure approvals", responses={200: ClosureApprovalSerializer(many=True), **AUTH_ERRORS})
     def get(self, request, makerspace_id):
-        space = get_object_or_404(Makerspace, pk=makerspace_id)
+        space = self.makerspace
         rows = DisclosureClosureApproval.objects.filter(makerspace=space)[:20]
         audit.record(
             request.user, "tenant_migration.disclosure_approvals_read",
@@ -88,7 +98,7 @@ class DisclosureApprovalListCreateView(MigrationAPIView):
 
     @extend_schema(tags=["Tenant migration"], summary="Approve each identity in one exact disclosure closure", request=ClosureApprovalCreateSerializer, responses={201: ClosureApprovalSerializer, 400: FIELD_ERRORS, 409: CONFLICT, **AUTH_ERRORS})
     def post(self, request, makerspace_id):
-        space = get_object_or_404(Makerspace, pk=makerspace_id)
+        space = self.makerspace
         serializer = ClosureApprovalCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -129,7 +139,7 @@ class MigrationExportListCreateView(MigrationAPIView):
     def post(self, request, makerspace_id):
         serializer = MigrationExportCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        space = get_object_or_404(Makerspace, pk=makerspace_id)
+        space = self.makerspace
         approval = get_object_or_404(
             DisclosureClosureApproval,
             pk=serializer.validated_data["approval_id"], makerspace=space,

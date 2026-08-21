@@ -21341,6 +21341,160 @@
                 }
             }
         },
+        "/api/v1/admin/organizations/{organization_id}/analytics/{report_key}": {
+            "get": {
+                "operationId": "api_v1_admin_organizations_analytics_retrieve",
+                "description": "Requires an active organization membership carrying the report's action. Authorization and the owned-makerspace set are resolved server-side; a combined total is always returned together with its per-makerspace breakdown.",
+                "summary": "Get organization analytics report",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "end",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "organization_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "report_key",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "active-loans",
+                                "booking-utilization",
+                                "damaged-lost",
+                                "damaged-missing",
+                                "event-attendance",
+                                "fablab-health",
+                                "machine-usage",
+                                "maintenance-activity",
+                                "member-activity",
+                                "most-lent",
+                                "payment-reconciliation",
+                                "qr-scans",
+                                "recently-added",
+                                "returns",
+                                "summary",
+                                "taken-items",
+                                "top-borrowers"
+                            ]
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "start",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "status",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "canceled",
+                                "paid_offline",
+                                "paid_online",
+                                "pending",
+                                "waived"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "subject_type",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "booking",
+                                "event_registration",
+                                "machine_service_request",
+                                "makerspace_membership"
+                            ]
+                        }
+                    }
+                ],
+                "tags": [
+                    "Analytics"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrganizationReportResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Invalid or excluded organization report."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Organization or report not found."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/organized-events/": {
             "get": {
                 "operationId": "api_v1_admin_organized_events_retrieve",
@@ -45237,6 +45391,66 @@
                     "username"
                 ]
             },
+            "OrganizationReportBreakdown": {
+                "type": "object",
+                "properties": {
+                    "rows": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        }
+                    },
+                    "makerspace_id": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "makerspace_id",
+                    "rows"
+                ]
+            },
+            "OrganizationReportResponse": {
+                "type": "object",
+                "properties": {
+                    "report_key": {
+                        "type": "string"
+                    },
+                    "strategy": {
+                        "$ref": "#/components/schemas/StrategyEnum"
+                    },
+                    "breakdown": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OrganizationReportBreakdown"
+                        }
+                    },
+                    "total": {
+                        "$ref": "#/components/schemas/OrganizationReportRows"
+                    }
+                },
+                "required": [
+                    "breakdown",
+                    "report_key",
+                    "strategy",
+                    "total"
+                ]
+            },
+            "OrganizationReportRows": {
+                "type": "object",
+                "properties": {
+                    "rows": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        }
+                    }
+                },
+                "required": [
+                    "rows"
+                ]
+            },
             "OtpResetPasswordConfirm": {
                 "type": "object",
                 "properties": {
@@ -53378,6 +53592,18 @@
                 ],
                 "type": "string",
                 "description": "* `draft` - Draft\n* `counting` - Counting\n* `completed` - Completed\n* `approved` - Approved\n* `applied` - Applied\n* `cancelled` - Cancelled"
+            },
+            "StrategyEnum": {
+                "enum": [
+                    "sum",
+                    "group_sum",
+                    "row_union",
+                    "weighted_rate",
+                    "global_rank",
+                    "distinct_person"
+                ],
+                "type": "string",
+                "description": "* `sum` - sum\n* `group_sum` - group_sum\n* `row_union` - row_union\n* `weighted_rate` - weighted_rate\n* `global_rank` - global_rank\n* `distinct_person` - distinct_person"
             },
             "StripeConnectOnboarding": {
                 "type": "object",

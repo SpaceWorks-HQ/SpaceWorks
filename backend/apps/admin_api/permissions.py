@@ -60,6 +60,14 @@ def require_user_access_mutation(actor, target):
             )
 
 
+def require_makerspace_superadmin_access(actor, makerspace):
+    if (
+        not makerspace.superadmin_access_enabled
+        and not rbac.can(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk)
+    ):
+        raise PermissionDenied("This makerspace turned off superadmin access.")
+
+
 def hidden_space_manager_reset_break_glass(target):
     memberships = list(target.makerspace_memberships.select_related("makerspace"))
     hidden = [

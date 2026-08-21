@@ -8,6 +8,8 @@ from botocore.client import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 
+from apps.object_storage import delete_all_versions
+
 logger = logging.getLogger(__name__)
 
 # Shared by every uploader: apps.*.storage.staging_key() is f"staging/{final_key}".
@@ -63,36 +65,9 @@ def open_archive(key):
 def delete_archive(key):
     try:
         s3 = client()
-        bucket = settings.AWS_STORAGE_BUCKET_NAME
-        key_marker = version_marker = None
-        found_versions = False
-        try:
-            while True:
-                params = {"Bucket": bucket, "Prefix": key}
-                if key_marker:
-                    params["KeyMarker"] = key_marker
-                if version_marker:
-                    params["VersionIdMarker"] = version_marker
-                page = s3.list_object_versions(**params)
-                objects = [
-                    {"Key": item["Key"], "VersionId": item["VersionId"]}
-                    for group in (page.get("Versions", []), page.get("DeleteMarkers", []))
-                    for item in group
-                    if item.get("Key") == key
-                ]
-                if objects:
-                    found_versions = True
-                    s3.delete_objects(Bucket=bucket, Delete={"Objects": objects, "Quiet": True})
-                if not page.get("IsTruncated"):
-                    break
-                key_marker = page.get("NextKeyMarker")
-                version_marker = page.get("NextVersionIdMarker")
-        except ClientError as exc:
-            code = exc.response.get("Error", {}).get("Code", "")
-            if code not in {"NotImplemented", "InvalidRequest", "501"}:
-                raise
-        if not found_versions:
-            s3.delete_object(Bucket=bucket, Key=key)
+        delete_all_versions(
+            s3, bucket=settings.AWS_STORAGE_BUCKET_NAME, key=key
+        )
         return True
     except (BotoCoreError, ClientError):
         logger.exception("backup_archive_delete_failed", extra={"object_key": key})
