@@ -21,6 +21,7 @@ from .recipient_states import (
     reactivate_recipient,
     revoke_recipient,
 )
+from .recipient_selection import selection_for
 from .recipients_bech32 import Bech32DecodeError, convert_bits, decode, encode
 
 
@@ -36,6 +37,7 @@ __all__ = [
     "reissue_recipient_challenge",
     "reserve_recipient",
     "revoke_recipient",
+    "selection_for",
     "verify_recipient",
 ]
 

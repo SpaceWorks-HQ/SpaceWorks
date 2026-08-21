@@ -9,6 +9,7 @@ CHUNK_SIZE = 1024 * 1024
 SUPPORTED_ARCHIVE_FORMATS = frozenset({
     "spaceworks-phase5a-v1",
     "spaceworks-phase5a-v2",
+    "spaceworks-phase5a-v3",
 })
 
 

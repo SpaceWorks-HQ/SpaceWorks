@@ -14,6 +14,7 @@ from apps.backup.models import ARCHIVE_PURGE_WARNING, BackupArchive
 from apps.backup.settings_policy import POLICIES, Policy
 from apps.backup.tenant_projection import project_dataset
 from apps.data_export.datasets import DATASET_SPECS
+from apps.makerspaces.servability import servable_queryset
 
 
 OBJECT_FIELD_NAMES = frozenset({
@@ -32,7 +33,7 @@ CONTINUITY_KEYS = (
 )
 
 
-def _snapshot_payload(archive, root, modes):
+def _snapshot_payload(archive, root, modes, selected_recipients):
     with transaction.atomic():
         with connection.cursor() as cursor:
             cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
@@ -41,17 +42,25 @@ def _snapshot_payload(archive, root, modes):
             cursor.execute("SELECT pg_export_snapshot()")
             snapshot_id = cursor.fetchone()[0]
         if archive.scope == BackupArchive.Scope.DEPLOYMENT:
+            covered_makerspace_ids = list(
+                servable_queryset().order_by("pk").values_list("pk", flat=True)
+            )
             _pg_dump(root / "database.dump", snapshot_id)
             object_keys = _object_closure()
             _write_continuity_keys(root / "keys" / "env.json")
         else:
+            covered_makerspace_ids = [archive.makerspace_id]
             object_keys = _tenant_payload(archive.makerspace_id, root / "tenant")
         object_manifest = _capture_objects(root / "objects", object_keys, modes)
     return {
-        "format": "spaceworks-phase5a-v2",
+        "format": "spaceworks-phase5a-v3",
         "archive_id": str(archive.pk),
         "scope": archive.scope,
         "makerspace_id": archive.makerspace_id,
+        "recipients": selected_recipients,
+        "covered_makerspace_ids": covered_makerspace_ids,
+        "excluded_makerspace_ids": [],
+        "partial": False,
         "snapshot_at": snapshot_at.isoformat(),
         "postgres": {
             "source_server_major": int(server_version_num) // 10000,
@@ -227,5 +236,4 @@ def _write_json(path, value):
 
 def _command_version(command):
     return subprocess.run([command, "--version"], check=True, capture_output=True, text=True).stdout.strip()
-
 

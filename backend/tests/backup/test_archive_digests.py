@@ -67,8 +67,16 @@ def test_built_archive_manifest_contains_streamed_content_ledger(
         "_storage_modes",
         lambda: {"private": "versioned", "public_image": "versioned"},
     )
+    selected = [{"label": "Compatibility", "public_recipient": "age1test"}]
+    monkeypatch.setattr(
+        archive_builder.recipients, "selection_for", lambda _archive: selected
+    )
+    monkeypatch.setattr(
+        archive_builder, "_selection_at_read_committed", lambda _archive: selected
+    )
 
-    def snapshot(_archive, root, _modes):
+    def snapshot(_archive, root, _modes, selected_recipients):
+        assert selected_recipients is selected
         (root / "database.dump").write_bytes(b"database bytes")
         objects = archive_builder._capture_objects(
             root / "objects",
@@ -80,7 +88,11 @@ def test_built_archive_manifest_contains_streamed_content_ledger(
             },
             _modes,
         )
-        return {"format": "spaceworks-phase5a-v2", "storage": {"objects": objects}}
+        return {
+            "format": "spaceworks-phase5a-v2",
+            "recipients": selected_recipients,
+            "storage": {"objects": objects},
+        }
 
     def encrypt(command, **_kwargs):
         output = Path(command[command.index("-o") + 1])

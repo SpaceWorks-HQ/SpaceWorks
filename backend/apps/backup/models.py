@@ -48,6 +48,7 @@ class BackupArchive(models.Model):
         "makerspaces.Makerspace", null=True, blank=True, on_delete=models.SET_NULL,
         related_name="backup_archives",
     )
+    superadmin_access_at_decision = models.BooleanField(null=True)
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
         related_name="requested_backup_archives",
