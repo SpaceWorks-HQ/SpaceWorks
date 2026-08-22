@@ -1,37 +1,24 @@
 """Lane E compound capture, verified slice sealing, and readable-main routing."""
 
-from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import subprocess
 import tarfile
-import uuid
 
+from apps.backup.compound_recipients import FrozenSlice, frozen_slices
+from apps.backup.dek_rewrap import enumerate_staged_deks, seal_staged_deks
 from apps.backup.digests import sha256_file
 from apps.backup.main_projection import project_readable_main_dump
 from apps.backup.main_projection_inverse import boundary_deltas
 from apps.backup.main_projection_registry import table_rules
 from apps.backup.main_projection_verification import build_expected_ledger
-from apps.backup.models import (
-    MakerspaceArchiveCustodyState,
-    MakerspaceArchiveRecipient,
-)
+from apps.backup.object_ownership import MAIN_COMPONENT, slice_component
 from apps.backup.recipient_selection import BackupBuildError
 from apps.backup.recipients import fingerprint_for
 from apps.backup.slice_verification import verify_unsealed_slice
-from apps.makerspaces.models import Makerspace
 
 
 COMPOUND_ARCHIVE_FORMAT = "spaceworks-lane-e-e3-compound-v1"
-
-
-@dataclass(frozen=True)
-class FrozenSlice:
-    makerspace_id: int
-    slice_id: str
-    public_recipients: tuple[str, ...]
-    recipient_fingerprints: tuple[str, ...]
-    custody_state: str
 
 
 class CompoundCapture:
@@ -48,18 +35,32 @@ class CompoundCapture:
         self.frozen_slices = ()
         self.verified_makerspace_ids = set()
         self.expected_main_ledger = None
+        self.object_plan = None
 
-    def capture_from_snapshot(self, *, tenant_payload, capture_objects, write_json):
-        frozen = _frozen_slices(self.archive.id, self.platform_recipients)
-        self.frozen_slices = frozen
-        makerspace_ids = tuple(item.makerspace_id for item in frozen)
+    def prepare_from_snapshot(self):
+        """Freeze tenant custody and the pre-projection verification ledger."""
+        if self.frozen_slices:
+            raise BackupBuildError("Compound capture was prepared more than once.")
+        self.frozen_slices = frozen_slices(
+            self.archive.id, self.platform_recipients
+        )
+        makerspace_ids = tuple(
+            item.makerspace_id for item in self.frozen_slices
+        )
         self.expected_main_ledger = build_expected_ledger(
             "default", table_rules(), makerspace_ids
         )
+
+    def capture_from_snapshot(
+        self, *, tenant_payload, capture_objects, write_json, object_plan
+    ):
+        if self.expected_main_ledger is None:
+            raise BackupBuildError("Compound capture was not prepared in the snapshot.")
+        self.object_plan = object_plan
         slices_root = self.root / "slices"
         work_root = self.root / ".slice-build"
         try:
-            for item in frozen:
+            for item in self.frozen_slices:
                 self.slice_entries.append(
                     self._seal_slice(
                         item,
@@ -68,8 +69,10 @@ class CompoundCapture:
                         tenant_payload=tenant_payload,
                         capture_objects=capture_objects,
                         write_json=write_json,
+                        object_plan=object_plan,
                     )
                 )
+            object_plan.assert_complete()
             self.require_verified_slice_coverage()
         finally:
             shutil.rmtree(work_root, ignore_errors=True)
@@ -83,12 +86,20 @@ class CompoundCapture:
         tenant_payload,
         capture_objects,
         write_json,
+        object_plan,
     ):
         plaintext = work_root / item.slice_id
         rows_root = plaintext / "rows"
-        object_keys = tenant_payload(item.makerspace_id, rows_root)
+        tenant_payload(item.makerspace_id, rows_root)
+        component = slice_component(item.makerspace_id)
+        object_keys = object_plan.closure(component)
         objects = capture_objects(
             plaintext / "objects", object_keys, self.modes
+        )
+        object_plan.bind_component(component, plaintext / "objects", objects)
+        staged_deks = enumerate_staged_deks(item.makerspace_id)
+        sealed_deks = seal_staged_deks(
+            staged_deks, item.public_recipients, plaintext / "keys" / "deks"
         )
         write_json(
             plaintext / "inverse" / "boundary-deltas.json",
@@ -103,9 +114,13 @@ class CompoundCapture:
                 "recipient_fingerprints": list(item.recipient_fingerprints),
                 "custody_state": item.custody_state,
                 "storage": {"objects": objects},
+                "sealed_deks": sealed_deks,
             },
         )
-        verify_unsealed_slice(item.makerspace_id, plaintext, objects)
+        verify_unsealed_slice(
+            item.makerspace_id, plaintext, objects,
+            staged_deks=staged_deks, sealed_deks=sealed_deks,
+        )
         self.verified_makerspace_ids.add(item.makerspace_id)
         slices_root.mkdir(parents=True, exist_ok=True)
         plain_tar = work_root / f"{item.slice_id}.tar"
@@ -166,10 +181,13 @@ class CompoundCapture:
                 makerspace_ids,
                 self.expected_main_ledger,
             )
-            _verify_sealed_slices(self.root, self.slice_entries)
-            result = _exclude_sovereign_objects(
-                self.root, manifest, set(makerspace_ids)
+            if self.object_plan is None:
+                raise BackupBuildError("Compound object ownership proof is missing.")
+            self.object_plan.verify_component(
+                MAIN_COMPONENT, manifest["storage"]["objects"]
             )
+            _verify_sealed_slices(self.root, self.slice_entries)
+            result = dict(manifest)
         finally:
             shutil.rmtree(build_root, ignore_errors=True)
         covered = [
@@ -180,68 +198,6 @@ class CompoundCapture:
         result["excluded_makerspace_ids"] = list(makerspace_ids)
         result["partial"] = bool(makerspace_ids)
         return result
-
-
-def _frozen_slices(archive_id, platform_recipients):
-    # Deployment selection intentionally returns only the platform recipient;
-    # slice custody is therefore resolved directly from this frozen tenant view.
-    makerspace_ids = tuple(
-        Makerspace.objects.filter(superadmin_access_enabled=False)
-        .order_by("pk")
-        .values_list("pk", flat=True)
-    )
-    recipient_rows = MakerspaceArchiveRecipient.objects.filter(
-        makerspace_id__in=makerspace_ids,
-        verified_at__isnull=False,
-        revoked_at__isnull=True,
-        compromised_at__isnull=True,
-    ).order_by("makerspace_id", "pk").values_list(
-        "makerspace_id", "public_recipient"
-    )
-    by_makerspace = {makerspace_id: [] for makerspace_id in makerspace_ids}
-    for makerspace_id, public_recipient in recipient_rows:
-        by_makerspace[makerspace_id].append(public_recipient)
-    custody = dict(
-        MakerspaceArchiveCustodyState.objects.filter(
-            makerspace_id__in=makerspace_ids
-        ).values_list("makerspace_id", "state")
-    )
-
-    result = []
-    for makerspace_id in makerspace_ids:
-        public_recipients = tuple(by_makerspace[makerspace_id])
-        if not public_recipients:
-            raise BackupBuildError(
-                "A sovereign makerspace has no valid archive recipient."
-            )
-        fingerprints = tuple(sorted(
-            fingerprint_for(value) for value in public_recipients
-        ))
-        if len(set(fingerprints)) != len(fingerprints):
-            raise BackupBuildError(
-                "A sovereign makerspace has duplicate archive recipients."
-            )
-        if platform_recipients.intersection(public_recipients):
-            raise BackupBuildError(
-                "A platform archive recipient cannot be used for a sovereign slice."
-            )
-        expected_custody = (
-            MakerspaceArchiveCustodyState.State.DEGRADED_ONE_RECIPIENT
-            if len(public_recipients) == 1
-            else MakerspaceArchiveCustodyState.State.HEALTHY
-        )
-        if len(public_recipients) == 1 and custody.get(makerspace_id) != expected_custody:
-            raise BackupBuildError(
-                "A one-recipient sovereign makerspace lacks its degraded custody state."
-            )
-        result.append(FrozenSlice(
-            makerspace_id=makerspace_id,
-            slice_id=str(uuid.uuid5(archive_id, f"sovereign-slice:{makerspace_id}")),
-            public_recipients=public_recipients,
-            recipient_fingerprints=fingerprints,
-            custody_state=expected_custody,
-        ))
-    return tuple(result)
 
 
 def add_slice_metadata(manifest, *, slices, recipients):
@@ -263,21 +219,3 @@ def _verify_sealed_slices(root, entries):
             or sha256_file(path) != entry["ciphertext_sha256"]
         ):
             raise BackupBuildError("A sealed sovereign slice failed ciphertext verification.")
-
-
-def _exclude_sovereign_objects(root, manifest, makerspace_ids):
-    result = dict(manifest)
-    storage_manifest = dict(result["storage"])
-    retained = []
-    for item in storage_manifest["objects"]:
-        if item.get("makerspace_id") in makerspace_ids:
-            path = root / "objects" / item["bucket_kind"] / item["key"]
-            path.unlink(missing_ok=True)
-        else:
-            path = root / "objects" / item["bucket_kind"] / item["key"]
-            if path.stat().st_size != item["size"] or sha256_file(path) != item["sha256"]:
-                raise BackupBuildError("Readable-main object verification failed.")
-            retained.append(item)
-    storage_manifest["objects"] = retained
-    result["storage"] = storage_manifest
-    return result

@@ -76,6 +76,14 @@ AUTO_CREATED_M2M_TABLES = {
     "auth_group_permissions": (RowDisposition.RETAIN_GLOBAL, None),
 }
 
+# These rows are tenant-owned for deployment projection even though manager data
+# export deliberately omits them. W8 replaces the source-broker row with a sealed
+# recipient payload; retaining it in the readable main would preserve platform
+# unwrap capability for sovereign mapped ciphertext.
+SPECIAL_TENANT_TABLES = {
+    "encryption.MakerspaceEncryptionKey": TenantPredicate(("makerspace",)),
+}
+
 
 def table_rules():
     """Return one explicit disposition for every model-backed physical table."""
@@ -104,16 +112,19 @@ def table_rules():
             if label not in MODELS:
                 missing.append(label)
                 continue
+            special_predicate = SPECIAL_TENANT_TABLES.get(label)
             spec = DATASET_SPECS.get(label)
             disposition = (
                 RowDisposition.COPY_TO_SLICE
-                if spec is not None
+                if spec is not None or special_predicate is not None
                 else RowDisposition.RETAIN_GLOBAL
             )
             predicate = (
-                TenantPredicate((spec[1].any_paths[0],))
-                if spec is not None
-                else None
+                special_predicate
+                or (
+                    TenantPredicate((spec[1].any_paths[0],))
+                    if spec is not None else None
+                )
             )
         else:
             disposition, predicate = RowDisposition.RETAIN_GLOBAL, None
