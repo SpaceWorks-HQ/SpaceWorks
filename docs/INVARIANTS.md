@@ -1785,10 +1785,47 @@ Load-bearing details that carried over unchanged:
 recipient ONLY when `superadmin_access_enabled` is true** (`backup/recipient_selection.py`). That is the
 whole custody model: with the switch off, the operator can *run* a tenant backup but cannot *open* it.
 
-**Scope of the guarantee — do not overstate it in UI or copy.** This covers **tenant** archives only.
-A full **deployment** backup is a raw `pg_dump` encrypted to the platform recipient and **still contains
-every makerspace's rows**, including switch-off ones. Deployment-archive exclusion is Lane E and is
-**not built**.
+**Lane E readable-main exclusion is BUILT (E1–E3, 2026-08-22).** A deployment archive keeps
+`manifest.json` and `database.dump` at the bundle root for restore compatibility and carries sealed tenant
+slices under `slices/`. The exclusion registry assigns every physical table either a deployment-global
+retain disposition or a tenant-owner predicate, and it assigns retained-row foreign keys into sliced tables
+an explicit project-null or drop-row disposition. A sovereign row is excluded from the readable main only
+after the same frozen makerspace has a plaintext-verified slice. The resulting main dump is restored into a
+fresh PostgreSQL verification database before packaging; its ownership postconditions, row-identity ledger,
+catalog and sequence high-water state are checked there. Slice rows and object digests are checked while
+plaintext is available before sealing. After sealing, the platform verifies only ciphertext size and digest;
+the platform cannot perform semantic verification without a tenant-held identity.
+
+**The PostgreSQL client major must equal the server major for anything that dumps or restores THIS
+deployment**, and `apps/backup/postgres_client.py` is the only place that resolves those binaries. The
+image ships two client majors on purpose: `pg_dump` must be at least as new as any *source* server tenant
+migration reads (14-17), so the newest is on `PATH`, while the deployment's own dump and restore need the
+server's own major. Getting this wrong does not degrade, it breaks silently in both directions: `pg_dump`
+17 writes archive header version **1.16**, which `pg_restore` 16 refuses outright, and `pg_restore` 17+
+emits an unconditional `SET transaction_timeout = 0;`, a GUC that does not exist before 17, so a PG16
+server rejects it and `--exit-on-error` aborts. This was not hypothetical: until 2026-08-23 the backend
+dumped with client 17 against `postgres:16` while `scripts/restore.sh` restored inside the `db` container
+with client 16, so **every deployment archive produced was unrestorable through the shipped restore path**.
+Never call a bare `pg_dump`/`pg_restore`/`createdb`/`dropdb` from application code, and keep the archive
+build's readiness gate checking the *resolved* binaries rather than `PATH`.
+
+**Auto-created many-to-many through tables are physical tables, not fields embedded in their owning
+model's row.** Each must therefore have its own literal physical-table disposition and its own count,
+identity digest and concrete-column row digest. The owning model's digest covers only its concrete columns.
+Never bypass `raw_projection.fixture_payload`'s refusal to synthesize missing auto-created M2M rows: a new
+through table without an explicit disposition is registry drift and must fail the build.
+
+> **The guarantee:** the platform-readable portion of a deployment artifact excludes sovereign tenant
+> content. The artifact still carries that content as opaque ciphertext, together with slice identifiers,
+> sizes, ciphertext digests and recipient facts. Opening the readable main does not open a sovereign slice;
+> doing that requires a matching tenant-held identity.
+
+This guarantee **does not establish** physical absence, data residency, deletion, storage reduction,
+concealment of a tenant's existence, or reduced subpoena/discovery scope. It is a custody and readability
+boundary only. Infrastructure snapshots, database PITR, the live service, older application artifacts and
+copies downloaded by their holders remain governed by their own controls and retention. No UI, API, audit
+event, log line, manifest field, docstring or comment may describe this as removal from the archive or claim
+one of those excluded properties.
 
 **The decision is snapshotted at request time, and selection FAILS CLOSED without it.** An archive is
 requested in a web process (`create_archive`) and built later in a Celery worker (`run_archive` via

@@ -198,6 +198,8 @@ class Command(BaseCommand):
             or not manifest.get("age_encrypted")
         ):
             raise CommandError("The authenticated archive manifest does not match the restore intent.")
+        if manifest.get("partial"):
+            raise CommandError("The legacy restore path cannot restore a compound readable main.")
         if bundle_path:
             try:
                 verify_content_ledger(

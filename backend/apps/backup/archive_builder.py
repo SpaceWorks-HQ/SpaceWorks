@@ -31,6 +31,10 @@ from apps.backup.archive_payload import (
 from apps.backup.compound_archive import CompoundCapture, add_slice_metadata
 from apps.backup.digests import build_content_ledger, sha256_file
 from apps.backup.models import BackupArchive, DeploymentRecoveryState
+from apps.backup.postgres_client import (
+    PostgresClientUnavailable,
+    client_binary,
+)
 from apps.backup.recipient_selection import BackupBuildError
 
 
@@ -38,7 +42,7 @@ def build_archive(archive):
     selected_recipients = recipients.selection_for(archive)
     _require_binary("age")
     if archive.scope == BackupArchive.Scope.DEPLOYMENT:
-        _require_binary("pg_dump")
+        _require_postgres_clients()
     tempdir = tempfile.TemporaryDirectory(prefix="spaceworks-backup-")
     try:
         root = Path(tempdir.name, "bundle")
@@ -74,6 +78,7 @@ def build_archive(archive):
                     selected_recipients,
                     compound_capture=compound_capture,
                 )
+                manifest = compound_capture.project_readable_main(manifest)
                 manifest = add_slice_metadata(
                     manifest,
                     slices=compound_capture.slice_entries,
@@ -144,3 +149,17 @@ def _set_backup_quiescence(enabled):
 def _require_binary(command):
     if shutil.which(command) is None:
         raise BackupBuildError(f"Required backup binary is missing: {command}.")
+
+
+def _require_postgres_clients():
+    """Check the clients the build will actually invoke, not whatever PATH holds.
+
+    These are resolved for the server's own major version, so a PATH-only check
+    would pass on a deployment whose matching client is not installed and let the
+    run fail much later, mid-capture.
+    """
+    for command in ("pg_dump", "pg_restore", "createdb", "dropdb"):
+        try:
+            client_binary(command)
+        except PostgresClientUnavailable as exc:
+            raise BackupBuildError(str(exc)) from exc

@@ -10,6 +10,7 @@ from django.core.management.base import CommandError
 from django.utils import timezone
 
 from apps.backup import archive_payload, storage
+from apps.backup.archive_payload import _build_info
 from apps.backup.digests import SUPPORTED_ARCHIVE_FORMATS
 from apps.backup.management.commands.backup_control import Command
 from apps.backup.models import BackupArchive, RestoreOperation
@@ -47,7 +48,10 @@ def _manifest(restore, format_name, contents=None):
         "scope": BackupArchive.Scope.DEPLOYMENT,
         "age_encrypted": True,
         "postgres": {"source_server_major": 14},
-        "build": {"source_hash": "unknown"},
+        # The running build identity, not a literal: "unknown" is only correct
+        # outside an image, so hard-coding it made this pass on the host and
+        # fail in Docker, where /app/BUILD_INFO.json carries a real hash.
+        "build": {"source_hash": _build_info()["source_hash"]},
         "settings": {},
     }
     if contents is not None:
@@ -144,6 +148,20 @@ def test_v3_preflight_refuses_missing_content_ledger(tmp_path):
     )
 
     with pytest.raises(CommandError, match="ledger is required"):
+        call_command(
+            "backup_control", "preflight", str(restore.pk),
+            "--manifest", str(manifest_path), "--bundle", str(tmp_path),
+        )
+
+
+def test_legacy_preflight_refuses_compound_readable_main(tmp_path):
+    restore = _restore()
+    manifest = _manifest(restore, "spaceworks-phase5a-v3", contents=[])
+    manifest["partial"] = True
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(CommandError, match="legacy restore path"):
         call_command(
             "backup_control", "preflight", str(restore.pk),
             "--manifest", str(manifest_path), "--bundle", str(tmp_path),
