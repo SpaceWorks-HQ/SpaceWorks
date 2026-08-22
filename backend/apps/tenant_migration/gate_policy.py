@@ -101,6 +101,13 @@ TASK_EXEMPTIONS = {
     "apps.backup.tasks.scheduled_deployment_backup_task": "Deployment backup control plane.",
     "apps.backup.tasks.purge_expired_backup_archives_task": "Platform backup retention.",
     "apps.backup.tasks.cleanup_expired_restore_rollbacks_task": "Deployment recovery cleanup.",
+    "apps.backup.tasks.deliver_archive_custody_alarms_task": (
+        "Archive-custody alarm delivery. Writes only its own outbox rows and the "
+        "derived custody-state delivery marker -- both deployment control-plane "
+        "state, never tenant domain data -- and sends mail. It reads a makerspace "
+        "to resolve recipients but mutates no tenant row, so it cannot disturb a "
+        "frozen source."
+    ),
     "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task": "Target-side import retention and recovery.",
     "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task": "Target-side import object rollback does not mutate the frozen source.",
     "apps.tenant_migration.tasks.resume_expired_finalizing_import_jobs_task": "Target-side import finalization recovery does not mutate the frozen source.",
