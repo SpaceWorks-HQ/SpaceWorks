@@ -18,6 +18,7 @@ from apps.makerspaces.models import default_enabled_modules
 
 class RowDisposition(StrEnum):
     DROP = "drop"
+    PRESERVE_LIVE = "preserve_live"
     STAGE_INERT = "stage_inert"
     KEEP_TARGET = "keep_target"
     RESOLVE = "resolve"
@@ -183,7 +184,10 @@ TARGET_FIELD_PROJECTION = {
 
 
 ROW_POLICIES = {
-    "machines.MachineOperator": RowPolicy(RowDisposition.DROP, "Operator levels grant machine authority independently of roles."),
+    "machines.MachineOperator": RowPolicy(
+        RowDisposition.PRESERVE_LIVE,
+        "Owner decision 22: preserve the exact live machine grant and provenance.",
+    ),
     "makerspaces.MakerspaceRole": RowPolicy(RowDisposition.KEEP_TARGET, "Target-seeded roles are authoritative; archived role rows are dropped."),
     "machines.RoleMachineScope": RowPolicy(RowDisposition.DROP, "Archived role scope would rewrite target machine authority."),
     "machines.RoleMachineTypeScope": RowPolicy(RowDisposition.DROP, "Archived scopes can both grant authority and collide with seeded scopes."),

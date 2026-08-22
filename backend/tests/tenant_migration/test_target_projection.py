@@ -18,6 +18,7 @@ from apps.tenant_migration.projection_guards import (
     validate_projection_registry,
     validate_unique_constraint_risks,
 )
+from apps.tenant_migration.row_dispositions import row_disposition
 from apps.tenant_migration.unique_values import (
     DEPLOYMENT_GLOBAL_UNIQUE_RULES,
     UniqueValueDisposition,
@@ -87,9 +88,8 @@ def test_only_operator_selectable_policy_fields_allow_an_override():
     } == allowed
 
 
-def test_authority_and_disclosure_rows_cannot_arrive_live():
+def test_authority_rows_follow_the_explicit_drop_or_decision_22_policy():
     expected_dropped = {
-        "machines.MachineOperator",
         "machines.RoleMachineScope",
         "machines.RoleMachineTypeScope",
         "integrations.NotificationRecipient",
@@ -106,6 +106,12 @@ def test_authority_and_disclosure_rows_cannot_arrive_live():
         ROW_POLICIES["makerspaces.MakerspaceRole"].disposition
         is RowDisposition.KEEP_TARGET
     )
+    assert (
+        ROW_POLICIES["machines.MachineOperator"].disposition
+        is RowDisposition.PRESERVE_LIVE
+    )
+    assert "Owner decision 22" in ROW_POLICIES["machines.MachineOperator"].reason
+    assert row_disposition("machines.MachineOperator", {}, None) == "insert"
 
 
 def test_only_open_membership_request_states_are_authority_rows():

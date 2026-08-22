@@ -26,6 +26,11 @@ _PATCH_LOCK = RLock()
 # Cross-tenant reversal snapshots are selected alongside the row's own concrete
 # columns. Values below are ORM paths, not model attributes read after materializing.
 REFERENCE_COLUMNS = {
+    "machines.Machine": {
+        # Lane D fingerprints a machine by its stable type slug without ever
+        # materializing the related MachineType or reading a mapped attribute.
+        "_machine_type_slug": "machine_type__slug",
+    },
     "events.EventCollaborator": {
         "_event_makerspace_id": "event__makerspace_id",
         "_event_title": "event__title",

@@ -38,6 +38,8 @@ class ImportAccounting:
 def row_disposition(model_label, row, references):
     policy = ROW_POLICIES.get(model_label)
     if policy is not None and condition_matches(policy.condition, row):
+        if policy.disposition is RowDisposition.PRESERVE_LIVE:
+            return "insert"
         if policy.disposition is RowDisposition.KEEP_TARGET:
             return "resolve"
         if policy.disposition is RowDisposition.DROP:

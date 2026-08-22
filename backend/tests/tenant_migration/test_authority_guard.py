@@ -29,6 +29,8 @@ def test_declared_relational_and_discriminator_authority_inputs():
         ("makerspaces.MakerspaceRole", "is_protected"),
         ("machines.MachineType", "managing_action"),
         ("machines.MachineOperator", "access_level"),
+        ("machines.MachineOperator", "assigned_by"),
+        ("machines.MachineOperator", "assigned_at"),
         ("machines.RoleMachineScope", "role"),
         ("machines.RoleMachineTypeScope", "role"),
         ("integrations.NotificationRecipient", "kind"),

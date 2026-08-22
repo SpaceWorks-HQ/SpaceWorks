@@ -72,6 +72,9 @@
   `archive_envelope.py` + `object_export.py` (streamed into `age`); `admission.py` (the source-superadmin
   closure approval); `materialization.py` + `raw_repository.py` + `row_planning.py`/`row_dispositions.py`
   (one-shot insertion); `target_projection.py` + `unique_values.py` + `closure_references.py`;
+  `tenant_dump_model_catalog.py` + `tenant_dump_field_snapshot.py` +
+  `tenant_dump_authority.py`/`tenant_dump_catalog.py` (Lane D's deny-by-default source catalog), and
+  `tenant_dump_source_projection.py` (single-makerspace raw rows plus decision-22 grant closure);
   `verification.py` (pre-commit), audit-reference domains behind the `audit_references.py` barrel, and
   `target_cutover.py` (pre-activation + `IMPORTING → ACTIVE`);
   `receipts.py`/`receipt_crypto.py`/`cutover.py` (signed single-use handoff); `views_*.py` (superadmin REST).
