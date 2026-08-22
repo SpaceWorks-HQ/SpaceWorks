@@ -28,8 +28,8 @@ class TenantDumpProjectionError(RuntimeError):
 @dataclass(frozen=True)
 class TenantDumpSourceProjection:
     makerspace_id: int
-    rows: Mapping[str, tuple[dict, ...]]
-    machine_operator_manifest: tuple[dict, ...]
+    rows: Mapping[str, tuple[Mapping[str, object], ...]]
+    machine_operator_manifest: tuple[Mapping[str, object], ...]
 
 
 def project_makerspace_source(makerspace_id):
@@ -48,7 +48,7 @@ def project_makerspace_source(makerspace_id):
             ).order_by(model._meta.pk.name)
             records = raw_records(queryset, model)
             projected[label] = tuple(
-                row
+                MappingProxyType(dict(row))
                 for row in records
                 if _source_row_allowed(label, row, makerspace_id)
             )
@@ -57,14 +57,18 @@ def project_makerspace_source(makerspace_id):
         user_ids = _referenced_user_ids(projected)
         User = apps.get_model("accounts.User")
         projected["accounts.User"] = tuple(
-            raw_records(
+            MappingProxyType(dict(row))
+            for row in raw_records(
                 User._default_manager.filter(pk__in=user_ids).order_by(
                     User._meta.pk.name
                 ),
                 User,
             )
         )
-        manifest = validate_machine_operator_closure(projected, makerspace_id)
+        manifest = tuple(
+            MappingProxyType(dict(item))
+            for item in validate_machine_operator_closure(projected, makerspace_id)
+        )
 
     return TenantDumpSourceProjection(
         makerspace_id=makerspace_id,

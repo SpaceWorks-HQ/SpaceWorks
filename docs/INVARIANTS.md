@@ -1931,6 +1931,24 @@ unmanaged model or model-bearing app fails closed until classified. The projecti
 portable-import rule: every `MachineOperator` assignment travels as live authority with `assigned_at` and
 `assigned_by`, and a missing machine, operator or non-null assigner refuses the build.
 
+**Lane D D2 derives its database dump only through a migrated, run-owned scratch database.** The loader
+uses D1's row/field catalog and its reviewed concrete-column snapshot, deletes portable predicates in
+reverse dependency order, and inserts raw rows in actual FK order while every database constraint remains
+active. Migrations run in a child process whose Django `default` connection is the scratch database; this
+is required because historical `RunPython` functions with unqualified managers would otherwise route their
+data writes back to the live in-process `default` connection. It never sets `session_replication_role`;
+only an actual strongly connected component whose cycle
+edges are all nullable may use the two-pass NULL-then-update path. Global `MachineType` built-ins resolve by
+`(makerspace IS NULL, slug)` only when the canonical `name`/`icon`/`is_builtin`/`managing_action`/
+`capability_config` fingerprint equals the migrated target definition; tenant custom rows retain their PKs.
+The tenant PII fence is explicitly closed under the matching `tenant_import` GUC for mapped raw insertion
+and is dumped `open` with operation fields cleared. Immediately before `pg_dump`, `spaceworks_cache` must be
+empty and every owned sequence is normalized to `max(pk), true` or `seqstart, false`. The server-matched
+client from `backup/postgres_client.py` creates the custom `--no-owner --no-acl` dump; a second empty database
+restores it and repeats catalog, FK-closure, open-fence, cache and raw mapped-value digest checks before the
+candidate is atomically exposed. Object members are copied only from immutable capture staging and carry an
+opaque member path plus original key, version ID, size, content type and SHA-256; ETag is never a digest.
+
 - **Phase 4's archive projection DECRYPTS mapped PII.** `archive.source_value` reads fields through
   `getattr`, and `ScopedPiiModelMixin.__getattribute__` decrypts — so a PORTABLE archive built on it
   contains **plaintext**, and the target then calls `parse_envelope()` on plaintext and aborts.
