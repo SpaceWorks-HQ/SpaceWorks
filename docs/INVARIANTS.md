@@ -1904,6 +1904,14 @@ is now a recurring trap, not a one-off.**
 `docs/superpowers/specs/2026-08-16-phase5b-plan-v13.md` (gitignored) — **cumulative and standalone;
 v1–v12 are history only**. Conclusions that cost thirteen review rounds and must not be re-derived:
 
+**Lane D D1 adds a separate deny-by-default source catalog.** Its literal model and
+concrete-or-M2M field snapshots are checked against `apps.get_models(include_auto_created=True)` and a
+pinned graph digest before source projection reads a row. A new field, M2M, model, generated through table,
+unmanaged model or model-bearing app fails closed until classified. The projection reuses
+`backup.raw_projection` under its no-decrypt guard. Owner decision 22 deliberately reverses the older
+portable-import rule: every `MachineOperator` assignment travels as live authority with `assigned_at` and
+`assigned_by`, and a missing machine, operator or non-null assigner refuses the build.
+
 - **Phase 4's archive projection DECRYPTS mapped PII.** `archive.source_value` reads fields through
   `getattr`, and `ScopedPiiModelMixin.__getattribute__` decrypts — so a PORTABLE archive built on it
   contains **plaintext**, and the target then calls `parse_envelope()` on plaintext and aborts.

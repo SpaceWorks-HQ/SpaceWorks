@@ -35,6 +35,8 @@ def export_row_policy(model_label, row):
         # while import applies the same refusal independently because crafted and
         # older archives are not under the source exporter's control.
         return False, False
+    if policy.disposition is RowDisposition.PRESERVE_LIVE:
+        return True, True
     if policy.disposition in {
         RowDisposition.STAGE_INERT,
         RowDisposition.KEEP_TARGET,
