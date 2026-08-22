@@ -2,46 +2,59 @@ import json
 from datetime import timedelta
 from decimal import Decimal
 
+import pytest
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from apps.accounts.models import User
-from apps.backup.tenant_projection import project_dataset
+from apps.backup.raw_projection import raw_records
+from apps.backup.tenant_projection import project_raw_dataset
 from apps.events.models import Event, EventCollaborator, EventRegistration
 from apps.makerspaces.models import Makerspace
-from apps.operations.models import StockTransfer
+from apps.operations.models import StockTransfer, StockTransferLine
 from apps.payments.models import Payment
 
 
+pytestmark = pytest.mark.django_db
+
+
 def spaces():
-    own = Makerspace(pk=1, name="Own space", slug="own-space")
-    foreign = Makerspace(pk=2, name="Foreign space", slug="foreign-space")
+    own = Makerspace.objects.create(name="Own space", slug="own-space")
+    foreign = Makerspace.objects.create(name="Foreign space", slug="foreign-space")
     return own, foreign
+
+
+def project(label, queryset, makerspace_id):
+    model = queryset.model
+    records = raw_records(queryset.order_by(model._meta.pk.name), model)
+    return project_raw_dataset(label, model, records, makerspace_id)
 
 
 def test_event_collaboration_is_snapshot_only_in_both_directions():
     own, foreign = spaces()
     now = timezone.now()
-    hosted = Event(
-        pk=10, makerspace=own, title="Hosted", starts_at=now,
-        ends_at=now + timedelta(hours=1),
+    hosted = Event.objects.create(
+        makerspace=own, title="Hosted", starts_at=now, ends_at=now + timedelta(hours=1)
     )
-    foreign_event = Event(
-        pk=11, makerspace=foreign, title="Foreign", starts_at=now,
+    foreign_event = Event.objects.create(
+        makerspace=foreign,
+        title="Foreign",
+        starts_at=now,
         ends_at=now + timedelta(hours=2),
     )
-    rows = [
-        EventCollaborator(pk=20, event=hosted, makerspace=foreign, created_at=now),
-        EventCollaborator(pk=21, event=foreign_event, makerspace=own, created_at=now),
-    ]
+    EventCollaborator.objects.create(event=hosted, makerspace=foreign)
+    EventCollaborator.objects.create(event=foreign_event, makerspace=own)
 
-    payload, references, included = project_dataset(
-        "events.EventCollaborator", rows, own.pk
+    payload, references, included = project(
+        "events.EventCollaborator",
+        EventCollaborator.objects.all(),
+        own.pk,
     )
 
     assert json.loads(payload) == []
     assert included == []
     assert {item["type"] for item in references} == {
-        "hosted_event_collaborator", "foreign_host_event",
+        "hosted_event_collaborator",
+        "foreign_host_event",
     }
     assert {item.get("host", item.get("makerspace"))["slug"] for item in references} == {
         foreign.slug
@@ -50,29 +63,39 @@ def test_event_collaboration_is_snapshot_only_in_both_directions():
 
 def test_cross_tenant_fields_are_nulled_and_preserved_as_provenance():
     own, foreign = spaces()
-    actor = User(pk=30, username="operator")
+    actor = get_user_model().objects.create_user(username="operator")
     now = timezone.now()
-    event = Event(
-        pk=31, makerspace=own, title="Hosted", starts_at=now,
+    event = Event.objects.create(
+        makerspace=own,
+        title="Hosted",
+        starts_at=now,
         ends_at=now + timedelta(hours=1),
     )
-    registration = EventRegistration(
-        pk=32, event=event, name="Maker", email="maker@example.test", phone="",
-        registered_via_makerspace=foreign, payment_via_makerspace=foreign,
-        created_at=now,
+    registration = EventRegistration.objects.create(
+        event=event,
+        name="Maker",
+        email="maker@example.test",
+        phone="",
+        registered_via_makerspace=foreign,
+        payment_via_makerspace=foreign,
     )
-    payment = Payment(
-        pk=33, makerspace=own, via_makerspace=foreign,
-        subject_type=Payment.SubjectType.EVENT_REGISTRATION, subject_id=32,
-        amount=Decimal("10.00"), currency="inr", created_by=actor,
-        created_at=now, updated_at=now,
+    payment = Payment.objects.create(
+        makerspace=own,
+        via_makerspace=foreign,
+        subject_type=Payment.SubjectType.EVENT_REGISTRATION,
+        subject_id=registration.pk,
+        amount=Decimal("10.00"),
+        currency="inr",
+        created_by=actor,
     )
 
-    registration_json, registration_refs, _ = project_dataset(
-        "events.EventRegistration", [registration], own.pk
+    registration_json, registration_refs, _ = project(
+        "events.EventRegistration",
+        EventRegistration.objects.filter(pk=registration.pk),
+        own.pk,
     )
-    payment_json, payment_refs, _ = project_dataset(
-        "payments.Payment", [payment], own.pk
+    payment_json, payment_refs, _ = project(
+        "payments.Payment", Payment.objects.filter(pk=payment.pk), own.pk
     )
 
     registration_fields = json.loads(registration_json)[0]["fields"]
@@ -81,22 +104,26 @@ def test_cross_tenant_fields_are_nulled_and_preserved_as_provenance():
     assert {item["makerspace"]["slug"] for item in registration_refs} == {foreign.slug}
     assert json.loads(payment_json)[0]["fields"]["via_makerspace"] is None
     assert payment_refs[0]["makerspace"] == {
-        "name": foreign.name, "slug": foreign.slug,
+        "name": foreign.name,
+        "slug": foreign.slug,
     }
 
 
 def test_owned_cross_space_transfer_keeps_row_but_nulls_foreign_side():
     own, foreign = spaces()
-    actor = User(pk=40, username="operator")
-    now = timezone.now()
-    transfer = StockTransfer(
-        pk=41, makerspace=own, source_makerspace=own,
-        destination_makerspace=foreign, created_by=actor,
-        reason="Send tool", created_at=now, applied_at=now,
+    actor = get_user_model().objects.create_user(username="transfer-operator")
+    transfer = StockTransfer.objects.create(
+        makerspace=own,
+        source_makerspace=own,
+        destination_makerspace=foreign,
+        created_by=actor,
+        reason="Send tool",
     )
 
-    payload, references, included = project_dataset(
-        "operations.StockTransfer", [transfer], own.pk
+    payload, references, included = project(
+        "operations.StockTransfer",
+        StockTransfer.objects.filter(pk=transfer.pk),
+        own.pk,
     )
 
     fields = json.loads(payload)[0]["fields"]
@@ -106,16 +133,52 @@ def test_owned_cross_space_transfer_keeps_row_but_nulls_foreign_side():
     assert references[0]["makerspace"]["slug"] == foreign.slug
 
 
-def test_transfer_owner_source_disagreement_fails_archive_projection():
+def test_inbound_transfer_is_snapshot_only_and_its_lines_are_excluded():
     own, foreign = spaces()
-    transfer = StockTransfer(
-        pk=50, makerspace=own, source_makerspace=foreign,
-        destination_makerspace=own, reason="Invalid ownership",
+    transfer = StockTransfer.objects.create(
+        makerspace=foreign,
+        source_makerspace=foreign,
+        destination_makerspace=own,
+        reason="Receive tool",
+    )
+    line = StockTransferLine.objects.create(transfer=transfer, notes="Inbound line")
+
+    payload, references, included = project(
+        "operations.StockTransfer",
+        StockTransfer.objects.filter(pk=transfer.pk),
+        own.pk,
+    )
+    line_payload, _, included_lines = project(
+        "operations.StockTransferLine",
+        StockTransferLine.objects.filter(pk=line.pk),
+        own.pk,
     )
 
-    try:
-        project_dataset("operations.StockTransfer", [transfer], own.pk)
-    except ValueError as exc:
-        assert "owner disagrees" in str(exc)
-    else:
-        raise AssertionError("An inconsistent transfer must fail the archive.")
+    assert json.loads(payload) == []
+    assert included == []
+    assert references == [{
+        "type": "inbound_stock_transfer",
+        "source": {"name": foreign.name, "slug": foreign.slug},
+        "destination": {"name": own.name, "slug": own.slug},
+        "status": transfer.status,
+        "recorded_at": transfer.created_at,
+    }]
+    assert json.loads(line_payload) == []
+    assert included_lines == []
+
+
+def test_transfer_owner_source_disagreement_fails_archive_projection():
+    own, foreign = spaces()
+    transfer = StockTransfer.objects.create(
+        makerspace=own,
+        source_makerspace=foreign,
+        destination_makerspace=own,
+        reason="Invalid ownership",
+    )
+
+    with pytest.raises(ValueError, match="owner disagrees"):
+        project(
+            "operations.StockTransfer",
+            StockTransfer.objects.filter(pk=transfer.pk),
+            own.pk,
+        )

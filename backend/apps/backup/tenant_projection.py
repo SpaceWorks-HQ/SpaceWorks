@@ -1,19 +1,18 @@
-"""Lossless tenant rows with explicit snapshots for cross-tenant edges."""
+"""Lossless tenant projection from raw records, including boundary snapshots."""
 
+from collections.abc import Mapping
 import json
 
-from django.core import serializers
+from apps.backup.raw_projection import RawProjectionViolation, fixture_payload
 
 
-def project_dataset(label, queryset, makerspace_id):
-    """Return Django fixture JSON plus non-restorable external references.
-
-    Phase 5A tenant archives are downloadable evidence, not import bundles.  Even so,
-    they must never imply that a relationship owned by another tenant can be restored
-    as a live foreign key.  The small, locked set of shared edges is projected here;
-    all other tenant-owned rows retain their complete database representation.
-    """
-    rows = list(queryset)
+def project_raw_dataset(label, model, records, makerspace_id):
+    """Return fixture JSON and non-restorable references from raw mappings only."""
+    rows = list(records)
+    if any(not isinstance(row, Mapping) for row in rows):
+        raise RawProjectionViolation(
+            "project_raw_dataset() accepts values()/values_list()-style raw records only."
+        )
     references = []
     if label == "events.EventCollaborator":
         references.extend(_event_collaborator_references(rows, makerspace_id))
@@ -21,41 +20,53 @@ def project_dataset(label, queryset, makerspace_id):
     elif label == "operations.StockTransfer":
         rows, references = _project_transfers(rows, makerspace_id)
     elif label == "operations.StockTransferLine":
-        rows = [row for row in rows if row.transfer.makerspace_id == makerspace_id]
+        rows = [row for row in rows if row["_transfer_makerspace_id"] == makerspace_id]
 
-    payload = json.loads(serializers.serialize("json", rows))
+    payload = fixture_payload(model, rows)
     if label == "events.EventRegistration":
         references.extend(_null_external_makerspaces(
-            payload, rows, makerspace_id,
+            payload,
+            rows,
+            makerspace_id,
             ("registered_via_makerspace", "payment_via_makerspace"),
         ))
     elif label == "payments.Payment":
         references.extend(_null_external_makerspaces(
-            payload, rows, makerspace_id, ("via_makerspace",),
+            payload, rows, makerspace_id, ("via_makerspace",)
         ))
     elif label == "operations.StockTransfer":
         references.extend(_null_transfer_counterparty(payload, rows, makerspace_id))
-    return json.dumps(payload, sort_keys=True), references, [row.pk for row in rows]
+    return json.dumps(payload, sort_keys=True), references, [
+        row[model._meta.pk.attname] for row in rows
+    ]
+
+
+def project_dataset(*args, **kwargs):
+    """Reject the retired model-materializing producer."""
+    raise RawProjectionViolation(
+        "project_dataset() is retired; project_raw_dataset() requires raw records."
+    )
 
 
 def _event_collaborator_references(rows, makerspace_id):
     result = []
     for row in rows:
-        if row.event.makerspace_id == makerspace_id:
+        common = {
+            "event": _event_snapshot(row),
+            "status": row["status"],
+            "recorded_at": row["responded_at"] or row["created_at"],
+        }
+        if row["_event_makerspace_id"] == makerspace_id:
             result.append({
                 "type": "hosted_event_collaborator",
-                "event": _event_snapshot(row.event),
-                "makerspace": _makerspace_snapshot(row.makerspace),
-                "status": row.status,
-                "recorded_at": row.responded_at or row.created_at,
+                **common,
+                "makerspace": _makerspace_snapshot(row, "_makerspace"),
             })
         else:
             result.append({
                 "type": "foreign_host_event",
-                "event": _event_snapshot(row.event),
-                "host": _makerspace_snapshot(row.event.makerspace),
-                "status": row.status,
-                "recorded_at": row.responded_at or row.created_at,
+                **common,
+                "host": _makerspace_snapshot(row, "_event_makerspace"),
             })
     return result
 
@@ -63,19 +74,19 @@ def _event_collaborator_references(rows, makerspace_id):
 def _project_transfers(rows, makerspace_id):
     owned, references = [], []
     for row in rows:
-        if row.source_makerspace_id and row.makerspace_id != row.source_makerspace_id:
+        if row["source_makerspace_id"] and row["makerspace_id"] != row["source_makerspace_id"]:
             raise ValueError(
-                f"StockTransfer {row.pk} owner disagrees with its source participant."
+                f"StockTransfer {row['id']} owner disagrees with its source participant."
             )
-        if row.makerspace_id == makerspace_id:
+        if row["makerspace_id"] == makerspace_id:
             owned.append(row)
             continue
         references.append({
             "type": "inbound_stock_transfer",
-            "source": _makerspace_snapshot(row.source_makerspace),
-            "destination": _makerspace_snapshot(row.destination_makerspace),
-            "status": row.status,
-            "recorded_at": row.applied_at or row.created_at,
+            "source": _makerspace_snapshot(row, "_source_makerspace"),
+            "destination": _makerspace_snapshot(row, "_destination_makerspace"),
+            "status": row["status"],
+            "recorded_at": row["applied_at"] or row["created_at"],
         })
     return owned, references
 
@@ -84,15 +95,15 @@ def _null_external_makerspaces(payload, rows, makerspace_id, field_names):
     result = []
     for item, row in zip(payload, rows, strict=True):
         for field_name in field_names:
-            related = getattr(row, field_name)
-            if related is None or related.pk == makerspace_id:
+            related_id = row[f"{field_name}_id"]
+            if related_id is None or related_id == makerspace_id:
                 continue
             item["fields"][field_name] = None
             result.append({
                 "type": f"{item['model']}.{field_name}",
                 "row_pk": item["pk"],
-                "makerspace": _makerspace_snapshot(related),
-                "recorded_at": getattr(row, "created_at", None),
+                "makerspace": _makerspace_snapshot(row, f"_{field_name}"),
+                "recorded_at": row.get("created_at"),
             })
     return result
 
@@ -101,29 +112,30 @@ def _null_transfer_counterparty(payload, rows, makerspace_id):
     result = []
     for item, row in zip(payload, rows, strict=True):
         for side in ("source", "destination"):
-            related = getattr(row, f"{side}_makerspace")
-            if related is None or related.pk == makerspace_id:
+            field_name = f"{side}_makerspace"
+            related_id = row[f"{field_name}_id"]
+            if related_id is None or related_id == makerspace_id:
                 continue
-            item["fields"][f"{side}_makerspace"] = None
+            item["fields"][field_name] = None
             item["fields"][f"{side}_container"] = None
             result.append({
                 "type": f"operations.StockTransfer.{side}",
                 "row_pk": item["pk"],
-                "makerspace": _makerspace_snapshot(related),
-                "recorded_at": row.applied_at or row.created_at,
+                "makerspace": _makerspace_snapshot(row, f"_{field_name}"),
+                "recorded_at": row["applied_at"] or row["created_at"],
             })
     return result
 
 
-def _makerspace_snapshot(makerspace):
-    if makerspace is None:
-        return None
-    return {"name": makerspace.name, "slug": makerspace.slug}
+def _makerspace_snapshot(row, prefix):
+    name = row[f"{prefix}_name"]
+    slug = row[f"{prefix}_slug"]
+    return None if name is None and slug is None else {"name": name, "slug": slug}
 
 
-def _event_snapshot(event):
+def _event_snapshot(row):
     return {
-        "title": event.title,
-        "starts_at": event.starts_at,
-        "ends_at": event.ends_at,
+        "title": row["_event_title"],
+        "starts_at": row["_event_starts_at"],
+        "ends_at": row["_event_ends_at"],
     }

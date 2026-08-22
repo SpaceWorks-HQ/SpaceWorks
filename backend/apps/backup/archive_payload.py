@@ -11,8 +11,9 @@ from django.db import connection, transaction
 
 from apps.backup import storage
 from apps.backup.models import ARCHIVE_PURGE_WARNING, BackupArchive
+from apps.backup.raw_projection import no_decrypt_guard, raw_records
 from apps.backup.settings_policy import POLICIES, Policy
-from apps.backup.tenant_projection import project_dataset
+from apps.backup.tenant_projection import project_raw_dataset
 from apps.data_export.datasets import DATASET_SPECS
 from apps.makerspaces.servability import servable_queryset
 
@@ -140,29 +141,44 @@ def _postgres_environment():
 
 
 def _tenant_payload(makerspace_id, root):
-    root.mkdir(parents=True)
-    object_keys = {"private": {}, "public_image": {}}
-    referenced_users = set()
-    external_references = []
-    for label, (_path, predicate) in sorted(DATASET_SPECS.items()):
-        model = apps.get_model(label)
-        queryset = model.objects.filter(predicate.as_q(makerspace_id)).order_by(model._meta.pk.name)
-        payload, references, included_pks = project_dataset(label, queryset, makerspace_id)
-        included = queryset.filter(pk__in=included_pks)
-        external_references.extend(references)
-        destination = root / f"{label.lower().replace('.', '_')}.json"
-        destination.write_text(payload, encoding="utf-8")
-        _collect_model_objects(
-            included, model, object_keys, fixed_makerspace_id=makerspace_id
+    # The guard ends with raw row/object-key projection. Future DEK rewrap belongs
+    # after this context because it is the separately authorized unwrap phase.
+    with no_decrypt_guard():
+        root.mkdir(parents=True)
+        object_keys = {"private": {}, "public_image": {}}
+        referenced_users = set()
+        external_references = []
+        for label, (_path, predicate) in sorted(DATASET_SPECS.items()):
+            model = apps.get_model(label)
+            queryset = model.objects.filter(predicate.as_q(makerspace_id)).order_by(
+                model._meta.pk.name
+            )
+            records = raw_records(queryset, model)
+            payload, references, included_pks = project_raw_dataset(
+                label, model, records, makerspace_id
+            )
+            included = queryset.filter(pk__in=included_pks)
+            external_references.extend(references)
+            destination = root / f"{label.lower().replace('.', '_')}.json"
+            destination.write_text(payload, encoding="utf-8")
+            _collect_model_objects(
+                included, model, object_keys, fixed_makerspace_id=makerspace_id
+            )
+            for field in model._meta.fields:
+                if (
+                    field.remote_field
+                    and field.remote_field.model._meta.label == "accounts.User"
+                ):
+                    referenced_users.update(
+                        included.values_list(field.attname, flat=True)
+                    )
+        User = apps.get_model("accounts.User")
+        users = list(
+            User.objects.filter(pk__in=referenced_users).values("id", "username")
         )
-        for field in model._meta.fields:
-            if field.remote_field and field.remote_field.model._meta.label == "accounts.User":
-                referenced_users.update(included.values_list(field.attname, flat=True))
-    User = apps.get_model("accounts.User")
-    users = list(User.objects.filter(pk__in=referenced_users).values("id", "username"))
-    _write_json(root / "global_user_references.json", users)
-    _write_json(root / "external_references.json", external_references)
-    return object_keys
+        _write_json(root / "global_user_references.json", users)
+        _write_json(root / "external_references.json", external_references)
+        return object_keys
 
 
 def _object_closure():
@@ -276,4 +292,3 @@ def _write_json(path, value):
 
 def _command_version(command):
     return subprocess.run([command, "--version"], check=True, capture_output=True, text=True).stdout.strip()
-
