@@ -1808,18 +1808,24 @@ exist, so the supported sequence is **create on → enrol and verify two → swi
 
 **Every transaction that changes the effective recipient count must go through
 `backup/custody.py::with_makerspace_custody_lock`, which locks the MAKERSPACE ROW FIRST, then recipient
-rows in `pk` order.** The full set is revoke, compromise, verify, reactivate, switch changes, archive
-creation and restore activation. A uniform order is mandatory: `verify_recipient` once locked the
+rows in `pk` order.** The full count-changing set is revoke, compromise, verify, reactivate, switch
+changes and restore activation. Archive creation directly locks the makerspace first to snapshot the
+switch decision; it changes no recipient count, so it does not widen that lock to recipient rows. A
+uniform order is mandatory: `verify_recipient` once locked the
 recipient row first and `reactivate_recipient` locked nothing at all, which is a deadlock and a lost
 update. **This supersedes Lane K1's "recipient mutation takes no lock".** K1's actual concern still
 holds — a backup build holds a *file* lock and its own `REPEATABLE READ` snapshot, never the makerspace
 row, so an urgent revocation is still never blocked by a running backup.
 
 **`MakerspaceArchiveCustodyState` is the authoritative alarm record**, written in the same transaction
-as the mutation that caused it, with `alarm_episode` distinguishing repeat occurrences so delivery
-cannot spam. It is **derived, recomputable** state, so backfilling it is idempotent. There is currently
-**no outbound notification channel** — readiness (`archive_custody.below_floor_makerspaces`) plus admin
-visibility is the whole delivery path. Do not describe it as paging anyone.
+as the mutation that caused it. Custody is `not_applicable` while superadmin access is enabled;
+`alarm_revision` advances once for every state-or-reason transition and is the delivery identity.
+`alarm_episode` remains the reporting identity for repeat unhealthy episodes. The state is **derived,
+recomputable**, so backfilling it is idempotent. `ArchiveCustodyAlarmDelivery` is the recoverable outbox:
+tenant repair-capable staff receive the primary warning, and platform operators receive zero-recipient,
+unreachable-recipient, and exhausted-delivery escalations. Delivery is **at-least-once** — SMTP may accept
+a message before a worker dies and its retry may duplicate it, but the outbox never knowingly drops it.
+Readiness surfaces below-floor, zero-recipient, undelivered, and missing-operator-address counts.
 
 **Never combine a `RunPython` data migration and an `AddConstraint` on the same table in one
 migration.** PostgreSQL raises *"cannot ALTER TABLE because it has pending trigger events"* as soon as

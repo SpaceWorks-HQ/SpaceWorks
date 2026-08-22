@@ -213,6 +213,9 @@ OMITTED_MODELS = {
     "backup.MakerspaceArchiveCustodyState": (
         "Deployment-local archive-custody alarm state, recomputed from recipients."
     ),
+    "backup.ArchiveCustodyAlarmDelivery": (
+        "Deployment-local custody-alarm delivery and retry state."
+    ),
     "backup.BackupLease": "Deployment scheduler lease.",
     "backup.DeploymentRecoveryState": "Deployment recovery and quarantine state.",
     "backup.PlatformBackupSettings": "Platform backup configuration and age recipient.",

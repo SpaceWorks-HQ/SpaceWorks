@@ -26,6 +26,19 @@ class Migration(migrations.Migration):
     dependencies = [
         ('machines', '0010_member_service_request_owner'),
         ('makerspaces', '0045_membership_join_policy_referrals'),
+        # This migration REPLACES the pii_fence_machine_service_request function that
+        # encryption/0006 creates, swapping its bucket-join lookup for NEW.makerspace_id
+        # once that column exists. Both migrations previously depended only on
+        # machines/0010, so they were siblings and Django ordered them arbitrarily -- it
+        # happened to pick the right order until a new cross-app dependency elsewhere
+        # perturbed the traversal, and then encryption/0006's plain CREATE FUNCTION
+        # aborted the whole build with DuplicateFunction.
+        #
+        # Making that CREATE idempotent would be the WRONG fix: it would then overwrite
+        # this migration's newer body with the stale bucket-join one, silently reverting
+        # a PII write fence to logic that reads a column this migration moved. The
+        # ordering is a real requirement, so it is declared here instead.
+        ('encryption', '0006_machine_service_request_pii_fence'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

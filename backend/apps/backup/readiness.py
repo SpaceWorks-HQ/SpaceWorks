@@ -1,10 +1,7 @@
 """Deployment-level archive-custody readiness summary."""
 
-from .models import MakerspaceArchiveCustodyState
+from .custody_alarms import readiness_counts
 
 
 def archive_custody_readiness():
-    below_floor = MakerspaceArchiveCustodyState.objects.exclude(
-        state=MakerspaceArchiveCustodyState.State.HEALTHY
-    ).count()
-    return {"below_floor_makerspaces": below_floor}
+    return readiness_counts()

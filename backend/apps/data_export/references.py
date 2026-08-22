@@ -48,6 +48,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("backup.DeploymentRecoveryState", "acknowledged_by"),
         ("backup.DeploymentRecoveryState", "recovery_principal"),
         ("backup.MakerspaceArchiveRecipient", "added_by"),
+        ("backup.ArchiveCustodyAlarmDelivery", "recipient_user"),
         ("backup.RestoreOperation", "requested_by"),
         ("data_export.DataExportJob", "requested_by"),
         ("data_export.DataExportJob", "download_issued_to"),

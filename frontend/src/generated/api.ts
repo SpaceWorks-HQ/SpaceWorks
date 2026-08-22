@@ -692,7 +692,12 @@ export type ApprovalModeEnum = "instant" | "approve";
 
 export type ArchiveCustodyReadiness = {
   "below_floor_makerspaces": number;
+  "zero_recipient_makerspaces": number;
+  "undelivered_alarms": number;
+  "alarms_with_no_operator_address": number;
 };
+
+export type ArchiveCustodyStateEnum = "healthy" | "not_applicable" | "degraded_one_recipient" | "floor_breached_zero";
 
 export type ArchivedPaymentMakerspace = {
   "id": number;
@@ -2580,7 +2585,7 @@ export type Makerspace = {
   "referrals_enabled"?: boolean;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
-  "archive_custody_state": "healthy" | "degraded_one_recipient" | "floor_breached_zero" | null;
+  "archive_custody_state": ArchiveCustodyStateEnum | null;
   "staff_notifications_enabled"?: boolean;
   "booking_requester_notifications_enabled"?: boolean;
   "logo_key": string;
@@ -3586,7 +3591,7 @@ export type PatchedMakerspace = {
   "referrals_enabled"?: boolean;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
-  "archive_custody_state"?: "healthy" | "degraded_one_recipient" | "floor_breached_zero" | null;
+  "archive_custody_state"?: ArchiveCustodyStateEnum | null;
   "staff_notifications_enabled"?: boolean;
   "booking_requester_notifications_enabled"?: boolean;
   "logo_key"?: string;

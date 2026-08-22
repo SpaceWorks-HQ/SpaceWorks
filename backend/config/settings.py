@@ -546,6 +546,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.backup.tasks.scheduled_deployment_backup_task",
         "schedule": crontab(hour=2, minute=0),
     },
+    "deliver-archive-custody-alarms": {
+        "task": "apps.backup.tasks.deliver_archive_custody_alarms_task",
+        "schedule": crontab(hour=1, minute=30),
+    },
     "purge-expired-backup-archives": {
         "task": "apps.backup.tasks.purge_expired_backup_archives_task",
         "schedule": crontab(hour=3, minute=55),

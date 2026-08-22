@@ -116,6 +116,7 @@ class MakerspaceArchiveRecipient(models.Model):
 class MakerspaceArchiveCustodyState(models.Model):
     class State(models.TextChoices):
         HEALTHY = "healthy", "Healthy"
+        NOT_APPLICABLE = "not_applicable", "Not applicable"
         DEGRADED_ONE_RECIPIENT = (
             "degraded_one_recipient",
             "Degraded: one recipient",
@@ -144,6 +145,7 @@ class MakerspaceArchiveCustodyState(models.Model):
         related_name="triggered_custody_states",
     )
     alarm_episode = models.PositiveBigIntegerField(default=0)
+    alarm_revision = models.PositiveBigIntegerField(default=0)
 
 
 class ArchiveRecipientReservation(models.Model):
@@ -287,3 +289,8 @@ class RestoreRollbackObject(models.Model):
                 name="uniq_restore_rollback_object",
             )
         ]
+
+
+# Keep the public model import surface stable while the custody outbox lives in its
+# own module; this file is already at the repository's size ceiling.
+from .models_custody_alarm import ArchiveCustodyAlarmDelivery  # noqa: E402,F401

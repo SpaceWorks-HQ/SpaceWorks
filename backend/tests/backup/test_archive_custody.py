@@ -105,7 +105,9 @@ def test_compromise_from_two_to_one_succeeds_and_records_degraded_state():
 
 
 def test_compromise_to_zero_records_floor_breach():
-    makerspace = Makerspace.objects.create(name="Zero", slug="custody-zero")
+    makerspace = Makerspace.objects.create(
+        name="Zero", slug="custody-zero", superadmin_access_enabled=False
+    )
     recipient = _recipient(makerspace, 20)
 
     compromise_recipient(recipient=recipient)
@@ -117,7 +119,9 @@ def test_compromise_to_zero_records_floor_breach():
 
 
 def test_verification_heals_at_two_and_stamps_clear_time():
-    makerspace = Makerspace.objects.create(name="Verify", slug="custody-verify")
+    makerspace = Makerspace.objects.create(
+        name="Verify", slug="custody-verify", superadmin_access_enabled=False
+    )
     _recipient(makerspace, 30)
     challenged = _recipient(makerspace, 31, verified=False)
     challenged.challenge_nonce_digest = hashlib.sha256(NONCE).hexdigest()
@@ -145,7 +149,9 @@ def test_verification_heals_at_two_and_stamps_clear_time():
 
 def test_reactivation_heals_at_two_and_stamps_clear_time():
     makerspace = Makerspace.objects.create(
-        name="Reactivate", slug="custody-reactivate"
+        name="Reactivate",
+        slug="custody-reactivate",
+        superadmin_access_enabled=False,
     )
     _recipient(makerspace, 40)
     revoked = _recipient(makerspace, 41, revoked=True)
@@ -162,7 +168,9 @@ def test_reactivation_heals_at_two_and_stamps_clear_time():
 
 
 def test_alarm_episode_increments_across_separate_degrade_heal_cycles():
-    makerspace = Makerspace.objects.create(name="Episodes", slug="custody-episodes")
+    makerspace = Makerspace.objects.create(
+        name="Episodes", slug="custody-episodes", superadmin_access_enabled=False
+    )
     first = _recipient(makerspace, 50)
     _recipient(makerspace, 51)
     spare = _recipient(makerspace, 52, revoked=True)

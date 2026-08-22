@@ -75,7 +75,7 @@ def test_activation_retry_returns_same_persisted_receipt(monkeypatch):
     assert ReceiptConsumption.objects.count() == 1
     assert MakerspaceArchiveCustodyState.objects.get(
         makerspace=job.target_makerspace
-    ).state == MakerspaceArchiveCustodyState.State.FLOOR_BREACHED_ZERO
+    ).state == MakerspaceArchiveCustodyState.State.NOT_APPLICABLE
 
 
 def test_aborted_target_cannot_activate(monkeypatch):

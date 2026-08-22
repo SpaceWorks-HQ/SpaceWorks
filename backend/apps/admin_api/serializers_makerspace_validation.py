@@ -55,6 +55,7 @@ class MakerspaceValidationMixin:
             "nullable": True,
             "enum": [
                 "healthy",
+                "not_applicable",
                 "degraded_one_recipient",
                 "floor_breached_zero",
             ],

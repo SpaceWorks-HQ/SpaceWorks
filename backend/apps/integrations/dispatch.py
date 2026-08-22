@@ -25,6 +25,7 @@ EMAIL_MODULE_EXEMPT = frozenset({
     ("account", "password_reset"),
     ("account", "email_verification"),
     ("hardware", "return_reminder"),
+    ("backup", "archive_custody_alarm"),
 })
 
 
@@ -262,4 +263,3 @@ def _deliver(log):
             ]
         )
     return log
-

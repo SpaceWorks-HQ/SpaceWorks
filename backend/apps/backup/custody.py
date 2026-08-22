@@ -1,5 +1,6 @@
 """Serialized archive-recipient custody state maintenance."""
 
+import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
 
@@ -17,6 +18,7 @@ from .models import (
 RECIPIENT_FLOOR = 2
 RECIPIENT_COMPROMISED = "recipient_compromised"
 RECIPIENT_COUNT_BELOW_FLOOR = "recipient_count_below_floor"
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -88,7 +90,10 @@ def validate_deployment_custody():
     for makerspace_id in makerspace_ids:
         with with_makerspace_custody_lock(makerspace_id) as custody:
             count = custody.verified_recipient_count()
-            if count < RECIPIENT_FLOOR:
+            if (
+                not custody.makerspace.superadmin_access_enabled
+                and count < RECIPIENT_FLOOR
+            ):
                 below_floor_ids.append(makerspace_id)
             if not custody.makerspace.superadmin_access_enabled and count == 0:
                 zero_recipient_off_ids.append(makerspace_id)
@@ -121,6 +126,10 @@ def _sync_custody_state(custody_lock):
         .first()
     )
 
+    if custody_lock.makerspace.superadmin_access_enabled:
+        _record_not_applicable(current, custody_lock.makerspace, now)
+        return
+
     if count >= RECIPIENT_FLOOR:
         _record_healthy(current, custody_lock.makerspace, now)
         return
@@ -135,15 +144,28 @@ def _sync_custody_state(custody_lock):
 
 def _record_healthy(current, makerspace, now):
     if current is None:
-        MakerspaceArchiveCustodyState.objects.create(makerspace=makerspace)
+        MakerspaceArchiveCustodyState.objects.create(
+            makerspace=makerspace,
+            alarm_revision=1,
+        )
         return
-    if current.state == MakerspaceArchiveCustodyState.State.HEALTHY:
+    if (
+        current.state == MakerspaceArchiveCustodyState.State.HEALTHY
+        and not current.reason_code
+        and current.triggering_recipient_id is None
+    ):
         return
+    changed = (
+        current.state != MakerspaceArchiveCustodyState.State.HEALTHY
+        or bool(current.reason_code)
+    )
     current.state = MakerspaceArchiveCustodyState.State.HEALTHY
     current.reason_code = ""
     current.cleared_at = now
     current.last_alarm_at = None
     current.triggering_recipient = None
+    if changed:
+        current.alarm_revision += 1
     current.save(
         update_fields=(
             "state",
@@ -151,14 +173,49 @@ def _record_healthy(current, makerspace, now):
             "cleared_at",
             "last_alarm_at",
             "triggering_recipient",
+            "alarm_revision",
         )
     )
+
+
+def _record_not_applicable(current, makerspace, now):
+    if current is None:
+        MakerspaceArchiveCustodyState.objects.create(
+            makerspace=makerspace,
+            state=MakerspaceArchiveCustodyState.State.NOT_APPLICABLE,
+            cleared_at=now,
+            alarm_revision=1,
+        )
+        return
+    if (
+        current.state == MakerspaceArchiveCustodyState.State.NOT_APPLICABLE
+        and not current.reason_code
+        and current.triggering_recipient_id is None
+        and current.cleared_at is not None
+        and current.last_alarm_at is None
+    ):
+        return
+    changed = (
+        current.state != MakerspaceArchiveCustodyState.State.NOT_APPLICABLE
+        or bool(current.reason_code)
+    )
+    current.state = MakerspaceArchiveCustodyState.State.NOT_APPLICABLE
+    current.reason_code = ""
+    current.cleared_at = now
+    current.last_alarm_at = None
+    current.triggering_recipient = None
+    if changed:
+        current.alarm_revision += 1
+    current.save()
 
 
 def _record_breach(current, custody_lock, target_state, now):
     fresh_episode = (
         current is None
-        or current.state == MakerspaceArchiveCustodyState.State.HEALTHY
+        or current.state in (
+            MakerspaceArchiveCustodyState.State.HEALTHY,
+            MakerspaceArchiveCustodyState.State.NOT_APPLICABLE,
+        )
     )
     previous_reason = current.reason_code if current is not None else ""
     reason_code = (
@@ -176,6 +233,8 @@ def _record_breach(current, custody_lock, target_state, now):
         current.entered_at = now
     if fresh_episode or state_changed or reason_changed:
         current.last_alarm_at = None
+    if state_changed or reason_changed:
+        current.alarm_revision += 1
 
     current.state = target_state
     current.reason_code = reason_code
@@ -183,3 +242,20 @@ def _record_breach(current, custody_lock, target_state, now):
     if custody_lock.triggering_recipient_id is not None:
         current.triggering_recipient_id = custody_lock.triggering_recipient_id
     current.save()
+    if state_changed or reason_changed:
+        transaction.on_commit(
+            lambda mid=custody_lock.makerspace.pk: _schedule_custody_alarm(mid),
+            robust=True,
+        )
+
+
+def _schedule_custody_alarm(makerspace_id):
+    try:
+        from .tasks import deliver_archive_custody_alarms_task
+
+        deliver_archive_custody_alarms_task.delay(makerspace_id)
+    except Exception:
+        logger.exception(
+            "archive_custody_alarm_enqueue_failed",
+            extra={"makerspace_id": makerspace_id},
+        )

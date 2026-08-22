@@ -66,9 +66,15 @@ def test_report_lists_one_verified_recipient_and_current_custody_state():
 
 
 def test_readiness_counts_below_floor_custody_rows(monkeypatch):
-    healthy = Makerspace.objects.create(name="Healthy", slug="readiness-healthy")
+    healthy = Makerspace.objects.create(
+        name="Healthy",
+        slug="readiness-healthy",
+        superadmin_access_enabled=False,
+    )
     degraded = Makerspace.objects.create(
-        name="Degraded", slug="readiness-degraded"
+        name="Degraded",
+        slug="readiness-degraded",
+        superadmin_access_enabled=False,
     )
     for makerspace, count in ((healthy, 2), (degraded, 1)):
         for index in range(count):
@@ -87,3 +93,4 @@ def test_readiness_counts_below_floor_custody_rows(monkeypatch):
 
     assert response.status_code == 200
     assert response.data["archive_custody"]["below_floor_makerspaces"] == 1
+    assert response.data["archive_custody"]["zero_recipient_makerspaces"] == 0

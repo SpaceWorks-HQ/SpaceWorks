@@ -24,6 +24,46 @@ OBJECT_FIELD_NAMES = frozenset({
     # image that does not exist in storage.
     "logo_key",
 })
+# Deny-by-default classification for every concrete `*_key` field in the schema.
+# OBJECT_FIELD_NAMES above is the ONLY thing deciding which object-storage bytes a
+# backup captures, and it is hand-written: it has already drifted once, when
+# `logo_key` was missing and restores left Makerspace.logo_key pointing at an object
+# that was never captured. `tests/backup/test_object_field_coverage.py` fails when a
+# new `*_key` field appears in neither set, forcing an explicit decision.
+#
+# Classified by (model label, field name), not bare name: `public_key` and
+# `source_key` each appear on more than one model with different meanings.
+#
+# `backup.BackupArchive.object_key` is deliberately NOT listed here -- it IS an
+# object pointer, so it matches OBJECT_FIELD_NAMES by name, and `_collect_model_objects`
+# then skips it at runtime via the "backup-archives/" prefix test so that an archive
+# can never contain itself.
+NON_OBJECT_KEY_FIELDS = frozenset({
+    ("accounts.NativeAppRegistration", "verifier_config_key"),   # attestation config id
+    ("accounts.PlatformSocialAuthSettings", "apple_private_key"),  # credential
+    ("audit.AuditMacKey", "wrapped_key"),                        # credential
+    ("audit.AuditSigningKey", "public_key"),                     # credential
+    ("audit.AuditSigningKey", "wrapped_private_key"),            # credential
+    ("audit.AuditSigningKeyRotation", "new_key"),                # FK to AuditSigningKey
+    ("audit.AuditSigningKeyRotation", "old_key"),                # FK to AuditSigningKey
+    ("backup.RestoreRollbackObject", "module_key"),              # module key string
+    ("backup.RestoreRollbackObject", "source_key"),              # restore-internal pointer
+    ("integrations.PlatformPushSettings", "apns_private_key"),   # credential
+    ("makerspaces.Makerspace", "public_api_key"),                # credential
+    ("payments.MakerspacePaymentSettings", "stripe_publishable_key"),  # credential
+    ("payments.MakerspacePaymentSettings", "stripe_secret_key"),       # credential
+    ("payments.PlatformStripeConnectSettings", "stripe_publishable_key"),  # credential
+    ("payments.PlatformStripeConnectSettings", "stripe_secret_key"),       # credential
+    ("sessions.Session", "session_key"),                         # django session id
+    ("tenant_migration.DeploymentSigningKey", "public_key"),     # credential
+    ("tenant_migration.MigrationPairing", "source_public_key"),  # credential
+    ("tenant_migration.MigrationPairing", "target_public_key"),  # credential
+    ("tenant_migration.TenantImportObject", "source_key"),       # transient import-job row
+    ("tenant_migration.TenantImportObject", "staging_key"),      # transient import-job row
+    ("tenant_migration.TenantImportObject", "target_key"),       # transient import-job row
+})
+
+
 CONTINUITY_KEYS = (
     "SECRET_KEY", "API_CLIENT_ENC_KEY", "PII_MASTER_KEY", "PII_MASTER_KEY_PREVIOUS",
     "PII_SEARCH_HASH_KEY", "HMAC_SECRET", "PUSH_TOKEN_HMAC_KEY", "CRON_SECRET",
