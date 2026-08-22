@@ -15,6 +15,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import User
 from apps.backup import archive_builder, storage
+from apps.backup.archive_payload import _build_info
 from apps.backup.archive_import import import_disaster_archive
 from apps.backup.management.commands.backup_control import Command
 from apps.backup.models import BackupArchive, RestoreOperation
@@ -49,7 +50,10 @@ def _manifest(restore, *, format_name="spaceworks-phase5a-v2", contents=None):
         "scope": BackupArchive.Scope.DEPLOYMENT,
         "age_encrypted": True,
         "postgres": {"source_server_major": 14},
-        "build": {"source_hash": "unknown"},
+        # The running build identity, not a literal: "unknown" is only correct
+        # outside an image, so hard-coding it made this pass on the host and
+        # fail in Docker, where /app/BUILD_INFO.json carries a real hash.
+        "build": {"source_hash": _build_info()["source_hash"]},
         "settings": {},
     }
     if contents is not None:

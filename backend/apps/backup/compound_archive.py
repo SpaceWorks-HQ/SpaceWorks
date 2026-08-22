@@ -1,9 +1,4 @@
-"""Lane E E2 sealed-slice packaging for deployment archives.
-
-In E2 the root payload is still the existing full deployment payload and
-contains every makerspace. Row exclusion arrives in E3; this module adds
-tenant-recipient sealed slices and sanitized routing metadata to its manifest.
-"""
+"""Lane E compound capture, verified slice sealing, and readable-main routing."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,16 +8,21 @@ import tarfile
 import uuid
 
 from apps.backup.digests import sha256_file
+from apps.backup.main_projection import project_readable_main_dump
+from apps.backup.main_projection_inverse import boundary_deltas
+from apps.backup.main_projection_registry import table_rules
+from apps.backup.main_projection_verification import build_expected_ledger
 from apps.backup.models import (
     MakerspaceArchiveCustodyState,
     MakerspaceArchiveRecipient,
 )
 from apps.backup.recipient_selection import BackupBuildError
 from apps.backup.recipients import fingerprint_for
+from apps.backup.slice_verification import verify_unsealed_slice
 from apps.makerspaces.models import Makerspace
 
 
-COMPOUND_ARCHIVE_FORMAT = "spaceworks-lane-e-e2-compound-v1"
+COMPOUND_ARCHIVE_FORMAT = "spaceworks-lane-e-e3-compound-v1"
 
 
 @dataclass(frozen=True)
@@ -45,9 +45,17 @@ class CompoundCapture:
             entry["public_recipient"] for entry in platform_recipients
         )
         self.slice_entries = []
+        self.frozen_slices = ()
+        self.verified_makerspace_ids = set()
+        self.expected_main_ledger = None
 
     def capture_from_snapshot(self, *, tenant_payload, capture_objects, write_json):
         frozen = _frozen_slices(self.archive.id, self.platform_recipients)
+        self.frozen_slices = frozen
+        makerspace_ids = tuple(item.makerspace_id for item in frozen)
+        self.expected_main_ledger = build_expected_ledger(
+            "default", table_rules(), makerspace_ids
+        )
         slices_root = self.root / "slices"
         work_root = self.root / ".slice-build"
         try:
@@ -62,6 +70,7 @@ class CompoundCapture:
                         write_json=write_json,
                     )
                 )
+            self.require_verified_slice_coverage()
         finally:
             shutil.rmtree(work_root, ignore_errors=True)
 
@@ -82,6 +91,10 @@ class CompoundCapture:
             plaintext / "objects", object_keys, self.modes
         )
         write_json(
+            plaintext / "inverse" / "boundary-deltas.json",
+            boundary_deltas(item.makerspace_id),
+        )
+        write_json(
             plaintext / "slice-manifest.json",
             {
                 "format": COMPOUND_ARCHIVE_FORMAT,
@@ -92,6 +105,8 @@ class CompoundCapture:
                 "storage": {"objects": objects},
             },
         )
+        verify_unsealed_slice(item.makerspace_id, plaintext, objects)
+        self.verified_makerspace_ids.add(item.makerspace_id)
         slices_root.mkdir(parents=True, exist_ok=True)
         plain_tar = work_root / f"{item.slice_id}.tar"
         encrypted = slices_root / f"{item.slice_id}.tar.age"
@@ -121,6 +136,50 @@ class CompoundCapture:
             "recipient_fingerprints": list(item.recipient_fingerprints),
             "custody_state": item.custody_state,
         }
+
+    def require_verified_slice_coverage(self):
+        expected = {item.makerspace_id for item in self.frozen_slices}
+        emitted = {
+            entry.get("makerspace_id")
+            for entry in self.slice_entries
+            if isinstance(entry, dict)
+        }
+        if expected != emitted or expected != self.verified_makerspace_ids:
+            raise BackupBuildError(
+                "Readable-main exclusion requires one verified slice per sovereign makerspace."
+            )
+
+    def project_readable_main(self, manifest):
+        """Replace the full source dump only after slice coverage and main verification."""
+        self.require_verified_slice_coverage()
+        if self.expected_main_ledger is None:
+            raise BackupBuildError("Readable-main verification ledger is missing.")
+        makerspace_ids = tuple(item.makerspace_id for item in self.frozen_slices)
+        build_root = self.root / ".main-build"
+        source_dump = build_root / "source.dump"
+        build_root.mkdir()
+        (self.root / "database.dump").replace(source_dump)
+        try:
+            project_readable_main_dump(
+                source_dump,
+                self.root / "database.dump",
+                makerspace_ids,
+                self.expected_main_ledger,
+            )
+            _verify_sealed_slices(self.root, self.slice_entries)
+            result = _exclude_sovereign_objects(
+                self.root, manifest, set(makerspace_ids)
+            )
+        finally:
+            shutil.rmtree(build_root, ignore_errors=True)
+        covered = [
+            value for value in result["covered_makerspace_ids"]
+            if value not in makerspace_ids
+        ]
+        result["covered_makerspace_ids"] = covered
+        result["excluded_makerspace_ids"] = list(makerspace_ids)
+        result["partial"] = bool(makerspace_ids)
+        return result
 
 
 def _frozen_slices(archive_id, platform_recipients):
@@ -193,4 +252,32 @@ def add_slice_metadata(manifest, *, slices, recipients):
         fingerprint_for(entry["public_recipient"]) for entry in recipients
     )
     result["slices"] = list(slices)
+    return result
+
+
+def _verify_sealed_slices(root, entries):
+    for entry in entries:
+        path = root / entry["path"]
+        if (
+            path.stat().st_size != entry["size_bytes"]
+            or sha256_file(path) != entry["ciphertext_sha256"]
+        ):
+            raise BackupBuildError("A sealed sovereign slice failed ciphertext verification.")
+
+
+def _exclude_sovereign_objects(root, manifest, makerspace_ids):
+    result = dict(manifest)
+    storage_manifest = dict(result["storage"])
+    retained = []
+    for item in storage_manifest["objects"]:
+        if item.get("makerspace_id") in makerspace_ids:
+            path = root / "objects" / item["bucket_kind"] / item["key"]
+            path.unlink(missing_ok=True)
+        else:
+            path = root / "objects" / item["bucket_kind"] / item["key"]
+            if path.stat().st_size != item["size"] or sha256_file(path) != item["sha256"]:
+                raise BackupBuildError("Readable-main object verification failed.")
+            retained.append(item)
+    storage_manifest["objects"] = retained
+    result["storage"] = storage_manifest
     return result

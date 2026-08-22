@@ -16,6 +16,8 @@ def project_raw_dataset(label, model, records, makerspace_id):
     references = []
     if label == "events.EventCollaborator":
         references.extend(_event_collaborator_references(rows, makerspace_id))
+        for item, row in zip(references, rows, strict=True):
+            item["row_preimage"] = fixture_payload(model, (row,))[0]
         rows = []
     elif label == "operations.StockTransfer":
         rows, references = _project_transfers(rows, makerspace_id)
@@ -102,6 +104,7 @@ def _null_external_makerspaces(payload, rows, makerspace_id, field_names):
             result.append({
                 "type": f"{item['model']}.{field_name}",
                 "row_pk": item["pk"],
+                "field_preimage": related_id,
                 "makerspace": _makerspace_snapshot(row, f"_{field_name}"),
                 "recorded_at": row.get("created_at"),
             })
@@ -121,6 +124,7 @@ def _null_transfer_counterparty(payload, rows, makerspace_id):
             result.append({
                 "type": f"operations.StockTransfer.{side}",
                 "row_pk": item["pk"],
+                "field_preimage": related_id,
                 "makerspace": _makerspace_snapshot(row, f"_{field_name}"),
                 "recorded_at": row["applied_at"] or row["created_at"],
             })

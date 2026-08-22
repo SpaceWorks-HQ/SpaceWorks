@@ -10,7 +10,7 @@ import uuid
 import pytest
 from django.utils import timezone
 
-from apps.backup import archive_builder, archive_payload
+from apps.backup import archive_builder, archive_payload, compound_archive
 from apps.backup.models import (
     BackupArchive,
     MakerspaceArchiveCustodyState,
@@ -27,6 +27,7 @@ PLATFORM_RECIPIENT = "age1platform-e2"
 TENANT_RECIPIENT_ONE = "age1tenant-e2-one"
 TENANT_RECIPIENT_TWO = "age1tenant-e2-two"
 FULL_MAIN_BYTES = b"full deployment with sovereign tenant content marker"
+PROJECTED_MAIN_BYTES = b"verified readable main without sovereign rows"
 
 
 def _archive():
@@ -70,6 +71,18 @@ def _prepare_build(monkeypatch, settings, markers):
     )
     monkeypatch.setattr(
         archive_payload, "_command_version", lambda _command: "pg_dump 16"
+    )
+    monkeypatch.setattr(
+        compound_archive, "verify_unsealed_slice", lambda *_args: None
+    )
+    def project_main(source, destination, makerspace_ids, _expected):
+        if makerspace_ids:
+            destination.write_bytes(PROJECTED_MAIN_BYTES)
+        else:
+            shutil.copyfile(source, destination)
+
+    monkeypatch.setattr(
+        compound_archive, "project_readable_main_dump", project_main
     )
 
     def tenant_payload(makerspace_id, root):
@@ -166,7 +179,7 @@ def test_deployment_compound_has_only_off_slice_and_sanitized_root_manifest(
         assert slice_entry["ciphertext_sha256"] == hashlib.sha256(
             slice_path.read_bytes()
         ).hexdigest()
-        assert (root / "database.dump").read_bytes() == FULL_MAIN_BYTES
+        assert (root / "database.dump").read_bytes() == PROJECTED_MAIN_BYTES
         assert not (root / "main").exists()
         assert [
             entry["path"] for entry in manifest["contents"]
@@ -221,7 +234,8 @@ def test_extracted_deployment_payload_stays_at_archive_root(
         assert root_database.is_file()
         assert root_manifest.stat().st_size > 0
         assert root_database.stat().st_size > 0
-        assert root_database.read_bytes() == FULL_MAIN_BYTES
+        expected = PROJECTED_MAIN_BYTES if with_slices else FULL_MAIN_BYTES
+        assert root_database.read_bytes() == expected
         assert not (extracted / "main").exists()
         assert len(list(extracted.rglob("manifest.json"))) == 1
         manifest = json.loads(root_manifest.read_text(encoding="utf-8"))

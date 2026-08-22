@@ -9,6 +9,7 @@ from unittest.mock import patch
 from django.core import serializers
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import F
+from django.db.models import Q
 from django.db.models.fields.composite import CompositePrimaryKey
 from django.utils.encoding import is_protected_type
 
@@ -56,6 +57,13 @@ REFERENCE_COLUMNS = {
         "_via_makerspace_slug": "via_makerspace__slug",
     },
 }
+
+
+def canonical_owner_q(predicate, makerspace_id):
+    """Compile Lane E's one canonical owner path, excluding global helper rows."""
+    path = predicate.any_paths[0]
+    lookup = path if path in {"pk", "id"} else f"{path}_id"
+    return Q(**{lookup: makerspace_id})
 
 
 class _RawValueProxy:
@@ -108,6 +116,16 @@ def fixture_payload(model, records):
     # Match serializers.serialize("json", ...), then the existing sorted re-dump.
     normalized = json.loads(json.dumps(payload, cls=DjangoJSONEncoder))
     return normalized
+
+
+def concrete_record_payload(model, record):
+    """Normalize exactly one physical row without traversing M2M relations."""
+    proxy = _RawValueProxy(record)
+    payload = {
+        field.column: _value_from_record(record, proxy, field)
+        for field in model._meta.concrete_fields
+    }
+    return json.loads(json.dumps(payload, cls=DjangoJSONEncoder))
 
 
 def _value_from_record(record, proxy, field):

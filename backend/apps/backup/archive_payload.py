@@ -10,8 +10,9 @@ from django.conf import settings
 from django.db import connection, transaction
 
 from apps.backup import storage
+from apps.backup.postgres_client import client_binary
 from apps.backup.models import ARCHIVE_PURGE_WARNING, BackupArchive
-from apps.backup.raw_projection import no_decrypt_guard, raw_records
+from apps.backup.raw_projection import canonical_owner_q, no_decrypt_guard, raw_records
 from apps.backup.settings_policy import POLICIES, Policy
 from apps.backup.tenant_projection import project_raw_dataset
 from apps.data_export.datasets import DATASET_SPECS
@@ -111,7 +112,9 @@ def _snapshot_payload(archive, root, modes, selected_recipients, *, compound_cap
         "snapshot_at": snapshot_at.isoformat(),
         "postgres": {
             "source_server_major": int(server_version_num) // 10000,
-            "client": _command_version("pg_dump") if archive.scope == BackupArchive.Scope.DEPLOYMENT else "not-used",
+            "client": _command_version(client_binary("pg_dump"))
+            if archive.scope == BackupArchive.Scope.DEPLOYMENT
+            else "not-used",
             "supported_source_majors": [14, 15, 16, 17],
         },
         "build": _build_info(),
@@ -126,7 +129,9 @@ def _snapshot_payload(archive, root, modes, selected_recipients, *, compound_cap
 def _pg_dump(destination, snapshot_id):
     env = _postgres_environment()
     command = [
-        "pg_dump", "--format=custom", "--no-owner", "--no-acl",
+        # The server's own client major, not PATH's newest: a 1.16 archive from
+        # pg_dump 17 is unreadable by the pg_restore the restore path runs.
+        client_binary("pg_dump"), "--format=custom", "--no-owner", "--no-acl",
         f"--snapshot={snapshot_id}", f"--file={destination}",
     ]
     subprocess.run(command, env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -156,7 +161,7 @@ def _tenant_payload(makerspace_id, root):
         external_references = []
         for label, (_path, predicate) in sorted(DATASET_SPECS.items()):
             model = apps.get_model(label)
-            queryset = model.objects.filter(predicate.as_q(makerspace_id)).order_by(
+            queryset = model.objects.filter(canonical_owner_q(predicate, makerspace_id)).order_by(
                 model._meta.pk.name
             )
             records = raw_records(queryset, model)

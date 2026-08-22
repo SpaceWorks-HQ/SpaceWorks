@@ -5,9 +5,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 ARG POSTGRESQL_CLIENT_MAJOR=17
-# pg_dump must be at least as new as every supported source server (14-17). The PGDG
-# repository supplies the versioned client on every Debian suite; apt preferences pin
-# it to the declared major instead of floating to 18. `age` is the archive boundary.
+ARG POSTGRESQL_LOCAL_SERVER_MAJOR=16
+# Two client majors, because the two directions have opposite constraints:
+#   * pg_dump must be at least as new as every supported *source* server (14-17), so
+#     POSTGRESQL_CLIENT_MAJOR is what lands on PATH for tenant migration.
+#   * pg_restore must be no newer than the *target* server. pg_restore 17+ emits an
+#     unconditional `SET transaction_timeout = 0;`, a GUC that does not exist before
+#     17, so restoring into the deployment's own postgres:16 with --exit-on-error
+#     dies on the preamble. The readable-main projection restores into a temporary
+#     database on that server, so it needs a client of the server's own major and
+#     resolves it from /usr/lib/postgresql/<major>/bin explicitly.
+# Both are versioned package names, so nothing floats to 18. `age` is the archive
+# boundary.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl gnupg age \
     && install -d /usr/share/postgresql-common/pgdg \
@@ -16,10 +25,10 @@ RUN apt-get update \
     && . /etc/os-release \
     && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
       > /etc/apt/sources.list.d/pgdg.list \
-    && printf 'Package: postgresql-client-*\nPin: version %s.*\nPin-Priority: 1001\n' "$POSTGRESQL_CLIENT_MAJOR" \
-      > /etc/apt/preferences.d/spaceworks-postgresql-client \
     && apt-get update \
-    && apt-get install -y --no-install-recommends "postgresql-client-$POSTGRESQL_CLIENT_MAJOR" \
+    && apt-get install -y --no-install-recommends \
+      "postgresql-client-$POSTGRESQL_CLIENT_MAJOR" \
+      "postgresql-client-$POSTGRESQL_LOCAL_SERVER_MAJOR" \
     && rm -rf /var/lib/apt/lists/*
 
 # Created before COPY so the source can be chowned as it lands. A later
