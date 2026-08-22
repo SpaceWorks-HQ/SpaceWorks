@@ -74,7 +74,7 @@ CONTINUITY_KEYS = (
 )
 
 
-def _snapshot_payload(archive, root, modes, selected_recipients):
+def _snapshot_payload(archive, root, modes, selected_recipients, *, compound_capture=None):
     with transaction.atomic():
         with connection.cursor() as cursor:
             cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
@@ -93,6 +93,12 @@ def _snapshot_payload(archive, root, modes, selected_recipients):
             covered_makerspace_ids = [archive.makerspace_id]
             object_keys = _tenant_payload(archive.makerspace_id, root / "tenant")
         object_manifest = _capture_objects(root / "objects", object_keys, modes)
+        if compound_capture is not None:
+            compound_capture.capture_from_snapshot(
+                tenant_payload=_tenant_payload,
+                capture_objects=_capture_objects,
+                write_json=_write_json,
+            )
     return {
         "format": "spaceworks-phase5a-v3",
         "archive_id": str(archive.pk),
