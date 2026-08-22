@@ -75,6 +75,13 @@
   `tenant_dump_model_catalog.py` + `tenant_dump_field_snapshot.py` +
   `tenant_dump_authority.py`/`tenant_dump_catalog.py` (Lane D's deny-by-default source catalog), and
   `tenant_dump_source_projection.py` (single-makerspace raw rows plus decision-22 grant closure);
+  `tenant_dump_builder.py` (Lane D's migrated scratch → verified custom-dump orchestrator), with
+  `tenant_dump_database.py`, `tenant_dump_graph.py`, `tenant_dump_raw.py`, `tenant_dump_sql.py` and
+  `tenant_dump_verification.py` owning run-scoped databases, actual-row FK ordering/nullable cycles,
+  reviewed raw columns, fence/closure SQL and restored-candidate verification respectively;
+  `tenant_dump_sequences.py` owns Lane D's exact empty/non-empty sequence state;
+  `tenant_dump_machine_types.py` resolves only fingerprint-identical global built-ins, while
+  `tenant_dump_objects.py` packages immutable staged object bytes without live-storage reads;
   `verification.py` (pre-commit), audit-reference domains behind the `audit_references.py` barrel, and
   `target_cutover.py` (pre-activation + `IMPORTING → ACTIVE`);
   `receipts.py`/`receipt_crypto.py`/`cutover.py` (signed single-use handoff); `views_*.py` (superadmin REST).
