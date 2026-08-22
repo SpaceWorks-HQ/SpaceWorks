@@ -28,6 +28,7 @@ from apps.backup.archive_payload import (
     _write_continuity_keys,
     _write_json,
 )
+from apps.backup.compound_archive import CompoundCapture, add_slice_metadata
 from apps.backup.digests import build_content_ledger, sha256_file
 from apps.backup.models import BackupArchive, DeploymentRecoveryState
 from apps.backup.recipient_selection import BackupBuildError
@@ -45,7 +46,15 @@ def build_archive(archive):
         workers_paused = False
         try:
             root.mkdir()
+            compound_capture = None
             modes = _storage_modes()
+            if archive.scope == BackupArchive.Scope.DEPLOYMENT:
+                compound_capture = CompoundCapture(
+                    archive=archive,
+                    root=root,
+                    modes=modes,
+                    platform_recipients=selected_recipients,
+                )
             quiesced = "quiesced" in modes.values()
             if quiesced:
                 _set_backup_quiescence(True)
@@ -53,21 +62,35 @@ def build_archive(archive):
                 workers_paused = quiescence.pause_worker_consumers()
                 drain_presigned_uploads()
                 quiescence.assert_workers_drained()
-            manifest = _snapshot_payload(
-                archive, root, modes, selected_recipients
-            )
+            if compound_capture is None:
+                manifest = _snapshot_payload(
+                    archive, root, modes, selected_recipients
+                )
+            else:
+                manifest = _snapshot_payload(
+                    archive,
+                    root,
+                    modes,
+                    selected_recipients,
+                    compound_capture=compound_capture,
+                )
+                manifest = add_slice_metadata(
+                    manifest,
+                    slices=compound_capture.slice_entries,
+                    recipients=selected_recipients,
+                )
             manifest["contents"] = build_content_ledger(root)
             _write_json(root / "manifest.json", manifest)
             encrypted = Path(tempdir.name, f"{archive.id}.tar.age")
             plain = Path(tempdir.name, f"{archive.id}.tar")
             with tarfile.open(plain, "w") as bundle:
                 bundle.add(root, arcname=".")
-            if _selection_at_read_committed(archive) != manifest["recipients"]:
+            if _selection_at_read_committed(archive) != selected_recipients:
                 raise BackupBuildError(
                     "Archive recipient selection changed before encryption."
                 )
             args = ["age"]
-            for entry in manifest["recipients"]:
+            for entry in selected_recipients:
                 args += ["-r", entry["public_recipient"]]
             args += ["-o", str(encrypted), str(plain)]
             subprocess.run(
