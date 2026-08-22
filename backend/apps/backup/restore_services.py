@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import timedelta
 
@@ -7,7 +8,10 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.audit import services as audit
+from apps.backup.custody import validate_deployment_custody
 from apps.backup.models import BackupArchive, DeploymentRecoveryState, RestoreOperation
+
+logger = logging.getLogger(__name__)
 
 
 ALLOWED_STAGE_TRANSITIONS = {
@@ -112,12 +116,43 @@ def set_stage(restore_id, stage, *, error=""):
         raise ValidationError(
             f"Restore stage cannot move from {restore.stage} to {stage}."
         )
+    returning_to_normal = (
+        stage == RestoreOperation.Stage.COMPLETED
+        and restore.kind == RestoreOperation.Kind.ROLLBACK_IN_PLACE
+    )
+    if returning_to_normal:
+        # Persists every makerspace's custody state in deterministic order.
+        custody = validate_deployment_custody()
+        if custody.zero_recipient_off_makerspace_ids:
+            # Deliberately NOT fatal -- same reasoning as the validating-stage check in
+            # restore_control_records: zero recipients is an explicitly supported state
+            # after a compromise, so blocking the return to normal would strand the
+            # whole deployment with no repair path (quarantine exposes no recipient
+            # management). Fail closed on the BUILD side, where `selection_for` already
+            # refuses to encrypt to nobody -- never on recovery.
+            logger.error(
+                "restore_normal_with_zero_recipient_self_governed_makerspaces",
+                extra={
+                    "makerspace_ids": list(custody.zero_recipient_off_makerspace_ids)
+                },
+            )
     restore.stage = stage
     restore.supervisor_heartbeat_at = timezone.now()
     restore.error_detail = str(error)[:500]
     if stage in {RestoreOperation.Stage.COMPLETED, RestoreOperation.Stage.FAILED, RestoreOperation.Stage.ABORTED}:
         restore.completed_at = timezone.now()
     restore.save()
+    if returning_to_normal:
+        state = _locked_state()
+        state.mode = DeploymentRecoveryState.Mode.NORMAL
+        state.active_restore = None
+        state.save(update_fields=("mode", "active_restore", "updated_at"))
+        audit.record(
+            restore.requested_by,
+            "backup.restore_completed",
+            target=restore,
+            meta={"archive_custody_below_floor": custody.below_floor_count},
+        )
     return restore
 
 

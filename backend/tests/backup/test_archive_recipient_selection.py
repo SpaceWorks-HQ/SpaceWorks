@@ -21,11 +21,18 @@ VALID_RECIPIENT = (
 PLATFORM_RECIPIENT = "age1platform-recipient"
 
 
-def _archive(makerspace, *, decision=None, scope=BackupArchive.Scope.MAKERSPACE):
+def _archive(
+    makerspace,
+    *,
+    decision=False,
+    scope=BackupArchive.Scope.MAKERSPACE,
+):
     return BackupArchive.objects.create(
         scope=scope,
         makerspace=makerspace if scope == BackupArchive.Scope.MAKERSPACE else None,
-        superadmin_access_at_decision=decision,
+        superadmin_access_at_decision=(
+            decision if scope == BackupArchive.Scope.MAKERSPACE else None
+        ),
         object_key=f"backup-archives/{scope}/{uuid.uuid4()}.tar.age",
         expires_at=timezone.now() + timedelta(days=1),
     )
@@ -131,7 +138,7 @@ def test_switch_controls_platform_recipient_in_manifest_and_age_argv(
         superadmin_access_enabled=switch_enabled,
     )
     _recipient(makerspace)
-    archive = _archive(makerspace)
+    archive = _archive(makerspace, decision=switch_enabled)
     calls = _successful_build_stubs(monkeypatch)
 
     _encrypted, manifest, tempdir, _digest = archive_builder.build_archive(archive)
@@ -153,20 +160,15 @@ def test_frozen_switch_value_ignores_flipped_live_flag(settings):
         name="Frozen switch", slug="archive-frozen", superadmin_access_enabled=False
     )
     _recipient(makerspace)
-    archive = _archive(makerspace, decision=True)
+    archive = _archive(makerspace, decision=False)
 
-    assert len(recipients.selection_for(archive)) == 2
-
-    archive.superadmin_access_at_decision = False
-    archive.save(update_fields=("superadmin_access_at_decision",))
     makerspace.superadmin_access_enabled = True
     makerspace.save(update_fields=("superadmin_access_enabled",))
+
     assert recipients.selection_for(archive) == [{
         "label": "Tenant custody",
         "public_recipient": VALID_RECIPIENT,
     }]
-
-
 @pytest.mark.parametrize("failure_at", ("mkdir", "storage", "payload"))
 def test_every_build_failure_cleans_plaintext_workspace(
     monkeypatch, settings, tmp_path, failure_at
@@ -257,7 +259,7 @@ def test_age_argv_projects_recorded_duplicates_literally(monkeypatch, settings):
         superadmin_access_enabled=True,
     )
     _recipient(makerspace)
-    archive = _archive(makerspace)
+    archive = _archive(makerspace, decision=True)
     calls = _successful_build_stubs(monkeypatch)
 
     encrypted, _manifest, tempdir, _digest = archive_builder.build_archive(archive)

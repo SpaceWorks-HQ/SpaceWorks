@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from apps.audit import services as audit
 
+from .custody import with_makerspace_custody_lock
 from .models import ArchiveRecipientReservation, MakerspaceArchiveRecipient
 from .recipient_states import (
     compromise_recipient,
@@ -174,10 +175,8 @@ def enroll_recipient_with_challenge(
 def verify_recipient(*, recipient_id, makerspace_id, submitted_nonce, actor=None):
     """Verify one canonical nonce and reserve its fingerprint in one locked commit."""
     raw_nonce = decode_submitted_nonce(submitted_nonce)
-    with transaction.atomic():
-        recipient = MakerspaceArchiveRecipient.objects.select_for_update().get(
-            pk=recipient_id, makerspace_id=makerspace_id
-        )
+    with with_makerspace_custody_lock(makerspace_id) as custody:
+        recipient = custody.recipient(recipient_id)
         if recipient.verified_at is not None:
             _refuse("This recipient is already verified.", "recipient_verified")
         if not recipient.challenge_nonce_digest or recipient.challenge_issued_at is None:

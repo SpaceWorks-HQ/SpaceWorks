@@ -149,6 +149,14 @@ def test_every_recipient_action_audits_only_id_and_fingerprint(monkeypatch):
         {"nonce": encode_unpadded_base64url(SECOND_NONCE)},
         format="json",
     ).status_code == 200
+    for number in (1, 2):
+        MakerspaceArchiveRecipient.objects.create(
+            makerspace=makerspace,
+            public_recipient=f"age1audit-support-{number}",
+            fingerprint=f"{number:064x}",
+            label=f"Audit support {number}",
+            verified_at=timezone.now(),
+        )
     assert client.post(_url("revoke", makerspace, recipient)).status_code == 200
     assert client.post(_url("reactivate", makerspace, recipient)).status_code == 200
     assert client.post(_url("compromise", makerspace, recipient)).status_code == 200

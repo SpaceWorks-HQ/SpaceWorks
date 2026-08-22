@@ -2,8 +2,6 @@
 
 from django.conf import settings
 
-from apps.makerspaces.models import Makerspace
-
 from .models import BackupArchive, MakerspaceArchiveRecipient
 
 
@@ -51,9 +49,12 @@ def _platform_recipient():
 
 
 def _superadmin_access_decision(archive):
-    decided = getattr(archive, "superadmin_access_at_decision", None)
-    if decided is not None:
-        return decided
-    return Makerspace.objects.values_list(
-        "superadmin_access_enabled", flat=True
-    ).get(pk=archive.makerspace_id)
+    if archive.scope == BackupArchive.Scope.DEPLOYMENT:
+        return False
+    decided = archive.superadmin_access_at_decision
+    if decided is None:
+        raise BackupBuildError(
+            "Makerspace backup archive is missing its request-time superadmin "
+            "access decision snapshot."
+        )
+    return decided

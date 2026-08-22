@@ -1779,6 +1779,55 @@ Load-bearing details that carried over unchanged:
 
 ## Backup, restore and tenant migration (Phase 5A shipped; 5B plan-approved, unbuilt)
 
+### Archive-recipient custody: the two-recipient admission floor (BUILT 2026-08-22)
+
+**A makerspace archive is encrypted to its own verified recipients, and the platform is added as a
+recipient ONLY when `superadmin_access_enabled` is true** (`backup/recipient_selection.py`). That is the
+whole custody model: with the switch off, the operator can *run* a tenant backup but cannot *open* it.
+
+**Scope of the guarantee — do not overstate it in UI or copy.** This covers **tenant** archives only.
+A full **deployment** backup is a raw `pg_dump` encrypted to the platform recipient and **still contains
+every makerspace's rows**, including switch-off ones. Deployment-archive exclusion is Lane E and is
+**not built**.
+
+**The decision is snapshotted at request time, and selection FAILS CLOSED without it.** An archive is
+requested in a web process (`create_archive`) and built later in a Celery worker (`run_archive` via
+`run_backup_archive_task`), so the switch can be flipped in between. `create_archive` therefore
+re-reads the makerspace under `select_for_update()` and stores `superadmin_access_at_decision`; a NULL
+snapshot on a makerspace-scoped archive **raises** rather than falling back to the live flag. Falling
+back to the live flag is the bug this closes — never reintroduce it. Rows predating the field carry
+`legacy_pre_decision_snapshot` and are exempt from the constraint.
+
+**The floor is an ADMISSION floor, not an absolute invariant.** Ordinary revocation may not take a
+makerspace below **two** verified, non-revoked, non-compromised recipients, and switching
+`superadmin_access_enabled` off requires two. But **compromise always proceeds immediately**, even if
+that breaches the floor — security response must never wait for redundancy. A makerspace left at **one**
+recipient **continues** to back up under a recorded degraded state (owner decision); at **zero** it
+fails closed. Creating a makerspace with the switch already off is refused: at creation no recipient can
+exist, so the supported sequence is **create on → enrol and verify two → switch off**.
+
+**Every transaction that changes the effective recipient count must go through
+`backup/custody.py::with_makerspace_custody_lock`, which locks the MAKERSPACE ROW FIRST, then recipient
+rows in `pk` order.** The full set is revoke, compromise, verify, reactivate, switch changes, archive
+creation and restore activation. A uniform order is mandatory: `verify_recipient` once locked the
+recipient row first and `reactivate_recipient` locked nothing at all, which is a deadlock and a lost
+update. **This supersedes Lane K1's "recipient mutation takes no lock".** K1's actual concern still
+holds — a backup build holds a *file* lock and its own `REPEATABLE READ` snapshot, never the makerspace
+row, so an urgent revocation is still never blocked by a running backup.
+
+**`MakerspaceArchiveCustodyState` is the authoritative alarm record**, written in the same transaction
+as the mutation that caused it, with `alarm_episode` distinguishing repeat occurrences so delivery
+cannot spam. It is **derived, recomputable** state, so backfilling it is idempotent. There is currently
+**no outbound notification channel** — readiness (`archive_custody.below_floor_makerspaces`) plus admin
+visibility is the whole delivery path. Do not describe it as paging anyone.
+
+**Never combine a `RunPython` data migration and an `AddConstraint` on the same table in one
+migration.** PostgreSQL raises *"cannot ALTER TABLE because it has pending trigger events"* as soon as
+there are rows to update, so the migration passes on a fresh database and aborts on a real upgrade.
+This cost a real bug here and is why the constraint lives in its own migration. `makemigrations --check`
+cannot catch it — **a `MigrationExecutor` test that actually runs the migration over pre-seeded rows is
+required** (pattern: `tests/test_procurement_machine_type_migration.py`).
+
 **The deployment recovery gate reads live state on EVERY request, deliberately uncached.**
 `apps/backup/middleware.py` is first in `MIDDLEWARE` and resolves `DeploymentRecoveryState.mode`
 before anything else. A cache was written and **reverted**, and the reasoning is the invariant: a TTL

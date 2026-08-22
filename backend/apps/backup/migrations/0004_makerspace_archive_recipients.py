@@ -8,7 +8,10 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("backup", "0002_backuparchive_archive_sha256"),
+        (
+            "backup",
+            "0003_restorerollbackobject_source_absent_marker_version_id",
+        ),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

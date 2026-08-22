@@ -35488,6 +35488,18 @@
                     "nonce"
                 ]
             },
+            "ArchiveCustodyReadiness": {
+                "type": "object",
+                "properties": {
+                    "below_floor_makerspaces": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "below_floor_makerspaces"
+                ]
+            },
             "ArchiveRequestError": {
                 "type": "object",
                 "properties": {
@@ -43065,6 +43077,16 @@
                     "superadmin_access_enabled": {
                         "type": "boolean"
                     },
+                    "archive_custody_state": {
+                        "enum": [
+                            "healthy",
+                            "degraded_one_recipient",
+                            "floor_breached_zero"
+                        ],
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
                     "staff_notifications_enabled": {
                         "type": "boolean"
                     },
@@ -43268,6 +43290,7 @@
                     }
                 },
                 "required": [
+                    "archive_custody_state",
                     "branding_config",
                     "cover_image_key",
                     "cover_image_url",
@@ -47102,6 +47125,16 @@
                     },
                     "superadmin_access_enabled": {
                         "type": "boolean"
+                    },
+                    "archive_custody_state": {
+                        "enum": [
+                            "healthy",
+                            "degraded_one_recipient",
+                            "floor_breached_zero"
+                        ],
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
                     },
                     "staff_notifications_enabled": {
                         "type": "boolean"
@@ -51189,9 +51222,13 @@
                     },
                     "database": {
                         "type": "string"
+                    },
+                    "archive_custody": {
+                        "$ref": "#/components/schemas/ArchiveCustodyReadiness"
                     }
                 },
                 "required": [
+                    "archive_custody",
                     "database",
                     "status"
                 ]

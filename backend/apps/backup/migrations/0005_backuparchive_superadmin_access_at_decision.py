@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("backup", "0003_makerspace_archive_recipients"),
+        ("backup", "0004_makerspace_archive_recipients"),
     ]
 
     operations = [

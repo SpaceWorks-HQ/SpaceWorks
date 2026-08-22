@@ -27,5 +27,12 @@ class ReadinessView(APIView):
             cursor.execute("SELECT 1")
             cursor.fetchone()
         from apps.encryption.readiness import assert_ready
+        from apps.backup.readiness import archive_custody_readiness
         assert_ready()
-        return Response({"status": "ready", "database": "ok"})
+        return Response(
+            {
+                "status": "ready",
+                "database": "ok",
+                "archive_custody": archive_custody_readiness(),
+            }
+        )

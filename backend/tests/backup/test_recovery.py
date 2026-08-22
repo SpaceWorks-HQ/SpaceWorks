@@ -11,7 +11,13 @@ from apps.accounts.models import User
 from apps.accounts.tokens import SpaceWorksRefreshToken, validate_auth_generation
 from apps.apiclients.models import ApiClient
 from apps.audit.models import AuditLog
-from apps.backup.models import BackupArchive, DeploymentRecoveryState, RestoreOperation
+from apps.backup.models import (
+    BackupArchive,
+    DeploymentRecoveryState,
+    MakerspaceArchiveCustodyState,
+    MakerspaceArchiveRecipient,
+    RestoreOperation,
+)
 from apps.backup.recovery import (
     RESIDUAL_RISK,
     acknowledge_quarantine,
@@ -106,6 +112,31 @@ def test_only_durable_recovery_principal_can_authenticate_and_acknowledge():
     assert state.acknowledged_by_id == recovered.pk
     assert state.acknowledgement == RESIDUAL_RISK
     assert AuditLog.objects.filter(action="backup.quarantine_acknowledged").exists()
+
+
+def test_acknowledgement_records_below_floor_custody_inside_transaction():
+    admin, _other, restore = recovery_fixture()
+    makerspace = Makerspace.objects.create(
+        name="Restored degraded",
+        slug="restored-degraded",
+        superadmin_access_enabled=False,
+    )
+    MakerspaceArchiveRecipient.objects.create(
+        makerspace=makerspace,
+        public_recipient="age1restoreddegraded",
+        fingerprint="9" * 64,
+        label="Only restored custodian",
+        verified_at=timezone.now(),
+    )
+    enter_quarantine(restore, "disaster restore")
+    recovered = set_recovery_principal(admin, "one-time-recovery-password")
+
+    state = acknowledge_quarantine(recovered, RESIDUAL_RISK)
+
+    custody = MakerspaceArchiveCustodyState.objects.get(makerspace=makerspace)
+    assert state.mode == DeploymentRecoveryState.Mode.NORMAL
+    assert custody.state == custody.State.DEGRADED_ONE_RECIPIENT
+    assert custody.alarm_episode == 1
 
 
 def test_recovery_state_is_limited_to_superadmin_or_recovery_principal():

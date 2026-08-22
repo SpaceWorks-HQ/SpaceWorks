@@ -121,7 +121,6 @@ class Command(BaseCommand):
             self.stdout.write(restore.decision)
         elif action == "complete":
             set_stage(restore_id, RestoreOperation.Stage.COMPLETED)
-            self._normal_mode()
             self.stdout.write("complete")
         elif action == "fail":
             set_stage(restore_id, RestoreOperation.Stage.FAILED, error=options["message"])

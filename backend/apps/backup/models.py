@@ -3,6 +3,7 @@ import uuid
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 
 ARCHIVE_PURGE_WARNING = (
@@ -49,6 +50,7 @@ class BackupArchive(models.Model):
         related_name="backup_archives",
     )
     superadmin_access_at_decision = models.BooleanField(null=True)
+    legacy_pre_decision_snapshot = models.BooleanField(default=False)
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
         related_name="requested_backup_archives",
@@ -72,6 +74,16 @@ class BackupArchive(models.Model):
     class Meta:
         ordering = ("-created_at",)
         indexes = [models.Index(fields=("scope", "makerspace", "status", "created_at"))]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(scope="makerspace")
+                    | models.Q(superadmin_access_at_decision__isnull=False)
+                    | models.Q(legacy_pre_decision_snapshot=True)
+                ),
+                name="backup_makerspace_decision_snapshot_present",
+            )
+        ]
 
 
 class MakerspaceArchiveRecipient(models.Model):
@@ -99,6 +111,39 @@ class MakerspaceArchiveRecipient(models.Model):
 
     class Meta:
         ordering = ("pk",)
+
+
+class MakerspaceArchiveCustodyState(models.Model):
+    class State(models.TextChoices):
+        HEALTHY = "healthy", "Healthy"
+        DEGRADED_ONE_RECIPIENT = (
+            "degraded_one_recipient",
+            "Degraded: one recipient",
+        )
+        FLOOR_BREACHED_ZERO = "floor_breached_zero", "Floor breached: zero"
+
+    makerspace = models.OneToOneField(
+        "makerspaces.Makerspace",
+        on_delete=models.CASCADE,
+        related_name="archive_custody_state",
+    )
+    state = models.CharField(
+        max_length=32,
+        choices=State.choices,
+        default=State.HEALTHY,
+    )
+    reason_code = models.CharField(max_length=64, blank=True)
+    entered_at = models.DateTimeField(default=timezone.now)
+    cleared_at = models.DateTimeField(null=True, blank=True)
+    last_alarm_at = models.DateTimeField(null=True, blank=True)
+    triggering_recipient = models.ForeignKey(
+        MakerspaceArchiveRecipient,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="triggered_custody_states",
+    )
+    alarm_episode = models.PositiveBigIntegerField(default=0)
 
 
 class ArchiveRecipientReservation(models.Model):

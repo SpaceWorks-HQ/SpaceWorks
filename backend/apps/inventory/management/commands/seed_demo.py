@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand, CommandError
 from decimal import Decimal
 
 from apps.accounts.models import User
+from apps.backup.custody import initialize_custody_state
 from apps.apiclients.models import ApiClient
 from apps.boxes.models import Box
 from apps.inventory.categories import ensure_default_categories
@@ -33,7 +34,7 @@ DEMO_SPACES = [
         "name": "Beta Woodshop",
         "location": "North Wing - Woodshop",
         "manager": "beta_manager",
-        "superadmin_access_enabled": False,
+        "superadmin_access_enabled": True,
     },
     {
         "slug": "gamma-fab",
@@ -88,6 +89,7 @@ class Command(BaseCommand):
                     "created_by": superadmin,
                 },
             )
+            initialize_custody_state(makerspace.pk)
             spaces_created += int(created)
             # Modules are opt-in, so a freshly created makerspace starts core-only and
             # the machine-service seed below would hit `require_module` and abort the

@@ -690,6 +690,10 @@ export type ApiKeyRequest = {
 
 export type ApprovalModeEnum = "instant" | "approve";
 
+export type ArchiveCustodyReadiness = {
+  "below_floor_makerspaces": number;
+};
+
 export type ArchivedPaymentMakerspace = {
   "id": number;
   "slug": string;
@@ -2576,6 +2580,7 @@ export type Makerspace = {
   "referrals_enabled"?: boolean;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
+  "archive_custody_state": "healthy" | "degraded_one_recipient" | "floor_breached_zero" | null;
   "staff_notifications_enabled"?: boolean;
   "booking_requester_notifications_enabled"?: boolean;
   "logo_key": string;
@@ -3581,6 +3586,7 @@ export type PatchedMakerspace = {
   "referrals_enabled"?: boolean;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
+  "archive_custody_state"?: "healthy" | "degraded_one_recipient" | "floor_breached_zero" | null;
   "staff_notifications_enabled"?: boolean;
   "booking_requester_notifications_enabled"?: boolean;
   "logo_key"?: string;
@@ -4613,6 +4619,7 @@ export type RateLimitTierEnum = "public" | "standard" | "trusted";
 export type Readiness = {
   "status": string;
   "database": string;
+  "archive_custody": ArchiveCustodyReadiness;
 };
 
 export type ReceiptEnvelope = {

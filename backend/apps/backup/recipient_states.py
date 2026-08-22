@@ -1,65 +1,75 @@
-"""Lock-free, short transactions for urgent archive-recipient state changes."""
+"""Short, makerspace-first transactions for archive-recipient state changes."""
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
 from django.utils import timezone
 
 from apps.audit import services as audit
 
-from .models import MakerspaceArchiveRecipient
+from .custody import (
+    RECIPIENT_COMPROMISED,
+    RECIPIENT_FLOOR,
+    with_makerspace_custody_lock,
+)
 
 
 def revoke_recipient(*, recipient, actor=None):
-    return _set_recipient_state(
-        recipient=recipient,
-        actor=actor,
-        action="backup.archive_recipient_revoked",
-        updates={"revoked_at": timezone.now()},
-    )
+    with with_makerspace_custody_lock(recipient.makerspace_id) as custody:
+        locked = custody.recipient(recipient.pk)
+        if (
+            _is_effective(locked)
+            and custody.verified_recipient_count() <= RECIPIENT_FLOOR
+        ):
+            raise ValidationError(
+                "At least two verified archive recipients must remain active.",
+                code="recipient_floor",
+            )
+        locked.revoked_at = timezone.now()
+        locked.save(update_fields=("revoked_at",))
+        _audit_recipient(actor, "backup.archive_recipient_revoked", locked)
+        return locked
 
 
 def compromise_recipient(*, recipient, actor=None):
-    return _set_recipient_state(
-        recipient=recipient,
-        actor=actor,
-        action="backup.archive_recipient_compromised",
-        updates={"compromised_at": timezone.now()},
-    )
+    with with_makerspace_custody_lock(recipient.makerspace_id) as custody:
+        locked = custody.recipient(recipient.pk)
+        was_effective = _is_effective(locked)
+        locked.compromised_at = timezone.now()
+        locked.save(update_fields=("compromised_at",))
+        if was_effective:
+            custody.record_trigger(
+                reason_code=RECIPIENT_COMPROMISED,
+                recipient=locked,
+            )
+        _audit_recipient(actor, "backup.archive_recipient_compromised", locked)
+        return locked
 
 
 def reactivate_recipient(*, recipient, actor=None):
-    with transaction.atomic():
-        updated = MakerspaceArchiveRecipient.objects.filter(
-            pk=recipient.pk,
-            makerspace_id=recipient.makerspace_id,
-            compromised_at__isnull=True,
-            revoked_at__isnull=False,
-        ).update(revoked_at=None)
-        if not updated:
-            current = MakerspaceArchiveRecipient.objects.get(pk=recipient.pk)
-            if current.compromised_at is not None:
-                raise ValidationError(
-                    "A compromised recipient cannot be reactivated.",
-                    code="recipient_compromised",
-                )
+    with with_makerspace_custody_lock(recipient.makerspace_id) as custody:
+        locked = custody.recipient(recipient.pk)
+        if locked.compromised_at is not None:
+            raise ValidationError(
+                "A compromised recipient cannot be reactivated.",
+                code="recipient_compromised",
+            )
+        if locked.revoked_at is None:
             raise ValidationError(
                 "This recipient is not revoked.", code="recipient_not_revoked"
             )
-        recipient.refresh_from_db()
+        locked.revoked_at = None
+        locked.save(update_fields=("revoked_at",))
         _audit_recipient(
-            actor, "backup.archive_recipient_reactivated", recipient
+            actor, "backup.archive_recipient_reactivated", locked
         )
-        return recipient
+        return locked
 
 
-def _set_recipient_state(*, recipient, actor, action, updates):
-    with transaction.atomic():
-        MakerspaceArchiveRecipient.objects.filter(
-            pk=recipient.pk, makerspace_id=recipient.makerspace_id
-        ).update(**updates)
-        recipient.refresh_from_db()
-        _audit_recipient(actor, action, recipient)
-        return recipient
+def _is_effective(recipient):
+    return (
+        recipient.verified_at is not None
+        and recipient.revoked_at is None
+        and recipient.compromised_at is None
+    )
 
 
 def _audit_recipient(actor, action, recipient):

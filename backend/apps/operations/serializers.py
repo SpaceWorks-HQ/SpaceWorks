@@ -1,5 +1,14 @@
 from rest_framework import serializers
 
+from apps.operations.serializers_health import (
+    ContainerAssetSummarySerializer,
+    ContainerProductSummarySerializer,
+    EmptySerializer,
+    GenericObjectSerializer,
+    HealthSerializer,
+    ReadinessSerializer,
+)
+
 from apps.boxes.models import Box, QrCode
 from apps.boxes.serializers import BoxSerializer, QrCodeSerializer
 from apps.inventory.models import InventoryAsset, InventoryProduct
@@ -12,37 +21,6 @@ from apps.operations.models import (
     StocktakeLine,
     StocktakeSession,
 )
-
-
-class EmptySerializer(serializers.Serializer):
-    pass
-
-
-class GenericObjectSerializer(serializers.Serializer):
-    detail = serializers.CharField(required=False)
-
-
-class HealthSerializer(serializers.Serializer):
-    status = serializers.CharField()
-
-
-class ReadinessSerializer(serializers.Serializer):
-    status = serializers.CharField()
-    database = serializers.CharField()
-
-
-class ContainerProductSummarySerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    name = serializers.CharField()
-    available_quantity = serializers.IntegerField()
-    tracking_mode = serializers.CharField()
-
-
-class ContainerAssetSummarySerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    asset_tag = serializers.CharField()
-    product = serializers.CharField()
-    status = serializers.CharField()
 
 
 class ContainerContentsSerializer(serializers.Serializer):

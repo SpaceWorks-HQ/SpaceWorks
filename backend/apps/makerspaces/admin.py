@@ -109,6 +109,20 @@ class MakerspaceAdmin(MakerspaceImageAdminMixin, MakerspaceCapabilityAdminMixin,
     readonly_fields = ("logo_preview", "cover_preview")
     inlines = (MakerspaceMembershipInline,)
 
+    def save_model(self, request, obj, form, change):
+        """Initialise archive-custody state for makerspaces created via /control/.
+
+        The control-plane admin saves the model directly, so it never reaches the
+        admin-API serializer that seeds this row. Without it a new makerspace has no
+        custody state, which makes readiness UNDERCOUNT below-floor spaces and the API
+        return null until some later recipient mutation happens to create it.
+        """
+        super().save_model(request, obj, form, change)
+        if not change:
+            from apps.backup.custody import initialize_custody_state
+
+            initialize_custody_state(obj.pk)
+
     def has_change_permission(self, request, obj=None):
         if obj is not None and not obj.superadmin_access_enabled:
             return False

@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.utils.text import slugify
 
+from apps.backup.custody import initialize_custody_state
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.module_install import apply_profile
 from apps.makerspaces.module_profiles import DEFAULT_PROFILE, PROFILES
@@ -68,6 +69,8 @@ class Command(BaseCommand):
             slug=slug,
             defaults={"name": options["makerspace_name"], "created_by": user},
         )
+        if space_created:
+            initialize_custody_state(makerspace.pk)
         # Only on creation: re-running setup must never silently rewrite the modules an
         # operator has since chosen.
         if space_created:

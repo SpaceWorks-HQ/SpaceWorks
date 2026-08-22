@@ -210,6 +210,9 @@ OMITTED_MODELS = {
     # not travel inside one either.
     "backup.BackupArchive": "Deployment archive lifecycle and download bearer state.",
     "backup.ArchiveRecipientReservation": "Deployment-local key-namespace state.",
+    "backup.MakerspaceArchiveCustodyState": (
+        "Deployment-local archive-custody alarm state, recomputed from recipients."
+    ),
     "backup.BackupLease": "Deployment scheduler lease.",
     "backup.DeploymentRecoveryState": "Deployment recovery and quarantine state.",
     "backup.PlatformBackupSettings": "Platform backup configuration and age recipient.",

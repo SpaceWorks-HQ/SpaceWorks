@@ -2,10 +2,12 @@ import pytest
 from django.contrib import admin
 from django.test import RequestFactory
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.audit.models import AuditLog
+from apps.backup.models import MakerspaceArchiveRecipient
 from apps.integrations.models import PlatformEmailSettings
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
@@ -357,6 +359,27 @@ def test_superadmin_access_cannot_be_disabled_until_platform_smtp_is_configured(
     cfg = PlatformEmailSettings.load()
     cfg.smtp_host = "smtp.example.com"
     cfg.save(update_fields=["smtp_host"])
+
+    # The recipient floor is a SECOND, independent precondition. Assert it blocks on
+    # its own so this test keeps proving what it is named for -- that the SMTP gate
+    # opens -- rather than passing because some other guard happens to refuse.
+    floor_blocked = client.patch(
+        url,
+        {"superadmin_access_enabled": False},
+        format="json",
+    )
+    makerspace.refresh_from_db()
+    assert floor_blocked.status_code == 400
+    assert makerspace.superadmin_access_enabled is True
+
+    for number in (1, 2):
+        MakerspaceArchiveRecipient.objects.create(
+            makerspace=makerspace,
+            public_recipient=f"age1hardhidesmtp{number}",
+            fingerprint=f"{number:064x}",
+            label=f"Custodian {number}",
+            verified_at=timezone.now(),
+        )
 
     allowed = client.patch(
         url,

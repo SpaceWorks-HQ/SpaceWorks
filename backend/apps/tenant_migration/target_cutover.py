@@ -4,6 +4,7 @@ from django.db import transaction
 
 from apps.accounts.models import User
 from apps.audit import services as audit
+from apps.backup.custody import with_makerspace_custody_lock
 from apps.makerspaces.models import Makerspace
 
 from . import target_state
@@ -43,49 +44,59 @@ def activate_target(*, pairing, import_job, receipt_envelope, actor):
 @transaction.atomic
 def _activate_target_transaction(*, pairing, import_job, receipt_envelope, actor):
     pairing = MigrationPairing.objects.select_for_update().get(pk=pairing.pk)
-    job, target = _validated_target_job(pairing, import_job)
+    job, target = _validated_target_job(pairing, import_job, lock_target=False)
     _require_activation_ready(job)
     receipt = verify_and_persist_peer_receipt(
         pairing,
         receipt_envelope,
         MigrationReceipt.Operation.SOURCE_CUTOVER,
     )
-    consumed = ReceiptConsumption.objects.filter(receipt=receipt).first()
-    if consumed is not None:
-        _require_idempotent_consumption(
-            consumed, ReceiptConsumption.Purpose.ACTIVATE_TARGET
-        )
-        if not target_state.target_has_state(target.pk, target_state.ACTIVE):
-            raise TransitionConflictError(
-                "The activation receipt was consumed without an active target."
+    with with_makerspace_custody_lock(target.pk) as custody:
+        target = custody.makerspace
+        consumed = ReceiptConsumption.objects.filter(receipt=receipt).first()
+        if consumed is not None:
+            _require_idempotent_consumption(
+                consumed, ReceiptConsumption.Purpose.ACTIVATE_TARGET
             )
-        return persisted_envelope(receipt)
+            if not target_state.target_has_state(target.pk, target_state.ACTIVE):
+                raise TransitionConflictError(
+                    "The activation receipt was consumed without an active target."
+                )
+            return persisted_envelope(receipt)
 
-    verify_import_object_ownership(job)
-    verify_import_object_journal_state(job)
-    if target_state.transition_target(
-        target.pk, target_state.IMPORTING, target_state.ACTIVE
-    ) != 1:
-        raise TransitionConflictError(
-            "Target activation requires the IMPORTING lifecycle state."
+        if (
+            not target.superadmin_access_enabled
+            and custody.verified_recipient_count() == 0
+        ):
+            raise TransitionConflictError(
+                "Target activation requires a verified archive recipient when "
+                "superadmin access is disabled."
+            )
+        verify_import_object_ownership(job)
+        verify_import_object_journal_state(job)
+        if target_state.transition_target(
+            target.pk, target_state.IMPORTING, target_state.ACTIVE
+        ) != 1:
+            raise TransitionConflictError(
+                "Target activation requires the IMPORTING lifecycle state."
+            )
+        consume_once(receipt, ReceiptConsumption.Purpose.ACTIVATE_TARGET, actor)
+        audit.record(
+            actor,
+            "tenant_migration.target_activated",
+            makerspace=target,
+            target=receipt,
+            meta={
+                "migration_id": str(receipt.migration_id),
+                "receipt_id": str(receipt.receipt_id),
+                "signer_fingerprint": receipt.signer_fingerprint,
+                "source_deployment_id": receipt.source_deployment_id,
+                "target_deployment_id": receipt.target_deployment_id,
+                "format_version": receipt.format_version,
+                "outcome": "active",
+            },
         )
-    consume_once(receipt, ReceiptConsumption.Purpose.ACTIVATE_TARGET, actor)
-    audit.record(
-        actor,
-        "tenant_migration.target_activated",
-        makerspace=target,
-        target=receipt,
-        meta={
-            "migration_id": str(receipt.migration_id),
-            "receipt_id": str(receipt.receipt_id),
-            "signer_fingerprint": receipt.signer_fingerprint,
-            "source_deployment_id": receipt.source_deployment_id,
-            "target_deployment_id": receipt.target_deployment_id,
-            "format_version": receipt.format_version,
-            "outcome": "active",
-        },
-    )
-    return persisted_envelope(receipt)
+        return persisted_envelope(receipt)
 
 
 def abort_target(*, pairing, import_job, actor):
@@ -141,10 +152,13 @@ def _abort_target_transaction(*, pairing, import_job, actor):
     return persisted_envelope(receipt)
 
 
-def _validated_target_job(pairing, import_job):
+def _validated_target_job(pairing, import_job, *, lock_target=True):
     job = import_job.__class__.objects.select_for_update().get(pk=import_job.pk)
     _require_matching_job(pairing, job)
-    target = Makerspace.objects.select_for_update().get(pk=job.target_makerspace_id)
+    targets = Makerspace.objects
+    if lock_target:
+        targets = targets.select_for_update()
+    target = targets.get(pk=job.target_makerspace_id)
     job.target_makerspace = target
     return job, target
 

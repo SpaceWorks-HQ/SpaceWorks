@@ -6,6 +6,7 @@ from apps.backup.models import (
     BackupArchive,
     BackupLease,
     DeploymentRecoveryState,
+    MakerspaceArchiveCustodyState,
     PlatformBackupSettings,
     RestoreOperation,
     RestoreRollbackObject,
@@ -36,6 +37,27 @@ class RestoreOperationAdmin(ReadOnlyBackupAdmin):
     list_display = ("id", "kind", "stage", "decision", "requested_at")
     list_filter = ("kind", "stage", "decision", "requested_at")
     readonly_fields = tuple(field.name for field in RestoreOperation._meta.fields)
+
+
+@admin.register(MakerspaceArchiveCustodyState)
+class MakerspaceArchiveCustodyStateAdmin(ReadOnlyBackupAdmin):
+    list_display = (
+        "makerspace",
+        "state",
+        "reason_code",
+        "alarm_episode",
+        "entered_at",
+        "cleared_at",
+    )
+    list_filter = ("state", "reason_code")
+    readonly_fields = tuple(
+        field.name for field in MakerspaceArchiveCustodyState._meta.fields
+    )
+
+    def resolve_hidden_lookup(self):
+        # This deployment alarm must remain visible even when its makerspace has
+        # intentionally hidden ordinary tenant data from the control plane.
+        return None
 
 
 for model in (
