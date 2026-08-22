@@ -1796,6 +1796,25 @@ catalog and sequence high-water state are checked there. Slice rows and object d
 plaintext is available before sealing. After sealing, the platform verifies only ciphertext size and digest;
 the platform cannot perform semantic verification without a tenant-held identity.
 
+**Lane E object ownership and W8 rewrap are fail-closed (E4, 2026-08-23).** Deployment capture builds one
+typed pre-projection multimap for every declared object-bearing field plus the exact object-bearing
+`AuditLog.meta` variants. Bucket selection is row-dependent where the schema says it is
+(`RestoreRollbackObject.copy_key` uses that row's `bucket_kind`). The same physical `(bucket_kind, key)`
+may have only one canonical component candidate: a main/slice or slice/slice conflict refuses the whole
+archive; first ship never duplicates bytes and has no shared envelope. Historical audit object strings and
+recursive archive pointers are explicit coordination references, not generic JSON discoveries. Each
+component then proves reference/manifest equality, binds immutable captured size and SHA-256 facts, and
+re-reads every packaged byte against them before the readable main can be projected.
+
+`MakerspaceEncryptionKey` is tenant-owned for Lane E projection even though manager data export omits it.
+Its source-broker row must not survive in the readable main. Inside the same immutable snapshot, W8 freezes
+the exact raw row identity, makerspace/version/status, broker coordinates, wrapped-DEK bytes and wrapped-byte
+digest. Only that frozen tuple may enter `backup/dek_rewrap.py`; inside `dek_cache_disabled()` the adapter
+unwraps those exact bytes and streams each plaintext DEK through stdin directly into an age envelope for
+the complete frozen tenant-recipient set. Plaintext DEKs never enter a manifest, filesystem member, process
+argv, log, exception or database row. Missing, duplicate, extra, unsupported or digest-substituted rows and
+any sealed-inventory or ciphertext-ledger mismatch fail the slice before outer sealing.
+
 **The PostgreSQL client major must equal the server major for anything that dumps or restores THIS
 deployment**, and `apps/backup/postgres_client.py` is the only place that resolves those binaries. The
 image ships two client majors on purpose: `pg_dump` must be at least as new as any *source* server tenant

@@ -73,7 +73,7 @@ def _prepare_build(monkeypatch, settings, markers):
         archive_payload, "_command_version", lambda _command: "pg_dump 16"
     )
     monkeypatch.setattr(
-        compound_archive, "verify_unsealed_slice", lambda *_args: None
+        compound_archive, "verify_unsealed_slice", lambda *_args, **_kwargs: None
     )
     def project_main(source, destination, makerspace_ids, _expected):
         if makerspace_ids:
@@ -98,7 +98,11 @@ def _prepare_build(monkeypatch, settings, markers):
     def fake_age(command, **_kwargs):
         commands.append(command)
         output = Path(command[command.index("-o") + 1])
-        shutil.copyfile(command[-1], output)
+        payload = _kwargs.get("input")
+        if payload is None:
+            shutil.copyfile(command[-1], output)
+        else:
+            output.write_bytes(b"sealed:" + hashlib.sha256(payload).digest())
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(archive_builder.subprocess, "run", fake_age)

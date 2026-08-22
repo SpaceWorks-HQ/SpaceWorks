@@ -10,6 +10,15 @@ from django.conf import settings
 from django.db import connection, transaction
 
 from apps.backup import storage
+from apps.backup.archive_objects import (
+    NON_OBJECT_KEY_FIELDS,
+    OBJECT_FIELD_NAMES,
+    capture_objects as _capture_objects,
+    collect_model_objects as _collect_model_objects,
+    module_for_model as _module_for_model,
+    object_closure as _object_closure,
+)
+from apps.backup.object_ownership import MAIN_COMPONENT, build_object_ownership_plan
 from apps.backup.postgres_client import client_binary
 from apps.backup.models import ARCHIVE_PURGE_WARNING, BackupArchive
 from apps.backup.raw_projection import canonical_owner_q, no_decrypt_guard, raw_records
@@ -17,53 +26,6 @@ from apps.backup.settings_policy import POLICIES, Policy
 from apps.backup.tenant_projection import project_raw_dataset
 from apps.data_export.datasets import DATASET_SPECS
 from apps.makerspaces.servability import servable_queryset
-
-
-OBJECT_FIELD_NAMES = frozenset({
-    "object_key", "image_key", "avatar_key", "cover_image_key", "copy_key",
-    # logo_key was missing, so a backup captured the DB value but not the object:
-    # restoring left Makerspace.logo_key (and now Organization.logo_key) pointing at an
-    # image that does not exist in storage.
-    "logo_key",
-})
-# Deny-by-default classification for every concrete `*_key` field in the schema.
-# OBJECT_FIELD_NAMES above is the ONLY thing deciding which object-storage bytes a
-# backup captures, and it is hand-written: it has already drifted once, when
-# `logo_key` was missing and restores left Makerspace.logo_key pointing at an object
-# that was never captured. `tests/backup/test_object_field_coverage.py` fails when a
-# new `*_key` field appears in neither set, forcing an explicit decision.
-#
-# Classified by (model label, field name), not bare name: `public_key` and
-# `source_key` each appear on more than one model with different meanings.
-#
-# `backup.BackupArchive.object_key` is deliberately NOT listed here -- it IS an
-# object pointer, so it matches OBJECT_FIELD_NAMES by name, and `_collect_model_objects`
-# then skips it at runtime via the "backup-archives/" prefix test so that an archive
-# can never contain itself.
-NON_OBJECT_KEY_FIELDS = frozenset({
-    ("accounts.NativeAppRegistration", "verifier_config_key"),   # attestation config id
-    ("accounts.PlatformSocialAuthSettings", "apple_private_key"),  # credential
-    ("audit.AuditMacKey", "wrapped_key"),                        # credential
-    ("audit.AuditSigningKey", "public_key"),                     # credential
-    ("audit.AuditSigningKey", "wrapped_private_key"),            # credential
-    ("audit.AuditSigningKeyRotation", "new_key"),                # FK to AuditSigningKey
-    ("audit.AuditSigningKeyRotation", "old_key"),                # FK to AuditSigningKey
-    ("backup.RestoreRollbackObject", "module_key"),              # module key string
-    ("backup.RestoreRollbackObject", "source_key"),              # restore-internal pointer
-    ("integrations.PlatformPushSettings", "apns_private_key"),   # credential
-    ("makerspaces.Makerspace", "public_api_key"),                # credential
-    ("payments.MakerspacePaymentSettings", "stripe_publishable_key"),  # credential
-    ("payments.MakerspacePaymentSettings", "stripe_secret_key"),       # credential
-    ("payments.PlatformStripeConnectSettings", "stripe_publishable_key"),  # credential
-    ("payments.PlatformStripeConnectSettings", "stripe_secret_key"),       # credential
-    ("sessions.Session", "session_key"),                         # django session id
-    ("tenant_migration.DeploymentSigningKey", "public_key"),     # credential
-    ("tenant_migration.MigrationPairing", "source_public_key"),  # credential
-    ("tenant_migration.MigrationPairing", "target_public_key"),  # credential
-    ("tenant_migration.TenantImportObject", "source_key"),       # transient import-job row
-    ("tenant_migration.TenantImportObject", "staging_key"),      # transient import-job row
-    ("tenant_migration.TenantImportObject", "target_key"),       # transient import-job row
-})
 
 
 CONTINUITY_KEYS = (
@@ -88,17 +50,29 @@ def _snapshot_payload(archive, root, modes, selected_recipients, *, compound_cap
                 servable_queryset().order_by("pk").values_list("pk", flat=True)
             )
             _pg_dump(root / "database.dump", snapshot_id)
-            object_keys = _object_closure()
+            if compound_capture is None:
+                object_keys = _object_closure()
+                object_plan = None
+            else:
+                compound_capture.prepare_from_snapshot()
+                object_plan = build_object_ownership_plan(
+                    item.makerspace_id for item in compound_capture.frozen_slices
+                )
+                object_keys = object_plan.closure(MAIN_COMPONENT)
             _write_continuity_keys(root / "keys" / "env.json")
         else:
             covered_makerspace_ids = [archive.makerspace_id]
             object_keys = _tenant_payload(archive.makerspace_id, root / "tenant")
         object_manifest = _capture_objects(root / "objects", object_keys, modes)
         if compound_capture is not None:
+            object_plan.bind_component(
+                MAIN_COMPONENT, root / "objects", object_manifest
+            )
             compound_capture.capture_from_snapshot(
                 tenant_payload=_tenant_payload,
                 capture_objects=_capture_objects,
                 write_json=_write_json,
+                object_plan=object_plan,
             )
     return {
         "format": "spaceworks-phase5a-v3",
@@ -190,67 +164,6 @@ def _tenant_payload(makerspace_id, root):
         _write_json(root / "global_user_references.json", users)
         _write_json(root / "external_references.json", external_references)
         return object_keys
-
-
-def _object_closure():
-    result = {"private": {}, "public_image": {}}
-    for model in apps.get_models():
-        _collect_model_objects(model._default_manager.all(), model, result)
-    return result
-
-
-def _collect_model_objects(queryset, model, result, fixed_makerspace_id=None):
-    spec = DATASET_SPECS.get(model._meta.label)
-    ownership_paths = spec[1].any_paths if spec else ()
-    if not ownership_paths and any(
-        field.name == "makerspace" for field in model._meta.concrete_fields
-    ):
-        ownership_paths = ("makerspace",)
-    for field in model._meta.concrete_fields:
-        if field.name not in OBJECT_FIELD_NAMES:
-            continue
-        if field.name == "copy_key":
-            for key, kind, owner, module_key in queryset.exclude(copy_key="").values_list(
-                "copy_key", "bucket_kind", "makerspace_id", "module_key"
-            ):
-                result[kind][str(key)] = {
-                    "makerspace_id": owner, "module_key": module_key,
-                }
-            continue
-        bucket_kind = "public_image" if field.name != "object_key" else "private"
-        value_paths = [path if path in {"pk", "id"} else f"{path}_id" for path in ownership_paths]
-        for values in queryset.exclude(**{field.name: ""}).values_list(field.name, *value_paths):
-            key, *owners = values
-            if key and not str(key).startswith("backup-archives/"):
-                owner = fixed_makerspace_id or next((item for item in owners if item), None)
-                result[bucket_kind][str(key)] = {
-                    "makerspace_id": owner,
-                    "module_key": _module_for_model(model._meta.label),
-                }
-
-
-def _capture_objects(root, object_keys, modes):
-    manifest = []
-    buckets = {"private": settings.AWS_STORAGE_BUCKET_NAME, "public_image": settings.PUBLIC_IMAGE_BUCKET}
-    for kind, keys in object_keys.items():
-        bucket = buckets[kind]
-        for key, ownership in sorted(keys.items()):
-            destination = root / kind / key
-            item = storage.download_object(bucket, key, destination, versioned=modes[kind] == "versioned")
-            manifest.append({"bucket_kind": kind, **ownership, **item})
-    return manifest
-
-
-def _module_for_model(label):
-    return {
-        "events.Event": "events",
-        "bookings.BookableSpace": "bookings",
-        "maintenance.MaintenanceLogDocument": "maintenance",
-        "procurement.ToBuyReceipt": "procurement",
-        "makerspaces.MemberProfile": "membership",
-        "makerspaces.MemberProject": "membership",
-        "machines.ServiceRequestFile": "machine_service",
-    }.get(label, "")
 
 
 def _storage_modes():

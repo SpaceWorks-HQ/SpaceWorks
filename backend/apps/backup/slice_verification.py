@@ -5,6 +5,7 @@ from pathlib import Path
 
 from django.apps import apps
 
+from apps.backup.dek_rewrap import verify_sealed_dek_inventory
 from apps.backup.digests import sha256_file
 from apps.backup.main_projection_inverse import boundary_deltas
 from apps.backup.raw_projection import canonical_owner_q, no_decrypt_guard, raw_records
@@ -13,7 +14,9 @@ from apps.backup.tenant_projection import project_raw_dataset
 from apps.data_export.datasets import DATASET_SPECS
 
 
-def verify_unsealed_slice(makerspace_id, plaintext, object_manifest):
+def verify_unsealed_slice(
+    makerspace_id, plaintext, object_manifest, *, staged_deks=(), sealed_deks=()
+):
     """Compare plaintext rows to the frozen source and object bytes to their ledgers."""
     root = Path(plaintext)
     rows_root = root / "rows"
@@ -69,8 +72,13 @@ def verify_unsealed_slice(makerspace_id, plaintext, object_manifest):
         boundary_deltas(makerspace_id),
         "boundary reversal ledger",
     )
-    _verify_slice_manifest(root / "slice-manifest.json", makerspace_id, object_manifest)
+    _verify_slice_manifest(
+        root / "slice-manifest.json", makerspace_id, object_manifest, sealed_deks
+    )
     _verify_objects(root / "objects", object_manifest)
+    verify_sealed_dek_inventory(
+        staged_deks, sealed_deks, root / "keys" / "deks"
+    )
 
 
 def _verify_json(path, expected, label):
@@ -102,7 +110,7 @@ def _verify_objects(root, manifest):
             )
 
 
-def _verify_slice_manifest(path, makerspace_id, objects):
+def _verify_slice_manifest(path, makerspace_id, objects, sealed_deks):
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
         fingerprints = manifest["recipient_fingerprints"]
@@ -110,6 +118,7 @@ def _verify_slice_manifest(path, makerspace_id, objects):
             manifest["makerspace_id"] == makerspace_id
             and isinstance(manifest["slice_id"], str)
             and manifest["storage"]["objects"] == objects
+            and manifest["sealed_deks"] == sealed_deks
             and fingerprints
             and len(fingerprints) == len(set(fingerprints))
         )

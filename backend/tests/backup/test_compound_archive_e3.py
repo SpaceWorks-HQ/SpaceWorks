@@ -1,4 +1,5 @@
 from datetime import timedelta
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -142,7 +143,11 @@ def _prepare(monkeypatch, settings):
             return real_run(command, **kwargs)
         commands.append(command)
         output = Path(command[command.index("-o") + 1])
-        shutil.copyfile(command[-1], output)
+        payload = kwargs.get("input")
+        if payload is None:
+            shutil.copyfile(command[-1], output)
+        else:
+            output.write_bytes(b"sealed:" + hashlib.sha256(payload).digest())
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(archive_builder.subprocess, "run", fake_age)
@@ -382,7 +387,7 @@ def test_failed_plaintext_slice_verification_fails_before_sealing(
     _sovereign()
     commands = _prepare(monkeypatch, settings)
 
-    def fail_verification(*_args):
+    def fail_verification(*_args, **_kwargs):
         raise BackupBuildError("injected plaintext verification failure")
 
     monkeypatch.setattr(
