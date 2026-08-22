@@ -43,7 +43,7 @@ class MakerspaceListCreateView(generics.ListCreateAPIView):
         # manager isn't stuck on an empty list / "No makerspace" screen. Create
         # (POST) stays superadmin-only in perform_create, so widening the read
         # scope here doesn't grant anyone new write access.
-        queryset = servable_queryset()
+        queryset = servable_queryset().select_related("archive_custody_state")
         actor = self.request.user
         origin_scope = origin_scoped_makerspace_id(self.request)
         scope = rbac.makerspaces_for_actions(

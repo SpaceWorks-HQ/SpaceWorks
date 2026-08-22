@@ -6,14 +6,18 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import User
+from apps.audit.models import AuditLog
 from apps.backup import services
 from apps.backup.models import (
     BackupArchive,
     BackupLease,
     DeploymentRecoveryState,
+    MakerspaceArchiveCustodyState,
+    MakerspaceArchiveRecipient,
     PlatformBackupSettings,
     RestoreOperation,
 )
+from apps.makerspaces.models import Makerspace
 from apps.backup.restore_services import decide_restore, enter_quiescence, record_restore_diff, set_stage
 from apps.operations.models import PeriodicTaskRun
 
@@ -87,3 +91,68 @@ def test_supervisor_stage_table_rejects_skipping_destructive_preconditions():
         set_stage(restore.pk, RestoreOperation.Stage.DB_RESTORING)
     with pytest.raises(ValidationError, match="preflighted"):
         enter_quiescence(restore.pk)
+
+
+def test_completed_restore_records_degraded_custody_before_normal_mode():
+    actor, restore = restore_fixture(stage=RestoreOperation.Stage.VALIDATING)
+    makerspace = Makerspace.objects.create(
+        name="Restore degraded",
+        slug="restore-degraded",
+        superadmin_access_enabled=False,
+    )
+    MakerspaceArchiveRecipient.objects.create(
+        makerspace=makerspace,
+        public_recipient="age1restoredegraded",
+        fingerprint="b" * 64,
+        label="Only custodian",
+        verified_at=timezone.now(),
+    )
+    state = DeploymentRecoveryState.load()
+    state.mode = DeploymentRecoveryState.Mode.QUIESCED
+    state.active_restore = restore
+    state.save(update_fields=("mode", "active_restore", "updated_at"))
+
+    completed = set_stage(restore.pk, RestoreOperation.Stage.COMPLETED)
+
+    state.refresh_from_db()
+    custody = MakerspaceArchiveCustodyState.objects.get(makerspace=makerspace)
+    assert completed.stage == RestoreOperation.Stage.COMPLETED
+    assert state.mode == DeploymentRecoveryState.Mode.NORMAL
+    assert state.active_restore_id is None
+    assert custody.state == custody.State.DEGRADED_ONE_RECIPIENT
+    assert AuditLog.objects.filter(
+        action="backup.restore_completed", actor=actor
+    ).exists()
+
+
+def test_completed_restore_records_but_does_not_block_zero_recipient_off_tenant():
+    """Recovery must never be blocked by a tenant's custody posture.
+
+    Zero verified recipients is an explicitly supported state -- a compromise always
+    proceeds even when it breaches the floor -- so refusing to return the deployment to
+    normal would strand the WHOLE deployment with no repair path, since quarantine
+    exposes no recipient management. The fail-closed rule belongs on the build side,
+    where `selection_for` already refuses to encrypt an archive to nobody.
+    """
+    _actor, restore = restore_fixture(stage=RestoreOperation.Stage.VALIDATING)
+    makerspace = Makerspace.objects.create(
+        name="Restore zero",
+        slug="restore-zero",
+        superadmin_access_enabled=False,
+    )
+    state = DeploymentRecoveryState.load()
+    state.mode = DeploymentRecoveryState.Mode.QUIESCED
+    state.active_restore = restore
+    state.save(update_fields=("mode", "active_restore", "updated_at"))
+
+    set_stage(restore.pk, RestoreOperation.Stage.COMPLETED)
+
+    restore.refresh_from_db()
+    state.refresh_from_db()
+    assert restore.stage == RestoreOperation.Stage.COMPLETED
+    assert state.mode == DeploymentRecoveryState.Mode.NORMAL
+
+    # The alarm must still be raised, and durably -- proceeding is not the same as
+    # ignoring. The operator has to be able to see which tenant is unprotected.
+    custody = MakerspaceArchiveCustodyState.objects.get(makerspace=makerspace)
+    assert custody.state == MakerspaceArchiveCustodyState.State.FLOOR_BREACHED_ZERO

@@ -21,6 +21,7 @@ from apps.backup.models import (
     PlatformBackupSettings,
 )
 from apps.backup.operation_lock import OperationLockUnavailable, deployment_operation_lock
+from apps.makerspaces.models import Makerspace
 
 
 logger = logging.getLogger(__name__)
@@ -37,11 +38,16 @@ def create_archive(actor, *, scope, makerspace=None):
         raise ValidationError("A makerspace archive requires a makerspace.")
     archive_id = uuid.uuid4()
     with transaction.atomic():
+        superadmin_access_at_decision = None
+        if scope == BackupArchive.Scope.MAKERSPACE:
+            makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+            superadmin_access_at_decision = makerspace.superadmin_access_enabled
         retention_days = PlatformBackupSettings.load().retention_days
         archive = BackupArchive.objects.create(
             id=archive_id,
             scope=scope,
             makerspace=makerspace,
+            superadmin_access_at_decision=superadmin_access_at_decision,
             requested_by=actor,
             object_key=f"backup-archives/{scope}/{archive_id}.tar.age",
             expires_at=timezone.now() + timedelta(days=retention_days),

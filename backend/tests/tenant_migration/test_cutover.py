@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from apps.makerspaces import lifecycle
+from apps.backup.models import MakerspaceArchiveCustodyState
 from apps.makerspaces.models import Makerspace
 from apps.tenant_migration import cutover
 from apps.tenant_migration.models import (
@@ -72,6 +73,9 @@ def test_activation_retry_returns_same_persisted_receipt(monkeypatch):
     assert job.target_makerspace.lifecycle_state == Makerspace.LifecycleState.ACTIVE
     assert MigrationReceipt.objects.filter(pairing=pairing).count() == 1
     assert ReceiptConsumption.objects.count() == 1
+    assert MakerspaceArchiveCustodyState.objects.get(
+        makerspace=job.target_makerspace
+    ).state == MakerspaceArchiveCustodyState.State.NOT_APPLICABLE
 
 
 def test_aborted_target_cannot_activate(monkeypatch):

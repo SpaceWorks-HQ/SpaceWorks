@@ -29,6 +29,15 @@ ALWAYS_OMITTED = {
     ),
     ("audit.AuditLog", "event_uuid"): "Source-deployment audit integrity identity.",
     ("audit.AuditLog", "row_mac"): "Source-deployment audit integrity evidence.",
+    ("backup.MakerspaceArchiveRecipient", "verified_at"): (
+        "Proof of possession must be repeated on the target deployment."
+    ),
+    ("backup.MakerspaceArchiveRecipient", "challenge_nonce_digest"): (
+        "Source-deployment proof-of-possession challenge."
+    ),
+    ("backup.MakerspaceArchiveRecipient", "challenge_issued_at"): (
+        "Source-deployment proof-of-possession challenge lifecycle."
+    ),
     ("bookings.BookableSpace", "public_token"): "Source bearer/status token.",
     ("bookings.Booking", "public_token"): "Source bearer/status token.",
     ("events.Event", "public_token"): "Source bearer/status token.",

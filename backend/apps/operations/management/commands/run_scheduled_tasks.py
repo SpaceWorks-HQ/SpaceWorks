@@ -70,6 +70,11 @@ SCHEDULED_TASKS = (
         24 * 60,
     ),
     (
+        "deliver-archive-custody-alarms",
+        "apps.backup.tasks.deliver_archive_custody_alarms_task",
+        24 * 60,
+    ),
+    (
         "purge-expired-backup-archives",
         "apps.backup.tasks.purge_expired_backup_archives_task",
         24 * 60,

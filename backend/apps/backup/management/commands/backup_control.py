@@ -20,6 +20,10 @@ from apps.backup.digests import (
     verify_content_ledger,
 )
 from apps.backup.models import BackupArchive, DeploymentRecoveryState, RestoreOperation
+from apps.backup.management.commands.backup_preflight import (
+    build_info,
+    check_setting_policies,
+)
 from apps.backup.recovery import enter_quarantine
 from apps.backup.object_restore import (
     cleanup_rollback_objects,
@@ -43,7 +47,8 @@ from apps.backup.restore_services import (
 
 class Command(BaseCommand):
     help = "Privileged-host coordination surface for backup restore."
-
+    _build_info = staticmethod(build_info)
+    _check_setting_policies = staticmethod(check_setting_policies)
     def add_arguments(self, parser):
         actions = parser.add_subparsers(dest="action", required=True)
         for name in ("claim", "preflight", "quiesce", "decision", "complete", "fail", "quarantine", "validate", "pause"):
@@ -116,7 +121,6 @@ class Command(BaseCommand):
             self.stdout.write(restore.decision)
         elif action == "complete":
             set_stage(restore_id, RestoreOperation.Stage.COMPLETED)
-            self._normal_mode()
             self.stdout.write("complete")
         elif action == "fail":
             set_stage(restore_id, RestoreOperation.Stage.FAILED, error=options["message"])
@@ -199,7 +203,10 @@ class Command(BaseCommand):
                 verify_content_ledger(
                     bundle_path,
                     manifest.get("contents"),
-                    require_ledger=manifest.get("format") == "spaceworks-phase5a-v2",
+                    require_ledger=manifest.get("format") in {
+                        "spaceworks-phase5a-v2",
+                        "spaceworks-phase5a-v3",
+                    },
                 )
             except ArchiveDigestError as exc:
                 raise CommandError(str(exc)) from exc
@@ -232,45 +239,6 @@ class Command(BaseCommand):
         if restore.stage == RestoreOperation.Stage.CLAIMED:
             set_stage(restore_id, RestoreOperation.Stage.PREFLIGHT)
         self.stdout.write("preflight-ok")
-
-    @staticmethod
-    def _build_info():
-        path = Path("/app/BUILD_INFO.json")
-        if not path.exists():
-            return {"source_hash": "unknown"}
-        return json.loads(path.read_text(encoding="utf-8"))
-
-    @staticmethod
-    def _check_setting_policies(archived):
-        from apps.backup.settings_policy import POLICIES, Policy
-
-        blocking = []
-        warnings = []
-        for name, policy in POLICIES.items():
-            if policy.policy == Policy.EXCLUDED:
-                continue
-            fact = archived.get(name, {})
-            raw = os.environ.get(name, "")
-            if policy.policy == Policy.EXACT_FINGERPRINT:
-                matches = fact.get("fingerprint") == hashlib.sha256(raw.encode()).hexdigest()
-            elif policy.policy == Policy.CAPABILITY_PROBE:
-                matches = not fact.get("configured") or bool(raw)
-            else:
-                matches = fact.get("value", "") == raw
-            if not matches:
-                (blocking if policy.blocks_restore else warnings).append(name)
-        if blocking:
-            raise CommandError(
-                f"Restore-blocking setting preflight failed: {', '.join(sorted(blocking))}."
-            )
-        if warnings:
-            # Values are intentionally omitted: this output is safe to retain in host logs.
-            import sys
-
-            print(
-                f"WARNING: non-blocking settings differ: {', '.join(sorted(warnings))}.",
-                file=sys.stderr,
-            )
 
     def _export_archive(self, restore_id, output):
         restore = RestoreOperation.objects.select_related("archive").get(pk=restore_id)

@@ -9,6 +9,7 @@ from rest_framework.exceptions import AuthenticationFailed, PermissionDenied, Va
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from apps.audit import services as audit
+from apps.backup.custody import validate_deployment_custody
 from apps.backup.models import DeploymentRecoveryState, RestoreOperation
 
 
@@ -171,6 +172,16 @@ def acknowledge_quarantine(actor, acknowledgement):
         raise PermissionDenied("Only the recovered superadmin may acknowledge quarantine.")
     if acknowledgement != RESIDUAL_RISK:
         raise ValidationError({"acknowledgement": "The residual-risk acknowledgement must match exactly."})
+    custody = validate_deployment_custody()
+    if custody.zero_recipient_off_makerspace_ids:
+        raise ValidationError(
+            {
+                "archive_custody": (
+                    "Quarantine cannot be acknowledged while a self-governed "
+                    "makerspace has zero verified archive recipients."
+                )
+            }
+        )
     now = timezone.now()
     state.mode = DeploymentRecoveryState.Mode.NORMAL
     state.acknowledged_at = now

@@ -3,6 +3,7 @@ from celery import shared_task
 from apps.backup.services import purge_expired_archives, run_archive, schedule_deployment_backup
 from apps.backup.models import BackupArchive
 from apps.backup.object_restore import cleanup_expired_rollback_objects
+from apps.backup.custody_alarms import deliver_archive_custody_alarms
 
 
 @shared_task(bind=True, max_retries=0)
@@ -25,3 +26,8 @@ def purge_expired_backup_archives_task(self):
 @shared_task(bind=True, max_retries=0)
 def cleanup_expired_restore_rollbacks_task(self):
     return cleanup_expired_rollback_objects()
+
+
+@shared_task(bind=True, max_retries=0)
+def deliver_archive_custody_alarms_task(self, makerspace_id=None):
+    return deliver_archive_custody_alarms(makerspace_id=makerspace_id)

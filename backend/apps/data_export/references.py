@@ -42,12 +42,13 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("accounts.PhoneVerificationChallenge", "user"),
         ("accounts.SocialIdentity", "user"),
         ("admin_api.BulkImportJob", "actor"),
-        # Phase 5A. The guard scans every internal model, not only exported ones, so these
-        # must be declared even though their owning models are deployment state that never
-        # travels -- the declaration keeps the scan and the registry in step.
+        # Phase 5A deployment models still need declarations because the guard scans
+        # every internal model, not only exported ones.
         ("backup.BackupArchive", "requested_by"),
         ("backup.DeploymentRecoveryState", "acknowledged_by"),
         ("backup.DeploymentRecoveryState", "recovery_principal"),
+        ("backup.MakerspaceArchiveRecipient", "added_by"),
+        ("backup.ArchiveCustodyAlarmDelivery", "recipient_user"),
         ("backup.RestoreOperation", "requested_by"),
         ("data_export.DataExportJob", "requested_by"),
         ("data_export.DataExportJob", "download_issued_to"),
@@ -107,11 +108,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("makerspaces.Makerspace", "archived_by"),
         ("makerspaces.MakerspaceArchiveRequest", "requested_by"),
         ("makerspaces.MakerspaceArchiveRequest", "resolved_by"),
-        # Phase 8: resolved by the drain, never by the request path. The model is
-        # omitted, but the edge is declared so completeness stays a total check.
         ("accounts.PasswordResetEnvelope", "user"),
-        # Phase 7. The models are omitted, but the edges are declared so user-edge
-        # completeness stays a total check over the model graph.
         ("accounts.MemberClaimCode", "issued_by"),
         ("accounts.MemberClaimCode", "revoked_by"),
         ("accounts.OidcBrowserAttempt", "intended_user"),
@@ -124,9 +121,8 @@ RELATIONAL_USER_FIELDS = frozenset(
         # Phase 7 import machinery. The model itself is omitted, but the edge is
         # declared so user-edge completeness stays a total check over the graph.
         ("makerspaces.ImportedUserReconciliation", "target_user"),
-        # Phase 5B target-side coordination is omitted from exports, but the model-graph
-        # guard still requires every account edge to be declared explicitly. A model-level
-        # omission does not decide whether an account belongs in the global user closure.
+        # Omitted Phase 5B coordination still declares every account edge; model-level
+        # omission does not decide whether an account belongs in the user closure.
         ("tenant_migration.TenantImportJob", "actor"),
         ("tenant_migration.ImportIdentityDecision", "target_user"),
         ("tenant_migration.DisclosureClosureApproval", "approved_by"),
@@ -134,8 +130,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("tenant_migration.MigrationPairing", "approved_by"),
         ("tenant_migration.ReceiptConsumption", "consumed_by"),
         ("tenant_migration.MigratedOutHandoff", "reopened_by"),
-        # Source-side gate ownership is deployment coordination state. Its actor is
-        # deliberately excluded from every tenant archive and global user closure.
+        # Source-gate ownership is excluded from every tenant archive and user closure.
         ("tenant_migration.SourceMigrationGate", "actor"),
         ("makerspaces.MakerspaceWaiver", "created_by"),
         ("makerspaces.MembershipRequest", "user"),
@@ -243,13 +238,9 @@ JSON_FIELDS = frozenset(
 
 SEMANTIC_REFERENCES = {}
 for _fidelity in Fidelity:
-    # PORTABLE stopped pulling a user audit TARGET into the global closure when the
-    # migration audit registry took over: it never remaps a user target, keeping it as
-    # inert source provenance instead, so nothing downstream needs that person emitted.
-    # REDACTED is deliberately unchanged. It is shipped, operator-facing behaviour, and
-    # the closure decides who appears in `global/users.csv` -- narrowing it here would
-    # quietly drop people from an existing export as a side effect of building migration
-    # support, which is not this phase's decision to make.
+    # PORTABLE keeps audit targets as inert source provenance, so it does not pull user
+    # targets into the global closure. REDACTED remains shipped operator-facing behavior;
+    # narrowing it would silently drop people from an existing export.
     SEMANTIC_REFERENCES[(_fidelity, "audit.AuditLog", "target_type+target_id")] = (
         (
             SemanticUserRef(

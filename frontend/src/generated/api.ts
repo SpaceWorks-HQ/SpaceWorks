@@ -27,6 +27,7 @@ export const openApiTags = [
   "Asset units",
   "Auth",
   "Backup",
+  "Backup recipients",
   "Backup recovery",
   "Bulk import",
   "Containers",
@@ -187,6 +188,12 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/api-client-scopes",
   "/api/v1/admin/makerspace/{makerspace_id}/api-clients",
   "/api/v1/admin/makerspace/{makerspace_id}/api-settings",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients/{id}/compromise",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients/{id}/reactivate",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients/{id}/reissue-challenge",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients/{id}/revoke",
+  "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients/{id}/verify",
   "/api/v1/admin/makerspace/{makerspace_id}/archive-requests",
   "/api/v1/admin/makerspace/{makerspace_id}/archive-requests/{id}/withdraw",
   "/api/v1/admin/makerspace/{makerspace_id}/backups",
@@ -683,6 +690,15 @@ export type ApiKeyRequest = {
 
 export type ApprovalModeEnum = "instant" | "approve";
 
+export type ArchiveCustodyReadiness = {
+  "below_floor_makerspaces": number;
+  "zero_recipient_makerspaces": number;
+  "undelivered_alarms": number;
+  "alarms_with_no_operator_address": number;
+};
+
+export type ArchiveCustodyStateEnum = "healthy" | "not_applicable" | "degraded_one_recipient" | "floor_breached_zero";
+
 export type ArchivedPaymentMakerspace = {
   "id": number;
   "slug": string;
@@ -693,6 +709,39 @@ export type ArchivedPaymentSummary = {
   "makerspace": ArchivedPaymentMakerspace;
   "pending_count": number;
   "total_count": number;
+};
+
+export type ArchiveRecipient = {
+  "id": number;
+  "public_recipient": string;
+  "fingerprint": string;
+  "label": string;
+  "added_by": number | null;
+  "added_at": string;
+  "revoked_at": string | null;
+  "compromised_at": string | null;
+  "verified_at": string | null;
+  "challenge_issued_at": string | null;
+};
+
+export type ArchiveRecipientChallenge = {
+  "recipient": ArchiveRecipient;
+  "encrypted_challenge": string;
+  "nonce_encoding"?: string;
+};
+
+export type ArchiveRecipientCreate = {
+  "public_recipient": string;
+  "label": string;
+};
+
+export type ArchiveRecipientError = {
+  "detail": string;
+  "code": string;
+};
+
+export type ArchiveRecipientVerify = {
+  "nonce": string;
 };
 
 export type ArchiveRequestError = {
@@ -2536,6 +2585,7 @@ export type Makerspace = {
   "referrals_enabled"?: boolean;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
+  "archive_custody_state": ArchiveCustodyStateEnum | null;
   "staff_notifications_enabled"?: boolean;
   "booking_requester_notifications_enabled"?: boolean;
   "logo_key": string;
@@ -3541,6 +3591,7 @@ export type PatchedMakerspace = {
   "referrals_enabled"?: boolean;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
+  "archive_custody_state"?: ArchiveCustodyStateEnum | null;
   "staff_notifications_enabled"?: boolean;
   "booking_requester_notifications_enabled"?: boolean;
   "logo_key"?: string;
@@ -4573,6 +4624,7 @@ export type RateLimitTierEnum = "public" | "standard" | "trusted";
 export type Readiness = {
   "status": string;
   "database": string;
+  "archive_custody": ArchiveCustodyReadiness;
 };
 
 export type ReceiptEnvelope = {

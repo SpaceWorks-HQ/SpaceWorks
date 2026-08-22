@@ -3,11 +3,15 @@
 import json
 from pathlib import Path
 
+import logging
+
 from django.core.management import call_command
 from django.db import transaction
 from django.utils import timezone
 
 from apps.backup.models import BackupArchive, DeploymentRecoveryState, RestoreOperation
+
+logger = logging.getLogger(__name__)
 
 
 def export_control_record(restore_id, output, decision=None):
@@ -71,9 +75,26 @@ def validate_restored_state(restore_id):
         raise RuntimeError("Only the validating stage can run restored-state checks.")
     call_command("check", verbosity=0)
     from apps.accounts.token_guard import validate_token_configuration
+    from apps.backup.custody import validate_deployment_custody
     from apps.backup.route_guard import validate_recovery_route_allowlists
     from apps.encryption.readiness import assert_ready
 
     assert_ready()
+    # `validate_deployment_custody` has already PERSISTED each makerspace's custody
+    # state in deterministic order, so the alarm exists before we decide anything.
+    custody = validate_deployment_custody()
+    if custody.zero_recipient_off_makerspace_ids:
+        # Deliberately NOT fatal. Zero recipients is an explicitly supported state --
+        # a compromise always proceeds even when it breaches the floor -- so aborting
+        # here would make every deployment archive containing such a tenant
+        # unrestorable, with no repair path (quarantine blocks acknowledgement and
+        # exposes no recipient management). Refusing the restore does not fix the
+        # tenant's custody posture; it only prevents recovery.
+        # The fail-closed rule belongs on the BUILD side, where `selection_for`
+        # already refuses to encrypt an archive to nobody.
+        logger.error(
+            "restore_zero_recipient_self_governed_makerspaces",
+            extra={"makerspace_ids": list(custody.zero_recipient_off_makerspace_ids)},
+        )
     validate_token_configuration()
     validate_recovery_route_allowlists()

@@ -2,9 +2,12 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin
 
 from apps.backup.models import (
+    ArchiveCustodyAlarmDelivery,
+    ArchiveRecipientReservation,
     BackupArchive,
     BackupLease,
     DeploymentRecoveryState,
+    MakerspaceArchiveCustodyState,
     PlatformBackupSettings,
     RestoreOperation,
     RestoreRollbackObject,
@@ -37,6 +40,55 @@ class RestoreOperationAdmin(ReadOnlyBackupAdmin):
     readonly_fields = tuple(field.name for field in RestoreOperation._meta.fields)
 
 
-for model in (PlatformBackupSettings, DeploymentRecoveryState, BackupLease, RestoreRollbackObject):
-    admin.site.register(model, ReadOnlyBackupAdmin)
+@admin.register(MakerspaceArchiveCustodyState)
+class MakerspaceArchiveCustodyStateAdmin(ReadOnlyBackupAdmin):
+    list_display = (
+        "makerspace",
+        "state",
+        "reason_code",
+        "alarm_episode",
+        "entered_at",
+        "cleared_at",
+    )
+    list_filter = ("state", "reason_code")
+    readonly_fields = tuple(
+        field.name for field in MakerspaceArchiveCustodyState._meta.fields
+    )
 
+    def resolve_hidden_lookup(self):
+        # This deployment alarm must remain visible even when its makerspace has
+        # intentionally hidden ordinary tenant data from the control plane.
+        return None
+
+
+@admin.register(ArchiveCustodyAlarmDelivery)
+class ArchiveCustodyAlarmDeliveryAdmin(ReadOnlyBackupAdmin):
+    list_display = (
+        "id",
+        "makerspace",
+        "alarm_revision",
+        "cycle",
+        "channel",
+        "status",
+        "attempts",
+        "updated_at",
+    )
+    list_filter = ("channel", "status", "created_at")
+    readonly_fields = tuple(
+        field.name for field in ArchiveCustodyAlarmDelivery._meta.fields
+    )
+
+    def resolve_hidden_lookup(self):
+        # Platform custody operations remain visible when the affected tenant has
+        # deliberately hidden ordinary tenant data from the control plane.
+        return None
+
+
+for model in (
+    PlatformBackupSettings,
+    DeploymentRecoveryState,
+    BackupLease,
+    RestoreRollbackObject,
+    ArchiveRecipientReservation,
+):
+    admin.site.register(model, ReadOnlyBackupAdmin)

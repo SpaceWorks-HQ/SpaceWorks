@@ -6,6 +6,25 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-08-22 — Archive-recipient custody, Part A (K1 landed + the two-recipient floor).** A tenant archive
+  is encrypted to the makerspace's own verified `age` recipients, and the platform is added **only** when
+  `superadmin_access_enabled` is true — so with the switch off the operator can *run* a tenant backup but
+  cannot *open* it. Scope is deliberately narrow: **deployment backups still contain every makerspace's rows**
+  (Lane E unbuilt), so this is not yet "excluded from my platform backup". Fixed a latent K1 bug where
+  `superadmin_access_at_decision` was written by nothing, so a switch flipped between an archive's request
+  (web) and its build (Celery) silently changed who could decrypt it; selection now fails closed on a missing
+  snapshot instead of reading the live flag. Added `MakerspaceArchiveCustodyState` as the authoritative alarm
+  record, a **two-recipient admission floor** (ordinary revocation refuses below two; **compromise always
+  proceeds**; one recipient keeps backing up degraded; zero fails closed on build), and a single
+  makerspace-first lock through which every count-changing transition now passes — correcting
+  `verify_recipient`, which locked the recipient row first, and `reactivate_recipient`, which locked nothing.
+  Creating a makerspace with the switch already off is refused. Recovery is never blocked by a tenant's
+  custody posture: **fail closed on build, not on restore.** Two migration bugs were caught before shipping —
+  a constraint violation, and `AddConstraint` after `RunPython` in one migration, which aborts on any real
+  upgrade but passes on a fresh database. Rules in `docs/INVARIANTS.md`; supersedes Lane K1's "recipient
+  mutation takes no lock" and its one-recipient switch-off. Still open: no outbound alarm channel (readiness +
+  admin only), and the two-release rollout is operator discipline, not enforced by code.
+
 One line per shipped batch. The rules these introduced live in `docs/INVARIANTS.md`; use
 `git log --oneline`/`git blame` for the implementing commits and per-file history.
 

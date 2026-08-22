@@ -3,6 +3,7 @@ import uuid
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 
 ARCHIVE_PURGE_WARNING = (
@@ -48,6 +49,8 @@ class BackupArchive(models.Model):
         "makerspaces.Makerspace", null=True, blank=True, on_delete=models.SET_NULL,
         related_name="backup_archives",
     )
+    superadmin_access_at_decision = models.BooleanField(null=True)
+    legacy_pre_decision_snapshot = models.BooleanField(default=False)
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
         related_name="requested_backup_archives",
@@ -71,6 +74,100 @@ class BackupArchive(models.Model):
     class Meta:
         ordering = ("-created_at",)
         indexes = [models.Index(fields=("scope", "makerspace", "status", "created_at"))]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(scope="makerspace")
+                    | models.Q(superadmin_access_at_decision__isnull=False)
+                    | models.Q(legacy_pre_decision_snapshot=True)
+                ),
+                name="backup_makerspace_decision_snapshot_present",
+            )
+        ]
+
+
+class MakerspaceArchiveRecipient(models.Model):
+    makerspace = models.ForeignKey(
+        "makerspaces.Makerspace",
+        on_delete=models.CASCADE,
+        related_name="archive_recipients",
+    )
+    public_recipient = models.CharField(max_length=200)
+    fingerprint = models.CharField(max_length=64)
+    label = models.CharField(max_length=120)
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="added_archive_recipients",
+    )
+    added_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    compromised_at = models.DateTimeField(null=True, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    challenge_nonce_digest = models.CharField(max_length=64, blank=True)
+    challenge_issued_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("pk",)
+
+
+class MakerspaceArchiveCustodyState(models.Model):
+    class State(models.TextChoices):
+        HEALTHY = "healthy", "Healthy"
+        NOT_APPLICABLE = "not_applicable", "Not applicable"
+        DEGRADED_ONE_RECIPIENT = (
+            "degraded_one_recipient",
+            "Degraded: one recipient",
+        )
+        FLOOR_BREACHED_ZERO = "floor_breached_zero", "Floor breached: zero"
+
+    makerspace = models.OneToOneField(
+        "makerspaces.Makerspace",
+        on_delete=models.CASCADE,
+        related_name="archive_custody_state",
+    )
+    state = models.CharField(
+        max_length=32,
+        choices=State.choices,
+        default=State.HEALTHY,
+    )
+    reason_code = models.CharField(max_length=64, blank=True)
+    entered_at = models.DateTimeField(default=timezone.now)
+    cleared_at = models.DateTimeField(null=True, blank=True)
+    last_alarm_at = models.DateTimeField(null=True, blank=True)
+    triggering_recipient = models.ForeignKey(
+        MakerspaceArchiveRecipient,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="triggered_custody_states",
+    )
+    alarm_episode = models.PositiveBigIntegerField(default=0)
+    alarm_revision = models.PositiveBigIntegerField(default=0)
+
+
+class ArchiveRecipientReservation(models.Model):
+    class Kind(models.TextChoices):
+        TENANT = "tenant", "Tenant"
+        PLATFORM = "platform", "Platform"
+
+    fingerprint = models.CharField(max_length=64, unique=True)
+    makerspace_id_snapshot = models.BigIntegerField(null=True)
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    reserved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(kind="tenant", makerspace_id_snapshot__isnull=False)
+                    | models.Q(kind="platform", makerspace_id_snapshot__isnull=True)
+                ),
+                name="archive_reservation_kind_matches_tenant",
+            )
+        ]
 
 
 class RestoreOperation(models.Model):
@@ -192,3 +289,8 @@ class RestoreRollbackObject(models.Model):
                 name="uniq_restore_rollback_object",
             )
         ]
+
+
+# Keep the public model import surface stable while the custody outbox lives in its
+# own module; this file is already at the repository's size ceiling.
+from .models_custody_alarm import ArchiveCustodyAlarmDelivery  # noqa: E402,F401
