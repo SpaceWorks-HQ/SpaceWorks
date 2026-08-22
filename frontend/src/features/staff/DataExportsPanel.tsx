@@ -45,6 +45,12 @@ export function DataExportsPanel({ makerspaceId }: { makerspaceId: number }) {
             and free-text form answers. It is not a migration backup.
           </p>
           <p className="mt-2">
+            <span className="font-semibold">It does contain member contact details.</span>{" "}
+            Names, email addresses and phone numbers that members supplied on your records are
+            included in readable form. &ldquo;Redacted&rdquo; refers to audit metadata and form
+            answers, not to personal data — handle the file accordingly.
+          </p>
+          <p className="mt-2">
             The referenced-users file contains only id and username for people referenced by
             exported rows. This is a new intentional disclosure: the staff audit API exposes
             only a numeric actor id and the current console omits the actor. Usernames are

@@ -38870,7 +38870,7 @@
                     "REDACTED"
                 ],
                 "type": "string",
-                "description": "* `REDACTED` - Redacted"
+                "description": "* `REDACTED` - Readable — audit metadata and form answers redacted; member contact details included"
             },
             "FieldValidationError": {
                 "type": "object",

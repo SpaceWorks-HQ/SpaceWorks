@@ -1826,6 +1826,16 @@ v1–v12 are history only**. Conclusions that cost thirteen review rounds and mu
   not authorize the *closure*: a manager can plant unrelated global accounts into the user closure
   with an ordinary invitation or a membership for an existing username, and PORTABLE emits their
   email and phone. Phase 4 already forces `REDACTED` for Space Managers.
+- **`REDACTED` is NOT a PII-free fidelity, and its name has already misled one review.** The line
+  above is a narrow, true contrast — the **global-user closure** at `REDACTED` emits only `id` and
+  `username` (`data_export/fields.py:9`), so platform account email/phone do not travel. But every
+  field without an explicit disposition falls through to `Emitted()` (`fields.py:139`), so the
+  scoped-PII mapped fields on makerspace-owned rows — requester/attendee names, emails and phones on
+  `HardwareRequest`, `EventRegistration`, `Booking`, `MachineServiceRequest`, `MachineUsageEntry`,
+  `EmailLog` — **are decrypted and emitted in plaintext**. That is deliberate, shipped and pinned by a
+  byte-regression test (`tests/data_export/test_portable_external_refs.py:190` locks `requester_name`
+  readable), so **do not "fix" it as a leak**. What it redacts is audit meta and custom-form answers.
+  Owner decision 2026-08-22: behaviour unchanged, the label and disclosure copy now say so.
 - **Verification must measure authority CONFERRED BY THE IMPORT**, not total effective authority —
   the latter is unsatisfiable for a legitimately linked target superadmin, since `rbac` grants
   superusers everything.

@@ -6,7 +6,16 @@ from apps.data_export.types import Fidelity
 
 class DataExportCreateSerializer(serializers.Serializer):
     fidelity = serializers.ChoiceField(
-        choices=((Fidelity.REDACTED.value, "Redacted"),),
+        # The label spells out the scope because the VALUE does not: "REDACTED" reads as
+        # "PII removed", and this mode removes audit metadata and form answers, not member
+        # contact details. The value is a stored API contract and is deliberately unchanged.
+        choices=(
+            (
+                Fidelity.REDACTED.value,
+                "Readable — audit metadata and form answers redacted; "
+                "member contact details included",
+            ),
+        ),
         default=Fidelity.REDACTED.value,
         required=False,
     )

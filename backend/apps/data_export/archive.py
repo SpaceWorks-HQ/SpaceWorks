@@ -183,6 +183,13 @@ configuration, five operator-authored JSON configuration fields, and transient
 authentication state. Audit metadata is replaced by a redaction marker, and free-text
 custom-form answers are redacted according to the type stored with each answer.
 
+This archive DOES contain member contact details. Names, email addresses and phone
+numbers that members supplied on this makerspace's records - hardware requests, event
+registrations, bookings, machine service requests and usage entries - are included in
+readable form. "Redacted" refers to audit metadata and form answers, not to personal
+data. Handle this archive as a file containing other people's personal information:
+storing or sharing it may carry obligations under your local data-protection law.
+
 The global users file is not a platform roster. It contains only users referenced by
 the exported makerspace rows. For those referenced users, id + username is a new
 intentional disclosure: the staff audit API returns only a numeric actor id and the
