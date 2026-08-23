@@ -199,6 +199,11 @@ _SOURCE_LOCAL_EDGES = {
     ("tenant_migration.identity_decisions_read", "import_id"),
     ("tenant_migration.import_completed", "import_id"),
     ("tenant_migration.verification_read", "import_id"),
+    # Lane E compound-artifact identifiers. Deployment-operational: the artifact
+    # and component ledger rows never travel, so there is no PK to remap and the
+    # live binding must not be asserted on a target.
+    ("backup.archive_exclusion_activated", "artifact_id"),
+    ("backup.archive_exclusion_activated", "capture_id"),
 }
 AUDIT_META_REFERENCES.update(_reference(S, None, *_SOURCE_LOCAL_EDGES))
 AUDIT_META_REFERENCES.update(

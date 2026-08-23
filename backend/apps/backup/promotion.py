@@ -101,7 +101,8 @@ def _promote_atomic(artifact_id, retained_ids, sovereign_ids, artifact_ids):
 
     now = timezone.now()
     pending = []
-    for makerspace_id, activation in activations.items():
+    for makerspace_id in sovereign_ids:
+        activation = activations[makerspace_id]
         if activation.state != B1ActivationState.State.OFF_PENDING:
             continue
         activation.state = B1ActivationState.State.OFF_EFFECTIVE
@@ -215,4 +216,3 @@ def _lock_associations(components):
             component_id__in=[item.pk for item in components]
         ).order_by("pk")
     )
-
