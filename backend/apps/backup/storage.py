@@ -25,6 +25,10 @@ class BackupStorageError(RuntimeError):
     pass
 
 
+class BackupVerificationError(BackupStorageError):
+    pass
+
+
 def client(*, public_endpoint=False):
     endpoint = settings.AWS_S3_PUBLIC_ENDPOINT_URL if public_endpoint else settings.AWS_S3_ENDPOINT_URL
     return boto3.client(
@@ -178,3 +182,6 @@ def _latest_retained_version(s3, bucket, key):
             return ""
         key_marker = page.get("NextKeyMarker")
         version_marker = page.get("NextVersionIdMarker")
+
+
+from .storage_promotion import create_final_from_staging, final_locator, object_exists, staging_locator, stream_verify, upload_staging  # noqa: E402,F401

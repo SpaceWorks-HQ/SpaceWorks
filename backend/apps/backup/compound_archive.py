@@ -1,13 +1,20 @@
 """Lane E compound capture, verified slice sealing, and readable-main routing."""
 
 from pathlib import Path
+import json
 import shutil
 import subprocess
 import tarfile
+import uuid
 
-from apps.backup.compound_recipients import FrozenSlice, frozen_slices
+from apps.backup.compound_recipients import (
+    FrozenSlice,
+    frozen_population,
+    frozen_slices,
+    predecessor_snapshot,
+)
 from apps.backup.dek_rewrap import enumerate_staged_deks, seal_staged_deks
-from apps.backup.digests import sha256_file
+from apps.backup.digests import build_content_ledger, sha256_file
 from apps.backup.main_projection import project_readable_main_dump
 from apps.backup.main_projection_inverse import boundary_deltas
 from apps.backup.main_projection_registry import table_rules
@@ -16,16 +23,16 @@ from apps.backup.object_ownership import MAIN_COMPONENT, slice_component
 from apps.backup.recipient_selection import BackupBuildError
 from apps.backup.recipients import fingerprint_for
 from apps.backup.slice_verification import verify_unsealed_slice
+from apps.backup.user_closure import user_closure_digest
 
 
 COMPOUND_ARCHIVE_FORMAT = "spaceworks-lane-e-e3-compound-v1"
 
 
 class CompoundCapture:
-    """Build sovereign slices from the caller's repeatable-read capture."""
-
     def __init__(self, *, archive, root, modes, platform_recipients):
         self.archive = archive
+        self.capture_id = uuid.uuid4()
         self.root = Path(root)
         self.modes = modes
         self.platform_recipients = frozenset(
@@ -36,13 +43,22 @@ class CompoundCapture:
         self.verified_makerspace_ids = set()
         self.expected_main_ledger = None
         self.object_plan = None
+        self.frozen_population = ()
+        self.frozen_population_ids = ()
+        self.predecessor_snapshot = {}
+        self.user_closure_entries = set()
+        self.user_closure_digest = user_closure_digest(())
 
     def prepare_from_snapshot(self):
-        """Freeze tenant custody and the pre-projection verification ledger."""
         if self.frozen_slices:
             raise BackupBuildError("Compound capture was prepared more than once.")
+        self.frozen_population = frozen_population()
+        self.predecessor_snapshot = predecessor_snapshot()
+        self.frozen_population_ids = tuple(
+            item["makerspace_id"] for item in self.frozen_population
+        )
         self.frozen_slices = frozen_slices(
-            self.archive.id, self.platform_recipients
+            self.capture_id, self.platform_recipients, self.frozen_population
         )
         makerspace_ids = tuple(
             item.makerspace_id for item in self.frozen_slices
@@ -74,6 +90,9 @@ class CompoundCapture:
                 )
             object_plan.assert_complete()
             self.require_verified_slice_coverage()
+            self.user_closure_digest = user_closure_digest(
+                self.user_closure_entries
+            )
         finally:
             shutil.rmtree(work_root, ignore_errors=True)
 
@@ -97,6 +116,16 @@ class CompoundCapture:
             plaintext / "objects", object_keys, self.modes
         )
         object_plan.bind_component(component, plaintext / "objects", objects)
+        closure_entries = self._user_closure(plaintext)
+        self.user_closure_entries.update(closure_entries)
+        write_json(
+            plaintext / "user-closure-ledger.json",
+            [{
+                "disposition": disposition,
+                "source_user_pk": int(source_pk),
+                "reason_code": reason_code,
+            } for disposition, source_pk, reason_code in closure_entries],
+        )
         staged_deks = enumerate_staged_deks(item.makerspace_id)
         sealed_deks = seal_staged_deks(
             staged_deks, item.public_recipients, plaintext / "keys" / "deks"
@@ -142,7 +171,9 @@ class CompoundCapture:
             raise BackupBuildError(
                 "A sovereign archive slice could not be encrypted."
             ) from exc
+        content_ledger = build_content_ledger(plaintext)
         return {
+            "component_id": item.slice_id,
             "slice_id": item.slice_id,
             "makerspace_id": item.makerspace_id,
             "path": f"slices/{item.slice_id}.tar.age",
@@ -150,6 +181,45 @@ class CompoundCapture:
             "ciphertext_sha256": sha256_file(encrypted),
             "recipient_fingerprints": list(item.recipient_fingerprints),
             "custody_state": item.custody_state,
+            "object_ledger_count": len(objects),
+            "object_ledger_digest": _json_digest(objects),
+            "content_ledger_count": len(content_ledger),
+            "content_ledger_digest": _json_digest(content_ledger),
+        }
+
+    @staticmethod
+    def _user_closure(plaintext):
+        path = plaintext / "rows" / "global_user_references.json"
+        try:
+            values = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise BackupBuildError("A sovereign user-closure ledger is unreadable.") from exc
+        return tuple(sorted({
+            ("stubbed", str(item["id"]), "sovereign-global-user-reference")
+            for item in values
+        }))
+
+    def promotion_snapshot(self):
+        slices = {item.makerspace_id: item for item in self.frozen_slices}
+        return {
+            **self.predecessor_snapshot,
+            "retained": [
+                {
+                    **item,
+                    "custody_state": (
+                        slices[item["makerspace_id"]].custody_state
+                        if item["makerspace_id"] in slices else None
+                    ),
+                    "recipients": [
+                        {"pk": pk, "fingerprint": fingerprint}
+                        for pk, fingerprint in (
+                            slices[item["makerspace_id"]].recipient_rows
+                            if item["makerspace_id"] in slices else ()
+                        )
+                    ],
+                }
+                for item in self.frozen_population
+            ]
         }
 
     def require_verified_slice_coverage(self):
@@ -165,7 +235,6 @@ class CompoundCapture:
             )
 
     def project_readable_main(self, manifest):
-        """Replace the full source dump only after slice coverage and main verification."""
         self.require_verified_slice_coverage()
         if self.expected_main_ledger is None:
             raise BackupBuildError("Readable-main verification ledger is missing.")
@@ -219,3 +288,12 @@ def _verify_sealed_slices(root, entries):
             or sha256_file(path) != entry["ciphertext_sha256"]
         ):
             raise BackupBuildError("A sealed sovereign slice failed ciphertext verification.")
+
+
+def _json_digest(value):
+    import hashlib
+
+    encoded = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), default=str
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()

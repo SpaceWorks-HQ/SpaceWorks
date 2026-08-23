@@ -1,8 +1,5 @@
-import hashlib
-import hmac
 import logging
 import os
-import secrets
 from datetime import timedelta
 import uuid
 
@@ -13,10 +10,13 @@ from rest_framework.exceptions import ValidationError
 
 from apps.audit import services as audit
 from apps.backup import storage
+from apps.backup.artifact_ledger import ArtifactLedgerMismatch, mark_failed
+from apps.backup.artifact_protocol import upload_verify_and_promote
 from apps.backup.archive_builder import BackupBuildError, build_archive
 from apps.backup.archive_import import import_disaster_archive
 from apps.backup.models import (
     BackupArchive,
+    BackupArtifactLedger,
     BackupLease,
     PlatformBackupSettings,
 )
@@ -26,9 +26,12 @@ from apps.makerspaces.models import Makerspace
 
 logger = logging.getLogger(__name__)
 
-
-class DownloadTokenError(RuntimeError):
-    pass
+from apps.backup.services_access import (  # noqa: E402,F401
+    DownloadTokenError,
+    consume_download_token,
+    issue_download_token,
+    purge_expired_archives,
+)
 
 
 def superadmin_access_decision(makerspace):
@@ -91,13 +94,19 @@ def _run_archive_locked(archive_id):
         archive = _claim_archive(archive_id)
         if archive is None:
             return None
-        encrypted, manifest, tempdir, archive_sha256 = build_archive(archive)
+        build = build_archive(archive)
+        encrypted, manifest, tempdir, archive_sha256 = build
         size = os.path.getsize(encrypted)
-        storage.upload_archive(archive.object_key, encrypted)
-        _complete_archive(archive.pk, manifest, size, archive_sha256)
+        if archive.scope == BackupArchive.Scope.DEPLOYMENT:
+            upload_verify_and_promote(archive, build, size)
+        else:
+            storage.upload_archive(archive.object_key, encrypted)
+            _complete_archive(archive.pk, manifest, size, archive_sha256)
         return BackupArchive.objects.get(pk=archive_id)
     except Exception as exc:
         if archive is not None:
+            if isinstance(exc, (ArtifactLedgerMismatch, storage.BackupVerificationError)):
+                mark_failed(archive.pk, "promotion_revalidation_failed")
             _fail_archive(archive, _safe_failure_detail(exc))
         raise
     finally:
@@ -152,15 +161,33 @@ def _complete_archive(archive_id, manifest, size, archive_sha256):
 
 
 def _fail_archive(archive, detail):
-    storage.delete_archive(archive.object_key)
+    ledger = BackupArtifactLedger.objects.filter(pk=archive.pk).first()
+    if ledger and ledger.state in {
+        BackupArtifactLedger.State.AVAILABLE,
+        BackupArtifactLedger.State.SUPERSEDED,
+        BackupArtifactLedger.State.BYTES_DELETED,
+        BackupArtifactLedger.State.FINAL_VERIFIED,
+    }:
+        return
+    if ledger:
+        mark_failed(ledger.artifact_id, "archive_run_failed")
+        storage.delete_archive(ledger.staging_locator)
+        storage.delete_archive(ledger.final_locator)
+    else:
+        storage.delete_archive(archive.object_key)
     message = str(detail).strip()[:500]
-    BackupArchive.objects.filter(pk=archive.pk).update(
+    updated = BackupArchive.objects.filter(
+        pk=archive.pk,
+        status__in=(BackupArchive.Status.PENDING, BackupArchive.Status.RUNNING),
+    ).update(
         status=BackupArchive.Status.FAILED,
         failure_detail=message,
         completed_at=timezone.now(),
         download_token_digest="",
         download_token_expires_at=None,
     )
+    if not updated:
+        return
     PlatformBackupSettings.objects.update_or_create(
         pk=1, defaults={"last_error": message}
     )
@@ -183,7 +210,7 @@ def fail_archive_dispatch(archive, exc):
 
 
 def _safe_failure_detail(exc):
-    if isinstance(exc, (BackupBuildError, storage.BackupStorageError, OperationLockUnavailable)):
+    if isinstance(exc, (BackupBuildError, storage.BackupStorageError, ArtifactLedgerMismatch, OperationLockUnavailable)):
         return str(exc)[:500]
     return "The backup failed unexpectedly; inspect server logs."
 
@@ -222,64 +249,3 @@ def schedule_deployment_backup():
             row.save(update_fields=("last_scheduled_at", "updated_at"))
             archive = create_archive(None, scope=BackupArchive.Scope.DEPLOYMENT)
         return _run_archive_locked(archive.pk)
-
-
-@transaction.atomic
-def issue_download_token(archive, actor):
-    locked = BackupArchive.objects.select_for_update().get(pk=archive.pk)
-    if locked.status != BackupArchive.Status.AVAILABLE or locked.expires_at <= timezone.now():
-        raise ValidationError("This backup archive is not available for download.")
-    raw = secrets.token_urlsafe(32)
-    locked.download_token_digest = hashlib.sha256(raw.encode()).hexdigest()
-    locked.download_token_expires_at = timezone.now() + timedelta(
-        seconds=settings.BACKUP_DOWNLOAD_TTL_SECONDS
-    )
-    locked.download_token_consumed_at = None
-    locked.save(update_fields=(
-        "download_token_digest", "download_token_expires_at",
-        "download_token_consumed_at", "updated_at",
-    ))
-    audit.record(
-        actor, "backup.download_url_issued", makerspace=locked.makerspace,
-        target=locked, meta={"archives_outside_purge_guarantee": True},
-    )
-    return raw, locked.download_token_expires_at
-
-
-@transaction.atomic
-def consume_download_token(archive_id, raw):
-    archive = BackupArchive.objects.select_for_update().filter(pk=archive_id).first()
-    now = timezone.now()
-    expected = hashlib.sha256(raw.encode()).hexdigest()
-    valid = bool(
-        archive and archive.status == BackupArchive.Status.AVAILABLE
-        and archive.download_token_digest and archive.download_token_consumed_at is None
-        and archive.download_token_expires_at and archive.download_token_expires_at > now
-        and hmac.compare_digest(archive.download_token_digest, expected)
-    )
-    if not valid:
-        raise DownloadTokenError("The backup download is invalid, expired, or already used.")
-    archive.download_token_consumed_at = now
-    archive.save(update_fields=("download_token_consumed_at", "updated_at"))
-    audit.record(None, "backup.downloaded", makerspace=archive.makerspace, target=archive)
-    return archive
-
-
-def purge_expired_archives(limit=100):
-    archives = list(BackupArchive.objects.filter(expires_at__lte=timezone.now()).order_by("pk")[:limit])
-    deleted = 0
-    for archive in archives:
-        if storage.delete_archive(archive.object_key):
-            if archive.restores.exists():
-                archive.status = BackupArchive.Status.EXPIRED
-                archive.size_bytes = 0
-                archive.download_token_digest = ""
-                archive.download_token_expires_at = None
-                archive.save(update_fields=(
-                    "status", "size_bytes", "download_token_digest",
-                    "download_token_expires_at", "updated_at",
-                ))
-            else:
-                archive.delete()
-            deleted += 1
-    return deleted

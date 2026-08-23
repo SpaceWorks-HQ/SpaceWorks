@@ -112,6 +112,9 @@ TASK_EXEMPTIONS = {
         "Lane D custody-alarm delivery writes only deployment-local derived state "
         "and its recoverable outbox before sending mail."
     ),
+    "apps.backup.tasks.reconcile_backup_artifacts_task": (
+        "Deployment-local backup staging, verification, and artifact ledger recovery."
+    ),
     "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task": "Target-side import retention and recovery.",
     "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task": "Target-side import object rollback does not mutate the frozen source.",
     "apps.tenant_migration.tasks.cleanup_refused_tenant_dump_artifacts_task": (

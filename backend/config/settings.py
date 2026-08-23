@@ -488,6 +488,12 @@ TENANT_MIGRATION_PRESIGN_DRAIN_SECONDS = env.int(
     ),
 )
 BACKUP_AGE_RECIPIENT = env("BACKUP_AGE_RECIPIENT", default="")
+BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY = env(
+    "BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY", default=""
+)
+BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY = env(
+    "BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY", default=""
+)
 TENANT_MIGRATION_AGE_RECIPIENT = env(
     "TENANT_MIGRATION_AGE_RECIPIENT", default=""
 )
@@ -557,6 +563,10 @@ CELERY_BEAT_SCHEDULE = {
     "deliver-tenant-exit-custody-alarms": {
         "task": "apps.backup.tasks.deliver_tenant_exit_custody_alarms_task",
         "schedule": crontab(minute=45),
+    },
+    "reconcile-backup-artifacts": {
+        "task": "apps.backup.tasks.reconcile_backup_artifacts_task",
+        "schedule": crontab(minute="*/5"),
     },
     "purge-expired-backup-archives": {
         "task": "apps.backup.tasks.purge_expired_backup_archives_task",

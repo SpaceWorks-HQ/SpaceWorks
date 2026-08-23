@@ -1,4 +1,5 @@
 """Snapshot-consistent archive construction; caller owns remote upload."""
+from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import subprocess
@@ -31,11 +32,29 @@ from apps.backup.archive_payload import (
 from apps.backup.compound_archive import CompoundCapture, add_slice_metadata
 from apps.backup.digests import build_content_ledger, sha256_file
 from apps.backup.models import BackupArchive, DeploymentRecoveryState
+from apps.backup.outer_manifest import build_outer_manifest
 from apps.backup.postgres_client import (
     PostgresClientUnavailable,
     client_binary,
 )
 from apps.backup.recipient_selection import BackupBuildError
+
+
+@dataclass(frozen=True)
+class ArchiveBuildResult:
+    encrypted: Path
+    manifest: dict
+    tempdir: object
+    archive_sha256: str
+    promotion_snapshot: dict | None = None
+
+    def __iter__(self):
+        # Preserve the established four-value build API for callers that only
+        # need the local artifact. Promotion consumes the named snapshot.
+        yield self.encrypted
+        yield self.manifest
+        yield self.tempdir
+        yield self.archive_sha256
 
 
 def build_archive(archive):
@@ -85,6 +104,15 @@ def build_archive(archive):
                     recipients=selected_recipients,
                 )
             manifest["contents"] = build_content_ledger(root)
+            promotion_snapshot = None
+            if compound_capture is not None:
+                manifest = build_outer_manifest(
+                    archive=archive,
+                    capture=compound_capture,
+                    detailed_manifest=manifest,
+                    root=root,
+                )
+                promotion_snapshot = compound_capture.promotion_snapshot()
             _write_json(root / "manifest.json", manifest)
             encrypted = Path(tempdir.name, f"{archive.id}.tar.age")
             plain = Path(tempdir.name, f"{archive.id}.tar")
@@ -105,7 +133,13 @@ def build_archive(archive):
                 stderr=subprocess.PIPE,
             )
             plain.unlink()
-            return encrypted, manifest, tempdir, sha256_file(encrypted)
+            return ArchiveBuildResult(
+                encrypted=encrypted,
+                manifest=manifest,
+                tempdir=tempdir,
+                archive_sha256=sha256_file(encrypted),
+                promotion_snapshot=promotion_snapshot,
+            )
         except (OSError, subprocess.CalledProcessError) as exc:
             raise BackupBuildError(
                 "The age-encrypted archive could not be built."

@@ -87,6 +87,8 @@ GLOBAL_ADMIN_MODELS = {
     "backup.makerspacetenantexitcustodystate",
     "backup.tenantexitcustodyalarmdelivery",
     "tenant_migration.tenantdumpcapture",
+    "backup.b1activationstate", "backup.backupartifactledger",
+    "backup.backupartifactcomponent", "backup.backupcomponentrecipient",
     "encryption.piiglobalwritefence",
     "token_blacklist.blacklistedtoken",
     "token_blacklist.outstandingtoken",

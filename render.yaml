@@ -78,6 +78,10 @@ envVarGroups:
         sync: false
       - key: BACKUP_AGE_RECIPIENT
         sync: false
+      - key: BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY
+        sync: false
+      - key: BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY
+        sync: false
       # NOTE: CELERY_BROKER_URL is NOT defined here - Render `fromService` refs are only
       # honored inside a service's own envVars, not inside an envVarGroup. It is wired
       # directly onto the web + worker services below.

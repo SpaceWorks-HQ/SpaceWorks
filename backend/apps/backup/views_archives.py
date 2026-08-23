@@ -26,7 +26,11 @@ class DeploymentArchiveListCreateView(APIView):
 
     @extend_schema(tags=["Backup"], summary="List full-deployment backup archives", responses={200: BackupArchiveSerializer(many=True), **AUTH_ERRORS})
     def get(self, request):
-        rows = BackupArchive.objects.filter(scope=BackupArchive.Scope.DEPLOYMENT)[:30]
+        rows = BackupArchive.objects.filter(
+            scope=BackupArchive.Scope.DEPLOYMENT
+        ).exclude(
+            status__in=(BackupArchive.Status.PENDING, BackupArchive.Status.RUNNING)
+        )[:30]
         return Response(BackupArchiveSerializer(rows, many=True).data)
 
     @extend_schema(tags=["Backup"], summary="Request an age-encrypted full-deployment backup", request=BackupArchiveCreateSerializer, responses={202: BackupArchiveSerializer, 503: OpenApiResponse(description="The backup worker is unavailable."), **AUTH_ERRORS})
@@ -47,7 +51,11 @@ class MakerspaceArchiveListCreateView(APIView):
     @extend_schema(tags=["Backup"], summary="List makerspace backup archives", responses={200: BackupArchiveSerializer(many=True), 404: NOT_FOUND, **AUTH_ERRORS})
     def get(self, request, makerspace_id):
         makerspace = self._makerspace(request, makerspace_id)
-        rows = BackupArchive.objects.filter(scope=BackupArchive.Scope.MAKERSPACE, makerspace=makerspace)[:30]
+        rows = BackupArchive.objects.filter(
+            scope=BackupArchive.Scope.MAKERSPACE, makerspace=makerspace
+        ).exclude(
+            status__in=(BackupArchive.Status.PENDING, BackupArchive.Status.RUNNING)
+        )[:30]
         return Response(BackupArchiveSerializer(rows, many=True).data)
 
     @extend_schema(tags=["Backup"], summary="Request an age-encrypted makerspace backup", request=BackupArchiveCreateSerializer, responses={202: BackupArchiveSerializer, 404: NOT_FOUND, 503: OpenApiResponse(description="The backup worker is unavailable."), **AUTH_ERRORS})

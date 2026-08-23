@@ -294,6 +294,7 @@ class RestoreRollbackObject(models.Model):
 # Keep the public model import surface stable while the custody outbox lives in its
 # own module; this file is already at the repository's size ceiling.
 from .models_custody_alarm import ArchiveCustodyAlarmDelivery  # noqa: E402,F401
+from .models_artifact_ledger import B1ActivationState, BackupArtifactComponent, BackupArtifactLedger, BackupComponentRecipient  # noqa: E402,F401
 from .models_tenant_exit_custody import (  # noqa: E402,F401
     MakerspaceTenantExitCustodyState,
     TenantExitCustodyAlarmDelivery,
