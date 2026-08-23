@@ -505,6 +505,10 @@ BACKUP_PRESIGN_DRAIN_SECONDS = env.int(
     default=max(EVIDENCE_URL_TTL_SECONDS, PUBLIC_IMAGE_URL_TTL_SECONDS, PRINT_URL_TTL_SECONDS),
 )
 BACKUP_OPS_DIR = env("BACKUP_OPS_DIR", default="/var/lib/spaceworks/ops")
+TENANT_DUMP_STAGING_DIR = env("TENANT_DUMP_STAGING_DIR", default="")
+TENANT_DUMP_STAGING_MAX_AGE_SECONDS = env.int(
+    "TENANT_DUMP_STAGING_MAX_AGE_SECONDS", default=7 * 24 * 60 * 60
+)
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
 CELERY_BEAT_SCHEDULE = {
     "flush-api-client-usage": {
@@ -550,6 +554,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.backup.tasks.deliver_archive_custody_alarms_task",
         "schedule": crontab(hour=1, minute=30),
     },
+    "deliver-tenant-exit-custody-alarms": {
+        "task": "apps.backup.tasks.deliver_tenant_exit_custody_alarms_task",
+        "schedule": crontab(minute=45),
+    },
     "purge-expired-backup-archives": {
         "task": "apps.backup.tasks.purge_expired_backup_archives_task",
         "schedule": crontab(hour=3, minute=55),
@@ -565,6 +573,10 @@ CELERY_BEAT_SCHEDULE = {
     "cleanup-abandoned-tenant-import-objects": {
         "task": "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task",
         "schedule": crontab(minute=35),
+    },
+    "cleanup-refused-tenant-dump-artifacts": {
+        "task": "apps.tenant_migration.tasks.cleanup_refused_tenant_dump_artifacts_task",
+        "schedule": crontab(minute=40),
     },
     "resume-expired-tenant-import-finalizations": {
         "task": "apps.tenant_migration.tasks.resume_expired_finalizing_import_jobs_task",

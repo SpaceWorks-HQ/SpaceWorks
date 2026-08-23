@@ -9,7 +9,7 @@ from types import MappingProxyType
 
 from django.apps import apps
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import connection
+from django.db import connections
 
 from apps.backup.raw_projection import no_decrypt_guard, raw_records
 from apps.data_export.datasets import DATASET_SPECS
@@ -32,10 +32,10 @@ class TenantDumpSourceProjection:
     machine_operator_manifest: tuple[Mapping[str, object], ...]
 
 
-def project_makerspace_source(makerspace_id):
+def project_makerspace_source(makerspace_id, *, using="default"):
     """Read one tenant with the shared raw producer, then prove live-grant closure."""
     validate_catalog()
-    validate_unowned_tables(connection.introspection.table_names())
+    validate_unowned_tables(connections[using].introspection.table_names())
     projected = {}
     with no_decrypt_guard():
         for label, (_path, predicate) in sorted(DATASET_SPECS.items()):
@@ -43,7 +43,7 @@ def project_makerspace_source(makerspace_id):
             if rule.disposition is ModelDisposition.DROP:
                 continue
             model = apps.get_model(label)
-            queryset = model._default_manager.filter(
+            queryset = model._default_manager.using(using).filter(
                 predicate.as_q(makerspace_id)
             ).order_by(model._meta.pk.name)
             records = raw_records(queryset, model)
@@ -59,7 +59,7 @@ def project_makerspace_source(makerspace_id):
         projected["accounts.User"] = tuple(
             MappingProxyType(dict(row))
             for row in raw_records(
-                User._default_manager.filter(pk__in=user_ids).order_by(
+                User._default_manager.using(using).filter(pk__in=user_ids).order_by(
                     User._meta.pk.name
                 ),
                 User,

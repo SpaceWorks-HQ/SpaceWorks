@@ -100,6 +100,9 @@ def _owned_database(name, alias, *, database=None, migrate=False):
     _run([client_binary("createdb", major), name], database=database)
     registered = False
     try:
+        from .tenant_dump_database_cleanup import mark_owned_database
+
+        mark_owned_database(name, database)
         _register_alias(alias, name, database)
         registered = True
         with connections[alias].cursor() as cursor:

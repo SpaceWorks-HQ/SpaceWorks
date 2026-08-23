@@ -60,7 +60,10 @@
   global quarantine `middleware.py` + `route_policy.py`, `recovery.py`, `object_restore.py`,
   `operation_lock.py`, and the privileged host scripts (`scripts/restore.sh`, `scripts/import-backup.sh`)
   that mirror `apps/updates`. Project JWT classes (`accounts/tokens.py`, `token_guard.py`) stamp
-  `auth_generation`.
+  `auth_generation`. `custody.py` is the makerspace-first/recipient-PK serialization boundary;
+  `tenant_exit_custody.py` derives Lane D's independent tenant-only floor, while
+  `tenant_exit_custody_alarms.py` reuses the decision-19b recipient selectors and parameterized durable
+  dispatcher for its retryable outbox.
 - `backend/apps/data_export/` — Space-Manager data export (Phase 4). Per-fidelity (`REDACTED`/`PORTABLE`)
   disposition registry over models, fields, datasets, traversals and the global-user reference closure, with
   **drift guards that refuse an unclassified model or field**. Its `guards._equal(subject, declared,
@@ -82,6 +85,14 @@
   `tenant_dump_sequences.py` owns Lane D's exact empty/non-empty sequence state;
   `tenant_dump_machine_types.py` resolves only fingerprint-identical global built-ins, while
   `tenant_dump_objects.py` packages immutable staged object bytes without live-storage reads;
+  `tenant_dump_capture.py` + `tenant_dump_capture_database.py` freeze the full exported-snapshot database
+  and exact object bytes before `source_gate_release.py` performs the fenced `copy_capture` release;
+  `tenant_dump_staging.py` + `tenant_dump_database_cleanup.py` own marker-guarded crash cleanup;
+  `tenant_dump_cleanup.py` retries refused unpublished-object deletion from its durable capture-row key;
+  `tenant_dump_derivation.py` derives D2 output only from that capture, `tenant_dump_lineage.py` binds its
+  parent/policy digests, and `tenant_dump_publication.py` owns recipient revalidation, refusal cleanup and
+  the atomic pending-to-published/download transition; `tenant_dump_audit_anchors.py` supplies the
+  fail-closed external-anchor absence proof;
   `verification.py` (pre-commit), audit-reference domains behind the `audit_references.py` barrel, and
   `target_cutover.py` (pre-activation + `IMPORTING → ACTIVE`);
   `receipts.py`/`receipt_crypto.py`/`cutover.py` (signed single-use handoff); `views_*.py` (superadmin REST).

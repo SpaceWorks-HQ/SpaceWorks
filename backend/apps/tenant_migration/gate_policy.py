@@ -108,8 +108,15 @@ TASK_EXEMPTIONS = {
         "to resolve recipients but mutates no tenant row, so it cannot disturb a "
         "frozen source."
     ),
+    "apps.backup.tasks.deliver_tenant_exit_custody_alarms_task": (
+        "Lane D custody-alarm delivery writes only deployment-local derived state "
+        "and its recoverable outbox before sending mail."
+    ),
     "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task": "Target-side import retention and recovery.",
     "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task": "Target-side import object rollback does not mutate the frozen source.",
+    "apps.tenant_migration.tasks.cleanup_refused_tenant_dump_artifacts_task": (
+        "Lane D unpublished-byte cleanup mutates only source-deployment coordination state."
+    ),
     "apps.tenant_migration.tasks.resume_expired_finalizing_import_jobs_task": "Target-side import finalization recovery does not mutate the frozen source.",
     "apps.tenant_migration.tasks.run_import_job_task": "Target-side tenant materialization does not mutate the frozen source.",
 }
@@ -182,6 +189,9 @@ LIFECYCLE_EXEMPTIONS = {
 OBJECT_MUTATION_PARTICIPANTS = {
     "apps.data_export.services._fail_job": "Called only by the task-resolved run_export_job lifecycle.",
     "apps.data_export.services._finalize_job": "Called only by the task-resolved run_export_job lifecycle.",
+    "apps.data_export.services.run_export_job": (
+        "The export task resolves and holds the tenant gate for this lifecycle."
+    ),
     "apps.evidence.finalization.finalize_upload": "Reached only through the already-declared handover, return and direct-loan entry points.",
     "apps.events.services_images.remove_image": "Called by the tenant-resolved event image route.",
     "apps.events.services_images.update_image": "Called by the tenant-resolved event image route.",
@@ -197,4 +207,19 @@ OBJECT_MUTATION_PARTICIPANTS = {
     "apps.maintenance.services_documents.finalize_log_document": "Runs inside the model-resolved maintenance document route.",
     "apps.makerspaces.lifecycle_storage._delete_public_image_keys": "Tenant purge is an express source-gate exclusion.",
     "apps.makerspaces.profile_images._swap": "Runs inside the authenticated member profile image route.",
+    "apps.tenant_migration.tenant_dump_cleanup.cleanup_refused_tenant_dump_artifacts": (
+        "Deletes only private Lane D coordination artifacts after a refused run."
+    ),
+    "apps.tenant_migration.tenant_dump_publication._delete_unpublished": (
+        "Post-commit cleanup of a refused Lane D coordination artifact."
+    ),
+    "apps.tenant_migration.tenant_dump_publication._discard_failed_registration": (
+        "Fail-closed cleanup of an unpublished Lane D coordination artifact."
+    ),
+    "apps.tenant_migration.tenant_dump_publication.register_unpublished_artifact": (
+        "Offline Lane D sealing writes only a private publication-staging object."
+    ),
+    "apps.tenant_migration.services_export_job.run_migration_export_job": (
+        "The migration export lifecycle owns source_archive_write while uploading."
+    ),
 }

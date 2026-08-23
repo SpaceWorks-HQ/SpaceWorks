@@ -22,37 +22,54 @@ MAX_ATTEMPTS = 5
 MAX_ROWS_PER_SWEEP = 200
 
 
-def deliver_claimable_rows(*, makerspace_id=None, limit=MAX_ROWS_PER_SWEEP):
+def deliver_claimable_rows(
+    *,
+    makerspace_id=None,
+    limit=MAX_ROWS_PER_SWEEP,
+    delivery_model=ArchiveCustodyAlarmDelivery,
+    state_model=MakerspaceArchiveCustodyState,
+    event="archive_custody_alarm",
+    custody_label="Archive",
+):
     delivered = 0
     for _index in range(limit):
-        claim = _claim_next(makerspace_id=makerspace_id)
+        claim = _claim_next(
+            makerspace_id=makerspace_id,
+            delivery_model=delivery_model,
+        )
         if claim is None:
             break
-        _dispatch_claim(*claim)
+        _dispatch_claim(
+            *claim,
+            delivery_model=delivery_model,
+            state_model=state_model,
+            event=event,
+            custody_label=custody_label,
+        )
         delivered += 1
     return delivered
 
 
-def _claim_next(*, makerspace_id):
+def _claim_next(*, makerspace_id, delivery_model=ArchiveCustodyAlarmDelivery):
     while True:
         now = timezone.now()
         expired_at = now - CLAIM_LEASE
         ready = (
-            Q(status=ArchiveCustodyAlarmDelivery.Status.PENDING)
+            Q(status=delivery_model.Status.PENDING)
             | Q(
-                status=ArchiveCustodyAlarmDelivery.Status.FAILED,
+                status=delivery_model.Status.FAILED,
                 next_attempt_at__lte=now,
             )
             | Q(
-                status=ArchiveCustodyAlarmDelivery.Status.FAILED,
+                status=delivery_model.Status.FAILED,
                 next_attempt_at__isnull=True,
             )
             | Q(
-                status=ArchiveCustodyAlarmDelivery.Status.SENDING,
+                status=delivery_model.Status.SENDING,
                 claimed_at__lt=expired_at,
             )
         )
-        candidates = ArchiveCustodyAlarmDelivery.objects.filter(
+        candidates = delivery_model.objects.filter(
             ready,
             attempts__lt=MAX_ATTEMPTS,
         )
@@ -65,11 +82,11 @@ def _claim_next(*, makerspace_id):
             return None
 
         token = uuid.uuid4()
-        claimed = ArchiveCustodyAlarmDelivery.objects.filter(
+        claimed = delivery_model.objects.filter(
             pk=candidate_id,
             attempts__lt=MAX_ATTEMPTS,
         ).filter(ready).update(
-            status=ArchiveCustodyAlarmDelivery.Status.SENDING,
+            status=delivery_model.Status.SENDING,
             claimed_at=now,
             claim_token=token,
         )
@@ -77,9 +94,17 @@ def _claim_next(*, makerspace_id):
             return candidate_id, token
 
 
-def _dispatch_claim(delivery_id, claim_token):
+def _dispatch_claim(
+    delivery_id,
+    claim_token,
+    *,
+    delivery_model=ArchiveCustodyAlarmDelivery,
+    state_model=MakerspaceArchiveCustodyState,
+    event="archive_custody_alarm",
+    custody_label="Archive",
+):
     delivery = (
-        ArchiveCustodyAlarmDelivery.objects.select_related(
+        delivery_model.objects.select_related(
             "makerspace", "recipient_user"
         )
         .filter(pk=delivery_id, claim_token=claim_token)
@@ -90,10 +115,21 @@ def _dispatch_claim(delivery_id, claim_token):
     email_log = None
     notification = None
     try:
-        if delivery.channel == ArchiveCustodyAlarmDelivery.Channel.TENANT_INAPP:
-            notification = _dispatch_inapp(delivery)
+        if delivery.channel == delivery_model.Channel.TENANT_INAPP:
+            notification = _dispatch_inapp(
+                delivery,
+                state_model=state_model,
+                event=event,
+                custody_label=custody_label,
+            )
         else:
-            email_log = _dispatch_email(delivery)
+            email_log = _dispatch_email(
+                delivery,
+                delivery_model=delivery_model,
+                state_model=state_model,
+                event=event,
+                custody_label=custody_label,
+            )
             if email_log.status != EmailLog.Status.SENT:
                 raise RuntimeError(email_log.error or "email_dispatch_failed")
     except Exception as exc:
@@ -102,14 +138,15 @@ def _dispatch_claim(delivery_id, claim_token):
             claim_token,
             exc,
             email_log=email_log,
+            delivery_model=delivery_model,
         )
         return
 
-    updated = ArchiveCustodyAlarmDelivery.objects.filter(
+    updated = delivery_model.objects.filter(
         pk=delivery.pk,
         claim_token=claim_token,
     ).update(
-        status=ArchiveCustodyAlarmDelivery.Status.SENT,
+        status=delivery_model.Status.SENT,
         claimed_at=None,
         claim_token=None,
         next_attempt_at=None,
@@ -125,11 +162,18 @@ def _dispatch_claim(delivery_id, claim_token):
         )
 
 
-def _dispatch_email(delivery):
+def _dispatch_email(
+    delivery,
+    *,
+    delivery_model=ArchiveCustodyAlarmDelivery,
+    state_model=MakerspaceArchiveCustodyState,
+    event="archive_custody_alarm",
+    custody_label="Archive",
+):
     user = delivery.recipient_user
     if user is None or not user.email.strip():
         raise RuntimeError("custody_alarm_recipient_unavailable")
-    custody_state = MakerspaceArchiveCustodyState.objects.get(
+    custody_state = state_model.objects.get(
         makerspace_id=delivery.makerspace_id
     )
     recipient_count = delivery.makerspace.archive_recipients.filter(
@@ -137,12 +181,13 @@ def _dispatch_email(delivery):
         revoked_at__isnull=True,
         compromised_at__isnull=True,
     ).count()
-    operator = delivery.channel == ArchiveCustodyAlarmDelivery.Channel.OPERATOR_EMAIL
+    operator = delivery.channel == delivery_model.Channel.OPERATOR_EMAIL
     subject, body = alarm_message(
         delivery.makerspace,
         custody_state,
         recipient_count,
         operator=operator,
+        custody_label=custody_label,
     )
     return dispatch_email(
         to_email=user.email,
@@ -150,17 +195,25 @@ def _dispatch_email(delivery):
         text_body=body,
         makerspace=None if operator else delivery.makerspace,
         stream="backup",
-        event="archive_custody_alarm",
+        event=event,
         audience="operator" if operator else "staff",
         connection="platform" if operator else "makerspace",
         sync=True,
     )
 
 
-def _dispatch_inapp(delivery):
+def _dispatch_inapp(
+    delivery,
+    *,
+    state_model=MakerspaceArchiveCustodyState,
+    event="archive_custody_alarm",
+    custody_label="Archive",
+):
     if not module_enabled(delivery.makerspace, "notifications"):
         raise RuntimeError("notifications_module_unavailable")
-    custody_state = MakerspaceArchiveCustodyState.objects.get(
+    from apps.tenant_migration.gate_runtime import boundary_tenant_write
+
+    custody_state = state_model.objects.get(
         makerspace_id=delivery.makerspace_id
     )
     recipient_count = delivery.makerspace.archive_recipients.filter(
@@ -173,28 +226,37 @@ def _dispatch_inapp(delivery):
         custody_state,
         recipient_count,
         operator=False,
+        custody_label=custody_label,
     )
-    return Notification.objects.create(
-        makerspace=delivery.makerspace,
-        level=Notification.Level.CRITICAL,
-        event="archive_custody_alarm",
-        title=title,
-        body=body,
-    )
+    with boundary_tenant_write(delivery.makerspace_id):
+        return Notification.objects.create(
+            makerspace=delivery.makerspace,
+            level=Notification.Level.CRITICAL,
+            event=event,
+            title=title,
+            body=body,
+        )
 
 
-def _record_failure(delivery, claim_token, exc, *, email_log):
+def _record_failure(
+    delivery,
+    claim_token,
+    exc,
+    *,
+    email_log,
+    delivery_model=ArchiveCustodyAlarmDelivery,
+):
     attempts = delivery.attempts + 1
     exhausted = attempts >= MAX_ATTEMPTS
     error = sanitize_email_error(exc)[:200] or type(exc).__name__
-    updated = ArchiveCustodyAlarmDelivery.objects.filter(
+    updated = delivery_model.objects.filter(
         pk=delivery.pk,
         claim_token=claim_token,
     ).update(
         status=(
-            ArchiveCustodyAlarmDelivery.Status.EXHAUSTED
+            delivery_model.Status.EXHAUSTED
             if exhausted
-            else ArchiveCustodyAlarmDelivery.Status.FAILED
+            else delivery_model.Status.FAILED
         ),
         attempts=F("attempts") + 1,
         claimed_at=None,

@@ -17,16 +17,10 @@ def selection_for(archive) -> list[dict]:
     if archive.scope == BackupArchive.Scope.DEPLOYMENT:
         return [_platform_recipient()]
 
-    selected = list(
-        MakerspaceArchiveRecipient.objects.filter(
-            makerspace_id=archive.makerspace_id,
-            revoked_at__isnull=True,
-            compromised_at__isnull=True,
-            verified_at__isnull=False,
-        )
-        .order_by("pk")
-        .values("label", "public_recipient")
-    )
+    selected = [
+        {"label": row["label"], "public_recipient": row["public_recipient"]}
+        for row in effective_tenant_recipients(archive.makerspace_id)
+    ]
     if _superadmin_access_decision(archive):
         selected.append(_platform_recipient())
     if not selected:
@@ -34,6 +28,20 @@ def selection_for(archive) -> list[dict]:
             "No verified archive recipient is available for this makerspace."
         )
     return selected
+
+
+def effective_tenant_recipients(makerspace_id):
+    """Return the deterministic native-recipient rows covered by the custody lock."""
+    return tuple(
+        MakerspaceArchiveRecipient.objects.filter(
+            makerspace_id=makerspace_id,
+            revoked_at__isnull=True,
+            compromised_at__isnull=True,
+            verified_at__isnull=False,
+        )
+        .order_by("pk")
+        .values("pk", "label", "public_recipient", "fingerprint")
+    )
 
 
 def _platform_recipient():

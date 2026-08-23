@@ -31,6 +31,11 @@ class DownloadTokenError(RuntimeError):
     pass
 
 
+def superadmin_access_decision(makerspace):
+    """Return the request-time decision from an already locked makerspace row."""
+    return makerspace.superadmin_access_enabled
+
+
 def create_archive(actor, *, scope, makerspace=None):
     if scope == BackupArchive.Scope.DEPLOYMENT and makerspace is not None:
         raise ValidationError("A deployment archive cannot be scoped to a makerspace.")
@@ -41,7 +46,7 @@ def create_archive(actor, *, scope, makerspace=None):
         superadmin_access_at_decision = None
         if scope == BackupArchive.Scope.MAKERSPACE:
             makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
-            superadmin_access_at_decision = makerspace.superadmin_access_enabled
+            superadmin_access_at_decision = superadmin_access_decision(makerspace)
         retention_days = PlatformBackupSettings.load().retention_days
         archive = BackupArchive.objects.create(
             id=archive_id,

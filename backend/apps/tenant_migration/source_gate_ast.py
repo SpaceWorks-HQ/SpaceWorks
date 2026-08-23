@@ -11,7 +11,7 @@ APPS_DIR = Path(apps.__file__).resolve().parent
 OBJECT_MUTATION_NAMES = frozenset({
     "copy_object", "delete_archive", "delete_object", "delete_staged_file", "finalize_file",
     "finalize_receipt_upload", "finalize_upload", "presigned_upload",
-    "put_bytes", "release_public_image_on_commit",
+    "put_bytes", "release_public_image_on_commit", "upload_archive",
 })
 
 

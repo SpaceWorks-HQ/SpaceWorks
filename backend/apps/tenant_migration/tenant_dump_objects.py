@@ -18,7 +18,9 @@ def package_staged_objects(staging_root, bundle_root, entries):
         bucket_kind = entry["bucket_kind"]
         if bucket_kind not in _BUCKET_DIRECTORIES:
             raise TenantDumpVerificationError("Unknown Lane D object bucket kind.")
-        original_key = entry.get("original_key", entry.get("source_key"))
+        original_key = entry.get(
+            "original_key", entry.get("source_key", entry.get("key"))
+        )
         if not isinstance(original_key, str) or not original_key:
             raise TenantDumpVerificationError("Lane D object is missing its original key.")
         opaque = hashlib.sha256(original_key.encode("utf-8")).hexdigest()

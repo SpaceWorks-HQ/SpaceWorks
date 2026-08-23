@@ -75,6 +75,11 @@ SCHEDULED_TASKS = (
         24 * 60,
     ),
     (
+        "deliver-tenant-exit-custody-alarms",
+        "apps.backup.tasks.deliver_tenant_exit_custody_alarms_task",
+        60,
+    ),
+    (
         "purge-expired-backup-archives",
         "apps.backup.tasks.purge_expired_backup_archives_task",
         24 * 60,
@@ -92,6 +97,11 @@ SCHEDULED_TASKS = (
     (
         "cleanup-abandoned-tenant-import-objects",
         "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task",
+        60,
+    ),
+    (
+        "cleanup-refused-tenant-dump-artifacts",
+        "apps.tenant_migration.tasks.cleanup_refused_tenant_dump_artifacts_task",
         60,
     ),
     (
