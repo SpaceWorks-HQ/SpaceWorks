@@ -3,7 +3,11 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.models import User
-from apps.backup.custody import RECIPIENT_FLOOR, with_makerspace_custody_lock
+from apps.backup.activation import (
+    ActivationRecipientFloorError,
+    set_superadmin_access,
+)
+from apps.backup.custody import with_makerspace_custody_lock
 from apps.integrations.email import platform_email_configured
 from apps.makerspaces import domain_verification
 from apps.makerspaces.models import (
@@ -57,11 +61,12 @@ class MakerspaceMutationMixin:
             old_domain = locked.frontend_domain
             actor = self.context["request"].user
             is_superadmin = actor.is_superuser or actor.role == User.Role.SUPERADMIN
-            if new_flag is not None and new_flag != locked.superadmin_access_enabled:
-                self._validate_access_change(
-                    custody, locked, new_flag, is_superadmin
-                )
-                locked.superadmin_access_enabled = new_flag
+            access_changes = (
+                new_flag is not None
+                and new_flag != locked.superadmin_access_enabled
+            )
+            if access_changes:
+                self._validate_access_change(locked, new_flag, is_superadmin)
             for field, value in validated_data.items():
                 setattr(locked, field, value)
             if (
@@ -86,9 +91,20 @@ class MakerspaceMutationMixin:
             if discord_webhook_url is not missing:
                 locked.set_discord_webhook_url(discord_webhook_url)
             locked.save()
+            if access_changes:
+                try:
+                    set_superadmin_access(
+                        custody,
+                        enabled=new_flag,
+                        actor=actor,
+                    )
+                except ActivationRecipientFloorError as exc:
+                    raise serializers.ValidationError(
+                        {"superadmin_access_enabled": _DISABLE_ACCESS_SEQUENCE}
+                    ) from exc
             return locked
 
-    def _validate_access_change(self, custody, locked, new_flag, is_superadmin):
+    def _validate_access_change(self, locked, new_flag, is_superadmin):
         if new_flag is True and is_superadmin:
             raise serializers.ValidationError(
                 {
@@ -123,10 +139,6 @@ class MakerspaceMutationMixin:
                         "so password recovery remains possible."
                     )
                 }
-            )
-        if custody.verified_recipient_count() < RECIPIENT_FLOOR:
-            raise serializers.ValidationError(
-                {"superadmin_access_enabled": _DISABLE_ACCESS_SEQUENCE}
             )
 
     @staticmethod

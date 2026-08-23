@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from apps.backup.activation_integrity import state_matches_flag
 from apps.backup.models import (
     B1ActivationState,
     BackupArtifactLedger,
@@ -39,6 +40,15 @@ def frozen_population():
     )
     if set(activations) != {item[0] for item in makerspaces}:
         raise BackupBuildError("The Lane E activation-state population is incomplete.")
+    divergent = [
+        makerspace_id
+        for makerspace_id, access_enabled in makerspaces
+        if not state_matches_flag(access_enabled, activations[makerspace_id])
+    ]
+    if divergent:
+        raise BackupBuildError(
+            "The Lane E access flag and activation state diverge."
+        )
     return tuple({
         "makerspace_id": makerspace_id,
         "superadmin_access_enabled": access_enabled,

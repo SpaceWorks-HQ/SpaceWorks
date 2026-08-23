@@ -1851,6 +1851,29 @@ available with leftover staging retries cleanup only. Staging is deleted after p
 cleanup failure never demotes a verified final. A failed newer run may set `last_error`, but must preserve
 the prior artifact and `last_success_at`.
 
+**Lane E activation is one switch over two state machines (E6, 2026-08-23).**
+`Makerspace.superadmin_access_enabled` is live platform authority;
+`B1ActivationState.state` is the deployment-archive guarantee (`on`, `off_pending`, `off_effective`). They
+must satisfy `flag=on ⇔ state=on` and `flag=off ⇔ state∈{off_pending,off_effective}`. Raw writes to either
+surface are forbidden. `backup/activation.py::set_superadmin_access` is the sole switch writer: under Part
+A's makerspace-first custody lock it locks recipients in PK order and the activation row next, then commits
+the flag, activation transition and `makerspace.superadmin_access_changed` audit together. Its committed
+event is scheduled with `transaction.on_commit(..., robust=True)`, so outbound consumers cannot run under
+the lock or roll back the switch. The deployment check `backup.E001`/`backup.E002` and
+`repair_b1_activation_state` independently detect missing rows and both directions of cross-table
+divergence; applied repairs require an accountable active superuser and audit every repaired row.
+
+The only switch-off transition is `on → off_pending`, after the two-recipient admission floor; it never
+claims effective exclusion. The only `off_pending → off_effective` writer remains E5's
+`promotion.promote_verified_artifact()` transaction, and it advances sovereign IDs only after the whole
+compound artifact is verified and available. Failed, historical or partially valid runs do not advance it.
+`off_effective → off_pending` is forbidden. Either off state may return to `on` through the authorized
+re-enable switch; this clears only the current activation pointer, while prior ciphertext, durable component
+recipient associations and recipient lifecycle facts remain unchanged. Capture and promotion both refuse
+flag/state divergence even if the deployment check was skipped. Rollout is deliberately conservative:
+existing flag-on rows seed `on`, existing flag-off rows seed `off_pending` regardless of recipient count or
+historical artifacts, and migration 0013 asserts one activation row for every retained makerspace.
+
 **The PostgreSQL client major must equal the server major for anything that dumps or restores THIS
 deployment**, and `apps/backup/postgres_client.py` is the only place that resolves those binaries. The
 image ships two client majors on purpose: `pg_dump` must be at least as new as any *source* server tenant
