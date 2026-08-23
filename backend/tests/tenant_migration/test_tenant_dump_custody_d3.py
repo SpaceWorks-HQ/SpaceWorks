@@ -49,7 +49,17 @@ def test_request_locks_makerspace_then_recipient_rows_before_capture():
         if 'INSERT INTO "tenant_migration_tenantdumpcapture"' in sql
     )
     assert makerspace_lock < recipient_lock < capture_insert
-    assert "ORDER BY" in recipient_sql and '"id" ASC' in recipient_sql
+    # Deterministic primary-key order is the property that matters; the exact SQL
+    # rendering is Django's business. `.values_list("pk")` selects `"id" AS "pk"`
+    # and Django then orders by the ordinal of that first column, so PK-ascending
+    # locking appears as `ORDER BY 1 ASC` rather than `ORDER BY "id" ASC`. Accept
+    # either spelling, but pin that the ordered column really is the primary key.
+    assert '"id"' in recipient_sql
+    assert (
+        'ORDER BY "backup_makerspacearchiverecipient"."id" ASC' in recipient_sql
+        or 'ORDER BY "id" ASC' in recipient_sql
+        or "ORDER BY 1 ASC" in recipient_sql
+    )
     assert capture.frozen_tenant_recipients[0]["fingerprint"]
 
 

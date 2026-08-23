@@ -32,13 +32,13 @@ SUPPORTED_STATUSES = frozenset(MakerspaceEncryptionKey.Status.values)
 SUPPORTED_BACKENDS = frozenset(MakerspaceEncryptionKey.BrokerBackend.values)
 
 
-def enumerate_staged_deks(makerspace_id):
+def enumerate_staged_deks(makerspace_id, *, using="default"):
     """Freeze exact raw key rows while the caller owns the snapshot transaction."""
     fields = (
         "pk", "makerspace_id", "version", "status", "broker_backend",
         "broker_key_id", "wrapped_dek",
     )
-    rows = MakerspaceEncryptionKey._base_manager.filter(
+    rows = MakerspaceEncryptionKey._base_manager.using(using).filter(
         makerspace_id=makerspace_id
     ).order_by("pk").values_list(*fields)
     result = []
@@ -66,7 +66,7 @@ def seal_staged_deks(staged_rows, recipients, root):
         raise BackupBuildError("W8 accepts only an immutable staged enumeration.")
     staged = staged_rows
     recipients = tuple(recipients)
-    _validate_staging(staged)
+    validate_staged_deks(staged)
     if not recipients or len(set(recipients)) != len(recipients):
         raise BackupBuildError("W8 requires one non-empty frozen recipient set.")
     root = Path(root)
@@ -150,7 +150,8 @@ def _sealed_record(row, path):
     }
 
 
-def _validate_staging(staged):
+def validate_staged_deks(staged):
+    """Validate immutable source-key identity and wrapped-byte integrity."""
     identities = set()
     versions = set()
     for row in staged:
@@ -183,7 +184,7 @@ def _validate_staging(staged):
 def verify_sealed_dek_inventory(staged_rows, sealed_rows, root):
     """Prove exact row equality and immutable ciphertext bytes before slice sealing."""
     staged = tuple(staged_rows)
-    _validate_staging(staged)
+    validate_staged_deks(staged)
     expected = {_identity(row): row for row in staged}
     actual = {}
     for record in sealed_rows:

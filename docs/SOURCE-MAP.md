@@ -93,10 +93,17 @@
   and exact object bytes before `source_gate_release.py` performs the fenced `copy_capture` release;
   `tenant_dump_staging.py` + `tenant_dump_database_cleanup.py` own marker-guarded crash cleanup;
   `tenant_dump_cleanup.py` retries refused unpublished-object deletion from its durable capture-row key;
-  `tenant_dump_derivation.py` derives D2 output only from that capture, `tenant_dump_lineage.py` binds its
-  parent/policy digests, and `tenant_dump_publication.py` owns recipient revalidation, refusal cleanup and
-  the atomic pending-to-published/download transition; `tenant_dump_audit_anchors.py` supplies the
-  fail-closed external-anchor absence proof;
+  `tenant_dump_derivation.py` derives and seals output only from that capture;
+  `tenant_dump_pii.py` binds raw mapped-column mode findings and ciphertext AAD identities;
+  `tenant_dump_key_inventory.py` freezes and exact-set checks source-broker key facts, while
+  `tenant_dump_dek_protocol.py`/`tenant_dump_dek_helper.py`/`tenant_dump_deks.py` keep plaintext DEKs inside
+  the bounded child operation and emit only the tenant-recipient ciphertext;
+  `tenant_dump_recipients.py` keeps `outer_recipients` and `tenant_dek_recipients` distinct, and
+  `tenant_dump_envelope.py` owns the declared key-member presence/absence ledger plus streaming outer seal;
+  `tenant_dump_manifest.py` and `tenant_dump_lineage.py` bind D4 custody facts and parent/policy digests;
+  `tenant_dump_publication.py` owns recipient revalidation, refusal cleanup and the atomic
+  pending-to-published/download transition; `tenant_dump_audit_anchors.py` supplies the fail-closed
+  external-anchor absence proof;
   `verification.py` (pre-commit), audit-reference domains behind the `audit_references.py` barrel, and
   `target_cutover.py` (pre-activation + `IMPORTING → ACTIVE`);
   `receipts.py`/`receipt_crypto.py`/`cutover.py` (signed single-use handoff); `views_*.py` (superadmin REST).

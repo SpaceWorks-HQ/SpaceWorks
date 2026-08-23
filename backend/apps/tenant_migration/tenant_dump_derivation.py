@@ -7,7 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.audit import services as audit
-from apps.backup.digests import build_content_ledger, sha256_file
+from apps.backup.digests import sha256_file
 
 from .models import TenantDumpCapture
 from .tenant_dump_builder import build_tenant_dump
@@ -16,13 +16,27 @@ from .tenant_dump_database import (
     empty_verification_database,
     restore_scratch_dump,
 )
+from .tenant_dump_deks import seal_tenant_deks
+from .tenant_dump_envelope import (
+    TENANT_DEKS_MEMBER,
+    build_tenant_content_ledger,
+    seal_outer_bundle,
+)
 from .tenant_dump_errors import TenantDumpBuildError, TenantDumpVerificationError
+from .tenant_dump_key_inventory import (
+    enumerate_immutable_source_keys,
+    manifest_key_inventory,
+    retained_key_rows,
+)
 from .tenant_dump_lineage import (
     FORMAT,
     canonical_digest,
     derivation_policy_digest,
 )
 from .tenant_dump_objects import package_staged_objects
+from .tenant_dump_pii import ENCRYPTED, scan_mapped_pii, source_pii_mode
+from .tenant_dump_publication import revalidate_before_encryption
+from .tenant_dump_recipients import recipient_sets
 from .tenant_dump_source_projection import project_makerspace_source
 from .tenant_dump_staging import require_owned_root
 
@@ -32,6 +46,7 @@ def derive_tenant_dump(capture_id, *, database=None):
     root = require_owned_root(capture.pk)
     source_image = root / "database.source.dump"
     bundle = root / "derived"
+    artifact = root / "tenant-dump.tar.age"
     try:
         _verify_capture_bytes(capture, source_image)
         if bundle.exists():
@@ -47,29 +62,64 @@ def derive_tenant_dump(capture_id, *, database=None):
                 capture.source_makerspace_id,
                 using=using,
             )
+            pii_mode = source_pii_mode(capture.source_encryption_mode)
+            pii_findings = scan_mapped_pii(projection.rows, pii_mode)
+            source_key_rows = enumerate_immutable_source_keys(
+                capture.source_makerspace_id,
+                using=using,
+            )
+            retained_keys = retained_key_rows(source_key_rows, mode=pii_mode)
         build = build_tenant_dump(
             projection,
             bundle / "database.dump",
             run_id=capture.pk,
+            source_pii_mode=pii_mode,
             database=database,
         )
         objects = package_staged_objects(root, bundle, capture.object_ledger)
+        key_envelope = None
+        if pii_mode == ENCRYPTED:
+            frozen = revalidate_before_encryption(capture.pk, stage="inner")
+            recipients = recipient_sets(capture, frozen)
+            key_envelope = seal_tenant_deks(
+                source_key_rows,
+                retained_keys,
+                recipients.tenant_dek_recipients,
+                bundle / TENANT_DEKS_MEMBER,
+            )
         policy_digest = derivation_policy_digest(
             source_encryption_mode=capture.source_encryption_mode
         )
-        manifest = _manifest(capture, build, objects, projection, policy_digest)
-        manifest["contents"] = build_content_ledger(bundle)
+        manifest = _manifest(
+            capture,
+            build,
+            objects,
+            projection,
+            policy_digest,
+            pii_mode=pii_mode,
+            pii_findings=pii_findings,
+            retained_keys=retained_keys,
+            key_envelope=key_envelope,
+        )
+        manifest["contents"] = build_tenant_content_ledger(
+            bundle, source_pii_mode=pii_mode
+        )
         manifest_path = bundle / "manifest.json"
         manifest_path.write_text(
             json.dumps(manifest, sort_keys=True, separators=(",", ":")),
             encoding="utf-8",
         )
         manifest_path.chmod(0o600)
+        frozen = revalidate_before_encryption(capture.pk, stage="outer")
+        recipients = recipient_sets(capture, frozen)
+        seal_outer_bundle(bundle, artifact, recipients.outer_recipients)
+        shutil.rmtree(bundle)
         _complete_derivation(capture.pk, manifest, policy_digest)
-        return bundle, manifest
+        return artifact, manifest
     except Exception as exc:
         if bundle.exists():
             shutil.rmtree(bundle)
+        artifact.unlink(missing_ok=True)
         _fail_derivation(capture.pk, exc)
         raise
 
@@ -93,10 +143,22 @@ def _verify_capture_bytes(capture, source_image):
         raise TenantDumpVerificationError("The immutable object ledger digest changed.")
 
 
-def _manifest(capture, build, objects, projection, policy_digest):
+def _manifest(
+    capture,
+    build,
+    objects,
+    projection,
+    policy_digest,
+    *,
+    pii_mode,
+    pii_findings,
+    retained_keys,
+    key_envelope,
+):
     return {
         "format": FORMAT,
         "capture_id": str(capture.pk),
+        "source_pii_mode": pii_mode,
         "source": {
             "deployment_identity": capture.source_deployment_identity,
             "makerspace_id": capture.source_makerspace_id,
@@ -111,6 +173,7 @@ def _manifest(capture, build, objects, projection, policy_digest):
             "database_snapshot_at": capture.database_snapshot_at.isoformat(),
             "postgres_major": capture.source_postgres_major,
             "encryption_mode": capture.source_encryption_mode,
+            "source_pii_mode": pii_mode,
             "catalog_digest": capture.catalog_digest,
             "capture_completed_at": capture.capture_completed_at.isoformat(),
         },
@@ -125,6 +188,15 @@ def _manifest(capture, build, objects, projection, policy_digest):
             "sequence_state": build.sequence_state,
         },
         "objects": list(objects),
+        "encryption": {
+            "source_pii_mode": pii_mode,
+            "mapped_column_findings": pii_findings.as_manifest(),
+            "retained_key_inventory": manifest_key_inventory(retained_keys),
+            "tenant_dek_envelope": key_envelope or {
+                "path": TENANT_DEKS_MEMBER,
+                "present": False,
+            },
+        },
         "machine_operator_manifest": list(projection.machine_operator_manifest),
     }
 

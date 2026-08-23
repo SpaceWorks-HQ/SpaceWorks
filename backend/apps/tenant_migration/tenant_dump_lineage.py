@@ -5,10 +5,11 @@ import json
 
 from .tenant_dump_catalog import CATALOG_SCHEMA_SHA256
 from .tenant_dump_errors import TenantDumpVerificationError
+from .tenant_dump_manifest import verify_envelope_custody_manifest
 
 
 FORMAT = "spaceworks-tenant-dump-v1"
-DERIVATION_POLICY_VERSION = 1
+DERIVATION_POLICY_VERSION = 2
 
 
 def canonical_digest(value):
@@ -71,4 +72,5 @@ def verify_artifact_lineage(capture, manifest):
     forbidden = {"companion_slice", "companion_slice_id", "lossless_slice"}
     if forbidden & set(manifest):
         raise TenantDumpVerificationError("A tenant-exit artifact cannot name a companion slice.")
+    verify_envelope_custody_manifest(capture, manifest)
     return True
