@@ -208,6 +208,11 @@ if ! grep -q '^BACKUP_AGE_RECIPIENT=' .env; then
   printf '\nBACKUP_AGE_RECIPIENT=%s\n' "$BACKUP_RECIPIENT" >> .env
   "${COMPOSE[@]}" up -d
 fi
+if ! grep -q '^BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY=' .env; then
+  SIGNING_PAIR="$("${COMPOSE[@]}" exec -T backend python -c 'from apps.ed25519 import encode_key,generate_keypair; p,q=generate_keypair(); print(encode_key(p)); print(encode_key(q))' | tr -d '\r')"
+  printf '\nBACKUP_ARCHIVE_SIGNING_PRIVATE_KEY=%s\nBACKUP_ARCHIVE_VERIFY_PUBLIC_KEY=%s\n' "$(printf '%s\n' "$SIGNING_PAIR" | sed -n '1p')" "$(printf '%s\n' "$SIGNING_PAIR" | sed -n '2p')" >> .env
+  "${COMPOSE[@]}" up -d
+fi
 
 say "Waiting for the app to be ready..."
 ready=0

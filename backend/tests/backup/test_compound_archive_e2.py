@@ -87,9 +87,8 @@ def _prepare_build(monkeypatch, settings, markers):
 
     def tenant_payload(makerspace_id, root):
         root.mkdir(parents=True)
-        (root / "payload.json").write_text(
-            markers[makerspace_id], encoding="utf-8"
-        )
+        (root / "payload.json").write_text(markers[makerspace_id], encoding="utf-8")
+        (root / "global_user_references.json").write_text("[]", encoding="utf-8")
         return {"private": {}, "public_image": {}}
 
     monkeypatch.setattr(archive_payload, "_tenant_payload", tenant_payload)

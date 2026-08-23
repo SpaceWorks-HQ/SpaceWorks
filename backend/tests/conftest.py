@@ -2,6 +2,7 @@
 
 import pytest
 from cryptography.fernet import Fernet
+from apps.ed25519 import encode_key, generate_keypair
 from django.core.cache import cache
 from django.db import connection
 
@@ -13,6 +14,9 @@ _TEST_AUDIT_MAC_MASTER_KEY = (
     os.environ.get("AUDIT_MAC_MASTER_KEY")
     or Fernet.generate_key().decode("ascii")
 )
+_TEST_BACKUP_PRIVATE_RAW, _TEST_BACKUP_PUBLIC_RAW = generate_keypair()
+_TEST_BACKUP_PRIVATE_KEY = encode_key(_TEST_BACKUP_PRIVATE_RAW)
+_TEST_BACKUP_PUBLIC_KEY = encode_key(_TEST_BACKUP_PUBLIC_RAW)
 
 
 @pytest.fixture(autouse=True)
@@ -20,11 +24,15 @@ def disable_axes_by_default(settings, request):
     settings.AXES_ENABLED = False
     settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.AUDIT_MAC_MASTER_KEY = _TEST_AUDIT_MAC_MASTER_KEY
+    settings.BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY = _TEST_BACKUP_PRIVATE_KEY
+    settings.BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY = _TEST_BACKUP_PUBLIC_KEY
     _reset_axes_state(request)
     yield
     settings.AXES_ENABLED = False
     settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.AUDIT_MAC_MASTER_KEY = _TEST_AUDIT_MAC_MASTER_KEY
+    settings.BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY = _TEST_BACKUP_PRIVATE_KEY
+    settings.BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY = _TEST_BACKUP_PUBLIC_KEY
     _reset_axes_state(request)
 
 

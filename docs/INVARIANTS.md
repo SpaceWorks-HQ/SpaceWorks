@@ -1815,6 +1815,42 @@ the complete frozen tenant-recipient set. Plaintext DEKs never enter a manifest,
 argv, log, exception or database row. Missing, duplicate, extra, unsupported or digest-substituted rows and
 any sealed-inventory or ciphertext-ledger mismatch fail the slice before outer sealing.
 
+**Lane E promotion is a signed, staged, durable protocol (E5, 2026-08-23).** The readable outer manifest
+is an allowlist: capture/build identity, frozen retained/readable/sovereign ID sets, opaque component facts,
+component-level object/content ledger digests and counts, reservation/fence facts, not-restored seeds and
+the versioned length-framed `user_closure_digest`. Raw identity tuples remain inside sealed slices. Raw
+rows, object keys, low-entropy unique values, boundary endpoints, W8 payloads and inverse deltas must never
+be added to that manifest. Its Ed25519 signature binds canonical manifest bytes plus the component ledger;
+the artifact carries only the signer fingerprint and signature, never a public or private signing key.
+Verification trusts `BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY` from the host channel, while the producer alone gets
+`BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY`. A manifest-provided key can never authenticate itself.
+
+`BackupArtifactLedger`, `BackupArtifactComponent` and `BackupComponentRecipient` outlive the optional
+`BackupArchive` row. Artifact/component identity facts are immutable, transitions are database-guarded,
+component-recipient associations are unique and recipient-use history is tombstoned when managed bytes are
+deleted. Do not fold this state back into `BackupArchive`: byte retention may delete that convenience row,
+but reconciliation and recipient history must survive it. `B1ActivationState` is seeded here only because
+promotion must atomically advance captured `off_pending` rows; the general switch transition service remains
+Lane E E6 work.
+
+**A deployment artifact is never uploaded directly to its advertised key.** The server uploads to the
+artifact-unique staging locator, streams it back for size plus SHA-256, conditionally creates the immutable
+final locator with `If-None-Match: *`, and streams the final object back too. HEAD and ETag are not integrity
+proofs. No makerspace, recipient, activation or artifact row lock may be held during those remote steps.
+Only then may `promotion.promote_verified_artifact()` run its one short no-I/O transaction, in this lock
+order: frozen makerspaces by ID; recipient rows by PK; activation rows; artifact rows; components;
+recipient associations; `BackupArchive`; `PlatformBackupSettings`. That transaction revalidates the full
+frozen population, access/activation/custody and exact valid recipient sets, signed identities/digests,
+durable associations, final verification facts and predecessor success state. Availability, eligible
+activation, all success audits (including the exact manifest `user_closure_digest`) and `last_success_at`
+commit or roll back together.
+
+The initial runner and `reconcile_backup_artifacts_task` call the same promotion primitive. Pending with
+staging resumes final creation; pending with final bytes stream-verifies and enters the same transaction;
+available with leftover staging retries cleanup only. Staging is deleted after promotion commit, and a
+cleanup failure never demotes a verified final. A failed newer run may set `last_error`, but must preserve
+the prior artifact and `last_success_at`.
+
 **The PostgreSQL client major must equal the server major for anything that dumps or restores THIS
 deployment**, and `apps/backup/postgres_client.py` is the only place that resolves those binaries. The
 image ships two client majors on purpose: `pg_dump` must be at least as new as any *source* server tenant

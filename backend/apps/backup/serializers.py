@@ -59,7 +59,10 @@ class RestoreOperationSerializer(serializers.ModelSerializer):
 
 class RestoreCreateSerializer(serializers.Serializer):
     archive = serializers.PrimaryKeyRelatedField(
-        queryset=BackupArchive.objects.filter(scope=BackupArchive.Scope.DEPLOYMENT)
+        queryset=BackupArchive.objects.filter(
+            scope=BackupArchive.Scope.DEPLOYMENT,
+            status=BackupArchive.Status.AVAILABLE,
+        )
     )
     kind = serializers.ChoiceField(choices=RestoreOperation.Kind.choices)
 

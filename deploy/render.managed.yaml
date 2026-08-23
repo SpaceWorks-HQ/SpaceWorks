@@ -123,6 +123,10 @@ envVarGroups:
         sync: false
       - key: BACKUP_AGE_RECIPIENT
         sync: false
+      - key: BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY
+        sync: false
+      - key: BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY
+        sync: false
       - key: PUBLIC_APP_BASE_URL
         sync: false
       - key: TELEGRAM_BOT_TOKEN
