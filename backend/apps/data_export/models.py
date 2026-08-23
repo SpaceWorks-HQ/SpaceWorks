@@ -197,6 +197,7 @@ OMITTED_MODELS = {
     "tenant_migration.SourceMigrationGate": (
         "Source-deployment coordination state must not travel inside a tenant archive."
     ),
+    "tenant_migration.TenantDumpCapture": "Source capture, lineage, publication, and download coordination state.",
     "payments.PlatformStripeConnectSettings": "Platform payment credentials.",
     "payments.ProcessedStripeEvent": "Provider idempotency telemetry.",
     "payments.StripeConnectOAuthState": "Transient OAuth state.",
@@ -216,6 +217,8 @@ OMITTED_MODELS = {
     "backup.ArchiveCustodyAlarmDelivery": (
         "Deployment-local custody-alarm delivery and retry state."
     ),
+    "backup.MakerspaceTenantExitCustodyState": "Deployment-local Lane D custody state, independently recomputed from recipients.",
+    "backup.TenantExitCustodyAlarmDelivery": "Deployment-local Lane D custody alarm delivery and retry state.",
     "backup.BackupLease": "Deployment scheduler lease.",
     "backup.B1ActivationState": "Deployment-local Lane E activation state.",
     "backup.BackupArtifactLedger": "Durable deployment backup artifact operations.",

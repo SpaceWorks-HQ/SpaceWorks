@@ -32,6 +32,10 @@ NON_OBJECT_KEY_FIELDS = frozenset({
     ("tenant_migration.DeploymentSigningKey", "public_key"),
     ("tenant_migration.MigrationPairing", "source_public_key"),
     ("tenant_migration.MigrationPairing", "target_public_key"),
+    # Transient staging locator for an exit artifact that was never published.
+    # The bytes are deleted on refusal and renamed on publication, so a captured
+    # copy would restore as a pointer to something that must not exist.
+    ("tenant_migration.TenantDumpCapture", "unpublished_object_key"),
     ("tenant_migration.TenantImportObject", "source_key"),
     ("tenant_migration.TenantImportObject", "staging_key"),
     ("tenant_migration.TenantImportObject", "target_key"),

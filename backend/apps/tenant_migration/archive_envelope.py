@@ -1,4 +1,8 @@
-"""Build a tenant migration tar stream directly inside an age envelope."""
+"""Build the obsolete ``spaceworks-tenant-migration-v1`` envelope.
+
+Lane D must never call this module: its legacy payload places plaintext DEKs inside
+the outer envelope. ``spaceworks-tenant-dump-v1`` uses the tenant_dump_* D4 modules.
+"""
 
 import base64
 import io

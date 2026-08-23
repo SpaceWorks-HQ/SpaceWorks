@@ -1,5 +1,7 @@
 """Single-writer scheduled construction and external anchoring of audit batches."""
 
+from contextlib import contextmanager
+
 from django.db import connection, transaction
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
@@ -49,6 +51,22 @@ def _scope_lock(makerspace_id):
             "SELECT pg_advisory_xact_lock(%s, %s)",
             [LOCK_NAMESPACE, int(makerspace_id or 0)],
         )
+
+
+@contextmanager
+def scope_session_lock(makerspace_id):
+    """Serialize external anchor I/O without holding a database transaction."""
+    key = int(makerspace_id or 0)
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_lock(%s, %s)", [LOCK_NAMESPACE, key])
+    try:
+        yield
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_unlock(%s, %s)",
+                [LOCK_NAMESPACE, key],
+            )
 
 
 def _ordered_rows(batch):

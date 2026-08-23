@@ -58,7 +58,7 @@ class MakerspaceCustodyLock:
 
 
 @contextmanager
-def with_makerspace_custody_lock(makerspace_id):
+def with_makerspace_custody_lock(makerspace_id, *, sync_tenant_exit=True):
     """Lock makerspace then recipients, and sync custody before committing.
 
     Every count-changing caller performs its mutation and audit while yielded. A
@@ -78,6 +78,13 @@ def with_makerspace_custody_lock(makerspace_id):
         custody_lock = MakerspaceCustodyLock(makerspace=makerspace)
         yield custody_lock
         _sync_custody_state(custody_lock)
+        # Lane D's nested tenant-only envelope has a separate obligation. It must be
+        # recomputed under the exact same makerspace-first/recipient-PK lock, even when
+        # Part A truthfully records NOT_APPLICABLE because platform access is enabled.
+        if sync_tenant_exit:
+            from .tenant_exit_custody import sync_tenant_exit_custody_locked
+
+            sync_tenant_exit_custody_locked(custody_lock)
 
 
 def validate_deployment_custody():
@@ -113,7 +120,7 @@ def initialize_custody_state(makerspace_id):
     this wrapper exists so those call sites read as intent rather than as a `with`
     block with an empty body.
     """
-    with with_makerspace_custody_lock(makerspace_id):
+    with with_makerspace_custody_lock(makerspace_id, sync_tenant_exit=False):
         pass
 
 

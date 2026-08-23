@@ -40,6 +40,7 @@ def run_audit_attestation():
         activate_scope,
         batch_envelope,
         seal_scope,
+        scope_session_lock,
         synchronize_anchors,
     )
 
@@ -51,12 +52,17 @@ def run_audit_attestation():
     result = {"sealed": 0, "failed": 0}
     for makerspace_id in scope_ids:
         try:
-            key = activate_scope(makerspace_id, sink)
-            synchronize_anchors(makerspace_id, sink, key)
-            batch = seal_scope(makerspace_id, key)
-            if batch is not None:
-                sink.publish(batch_envelope(batch))
-                result["sealed"] += 1
+            # Lane D publication takes this same per-scope lock while proving that
+            # no immutable anchor exists. Keep activation, synchronization, sealing,
+            # and publication inside one serialization window so neither side can
+            # win a proof/publish race.
+            with scope_session_lock(makerspace_id):
+                key = activate_scope(makerspace_id, sink)
+                synchronize_anchors(makerspace_id, sink, key)
+                batch = seal_scope(makerspace_id, key)
+                if batch is not None:
+                    sink.publish(batch_envelope(batch))
+                    result["sealed"] += 1
         except Exception:  # noqa: BLE001 - one failed scope must not stop others
             result["failed"] += 1
             logger.exception(

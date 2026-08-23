@@ -5,6 +5,9 @@ from apps.backup.models import BackupArchive
 from apps.backup.object_restore import cleanup_expired_rollback_objects
 from apps.backup.custody_alarms import deliver_archive_custody_alarms
 from apps.backup.reconciliation import reconcile_artifact_uploads
+from apps.backup.tenant_exit_custody_alarms import (
+    deliver_tenant_exit_custody_alarms,
+)
 
 
 @shared_task(bind=True, max_retries=0)
@@ -32,6 +35,11 @@ def cleanup_expired_restore_rollbacks_task(self):
 @shared_task(bind=True, max_retries=0)
 def deliver_archive_custody_alarms_task(self, makerspace_id=None):
     return deliver_archive_custody_alarms(makerspace_id=makerspace_id)
+
+
+@shared_task(bind=True, max_retries=0)
+def deliver_tenant_exit_custody_alarms_task(self, makerspace_id=None):
+    return deliver_tenant_exit_custody_alarms(makerspace_id=makerspace_id)
 
 
 @shared_task(bind=True, max_retries=0)

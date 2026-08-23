@@ -7,6 +7,9 @@ from apps.tenant_migration.services_import_job import (
     run_import_job,
 )
 from apps.tenant_migration.services_export_job import run_migration_export_job
+from apps.tenant_migration.tenant_dump_cleanup import (
+    cleanup_refused_tenant_dump_artifacts,
+)
 
 
 @shared_task(name="apps.tenant_migration.tasks.cleanup_expired_import_jobs_task")
@@ -17,6 +20,11 @@ def cleanup_expired_import_jobs_task():
 @shared_task(name="apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task")
 def cleanup_abandoned_import_objects_task():
     return cleanup_abandoned_import_objects()
+
+
+@shared_task(name="apps.tenant_migration.tasks.cleanup_refused_tenant_dump_artifacts_task")
+def cleanup_refused_tenant_dump_artifacts_task():
+    return cleanup_refused_tenant_dump_artifacts()
 
 
 @shared_task(name="apps.tenant_migration.tasks.resume_expired_finalizing_import_jobs_task")

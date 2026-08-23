@@ -24,6 +24,7 @@ from .tenant_dump_errors import TenantDumpVerificationError
 from .tenant_dump_graph import plan_row_load
 from .tenant_dump_machine_types import resolve_machine_types
 from .tenant_dump_model_catalog import FIRST_PARTY_MODEL_RULES
+from .tenant_dump_pii import verify_ciphertext_aad_identities
 from .tenant_dump_raw import (
     SanitizedRow,
     mapped_raw_digest,
@@ -54,7 +55,9 @@ class TenantDumpBuildResult:
     used_two_pass: bool
 
 
-def build_tenant_dump(projection, destination, *, run_id, database=None):
+def build_tenant_dump(
+    projection, destination, *, run_id, source_pii_mode, database=None
+):
     """Build one target-compatible dump exclusively from a frozen D1 projection."""
     makerspace_id = int(projection.makerspace_id)
     operation_id = UUID(str(run_id))
@@ -114,6 +117,12 @@ def build_tenant_dump(projection, destination, *, run_id, database=None):
                 sequence_state = normalize_sequences(using)
                 final_rows = _final_rows(
                     (*root_plan.rows, *plan.rows), plan.deferred_foreign_keys
+                )
+                verify_ciphertext_aad_identities(
+                    projection.rows,
+                    final_rows,
+                    makerspace_id,
+                    mode=source_pii_mode,
                 )
                 projected_digest = projected_raw_digest(final_rows)
                 projected_identities = {

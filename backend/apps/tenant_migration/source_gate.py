@@ -31,6 +31,7 @@ class GateLease:
     fencing_token: int
     state: str
     lease_expires_at: object
+    purpose: str = SourceMigrationGate.Purpose.MIGRATION
 
 
 @dataclass(frozen=True)
@@ -40,7 +41,8 @@ class GateRecovery:
 
 
 def claim(
-    makerspace, actor, *, owner_id=None, fencing_token=None, now=None
+    makerspace, actor, *, owner_id=None, fencing_token=None, now=None,
+    purpose=SourceMigrationGate.Purpose.MIGRATION,
 ):
     """Close the gate after draining pre-existing shared-lock writers."""
     owner_id = owner_id or SourceMigrationGate.new_owner_id()
@@ -55,6 +57,10 @@ def claim(
         )
         if gate.state != SourceMigrationGate.State.OPEN:
             if gate.owner_id == owner_id:
+                if gate.purpose != purpose:
+                    raise SourceMigrationOwnershipError(
+                        "The source migration owner has a different gate purpose."
+                    )
                 if fencing_token != gate.fencing_token:
                     raise SourceMigrationOwnershipError(
                         "The source migration fencing token is stale."
@@ -69,6 +75,7 @@ def claim(
             0, int(settings.TENANT_MIGRATION_PRESIGN_DRAIN_SECONDS)
         )
         gate.state = SourceMigrationGate.State.DRAINING
+        gate.purpose = purpose
         gate.owner_id = owner_id
         gate.fencing_token += 1
         gate.actor = actor
@@ -89,6 +96,7 @@ def claim(
                 "owner_id": str(owner_id),
                 "fencing_token": gate.fencing_token,
                 "presign_drain_seconds": drain_seconds,
+                "purpose": purpose,
             },
         )
         return _lease(gate)
@@ -111,7 +119,8 @@ def heartbeat(lease, *, now=None):
 
 @contextmanager
 def quiesced_snapshot(
-    makerspace, actor, *, owner_id=None, fencing_token=None, sleep=time.sleep
+    makerspace, actor, *, owner_id=None, fencing_token=None, sleep=time.sleep,
+    purpose=SourceMigrationGate.Purpose.MIGRATION,
 ):
     """Yield inside the repeatable-read snapshot that establishes quiescence."""
     lease = claim(
@@ -119,6 +128,7 @@ def quiesced_snapshot(
         actor,
         owner_id=owner_id,
         fencing_token=fencing_token,
+        purpose=purpose,
     )
     gate = SourceMigrationGate.objects.only("presign_drain_until").get(
         makerspace_id=makerspace.pk
@@ -151,6 +161,7 @@ def quiesced_snapshot(
                 meta={
                     "owner_id": str(lease.owner_id),
                     "fencing_token": lease.fencing_token,
+                    "purpose": purpose,
                 },
             )
         elif gate.state != SourceMigrationGate.State.QUIESCED:
@@ -163,7 +174,10 @@ def quiesced_snapshot(
     # still empty, without retaining a row lock during object-storage I/O.
     with transaction.atomic():
         with connection.cursor() as cursor:
-            cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+            statement = "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"
+            if purpose == SourceMigrationGate.Purpose.COPY_CAPTURE:
+                statement += ", READ ONLY"
+            cursor.execute(statement)
         acquire_exclusive(makerspace.pk)
         gate = SourceMigrationGate.objects.get(makerspace_id=makerspace.pk)
         _require_live_owner(
@@ -245,6 +259,7 @@ def _open(gate, actor, *, action):
     previous_owner = gate.owner_id
     previous_token = gate.fencing_token
     gate.state = SourceMigrationGate.State.OPEN
+    gate.purpose = SourceMigrationGate.Purpose.MIGRATION
     gate.owner_id = None
     gate.fencing_token += 1
     gate.actor = actor
@@ -279,5 +294,6 @@ def _lease(gate):
         owner_id=gate.owner_id,
         fencing_token=gate.fencing_token,
         state=gate.state,
+        purpose=gate.purpose,
         lease_expires_at=gate.lease_expires_at,
     )

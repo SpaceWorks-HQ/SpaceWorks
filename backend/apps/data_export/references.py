@@ -23,8 +23,7 @@ def require_raw_user(fidelity, *, model, row_pk, field, user_id, existing_user_i
         )
     return user_id
 
-# Literal because raw integer references cannot be discovered from a ForeignKey.
-RAW_USER_REFERENCE_FIELDS = frozenset(
+RAW_USER_REFERENCE_FIELDS = frozenset(  # Raw integers are not discoverable as FKs.
     {
         ("encryption.PiiGlobalWriteFence", "actor_id"),
         ("encryption.PiiMakerspaceWriteFence", "actor_id"),
@@ -49,6 +48,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("backup.DeploymentRecoveryState", "recovery_principal"),
         ("backup.MakerspaceArchiveRecipient", "added_by"),
         ("backup.ArchiveCustodyAlarmDelivery", "recipient_user"),
+        ("backup.TenantExitCustodyAlarmDelivery", "recipient_user"),
         ("backup.RestoreOperation", "requested_by"),
         ("data_export.DataExportJob", "requested_by"),
         ("data_export.DataExportJob", "download_issued_to"),
@@ -132,6 +132,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("tenant_migration.MigratedOutHandoff", "reopened_by"),
         # Source-gate ownership is excluded from every tenant archive and user closure.
         ("tenant_migration.SourceMigrationGate", "actor"),
+        ("tenant_migration.TenantDumpCapture", "requested_by"),
         ("makerspaces.MakerspaceWaiver", "created_by"),
         ("makerspaces.MembershipRequest", "user"),
         ("makerspaces.MembershipRequest", "requested_by"),
@@ -171,6 +172,7 @@ _EXCLUDED_USER_EDGE_REASONS = {
         "Deployment-scoped source-gate ownership must not contribute to a tenant "
         "archive's global user closure."
     ),
+    ("tenant_migration.TenantDumpCapture", "requested_by"): "Source capture coordination must not contribute to a tenant archive's user closure.",
 }
 for _fidelity in Fidelity:
     for _label, _field in RELATIONAL_USER_FIELDS | RAW_USER_REFERENCE_FIELDS:
