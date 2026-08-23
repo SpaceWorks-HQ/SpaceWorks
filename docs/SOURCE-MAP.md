@@ -56,8 +56,11 @@
 - `backend/apps/updates/` — singleton platform update state, audited superadmin controls, and the
   `update_control` management command used by the privileged host scheduler. The web process never gets
   Docker-socket access; host scripts claim queued/automatic releases and report check/backup/result state.
-- `backend/apps/backup/` — deployment backup + restore (Phase 5A). Archive builder, `restore_diff`, the
-  global quarantine `middleware.py` + `route_policy.py`, `recovery.py`, `object_restore.py`,
+- `backend/apps/backup/` — deployment backup + restore (Phase 5A/Lane E). `outer_manifest.py` owns the
+  signed readable manifest, `artifact_ledger.py` + `models_artifact_ledger.py` own durable component and
+  recipient custody, and `artifact_protocol.py`/`promotion.py`/`reconciliation.py` own staged upload and the
+  single availability transaction. Archive builder, `restore_diff`, the global quarantine
+  `middleware.py` + `route_policy.py`, `recovery.py`, `object_restore.py`,
   `operation_lock.py`, and the privileged host scripts (`scripts/restore.sh`, `scripts/import-backup.sh`)
   that mirror `apps/updates`. Project JWT classes (`accounts/tokens.py`, `token_guard.py`) stamp
   `auth_generation`.

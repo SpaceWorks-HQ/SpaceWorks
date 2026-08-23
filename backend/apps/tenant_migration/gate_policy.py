@@ -108,6 +108,9 @@ TASK_EXEMPTIONS = {
         "to resolve recipients but mutates no tenant row, so it cannot disturb a "
         "frozen source."
     ),
+    "apps.backup.tasks.reconcile_backup_artifacts_task": (
+        "Deployment-local backup staging, verification, and artifact ledger recovery."
+    ),
     "apps.tenant_migration.tasks.cleanup_expired_import_jobs_task": "Target-side import retention and recovery.",
     "apps.tenant_migration.tasks.cleanup_abandoned_import_objects_task": "Target-side import object rollback does not mutate the frozen source.",
     "apps.tenant_migration.tasks.resume_expired_finalizing_import_jobs_task": "Target-side import finalization recovery does not mutate the frozen source.",

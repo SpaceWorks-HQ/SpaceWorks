@@ -103,7 +103,15 @@ def test_deployment_snapshot_manifest_is_v3_with_integer_coverage(
 ):
     first = Makerspace.objects.create(name="Covered one", slug="covered-one")
     second = Makerspace.objects.create(name="Covered two", slug="covered-two")
-    Makerspace.objects.create(
+    # Deliberately superseded by Lane E: this used to assert that an archived
+    # makerspace was NOT covered. The retained population is now every row in
+    # makerspaces_makerspace in the exported snapshot, regardless of lifecycle
+    # state or archived_at, because the dump physically contains its rows.
+    # Servability controls traffic, not whether retained custody data needs
+    # backup -- and the readable-main and sovereign sets must be exhaustive over
+    # that population, or an archived sovereign tenant belongs to neither set
+    # while its data still ships.
+    archived = Makerspace.objects.create(
         name="Archived", slug="covered-archived", archived_at=timezone.now()
     )
     archive = BackupArchive.objects.create(
@@ -133,7 +141,7 @@ def test_deployment_snapshot_manifest_is_v3_with_integer_coverage(
 
     assert manifest["format"] == "spaceworks-phase5a-v3"
     assert manifest["recipients"] is selected
-    assert manifest["covered_makerspace_ids"] == [first.pk, second.pk]
+    assert manifest["covered_makerspace_ids"] == [first.pk, second.pk, archived.pk]
     assert all(type(value) is int for value in manifest["covered_makerspace_ids"])
     assert manifest["excluded_makerspace_ids"] == []
     assert manifest["partial"] is False

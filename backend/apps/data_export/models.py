@@ -217,6 +217,10 @@ OMITTED_MODELS = {
         "Deployment-local custody-alarm delivery and retry state."
     ),
     "backup.BackupLease": "Deployment scheduler lease.",
+    "backup.B1ActivationState": "Deployment-local Lane E activation state.",
+    "backup.BackupArtifactLedger": "Durable deployment backup artifact operations.",
+    "backup.BackupArtifactComponent": "Durable deployment backup component operations.",
+    "backup.BackupComponentRecipient": "Durable recipient-use custody history.",
     "backup.DeploymentRecoveryState": "Deployment recovery and quarantine state.",
     "backup.PlatformBackupSettings": "Platform backup configuration and age recipient.",
     "backup.RestoreOperation": "Deployment restore lifecycle state.",

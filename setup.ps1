@@ -132,6 +132,11 @@ if (-not (Select-String -Path ".env" -Pattern '^BACKUP_AGE_RECIPIENT=' -Quiet)) 
   docker @compose up -d
   Warn "In-place restore requires a Linux host with flock. Windows backups remain downloadable and can be restored on a supported host."
 }
+if (-not (Select-String -Path ".env" -Pattern '^BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY=' -Quiet)) {
+  $pair = docker @compose exec -T backend python -c "from apps.ed25519 import encode_key,generate_keypair; p,q=generate_keypair(); print(encode_key(p)); print(encode_key(q))"
+  [System.IO.File]::AppendAllText((Join-Path $PSScriptRoot ".env"), "`nBACKUP_ARCHIVE_SIGNING_PRIVATE_KEY=$($pair[0].Trim())`nBACKUP_ARCHIVE_VERIFY_PUBLIC_KEY=$($pair[1].Trim())`n", (New-Object System.Text.UTF8Encoding($false)))
+  docker @compose up -d
+}
 
 Say "Waiting for the app to be ready..."
 $ready = $false

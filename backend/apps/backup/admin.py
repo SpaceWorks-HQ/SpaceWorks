@@ -4,7 +4,11 @@ from unfold.admin import ModelAdmin
 from apps.backup.models import (
     ArchiveCustodyAlarmDelivery,
     ArchiveRecipientReservation,
+    B1ActivationState,
     BackupArchive,
+    BackupArtifactComponent,
+    BackupArtifactLedger,
+    BackupComponentRecipient,
     BackupLease,
     DeploymentRecoveryState,
     MakerspaceArchiveCustodyState,
@@ -90,5 +94,9 @@ for model in (
     BackupLease,
     RestoreRollbackObject,
     ArchiveRecipientReservation,
+    B1ActivationState,
+    BackupArtifactLedger,
+    BackupArtifactComponent,
+    BackupComponentRecipient,
 ):
     admin.site.register(model, ReadOnlyBackupAdmin)

@@ -75,6 +75,11 @@ SCHEDULED_TASKS = (
         24 * 60,
     ),
     (
+        "reconcile-backup-artifacts",
+        "apps.backup.tasks.reconcile_backup_artifacts_task",
+        5,
+    ),
+    (
         "purge-expired-backup-archives",
         "apps.backup.tasks.purge_expired_backup_archives_task",
         24 * 60,

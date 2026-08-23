@@ -159,6 +159,8 @@ services:
       CRON_SECRET: ${CRON_SECRET:-}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
       BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+      BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY: ${BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY:-}
+      BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY: ${BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY:-}
       BACKUP_OPS_DIR: /var/lib/spaceworks/ops
     # Gunicorn's defaults are one synchronous worker with a 30s hard timeout and no
     # request log — a single slow upload or Stripe call then blocks the entire site,

@@ -25,7 +25,6 @@ from apps.backup.raw_projection import canonical_owner_q, no_decrypt_guard, raw_
 from apps.backup.settings_policy import POLICIES, Policy
 from apps.backup.tenant_projection import project_raw_dataset
 from apps.data_export.datasets import DATASET_SPECS
-from apps.makerspaces.servability import servable_queryset
 
 
 CONTINUITY_KEYS = (
@@ -46,8 +45,9 @@ def _snapshot_payload(archive, root, modes, selected_recipients, *, compound_cap
             cursor.execute("SELECT pg_export_snapshot()")
             snapshot_id = cursor.fetchone()[0]
         if archive.scope == BackupArchive.Scope.DEPLOYMENT:
+            Makerspace = apps.get_model("makerspaces.Makerspace")
             covered_makerspace_ids = list(
-                servable_queryset().order_by("pk").values_list("pk", flat=True)
+                Makerspace.objects.order_by("pk").values_list("pk", flat=True)
             )
             _pg_dump(root / "database.dump", snapshot_id)
             if compound_capture is None:
