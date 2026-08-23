@@ -2,6 +2,7 @@
 
 import hmac
 
+from apps.backup.activation_integrity import state_matches_flag
 from apps.backup.artifact_ledger import ArtifactLedgerMismatch, component_specs
 from apps.backup.models import (
     BackupArchive,
@@ -42,12 +43,25 @@ def validate_frozen_state(
     sovereign_ids = set(manifest_sets["sovereign"])
     for frozen in snapshot:
         makerspace_id = frozen["makerspace_id"]
+        if not state_matches_flag(
+            frozen["superadmin_access_enabled"], frozen["activation_state"]
+        ):
+            raise ArtifactLedgerMismatch(
+                "A frozen access flag and activation state diverge."
+            )
         if (
             spaces[makerspace_id].superadmin_access_enabled
             != frozen["superadmin_access_enabled"]
             or activations[makerspace_id].state != frozen["activation_state"]
         ):
             raise ArtifactLedgerMismatch("A frozen access or activation state changed.")
+        if not state_matches_flag(
+            spaces[makerspace_id].superadmin_access_enabled,
+            activations[makerspace_id].state,
+        ):
+            raise ArtifactLedgerMismatch(
+                "A current access flag and activation state diverge."
+            )
         is_sovereign = not frozen["superadmin_access_enabled"]
         if is_sovereign != (makerspace_id in sovereign_ids):
             raise ArtifactLedgerMismatch(

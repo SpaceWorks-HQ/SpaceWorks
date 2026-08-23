@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.audit import services as audit
-from apps.backup.models import MakerspaceArchiveRecipient
+from apps.backup.models import B1ActivationState, MakerspaceArchiveRecipient
 from apps.makerspaces.models import MakerspaceMembership
 from tests.return_helpers import (
     authenticated_client,
@@ -67,6 +67,7 @@ def test_superadmin_cannot_re_enable_but_makerspace_admin_can():
     assert disabled.status_code == 200
     space.refresh_from_db()
     assert space.superadmin_access_enabled is False
+    assert B1ActivationState.objects.get(makerspace=space).state == "off_pending"
 
     # Hard hide: once disabled, the space is RBAC-invisible to the superadmin, so
     # the re-enable PATCH 404s (it can't resolve the object) — re-enable stays a
@@ -79,6 +80,7 @@ def test_superadmin_cannot_re_enable_but_makerspace_admin_can():
     assert regrant.status_code == 404
     space.refresh_from_db()
     assert space.superadmin_access_enabled is False
+    assert B1ActivationState.objects.get(makerspace=space).state == "off_pending"
 
     restored = authenticated_client(space_manager).patch(
         makerspace_detail_url(space),
@@ -88,6 +90,7 @@ def test_superadmin_cannot_re_enable_but_makerspace_admin_can():
     assert restored.status_code == 200
     space.refresh_from_db()
     assert space.superadmin_access_enabled is True
+    assert B1ActivationState.objects.get(makerspace=space).state == "on"
 
 
 def test_makerspace_creation_rejects_superadmin_access_already_off():
@@ -146,6 +149,7 @@ def test_switching_off_with_two_verified_recipients_succeeds_and_surfaces_state(
     assert response.data["archive_custody_state"] == "healthy"
     space.refresh_from_db()
     assert space.superadmin_access_enabled is False
+    assert B1ActivationState.objects.get(makerspace=space).state == "off_pending"
 
 
 def test_superadmin_aggregates_hide_disabled_space():
