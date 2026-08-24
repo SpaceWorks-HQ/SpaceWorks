@@ -16,6 +16,7 @@ from .models_protocol import (  # noqa: F401,E402
     TenantMigrationExportJob,
 )
 from .models_source_gate import SourceMigrationGate  # noqa: F401,E402
+from .models_tenant_dump import TenantDumpCapture  # noqa: F401,E402
 
 
 class ExternalTenantReference(models.Model):

@@ -64,7 +64,10 @@
   `middleware.py` + `route_policy.py`, `recovery.py`, `object_restore.py`,
   `operation_lock.py`, and the privileged host scripts (`scripts/restore.sh`, `scripts/import-backup.sh`)
   that mirror `apps/updates`. Project JWT classes (`accounts/tokens.py`, `token_guard.py`) stamp
-  `auth_generation`.
+  `auth_generation`. `custody.py` is the makerspace-first/recipient-PK serialization boundary;
+  `tenant_exit_custody.py` derives Lane D's independent tenant-only floor, while
+  `tenant_exit_custody_alarms.py` reuses the decision-19b recipient selectors and parameterized durable
+  dispatcher for its retryable outbox.
 - `backend/apps/data_export/` — Space-Manager data export (Phase 4). Per-fidelity (`REDACTED`/`PORTABLE`)
   disposition registry over models, fields, datasets, traversals and the global-user reference closure, with
   **drift guards that refuse an unclassified model or field**. Its `guards._equal(subject, declared,
@@ -86,6 +89,21 @@
   `tenant_dump_sequences.py` owns Lane D's exact empty/non-empty sequence state;
   `tenant_dump_machine_types.py` resolves only fingerprint-identical global built-ins, while
   `tenant_dump_objects.py` packages immutable staged object bytes without live-storage reads;
+  `tenant_dump_capture.py` + `tenant_dump_capture_database.py` freeze the full exported-snapshot database
+  and exact object bytes before `source_gate_release.py` performs the fenced `copy_capture` release;
+  `tenant_dump_staging.py` + `tenant_dump_database_cleanup.py` own marker-guarded crash cleanup;
+  `tenant_dump_cleanup.py` retries refused unpublished-object deletion from its durable capture-row key;
+  `tenant_dump_derivation.py` derives and seals output only from that capture;
+  `tenant_dump_pii.py` binds raw mapped-column mode findings and ciphertext AAD identities;
+  `tenant_dump_key_inventory.py` freezes and exact-set checks source-broker key facts, while
+  `tenant_dump_dek_protocol.py`/`tenant_dump_dek_helper.py`/`tenant_dump_deks.py` keep plaintext DEKs inside
+  the bounded child operation and emit only the tenant-recipient ciphertext;
+  `tenant_dump_recipients.py` keeps `outer_recipients` and `tenant_dek_recipients` distinct, and
+  `tenant_dump_envelope.py` owns the declared key-member presence/absence ledger plus streaming outer seal;
+  `tenant_dump_manifest.py` and `tenant_dump_lineage.py` bind D4 custody facts and parent/policy digests;
+  `tenant_dump_publication.py` owns recipient revalidation, refusal cleanup and the atomic
+  pending-to-published/download transition; `tenant_dump_audit_anchors.py` supplies the fail-closed
+  external-anchor absence proof;
   `verification.py` (pre-commit), audit-reference domains behind the `audit_references.py` barrel, and
   `target_cutover.py` (pre-activation + `IMPORTING → ACTIVE`);
   `receipts.py`/`receipt_crypto.py`/`cutover.py` (signed single-use handoff); `views_*.py` (superadmin REST).

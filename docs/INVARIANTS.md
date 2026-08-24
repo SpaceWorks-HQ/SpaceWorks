@@ -1777,7 +1777,7 @@ Load-bearing details that carried over unchanged:
   `activity` payload is now a typed nested serializer that **omits** absent keys — a zero says
   "attended nothing", an absent key says "this space does not run events".
 
-## Backup, restore and tenant migration (Phase 5A shipped; 5B plan-approved, unbuilt)
+## Backup, restore and tenant migration (Phase 5A/5B and Lane D D1-D4 built)
 
 ### Archive-recipient custody: the two-recipient admission floor (BUILT 2026-08-22)
 
@@ -2092,6 +2092,76 @@ client from `backup/postgres_client.py` creates the custom `--no-owner --no-acl`
 restores it and repeats catalog, FK-closure, open-fence, cache and raw mapped-value digest checks before the
 candidate is atomically exposed. Object members are copied only from immutable capture staging and carry an
 opaque member path plus original key, version ID, size, content type and SHA-256; ETag is never a digest.
+
+**Lane D D3 freezes custody and source bytes as one immutable capture lineage.** The request transaction
+reuses `backup/custody.py::with_makerspace_custody_lock`: makerspace first, every archive-recipient row in
+PK order, then the capture and audit decision. It stores the Part-A superadmin decision plus the exact sorted
+canonical native-age recipient/fingerprint tuples. Zero tenant recipients refuses the request even when the
+platform could open an outer envelope; one continues under `degraded_one_recipient`. Publication authority
+never comes from that old snapshot alone: `tenant_dump_publication.py` re-locks in the same order and requires
+exact tuple equality immediately before each encryption boundary and again while the final transaction makes
+the object discoverable and creates its single-use download state. Addition, revocation, compromise, invalid
+canonicalization, missing durable current-revision alarm intent, or an outbox that cannot retry/escalate makes
+the pending artifact unusable; its unpublished bytes and owned staging are deleted and a new request is
+required. Recipient substitution and silent age-header removal are forbidden.
+If object deletion fails, the refused capture retains the private unpublished key as a retry journal;
+`cleanup_refused_tenant_dump_artifacts_task` retries it hourly, and only confirmed deletion clears the key.
+
+`MakerspaceTenantExitCustodyState` is deliberately separate from Part A custody and ignores
+`superadmin_access_enabled`: two recipients is healthy, one degraded, zero breached. Thus Part A
+`not_applicable` and Lane D degraded may coexist truthfully. Its `TenantExitCustodyAlarmDelivery` outbox is
+deployment-local and decision-19b sovereign: active non-operator `MANAGE_MAKERSPACE` members are primary;
+operators receive every zero-recipient revision and resolve-time no-repair/no-mail fallback, plus exhausted
+tenant delivery escalation. Intents are created under the custody revision lock and delivery is at-least-once;
+SMTP success is not publication authority, but durable retry/escalation capacity is. Both rows are DROP in
+the Lane D catalog and are independently derived on source and target.
+
+Phase S uses a `copy_capture` source-gate purpose and exports one PostgreSQL `REPEATABLE READ` snapshot to a
+full custom database image while copying the exact object closure under the same frozen source. Database and
+object-ledger SHA-256 facts, gate owner/fencing token, source identity, PostgreSQL major, encryption mode,
+catalog digest and completion time are committed before a live fenced release reopens the source. D2 then
+works only from those staged bytes. Run-owned filesystem and scratch-database markers make crash cleanup
+conservative: sweepers delete only marked Lane D resources, never an operator database or unmarked directory.
+The final `spaceworks-tenant-dump-v1` manifest binds the parent database digest, parent object-ledger digest
+and derivation-policy digest; companion slices are forbidden in this format. Publication also requires a
+fail-closed negative proof that no external audit anchor exists for the tenant.
+The attestation scheduler and final Lane D publication share the audit scope advisory lock, so anchor
+activation/sealing/publication cannot race between the negative proof and the discoverability commit.
+
+**Lane D D4 makes outer readability and tenant-DEK custody separate cryptographic facts.**
+`outer_recipients` is the exact frozen tenant-recipient set plus the platform recipient only when the
+request-time `superadmin_access_at_decision` snapshot is true. `tenant_dek_recipients` is always exactly the
+frozen tenant set and never gains the platform recipient. The age command builders consume those distinctly
+named sets directly; `spaceworks-tenant-dump-v1` does not call the obsolete
+`spaceworks-tenant-migration-v1` `archive_envelope.py` layout, whose platform-readable member contains
+plaintext DEKs.
+
+A plaintext source is scanned across every registered mapped raw column and refuses if any non-empty value
+has the PII-envelope prefix. Its manifest declares `source_pii_mode=plaintext`, an empty retained-key
+inventory and a `present=false` content-ledger entry for `keys/tenant-deks.age`; that member must not exist.
+An encrypted source refuses non-envelope mapped values, and the scratch plus restored-dump digest checks bind
+the exact raw ciphertext. The source makerspace PK and every mapped-row PK are compared explicitly because
+they form AES-GCM AAD and cannot be remapped. `MakerspaceEncryptionKey`, `PiiBlindIndex` and
+`SearchKeyGeneration` remain DROP tables and are verified empty in `database.dump`.
+
+For encrypted sources, D4 enumerates the source key rows from the restored immutable database image and
+retains only exact active/rotated rows. Identity, makerspace, version, status, recorded broker coordinates,
+wrapped bytes and wrapped-byte digest must equal that frozen enumeration; missing, duplicate, extra,
+disabled-as-live and live-source-substituted rows refuse the build. The parent process handles only wrapped
+bytes, non-secret inventory and resulting ciphertext. One short-lived helper receives wrapped rows over an
+anonymous stdin pipe, disables the DEK cache, unwraps each row once through its recorded source broker and
+streams a length-framed `(makerspace_id, version, status, DEK bytes)` payload to one age process addressed to
+every `tenant_dek_recipient`; ciphertext returns through anonymous stdout. Failures terminate and reap child
+processes, close pipes/caches, and remove partial ciphertext and staging before a generic secret-free error.
+The bounded guarantee is only that no Lane-D-created persistent application output retains a plaintext DEK
+after this operation. Python buffers, privileged host observation, process dumps and swap remain outside that
+application-level guarantee; cache clearing is best effort and is not secure zeroization.
+
+Only `keys/tenant-deks.age`, its ciphertext size/digest and the non-secret retained-key inventory enter the
+sanitized bundle. The bundle itself is streamed directly into the outer age envelope without a plaintext tar;
+the plaintext derived directory is removed before derivation commits. The derivation-policy version is bumped
+whenever this custody/layout contract changes, and publication re-verifies the source mode, mapped findings,
+key inventory and content-ledger declaration against the immutable capture.
 
 - **Phase 4's archive projection DECRYPTS mapped PII.** `archive.source_value` reads fields through
   `getattr`, and `ScopedPiiModelMixin.__getattribute__` decrypts — so a PORTABLE archive built on it

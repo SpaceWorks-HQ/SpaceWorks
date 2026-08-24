@@ -7,6 +7,10 @@ class SourceMigrationGateClosed(SourceMigrationGateError):
 
     code = "tenant_migration_quiesced"
 
+    def __init__(self, message, *, purpose=None):
+        super().__init__(message)
+        self.purpose = purpose
+
 
 class SourceMigrationOwnershipError(SourceMigrationGateError):
     """An owner, fencing token, or lease no longer grants authority."""

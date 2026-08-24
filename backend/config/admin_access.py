@@ -84,7 +84,9 @@ GLOBAL_ADMIN_MODELS = {
     # makerspace is below its archive-recipient floor in order to act on it.
     "backup.makerspacearchivecustodystate",
     "backup.archivecustodyalarmdelivery",
-    "backup.makerspacetenantexitcustodystate", "backup.tenantexitcustodyalarmdelivery",
+    "backup.makerspacetenantexitcustodystate",
+    "backup.tenantexitcustodyalarmdelivery",
+    "tenant_migration.tenantdumpcapture",
     "backup.b1activationstate", "backup.backupartifactledger",
     "backup.backupartifactcomponent", "backup.backupcomponentrecipient",
     "backup.b1restoreoperationstate", "backup.b1restorecomponentstate",

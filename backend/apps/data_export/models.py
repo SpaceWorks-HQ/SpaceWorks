@@ -197,6 +197,7 @@ OMITTED_MODELS = {
     "tenant_migration.SourceMigrationGate": (
         "Source-deployment coordination state must not travel inside a tenant archive."
     ),
+    "tenant_migration.TenantDumpCapture": "Source capture, lineage, publication, and download coordination state.",
     "payments.PlatformStripeConnectSettings": "Platform payment credentials.",
     "payments.ProcessedStripeEvent": "Provider idempotency telemetry.",
     "payments.StripeConnectOAuthState": "Transient OAuth state.",

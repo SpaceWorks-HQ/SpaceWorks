@@ -36,7 +36,7 @@ def assert_write_allowed(makerspace_id):
 def _assert_gate_state(makerspace_id):
     assert_restored(makerspace_id)
     gate = SourceMigrationGate.objects.only(
-        "state", "owner_id", "fencing_token", "lease_expires_at"
+        "state", "purpose", "owner_id", "fencing_token", "lease_expires_at"
     ).filter(makerspace_id=makerspace_id).first()
     if gate is None or gate.state == SourceMigrationGate.State.OPEN:
         return
@@ -48,7 +48,8 @@ def _assert_gate_state(makerspace_id):
     ):
         return
     raise SourceMigrationGateClosed(
-        "This makerspace is temporarily frozen for tenant migration."
+        "This makerspace is temporarily frozen for tenant migration.",
+        purpose=gate.purpose,
     )
 
 

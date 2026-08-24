@@ -171,7 +171,8 @@ FIRST_PARTY_FIELD_NAMES = {
     'tenant_migration.MigrationReceipt': frozenset('archive_digest format_version issued_here migration_id operation pairing persisted_at receipt_id signature signer_fingerprint source_deployment_id source_tenant_id target_deployment_id'.split()),
     'tenant_migration.ReceiptConsumption': frozenset('consumed_at consumed_by purpose receipt'.split()),
     'tenant_migration.MigratedOutHandoff': frozenset('abort_receipt archive_digest id migrated_out_at pairing reopened_at reopened_by source_cutover_receipt source_tenant state target_deployment_id'.split()),
-    'tenant_migration.SourceMigrationGate': frozenset('actor fencing_token heartbeat_at lease_expires_at makerspace owner_id presign_drain_until quiesced_at reopened_at state updated_at'.split()),
+    'tenant_migration.SourceMigrationGate': frozenset('actor fencing_token heartbeat_at lease_expires_at makerspace owner_id presign_drain_until purpose quiesced_at reopened_at state updated_at'.split()),
+    'tenant_migration.TenantDumpCapture': frozenset('artifact_sha256 artifact_size_bytes capture_completed_at catalog_digest content_ledger created_at database_image_sha256 database_snapshot_at derivation_policy_sha256 download_token_consumed_at download_token_digest download_token_expires_at frozen_tenant_recipients gate_fencing_token gate_owner_id id makerspace manifest object_key object_ledger object_ledger_sha256 parent_database_sha256 parent_object_ledger_sha256 published_at refusal_code refusal_detail requested_by source_deployment_identity source_encryption_mode source_makerspace_id source_makerspace_slug source_postgres_major status superadmin_access_at_decision unpublished_object_key updated_at'.split()),
     'tenant_migration.ExternalTenantReference': frozenset('created_at field_name id makerspace snapshot source_archive_digest source_model_label source_object_id target_model_label target_object_id'.split()),
 }
 

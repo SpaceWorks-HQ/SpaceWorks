@@ -13,6 +13,10 @@ class SourceMigrationGate(models.Model):
         QUIESCED = "quiesced", "Quiesced"
         MIGRATED_OUT = "migrated_out", "Migrated out"
 
+    class Purpose(models.TextChoices):
+        MIGRATION = "migration", "Tenant migration"
+        COPY_CAPTURE = "copy_capture", "Tenant exit copy capture"
+
     makerspace = models.OneToOneField(
         "makerspaces.Makerspace",
         primary_key=True,
@@ -21,6 +25,11 @@ class SourceMigrationGate(models.Model):
     )
     state = models.CharField(
         max_length=16, choices=State.choices, default=State.OPEN
+    )
+    purpose = models.CharField(
+        max_length=24,
+        choices=Purpose.choices,
+        default=Purpose.MIGRATION,
     )
     owner_id = models.UUIDField(null=True, blank=True)
     fencing_token = models.PositiveBigIntegerField(default=0)

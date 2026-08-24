@@ -113,4 +113,7 @@ def _public_identifier_makerspace_id(identifier):
 
 
 def _locked_response(exc):
-    return JsonResponse({"detail": str(exc), "code": exc.code}, status=423)
+    payload = {"detail": str(exc), "code": exc.code}
+    if getattr(exc, "purpose", None):
+        payload["purpose"] = exc.purpose
+    return JsonResponse(payload, status=423)

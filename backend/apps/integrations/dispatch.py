@@ -26,6 +26,7 @@ EMAIL_MODULE_EXEMPT = frozenset({
     ("account", "email_verification"),
     ("hardware", "return_reminder"),
     ("backup", "archive_custody_alarm"),
+    ("backup", "tenant_exit_custody_alarm"),
 })
 
 

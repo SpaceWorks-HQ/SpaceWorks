@@ -72,15 +72,23 @@ def operator_recipients():
     )
 
 
-def alarm_message(makerspace, custody_state, recipient_count, *, operator):
+def alarm_message(
+    makerspace,
+    custody_state,
+    recipient_count,
+    *,
+    operator,
+    custody_label="Archive",
+):
     audience = "Platform operator" if operator else "Makerspace staff"
-    subject = f"Archive custody alarm: {makerspace.name}"
+    subject = f"{custody_label} custody alarm: {makerspace.name}"
     body = (
         f"{audience} custody warning. Makerspace: {makerspace.name} "
         f"({makerspace.slug}). State: {custody_state.state}. "
         f"Verified archive recipients: {recipient_count}. "
         f"Alarm revision: {custody_state.alarm_revision}. "
-        "Review archive-recipient custody and restore redundancy. This message may "
+        f"Review {custody_label.lower()} recipient custody and restore redundancy. "
+        "This message may "
         "repeat because custody-alarm delivery is at-least-once."
     )
     return subject, body
