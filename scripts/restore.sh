@@ -21,7 +21,7 @@ control() {
 
 [[ "$RESTORE_ID" =~ ^[0-9a-fA-F-]{36}$ ]] || die "Usage: scripts/restore.sh <restore-uuid>"
 command -v docker >/dev/null 2>&1 || die "Docker is required."
-command -v flock >/dev/null 2>&1 || die "flock is required; Windows cannot run in-place restore."
+command -v flock >/dev/null 2>&1 || die "In-place restore must run under WSL2 (not native Git Bash/Windows). WSL2 supplies the Linux flock, AF_UNIX sockets, and root-owned-file trust semantics that fence destructive host orchestration; start Docker Desktop's WSL2 integration, open this install from a WSL2 shell, and rerun scripts/restore.sh there."
 [[ -d "$OPS_DIR" ]] || die "$OPS_DIR is missing; run setup on this host first."
 [[ -f "$IDENTITY_FILE" ]] || die "The age identity file is missing: $IDENTITY_FILE"
 

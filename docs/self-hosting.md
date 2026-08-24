@@ -2,6 +2,25 @@
 
 This project is Docker-first for operators who do not want to build Django or Vite locally.
 
+## Pinned curl install
+
+The supported fresh-install path needs no Git clone:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash
+```
+
+The installer defaults to `/opt/spaceworks`; override it on the `bash` process with, for example,
+`curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | SPACEWORKS_DIR="$HOME/SpaceWorks" bash`.
+It resolves the latest tagged GitHub release,
+downloads that tag's archive, and pins the published backend/frontend images to its immutable version.
+Before mutating the host it checks x86_64/aarch64 support, distribution/dependency handling, Docker,
+ports 80/9000/9001, 8 GiB of free disk, release availability, and existing state. Linux dependency
+installation supports apt, dnf/yum, pacman and zypper families identified from `/etc/os-release`.
+
+If `.spaceworks-version` already exists, pasting the command again offers update, module changes, both,
+or cancel; it never reruns first-instance setup. A non-empty install root without the marker is refused.
+
 ## Production Compose
 
 Use the production Compose file when deploying published images:
@@ -35,18 +54,22 @@ MAKERSPACE_BACKEND_IMAGE=ghcr.io/spaceworks-hq/spaceworks-backend
 MAKERSPACE_FRONTEND_IMAGE=ghcr.io/spaceworks-hq/spaceworks-frontend
 ```
 
-### Build from source (no published images)
+### Build from source (explicit opt-in)
 
-Until the GHCR images are published publicly, build locally with the build overlay:
+Release images are published to GHCR and `setup.sh` pulls them by default. A developer with a full
+source tree can explicitly build locally:
 
 ```bash
-SPACEWORKS_COMPOSE_BUILD_LAYER=1 scripts/spaceworks-compose.sh bundled up -d --build
+bash setup.sh --build
 ```
 
-For a guided first run that generates secrets, the atomic pointer and `.env`, use `setup.sh` at the repo
-root (see [setup-for-makerspaces.md](setup-for-makerspaces.md)). H1 host orchestration requires Linux host
-`flock`, ownership and Unix-socket semantics; on Windows run the Linux installer inside WSL2. PowerShell's
-direct Compose path is not a supported recovery topology.
+For a guided first run that generates secrets, the atomic pointer and `.env`, use the curl installer or
+`setup.sh` at the repo root (see [setup-for-makerspaces.md](setup-for-makerspaces.md)).
+
+Windows has two explicit support tiers. Install, normal Compose operation, upgrades and module changes
+work natively with Docker Desktop plus Git Bash. In-place restore, backup import and compound recovery
+must run under WSL2: their security boundary depends on Linux AF_UNIX sockets and root-owned-file trust
+semantics and is deliberately not emulated on Windows.
 
 > The frontend container's nginx proxies `/api/`, `/static/`, and the docs routes to the backend.
 > The **single published port (80)** serves the public app, the React staff console at `/admin`,
@@ -119,6 +142,27 @@ Run an immediate checked update with:
 bash scripts/update.sh --force
 ```
 
+When run in a terminal, the updater opens the same live-registry module tick list after the release is
+healthy. It is seeded from each makerspace's current `enabled_modules`, not an install profile. Cron has
+no terminal and therefore performs only the release update. Useful explicit forms are:
+
+```bash
+# Change modules without checking for a release.
+bash scripts/update.sh --modules-only --makerspace my-space
+
+# Non-interactively enable all optional modules except two for one makerspace.
+bash scripts/update.sh --all-modules --without=printing,payments \
+  --makerspace my-space --confirm-removals
+
+# A cross-tenant change is never implicit.
+bash scripts/update.sh --all-modules --all-makerspaces
+```
+
+With multiple makerspaces, interactive use asks for a slug; non-interactive use refuses unless given
+`--makerspace` or the explicit `--all-makerspaces` opt-in. Unticking/disabling a module requires
+confirmation and runs the two-pass dependency-safe uninstall loop. It only invokes `uninstall_module`:
+retained rows are never purged by setup or update.
+
 Pre-update database dumps are written to `backups/` and retained for 14 days. Each compressed dump
 contains PostgreSQL data: users, settings, inventory, requests, loan history, and audit metadata. It does
 **not** contain MinIO objects such as evidence photos, machine images, documents, or print files; back up
@@ -132,6 +176,12 @@ health. The version marker is not advanced, the UI records whether rollback succ
 backup remains available. Database migrations are not reversed automatically; keep migrations backward
 compatible with the immediately previous application release. If application rollback also fails, review
 `backups/auto-update.log` before restoring the database snapshot and previous image tag manually.
+
+On hosts with `flock`, the updater also holds the shared host operation-lock inode. Native Windows Git
+Bash normally lacks `flock`, so update falls back to the existing directory lock, recording its owner PID
+and start timestamp. A dead owner is detected and cleared on the next run. A live or unreadable owner is
+never silently discarded: after verifying no update is active, pass `--override-lock`. This fallback is
+for install/run/update only; run `scripts/restore.sh` and other compound recovery supervisors under WSL2.
 
 For a manual deployment, set `MAKERSPACE_IMAGE_TAG` to a release such as
 `0.5.1-main.42.a1b2c3d4e5f6`, then run:
