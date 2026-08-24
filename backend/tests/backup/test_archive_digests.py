@@ -190,7 +190,7 @@ def test_preflight_accepts_v1_manifest_without_content_ledger(
         Command, "_check_setting_policies", staticmethod(lambda _archived: None)
     )
     monkeypatch.setattr(
-        "apps.backup.management.commands.backup_control.shutil.which",
+        "apps.backup.backup_control_preflight.shutil.which",
         lambda _command: "/usr/bin/tool",
     )
 
@@ -212,7 +212,7 @@ def test_preflight_accepts_v1_manifest_without_content_ledger(
             return Cursor()
 
     monkeypatch.setattr(
-        "apps.backup.management.commands.backup_control.connections",
+        "apps.backup.backup_control_preflight.connections",
         {"default": Connection()},
     )
 
