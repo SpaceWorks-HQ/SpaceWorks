@@ -17,7 +17,7 @@ services:
     # runserver instead of gunicorn: it autoreloads on save, and with DEBUG on it
     # serves the /control/ + /docs/ assets straight from the staticfiles finders,
     # so the dev container never needs a collectstatic pass.
-    command: python manage.py runserver 0.0.0.0:8000
+    command: ["--role", "backend", "python", "manage.py", "runserver", "0.0.0.0:8000"]
     # The image drops to its own unprivileged uid (10001), but ./backend is
     # bind-mounted below and owned by you — and `makemigrations` has to write new
     # migration files back into it. Run as the host user so anything the container
@@ -58,6 +58,11 @@ services:
       - ./backend:/app
 
   beat:
+    volumes:
+      - ./backend:/app
+
+  candidate-backend:
+    command: ["--role", "backend", "python", "manage.py", "runserver", "0.0.0.0:8000"]
     volumes:
       - ./backend:/app
 

@@ -392,8 +392,8 @@ that is the *other* axis: `python manage.py suggest_tombstones` reads what every
 has installed and prints the `TOMBSTONED_APPS=` line to paste into `.env`. It is conservative by
 construction — an app is suggested only when **no** makerspace uses any of its modules, because a
 tombstone is process-global and would break the one tenant still using it. Apps owning no module key
-(`warranty`, `presence`, `payments`, `updates`) are listed separately for a by-hand decision. `setup.sh`,
-`setup.ps1` and `setup_instance --profile` (env `SETUP_MODULE_PROFILE`, default `recommended`) apply one,
+(`warranty`, `presence`, `payments`, `updates`) are listed separately for a by-hand decision. `setup.sh`
+and `setup_instance --profile` (env `SETUP_MODULE_PROFILE`, default `recommended`) apply one,
 **only when the makerspace is first created** so a re-run never rewrites an operator's choices.
 Core modules are **added back by `_canonical_modules`, not rejected** — no caller has to carry the core
 set and no otherwise-valid save fails on a row that lost one. Because `public_inventory` is core, the
@@ -2464,9 +2464,132 @@ encoder always emits canonical output, so stored envelopes are unaffected.
 
 ## Container / deployment invariants
 
-**The images run unprivileged.** `backend/Dockerfile` creates uid 10001 `app`, uses `COPY --chown`
+**The H1 host marker is a process boundary, and PostgreSQL grants are a separate authority
+boundary.** Every application-image start must enter through
+`backend/scripts/spaceworks_entrypoint.py` with one explicit role: `backend`, `worker`, `beat`, `cron`,
+`migrate`, or `management`. The root-owned, fsynced marker is mounted from the separate host-state
+directory read-only; it must never live at another writable alias under `BACKUP_OPS_DIR`. Missing,
+unreadable, malformed, unknown-version/state, or database-identity-mismatched markers refuse startup.
+Candidate preparation/health markers must classify that identity as a non-routable sibling; all other
+states require the active classification. Candidate capability decisions use the live topology proof below,
+not the pointer string or marker database name by themselves.
+Sibling allocation is a two-stage durable transition: the supervisor first invalidates every armed nonce
+and fsyncs a `candidate-preparation` **intent** marker carrying operation identity but no database name or
+OID; only then may it create and independently query the sibling. It invalidates every armed nonce again
+before atomically replacing intent with the **bound** marker through file fsync, same-directory rename and
+parent-directory fsync. An interrupted allocation always rewrites intent and requires a new proven-empty
+sibling. A pre-existing database is never adopted because its name matches, including after a crash between
+the bound rename and parent-directory fsync; a supervisor-owned sibling may be destroyed and recreated only
+after its durable run-owner marker matches. Intent never waits, retries or upgrades at the consume seam.
+The state matrix is exact: `normal` and `acknowledged-normal` admit all roles;
+`candidate-preparation` admits only `migrate`; `candidate-health` lets only `backend` proceed to the
+single-use capability seam; and `quarantined-after-cutover` admits only `backend`. Role refusal happens
+before the capability socket is contacted.
+
+**The consume-only Unix socket is the sole writable launch-capability channel.** The root supervisor derives
+the complete record from the fsynced candidate-health marker and appends/fsyncs it in the private host
+journal: restore ID, sibling name/OID, endpoint plus queried database UUID (and
+`pg_control_system().system_identifier` when permitted), outer artifact digest, capture ID, a random nonce,
+the allowed role and expiry. Neither that record nor its facts enter Compose environment or command
+arguments, and the private journal/signing key are never mounted in an application container. The entrypoint
+denies the role first, queries the live database identity, then submits exactly one `consume` request through
+the root-owned socket. The server authenticates the local uid, re-reads marker and pointer generation, matches
+every fact, appends/fsyncs `consumed`, and only then signs a short Ed25519 launch grant. The entrypoint verifies
+that grant with the read-only public key and immediately `exec`s. A crash anywhere after consumption spends
+the nonce; replacement requires explicit `rearm` under the host operation lock. Expiry, every marker or
+pointer transition/rollback, and terminal operation invalidate all armed nonces before their effect. The
+host may issue a launch grant only against a BOUND marker whose database identity is verified against the
+container's live query; an intent or half-bound marker is an immediate refusal and cannot consume a nonce.
+The identity is never inferred from the pointer, Compose environment or any container assertion. The
+socket exposes no read/list/write-filesystem operation. This replaces—do not implement alongside it—Lane D's
+superseded `capability.pending → capability.consumed` file-rename protocol.
+
+**Host effects resume from one fsynced append-only run ledger under one host lock.** The supervisor acquires
+`/var/lib/spaceworks/ops/operation.lock` before preflight on every new run and resume and retains the `flock`
+until exit. The descriptor is close-on-exec and is never inherited by a Docker-launched process. Every effect
+has an exact `{run_id, artifact_sha256, phase, state, attempt, started_at, finished_at, detail}` `begun` record
+fsynced before it runs and a `done` record fsynced after it completes; resume selects the first phase without
+`done`. An interrupted `database-restore` attempt can resume only against a different, proven-empty sibling.
+
+**Lane D target restore is one ordered, fail-closed H1-supervised operation.** Static preflight is read-only
+and independently proves artifact/build/schema/PostgreSQL/encryption/tenant facts, object capacity, approval
+input, exact current/source/scratch/sibling identities, privilege probes, provider isolation, the complete
+writer set and pointer CAS before allocation. It then persists the offline state, excludes every image
+writer, obtains and re-reads any external scheduler's zero-active fence receipt, and only then allocates a
+distinct empty non-routable sibling. Restore is exactly `pg_restore --exit-on-error --no-owner --no-acl`;
+the child receives a scrubbed environment and a temporary mode-`0600` pgpass file, never a password in
+argv, `PGPASSWORD`, the run ledger or the raised error;
+the maintenance owner and narrow runtime grants are re-established before any Django target command.
+Target state uses the distinct `target_import` recovery mode—never `enter_quarantine()`, because quarantine
+invalidates imported passwords. Object writes are pre-ledgered as `created_by_this_run` or
+`accepted_existing`; only the former may be rolled back. Activation order is immutable: verify, pointer CAS,
+set NORMAL against the explicitly queried new identity and fsync away the host gate, start every writer and
+prove its marker, then fsync the final ledger record while the supervisor still owns the lock. A completed
+cutover on re-entry requires both the pointer tuple and target database marker to match its ledger record.
+Missing recovery singleton rows and unknown recovery modes are routing-denied, never treated as NORMAL.
+
+**External schedulers participate through durable provider control-plane state.** The D7 adapter invokes
+idempotent `stop`, `fence`, `status`, `restart` and `readiness` operations with exact run/database/generation
+tuples. Fence must prove all catalogued jobs disabled and zero active work, and resume must re-read the same
+receipt. Restart/readiness must prove the new generation and database marker, exact job set/cadence, and no
+old-generation dispatch. Local container state, the host marker and assumed credential propagation are not
+scheduler receipts; a timeout or tuple conflict leaves the restore resumable behind its gates.
+
+**Cloud interpolation state is initialized once, not borrowed from later shells.**
+`scripts/init-cloud-environment.py init-from-current-environment` captures every variable referenced by the
+Cloud Compose file from that one invocation, refuses missing required values, atomically fsyncs the private
+static file plus H1 pointer, records only names/value digests, and requires `docker compose config` under a
+scrubbed environment to reproduce the committed database URL. Later production Compose calls remain behind
+the committed wrapper and its static/topology digest checks.
+
+**The database pointer and generation are one authority record.** Bundled and Cloud Compose use the single
+root-owned `/var/lib/spaceworks/ops/database-pointer.env`, written by file fsync, atomic same-directory rename,
+then parent-directory fsync. Cloud layers it after `/etc/spaceworks/cloud.env`; bundled layers it after the
+installer's static `.env`. `scripts/spaceworks-compose.sh` is the only supported production Compose launcher:
+it validates owner/mode, scheduler declaration and recorded configuration digests; refuses unregistered file
+or env overlays; unsets inherited `DATABASE_URL` and `SPACEWORKS_DB_POINTER_GENERATION`; and supplies static
+environment first and the pointer last. External orchestrators must instead keep URL plus monotonic generation
+in one versioned secret/config object and use store-native compare-and-swap on the expected version. A stale
+version, non-monotonic generation, missing durability, incomplete writer rollout or unsafe sibling lifecycle
+is refused.
+
+**Database identity is queried deployment state, never inferred from the pointer.** Migration 0021 seeds the
+immutable singleton in the active database. The readable-main artifact projection deliberately deletes that
+row under the immutable-delete GUC, so a restored sibling must receive one new
+`{database_uuid, run_id, artifact_sha256, capture_id, created_at}` row after restore and before admission.
+Connection host/port/database/TLS trust identity plus the queried UUID is authoritative. PostgreSQL's system
+identifier is corroboration only; inability to call `pg_control_system()` falls back to the UUID rather than
+dropping server identity. A pointer comparison without the singleton is always refused.
+
+Bundled databases use distinct maintenance and runtime identities. The application runtime role is a
+non-owner without superuser, role/database creation, replication, or row-security bypass authority.
+Entering candidate preparation writes the restrictive marker first, then makes that role `NOLOGIN`,
+terminates its sessions, and revokes table/sequence writes; the maintenance owner remains the only writer.
+Candidate health establishes read-only grants before marker admission; quarantine changes the marker first
+because it does not widen the admitted role set, then restores runtime writes; worker readmission happens
+only after writable grants. This ordering and the grant
+boundary cover raw SQL and `docker exec` paths that never execute the image entrypoint. A topology whose
+provider cannot establish and probe this split is unsupported, not degraded to an advisory process check.
+
+**Readiness remains reachable in quarantine and is bound to the host marker.** The readiness route is in
+the recovery allowlist and verifies the live database name/OID, no pending Django migration, every declared
+reservation row count/digest, every declared enabled database-fence definition, and every declared
+not-restored row count/digest.
+The `candidate-backend` recovery profile has no normal `migrate` dependency. Empty declarations are valid
+before E9 creates those database objects; E9 must populate exact declarations before candidate cutover.
+An external scheduler is outside the image/marker boundary, so its topology must declare either the same
+host gate or durable provider-control-plane disablement unless the marker is `normal` or
+`acknowledged-normal`. The topology
+validator refuses an external scheduler declaring neither; Lane D additionally refuses to run external
+mode without the provider callback adapter and its durable fence/status contract.
+
+**Ordinary image processes run unprivileged.** `backend/Dockerfile` creates uid 10001 `app`, uses `COPY --chown`
 (a later `chown -R /app` would duplicate the whole tree into a second layer) and drops `USER app`
-before CMD. Two paths must therefore stay writable and owned by `app`: `STATIC_ROOT`
+before ENTRYPOINT/CMD. The only bundled overrides are the short-lived root
+`orchestration-init`/`orchestration-ready` services: they run the fixed bootstrap entrypoint to provision
+database grants and the root-owned marker, expose no network service, and carry no arbitrary application
+command. Do not put migrations, Django management commands, or a shell into those privileged services.
+Two paths must stay writable and owned by `app`: `STATIC_ROOT`
 (`/app/staticfiles`, written by the boot-time `collectstatic`) and `/var/lib/celery`. In **dev** the
 `./backend` bind mount is owned by the host user, and `makemigrations` has to write into it, so
 `docker-compose.dev.yml` sets `user: "${DEV_UID:-1000}:${DEV_GID:-1000}"` on `backend` only —
@@ -2496,14 +2619,14 @@ in `Created` — **`setup.sh` could never bring the app up**. Origins are now se
 **Browser-facing storage URLs must name the real host, never `localhost`.**
 `AWS_S3_PUBLIC_ENDPOINT_URL` / `PUBLIC_IMAGE_BASE_URL` are baked into presigned evidence upload/view URLs
 and every public image `src`. The compose default (`http://localhost:9000`) makes a deployment work only
-from the server console and show broken images to everyone else, so `setup.sh`/`setup.ps1` now write both
+from the server console and show broken images to everyone else, so `setup.sh` writes both
 from the answered web address. The compose default is kept (not made `:?` required) so existing
 deployments don't hard-break on upgrade.
 
 **`.dockerignore` patterns are root-anchored.** A bare `__pycache__`/`*.pyc` does not match nested
 directories — every `apps/*/__pycache__` was shipping inside the image. Nested patterns need `**/`.
 
-**Production compose defaults that are not optional:** every long-running service carries
+**Production compose defaults that are not optional:** ordinary long-running services carry
 `restart: unless-stopped` (via the `x-restart` anchor) or the stack does not survive a host reboot, and a
 capped `json-file` `logging` block (via `x-logging`) or container logs fill the host disk. Third-party
 images are pinned to a verified release tag — **verify a tag actually resolves before pinning it**

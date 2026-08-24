@@ -14,7 +14,8 @@ Intel NUC) that stays on and connected to your network.
 Docker is the free "engine" that runs the app. Install it once:
 
 1. Go to **https://www.docker.com/products/docker-desktop/**.
-2. Download the version for your computer (Windows or Mac) and run the installer.
+2. Download the version for your computer (Windows or Mac) and run the installer. On Windows,
+   enable the WSL2 integration; H1 uses Linux host locks and Unix sockets.
 3. Click through the installer (the defaults are fine), then **start Docker Desktop** and wait
    until it says it's running (a whale icon appears in your taskbar/menu bar).
 
@@ -32,11 +33,9 @@ Docker is the free "engine" that runs the app. Install it once:
 This is the only "command" you'll run, and the script does the rest (it makes all the passwords
 and security keys for you).
 
-**On Windows:**
-1. Open the unzipped folder.
-2. Right-click the file **`setup.ps1`** → **Run with PowerShell**.
-   - If Windows blocks it, open **PowerShell** in that folder and run:
-     `powershell -ExecutionPolicy Bypass -File setup.ps1`
+**On Windows:** open the folder from a WSL2 terminal and run `bash setup.sh`. The old direct
+PowerShell/Compose route is deliberately refused because it cannot provide the root-owned Unix socket and
+host `flock` used by restore safety.
 
 **On Mac/Linux:**
 1. Open the **Terminal** app.
@@ -123,7 +122,7 @@ By default it's at `localhost` (only that computer). To let others at your space
    hostname).
 2. Re-run the setup once and enter that address when asked for the "web address", **or** edit the
    `ALLOWED_HOSTS` and `CORS_ALLOWED_ORIGINS` lines in the `.env` file to include it, then run
-   `docker compose -f docker-compose.prod.yml -f docker/compose.build.yml up -d`.
+   `SPACEWORKS_COMPOSE_BUILD_LAYER=1 scripts/spaceworks-compose.sh bundled up -d`.
 3. People then visit `http://<that-address>/` in their browser.
 
 > For a public website with a real domain and HTTPS, you'll want someone technical to put a
@@ -146,14 +145,13 @@ You have two good options before giving up:
 
 ## Everyday operations
 
-- **Start it / after a reboot:** Docker Desktop can auto-start the app, or run the same
-  `docker compose … up -d` command.
-- **Stop it:** `docker compose -f docker-compose.prod.yml -f docker/compose.build.yml down`
+- **Start it / after a reboot:** Docker Desktop can auto-start the app, or run
+  `SPACEWORKS_COMPOSE_BUILD_LAYER=1 scripts/spaceworks-compose.sh bundled up -d`.
+- **Stop it:** `SPACEWORKS_COMPOSE_BUILD_LAYER=1 scripts/spaceworks-compose.sh bundled down`
   (your data is safe — it's kept in a database volume).
 - **Update to a newer version:** guided installs check every seven days by default. Use
   **Staff console -> Platform settings -> Software updates** to control automatic installation or select
-  **Update now**. Run `scripts/update.sh --force`
-  (Mac/Linux) or `scripts/update.ps1 -Force` (Windows) to update immediately; the updater backs up
+  **Update now**. Run `scripts/update.sh --force` on Linux or from WSL2 to update immediately; the updater backs up
   PostgreSQL and verifies the new release before marking it installed. If the new application fails,
   it automatically returns to the previous retained release. Your `.env` and data are preserved. The
   database snapshot is retained but never restored automatically, and it does not cover MinIO photos
@@ -164,5 +162,5 @@ You have two good options before giving up:
 - **"Docker is not running"** — open Docker Desktop and wait for it to start, then try again.
 - **The page won't load** — give it another minute on first run; the build takes time.
 - **See what's happening:** run
-  `docker compose -f docker-compose.prod.yml -f docker/compose.build.yml logs backend`.
+  `SPACEWORKS_COMPOSE_BUILD_LAYER=1 scripts/spaceworks-compose.sh bundled logs backend`.
 - Still stuck? Open an issue on GitHub describing what you did and what you saw.

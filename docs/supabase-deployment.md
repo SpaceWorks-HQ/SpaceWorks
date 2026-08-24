@@ -83,7 +83,10 @@ photos and print files must remain in the private `AWS_STORAGE_BUCKET_NAME`.
 `pg_cron` can only run SQL, so it can't call `manage.py send_return_reminders`. Instead:
 
 1. Set `CRON_SECRET` to a long random value.
-2. Schedule a daily `POST https://<your-django-host>/api/v1/internal/cron/return-reminders`
+2. Configure the scheduler control plane to disable the job unless the SpaceWorks host marker is `normal`
+   or `acknowledged-normal`; a remote scheduler is not fenced by the image entrypoint and is unsupported
+   without this.
+3. Schedule a daily `POST https://<your-django-host>/api/v1/internal/cron/return-reminders`
    with header `X-Cron-Secret: <CRON_SECRET>` from GitHub Actions cron, cron-job.org, or
    Supabase `pg_cron` + `pg_net`. The endpoint **404s** until `CRON_SECRET` is set and returns
    **403** on a wrong secret; the management command still works for manual runs.

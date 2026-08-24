@@ -27,6 +27,12 @@ ALWAYS_OMITTED = {
     ("apiclients.ApiClient", "previous_secret_encrypted"): (
         "API client credential retained for the rotation grace window."
     ),
+    ("apiclients.ApiClient", "import_provenance_digest"): (
+        "Target-deployment Lane D issuance provenance."
+    ),
+    ("apiclients.ApiClient", "credential_delivered_at"): (
+        "Target-host one-time credential delivery state."
+    ),
     ("audit.AuditLog", "event_uuid"): "Source-deployment audit integrity identity.",
     ("audit.AuditLog", "row_mac"): "Source-deployment audit integrity evidence.",
     ("backup.MakerspaceArchiveRecipient", "verified_at"): (

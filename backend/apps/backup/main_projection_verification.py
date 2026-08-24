@@ -32,6 +32,8 @@ def build_expected_ledger(using, rules, makerspace_ids, *, sequence_facts):
         queryset = rule.model._base_manager.using(using).order_by(
             rule.model._meta.pk.name
         )
+        if rule.disposition == RowDisposition.OMIT_OPERATIONAL:
+            queryset = queryset.none()
         if rule.disposition == RowDisposition.COPY_TO_SLICE:
             queryset = queryset.exclude(sovereign_q(rule.predicate, makerspace_ids))
         if rule.model in dropped_boundaries:
@@ -62,6 +64,13 @@ def verify_readable_main(using, rules, makerspace_ids, expected):
         queryset = rule.model._base_manager.using(using).order_by(
             rule.model._meta.pk.name
         )
+        if (
+            rule.disposition == RowDisposition.OMIT_OPERATIONAL
+            and queryset.exists()
+        ):
+            raise BackupBuildError(
+                f"Readable main retains operational rows in {rule.model._meta.db_table}."
+            )
         if (
             rule.disposition == RowDisposition.COPY_TO_SLICE
             and queryset.filter(sovereign_q(rule.predicate, makerspace_ids)).exists()

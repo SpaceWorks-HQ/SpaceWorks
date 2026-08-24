@@ -8,7 +8,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from unfold.admin import ModelAdmin
 
 from apps.apiclients.admin_forms import ApiClientAdminForm
-from apps.apiclients.models import ApiClient, ApiKeyRequest
+from apps.apiclients.models import ApiClient, ApiClientImportApproval, ApiKeyRequest
 from apps.apiclients.notifications import notify_api_key_request_resolved
 from apps.apiclients.scope_registry import LEGACY_SCOPE
 from apps.apiclients.services import sync_makerspace_origins
@@ -240,7 +240,6 @@ class ApiKeyRequestAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
                 f"Skipped {skipped_count} non-pending API key request(s).",
                 level=messages.WARNING,
             )
-
     @admin.action(description="Reject selected API key requests")
     def reject_selected(self, request, queryset):
         rejected_count = 0
@@ -282,3 +281,15 @@ class ApiKeyRequestAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
                 f"Skipped {skipped_count} non-pending API key request(s).",
                 level=messages.WARNING,
             )
+
+
+@admin.register(ApiClientImportApproval)
+class ApiClientImportApprovalAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    list_display = ("source_client_ref", "makerspace", "api_client", "approved_at")
+    readonly_fields = tuple(field.name for field in ApiClientImportApproval._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

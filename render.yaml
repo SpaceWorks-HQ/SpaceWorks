@@ -1,4 +1,8 @@
 # Render Blueprint for the lean-paid always-on path.
+# H1 NOTE: the image now fails closed without the root-owned host marker. Render does not
+# mount that marker through this Blueprint, so deployment is intentionally refused until
+# a provider adapter lands in H1b. The explicit roles below must not be removed or replaced
+# with an ENTRYPOINT override.
 # Migrations are a documented ONE-OFF run against the Supabase direct/session URL,
 # not part of deploy. See docs/deploy-production.md. The app runtime uses the
 # transaction pooler URL. VPS deployment via docker-compose.prod.yml is the alternative.
@@ -112,7 +116,7 @@ services:
     # here; migrations are NOT run at start (they are a one-off against the direct/session
     # pooler - see docs/deploy-production.md), because the runtime DATABASE_URL is the
     # transaction pooler which can't run migration prepared statements.
-    startCommand: python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    startCommand: --role backend sh -c "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
     envVars:
       - fromGroup: makerspace-prod
       - key: CELERY_BROKER_URL
@@ -127,7 +131,7 @@ services:
     plan: starter
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    dockerCommand: celery -A config worker -l info
+    dockerCommand: --role worker celery -A config worker -l info
     envVars:
       - fromGroup: makerspace-prod
       - key: CELERY_BROKER_URL
@@ -142,7 +146,7 @@ services:
     plan: starter
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    dockerCommand: celery -A config beat -l info
+    dockerCommand: --role beat celery -A config beat -l info
     envVars:
       - fromGroup: makerspace-prod
       - key: CELERY_BROKER_URL

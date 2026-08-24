@@ -80,6 +80,17 @@ def ensure_global_pii_write_fence(request):
 
 
 @pytest.fixture(autouse=True)
+def ensure_deployment_recovery_state(request):
+    """Mirror the migration-seeded routing singleton after transactional flushes."""
+    if not request.node.get_closest_marker("django_db") or connection.needs_rollback:
+        return
+    request.getfixturevalue("db")
+    from apps.backup.models import DeploymentRecoveryState
+
+    DeploymentRecoveryState.objects.get_or_create(pk=1)
+
+
+@pytest.fixture(autouse=True)
 def ensure_global_audit_mac_key(request, settings):
     """Mirror the deploy-time global-key provisioning invariant in DB tests."""
     settings.AUDIT_MAC_MASTER_KEY = _TEST_AUDIT_MAC_MASTER_KEY

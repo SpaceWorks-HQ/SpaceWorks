@@ -42,16 +42,22 @@ class DeploymentRecoveryGateMiddleware:
     @staticmethod
     def _load_mode():
         state = DeploymentRecoveryState.objects.only("mode").filter(pk=1).first()
-        return state.mode if state else DeploymentRecoveryState.Mode.NORMAL
+        # The singleton is a routing gate, not optional configuration. Treating an
+        # absent row as NORMAL would make a partially restored sibling serve before
+        # Phase D7 has installed TARGET_IMPORT and completed pointer cutover.
+        return state.mode if state else "unavailable"
 
     @staticmethod
     def _refused(mode):
         detail = (
             "This deployment is in recovery quarantine. Only recovery routes are available."
             if mode == DeploymentRecoveryState.Mode.QUARANTINED
-            else "This deployment is temporarily quiesced for restore."
+            else (
+                "This deployment is being prepared as a non-routable import target."
+                if mode == DeploymentRecoveryState.Mode.TARGET_IMPORT
+                else "This deployment is temporarily unavailable for restore."
+            )
         )
         return JsonResponse(
             {"detail": detail, "code": f"deployment_{mode}"}, status=503
         )
-

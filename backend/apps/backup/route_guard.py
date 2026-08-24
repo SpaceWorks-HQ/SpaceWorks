@@ -1,7 +1,11 @@
 from django.urls import get_resolver
 
 from apps.accounts.claim_route_inspection import flatten_routes, handled_methods
-from apps.backup.route_policy import QUARANTINE_ALLOWED, QUIESCED_ALLOWED
+from apps.backup.route_policy import (
+    QUARANTINE_ALLOWED,
+    QUIESCED_ALLOWED,
+    TARGET_IMPORT_ALLOWED,
+)
 
 
 # Inspection is deliberately limited to the recovery surface.  The runtime decision is
@@ -40,6 +44,7 @@ def validate_recovery_route_allowlists(patterns=None, *, policy_sets=None):
     policy_sets = policy_sets or (
         ("quarantined", QUARANTINE_ALLOWED),
         ("quiesced", QUIESCED_ALLOWED),
+        ("target_import", TARGET_IMPORT_ALLOWED),
     )
     for mode, policies in policy_sets:
         names = {name for name, _method in policies}

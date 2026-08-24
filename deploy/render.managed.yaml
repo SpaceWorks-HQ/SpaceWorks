@@ -1,4 +1,7 @@
 # Render Blueprint for MANAGED multi-tenant hosting (plan Track D, phase 15).
+# H1 NOTE: the image now fails closed without the root-owned host marker. This Blueprint
+# cannot supply it and is intentionally refused until an H1b provider adapter exists. The
+# explicit process roles below must not be bypassed with a platform entrypoint override.
 #
 # This is deliberately a separate file from the repository root's `render.yaml`, which is
 # and stays the lean self-host blueprint. Render reads `render.yaml` at the repo root by
@@ -151,7 +154,7 @@ services:
     # Same reasoning as the self-host blueprint: collectstatic runs at START so the
     # populated STATIC_ROOT lives in the container that serves traffic, and migrations
     # stay a one-off against the direct/session pooler.
-    startCommand: python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    startCommand: --role backend sh -c "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
     envVars:
       - fromGroup: spaceworks-managed
       - key: CELERY_BROKER_URL
@@ -166,7 +169,7 @@ services:
     plan: starter
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    dockerCommand: celery -A config worker -l info
+    dockerCommand: --role worker celery -A config worker -l info
     envVars:
       - fromGroup: spaceworks-managed
       - key: CELERY_BROKER_URL
@@ -183,7 +186,7 @@ services:
     dockerContext: ./backend
     # Explicit --schedule: beat otherwise drops its shelve in the CWD, and /app is not
     # writable after the image drops to the unprivileged uid.
-    dockerCommand: celery -A config beat -l info --schedule /var/lib/celery/celerybeat-schedule
+    dockerCommand: --role beat celery -A config beat -l info --schedule /var/lib/celery/celerybeat-schedule
     envVars:
       - fromGroup: spaceworks-managed
       - key: CELERY_BROKER_URL

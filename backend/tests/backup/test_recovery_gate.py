@@ -33,6 +33,7 @@ def test_guard_rejects_an_allowed_method_the_view_does_not_handle():
 
 
 def test_method_keying_keeps_new_handlers_default_denied():
+    assert route_allowed("quarantined", "readiness", "GET")
     assert route_allowed("quarantined", "auth-login", "POST")
     assert not route_allowed("quarantined", "auth-login", "GET")
     assert not route_allowed("quarantined", "auth-login", "PUT")

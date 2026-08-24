@@ -218,6 +218,10 @@ DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=0)
 DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = env.bool(
     "DISABLE_SERVER_SIDE_CURSORS", default=False
 )
+SPACEWORKS_HOST_MARKER_PATH = env(
+    "SPACEWORKS_HOST_MARKER_PATH",
+    default="/run/spaceworks-host/restore-marker.json",
+)
 
 AUTH_PASSWORD_VALIDATORS = [
     {

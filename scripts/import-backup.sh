@@ -4,9 +4,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-COMPOSE=(docker compose -f docker-compose.prod.yml)
+COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)
 OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
-IDENTITY_FILE="${BACKUP_AGE_IDENTITY_FILE:-$OPS_DIR/age-identity.txt}"
+OPS_WORK_DIR="$OPS_DIR/work"
+IDENTITY_FILE="${BACKUP_AGE_IDENTITY_FILE:-$OPS_WORK_DIR/age-identity.txt}"
 SOURCE="${1:-}"
 USERNAME="${2:-}"
 EXPECTED_SHA256="${3:-}"
@@ -19,11 +20,11 @@ command -v flock >/dev/null 2>&1 || die "flock is required."
 
 exec 9>"$OPS_DIR/operation.lock"
 flock -n 9 || die "Another backup, restore, verification, or update is running."
-WORK="$(mktemp -d "$OPS_DIR/import-XXXXXXXX")"
+WORK="$(mktemp -d "$OPS_WORK_DIR/import-XXXXXXXX")"
 if [[ "$(id -u)" == "0" ]]; then
   chown -R 10001:10001 "$WORK"
 fi
-CONTAINER_WORK="${WORK/$OPS_DIR/\/var\/lib\/spaceworks\/ops}"
+CONTAINER_WORK="${WORK/$OPS_WORK_DIR/\/var\/lib\/spaceworks\/ops\/work}"
 cleanup() { rm -rf -- "$WORK"; }
 trap cleanup EXIT
 cp -- "$SOURCE" "$WORK/archive.tar.age"
@@ -124,7 +125,7 @@ import_args=(
 if [[ -n "$EXPECTED_SHA256" ]]; then
   import_args+=(--expected-sha256 "$EXPECTED_SHA256")
 fi
-restore_id="$("${COMPOSE[@]}" exec -T backend python manage.py import_backup_archive \
+restore_id="$("${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py import_backup_archive \
   "${import_args[@]}" | tail -n 1)"
 [[ "$restore_id" =~ ^[0-9a-fA-F-]{36}$ ]] || die "The app did not record a restore intent."
 trap - EXIT

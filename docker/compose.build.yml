@@ -11,6 +11,30 @@ services:
     build:
       context: ./backend
 
+  orchestration-init:
+    build:
+      context: ./backend
+
+  orchestration-ready:
+    build:
+      context: ./backend
+
+  migrate:
+    build:
+      context: ./backend
+
+  worker:
+    build:
+      context: ./backend
+
+  beat:
+    build:
+      context: ./backend
+
+  candidate-backend:
+    build:
+      context: ./backend
+
   frontend:
     build:
       context: ./frontend

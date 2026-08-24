@@ -144,7 +144,7 @@ The default path needs nothing installed on the host but Docker. Migrations run 
 ```bash
 # Everything — db, redis, minio, Django, Celery worker/beat, Vite — with live reload.
 ./scripts/dev-docker.sh up -d --build     # first run; drop --build afterwards
-./scripts/dev-docker.sh exec backend python manage.py seed_demo   # first run only
+./scripts/dev-docker.sh run --rm --no-deps backend --role management python manage.py seed_demo   # first run only
 ./scripts/dev-docker.sh logs -f backend
 ./scripts/dev-docker.sh restart worker beat   # Celery has no autoreload
 ./scripts/dev-docker.sh down

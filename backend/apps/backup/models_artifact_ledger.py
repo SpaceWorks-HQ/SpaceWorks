@@ -170,3 +170,8 @@ class BackupComponentRecipient(models.Model):
 
     def delete(self, *args, **kwargs):
         raise RuntimeError("Recipient-use history is tombstoned, never deleted.")
+
+
+# Importing this module from backup.models registers the operational singleton with
+# Django without growing the already-over-ceiling models.py barrel.
+from .models_host_identity import DeploymentDatabaseIdentity  # noqa: E402,F401

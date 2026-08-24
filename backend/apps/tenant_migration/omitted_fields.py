@@ -36,6 +36,8 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         DROP_ROW,
         ("apiclients.ApiClient", "client_id"),
         ("apiclients.ApiClient", "secret_encrypted"),
+        ("apiclients.ApiClient", "import_provenance_digest"),
+        ("apiclients.ApiClient", "credential_delivered_at"),
         # The retained rotation-grace secret goes with the current one: a client the
         # target cannot authenticate is a client the target must re-issue.
         ("apiclients.ApiClient", "previous_secret_encrypted"),

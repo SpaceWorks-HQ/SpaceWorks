@@ -5,6 +5,9 @@ HEALTH_ROUTES = {
     ("health", "GET"),
     ("health", "HEAD"),
     ("health", "OPTIONS"),
+    ("readiness", "GET"),
+    ("readiness", "HEAD"),
+    ("readiness", "OPTIONS"),
 }
 
 QUARANTINE_ALLOWED = HEALTH_ROUTES | {
@@ -31,6 +34,10 @@ QUIESCED_ALLOWED = HEALTH_ROUTES | {
     ("admin-restore-decision", "OPTIONS"),
 }
 
+# Structural non-routing is the primary D7 boundary. This allowlist is the second
+# application boundary if a candidate process is launched through H1b for health.
+TARGET_IMPORT_ALLOWED = HEALTH_ROUTES
+
 
 def route_allowed(mode, view_name, method):
     key = (view_name, method.upper())
@@ -38,4 +45,6 @@ def route_allowed(mode, view_name, method):
         return key in QUARANTINE_ALLOWED
     if mode == "quiesced":
         return key in QUIESCED_ALLOWED
-    return True
+    if mode == "target_import":
+        return key in TARGET_IMPORT_ALLOWED
+    return mode == "normal"

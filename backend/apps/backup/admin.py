@@ -22,6 +22,7 @@ from apps.backup.models import (
     RestoreRollbackObject,
     TenantExitCustodyAlarmDelivery,
 )
+from apps.backup.models_host_identity import DeploymentDatabaseIdentity
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -136,6 +137,7 @@ for model in (
     B1RestoreComponentState,
     B1ReservationEntry,
     B1FenceContinuity,
+    DeploymentDatabaseIdentity,
     # MakerspaceTenantExitCustodyState and TenantExitCustodyAlarmDelivery are NOT listed here:
     # both carry dedicated @admin.register classes above, and registering them twice raises
     # AlreadyRegistered at import time.

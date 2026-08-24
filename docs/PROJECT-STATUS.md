@@ -35,7 +35,7 @@ into grouped sections and a test asserts every sidebar link resolves. `tests/tes
 walks every registered admin and forces an explicit scoped/global decision (via `NESTED_MAKERSPACE_LOOKUPS`
 / `GLOBAL_ADMIN_MODELS`) so a new admin can't silently leak across the superadmin hide/archive scoping.
 
-**Non-technical install:** `setup.sh` / `setup.ps1` (first-run wizard: Docker check → generate secrets incl.
+**Non-technical install:** `setup.sh` on Linux/WSL2 (first-run wizard: Docker check → generate secrets incl.
 Fernet `API_CLIENT_ENC_KEY` → write `.env` → build → `setup_instance` → print URL/creds),
 `docker/compose.build.yml`, and `docs/setup-for-makerspaces.md`. TLS is env-gated (`ENABLE_HTTPS`, default
 off). First-run `setup_instance` seeds `superadmin`/`super123` + `must_change_password` (surfaced by login +
