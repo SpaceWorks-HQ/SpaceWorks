@@ -1,7 +1,7 @@
 from celery import Task
 from django.apps import apps
 
-from apps.tenant_migration.gate_locks import unscoped_writer_shared_session
+from apps.tenant_migration.gate_locks import unscoped_writer_shared_boundary
 from apps.tenant_migration.gate_policy import (
     TASK_EXEMPTIONS,
     TASK_INTERNAL_PARTICIPANTS,
@@ -34,7 +34,7 @@ class TenantGateTask(Task):
                 return super().__call__(*args, **kwargs)
             with boundary_tenant_write(makerspace_id):
                 return super().__call__(*args, **kwargs)
-        with unscoped_writer_shared_session():
+        with unscoped_writer_shared_boundary():
             return super().__call__(*args, **kwargs)
 
 
