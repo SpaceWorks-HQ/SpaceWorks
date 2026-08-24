@@ -11,9 +11,9 @@ from .tenant_restore_activation import cutover as _cutover, start_serving
 from .tenant_restore_objects import (
     load_object,
     object_phase,
-    object_phases,
     validate_object_plan,
 )
+from .tenant_restore_phases import ordered_phases
 from .tenant_restore_ledger import (
     done_detail as _done_detail,
     incomplete_effect as _incomplete,
@@ -28,42 +28,6 @@ from .tenant_restore_types import (
     StaticPreflight,
     TenantRestoreRefused,
 )
-
-
-BASE_PHASES_BEFORE_OBJECTS = (
-    "static-preflight",
-    "persist-offline",
-    "exclude-image-writers",
-)
-BASE_PHASES_AFTER_FENCE = (
-    "sibling-allocation",
-    "database-restore",
-    "target-state-and-cryptography",
-    "object-prefix-reservation",
-)
-BASE_PHASES_AFTER_OBJECTS = (
-    "api-client-reissue",
-    "target-superadmin",
-    "activation-verify",
-    "activation-cutover",
-    "activation-clear-gates",
-    "activation-start-serving",
-    "finalize",
-)
-
-
-def ordered_phases(inputs, *, external_scheduler):
-    fence = (
-        ("external-scheduler-stop", "external-scheduler-fence")
-        if external_scheduler else ()
-    )
-    return (
-        *BASE_PHASES_BEFORE_OBJECTS,
-        *fence,
-        *BASE_PHASES_AFTER_FENCE,
-        *object_phases(inputs.object_entries),
-        *BASE_PHASES_AFTER_OBJECTS,
-    )
 
 
 def _static_preflight(inputs, artifact, database, pointer, *, scheduler, ledger):
@@ -103,7 +67,7 @@ def _reestablish_exclusion(ledger, inputs, preflight, writers, scheduler):
 def run_target_restore(
     *, ops_dir, inputs, artifact, database, writers, pointer, target,
     object_store, destination_prefix, capability_journal, marker_writer,
-    scheduler=None,
+    storage_makerspace=None, scheduler=None,
     require_root_owned=True,
 ):
     """Run or resume Phase T; the H1 supervisor retains the lock until return."""
@@ -262,9 +226,14 @@ def run_target_restore(
             ledger, "object-prefix-reservation", {"prefix": destination_prefix},
             lambda: object_store.reserve_prefix(destination_prefix),
         )
+        if inputs.object_entries and storage_makerspace is None:
+            raise TenantRestoreRefused("Target storage accounting is unavailable.")
         for index, entry in enumerate(inputs.object_entries):
             if not _done(ledger, object_phase(index, entry)):
-                load_object(ledger, object_store, artifact, entry, index=index)
+                load_object(
+                    ledger, object_store, artifact, entry, index=index,
+                    makerspace=storage_makerspace,
+                )
 
         _effect(
             ledger, "api-client-reissue", {"approved": True},
