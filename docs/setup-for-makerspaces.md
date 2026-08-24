@@ -173,7 +173,9 @@ You have two good options before giving up:
   and files; back up the MinIO data volume separately.
 - **Change modules without upgrading:** run `bash scripts/update.sh --modules-only --makerspace <slug>`.
   With several makerspaces, select one slug or explicitly use `--all-makerspaces`; the updater never
-  guesses. Unticking asks for confirmation and retains all module data.
+  guesses. Use `--modules` to force the tick list during an update, or `--no-module-changes` to update only
+  the release. Unticking asks for confirmation and retains all module data; install and update never run
+  the separate destructive `purge_module_data` command.
 
 Pasting the curl installer again over an install with `.spaceworks-version` opens a menu for update,
 module changes, both, or cancel. A non-empty directory without that marker is refused instead of being
@@ -192,7 +194,7 @@ treated as a safe live deployment.
 ## Something went wrong?
 
 - **"Docker is not running"** — open Docker Desktop and wait for it to start, then try again.
-- **The page won't load** — give it another minute on first run; the build takes time.
+- **The page won't load** — give it another minute on first run; image download and startup take time.
 - **See what's happening:** run
   `scripts/spaceworks-compose.sh bundled logs backend`.
 - Still stuck? Open an issue on GitHub describing what you did and what you saw.

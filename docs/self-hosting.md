@@ -147,6 +147,12 @@ healthy. It is seeded from each makerspace's current `enabled_modules`, not an i
 no terminal and therefore performs only the release update. Useful explicit forms are:
 
 ```bash
+# Explicitly open the live module tick list after a checked update.
+bash scripts/update.sh --force --modules
+
+# Update the release without reviewing or changing modules.
+bash scripts/update.sh --force --no-module-changes
+
 # Change modules without checking for a release.
 bash scripts/update.sh --modules-only --makerspace my-space
 
@@ -161,7 +167,10 @@ bash scripts/update.sh --all-modules --all-makerspaces
 With multiple makerspaces, interactive use asks for a slug; non-interactive use refuses unless given
 `--makerspace` or the explicit `--all-makerspaces` opt-in. Unticking/disabling a module requires
 confirmation and runs the two-pass dependency-safe uninstall loop. It only invokes `uninstall_module`:
-retained rows are never purged by setup or update.
+retained rows are never purged by setup or update. `--modules` forces the interactive review;
+`--modules-only`, `--all-modules`, `--without=a,b`, `--makerspace <slug>`, `--all-makerspaces`,
+`--confirm-removals` and `--no-module-changes` provide explicit non-default behavior for operators and
+automation.
 
 Pre-update database dumps are written to `backups/` and retained for 14 days. Each compressed dump
 contains PostgreSQL data: users, settings, inventory, requests, loan history, and audit metadata. It does

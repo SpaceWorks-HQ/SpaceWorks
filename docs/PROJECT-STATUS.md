@@ -39,7 +39,9 @@ walks every registered admin and forces an explicit scoped/global decision (via 
 (preflight → tagged source archive → published-image pull → `setup.sh` secrets/instance/live module ticks →
 version marker), with `SPACEWORKS_DIR` override and an existing-install update/module menu.
 `setup.sh --build` is the explicit source-build path via `docker/compose.build.yml`. Native Windows covers
-install/run/update; restore and compound host recovery stay WSL2-only. See
+install/run/update, using the crash-recoverable PID/timestamp update lock when `flock` is unavailable;
+restore and compound host recovery stay WSL2-only because they require AF_UNIX sockets and
+root-owned-file trust semantics. See
 `docs/setup-for-makerspaces.md`. TLS is env-gated (`ENABLE_HTTPS`, default off). First-run
 `setup_instance` seeds `superadmin`/`super123` + `must_change_password` (surfaced by login + `/auth/me`,
 cleared by `/auth/change-password`).
