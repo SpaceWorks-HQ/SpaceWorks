@@ -201,7 +201,11 @@ def validate_user_edges(user_edges=USER_EDGES):
     raw = set()
     for model in internal_models():
         for field in model._meta.get_fields():
-            if field.concrete and field.is_relation and field.related_model is user:
+            if (
+                (field.concrete or field.many_to_many)
+                and field.is_relation
+                and field.related_model is user
+            ):
                 relational.add((model._meta.label, field.name))
             elif (
                 field.concrete
