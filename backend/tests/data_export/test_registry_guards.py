@@ -1,7 +1,9 @@
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
+from apps.data_export import guards
 from apps.data_export.datasets import DATASETS
 from apps.data_export.fields import FIELDS, USER_PROJECTIONS
 from apps.data_export.guards import (
@@ -172,6 +174,50 @@ def test_user_edge_completeness_detects_silent_edge():
 
     with pytest.raises(RegistryError, match="user-edge decisions"):
         validate_user_edges(changed)
+
+
+def test_user_edge_discovery_includes_many_to_many_and_through_fk(monkeypatch):
+    user = guards.apps.get_model("accounts.User")
+    direct_model = SimpleNamespace(
+        _meta=SimpleNamespace(
+            label="example.Team",
+            get_fields=lambda: (
+                SimpleNamespace(
+                    concrete=False,
+                    many_to_many=True,
+                    is_relation=True,
+                    related_model=user,
+                    name="members",
+                ),
+            ),
+        )
+    )
+    through_model = SimpleNamespace(
+        _meta=SimpleNamespace(
+            label="example.TeamMembership",
+            get_fields=lambda: (
+                SimpleNamespace(
+                    concrete=True,
+                    many_to_many=False,
+                    is_relation=True,
+                    related_model=user,
+                    name="user",
+                ),
+            ),
+        )
+    )
+    monkeypatch.setattr(
+        guards, "internal_models", lambda: (direct_model, through_model)
+    )
+    monkeypatch.setattr(guards, "RELATIONAL_USER_FIELDS", frozenset())
+    monkeypatch.setattr(guards, "RAW_USER_REFERENCE_FIELDS", frozenset())
+
+    with pytest.raises(RegistryError) as exc_info:
+        guards.validate_user_edges({})
+
+    message = str(exc_info.value)
+    assert "('example.Team', 'members')" in message
+    assert "('example.TeamMembership', 'user')" in message
 
 
 def test_semantic_reference_completeness_detects_silent_json_key():
