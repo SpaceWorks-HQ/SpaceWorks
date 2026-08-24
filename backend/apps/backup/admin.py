@@ -136,7 +136,8 @@ for model in (
     B1RestoreComponentState,
     B1ReservationEntry,
     B1FenceContinuity,
-    MakerspaceTenantExitCustodyState,
-    TenantExitCustodyAlarmDelivery,
+    # MakerspaceTenantExitCustodyState and TenantExitCustodyAlarmDelivery are NOT listed here:
+    # both carry dedicated @admin.register classes above, and registering them twice raises
+    # AlreadyRegistered at import time.
 ):
     admin.site.register(model, ReadOnlyBackupAdmin)
