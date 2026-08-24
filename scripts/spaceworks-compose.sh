@@ -10,6 +10,19 @@ TOPOLOGY="${1:-}"
 }
 shift
 
+# A curl install writes the exact release only after setup succeeds. Keep every
+# later Compose invocation on that reproducible tag unless the operator/update
+# process explicitly supplies a different one in the shell.
+if [[ -z "${MAKERSPACE_IMAGE_TAG:-}" && -f "$ROOT/.spaceworks-version" ]] \
+  && { [[ ! -f "$ROOT/.env" ]] || ! grep -q '^MAKERSPACE_IMAGE_TAG=.' "$ROOT/.env"; }; then
+  pinned_tag="$(tr -d '[:space:]' < "$ROOT/.spaceworks-version")"
+  [[ "$pinned_tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
+    echo "Invalid image tag in $ROOT/.spaceworks-version." >&2
+    exit 64
+  }
+  export MAKERSPACE_IMAGE_TAG="$pinned_tag"
+fi
+
 for argument in "$@"; do
   case "$argument" in
     -f|--file|--file=*|-f*|--env-file|--env-file=*|--project-directory|--project-directory=*)

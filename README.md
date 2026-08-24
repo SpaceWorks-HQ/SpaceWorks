@@ -67,20 +67,21 @@ Space Works runs entirely through Docker Compose — it brings up **PostgreSQL, 
 Celery worker/beat, and database migrations** and wires them to the app for you (the images don't bake
 in any addresses; the compose file passes them in). Pick one path:
 
-**Path 1 — Guided setup (easiest; builds from source).** One script generates all secrets, writes
-`.env`, builds everything, and creates your first admin + makerspace:
+**Path 1 — Guided pinned install (easiest; no Git clone or local build).** One script checks the host,
+downloads the newest tagged release, generates all secrets, pulls its published images, and creates your
+first admin + makerspace:
 
 ```bash
-git clone https://github.com/SpaceWorks-HQ/SpaceWorks.git
-cd SpaceWorks
-bash setup.sh                                          # macOS / Linux
-wsl bash setup.sh                                      # Windows, from WSL2
+curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash
 ```
 
 It prints your URL and login when it finishes and offers to install seven-day, backup-first production update checks. Super Admins can control
-automatic or manual installation from **Platform settings -> Software updates**. (Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/).)
+automatic or manual installation from **Platform settings -> Software updates**. Linux dependency installation supports apt,
+dnf/yum, pacman and zypper. Windows uses Docker Desktop plus Git Bash (set
+`SPACEWORKS_DIR="$HOME/SpaceWorks"` on the `bash` side of the pipe); destructive restore/recovery remains
+WSL2-only. Developers can use `bash setup.sh --build` from a full source checkout.
 
-**Path 2 — Prebuilt images (no local build).** Pull the two published images and start the stack —
+**Path 2 — Manual prebuilt-image setup.** Pull the two published images and start the stack —
 after `cp .env.example .env` (fill in the few values it asks for):
 
 ```bash
@@ -122,7 +123,8 @@ console shows you:
 | **Mobile apps** | Attested device sessions, native push and the in-app payment sheet |
 | **Updates** | In-app release control |
 
-**Pick a profile at install time** — `setup.sh` asks, or pass `--profile`:
+**Pick modules at install time** — `setup.sh` reads the live registry and opens a tick list. Its initial
+recommended state corresponds to this profile table; management commands can also pass `--profile`:
 
 | Profile | Modules | For |
 |---|---|---|
@@ -481,7 +483,7 @@ scripts/spaceworks-compose.sh bundled run --rm --no-deps backend --role manageme
 With no arguments it seeds **`superadmin` / `super123`** and forces a password change on first login.
 Guided installs can receive each successful `main` release automatically with a backup and readiness
 check. If deployment fails, the application containers return to the previous retained release. Run
-`scripts/update.sh --force` on Linux (or from WSL2 on Windows) for an immediate
+`bash scripts/update.sh --force` on Linux or Windows Git Bash for an immediate
 update; see **[docs/self-hosting.md](docs/self-hosting.md)** for scheduling, pinning, TLS, and recovery.
 
 **No server of your own?** Space Works is multi-tenant — partner with a nearby makerspace to run your space

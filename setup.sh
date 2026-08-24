@@ -1,13 +1,26 @@
 #!/usr/bin/env bash
-# Space Works - Open Source Makerspace Manager first-run setup for self-hosting (macOS / Linux).
+# Space Works - guided first-run setup (Linux, macOS, or Windows Git Bash/WSL).
 # Run it from the project folder:  bash setup.sh
 set -euo pipefail
 cd "$(dirname "$0")"
 
 ROOT="$PWD"
-export SPACEWORKS_COMPOSE_BUILD_LAYER=1
 COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)
-HOST_CONFIG_IMAGE="spaceworks-host-configure:local"
+BUILD_FROM_SOURCE=0
+case "${1:-}" in
+  "") ;;
+  --build) BUILD_FROM_SOURCE=1 ;;
+  *) printf 'Usage: bash setup.sh [--build]\n' >&2; exit 64 ;;
+esac
+if [[ "$BUILD_FROM_SOURCE" == 1 ]]; then
+  export SPACEWORKS_COMPOSE_BUILD_LAYER=1
+  export SPACEWORKS_HOST_CONFIG_BUILD=1
+  HOST_CONFIG_IMAGE="spaceworks-host-configure:local"
+else
+  unset SPACEWORKS_COMPOSE_BUILD_LAYER
+  export SPACEWORKS_HOST_CONFIG_BUILD=0
+  HOST_CONFIG_IMAGE="${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}"
+fi
 
 say()  { printf '\n\033[1;36m%s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m%s\033[0m\n' "$*"; }
@@ -16,6 +29,7 @@ die()  { printf '\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 # Keeps the installer below the repository's file-size ceiling while sharing no
 # ambient database pointer values with the privileged configuration helper.
 source "$ROOT/scripts/setup-host-orchestration.sh"
+source "$ROOT/scripts/module-selection.sh"
 
 # 1. Docker must be installed and running.
 command -v docker >/dev/null 2>&1 || die "Docker is not installed. Install Docker Desktop first: https://www.docker.com/products/docker-desktop/"
@@ -27,93 +41,14 @@ docker compose version >/dev/null 2>&1 || die "The 'docker compose' plugin is mi
 rand_key()   { ( set +o pipefail; LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-50}" ); }
 fernet_key() { head -c 32 /dev/urandom | base64 | tr '+/' '-_'; }
 
-# Per-module tick review. Runs AFTER the app is up so it can read the real module
-# registry via `list_modules` -- hardcoding the key list here would silently drift
-# from apps/makerspaces/module_registry.py, which is the single source of truth.
-# Core modules are shown but never toggleable: the loan flow IS the system.
 choose_modules() {
-  local raw line mark rest key desc i input tok changed
-  local keys=() descs=() state=() orig=()
-
-  raw="$("${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py list_modules 2>/dev/null)" || {
-    warn "Could not read the module list; keeping the '$MSPROFILE' profile as installed."
-    return 0
-  }
-
-  while IFS= read -r line; do
-    case "$line" in
-      "  + "*|"  - "*)
-        mark="${line:2:1}"; rest="${line:4}"
-        key="${rest%% *}"
-        desc="${rest#"$key"}"; desc="${desc#"${desc%%[![:space:]]*}"}"
-        keys[${#keys[@]}]="$key"; descs[${#descs[@]}]="$desc"
-        if [ "$mark" = "+" ]; then state[${#state[@]}]="x"; else state[${#state[@]}]=" "; fi
-        ;;
-    esac
-  done <<EOFMODS
-$raw
-EOFMODS
-
-  [ "${#keys[@]}" -gt 0 ] || { warn "No optional modules reported; keeping the profile."; return 0; }
-  orig=("${state[@]}")
-
-  echo
-  say "Choose your modules"
-  echo "Ticked modules are installed. This is the only module question -- adjust freely."
-  echo "Core modules (public catalogue, requests, evidence, QR, scanner) are always on."
-  echo "Presets: a = everything, n = core only. Or toggle individual numbers."
-  while :; do
-    echo
-    i=0
-    while [ "$i" -lt "${#keys[@]}" ]; do
-      printf '  [%s] %2d) %-20s %s\n' "${state[$i]}" "$((i + 1))" "${keys[$i]}" "${descs[$i]}"
-      i=$((i + 1))
-    done
-    echo
-    echo "  Numbers toggle (e.g. '3 7 11').  a = all,  n = none,  Enter = done."
-    read -r -p "  Toggle: " input || input=""
-    [ -n "$input" ] || break
-    case "$input" in
-      a|A) i=0; while [ "$i" -lt "${#keys[@]}" ]; do state[$i]="x"; i=$((i + 1)); done; continue ;;
-      n|N) i=0; while [ "$i" -lt "${#keys[@]}" ]; do state[$i]=" "; i=$((i + 1)); done; continue ;;
-    esac
-    for tok in $input; do
-      case "$tok" in
-        ''|*[!0-9]*) warn "  '$tok' is not a number."; continue ;;
-      esac
-      i=$((tok - 1))
-      if [ "$i" -lt 0 ] || [ "$i" -ge "${#keys[@]}" ]; then warn "  $tok is out of range."; continue; fi
-      if [ "${state[$i]}" = "x" ]; then state[$i]=" "; else state[$i]="x"; fi
-    done
-  done
-
-  # Apply. Installing resolves prerequisites transitively; uninstalling refuses a module
-  # another installed module still requires, so a refusal is reported, never forced.
-  # Two passes: an uninstall blocked by a dependent may succeed once that dependent is gone.
-  changed=0
-  for _pass in 1 2; do
-    i=0
-    while [ "$i" -lt "${#keys[@]}" ]; do
-      if [ "${state[$i]}" != "${orig[$i]}" ]; then
-        if [ "${state[$i]}" = "x" ]; then
-          if "${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py install_module "${keys[$i]}" >/dev/null 2>&1; then
-            say "  installed ${keys[$i]}"; orig[$i]="x"; changed=1
-          elif [ "$_pass" = 2 ]; then
-            warn "  could not install ${keys[$i]} (see: manage.py install_module ${keys[$i]})"
-          fi
-        else
-          if "${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py uninstall_module "${keys[$i]}" >/dev/null 2>&1; then
-            say "  removed ${keys[$i]}"; orig[$i]=" "; changed=1
-          elif [ "$_pass" = 2 ]; then
-            warn "  kept ${keys[$i]} — another installed module still requires it."
-          fi
-        fi
-      fi
-      i=$((i + 1))
-    done
-  done
-  [ "$changed" = 1 ] || say "  No module changes."
-  echo "  Data is never deleted by turning a module off; re-enabling restores its screens."
+  MODULE_MODE=interactive
+  MODULE_INTERACTIVE=1
+  MODULE_MAKERSPACE=""
+  MODULE_ALL_MAKERSPACES=0
+  MODULE_WITHOUT=""
+  MODULE_CONFIRM_REMOVALS=0
+  change_modules
 }
 
 FIRST_RUN=0
@@ -208,8 +143,14 @@ if ! grep -q '^SPACEWORKS_SCHEDULER_MODE=' .env; then
 fi
 chmod 600 .env
 prepare_compose_wrapper
-say "Building and starting the app (first run can take a few minutes)..."
-"${COMPOSE[@]}" up -d --build
+if [[ "$BUILD_FROM_SOURCE" == 1 ]]; then
+  say "Building and starting the app from source (first run can take a few minutes)..."
+  "${COMPOSE[@]}" up -d --build
+else
+  say "Pulling release images (first run can take a few minutes)..."
+  "${COMPOSE[@]}" pull
+  "${COMPOSE[@]}" up -d
+fi
 
 # The deployment operation lock must be the same inode for backend, worker, beat and
 # the privileged host scripts. Docker performs the ownership step so setup does not
@@ -247,7 +188,9 @@ if [ "$FIRST_RUN" = 1 ]; then
     --username "$ADMINUSER" --email "$ADMINEMAIL" --password "$ADMINPASS" \
     --makerspace-name "$MSNAME" --profile "$MSPROFILE"
 
-  choose_modules
+  if ! choose_modules; then
+    warn "Module selection was not applied. Re-run scripts/update.sh --modules-only after fixing the message above."
+  fi
 
   if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
     say "Enabling Google sign-in..."
