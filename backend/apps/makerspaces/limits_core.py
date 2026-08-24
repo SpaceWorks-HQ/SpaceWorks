@@ -1,7 +1,5 @@
 from django.conf import settings
 
-from apps.makerspaces.domain_verification import is_self_host
-
 
 NUMERIC_LIMIT_KEYS = frozenset(
     {
@@ -57,7 +55,9 @@ RESOURCE_LABELS = {
 
 def resource_limit(makerspace, key) -> int | None:
     """Return the effective managed limit; ``None`` means unlimited."""
-    if is_self_host():
+    from apps.makerspaces import limits
+
+    if limits.is_self_host():
         return None
     overrides = makerspace.resource_limit_overrides or {}
     if key in overrides:

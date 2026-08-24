@@ -1,5 +1,6 @@
 """Managed-platform fair-use limits; deliberately dormant on self-hosts."""
 
+from apps.makerspaces import domain_verification
 from apps.makerspaces.limits_core import (
     BOOLEAN_LIMIT_KEYS,
     KNOWN_LIMIT_KEYS,
@@ -35,3 +36,8 @@ from apps.makerspaces.limits_usage import (
     free_storage,
 )
 from apps.makerspaces.limits_validation import validate_resource_limit_overrides
+
+
+def is_self_host():
+    """Compatibility seam shared by every split limit implementation."""
+    return domain_verification.is_self_host()

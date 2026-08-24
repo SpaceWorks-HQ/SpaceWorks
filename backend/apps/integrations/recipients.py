@@ -1,3 +1,5 @@
+from apps.integrations.models_recipients import NotificationRecipient
+
 from .recipients_resolution import (
     _eligible_memberships,
     _role_scope_admits,
@@ -17,6 +19,7 @@ from .recipients_selection import (
 
 __all__ = [
     "FEATURE_MODULES",
+    "NotificationRecipient",
     "SELECTABLE_FEATURES",
     "feature_available",
     "has_selection",

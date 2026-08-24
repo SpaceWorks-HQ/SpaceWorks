@@ -20,10 +20,7 @@ closed — do not "fix" one to match the other.
 import logging
 
 from apps.integrations.models import NotificationFeature
-from apps.integrations.models_recipients import (
-    NotificationRecipient,
-    NotificationRecipientKind,
-)
+from apps.integrations.models_recipients import NotificationRecipientKind
 from apps.integrations.recipient_scope_matching import rule_covers as _rule_covers
 
 logger = logging.getLogger("apps.integrations.recipients")
@@ -85,8 +82,10 @@ def selection_rows(makerspace, feature, event):
     if not feature_available(makerspace, feature):
         return []
     try:
+        from apps.integrations import recipients
+
         return list(
-            NotificationRecipient.objects.filter(
+            recipients.NotificationRecipient.objects.filter(
                 makerspace=makerspace, feature=feature, event=event
             )
             .select_related("role", "user")

@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -11,6 +11,7 @@ from apps.apiclients.throttling import ClientTierRateThrottle
 from apps.events import services
 from apps.events.exceptions import DuplicateRegistration
 from apps.events.models import Event, EventRegistration
+from apps.events.organizer_models import EventOrganizer
 from apps.events.serializers_public import (
     PublicEventRegistrationInputSerializer,
     PublicEventRegistrationResponseSerializer,
@@ -62,7 +63,12 @@ class PublicEventListView(APIView):
         require_module(makerspace, 'events')
         events = (
             _public_events(makerspace)
-            .prefetch_related('organizers__organization')
+            .prefetch_related(
+                Prefetch(
+                    'organizers',
+                    queryset=EventOrganizer.objects.select_related('organization'),
+                )
+            )
             .annotate(
                 confirmed_count=Count(
                     'registrations',
