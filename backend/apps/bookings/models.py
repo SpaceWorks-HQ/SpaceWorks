@@ -53,7 +53,7 @@ class BookableSpace(models.Model):
     approval_mode = models.CharField(
         max_length=16,
         choices=ApprovalMode.choices,
-        default=ApprovalMode.INSTANT,
+        default=ApprovalMode.APPROVE,
     )
     custom_form = models.JSONField(
         null=True,
