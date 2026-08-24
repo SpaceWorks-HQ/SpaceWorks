@@ -38,6 +38,12 @@ _ENTRIES = (
     ),
     *_same(
         "accounts.User",
+        "is_tenant_dump_stub",
+        D.PRESERVE,
+        "The D6 immutable-image closure, not source privilege, sets the permanent denial marker.",
+    ),
+    *_same(
+        "accounts.User",
         "id username password email phone phone_e164 phone_verified_at email_verified_at "
         "is_active access_status must_change_password is_walk_in",
         (D.PRESERVE, D.RESET),

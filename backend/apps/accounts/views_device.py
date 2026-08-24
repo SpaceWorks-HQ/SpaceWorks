@@ -147,7 +147,11 @@ class DeviceLoginView(APIView):
             if matches.count() == 1:
                 username = matches.first().username
         user = authenticate(request=request, username=username, password=data["password"])
-        if not user or user.access_status != User.AccessStatus.ACTIVE:
+        if (
+            not user
+            or user.is_tenant_dump_stub
+            or user.access_status != User.AccessStatus.ACTIVE
+        ):
             _audit_login_failure(data, 'invalid_credentials')
             raise AuthenticationFailed("Invalid device credentials or attestation.")
         _require_mobile_module()

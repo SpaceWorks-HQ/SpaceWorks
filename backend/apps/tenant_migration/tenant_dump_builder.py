@@ -14,6 +14,7 @@ from apps.data_export.datasets import DATASET_SPECS
 
 from .tenant_dump_bootstrap import seed_default_roles
 from .tenant_dump_catalog import validate_catalog, validate_unowned_tables
+from .tenant_dump_cross_tenant import project_cross_tenant_values
 from .tenant_dump_database import (
     dump_scratch_database,
     empty_verification_database,
@@ -65,6 +66,10 @@ def build_tenant_dump(
     destination.parent.mkdir(parents=True, exist_ok=True)
     validate_catalog()
     validate_raw_column_allowlists()
+    if projection.user_closure is None:
+        raise TenantDumpVerificationError(
+            "The Lane D projection lacks its immutable-image user closure."
+        )
     expected_digest = mapped_raw_digest(projection.rows)
     mapped_identities = _mapped_identities(projection.rows)
     models = _portable_models()
@@ -137,6 +142,8 @@ def build_tenant_dump(
                 expected_projected_digest=projected_digest,
                 projected_identities=projected_identities,
                 expected_sequence_state=sequence_state,
+                capture_id=run_id,
+                expected_user_closure_digest=projection.user_closure.digest,
             )
             # Keep this adjacent to pg_dump: future verification code cannot make
             # runtime cache state accidentally portable.
@@ -156,6 +163,8 @@ def build_tenant_dump(
                 expected_projected_digest=projected_digest,
                 projected_identities=projected_identities,
                 expected_sequence_state=sequence_state,
+                capture_id=run_id,
+                expected_user_closure_digest=projection.user_closure.digest,
             )
             if restored_digest != expected_digest:
                 raise TenantDumpVerificationError(
@@ -205,17 +214,10 @@ def _apply_contextual_dispositions(row, source, makerspace_id):
     """Apply row-context rules whose result cannot be a table-wide field label."""
     values = dict(row.values)
     label = row.model._meta.label
-    if label == "operations.StockTransfer":
-        pairs = (
-            ("source_makerspace", "source_container"),
-            ("destination_makerspace", "destination_container"),
-        )
-        for makerspace_field, container_field in pairs:
-            key = row.model._meta.get_field(makerspace_field).attname
-            if source.get(key) not in (None, makerspace_id):
-                values[row.model._meta.get_field(makerspace_field).column] = None
-                values[row.model._meta.get_field(container_field).column] = None
-    elif label == "events.EventRegistration":
+    values = project_cross_tenant_values(
+        row.model, values, source, makerspace_id
+    )
+    if label == "events.EventRegistration":
         # Search generations and their blind-index rows are target-derived and empty
         # in the scratch bootstrap; ciphertext itself remains byte-identical.
         values[row.model._meta.get_field("email_exact_hash").column] = None

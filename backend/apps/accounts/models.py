@@ -43,6 +43,11 @@ class User(AbstractUser):
     # could otherwise become a real login. This flag is checked under the user lock at
     # issuance and confirmation. See `makerspaces.walk_in_services`.
     is_walk_in = models.BooleanField(default=False)
+    # Lane D keeps shared/deployment-global people only as FK-closing rows.  This
+    # marker is deliberately independent from the mutable account fields below:
+    # authentication and authorization refuse it even if an operator later edits
+    # ``is_active``, the password, or a role.
+    is_tenant_dump_stub = models.BooleanField(default=False)
     role = models.CharField(
         max_length=32,
         choices=Role.choices,

@@ -1,8 +1,10 @@
-"""Fail-closed D4 manifest and content-ledger verification."""
+"""Fail-closed D4 custody plus D6 closure/lost-edge manifest verification."""
 
 from .tenant_dump_envelope import TENANT_DEKS_MEMBER
 from .tenant_dump_errors import TenantDumpVerificationError
 from .tenant_dump_pii import source_pii_mode
+from .tenant_dump_cross_tenant_verify import verify_lost_edge_manifest
+from .tenant_dump_user_closure_manifest import verify_user_closure_manifest
 
 
 def verify_envelope_custody_manifest(capture, manifest):
@@ -47,6 +49,8 @@ def verify_envelope_custody_manifest(capture, manifest):
         raise TenantDumpVerificationError(
             "The Lane D manifest violates its source-mode DEK custody contract."
         )
+    verify_user_closure_manifest(manifest.get("user_closure"), capture.pk)
+    verify_lost_edge_manifest(manifest.get("cross_tenant_lost_edges"))
     return True
 
 

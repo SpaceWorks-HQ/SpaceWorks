@@ -1777,7 +1777,37 @@ Load-bearing details that carried over unchanged:
   `activity` payload is now a typed nested serializer that **omits** absent keys — a zero says
   "attended nothing", an absent key says "this space does not run events".
 
-## Backup, restore and tenant migration (Phase 5A/5B and Lane D D1-D4 built)
+## Backup, restore and tenant migration (Phase 5A/5B and Lane D D1-D4/D6 built)
+
+### Lane D tenant-exclusive identity and payment closure (D6, 2026-08-23)
+
+**Lane D does not use the older per-identity `DisclosureClosureApproval` policy.** That
+path remains for the older PORTABLE data-export/API contract, but a sovereign tenant
+dump classifies identities from its immutable captured database image: a referenced
+user is full only when at least one `MakerspaceMembership` exists and every membership,
+active or revoked, belongs to the exiting makerspace. Every other referenced person is
+an artifact-scoped, PII-free `is_tenant_dump_stub` row. Missing users, unclassified
+edges, dangling non-null edges, and semantic user references without a rewrite handler
+refuse the build. The persisted stub marker is a permanent denial input to password,
+JWT/refresh, device, phone, social, password-reset, member-claim, and RBAC paths; editing
+the stub's password, active flag, access status, or role does not make it a principal.
+
+The manifest's `user_closure` has exact sorted `included`, `stubbed`, and `refused`
+lists and a canonical SHA-256 digest. Entries contain only the artifact-scoped user
+reference, emitted source PK, reason, stub schema version, and sorted referencing-edge
+tuples. Source derivation, the migrated scratch database, the restored target-shaped
+verification database, and publication manifest validation reproduce or validate that
+same digest independently. Source audit stores only its digest, counts, and
+artifact/capture identifiers—never the identity lists.
+
+**Cross-tenant and payment history is fail-closed.** Foreign EventCollaborator rows and
+foreign-owned stock-transfer lines are dropped with PII-free lost-edge records;
+StockTransfer foreign makerspace/container pairs are nulled atomically. Registration
+routing is cleared. One pending tenant Payment refuses the whole dump. The four terminal
+statuses keep readable amount/currency/provider/status/subject history while clearing
+all routing, merchant/account/order/payment/session/intent handles and checkout URLs.
+The exact external-FK registry and independent scratch/target postconditions refuse
+schema drift or a surviving live provider binding.
 
 ### Archive-recipient custody: the two-recipient admission floor (BUILT 2026-08-22)
 

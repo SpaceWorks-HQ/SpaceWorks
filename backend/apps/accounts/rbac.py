@@ -49,7 +49,7 @@ from .rbac_superadmin import (
 
 def resolve_scope(actor):
     """Return the set of makerspace ids the actor may act in, or ALL."""
-    if actor is None or not getattr(actor, "is_authenticated", False):
+    if _actor_refused(actor):
         return set()
     if actor.is_superuser or actor.role == User.Role.SUPERADMIN:
         return _superadmin_visible_ids(actor, None)
@@ -75,7 +75,7 @@ def scope_by_makerspace(actor, queryset, makerspace_field="makerspace_id"):
 
 def makerspaces_for_action(actor, action):
     """Return makerspace ids where actor's membership role grants action, or ALL."""
-    if actor is None or not getattr(actor, "is_authenticated", False):
+    if _actor_refused(actor):
         return set()
     # Organization grants never enter this superadmin branch: hidden-space authority
     # must continue to come only from an explicit makerspace membership.
@@ -152,7 +152,7 @@ def scope_by_visibility_or_action(actor, action, queryset, field="makerspace_id"
 
 def effective_actions(actor, makerspace_id) -> set:
     """Return the membership-effective actions for an actor in one makerspace."""
-    if actor is None or not getattr(actor, "is_authenticated", False):
+    if _actor_refused(actor):
         return set()
     if _id_in(makerspace_id, archived_makerspace_ids()):
         return set()
@@ -173,7 +173,7 @@ def is_space_manager_identity(actor, makerspace_id) -> bool:
     This deliberately does not infer identity from actions: Machine Managers and
     custom roles granted manage_machines cannot configure types or pricing.
     """
-    if actor is None or not getattr(actor, "is_authenticated", False):
+    if _actor_refused(actor):
         return False
     if _id_in(makerspace_id, archived_makerspace_ids()):
         return False
@@ -201,7 +201,7 @@ def can(actor, action, makerspace_id=None):
 
     Superadmin: everything. Everyone else: authority is per-makerspace, so a
     makerspace_id is required and the membership role decides the allowed actions."""
-    if actor is None or not getattr(actor, "is_authenticated", False):
+    if _actor_refused(actor):
         return False
     if makerspace_id is not None and _id_in(makerspace_id, archived_makerspace_ids()):
         return False
@@ -229,6 +229,15 @@ def archived_makerspace_ids():
     from apps.makerspaces.servability import unservable_makerspace_ids
 
     return unservable_makerspace_ids()
+
+
+def _actor_refused(actor):
+    """Tenant-dump stubs never become principals through later field edits."""
+    return bool(
+        actor is None
+        or not getattr(actor, "is_authenticated", False)
+        or getattr(actor, "is_tenant_dump_stub", False)
+    )
 
 
 def _exclude_archived_ids(scope):

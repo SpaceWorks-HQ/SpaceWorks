@@ -20,7 +20,11 @@ from apps.makerspaces.servability import servable_queryset
 
 
 def assert_social_user_active(user):
-    if not user.is_active or user.access_status != User.AccessStatus.ACTIVE:
+    if (
+        user.is_tenant_dump_stub
+        or not user.is_active
+        or user.access_status != User.AccessStatus.ACTIVE
+    ):
         from apps.accounts.services_social_identity import SocialResolutionError
 
         raise SocialResolutionError("access_denied", 403)

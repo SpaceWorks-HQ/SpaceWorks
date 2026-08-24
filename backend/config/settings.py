@@ -249,7 +249,7 @@ SILENCED_SYSTEM_CHECKS = ["models.E034"]
 
 AUTHENTICATION_BACKENDS = [
     "axes.backends.AxesStandaloneBackend",
-    "django.contrib.auth.backends.ModelBackend",
+    "apps.accounts.auth_backends.SpaceWorksModelBackend",
 ]
 
 AXES_FAILURE_LIMIT = env.int("AXES_FAILURE_LIMIT", default=5)

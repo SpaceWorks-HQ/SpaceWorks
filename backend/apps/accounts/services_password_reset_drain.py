@@ -230,6 +230,7 @@ def _finish_claimed_terminal(envelope, claim, status, now):
 def _recoverable(user):
     return bool(
         user is not None
+        and not user.is_tenant_dump_stub
         and user.is_active
         and user.access_status == User.AccessStatus.ACTIVE
         and not user.is_walk_in

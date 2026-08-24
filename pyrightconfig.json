@@ -1,0 +1,18 @@
+{
+  "venvPath": "backend",
+  "venv": ".venv",
+  "typeCheckingMode": "standard",
+  "include": ["backend"],
+  "extraPaths": ["backend"],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.venv",
+    "**/migrations",
+    "**/staticfiles",
+    "frontend",
+    "backups",
+    "report"
+  ],
+  "reportMissingTypeStubs": "none"
+}

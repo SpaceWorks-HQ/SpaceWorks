@@ -177,6 +177,10 @@ class LoginSerializer(TokenObtainPairSerializer):
             if email_matches.count() == 1:
                 attrs[self.username_field] = email_matches.first().username
         data = super().validate(attrs)  # raises AuthenticationFailed on bad creds/inactive
+        if self.user.is_tenant_dump_stub:
+            raise AuthenticationFailed(
+                self.error_messages["no_active_account"], code="no_active_account"
+            )
         from apps.backup.recovery import assert_token_issuance_allowed
 
         assert_token_issuance_allowed(self.user)
@@ -263,6 +267,11 @@ class SpaceWorksTokenRefreshSerializer(TokenRefreshSerializer):
                     code="no_active_account",
                 ) from exc
             if not api_settings.USER_AUTHENTICATION_RULE(user):
+                raise AuthenticationFailed(
+                    self.error_messages["no_active_account"],
+                    code="no_active_account",
+                )
+            if user.is_tenant_dump_stub:
                 raise AuthenticationFailed(
                     self.error_messages["no_active_account"],
                     code="no_active_account",

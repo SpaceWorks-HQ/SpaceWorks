@@ -27,3 +27,20 @@ class TenantDumpTargetError(TenantDumpBuildError):
     def __init__(self, message, *, code="target_reconstruction_refused"):
         self.code = code
         super().__init__(message)
+
+
+class TenantDumpClosureRefused(TenantDumpVerificationError):
+    """The immutable image cannot produce a total full-user/stub closure."""
+
+    def __init__(self, detail, *, reason_code="closure_refused", closure=None):
+        self.reason_code = reason_code
+        self.closure = closure
+        super().__init__(detail)
+
+
+class TenantDumpDispositionRefused(TenantDumpBuildError):
+    """A cross-tenant or payment row has no truthful D6 projection."""
+
+    def __init__(self, detail, *, reason_code="disposition_refused"):
+        self.reason_code = reason_code
+        super().__init__(detail)

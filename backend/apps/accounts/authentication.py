@@ -50,6 +50,8 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
         if authenticated is None:
             return None
         user, token = authenticated
+        if user.is_tenant_dump_stub:
+            raise AuthenticationFailed("Account is not available.")
         validate_auth_generation(token)
         from apps.backup.recovery import assert_principal_allowed
 
@@ -144,6 +146,8 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
         ):
             raise PermissionDenied("Claim session is not valid for this makerspace.")
         user = attach_claim_context(claim.membership.user, claim)
+        if user.is_tenant_dump_stub:
+            raise AuthenticationFailed("Claim identity is not available.")
         from apps.backup.recovery import assert_principal_allowed
 
         assert_principal_allowed(user)
