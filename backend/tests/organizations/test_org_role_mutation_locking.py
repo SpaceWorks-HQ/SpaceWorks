@@ -66,10 +66,21 @@ def test_role_mutation_locks_organization_parent_before_child_rows():
         sql = query["sql"]
         if "FOR UPDATE" not in sql:
             continue
-        for table in expected_tables:
-            if f'FROM "{table}"' in sql:
-                organization_lock_sql.append((table, sql))
-                break
+        # The membership query's not-restored predicate contains a nested FROM
+        # OrganizationMakerspace. Classify the row Django actually locks, not every
+        # table the authorization query reads while deciding whether it is eligible.
+        explicit_target = next(
+            (
+                table
+                for table in expected_tables
+                if f'FOR UPDATE OF "{table}"' in sql
+            ),
+            None,
+        )
+        base_table = sql.partition('FROM "')[2].partition('"')[0]
+        locked_table = explicit_target or base_table
+        if locked_table in expected_tables:
+            organization_lock_sql.append((locked_table, sql))
 
     assert [table for table, _ in organization_lock_sql] == expected_tables
     for table, sql in organization_lock_sql:

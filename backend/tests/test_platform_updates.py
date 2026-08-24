@@ -262,13 +262,19 @@ def test_the_web_process_never_shells_out_to_docker():
     assert not offenders, (
         f"{offenders} invoke Docker from application code. The web process has no socket "
         f"to reach it with, so this cannot work in a real deployment even if it passes "
-        f"locally -- put the action in scripts/update.* and drive it from update_control."
+        f"locally -- put privileged orchestration in a root-only host script."
     )
 
 
 def test_the_host_script_is_the_thing_that_drives_docker():
     """The negative tests above are only meaningful if the work happens somewhere."""
-    script = (REPO_ROOT / "scripts" / "update.sh").read_text(encoding="utf-8-sig")
+    update_script = (REPO_ROOT / "scripts" / "update.sh").read_text(
+        encoding="utf-8-sig"
+    )
+    compose_wrapper = (REPO_ROOT / "scripts" / "spaceworks-compose.sh").read_text(
+        encoding="utf-8-sig"
+    )
 
-    assert "docker compose" in script
-    assert "update_control" in script
+    assert 'COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)' in update_script
+    assert 'exec docker compose "${COMPOSE_ARGS[@]}" "$@"' in compose_wrapper
+    assert "update_control" in update_script

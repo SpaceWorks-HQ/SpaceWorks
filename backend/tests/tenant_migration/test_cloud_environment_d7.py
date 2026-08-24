@@ -1,5 +1,3 @@
-import subprocess
-
 import pytest
 import yaml
 
@@ -43,28 +41,28 @@ def compose_file(tmp_path):
     return path
 
 
-def test_init_captures_invoking_environment_and_reproduces_under_scrubbed_env(
-    tmp_path, monkeypatch
-):
+def test_init_captures_invoking_environment_and_validates_host_rendering(tmp_path):
     compose = compose_file(tmp_path)
     static = tmp_path / "etc" / "cloud.env"
     pointer = tmp_path / "ops" / "database-pointer.env"
     topology = tmp_path / "ops" / "topology.json"
     observed = {}
 
-    def runner(argv, **kwargs):
-        observed.update({"argv": argv, "env": kwargs["env"]})
-        current = read_pointer(pointer, require_root_owned=False)
-        return subprocess.CompletedProcess(
-            argv, 0,
-            yaml.safe_dump({"services": {
-                name: {"environment": {"DATABASE_URL": current.database_url}}
-                for name in ("backend", "cron")
-            }}),
-            "",
+    def compose_renderer(compose_path, static_env, pointer_path):
+        observed.update(
+            {
+                "compose_path": compose_path,
+                "static_env": static_env,
+                "pointer_path": pointer_path,
+            }
         )
+        current = read_pointer(pointer, require_root_owned=False)
+        services = {
+            name: {"environment": {"DATABASE_URL": current.database_url}}
+            for name in ("backend", "cron")
+        }
+        return yaml.safe_dump({"services": services})
 
-    monkeypatch.setenv("AMBIENT_SECRET", "must-not-reach-compose")
     result = init_from_current_environment(
         compose_path=compose,
         static_env_path=static,
@@ -74,7 +72,7 @@ def test_init_captures_invoking_environment_and_reproduces_under_scrubbed_env(
             "DATABASE_URL": "postgres://runtime@db/active",
             "SECRET_KEY": "captured-once",
         },
-        runner=runner,
+        compose_renderer=compose_renderer,
         require_root_owned=False,
     )
 
@@ -83,8 +81,11 @@ def test_init_captures_invoking_environment_and_reproduces_under_scrubbed_env(
     assert "SECRET_KEY=captured-once" in static.read_text(encoding="utf-8")
     assert "OPTIONAL=fallback" in static.read_text(encoding="utf-8")
     assert read_pointer(pointer, require_root_owned=False).generation == 1
-    assert "AMBIENT_SECRET" not in observed["env"]
-    assert observed["argv"][-1] == "config"
+    assert observed == {
+        "compose_path": compose,
+        "static_env": static,
+        "pointer_path": pointer,
+    }
     assert {item["name"] for item in result["variables"]} >= {
         "DATABASE_URL", "SECRET_KEY", "OPTIONAL"
     }
@@ -102,6 +103,7 @@ def test_init_refuses_a_missing_required_value_before_writing_files(tmp_path):
             static_env_path=static,
             pointer_path=pointer,
             topology_record_path=tmp_path / "topology.json",
+            compose_renderer=lambda *_args: "",
             environ={"DATABASE_URL": "postgres://runtime@db/active"},
             require_root_owned=False,
         )

@@ -4,6 +4,7 @@ from django.utils import timezone
 from apps.accounts import rbac
 from apps.hardware_requests import notifications
 from apps.hardware_requests.models import HardwareRequest
+from apps.makerspaces.models import Makerspace
 from apps.notifications.emit import emit_notification
 from apps.tenant_migration.gate_runtime import fanout_tenant_write
 
@@ -11,8 +12,14 @@ from apps.tenant_migration.gate_runtime import fanout_tenant_write
 def run_return_reminders(*, now=None, limit=200) -> dict:
     now = now or timezone.now()
     limit = max(int(limit), 1)
+    unavailable_makerspace_ids = set(
+        Makerspace.objects.exclude(
+            archived_at__isnull=True,
+            lifecycle_state=Makerspace.LifecycleState.ACTIVE,
+        ).values_list("pk", flat=True)
+    )
     excluded_makerspace_ids = (
-        rbac.archived_makerspace_ids() | rbac.superadmin_hidden_makerspace_ids()
+        unavailable_makerspace_ids | rbac.superadmin_hidden_makerspace_ids()
     )
     queryset = (
         HardwareRequest.objects.select_related("makerspace", "requester")
