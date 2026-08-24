@@ -3,6 +3,8 @@
 import hashlib
 import re
 
+from apps.makerspaces import limits
+
 from .tenant_restore_types import ObjectEntry, TenantRestoreRefused
 
 
@@ -52,12 +54,13 @@ def validate_object_plan(entries, *, destination_prefix):
     return tuple(entries)
 
 
-def _detail(entry, outcome):
+def _detail(entry, outcome, accepted_size):
     return {
         "bucket": entry.bucket,
         "key": entry.key,
         "digest": entry.sha256,
         "outcome": outcome,
+        "accepted_size": accepted_size,
     }
 
 
@@ -76,28 +79,66 @@ def _incomplete_begun(ledger, phase):
     return begun[-1] if begun else None
 
 
-def load_object(ledger, store, artifact, entry, *, index):
+def _charge_accepted_bytes(ledger, makerspace, current_phase):
+    """Advance the reset counter to the durable, observed object-byte watermark."""
+    accepted = {}
+    for record in ledger.records():
+        if record["state"] != "begun" or not record["phase"].startswith("object-load-"):
+            continue
+        size = record["detail"].get("accepted_size")
+        if record["phase"] == current_phase or size is not None:
+            accepted[record["phase"]] = size
+    if any(
+        isinstance(size, bool) or not isinstance(size, int) or size < 0
+        for size in accepted.values()
+    ):
+        raise TenantRestoreRefused("Accepted object-byte accounting is incomplete.")
+
+    expected = sum(accepted.values())
+    makerspace.refresh_from_db(fields=("storage_bytes_used",))
+    if makerspace.storage_bytes_used > expected:
+        raise TenantRestoreRefused(
+            "Restored object-byte accounting exceeds its durable watermark."
+        )
+    limits.add_storage(makerspace, expected - makerspace.storage_bytes_used)
+
+
+def load_object(ledger, store, artifact, entry, *, index, makerspace):
     """Record the chosen outcome before a write and resume only missing bytes."""
     phase = object_phase(index, entry)
     prior = _incomplete_begun(ledger, phase)
     existing = store.digest(entry.bucket, entry.key)
-    if existing is not None and existing != entry.sha256:
+    if existing is not None and existing[1] != entry.sha256:
         raise TenantRestoreRefused("Existing target object bytes have a different SHA-256.")
-    if existing == entry.sha256:
+    if existing is not None:
         if prior is not None:
+            prior_size = prior["detail"].get("accepted_size")
+            if prior_size is None:
+                prior = ledger.begin(
+                    phase,
+                    _detail(entry, prior["detail"]["outcome"], existing[0]),
+                )
+            elif prior_size != existing[0]:
+                raise TenantRestoreRefused("Accepted target object size changed during resume.")
+            _charge_accepted_bytes(ledger, makerspace, phase)
             ledger.finish(prior, prior["detail"])
             return prior["detail"]["outcome"]
-        begun = ledger.begin(phase, _detail(entry, "accepted_existing"))
+        begun = ledger.begin(phase, _detail(entry, "accepted_existing", existing[0]))
+        _charge_accepted_bytes(ledger, makerspace, phase)
         ledger.finish(begun)
         return "accepted_existing"
 
     payload = artifact.object_bytes(entry)
     if len(payload) != entry.size or hashlib.sha256(payload).hexdigest() != entry.sha256:
         raise TenantRestoreRefused("Artifact object bytes do not match their manifest.")
-    begun = ledger.begin(phase, _detail(entry, "created_by_this_run"))
+    accepted_size = len(payload)
+    begun = ledger.begin(
+        phase, _detail(entry, "created_by_this_run", accepted_size)
+    )
     store.put(entry, payload)
-    if store.digest(entry.bucket, entry.key) != entry.sha256:
+    if store.digest(entry.bucket, entry.key) != (accepted_size, entry.sha256):
         raise TenantRestoreRefused("Target object write did not preserve SHA-256.")
+    _charge_accepted_bytes(ledger, makerspace, phase)
     ledger.finish(begun)
     return "created_by_this_run"
 
