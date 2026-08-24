@@ -10,6 +10,12 @@ from apps.tenant_migration.tenant_dump_errors import TenantDumpPublicationRefuse
 pytestmark = pytest.mark.django_db
 
 
+@pytest.fixture(autouse=True)
+def _configured_object_anchor(settings):
+    settings.AUDIT_ATTESTATION_S3_BUCKET = "d8-test-audit-anchors"
+    settings.AUDIT_ATTESTATION_RETENTION_DAYS = 1
+
+
 def _space(slug):
     return Makerspace.objects.create(name=slug, slug=slug)
 
