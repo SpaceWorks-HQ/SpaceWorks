@@ -1,6 +1,5 @@
 """The serialized owner of the access-flag side of Lane E activation."""
 
-from functools import partial
 
 from django.db import transaction
 from django.dispatch import Signal
@@ -80,12 +79,16 @@ def set_superadmin_access(custody, *, enabled, actor):
             "activation_after": activation.state,
         },
     )
+    # A bare functools.partial has no __qualname__, and Django's robust on_commit
+    # handler formats its failure message with func.__qualname__ -- so a failing
+    # receiver made the ERROR HANDLER raise, defeating robust=True entirely.
     transaction.on_commit(
-        partial(
-            access_switch_committed.send,
-            sender=set_superadmin_access,
-            makerspace_id=makerspace.pk,
-            enabled=enabled,
+        lambda makerspace_id=makerspace.pk, enabled=enabled: (
+            access_switch_committed.send(
+                sender=set_superadmin_access,
+                makerspace_id=makerspace_id,
+                enabled=enabled,
+            )
         ),
         robust=True,
     )
