@@ -64,7 +64,6 @@ def test_host_import_rejects_lane_d_before_storage_or_database_mutation(
     assert RestoreOperation.objects.count() == 0
 
 
-@pytest.mark.xfail(strict=True, reason="SPEC BUG: backend/apps/backup/restore_services.py:43-65 creates restore state without rejecting a Lane D archive manifest format.")
 def test_ordinary_restore_request_rejects_lane_d_before_state_mutation():
     actor = _superuser()
     DeploymentRecoveryState.load()

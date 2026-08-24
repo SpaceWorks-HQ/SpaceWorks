@@ -86,12 +86,13 @@ def test_restore_request_refuses_unsupported_format_before_side_effects():
         age_encrypted=True,
         expires_at=timezone.now() + timedelta(days=1),
     )
+    recovery_before = DeploymentRecoveryState.objects.values().get()
 
     with pytest.raises(ValidationError, match="format_unsupported"):
         request_restore(actor, archive, RestoreOperation.Kind.ROLLBACK_IN_PLACE)
 
     assert not RestoreOperation.objects.exists()
-    assert not DeploymentRecoveryState.objects.exists()
+    assert DeploymentRecoveryState.objects.values().get() == recovery_before
     assert not AuditLog.objects.filter(action="backup.restore_requested").exists()
 
 

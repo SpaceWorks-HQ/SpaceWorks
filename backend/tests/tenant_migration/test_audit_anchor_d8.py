@@ -14,6 +14,7 @@ pytestmark = pytest.mark.django_db
 def _configured_object_anchor(settings):
     settings.AUDIT_ATTESTATION_S3_BUCKET = "d8-test-audit-anchors"
     settings.AUDIT_ATTESTATION_RETENTION_DAYS = 1
+    settings.AUDIT_ATTESTATION_DEPLOYMENT_ID = "d8-test-deployment"
 
 
 def _space(slug):

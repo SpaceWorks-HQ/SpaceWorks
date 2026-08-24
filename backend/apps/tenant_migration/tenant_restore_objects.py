@@ -158,7 +158,7 @@ def rollback_created_objects(ledger, store):
         existing = store.digest(bucket, key)
         if existing is None:
             continue
-        if existing != digest:
+        if existing[1] != digest:
             raise TenantRestoreRefused(
                 "A run-created target object changed; automatic rollback is unsafe."
             )
