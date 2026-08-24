@@ -12,6 +12,7 @@ from apps.backup.archive_payload import CONTINUITY_KEYS
 
 SOURCE_HASH = "a" * 64
 POSTGRES_MAJOR = 16
+SUPPORTED_SOURCE_MAJORS = [14, 15, 16, 17]
 
 
 @dataclass
@@ -77,6 +78,7 @@ def make_import_fixture(tmp_path):
         "size_bytes": len(database),
         "ciphertext_sha256": hashlib.sha256(database).hexdigest(),
         "schema_catalog_digest": "b" * 64,
+        "semantic_digest": "3" * 64,
         "sequence_policy": "source-high-water-over-all-components",
         "recipient_fingerprints": [],
     }
@@ -101,6 +103,7 @@ def make_import_fixture(tmp_path):
         "postgres": {
             "source_server_major": POSTGRES_MAJOR,
             "client": f"pg_dump (PostgreSQL) {POSTGRES_MAJOR}.4",
+            "supported_source_majors": list(SUPPORTED_SOURCE_MAJORS),
         },
         "makerspace_sets": {
             "retained": [7], "readable_main": [], "sovereign": [7]
