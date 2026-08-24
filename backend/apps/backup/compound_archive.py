@@ -18,6 +18,7 @@ from apps.backup.main_projection import project_readable_main_dump
 from apps.backup.main_projection_registry import table_rules
 from apps.backup.main_projection_verification import build_expected_ledger
 from apps.backup.object_ownership import MAIN_COMPONENT, slice_component
+from apps.backup.outer_manifest_facts import closure_digest_from_slice_ledgers
 from apps.backup.physical_catalog import catalog_digest, physical_catalog_ledger
 from apps.backup.postgres_client import server_major
 from apps.backup.reconstruction_verifier import verify_reconstruction
@@ -25,7 +26,6 @@ from apps.backup.recipient_selection import BackupBuildError
 from apps.backup.recipients import fingerprint_for
 from apps.backup.source_reservations import capture_source_reservations
 from apps.backup.source_verifier import verify_and_sign_source_partition
-from apps.backup.user_closure import user_closure_digest
 
 
 COMPOUND_ARCHIVE_FORMAT = "spaceworks-lane-e-e3-compound-v1"
@@ -57,8 +57,7 @@ class CompoundCapture:
         self.frozen_population = ()
         self.frozen_population_ids = ()
         self.predecessor_snapshot = {}
-        self.user_closure_entries = set()
-        self.user_closure_digest = user_closure_digest(())
+        self.user_closure_digest = ""
         self.verifier_root = self.root.parent / f".lane-e-verifier-{self.capture_id}"
 
     def prepare_from_snapshot(self):
@@ -121,7 +120,6 @@ class CompoundCapture:
                 archive_format=COMPOUND_ARCHIVE_FORMAT,
             )
             self.unsealed_slices.append(unsealed)
-            self.user_closure_entries.update(unsealed.user_closure_entries)
             self.verified_makerspace_ids.add(item.makerspace_id)
         object_plan.assert_complete()
         self.reservation_capture = self.reservation_capture.bind_object_plan(
@@ -129,12 +127,20 @@ class CompoundCapture:
             {item.makerspace_id: item.slice_id for item in self.frozen_slices},
         )
         self.require_verified_slice_coverage()
-        self.user_closure_digest = user_closure_digest(self.user_closure_entries)
+        self.user_closure_digest = closure_digest_from_slice_ledgers(
+            self.unsealed_slices
+        )
 
     def promotion_snapshot(self):
         slices = {item.makerspace_id: item for item in self.frozen_slices}
         return {
             **self.predecessor_snapshot,
+            # This is recomputed from the plaintext slice ledgers after the outer
+            # manifest has been built. Promotion compares this independently
+            # persisted fact with the signed manifest before making bytes available.
+            "user_closure_digest": closure_digest_from_slice_ledgers(
+                self.unsealed_slices
+            ),
             "retained": [
                 {
                     **item,
@@ -207,7 +213,6 @@ class CompoundCapture:
             result = dict(manifest)
         finally:
             shutil.rmtree(build_root, ignore_errors=True)
-            shutil.rmtree(self.verifier_root, ignore_errors=True)
         covered = [
             value for value in result["covered_makerspace_ids"]
             if value not in makerspace_ids

@@ -17,6 +17,7 @@ from apps.backup.models import (
     PlatformBackupSettings,
 )
 from apps.backup.promotion_validation import (
+    independently_recomputed_user_closure_digest,
     validate_artifact_rows,
     validate_frozen_state,
 )
@@ -98,6 +99,7 @@ def _promote_atomic(artifact_id, retained_ids, sovereign_ids, artifact_ids):
         artifact, spaces, recipients, activations, settings_row, artifacts
     )
     validate_artifact_rows(artifact, archive, components, associations)
+    closure_digest = independently_recomputed_user_closure_digest(artifact)
 
     now = timezone.now()
     pending = []
@@ -159,7 +161,7 @@ def _promote_atomic(artifact_id, retained_ids, sovereign_ids, artifact_ids):
         meta={
             "scope": archive.scope,
             "size_bytes": artifact.expected_size_bytes,
-            "user_closure_digest": artifact.outer_manifest["user_closure_digest"],
+            "user_closure_digest": closure_digest,
         },
     )
     settings_row.last_success_at = now

@@ -113,13 +113,16 @@ def build_archive(archive):
             manifest["contents"] = build_content_ledger(root)
             promotion_snapshot = None
             if compound_capture is not None:
-                manifest = build_outer_manifest(
-                    archive=archive,
-                    capture=compound_capture,
-                    detailed_manifest=manifest,
-                    root=root,
-                )
-                promotion_snapshot = compound_capture.promotion_snapshot()
+                try:
+                    manifest = build_outer_manifest(
+                        archive=archive,
+                        capture=compound_capture,
+                        detailed_manifest=manifest,
+                        root=root,
+                    )
+                    promotion_snapshot = compound_capture.promotion_snapshot()
+                finally:
+                    compound_capture.cleanup_verifier_material()
             _write_json(root / "manifest.json", manifest)
             encrypted = Path(tempdir.name, f"{archive.id}.tar.age")
             plain = Path(tempdir.name, f"{archive.id}.tar")
