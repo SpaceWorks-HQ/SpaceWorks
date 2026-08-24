@@ -37,6 +37,8 @@ def is_active_member(user, makerspace_id):
     """True if `user` is a live, active member of the makerspace (not merely a stored row)."""
     if user is None or not getattr(user, "is_authenticated", False):
         return False
+    if getattr(user, "is_tenant_dump_stub", False):
+        return False
     if getattr(user, "access_status", None) != User.AccessStatus.ACTIVE:
         return False
     if not getattr(user, "is_active", False):
@@ -47,6 +49,8 @@ def is_active_member(user, makerspace_id):
 
 
 def _active_membership_makerspace_ids(user):
+    if getattr(user, "is_tenant_dump_stub", False):
+        return set()
     scope = set(
         user.makerspace_memberships.filter(status="active").values_list(
             "makerspace_id", flat=True

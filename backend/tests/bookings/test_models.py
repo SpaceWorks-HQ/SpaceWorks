@@ -48,7 +48,7 @@ def test_space_defaults_are_other_unlimited_private_active_and_image_null():
     assert space.show_public_booker_names is False
     assert space.is_active is True
     assert space.image_key is None
-    assert space.approval_mode == BookableSpace.ApprovalMode.INSTANT
+    assert space.approval_mode == BookableSpace.ApprovalMode.APPROVE
     assert space.custom_form is None
     assert space.requester_notifications_enabled is None
     assert space.makerspace.booking_requester_notifications_enabled is False

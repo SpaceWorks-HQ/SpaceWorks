@@ -330,14 +330,14 @@ def test_general_space_patch_cannot_change_approval_mode():
     makerspace = make_makerspace('booking-rules-approval-guard')
     manager = make_user('booking-rules-approval-manager', makerspace)
     space = make_space(makerspace)
-    assert space.approval_mode == BookableSpace.ApprovalMode.INSTANT
+    assert space.approval_mode == BookableSpace.ApprovalMode.APPROVE
 
     detail_url = reverse('admin-bookable-space-detail', kwargs={'pk': space.pk})
     response = client_for(manager).patch(
         detail_url,
-        {'approval_mode': BookableSpace.ApprovalMode.APPROVE},
+        {'approval_mode': BookableSpace.ApprovalMode.INSTANT},
         format='json',
     )
     assert response.status_code == 200
     space.refresh_from_db()
-    assert space.approval_mode == BookableSpace.ApprovalMode.INSTANT
+    assert space.approval_mode == BookableSpace.ApprovalMode.APPROVE
