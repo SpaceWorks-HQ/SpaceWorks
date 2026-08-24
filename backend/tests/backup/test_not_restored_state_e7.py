@@ -119,13 +119,6 @@ def test_readable_main_tenant_is_served_while_pending_tenant_fails_closed():
         get_public_makerspace(pending.slug)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "SPEC BUG: the bulk-import Celery task does not apply the canonical "
-        "not-restored tenant write gate before materializing inventory"
-    ),
-)
 def test_celery_worker_cannot_claim_or_apply_work_for_pending_tenant():
     pending = _space("e7-pending-worker")
     actor = _manager(pending, "e7-worker-manager")
@@ -157,7 +150,7 @@ def test_celery_worker_cannot_claim_or_apply_work_for_pending_tenant():
 
 
 def test_scheduled_return_reminder_skips_pending_tenant(monkeypatch):
-    pending = _space("e7-pending-scheduled")
+    pending = _space("e7-pending-cron")
     _component(_operation(), pending.pk)
     requester = User.objects.create_user(
         username=f"e7-overdue-{uuid4().hex}",
@@ -199,7 +192,7 @@ def test_scheduled_return_reminder_skips_pending_tenant(monkeypatch):
     result = send_return_reminders_task()
 
     request.refresh_from_db()
-    assert result == {"sent": 0, "skipped": 0}
+    assert result == {"sent": 0, "skipped": 1}
     assert delivered == []
     assert request.return_reminder_sent_at is None
 

@@ -184,7 +184,6 @@ def test_closed_membership_request_keeps_history_but_cannot_auto_activate():
     assert values["auto_activate_on_claim"] is False
 
 
-@pytest.mark.xfail(strict=True, reason="SPEC BUG: backend/apps/bookings/models.py:53-57 defaults BookableSpace.approval_mode to unsafe instant approval instead of approve.")
 def test_visibility_consent_template_and_checkout_values_are_exact():
     space = Makerspace.objects.create(
         name="D8 preserved disclosure", slug="d8-preserved-disclosure",

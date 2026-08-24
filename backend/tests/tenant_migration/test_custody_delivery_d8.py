@@ -180,7 +180,6 @@ def test_enqueue_failure_cannot_roll_back_recipient_or_custody_state(
     ).exists()
 
 
-@pytest.mark.xfail(strict=True, reason="SPEC BUG: backend/apps/backup/activation.py:83 registers a functools.partial as a robust on_commit callback, so a receiver failure escapes through Django's missing __qualname__ error path.")
 def test_post_commit_failure_cannot_roll_back_activation(
     django_capture_on_commit_callbacks
 ):
@@ -259,7 +258,7 @@ def test_zero_recipient_boundary_blocks_publication_and_creates_no_download_stat
 
     capture.refresh_from_db()
     assert capture.status == TenantDumpCapture.Status.REFUSED
-    assert capture.object_key == ""
+    assert capture.object_key is None
     assert capture.download_token_digest == ""
     assert capture.download_token_expires_at is None
 

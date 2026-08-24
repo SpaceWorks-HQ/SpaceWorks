@@ -22,6 +22,9 @@ from tests.backup.e7_partition_test_helpers import (
 )
 
 
+pytestmark = pytest.mark.django_db
+
+
 HEADER_BINDINGS = (
     "protocol_version",
     "artifact_id",
