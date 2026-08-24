@@ -76,6 +76,10 @@ INFRASTRUCTURE_KEYS = frozenset({
     "POSTGRES_PASSWORD", "POSTGRES_USER", "POSTGRES_DB",
     "POSTGRES_APP_PASSWORD", "POSTGRES_APP_USER",
     "SPACEWORKS_MAINTENANCE_DATABASE_URL", "SPACEWORKS_HOST_STATE_DIR",
+    # Travels with DATABASE_URL in the pointer file that scripts/spaceworks-compose.sh
+    # layers last; host_pointer.py writes and parses that file format. No backend code
+    # reads the generation from the environment -- the wrapper is its only consumer.
+    "SPACEWORKS_DB_POINTER_GENERATION",
     "MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD",
     "MINIO_API_CORS_ALLOW_ORIGIN", "MINIO_CORS_ALLOWED_ORIGINS",
     "MINIO_BROWSER_REDIRECT_URL", "MC_HOST_local",
