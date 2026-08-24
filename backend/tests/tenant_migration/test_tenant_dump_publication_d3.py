@@ -1,5 +1,6 @@
 import pytest
 
+from apps.backup.digests import sha256_file
 from apps.backup.models import TenantExitCustodyAlarmDelivery
 from apps.backup.recipient_states import compromise_recipient, revoke_recipient
 from apps.backup.tenant_exit_custody_alarms import required_intents_present_locked
@@ -10,6 +11,11 @@ from apps.tenant_migration.tenant_dump_cleanup import (
     cleanup_refused_tenant_dump_artifacts,
 )
 from apps.tenant_migration.tenant_dump_errors import TenantDumpPublicationRefused
+from apps.tenant_migration.tenant_dump_envelope import (
+    build_outer_manifest,
+    write_outer_artifact,
+)
+from apps.tenant_migration.tenant_dump_lineage import FORMAT
 from apps.tenant_migration.tenant_dump_model_catalog import FIRST_PARTY_MODEL_RULES
 from apps.tenant_migration.tenant_dump_publication import (
     register_unpublished_artifact,
@@ -121,7 +127,28 @@ def test_failed_artifact_registration_journals_an_undeletable_upload(
     capture.unpublished_object_key = ""
     capture.save(update_fields=("unpublished_object_key", "updated_at"))
     artifact = tmp_path / "sealed.tar.age"
-    artifact.write_bytes(b"sealed")
+    payload = tmp_path / "payload.age"
+    payload.write_bytes(b"sealed")
+    write_outer_artifact(
+        payload,
+        artifact,
+        build_outer_manifest(
+            format=FORMAT,
+            version=1,
+            artifact_id=capture.pk,
+            capture_id=capture.pk,
+            outer_recipient_fingerprints=["outer"],
+            tenant_dek_recipient_fingerprints=["tenant"],
+            encrypted_members=[{
+                "path": "payload.age",
+                "sha256": sha256_file(payload),
+                "size": payload.stat().st_size,
+            }],
+            source_build={"source_hash": "a" * 64},
+            postgres_major=16,
+            compatibility={},
+        ),
+    )
 
     original_save = TenantDumpCapture.save
     failed_once = False

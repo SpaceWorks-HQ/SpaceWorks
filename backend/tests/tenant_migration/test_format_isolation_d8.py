@@ -8,7 +8,7 @@ from rest_framework.exceptions import ValidationError
 from apps.accounts.models import User
 from apps.backup import storage
 from apps.backup.archive_import import import_disaster_archive
-from apps.backup.digests import SUPPORTED_ARCHIVE_FORMATS
+from apps.backup.digests import SUPPORTED_ARCHIVE_FORMATS, sha256_file
 from apps.backup.models import (
     BackupArchive,
     DeploymentRecoveryState,
@@ -93,7 +93,6 @@ def test_ordinary_restore_request_rejects_lane_d_before_state_mutation():
         "deployment/continuity-secrets.json",
     ),
 )
-@pytest.mark.xfail(strict=True, reason="SPEC BUG: backend/apps/tenant_migration/tenant_dump_envelope.py:17-34 accepts arbitrary bundle members instead of rejecting forbidden secret paths.")
 def test_lane_d_content_ledger_rejects_each_forbidden_secret_member(
     tmp_path, forbidden_member
 ):
@@ -101,10 +100,14 @@ def test_lane_d_content_ledger_rejects_each_forbidden_secret_member(
     member.parent.mkdir(parents=True, exist_ok=True)
     member.write_bytes(b"forbidden-secret-material")
 
-    with pytest.raises(TenantDumpVerificationError, match="forbidden|not permitted|secret|DEK"):
+    with pytest.raises(
+        TenantDumpVerificationError,
+        match="forbidden|not permitted|secret|DEK",
+    ) as exc_info:
         tenant_dump_envelope.build_tenant_content_ledger(
             tmp_path, source_pii_mode="plaintext"
         )
+    assert forbidden_member in str(exc_info.value)
 
 
 def test_source_broker_wrapped_dek_value_is_not_an_allowed_inventory_field():
@@ -122,7 +125,6 @@ def test_source_broker_wrapped_dek_value_is_not_an_allowed_inventory_field():
     assert _valid_key_inventory(inventory, 7) is False
 
 
-@pytest.mark.xfail(strict=True, reason="SPEC BUG: backend/apps/tenant_migration/tenant_dump_envelope.py:1-92 has no separately readable build_outer_manifest allowlist builder.")
 def test_lane_d_outer_manifest_has_a_strict_pre_decryption_allowlist():
     builder = getattr(tenant_dump_envelope, "build_outer_manifest", None)
     assert callable(builder), "Lane D needs a separately readable outer-manifest builder."
@@ -145,6 +147,40 @@ def test_lane_d_outer_manifest_has_a_strict_pre_decryption_allowlist():
         "encrypted_members", "source_build", "postgres_major", "compatibility",
     }
     assert not ({"rows", "object_keys", "user_closure", "deks"} & set(manifest))
+
+
+def test_lane_d_outer_manifest_is_readable_and_bound_to_ciphertext(tmp_path):
+    payload = tmp_path / "payload.age"
+    payload.write_bytes(b"sealed-ciphertext")
+    artifact = tmp_path / "tenant-dump.tar.age"
+    manifest = tenant_dump_envelope.build_outer_manifest(
+        format=FORMAT,
+        version=1,
+        artifact_id="artifact",
+        capture_id="capture",
+        outer_recipient_fingerprints=["outer"],
+        tenant_dek_recipient_fingerprints=["tenant"],
+        encrypted_members=[{
+            "path": "payload.age",
+            "sha256": sha256_file(payload),
+            "size": payload.stat().st_size,
+        }],
+        source_build={"source_hash": "b" * 64},
+        postgres_major=16,
+        compatibility={},
+    )
+    tenant_dump_envelope.write_outer_artifact(payload, artifact, manifest)
+
+    assert tenant_dump_envelope.read_outer_manifest(artifact) == manifest
+    with pytest.raises(TenantDumpVerificationError, match="structure"):
+        tenant_dump_envelope.validate_outer_manifest({**manifest, "rows": []})
+
+    tampered = artifact.read_bytes().replace(
+        b"sealed-ciphertext", b"sealed-CIPHERTEXT"
+    )
+    artifact.write_bytes(tampered)
+    with pytest.raises(TenantDumpVerificationError, match="bound"):
+        tenant_dump_envelope.read_outer_manifest(artifact)
 
 
 def test_lane_d_has_no_shared_deployment_secret_policy_or_include_secrets_switch():
