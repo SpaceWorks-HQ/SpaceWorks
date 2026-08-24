@@ -112,6 +112,31 @@ def test_self_host_custom_domain_is_allowed_despite_override(makerspace):
     assert limits.custom_domain_allowed(makerspace) is True
 
 
+def test_barrel_self_host_patch_controls_every_split_limit_module(
+    makerspace, monkeypatch
+):
+    """The historical barrel patch point must govern core, usage and reservations."""
+    makerspace.resource_limit_overrides = {
+        "products": 0,
+        "custom_domain": False,
+    }
+
+    monkeypatch.setattr(limits, "is_self_host", lambda: False)
+    assert limits.resource_limit(makerspace, "products") == 0
+    assert limits.custom_domain_allowed(makerspace) is False
+
+    monkeypatch.setattr(limits, "is_self_host", lambda: True)
+    assert limits.resource_limit(makerspace, "products") is None
+    assert limits.custom_domain_allowed(makerspace) is True
+
+    monkeypatch.setattr(limits, "is_self_host", lambda: False)
+    monkeypatch.setattr(limits, "resource_limit", lambda _space, _channel: 0)
+    assert limits.reserve_notification_quota(makerspace, "slack") is False
+
+    monkeypatch.setattr(limits, "is_self_host", lambda: True)
+    assert limits.reserve_notification_quota(makerspace, "slack") is True
+
+
 def test_override_validator_returns_cleaned_valid_dict():
     value = {"products": 5, "storage": None, "custom_domain": False}
 

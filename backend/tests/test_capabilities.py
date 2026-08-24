@@ -112,6 +112,7 @@ def test_model_and_admin_validator_share_printing_rule():
         validate_capabilities(["printing"], [])
 
 
+@pytest.mark.django_db
 def test_feature_dependency_and_bootstrap_projection():
     from apps.makerspaces.models import Makerspace
     from apps.makerspaces.platform import bootstrap_payload, feature_enabled
@@ -264,11 +265,8 @@ def test_membership_without_builtin_member_accounts_is_valid():
 def test_frontend_feature_definitions_match_the_backend():
     """`frontend/src/lib/features.ts` is a hand-kept mirror of the backend registry.
 
-    A parallel list is exactly the drift the capability registry exists to remove, and
-    here it is load-bearing: the staff console renders its checkboxes from the frontend
-    copy, so a feature missing there is invisible to the Space Manager who is supposed
-    to own it, and a stale `parent_module` renders a checkbox that is wrongly disabled
-    (an omitted checkbox is dropped from the PATCH and silently clears the capability).
+    The staff console renders this hand-kept copy; a missing feature is invisible, while
+    a stale parent disables the wrong checkbox and can silently clear the capability.
     """
     import json
     import re

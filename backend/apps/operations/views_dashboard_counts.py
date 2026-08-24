@@ -5,7 +5,6 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.hardware_requests.models import (
-    HardwareRequest,
     PublicProblemReport,
     PublicToolLoan,
 )
@@ -54,6 +53,8 @@ def build_dashboard(
     independently authorized for. Machine scoping must narrow machine data without
     revoking other granted actions.
     """
+    from apps.operations import views_dashboard
+
     now = timezone.now()
     today = timezone.localdate()
     scoped = machine_scope is not role_scope.EXEMPT
@@ -77,11 +78,11 @@ def build_dashboard(
 
     if not restricted:
         try:
-            reviewed_overdue = HardwareRequest.objects.filter(
+            reviewed_overdue = views_dashboard.HardwareRequest.objects.filter(
                 makerspace=makerspace,
                 status__in=[
-                    HardwareRequest.Status.ISSUED,
-                    HardwareRequest.Status.PARTIALLY_RETURNED,
+                    views_dashboard.HardwareRequest.Status.ISSUED,
+                    views_dashboard.HardwareRequest.Status.PARTIALLY_RETURNED,
                 ],
                 return_due_at__lt=now,
             ).count()
@@ -94,16 +95,16 @@ def build_dashboard(
         except Exception:
             pass
         try:
-            counts["pending_requests"] = HardwareRequest.objects.filter(
+            counts["pending_requests"] = views_dashboard.HardwareRequest.objects.filter(
                 makerspace=makerspace,
-                status=HardwareRequest.Status.PENDING_APPROVAL,
+                status=views_dashboard.HardwareRequest.Status.PENDING_APPROVAL,
             ).count()
         except Exception:
             pass
         try:
-            counts["awaiting_issue"] = HardwareRequest.objects.filter(
+            counts["awaiting_issue"] = views_dashboard.HardwareRequest.objects.filter(
                 makerspace=makerspace,
-                status=HardwareRequest.Status.ACCEPTED,
+                status=views_dashboard.HardwareRequest.Status.ACCEPTED,
             ).count()
         except Exception:
             pass

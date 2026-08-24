@@ -54,7 +54,7 @@ def test_notification_events_use_single_requester_email_adapter(
     django_capture_on_commit_callbacks,
 ):
     tenant = makerspace('booking-notify-events', True)
-    instant = space(tenant)
+    instant = space(tenant, approval_mode=BookableSpace.ApprovalMode.INSTANT)
     approval = space(
         tenant,
         name='Studio',
@@ -162,7 +162,7 @@ def test_notification_setup_failure_is_non_pii_and_never_breaks_mutation(
     caplog,
 ):
     tenant = makerspace('booking-notify-failure', True)
-    target = space(tenant)
+    target = space(tenant, approval_mode=BookableSpace.ApprovalMode.INSTANT)
 
     def fail(**kwargs):
         raise RuntimeError('ada@example.com private delivery detail')
@@ -191,7 +191,11 @@ def test_all_booking_services_emit_the_exact_lifecycle_event_once(monkeypatch):
     approval = space(
         tenant, approval_mode=BookableSpace.ApprovalMode.APPROVE,
     )
-    instant = space(tenant, name='Instant')
+    instant = space(
+        tenant,
+        name='Instant',
+        approval_mode=BookableSpace.ApprovalMode.INSTANT,
+    )
     calls = []
     monkeypatch.setattr(
         notifications,

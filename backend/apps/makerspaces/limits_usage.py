@@ -10,12 +10,13 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers
 
-from apps.makerspaces.domain_verification import is_self_host
-from apps.makerspaces.limits_core import RESOURCE_LABELS, resource_limit
+from apps.makerspaces.limits_core import RESOURCE_LABELS
 
 
 def custom_domain_allowed(makerspace) -> bool:
-    if is_self_host():
+    from apps.makerspaces import limits
+
+    if limits.is_self_host():
         return True
     return bool((makerspace.resource_limit_overrides or {}).get("custom_domain"))
 
@@ -159,9 +160,11 @@ def add_storage(makerspace, size_bytes) -> None:
     holds a transaction (it degrades to a savepoint when nested). On self-host or
     unlimited it is a no-op.
     """
-    if is_self_host() or not size_bytes:
+    from apps.makerspaces import limits
+
+    if limits.is_self_host() or not size_bytes:
         return
-    limit = resource_limit(makerspace, "storage")
+    limit = limits.resource_limit(makerspace, "storage")
     if limit is None:
         return
     from django.db import transaction
@@ -185,7 +188,9 @@ def add_storage(makerspace, size_bytes) -> None:
 
 def free_storage(makerspace, size_bytes) -> None:
     """Release managed object storage (never below zero)."""
-    if is_self_host() or not size_bytes:
+    from apps.makerspaces import limits
+
+    if limits.is_self_host() or not size_bytes:
         return
     from apps.makerspaces.models import Makerspace
     from django.db.models import F, Value
@@ -233,7 +238,9 @@ def check_quota(makerspace, key, *, adding=1) -> None:
     The caller must wrap this check and its create operation in
     ``transaction.atomic()`` so the makerspace row lock serializes creators.
     """
-    limit = resource_limit(makerspace, key)
+    from apps.makerspaces import limits
+
+    limit = limits.resource_limit(makerspace, key)
     if limit is None:
         return
 
@@ -254,4 +261,3 @@ def check_quota(makerspace, key, *, adding=1) -> None:
         raise serializers.ValidationError(
             {"limit": message}, code="limit_reached"
         )
-
