@@ -75,8 +75,7 @@ def _apply_refusal(case, fixture, settings):
         fixture.manifest["build"] = changed_build.copy()
         fixture.write()
     elif case == "component_policy":
-        fixture.manifest["main_component"]["size_bytes"] = 0
-        fixture.manifest["contents"][0]["size"] = 0
+        fixture.manifest["content_ledgers"][0]["count"] = 0
         fixture.write()
     return expected
 
