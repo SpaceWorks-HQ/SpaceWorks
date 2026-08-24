@@ -1917,6 +1917,19 @@ with client 16, so **every deployment archive produced was unrestorable through 
 Never call a bare `pg_dump`/`pg_restore`/`createdb`/`dropdb` from application code, and keep the archive
 build's readiness gate checking the *resolved* binaries rather than `PATH`.
 
+**A host-supplied deployment archive is rejected before any deployment mutation.**
+`apps.backup.import_preflight.validate_import_preflight` is the shared, side-effect-free admission path for both
+the validate-only management command and `import_backup_archive`. It binds the optional caller digest to the
+encrypted outer artifact; verifies the host-trusted signer, signature, compound format/version, declared
+component paths/sizes/digests and member allowlist; validates the exact nine-name single-line continuity-key
+shape; and requires source-build plus exact pg_dump/source-server/target-server major compatibility. The
+host wrapper holds its existing `flock` while it decrypts into the operation-owned temporary directory and
+runs that validator through `docker compose run --rm --no-deps`; only success permits the `.env` backup and
+rewrite or recreation of backend, worker and beat. Refusal writes no restore intent or audit, calls no object
+store, leaves `.env` byte-identical with no `.env.pre-restore-*`, does not restart a service, and cleans the
+temporary directory. The later Lane E section 11 producer/consumer host gate has one deliberately inert
+`host_restore_gate_status()` seam here; it defines no marker/socket protocol and confers no authority yet.
+
 **Auto-created many-to-many through tables are physical tables, not fields embedded in their owning
 model's row.** Each must therefore have its own literal physical-table disposition and its own count,
 identity digest and concrete-column row digest. The owning model's digest covers only its concrete columns.

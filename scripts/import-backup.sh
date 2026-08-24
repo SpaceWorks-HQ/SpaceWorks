@@ -54,6 +54,18 @@ with tarfile.open(archive) as bundle:
         output.write_bytes(source.read())
 PY
 
+preflight_args=(
+  --encrypted-file "$CONTAINER_WORK/archive.tar.age"
+  --bundle "$CONTAINER_WORK/archive.tar"
+  --manifest "$CONTAINER_WORK/manifest.json"
+  --continuity-secrets "$CONTAINER_WORK/keys-env.json"
+)
+if [[ -n "$EXPECTED_SHA256" ]]; then
+  preflight_args+=(--expected-sha256 "$EXPECTED_SHA256")
+fi
+"${COMPOSE[@]}" run --rm --no-deps -T backend \
+  python manage.py preflight_backup_import "${preflight_args[@]}"
+
 [[ -f .env ]] || die "The target deployment has no .env file to receive continuity secrets."
 cp -p -- .env "$WORK/target.env"
 if [[ "$(id -u)" == "0" ]]; then
@@ -105,7 +117,9 @@ printf '[Space Works backup import] Continuity secrets installed; previous envir
 import_args=(
   --username "$USERNAME"
   --encrypted-file "$CONTAINER_WORK/archive.tar.age"
+  --bundle "$CONTAINER_WORK/archive.tar"
   --manifest "$CONTAINER_WORK/manifest.json"
+  --continuity-secrets "$CONTAINER_WORK/keys-env.json"
 )
 if [[ -n "$EXPECTED_SHA256" ]]; then
   import_args+=(--expected-sha256 "$EXPECTED_SHA256")
