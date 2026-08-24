@@ -38,6 +38,7 @@ from apps.backup.postgres_client import (
     PostgresClientUnavailable,
     client_binary,
 )
+from apps.backup.producer_capability import assert_producer_capability
 from apps.backup.recipient_selection import BackupBuildError
 
 
@@ -61,6 +62,7 @@ class ArchiveBuildResult:
 def build_archive(archive):
     if archive.scope == BackupArchive.Scope.DEPLOYMENT:
         assert_deployment_fully_restored()
+        assert_producer_capability()
     else:
         assert_restored(archive.makerspace_id)
     selected_recipients = recipients.selection_for(archive)
@@ -111,13 +113,16 @@ def build_archive(archive):
             manifest["contents"] = build_content_ledger(root)
             promotion_snapshot = None
             if compound_capture is not None:
-                manifest = build_outer_manifest(
-                    archive=archive,
-                    capture=compound_capture,
-                    detailed_manifest=manifest,
-                    root=root,
-                )
-                promotion_snapshot = compound_capture.promotion_snapshot()
+                try:
+                    manifest = build_outer_manifest(
+                        archive=archive,
+                        capture=compound_capture,
+                        detailed_manifest=manifest,
+                        root=root,
+                    )
+                    promotion_snapshot = compound_capture.promotion_snapshot()
+                finally:
+                    compound_capture.cleanup_verifier_material()
             _write_json(root / "manifest.json", manifest)
             encrypted = Path(tempdir.name, f"{archive.id}.tar.age")
             plain = Path(tempdir.name, f"{archive.id}.tar")

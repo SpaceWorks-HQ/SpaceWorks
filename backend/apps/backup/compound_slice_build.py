@@ -22,7 +22,6 @@ class UnsealedSlice:
     object_manifest: tuple[dict, ...]
     staged_deks: list[object]
     sealed_deks: list[dict]
-    user_closure_entries: tuple[tuple[str, str, str], ...]
 
 
 def build_unsealed_slice(
@@ -75,7 +74,6 @@ def build_unsealed_slice(
         object_manifest=tuple(objects),
         staged_deks=staged_deks,
         sealed_deks=sealed_deks,
-        user_closure_entries=closure_entries,
     )
 
 

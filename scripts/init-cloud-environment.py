@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -13,6 +14,26 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from apps.backup.cloud_environment import init_from_current_environment  # noqa: E402
 from apps.backup.host_supervisor import supervise_run  # noqa: E402
+
+
+def render_compose_config(compose_path, static_env, pointer_path):
+    """Render Compose only in this root-owned host process, never in Django."""
+    scrubbed = {
+        key: value
+        for key, value in os.environ.items()
+        if key in {"PATH", "DOCKER_HOST", "DOCKER_CONTEXT", "XDG_RUNTIME_DIR"}
+    }
+    completed = subprocess.run(
+        [
+            "docker", "compose", "--env-file", str(static_env),
+            "--env-file", str(pointer_path), "-f", str(compose_path), "config",
+        ],
+        env=scrubbed,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return completed.stdout
 
 
 def main(argv=None):
@@ -43,6 +64,7 @@ def main(argv=None):
             static_env_path=args.static_env,
             pointer_path=ops / "database-pointer.env",
             topology_record_path=ops / "compose-topology.json",
+            compose_renderer=render_compose_config,
         )
         session.ledger.finish(begun, result)
     print(json.dumps(result, sort_keys=True))

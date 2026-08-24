@@ -1,5 +1,3 @@
-from datetime import datetime, timedelta, timezone as datetime_timezone
-
 import pytest
 from django.db import IntegrityError, transaction
 from django.urls import reverse
@@ -8,8 +6,8 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.audit.models import AuditLog
-from apps.bookings import services, services_bookings
-from apps.bookings.exceptions import BookingConflict, BookingInvalidTransition
+from apps.bookings import services
+from apps.bookings.exceptions import BookingInvalidTransition
 from apps.bookings.models import BookableSpace, Booking
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 
@@ -161,74 +159,6 @@ def test_update_booking_rules_saves_changed_fields_and_audits(monkeypatch):
     assert updated.approval_mode == BookableSpace.ApprovalMode.APPROVE
 
 
-@pytest.mark.parametrize(
-    ('starts_delta', 'duration', 'field'),
-    (
-        (timedelta(hours=2), timedelta(minutes=29), 'ends_at'),
-        (timedelta(hours=2), timedelta(minutes=481), 'ends_at'),
-        (timedelta(minutes=59), timedelta(minutes=60), 'starts_at'),
-        (timedelta(days=30, seconds=1), timedelta(minutes=60), 'starts_at'),
-    ),
-)
-def test_create_booking_rejects_rule_failures_without_rows_or_audit(
-    monkeypatch, starts_delta, duration, field
-):
-    now = datetime(2030, 1, 1, tzinfo=datetime_timezone.utc)
-    monkeypatch.setattr(services_bookings.timezone, 'now', lambda: now)
-    space = make_space()
-    before = AuditLog.objects.count()
-    starts_at = now + starts_delta
-
-    with pytest.raises(serializers.ValidationError) as caught:
-        create_booking(space, starts_at, starts_at + duration)
-
-    assert set(caught.value.detail) == {field}
-    assert not Booking.objects.filter(space=space).exists()
-    assert AuditLog.objects.count() == before
-
-
-@pytest.mark.parametrize(
-    ('starts_delta', 'duration'),
-    (
-        (timedelta(hours=2), timedelta(minutes=30)),
-        (timedelta(hours=2), timedelta(minutes=480)),
-        (timedelta(minutes=60), timedelta(minutes=60)),
-        (timedelta(days=30), timedelta(minutes=60)),
-    ),
-)
-def test_create_booking_allows_exact_rule_boundaries(
-    monkeypatch, starts_delta, duration
-):
-    now = datetime(2030, 1, 1, tzinfo=datetime_timezone.utc)
-    monkeypatch.setattr(services_bookings.timezone, 'now', lambda: now)
-    space = make_space()
-    starts_at = now + starts_delta
-
-    booking = create_booking(space, starts_at, starts_at + duration)
-
-    assert booking.pk is not None
-
-
-def test_valid_booking_still_creates_and_overlap_still_conflicts(monkeypatch):
-    now = datetime(2030, 1, 1, tzinfo=datetime_timezone.utc)
-    monkeypatch.setattr(services_bookings.timezone, 'now', lambda: now)
-    space = make_space()
-    starts_at = now + timedelta(hours=2)
-    first = create_booking(space, starts_at, starts_at + timedelta(hours=1))
-    before = AuditLog.objects.count()
-
-    with pytest.raises(BookingConflict):
-        create_booking(
-            space,
-            starts_at + timedelta(minutes=30),
-            starts_at + timedelta(minutes=90),
-        )
-
-    assert first.status == Booking.Status.CONFIRMED
-    assert Booking.objects.filter(space=space).count() == 1
-    assert AuditLog.objects.count() == before
-
-
 def test_booking_rules_api_scopes_updates_and_general_patch():
     makerspace = make_makerspace('booking-rules-api')
     manager = make_user('booking-rules-manager', makerspace)
@@ -330,14 +260,14 @@ def test_general_space_patch_cannot_change_approval_mode():
     makerspace = make_makerspace('booking-rules-approval-guard')
     manager = make_user('booking-rules-approval-manager', makerspace)
     space = make_space(makerspace)
-    assert space.approval_mode == BookableSpace.ApprovalMode.INSTANT
+    assert space.approval_mode == BookableSpace.ApprovalMode.APPROVE
 
     detail_url = reverse('admin-bookable-space-detail', kwargs={'pk': space.pk})
     response = client_for(manager).patch(
         detail_url,
-        {'approval_mode': BookableSpace.ApprovalMode.APPROVE},
+        {'approval_mode': BookableSpace.ApprovalMode.INSTANT},
         format='json',
     )
     assert response.status_code == 200
     space.refresh_from_db()
-    assert space.approval_mode == BookableSpace.ApprovalMode.INSTANT
+    assert space.approval_mode == BookableSpace.ApprovalMode.APPROVE

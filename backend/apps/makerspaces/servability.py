@@ -42,13 +42,23 @@ def unservable_makerspace_ids() -> set[int]:
     """Return IDs that every normal authorization scope must exclude."""
     from apps.backup.not_restored import active_component_states
 
-    ordinary = set(
+    ordinary = archived_or_inactive_makerspace_ids()
+    pending = set(
+        active_component_states().values_list("makerspace_id_snapshot", flat=True)
+    )
+    return ordinary | pending
+
+
+def archived_or_inactive_makerspace_ids() -> set[int]:
+    """The archived/inactive half of the policy, without the not-restored half.
+
+    A caller that must still let a pending (not-restored) tenant reach the
+    not-restored write gate needs this rather than `unservable_makerspace_ids`,
+    which unions both and would filter the tenant out before the gate ran.
+    """
+    return set(
         Makerspace.objects.exclude(
             archived_at__isnull=True,
             lifecycle_state=Makerspace.LifecycleState.ACTIVE,
         ).values_list("id", flat=True)
     )
-    pending = set(
-        active_component_states().values_list("makerspace_id_snapshot", flat=True)
-    )
-    return ordinary | pending

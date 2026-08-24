@@ -6,7 +6,6 @@ import hashlib
 import os
 from pathlib import Path
 import re
-import subprocess
 
 import yaml
 
@@ -75,29 +74,6 @@ def _inventory(values):
     ]
 
 
-def _compose_config(compose_path, static_env, pointer_path, *, runner=subprocess.run):
-    scrubbed = {
-        key: value for key, value in os.environ.items()
-        if key in {"PATH", "DOCKER_HOST", "DOCKER_CONTEXT", "XDG_RUNTIME_DIR"}
-    }
-    try:
-        completed = runner(
-            [
-                "docker", "compose", "--env-file", str(static_env),
-                "--env-file", str(pointer_path), "-f", str(compose_path), "config",
-            ],
-            env=scrubbed,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise CloudEnvironmentError(
-            "Cloud Compose config cannot be reproduced under a scrubbed environment."
-        ) from exc
-    return completed.stdout
-
-
 def _rendered_writer_database_urls(rendered, writer_services):
     try:
         document = yaml.safe_load(rendered)
@@ -126,9 +102,9 @@ def _rendered_writer_database_urls(rendered, writer_services):
 
 def init_from_current_environment(
     *, compose_path, static_env_path, pointer_path, topology_record_path,
-    environ=None, runner=subprocess.run, require_root_owned=True,
+    compose_renderer, environ=None, require_root_owned=True,
 ):
-    """Capture effective values once; later shells are never consulted."""
+    """Capture values once and validate output rendered by the host orchestrator."""
     environ = dict(os.environ if environ is None else environ)
     compose_path = Path(compose_path)
     with compose_path.open(encoding="utf-8") as handle:
@@ -163,9 +139,12 @@ def init_from_current_environment(
         topology="cloud", static_env=static_env_path, compose_files=[compose_path]
     )
     write_topology_record(topology_record_path, facts)
-    rendered = _compose_config(
-        compose_path, static_env_path, pointer_path, runner=runner
-    )
+    try:
+        rendered = compose_renderer(compose_path, static_env_path, pointer_path)
+    except Exception as exc:
+        raise CloudEnvironmentError(
+            "Cloud Compose config cannot be reproduced under a scrubbed environment."
+        ) from exc
     rendered_urls = _rendered_writer_database_urls(
         rendered, contract["writer_services"]
     )

@@ -2,6 +2,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.module_registry import module_available
 from apps.makerspaces.platform import feature_enabled, module_enabled
 
 
@@ -12,6 +13,18 @@ def require_module(makerspace_or_id, module_key):
         else get_object_or_404(Makerspace, pk=makerspace_or_id)
     )
     if not module_enabled(makerspace, module_key):
+        raise ValidationError({"module": f"{module_key} is disabled for this makerspace."})
+    return makerspace
+
+
+def require_module_for_servable(makerspace, module_key):
+    """Check capability after a canonical servable lookup without querying it twice."""
+    if not isinstance(makerspace, Makerspace):
+        raise TypeError("A servability-checked Makerspace instance is required.")
+    if (
+        module_key not in set(makerspace.enabled_modules or [])
+        or not module_available(module_key)
+    ):
         raise ValidationError({"module": f"{module_key} is disabled for this makerspace."})
     return makerspace
 

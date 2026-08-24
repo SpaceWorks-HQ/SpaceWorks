@@ -18,10 +18,18 @@ control() {
   "${COMPOSE[@]}" run --rm --no-deps -T backend \
     --role management python manage.py backup_control "$@"
 }
+reprovision_grants() {
+  local database_name="${1:-}"
+  local command=(run --rm --no-deps -T -e SPACEWORKS_GRANTS_ONLY=1)
+  if [[ -n "$database_name" ]]; then
+    command+=(-e "SPACEWORKS_GRANT_DATABASE_NAME=$database_name")
+  fi
+  "${COMPOSE[@]}" "${command[@]}" orchestration-ready >/dev/null
+}
 
 [[ "$RESTORE_ID" =~ ^[0-9a-fA-F-]{36}$ ]] || die "Usage: scripts/restore.sh <restore-uuid>"
 command -v docker >/dev/null 2>&1 || die "Docker is required."
-command -v flock >/dev/null 2>&1 || die "flock is required; Windows cannot run in-place restore."
+command -v flock >/dev/null 2>&1 || die "In-place restore must run under WSL2 (not native Git Bash/Windows). WSL2 supplies the Linux flock, AF_UNIX sockets, and root-owned-file trust semantics that fence destructive host orchestration; start Docker Desktop's WSL2 integration, open this install from a WSL2 shell, and rerun scripts/restore.sh there."
 [[ -d "$OPS_DIR" ]] || die "$OPS_DIR is missing; run setup on this host first."
 [[ -f "$IDENTITY_FILE" ]] || die "The age identity file is missing: $IDENTITY_FILE"
 
@@ -44,15 +52,17 @@ fi
 destructive=0
 finished=0
 workers_stopped=0
+claimed=0
+restart_allowed=1
 metadata=""
 restart_workers() {
-  if [[ "$workers_stopped" == 1 ]]; then
+  if [[ "$workers_stopped" == 1 && "$restart_allowed" == 1 ]]; then
     "${COMPOSE[@]}" up -d worker beat >/dev/null 2>&1
     workers_stopped=0
   fi
 }
 restart_backend() {
-  if [[ "$backend_stopped" == 1 ]]; then
+  if [[ "$backend_stopped" == 1 && "$restart_allowed" == 1 ]]; then
     "${COMPOSE[@]}" up -d backend >/dev/null 2>&1
     backend_stopped=0
   fi
@@ -66,15 +76,23 @@ cleanup() {
       say "Restore failed after database replacement; rolling objects and database back."
       control stage "$RESTORE_ID" rolling_back >/dev/null 2>&1 || true
       control rollback-objects "$RESTORE_ID" >/dev/null 2>&1 || true
-      "${COMPOSE[@]}" exec -T db sh -c \
+      rollback_grants_ready=0
+      if "${COMPOSE[@]}" exec -T db sh -c \
         'pg_restore --clean --if-exists --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-        < "$PRE_DB" >/dev/null 2>&1 || true
-      control reconcile-journal "$RESTORE_ID" \
-        --journal "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/swap-journal.jsonl" \
-        >/dev/null 2>&1 || true
-      control fail "$RESTORE_ID" --message "Privileged host restore failed; inspect $JOURNAL." \
-        >/dev/null 2>&1 || true
-    else
+        < "$PRE_DB" >/dev/null 2>&1 && reprovision_grants >/dev/null 2>&1; then
+        rollback_grants_ready=1
+      fi
+      if [[ "$rollback_grants_ready" == 1 ]]; then
+        control reconcile-journal "$RESTORE_ID" \
+          --journal "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/swap-journal.jsonl" \
+          >/dev/null 2>&1 || true
+        control fail "$RESTORE_ID" --message "Privileged host restore failed; inspect $JOURNAL." \
+          >/dev/null 2>&1 || true
+      else
+        say "Rollback database grants could not be reprovisioned; Django remains stopped."
+        restart_allowed=0
+      fi
+    elif [[ "$claimed" == 1 ]]; then
       control pause "$RESTORE_ID" --message \
         "Privileged host restore paused before destructive work; rerun the supervisor." \
         >/dev/null 2>&1 || true
@@ -104,6 +122,10 @@ if [[ -f "$DESTRUCTIVE_MARKER" ]]; then
   "${COMPOSE[@]}" exec -T db sh -c \
     'pg_restore --clean --if-exists --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
     < "$PRE_DB"
+  if ! reprovision_grants; then
+    restart_allowed=0
+    die "Interrupted rollback grants could not be reprovisioned; Django remains stopped."
+  fi
   control reconcile-journal "$RESTORE_ID" \
     --journal "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/swap-journal.jsonl" >/dev/null
   control rollback-objects "$RESTORE_ID" >/dev/null
@@ -116,9 +138,6 @@ if [[ -f "$DESTRUCTIVE_MARKER" ]]; then
   die "The interrupted restore was rolled back safely; inspect the failed operation before retrying."
 fi
 
-claim_result="$(control claim "$RESTORE_ID" | tail -n 1)"
-[[ "$claim_result" == "claimed" || "$claim_result" == "resume" ]] \
-  || die "Restore intent is not at a resumable pre-destructive stage."
 metadata="$(control describe "$RESTORE_ID" | tail -n 1)"
 archive_id="$(printf '%s' "$metadata" | sed -n 's/.*"archive_id": "\([0-9a-f-]*\)".*/\1/p')"
 kind="$(printf '%s' "$metadata" | sed -n 's/.*"kind": "\([a-z_]*\)".*/\1/p')"
@@ -146,10 +165,27 @@ with tarfile.open(archive) as bundle:
 PY
 [[ -s "$BUNDLE/manifest.json" && -s "$BUNDLE/database.dump" ]] \
   || die "The archive is missing its manifest or database dump."
-control preflight "$RESTORE_ID" \
-  --manifest "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle/manifest.json" \
-  --bundle "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle" \
-  --current-oci-digest "$oci_digest" >/dev/null
+restore_preflight() {
+  control preflight "$RESTORE_ID" \
+    --manifest "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle/manifest.json" \
+    --bundle "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle" \
+    --encrypted-file "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar.age" \
+    --decrypted-bundle "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar" \
+    --continuity-secrets "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle/keys/env.json" \
+    --current-oci-digest "$oci_digest"
+}
+preflight_result="$(restore_preflight | tail -n 1)"
+if [[ "$preflight_result" == "compound-coordinator-ready" ]]; then
+  die "scripts/restore.sh is the legacy in-place path and cannot execute a compound restore; invoke the target compound pre-cutover coordinator."
+fi
+[[ "$preflight_result" == "preflight-ok" ]] \
+  || die "The restore preflight returned an unknown path result."
+claim_result="$(control claim "$RESTORE_ID" | tail -n 1)"
+[[ "$claim_result" == "claimed" || "$claim_result" == "resume" ]] \
+  || die "Restore intent is not at a resumable pre-destructive stage."
+claimed=1
+[[ "$(restore_preflight | tail -n 1)" == "preflight-ok" ]] \
+  || die "The admitted legacy restore did not advance through preflight."
 
 drain_seconds="$(control quiesce "$RESTORE_ID" | tail -n 1)"
 [[ "$drain_seconds" =~ ^[0-9]+$ ]] || die "The app returned an invalid presign drain window."
@@ -172,20 +208,9 @@ if [[ "$kind" == "rollback_in_place" ]]; then
   "${COMPOSE[@]}" exec -T db sh -c \
     'pg_restore --no-owner --no-acl -U "$POSTGRES_USER" -d '"$temp_db" \
     < "$BUNDLE/database.dump"
-  archive_url="$("${COMPOSE[@]}" exec -T backend python - "$temp_db" <<'PY'
-import sys
-import os
-from urllib.parse import quote
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
-import django
-django.setup()
-from django.conf import settings
-d=settings.DATABASES['default']
-print(f"postgres://{quote(str(d.get('USER') or ''))}:{quote(str(d.get('PASSWORD') or ''))}@{d.get('HOST') or 'db'}:{d.get('PORT') or 5432}/{sys.argv[1]}")
-PY
-)"
+  reprovision_grants "$temp_db"
   say "Computing every-table diff in one live snapshot; choose before the console countdown expires."
-  decision="$(control diff-wait "$RESTORE_ID" --archive-database-url "$archive_url" | tail -n 1)"
+  decision="$(control diff-wait "$RESTORE_ID" --archive-database-name "$temp_db" | tail -n 1)"
   "${COMPOSE[@]}" exec -T db sh -c \
     'dropdb --if-exists -U "$POSTGRES_USER" '"$temp_db" >/dev/null 2>&1 || true
   [[ "$decision" != "abort" ]] || { finished=1; say "Restore aborted without destructive effect."; exit 0; }
@@ -207,6 +232,7 @@ say "Replacing the database."
 "${COMPOSE[@]}" exec -T db sh -c \
   'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()" >/dev/null && pg_restore --clean --if-exists --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   < "$BUNDLE/database.dump"
+reprovision_grants
 
 control rehydrate "$RESTORE_ID" --archive-id "$archive_id" --kind "$kind" \
   --requested-by "$requested_by" \

@@ -6,10 +6,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
-mkdir -p "$OPS_DIR"
-exec 8>"$OPS_DIR/operation.lock"
-flock -n 8 || { printf '[Space Works updater] Another deployment operation is running; skipping.\n'; exit 0; }
-
 COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)
 LOCK_DIR="$ROOT/.spaceworks-update.lock"
 VERSION_FILE="$ROOT/.spaceworks-version"
@@ -18,12 +14,79 @@ update_claimed=0
 update_complete=0
 deployment_started=0
 previous_version=""
+UPDATE_LOCK_HELD=0
+UPDATE_LOCK_OVERRIDE=0
+MODULE_REQUESTED=0
+MODULE_ONLY=0
+MODULE_MODE=interactive
+MODULE_INTERACTIVE=0
+MODULE_MAKERSPACE=""
+MODULE_ALL_MAKERSPACES=0
+MODULE_WITHOUT=""
+MODULE_CONFIRM_REMOVALS=0
+NO_MODULE_CHANGES=0
 
 say() { printf '[Space Works updater] %s\n' "$*"; }
+warn() { printf '[Space Works updater] WARNING: %s\n' "$*" >&2; }
 die() { printf '[Space Works updater] ERROR: %s\n' "$*" >&2; exit 1; }
+source "$ROOT/scripts/update-lock.sh"
+source "$ROOT/scripts/module-selection.sh"
+
+force_arg=()
+while (($# > 0)); do
+  case "$1" in
+    --force) force_arg=(--force) ;;
+    --modules) MODULE_REQUESTED=1; MODULE_MODE=interactive ;;
+    --modules-only) MODULE_REQUESTED=1; MODULE_ONLY=1 ;;
+    --no-module-changes) NO_MODULE_CHANGES=1 ;;
+    --all-modules) MODULE_REQUESTED=1; MODULE_MODE=all ;;
+    --without=*)
+      MODULE_REQUESTED=1; MODULE_WITHOUT="${1#*=}"
+      [[ "$MODULE_MODE" == all ]] || MODULE_MODE=without
+      ;;
+    --makerspace)
+      shift; (($# > 0)) || die "--makerspace requires a slug."
+      MODULE_MAKERSPACE="$1"; MODULE_REQUESTED=1
+      ;;
+    --all-makerspaces) MODULE_ALL_MAKERSPACES=1; MODULE_REQUESTED=1 ;;
+    --confirm-removals) MODULE_CONFIRM_REMOVALS=1 ;;
+    --override-lock) UPDATE_LOCK_OVERRIDE=1 ;;
+    -h|--help)
+      cat <<'EOF'
+Usage: scripts/update.sh [--force] [module options]
+  --modules                 interactively review current modules
+  --modules-only            change modules without checking for a release
+  --all-modules             enable every optional module
+  --without=key1,key2       keep current state, or all modules, except these keys
+  --makerspace <slug>       target one makerspace
+  --all-makerspaces         explicitly target every makerspace
+  --confirm-removals        acknowledge retained-data module removals non-interactively
+  --no-module-changes       update images only
+  --override-lock           clear a verified stale/wedged portable update lock
+EOF
+      exit 0
+      ;;
+    *) die "Unknown option: $1" ;;
+  esac
+  shift
+done
+[[ "$MODULE_ALL_MAKERSPACES" == 0 || -z "$MODULE_MAKERSPACE" ]] \
+  || die "Use either --makerspace or --all-makerspaces, not both."
+[[ "$NO_MODULE_CHANGES" == 0 || "$MODULE_REQUESTED" == 0 ]] \
+  || die "--no-module-changes cannot be combined with module-selection options."
+if [[ "$MODULE_REQUESTED" == 0 && "$NO_MODULE_CHANGES" == 0 && -t 0 && -t 1 ]]; then
+  MODULE_REQUESTED=1
+  MODULE_MODE=interactive
+fi
+if [[ "$MODULE_MODE" == interactive ]]; then
+  [[ "$MODULE_REQUESTED" == 0 || ( -t 0 && -t 1 ) ]] \
+    || die "Interactive module selection needs a terminal; use --all-modules/--without or --no-module-changes."
+  MODULE_INTERACTIVE="$MODULE_REQUESTED"
+fi
+
 wait_for_backend() {
-  local attempt
-  for attempt in $(seq 1 60); do
+  local _
+  for _ in $(seq 1 60); do
     if "${COMPOSE[@]}" exec -T backend python -c \
       "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/readiness/', timeout=3).read()" \
       >/dev/null 2>&1; then
@@ -33,28 +96,9 @@ wait_for_backend() {
   done
   return 1
 }
-force_arg=()
-if [[ "${1:-}" == "--force" ]]; then
-  force_arg=(--force)
-elif [[ -n "${1:-}" ]]; then
-  die "Unknown option: $1"
-fi
 
 command -v docker >/dev/null 2>&1 || die "Docker is not installed."
 command -v curl >/dev/null 2>&1 || die "curl is required to check GitHub releases."
-
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-  sleep 1
-  lock_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
-  if [[ "$lock_pid" =~ ^[0-9]+$ ]] && kill -0 "$lock_pid" 2>/dev/null; then
-    say "Another update is already running; skipping."
-    exit 0
-  fi
-  rm -f "$LOCK_DIR/pid"
-  rmdir "$LOCK_DIR" 2>/dev/null || die "Could not clear a stale update lock."
-  mkdir "$LOCK_DIR"
-fi
-printf '%s\n' "$$" > "$LOCK_DIR/pid"
 cleanup() {
   exit_code=$?
   trap - EXIT
@@ -78,11 +122,23 @@ cleanup() {
     "${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py update_control fail \
       --message "$failure_message" >/dev/null 2>&1 || true
   fi
-  rm -f "$LOCK_DIR/pid"
-  rmdir "$LOCK_DIR" 2>/dev/null || true
+  release_update_lock
   exit "$exit_code"
 }
 trap cleanup EXIT
+acquire_update_lock
+
+if [[ "$MODULE_REQUESTED" == 1 ]]; then
+  module_targets || die "Module targeting failed; no release or module changes were made."
+  if [[ "$MODULE_ALL_MAKERSPACES" == 0 ]]; then
+    MODULE_MAKERSPACE="${MODULE_TARGETS[0]}"
+  fi
+fi
+if [[ "$MODULE_ONLY" == 1 ]]; then
+  change_modules || die "One or more requested module changes were not applied."
+  say "Module review complete."
+  exit 0
+fi
 
 release_json="$(curl --fail --silent --show-error --location \
   --header 'Accept: application/vnd.github+json' \
@@ -110,6 +166,10 @@ if [[ "$decision" != "run" ]]; then
     say "$version is already installed."
   else
     say "$version is available; automatic updates are off and no manual update is queued."
+  fi
+  if [[ "$MODULE_REQUESTED" == 1 ]]; then
+    change_modules || die "One or more requested module changes were not applied."
+    say "Module review complete."
   fi
   exit 0
 fi
@@ -143,4 +203,8 @@ printf '%s\n' "$version" > "$VERSION_FILE"
   --version "$version" >/dev/null
 update_complete=1
 find "$ROOT/backups" -maxdepth 1 -type f -name 'pre-update-*.sql.gz' -mtime +14 -delete
+say "Release update complete: $version."
+if [[ "$MODULE_REQUESTED" == 1 ]]; then
+  change_modules || die "Release $version is healthy, but one or more module changes were not applied."
+fi
 say "Update complete: $version."

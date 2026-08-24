@@ -29,7 +29,7 @@ from tests.backup.e7_manifest_test_facts import (
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
-def _prepared(tmp_path):
+def _prepared(tmp_path, *, promotion_closure_digest=None, include_closure=True):
     space = Makerspace.objects.create(
         name="E5 sovereign", slug=f"e5-{uuid.uuid4().hex}",
         superadmin_access_enabled=False,
@@ -102,19 +102,24 @@ def _prepared(tmp_path):
         archive=archive, capture=capture, detailed_manifest=detailed, root=tmp_path
     )
     size, digest = 101, "e" * 64
+    promotion_snapshot = {
+        "predecessor_artifact_id": None,
+        "predecessor_success_at": None,
+        "retained": [{
+            "makerspace_id": space.pk,
+            "superadmin_access_enabled": False,
+            "activation_state": B1ActivationState.State.OFF_PENDING,
+            "custody_state": MakerspaceArchiveCustodyState.State.DEGRADED_ONE_RECIPIENT,
+            "recipients": [{"pk": recipient.pk, "fingerprint": recipient.fingerprint}],
+        }],
+    }
+    if include_closure:
+        promotion_snapshot["user_closure_digest"] = (
+            promotion_closure_digest or manifest["user_closure_digest"]
+        )
     build = SimpleNamespace(
         manifest=manifest,
-        promotion_snapshot={
-            "predecessor_artifact_id": None,
-            "predecessor_success_at": None,
-            "retained": [{
-                "makerspace_id": space.pk,
-                "superadmin_access_enabled": False,
-                "activation_state": B1ActivationState.State.OFF_PENDING,
-                "custody_state": MakerspaceArchiveCustodyState.State.DEGRADED_ONE_RECIPIENT,
-                "recipients": [{"pk": recipient.pk, "fingerprint": recipient.fingerprint}],
-            }],
-        },
+        promotion_snapshot=promotion_snapshot,
         archive_sha256=digest,
     )
     ledger = artifact_ledger.persist_pending(archive, build, size)
@@ -164,6 +169,36 @@ def test_promotion_rolls_back_every_success_write_when_completion_audit_fails(
     assert ledger.state == BackupArtifactLedger.State.FINAL_VERIFIED
     assert B1ActivationState.objects.get(makerspace=space).state == "off_pending"
     assert not AuditLog.objects.filter(action="backup.archive_exclusion_activated").exists()
+    assert PlatformBackupSettings.load().last_success_at is None
+
+
+@pytest.mark.parametrize(
+    "prepared_kwargs",
+    ({"promotion_closure_digest": "0" * 64}, {"include_closure": False}),
+)
+def test_promotion_refuses_closure_digest_drift_or_omission(
+    prepared_kwargs, tmp_path
+):
+    space, _recipient, archive, ledger, size, digest = _prepared(
+        tmp_path, **prepared_kwargs
+    )
+    artifact_ledger.mark_final_verified(ledger.pk, size, digest)
+
+    with pytest.raises(
+        artifact_ledger.ArtifactLedgerMismatch,
+        match="independently recomputed user-closure digest",
+    ):
+        promotion.promote_verified_artifact(ledger.pk)
+
+    archive.refresh_from_db()
+    ledger.refresh_from_db()
+    assert archive.status == BackupArchive.Status.RUNNING
+    assert ledger.state == BackupArtifactLedger.State.FINAL_VERIFIED
+    assert B1ActivationState.objects.get(makerspace=space).state == "off_pending"
+    assert not AuditLog.objects.filter(action="backup.archive_completed").exists()
+    assert not AuditLog.objects.filter(
+        action="backup.archive_exclusion_activated"
+    ).exists()
     assert PlatformBackupSettings.load().last_success_at is None
 
 

@@ -10,6 +10,7 @@ from .host_marker import (
     MarkerStage,
     MarkerState,
     marker_payload,
+    parse_marker,
     read_marker,
     write_marker_fsynced,
 )
@@ -72,6 +73,77 @@ class HostMarkerTransition:
             database,
             operation=operation,
         ))
+
+    def transition_bound(self, state, database, operation, *, readiness=None):
+        """Advance a proven bound candidate without ever accepting an intent."""
+        state = MarkerState(state)
+        current = read_marker(
+            self.marker_path,
+            require_root_owned=self.require_root_owned,
+        )
+        current_database = current.require_bound_database()
+        same_database = (
+            current_database.name == database.name
+            and current_database.oid == database.oid
+        )
+        identity_enrichment = (
+            same_database
+            and current_database.server_identity is None
+            and database.server_identity is not None
+            and current.state == MarkerState.CANDIDATE_PREPARATION
+            and state == MarkerState.CANDIDATE_HEALTH
+        )
+        if current_database != database and not identity_enrichment:
+            raise MarkerError(
+                "Only the current bound database may change host marker state."
+            )
+        if (
+            current.state == state
+            and state in {MarkerState.NORMAL, MarkerState.ACKNOWLEDGED_NORMAL}
+            and current.operation is None
+        ):
+            payload = marker_payload(state, database, readiness=readiness)
+            if current != parse_marker(payload):
+                raise MarkerError(
+                    "Completed normal marker readiness facts changed on resume."
+                )
+            return payload
+        payload = marker_payload(
+            state,
+            database,
+            operation=(
+                operation
+                if state in {
+                    MarkerState.CANDIDATE_PREPARATION,
+                    MarkerState.CANDIDATE_HEALTH,
+                    MarkerState.QUARANTINED_AFTER_CUTOVER,
+                }
+                else None
+            ),
+            readiness=readiness,
+        )
+        if current.state == state:
+            if current != parse_marker(payload):
+                raise MarkerError(
+                    "A resumed marker transition changed its bound facts."
+                )
+            return payload
+        if current.operation != operation:
+            raise MarkerError(
+                "Only the current bound operation may change host marker state."
+            )
+        allowed = {
+            (MarkerState.CANDIDATE_PREPARATION, MarkerState.CANDIDATE_HEALTH),
+            (MarkerState.CANDIDATE_HEALTH, MarkerState.QUARANTINED_AFTER_CUTOVER),
+            (MarkerState.QUARANTINED_AFTER_CUTOVER, MarkerState.NORMAL),
+            (
+                MarkerState.QUARANTINED_AFTER_CUTOVER,
+                MarkerState.ACKNOWLEDGED_NORMAL,
+            ),
+        }
+        if (current.state, state) not in allowed:
+            raise MarkerError("The host marker state transition is out of order.")
+        return self._replace(payload)
 
     def _replace(self, payload):
         # Invalidation precedes both stages. A crash can only narrow authority;

@@ -222,6 +222,22 @@ SPACEWORKS_HOST_MARKER_PATH = env(
     "SPACEWORKS_HOST_MARKER_PATH",
     default="/run/spaceworks-host/restore-marker.json",
 )
+BACKUP_PRODUCER_CAPABILITY_MARKER_PATH = env(
+    "BACKUP_PRODUCER_CAPABILITY_MARKER_PATH",
+    default="/run/spaceworks-host/producer-capability.json",
+)
+BACKUP_PRODUCER_PRIVILEGED_SCRIPTS_DIR = env(
+    "BACKUP_PRODUCER_PRIVILEGED_SCRIPTS_DIR",
+    default="/run/spaceworks-privileged-scripts",
+)
+BACKUP_PRODUCER_ENTRYPOINT_PATH = env(
+    "BACKUP_PRODUCER_ENTRYPOINT_PATH",
+    default="/app/scripts/spaceworks_entrypoint.py",
+)
+BACKUP_PRODUCER_MIGRATIONS_DIR = env(
+    "BACKUP_PRODUCER_MIGRATIONS_DIR",
+    default=str(BASE_DIR / "apps"),
+)
 
 AUTH_PASSWORD_VALIDATORS = [
     {

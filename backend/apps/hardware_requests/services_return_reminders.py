@@ -4,6 +4,7 @@ from django.utils import timezone
 from apps.accounts import rbac
 from apps.hardware_requests import notifications
 from apps.hardware_requests.models import HardwareRequest
+from apps.makerspaces.servability import archived_or_inactive_makerspace_ids
 from apps.notifications.emit import emit_notification
 from apps.tenant_migration.gate_runtime import fanout_tenant_write
 
@@ -11,8 +12,11 @@ from apps.tenant_migration.gate_runtime import fanout_tenant_write
 def run_return_reminders(*, now=None, limit=200) -> dict:
     now = now or timezone.now()
     limit = max(int(limit), 1)
+    # Only the archived/inactive half: a pending (not-restored) tenant must still
+    # reach the not-restored gate so the skip is recorded rather than prefiltered.
+    unavailable_makerspace_ids = archived_or_inactive_makerspace_ids()
     excluded_makerspace_ids = (
-        rbac.archived_makerspace_ids() | rbac.superadmin_hidden_makerspace_ids()
+        unavailable_makerspace_ids | rbac.superadmin_hidden_makerspace_ids()
     )
     queryset = (
         HardwareRequest.objects.select_related("makerspace", "requester")

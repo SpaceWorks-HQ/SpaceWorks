@@ -71,8 +71,9 @@
   `tenant_exit_custody_alarms.py` reuses the decision-19b recipient selectors and parameterized durable
   dispatcher for its retryable outbox. The `host_*` modules own H1's marker, consume-only capability socket,
   signed grant, run ledger, supervisor and atomic pointer; `database_grants.py` is its independent
-  PostgreSQL role boundary. `cloud_environment.py` captures Cloud Compose interpolation into durable static
-  configuration without consulting later ambient shells.
+  PostgreSQL role boundary. `cloud_environment.py` captures host-rendered Cloud Compose interpolation into
+  durable static configuration without consulting later ambient shells; only the root-only
+  `scripts/init-cloud-environment.py` renderer invokes Compose.
 - `backend/apps/data_export/` — Space-Manager data export (Phase 4). Per-fidelity (`REDACTED`/`PORTABLE`)
   disposition registry over models, fields, datasets, traversals and the global-user reference closure, with
   **drift guards that refuse an unclassified model or field**. Its `guards._equal(subject, declared,

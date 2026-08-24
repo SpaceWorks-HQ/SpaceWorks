@@ -67,20 +67,29 @@ Space Works runs entirely through Docker Compose — it brings up **PostgreSQL, 
 Celery worker/beat, and database migrations** and wires them to the app for you (the images don't bake
 in any addresses; the compose file passes them in). Pick one path:
 
-**Path 1 — Guided setup (easiest; builds from source).** One script generates all secrets, writes
-`.env`, builds everything, and creates your first admin + makerspace:
+**Path 1 — Guided pinned install (easiest; no Git clone or local build).** One script checks the host,
+downloads the newest tagged release, generates all secrets, pulls its published images, and creates your
+first admin + makerspace:
 
 ```bash
-git clone https://github.com/SpaceWorks-HQ/SpaceWorks.git
-cd SpaceWorks
-bash setup.sh                                          # macOS / Linux
-wsl bash setup.sh                                      # Windows, from WSL2
+curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash
 ```
 
-It prints your URL and login when it finishes and offers to install seven-day, backup-first production update checks. Super Admins can control
-automatic or manual installation from **Platform settings -> Software updates**. (Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/).)
+It installs to `/opt/spaceworks`; set `SPACEWORKS_DIR` on the `bash` side of the pipe to override that
+(on Windows Git Bash, use `SPACEWORKS_DIR="$HOME/SpaceWorks"`). It detects x86_64/aarch64 and the host
+distribution, checks dependencies, Docker, release availability, ports, disk space and existing state
+**before changing anything**, then installs missing Linux dependencies through apt, dnf/yum, pacman or
+zypper. The downloaded source and backend/frontend images are pinned to the tagged release.
 
-**Path 2 — Prebuilt images (no local build).** Pull the two published images and start the stack —
+It prints your URL and login when it finishes and offers to install seven-day, backup-first production
+update checks. Super Admins can control automatic or manual installation from **Platform settings →
+Software updates**. `setup.sh` pulls published images by default; developers with a full source checkout
+can explicitly opt into a local Django/Vite build with `bash setup.sh --build`.
+
+Run the same curl command later and an existing install offers **update**, **change modules**, **both**, or
+**cancel**. It never silently reinstalls or reruns first-instance setup.
+
+**Path 2 — Manual prebuilt-image setup.** Pull the two published images and start the stack —
 after `cp .env.example .env` (fill in the few values it asks for):
 
 ```bash
@@ -91,6 +100,39 @@ scripts/spaceworks-compose.sh bundled up -d
 
 This pulls **`ghcr.io/spaceworks-hq/spaceworks-backend`** + **`ghcr.io/spaceworks-hq/spaceworks-frontend`** and brings up the
 full stack automatically.
+
+### Upgrades and module changes
+
+An interactive update reviews the live module ticks after the new release is healthy. The useful explicit
+forms are:
+
+```bash
+bash scripts/update.sh --force --modules                    # update, then review modules
+bash scripts/update.sh --force --no-module-changes          # update images only
+bash scripts/update.sh --modules-only --makerspace my-space # modules only; no release check
+bash scripts/update.sh --all-modules --without=printing,payments \
+  --makerspace my-space --confirm-removals
+bash scripts/update.sh --all-modules --all-makerspaces      # explicit cross-tenant target
+```
+
+Modules belong to a makerspace through `Makerspace.enabled_modules`, not to the deployment as a whole.
+When more than one makerspace exists, select one with `--makerspace <slug>` or deliberately target all
+with `--all-makerspaces`; non-interactive updates refuse to guess. `--modules` requests the interactive
+tick list, while `--modules-only`, `--all-modules`, `--without=a,b`, `--confirm-removals` and
+`--no-module-changes` support explicit operator and automation flows.
+
+Unticking a module hides its surfaces and calls `uninstall_module`; it does **not** delete rows.
+`purge_module_data` is a separate destructive command and is never called by setup or update.
+
+### Windows support boundary
+
+- **Tier 1 — native:** install, run and upgrade with Docker Desktop plus Git Bash (or run the bash scripts
+  inside WSL). Because native Git Bash normally has no `flock`, the updater falls back to a PID/timestamp
+  directory lock, automatically clears a dead owner's lock, and provides `--override-lock` for a verified
+  wedged or unreadable owner.
+- **Tier 2 — WSL2 required:** in-place restore, backup import and compound host orchestration. Those
+  supervisors depend on Linux AF_UNIX sockets and root-owned-file trust semantics with no native Windows
+  equivalent; this tier does not have native parity.
 
 ## Modules
 
@@ -122,7 +164,8 @@ console shows you:
 | **Mobile apps** | Attested device sessions, native push and the in-app payment sheet |
 | **Updates** | In-app release control |
 
-**Pick a profile at install time** — `setup.sh` asks, or pass `--profile`:
+**Pick modules at install time** — `setup.sh` reads the live registry and opens a tick list. Its initial
+recommended state corresponds to this profile table; management commands can also pass `--profile`:
 
 | Profile | Modules | For |
 |---|---|---|
@@ -481,7 +524,7 @@ scripts/spaceworks-compose.sh bundled run --rm --no-deps backend --role manageme
 With no arguments it seeds **`superadmin` / `super123`** and forces a password change on first login.
 Guided installs can receive each successful `main` release automatically with a backup and readiness
 check. If deployment fails, the application containers return to the previous retained release. Run
-`scripts/update.sh --force` on Linux (or from WSL2 on Windows) for an immediate
+`bash scripts/update.sh --force` on Linux or Windows Git Bash for an immediate
 update; see **[docs/self-hosting.md](docs/self-hosting.md)** for scheduling, pinning, TLS, and recovery.
 
 **No server of your own?** Space Works is multi-tenant — partner with a nearby makerspace to run your space

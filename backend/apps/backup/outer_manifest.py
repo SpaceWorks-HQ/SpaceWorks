@@ -6,6 +6,7 @@ import json
 
 from django.conf import settings
 
+from apps.backup.compound_protocol import PROTOCOL_VERSION
 from apps.backup.outer_manifest_facts import (
     component_ciphertext_ledger,
     reservation_fence_ledger,
@@ -24,7 +25,6 @@ from apps.ed25519 import (
 )
 
 
-PROTOCOL_VERSION = "spaceworks-lane-e-b1-v1"
 SIGNATURE_DOMAIN = b"spaceworks-lane-e-outer-manifest-v1\x00"
 
 

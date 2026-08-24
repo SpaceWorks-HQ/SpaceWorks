@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -11,13 +11,14 @@ from apps.apiclients.throttling import ClientTierRateThrottle
 from apps.events import services
 from apps.events.exceptions import DuplicateRegistration
 from apps.events.models import Event, EventRegistration
+from apps.events.organizer_models import EventOrganizer
 from apps.events.serializers_public import (
     PublicEventRegistrationInputSerializer,
     PublicEventRegistrationResponseSerializer,
     PublicEventSerializer,
 )
 from apps.hardware_requests.exceptions import ErrorSerializer
-from apps.makerspaces.guards import require_module
+from apps.makerspaces.guards import require_module_for_servable
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.presence.guard import require_active_member
 
@@ -59,10 +60,15 @@ class PublicEventListView(APIView):
     )
     def get(self, request, makerspace_slug):
         makerspace = get_public_makerspace(makerspace_slug)
-        require_module(makerspace, 'events')
+        require_module_for_servable(makerspace, 'events')
         events = (
             _public_events(makerspace)
-            .prefetch_related('organizers__organization')
+            .prefetch_related(
+                Prefetch(
+                    'organizers',
+                    queryset=EventOrganizer.objects.select_related('organization'),
+                )
+            )
             .annotate(
                 confirmed_count=Count(
                     'registrations',
@@ -94,7 +100,7 @@ class PublicEventRegistrationView(APIView):
     )
     def post(self, request, makerspace_slug, public_token):
         makerspace = get_public_makerspace(makerspace_slug)
-        require_module(makerspace, 'events')
+        require_module_for_servable(makerspace, 'events')
         event = get_object_or_404(
             _public_events(makerspace),
             public_token=public_token,

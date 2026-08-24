@@ -20,6 +20,7 @@ SERVABILITY_CALLS = {
     "servable_q",
     "servable_queryset",
     "unservable_makerspace_ids",
+    "archived_or_inactive_makerspace_ids",
     *ARCHIVE_HELPERS,
 }
 
@@ -27,7 +28,7 @@ SERVABILITY_CALLS = {
 EXEMPTIONS = {
     # The policy implementation necessarily contains the raw fields it centralizes.
     ("makerspaces/servability.py", "is_servable"),
-    ("makerspaces/servability.py", "unservable_makerspace_ids"),
+    ("makerspaces/servability.py", "archived_or_inactive_makerspace_ids"),
     # Archive recovery must inspect and clear archived_at, and purge must inspect it.
     ("makerspaces/lifecycle_archive.py", "unarchive"),
     ("makerspaces/lifecycle_purge.py", "purge"),

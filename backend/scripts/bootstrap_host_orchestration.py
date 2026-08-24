@@ -3,8 +3,10 @@
 
 import os
 from pathlib import Path
+import re
 import sys
 from urllib.parse import unquote, urlparse
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import psycopg2
 
@@ -38,9 +40,50 @@ def _runtime_credentials(url):
     return unquote(parsed.username), unquote(parsed.password)
 
 
+def _database_url(url, database_name):
+    parsed = urlsplit(url)
+    return urlunsplit((
+        parsed.scheme,
+        parsed.netloc,
+        "/" + quote(database_name, safe=""),
+        parsed.query,
+        "",
+    ))
+
+
+def _grant_only(maintenance_url, runtime_url):
+    database_name = os.environ.get("SPACEWORKS_GRANT_DATABASE_NAME", "")
+    if database_name:
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_$]{0,62}", database_name):
+            raise RuntimeError("Grant target database name is invalid.")
+        maintenance_url = _database_url(maintenance_url, database_name)
+        runtime_url = _database_url(runtime_url, database_name)
+    runtime_role, runtime_password = _runtime_credentials(runtime_url)
+    try:
+        with psycopg2.connect(maintenance_url) as database:
+            database.autocommit = True
+            with database.cursor() as cursor:
+                cursor.execute("SELECT current_database()")
+                live_name = cursor.fetchone()[0]
+                target = GrantTarget(database=live_name, runtime_role=runtime_role)
+                provision_runtime_role(cursor, target, runtime_password)
+                apply_grant_state(cursor, target, MarkerState.NORMAL)
+    except Exception:
+        # DSNs contain credentials. Do not let a driver exception echo them into
+        # the host log; callers need only the stable failure classification.
+        raise RuntimeError("Role/grant reprovisioning failed.") from None
+
+
 def main():
     if os.geteuid() != 0:
         raise RuntimeError("Host orchestration bootstrap must run as root.")
+    maintenance_url = os.environ["DATABASE_URL"]
+    runtime_url = os.environ.get("SPACEWORKS_RUNTIME_DATABASE_URL")
+    if not runtime_url:
+        raise RuntimeError("SPACEWORKS_RUNTIME_DATABASE_URL is required.")
+    if os.environ.get("SPACEWORKS_GRANTS_ONLY") == "1":
+        _grant_only(maintenance_url, runtime_url)
+        return
     validate_scheduler_environment({
         "SPACEWORKS_SCHEDULER_MODE": os.environ.get("SPACEWORKS_SCHEDULER_MODE", ""),
         "SPACEWORKS_SCHEDULER_SERVICES": os.environ.get("SPACEWORKS_SCHEDULER_SERVICES", ""),
@@ -51,10 +94,6 @@ def main():
             "SPACEWORKS_SCHEDULER_CONTROL_PLANE_DISABLEMENT", ""
         ),
     })
-    maintenance_url = os.environ["DATABASE_URL"]
-    runtime_url = os.environ.get("SPACEWORKS_RUNTIME_DATABASE_URL")
-    if not runtime_url:
-        raise RuntimeError("SPACEWORKS_RUNTIME_DATABASE_URL is required.")
     marker_path = os.environ.get(
         "SPACEWORKS_HOST_MARKER_WRITE_PATH", "/host-state/restore-marker.json"
     )
