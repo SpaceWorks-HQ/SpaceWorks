@@ -5,6 +5,8 @@ from cryptography.fernet import Fernet
 from apps.ed25519 import encode_key, generate_keypair
 from django.core.cache import cache
 from django.db import connection
+from django.db.backends.base.base import BaseDatabaseWrapper
+from django.test import SimpleTestCase
 
 
 # Reuse the deployment key when the environment supplies one: migration 0004
@@ -136,3 +138,54 @@ def all_modules_enabled_for_test_makerspaces(monkeypatch):
 
     field = Makerspace._meta.get_field("enabled_modules")
     monkeypatch.setattr(field, "default", lambda: profile_modules(EVERYTHING))
+
+
+class _EveryDatabase(frozenset):
+    """A `databases` allow-set that also admits aliases created after setup.
+
+    Iteration still yields only the real aliases, so Django's teardown flushes
+    exactly the databases it created.
+    """
+
+    def __contains__(self, alias):
+        return True
+
+
+def _guarded_test_case():
+    """The TestCase whose undeclared-database guard is currently installed.
+
+    Django closes over the test class when it patches `ensure_connection`, and
+    that class attribute is the only place the allow-set can be widened.
+    """
+    patched = BaseDatabaseWrapper.ensure_connection
+    for cell in patched.__closure__ or ():
+        value = cell.cell_contents
+        if isinstance(value, type) and issubclass(value, SimpleTestCase):
+            return value
+    return None
+
+
+@pytest.fixture
+def allow_projection_databases():
+    """Let a test open the short-lived databases it creates mid-test.
+
+    Django rejects connections to aliases that did not exist when the test class
+    was set up, which is the right default. The readable-main projection, the E7
+    reconstruction verifier and the Lane D scratch projection each create,
+    register and drop a real database mid-test, and `databases="__all__"` cannot
+    express that because it is snapshotted at setup. The allow-set is widened for
+    the duration and restored before class teardown unwraps the guard.
+
+    Lives here rather than in one test module because three separate test
+    packages need it.
+    """
+    case = _guarded_test_case()
+    if case is None:
+        yield
+        return
+    original = case.databases
+    case.databases = _EveryDatabase(original)
+    try:
+        yield
+    finally:
+        case.databases = original

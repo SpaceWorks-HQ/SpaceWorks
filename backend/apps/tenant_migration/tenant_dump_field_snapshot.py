@@ -6,7 +6,7 @@ override in tenant_dump_authority.py before the catalog guard will pass.
 """
 
 FIRST_PARTY_FIELD_NAMES = {
-    'accounts.User': frozenset('access_status date_joined display_name email email_verified_at external_checkin_user_id first_name groups id is_active is_staff is_superuser is_walk_in last_login last_name must_change_password password phone phone_e164 phone_verified_at restriction_reason role self_registered_at telegram_user_id user_permissions username'.split()),
+    'accounts.User': frozenset('access_status date_joined display_name email email_verified_at external_checkin_user_id first_name groups id is_active is_staff is_superuser is_tenant_dump_stub is_walk_in last_login last_name must_change_password password phone phone_e164 phone_verified_at restriction_reason role self_registered_at telegram_user_id user_permissions username'.split()),
     'accounts.EmailVerificationChallenge': frozenset('code_digest consumed_at created_at email expires_at failed_attempts id last_sent_at user'.split()),
     'accounts.DailyOtpEmailCounter': frozenset('count day id'.split()),
     'accounts.NativeAppRegistration': frozenset('app_id approved_by created_at environment id makerspace platform revoked_at status updated_at verifier_config_key'.split()),

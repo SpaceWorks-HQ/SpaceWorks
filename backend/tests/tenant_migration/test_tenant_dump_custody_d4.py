@@ -17,6 +17,7 @@ from apps.tenant_migration.tenant_dump_errors import TenantDumpVerificationError
 from apps.tenant_migration.tenant_dump_manifest import verify_envelope_custody_manifest
 from apps.tenant_migration.tenant_dump_pii import PLAINTEXT, scan_mapped_pii
 from apps.tenant_migration.tenant_dump_recipients import recipient_sets
+from apps.tenant_migration.tenant_dump_user_closure import _closure
 
 
 def _recipient(seed):
@@ -63,7 +64,11 @@ def test_plaintext_content_ledger_declares_absent_tenant_dek_member(tmp_path):
     assert key_entry == {"path": TENANT_DEKS_MEMBER, "present": False}
     assert not (tmp_path / TENANT_DEKS_MEMBER).exists()
 
-    capture = SimpleNamespace(source_encryption_mode=False, source_makerspace_id=71)
+    capture = SimpleNamespace(
+        pk="d4-plaintext-capture",
+        source_encryption_mode=False,
+        source_makerspace_id=71,
+    )
     manifest = {
         "source_pii_mode": PLAINTEXT,
         "source": {"source_pii_mode": PLAINTEXT},
@@ -83,6 +88,10 @@ def test_plaintext_content_ledger_declares_absent_tenant_dek_member(tmp_path):
             },
         },
         "contents": contents,
+        # D6 deliberately supersedes the pre-D6 fixture contract: every publishable
+        # manifest now carries the exact closure and lost-edge schemas, even when empty.
+        "user_closure": _closure((), (), ()).manifest(),
+        "cross_tenant_lost_edges": [],
     }
     assert verify_envelope_custody_manifest(capture, manifest) is True
 

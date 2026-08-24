@@ -45,6 +45,7 @@ def validated_claim_session(token, *, for_update=False):
         revoked_at__isnull=True,
         absolute_expires_at__gt=now,
         membership__status="active",
+        membership__user__is_tenant_dump_stub=False,
         membership__user__is_active=True,
         membership__user__access_status="active",
         membership__user__is_walk_in=True,

@@ -34,6 +34,10 @@ class SpaceWorksRefreshToken(_GenerationBoundToken, RefreshToken):
 
     @classmethod
     def for_user(cls, user):
+        if getattr(user, "is_tenant_dump_stub", False):
+            from rest_framework.exceptions import AuthenticationFailed
+
+            raise AuthenticationFailed("Account is not available.")
         token = super().for_user(user)
         token["auth_generation"] = current_auth_generation()
         return token

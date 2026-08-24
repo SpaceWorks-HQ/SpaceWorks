@@ -187,6 +187,8 @@ _SOURCE_LOCAL_EDGES = {
     ("tenant_migration.source_gate_migrated_out", "owner_id"),
     ("tenant_migration.source_quiesced", "owner_id"),
     ("tenant_migration.tenant_dump_captured", "gate_owner_id"),
+    ("tenant_migration.tenant_dump_derived", "artifact_id"),
+    ("tenant_migration.tenant_dump_derived", "capture_id"),
     ("tenant_migration.objects_staged", "job_id"),
     ("tenant_migration.objects_promoted", "job_id"),
     ("tenant_migration.objects_rolled_back", "job_id"),

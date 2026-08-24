@@ -61,6 +61,7 @@ def derive_tenant_dump(capture_id, *, database=None):
             projection = project_makerspace_source(
                 capture.source_makerspace_id,
                 using=using,
+                capture_id=capture.pk,
             )
             pii_mode = source_pii_mode(capture.source_encryption_mode)
             pii_findings = scan_mapped_pii(projection.rows, pii_mode)
@@ -76,7 +77,12 @@ def derive_tenant_dump(capture_id, *, database=None):
             source_pii_mode=pii_mode,
             database=database,
         )
-        objects = package_staged_objects(root, bundle, capture.object_ledger)
+        object_entries = tuple(
+            item
+            for item in capture.object_ledger
+            if item.get("source_key") not in projection.excluded_object_keys
+        )
+        objects = package_staged_objects(root, bundle, object_entries)
         key_envelope = None
         if pii_mode == ENCRYPTED:
             frozen = revalidate_before_encryption(capture.pk, stage="inner")
@@ -198,6 +204,8 @@ def _manifest(
             },
         },
         "machine_operator_manifest": list(projection.machine_operator_manifest),
+        "user_closure": projection.user_closure.manifest(),
+        "cross_tenant_lost_edges": list(projection.cross_tenant_lost_edges),
     }
 
 
@@ -229,9 +237,21 @@ def _complete_derivation(capture_id, manifest, policy_digest):
         makerspace=capture.makerspace,
         target=capture,
         meta={
+            "artifact_id": str(capture.pk),
+            "capture_id": str(capture.pk),
             "database_image_sha256": capture.parent_database_sha256,
             "object_ledger_sha256": capture.parent_object_ledger_sha256,
             "derivation_policy_sha256": policy_digest,
+            "user_closure_digest": manifest["user_closure"]["sha256"],
+            "user_closure_included_count": len(
+                manifest["user_closure"]["included"]
+            ),
+            "user_closure_stubbed_count": len(
+                manifest["user_closure"]["stubbed"]
+            ),
+            "user_closure_refused_count": len(
+                manifest["user_closure"]["refused"]
+            ),
         },
     )
 

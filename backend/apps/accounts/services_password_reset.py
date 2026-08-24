@@ -228,7 +228,8 @@ def _credential_state_matches(user, envelope, normalized):
     except ValueError:
         return False
     return bool(
-        user.is_active
+        not user.is_tenant_dump_stub
+        and user.is_active
         and user.access_status == User.AccessStatus.ACTIVE
         and not user.is_walk_in
         and current_email == normalized

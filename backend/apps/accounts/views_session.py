@@ -94,7 +94,10 @@ def _refresh_user_is_active(token_str):
         return True
     user = User.objects.filter(pk=token.get("user_id")).first()
     return bool(
-        user and user.is_active and user.access_status == User.AccessStatus.ACTIVE
+        user
+        and not user.is_tenant_dump_stub
+        and user.is_active
+        and user.access_status == User.AccessStatus.ACTIVE
     )
 
 

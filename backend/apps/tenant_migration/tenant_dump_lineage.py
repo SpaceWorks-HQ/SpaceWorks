@@ -9,7 +9,7 @@ from .tenant_dump_manifest import verify_envelope_custody_manifest
 
 
 FORMAT = "spaceworks-tenant-dump-v1"
-DERIVATION_POLICY_VERSION = 2
+DERIVATION_POLICY_VERSION = 3
 
 
 def canonical_digest(value):

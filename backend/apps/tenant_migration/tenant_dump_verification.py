@@ -20,6 +20,11 @@ from .tenant_dump_sql import (
     verify_tables_empty,
 )
 from .tenant_dump_sequences import read_sequence_state
+from .tenant_dump_cross_tenant_verify import verify_cross_tenant_projection
+from .tenant_dump_user_closure import (
+    reproduce_user_closure,
+    verify_closure_digest,
+)
 
 
 def mapped_rows(using, identities):
@@ -76,6 +81,8 @@ def verify_projection_database(
     expected_projected_digest=None,
     projected_identities=None,
     expected_sequence_state=None,
+    capture_id=None,
+    expected_user_closure_digest=None,
 ):
     validate_catalog()
     validate_raw_column_allowlists()
@@ -84,6 +91,7 @@ def verify_projection_database(
     verify_open_tenant_fence(using, makerspace_id)
     verify_tables_empty(using, {"spaceworks_cache"})
     verify_source_disposition_tables_empty(using)
+    verify_cross_tenant_projection(using, makerspace_id)
     actual = mapped_raw_digest(mapped_rows(using, mapped_identities))
     if actual != expected_mapped_digest:
         raise TenantDumpVerificationError(
@@ -107,5 +115,14 @@ def verify_projection_database(
     ):
         raise TenantDumpVerificationError(
             "Lane D sequence state changed across the custom dump."
+        )
+    if expected_user_closure_digest is not None:
+        if capture_id is None:
+            raise TenantDumpVerificationError(
+                "Closure verification requires the artifact capture id."
+            )
+        verify_closure_digest(
+            reproduce_user_closure(using, capture_id),
+            expected_user_closure_digest,
         )
     return actual

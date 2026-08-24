@@ -17,8 +17,14 @@ from apps.data_export.references import USER_EDGES
 from apps.data_export.types import Fidelity
 
 from .tenant_dump_catalog import validate_catalog, validate_unowned_tables
+from .tenant_dump_cross_tenant import inspect_cross_tenant_source
 from .tenant_dump_model_catalog import FIRST_PARTY_MODEL_RULES
 from .tenant_dump_types import ModelDisposition
+from .tenant_dump_user_closure import build_user_closure
+from .tenant_dump_user_rows import (
+    apply_user_closure,
+    excluded_stub_profile_object_keys,
+)
 
 
 class TenantDumpProjectionError(RuntimeError):
@@ -30,14 +36,18 @@ class TenantDumpSourceProjection:
     makerspace_id: int
     rows: Mapping[str, tuple[Mapping[str, object], ...]]
     machine_operator_manifest: tuple[Mapping[str, object], ...]
+    user_closure: object | None = None
+    cross_tenant_lost_edges: tuple[Mapping[str, object], ...] = ()
+    excluded_object_keys: frozenset[str] = frozenset()
 
 
-def project_makerspace_source(makerspace_id, *, using="default"):
+def project_makerspace_source(makerspace_id, *, using="default", capture_id=None):
     """Read one tenant with the shared raw producer, then prove live-grant closure."""
     validate_catalog()
     validate_unowned_tables(connections[using].introspection.table_names())
     projected = {}
     with no_decrypt_guard():
+        cross_tenant = inspect_cross_tenant_source(makerspace_id, using=using)
         for label, (_path, predicate) in sorted(DATASET_SPECS.items()):
             rule = FIRST_PARTY_MODEL_RULES[label]
             if rule.disposition is ModelDisposition.DROP:
@@ -48,9 +58,9 @@ def project_makerspace_source(makerspace_id, *, using="default"):
             ).order_by(model._meta.pk.name)
             records = raw_records(queryset, model)
             projected[label] = tuple(
-                MappingProxyType(dict(row))
+                MappingProxyType(_decorate_cross_tenant_row(label, row, cross_tenant))
                 for row in records
-                if _source_row_allowed(label, row, makerspace_id)
+                if _source_row_allowed(label, row, makerspace_id, cross_tenant)
             )
 
         _close_conditional_rows(projected)
@@ -65,6 +75,17 @@ def project_makerspace_source(makerspace_id, *, using="default"):
                 User,
             )
         )
+        closure = None
+        excluded_object_keys = frozenset()
+        if capture_id is not None:
+            closure = build_user_closure(
+                projected, makerspace_id, capture_id, using=using
+            )
+            closed_rows = apply_user_closure(projected, closure)
+            excluded_object_keys = excluded_stub_profile_object_keys(
+                projected, closed_rows
+            )
+            projected = closed_rows
         manifest = tuple(
             MappingProxyType(dict(item))
             for item in validate_machine_operator_closure(projected, makerspace_id)
@@ -74,10 +95,15 @@ def project_makerspace_source(makerspace_id, *, using="default"):
         makerspace_id=makerspace_id,
         rows=MappingProxyType(projected),
         machine_operator_manifest=manifest,
+        user_closure=closure,
+        cross_tenant_lost_edges=tuple(
+            MappingProxyType(dict(item)) for item in cross_tenant.lost_edges
+        ),
+        excluded_object_keys=excluded_object_keys,
     )
 
 
-def _source_row_allowed(label, row, makerspace_id):
+def _source_row_allowed(label, row, makerspace_id, cross_tenant):
     if label == "makerspaces.MembershipRequest":
         return row["state"] not in {"requested", "invited"}
     if label == "apiclients.ApiKeyRequest":
@@ -91,8 +117,20 @@ def _source_row_allowed(label, row, makerspace_id):
     if label == "operations.StockTransfer":
         return row["makerspace_id"] == makerspace_id
     if label == "operations.StockTransferLine":
-        return row["_transfer_makerspace_id"] == makerspace_id
+        return (
+            row["_transfer_makerspace_id"] == makerspace_id
+            and row["id"] not in cross_tenant.dropped_transfer_line_ids
+        )
     return True
+
+
+def _decorate_cross_tenant_row(label, row, facts):
+    values = dict(row)
+    if label == "operations.StockTransfer":
+        for transfer_id, prefix in facts.nulled_transfer_pairs:
+            if transfer_id == row["id"]:
+                values[f"_d6_null_{prefix}_pair"] = True
+    return values
 
 
 def _close_conditional_rows(rows):

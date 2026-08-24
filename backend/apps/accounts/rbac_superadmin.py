@@ -36,6 +36,7 @@ def _is_superadmin(actor):
     return bool(
         actor is not None
         and getattr(actor, "is_authenticated", False)
+        and not getattr(actor, "is_tenant_dump_stub", False)
         and (actor.is_superuser or actor.role == User.Role.SUPERADMIN)
     )
 

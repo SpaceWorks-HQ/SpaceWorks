@@ -81,7 +81,11 @@ def rotate_device_refresh(raw):
         if unusable:
             blacklist_device_family(family, revoke_grant=True, reuse=True)
             replay = True
-        elif not user.is_active or user.access_status != user.AccessStatus.ACTIVE:
+        elif (
+            user.is_tenant_dump_stub
+            or not user.is_active
+            or user.access_status != user.AccessStatus.ACTIVE
+        ):
             blacklist_device_family(family, revoke_grant=True)
         elif (
             grant.status != grant.Status.ACTIVE
