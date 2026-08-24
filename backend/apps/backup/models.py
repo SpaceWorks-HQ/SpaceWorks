@@ -295,3 +295,5 @@ class RestoreRollbackObject(models.Model):
 # own module; this file is already at the repository's size ceiling.
 from .models_custody_alarm import ArchiveCustodyAlarmDelivery  # noqa: E402,F401
 from .models_artifact_ledger import B1ActivationState, BackupArtifactComponent, BackupArtifactLedger, BackupComponentRecipient  # noqa: E402,F401
+from .models_tenant_exit_custody import MakerspaceTenantExitCustodyState, TenantExitCustodyAlarmDelivery  # noqa: E402,F401
+from .models_restore_reservations import B1FenceContinuity, B1ReservationEntry, B1RestoreComponentState, B1RestoreOperationState  # noqa: E402,F401

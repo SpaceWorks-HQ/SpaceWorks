@@ -19,7 +19,7 @@ from apps.backup.recipient_selection import BackupBuildError
 from apps.backup.raw_projection import concrete_record_payload, no_decrypt_guard
 
 
-def build_expected_ledger(using, rules, makerspace_ids):
+def build_expected_ledger(using, rules, makerspace_ids, *, sequence_facts):
     """Capture expected row identities and sequence high-water outside candidates."""
     tables = {}
     dropped_boundaries = defaultdict(list)
@@ -51,7 +51,9 @@ def build_expected_ledger(using, rules, makerspace_ids):
             "identity_sha256": identity_digest,
             "raw_rows_sha256": row_digest,
         }
-    return {"tables": tables, "sequences": _sequence_ledger(using)}
+    sequences = _sequence_ledger(using)
+    _apply_expected_sequence_high_water(sequences, sequence_facts)
+    return {"tables": tables, "sequences": sequences}
 
 
 def verify_readable_main(using, rules, makerspace_ids, expected):
@@ -130,3 +132,26 @@ def _sequence_ledger(using):
             last_value, is_called = cursor.fetchone()
             result[name] = [*definition, last_value, is_called]
     return result
+
+
+def _apply_expected_sequence_high_water(ledger, facts):
+    """Project source sequence facts to the state installed in readable main."""
+
+    seen = set()
+    for fact in facts:
+        identity = (fact["schema"], fact["sequence"])
+        if identity in seen or fact["schema"] != "public":
+            raise BackupBuildError("The expected sequence high-water ledger is invalid.")
+        seen.add(identity)
+        expected = ledger.get(fact["sequence"])
+        definition = [
+            fact["start"], fact["increment"], fact["minimum"], fact["maximum"],
+            fact["cache"], fact["cycle"],
+        ]
+        if expected is None or expected[:-2] != definition:
+            raise BackupBuildError(
+                "The expected sequence high-water definition changed during capture."
+            )
+        expected[-2:] = [
+            fact["installed_last_value"], fact["installed_is_called"]
+        ]

@@ -5,6 +5,10 @@ from apps.backup.models import (
     ArchiveCustodyAlarmDelivery,
     ArchiveRecipientReservation,
     B1ActivationState,
+    B1FenceContinuity,
+    B1ReservationEntry,
+    B1RestoreComponentState,
+    B1RestoreOperationState,
     BackupArchive,
     BackupArtifactComponent,
     BackupArtifactLedger,
@@ -12,9 +16,11 @@ from apps.backup.models import (
     BackupLease,
     DeploymentRecoveryState,
     MakerspaceArchiveCustodyState,
+    MakerspaceTenantExitCustodyState,
     PlatformBackupSettings,
     RestoreOperation,
     RestoreRollbackObject,
+    TenantExitCustodyAlarmDelivery,
 )
 from config.admin_access import SuperuserOnlyModelAdmin
 
@@ -98,5 +104,11 @@ for model in (
     BackupArtifactLedger,
     BackupArtifactComponent,
     BackupComponentRecipient,
+    B1RestoreOperationState,
+    B1RestoreComponentState,
+    B1ReservationEntry,
+    B1FenceContinuity,
+    MakerspaceTenantExitCustodyState,
+    TenantExitCustodyAlarmDelivery,
 ):
     admin.site.register(model, ReadOnlyBackupAdmin)

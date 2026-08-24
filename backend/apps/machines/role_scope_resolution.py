@@ -53,6 +53,7 @@ def manage_scopes_for(actor, makerspace_ids):
     where ``MANAGE_MACHINES`` is already granted, but it is the safe answer if it ever is.
     """
     ids = {ms_id for ms_id in makerspace_ids if ms_id is not None}
+    ids -= rbac.archived_makerspace_ids()
     if not ids or actor is None or not getattr(actor, "is_authenticated", False):
         return {}
 

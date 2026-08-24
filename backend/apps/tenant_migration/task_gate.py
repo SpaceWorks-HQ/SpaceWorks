@@ -16,13 +16,20 @@ class TenantGateTask(Task):
     abstract = True
 
     def __call__(self, *args, **kwargs):
+        resolver = TASK_TENANT_RESOLVERS.get(self.name)
+        makerspace_id = (
+            _resolve_makerspace_id(resolver, args, kwargs)
+            if resolver is not None else _direct_makerspace_id(self.name, args, kwargs)
+        )
+        if makerspace_id is not None:
+            from apps.backup.not_restored import assert_restored
+
+            assert_restored(makerspace_id)
         if self.name in TASK_EXEMPTIONS:
             return super().__call__(*args, **kwargs)
         if self.name in TASK_INTERNAL_PARTICIPANTS:
             return super().__call__(*args, **kwargs)
-        resolver = TASK_TENANT_RESOLVERS.get(self.name)
         if resolver is not None:
-            makerspace_id = _resolve_makerspace_id(resolver, args, kwargs)
             if makerspace_id is None:
                 return super().__call__(*args, **kwargs)
             with boundary_tenant_write(makerspace_id):
@@ -44,3 +51,15 @@ def _resolve_makerspace_id(resolver, args, kwargs):
         .values_list(field, flat=True)
         .first()
     )
+
+
+def _direct_makerspace_id(task_name, args, kwargs):
+    value = kwargs.get("makerspace_id")
+    if value is not None:
+        return value
+    if (
+        task_name == "apps.backup.tasks.deliver_archive_custody_alarms_task"
+        and args
+    ):
+        return args[0]
+    return None

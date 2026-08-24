@@ -13,6 +13,7 @@ from django.db.models import Exists, Max, OuterRef
 from django.utils import timezone
 
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.servability import servable_queryset
 
 from .custody_alarm_dispatch import (
     CLAIM_LEASE,
@@ -52,8 +53,9 @@ ZERO_REMINDER = timedelta(days=1)
 
 
 def deliver_archive_custody_alarms(*, makerspace_id=None):
+    states = MakerspaceArchiveCustodyState.objects.filter(state__in=ALARM_STATES)
     state_ids = list(
-        MakerspaceArchiveCustodyState.objects.filter(state__in=ALARM_STATES)
+        servable_queryset(states, relation="makerspace")
         .filter(**({"makerspace_id": makerspace_id} if makerspace_id else {}))
         .order_by("makerspace_id")
         .values_list("pk", flat=True)

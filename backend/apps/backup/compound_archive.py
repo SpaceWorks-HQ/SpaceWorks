@@ -1,11 +1,10 @@
 """Lane E compound capture, verified slice sealing, and readable-main routing."""
 
 from pathlib import Path
-import json
 import shutil
-import subprocess
-import tarfile
 import uuid
+
+from django.db import connection
 
 from apps.backup.compound_recipients import (
     FrozenSlice,
@@ -13,16 +12,19 @@ from apps.backup.compound_recipients import (
     frozen_slices,
     predecessor_snapshot,
 )
-from apps.backup.dek_rewrap import enumerate_staged_deks, seal_staged_deks
-from apps.backup.digests import build_content_ledger, sha256_file
+from apps.backup.compound_slice_build import build_unsealed_slice, seal_verified_slice
+from apps.backup.digests import sha256_file
 from apps.backup.main_projection import project_readable_main_dump
-from apps.backup.main_projection_inverse import boundary_deltas
 from apps.backup.main_projection_registry import table_rules
 from apps.backup.main_projection_verification import build_expected_ledger
 from apps.backup.object_ownership import MAIN_COMPONENT, slice_component
+from apps.backup.physical_catalog import catalog_digest, physical_catalog_ledger
+from apps.backup.postgres_client import server_major
+from apps.backup.reconstruction_verifier import verify_reconstruction
 from apps.backup.recipient_selection import BackupBuildError
 from apps.backup.recipients import fingerprint_for
-from apps.backup.slice_verification import verify_unsealed_slice
+from apps.backup.source_reservations import capture_source_reservations
+from apps.backup.source_verifier import verify_and_sign_source_partition
 from apps.backup.user_closure import user_closure_digest
 
 
@@ -39,15 +41,25 @@ class CompoundCapture:
             entry["public_recipient"] for entry in platform_recipients
         )
         self.slice_entries = []
+        self.unsealed_slices = []
         self.frozen_slices = ()
         self.verified_makerspace_ids = set()
         self.expected_main_ledger = None
+        self.expected_full_ledger = None
+        self.source_catalog_ledger = None
+        self.source_catalog_digest = ""
+        self.reservation_capture = None
+        self.source_partition_proof = None
+        self.source_dump_sha256 = ""
+        self.source_database_identity = ""
+        self.source_server_identity = ""
         self.object_plan = None
         self.frozen_population = ()
         self.frozen_population_ids = ()
         self.predecessor_snapshot = {}
         self.user_closure_entries = set()
         self.user_closure_digest = user_closure_digest(())
+        self.verifier_root = self.root.parent / f".lane-e-verifier-{self.capture_id}"
 
     def prepare_from_snapshot(self):
         if self.frozen_slices:
@@ -60,11 +72,34 @@ class CompoundCapture:
         self.frozen_slices = frozen_slices(
             self.capture_id, self.platform_recipients, self.frozen_population
         )
+        self.source_dump_sha256 = sha256_file(self.root / "database.dump")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT current_database(), current_setting('server_version_num'), "
+                "(pg_catalog.pg_control_system()).system_identifier"
+            )
+            database_name, version, system_identifier = cursor.fetchone()
+        self.source_database_identity = database_name
+        self.source_server_identity = f"postgresql:{version}:{system_identifier}"
         makerspace_ids = tuple(
             item.makerspace_id for item in self.frozen_slices
         )
+        rules = table_rules()
+        self.source_catalog_ledger = physical_catalog_ledger("default")
+        self.source_catalog_digest = catalog_digest(self.source_catalog_ledger)
+        self.reservation_capture = capture_source_reservations(
+            "default",
+            rules,
+            {item.makerspace_id: item.slice_id for item in self.frozen_slices},
+            postgres_major=server_major(),
+        )
         self.expected_main_ledger = build_expected_ledger(
-            "default", table_rules(), makerspace_ids
+            "default", rules, makerspace_ids,
+            sequence_facts=self.reservation_capture.sequence_facts,
+        )
+        self.expected_full_ledger = build_expected_ledger(
+            "default", rules, (),
+            sequence_facts=self.reservation_capture.sequence_facts,
         )
 
     def capture_from_snapshot(
@@ -73,131 +108,28 @@ class CompoundCapture:
         if self.expected_main_ledger is None:
             raise BackupBuildError("Compound capture was not prepared in the snapshot.")
         self.object_plan = object_plan
-        slices_root = self.root / "slices"
-        work_root = self.root / ".slice-build"
-        try:
-            for item in self.frozen_slices:
-                self.slice_entries.append(
-                    self._seal_slice(
-                        item,
-                        slices_root=slices_root,
-                        work_root=work_root,
-                        tenant_payload=tenant_payload,
-                        capture_objects=capture_objects,
-                        write_json=write_json,
-                        object_plan=object_plan,
-                    )
-                )
-            object_plan.assert_complete()
-            self.require_verified_slice_coverage()
-            self.user_closure_digest = user_closure_digest(
-                self.user_closure_entries
+        self.verifier_root.mkdir(parents=True, exist_ok=False)
+        for item in self.frozen_slices:
+            unsealed = build_unsealed_slice(
+                item,
+                work_root=self.verifier_root,
+                tenant_payload=tenant_payload,
+                capture_objects=capture_objects,
+                write_json=write_json,
+                object_plan=object_plan,
+                modes=self.modes,
+                archive_format=COMPOUND_ARCHIVE_FORMAT,
             )
-        finally:
-            shutil.rmtree(work_root, ignore_errors=True)
-
-    def _seal_slice(
-        self,
-        item,
-        *,
-        slices_root,
-        work_root,
-        tenant_payload,
-        capture_objects,
-        write_json,
-        object_plan,
-    ):
-        plaintext = work_root / item.slice_id
-        rows_root = plaintext / "rows"
-        tenant_payload(item.makerspace_id, rows_root)
-        component = slice_component(item.makerspace_id)
-        object_keys = object_plan.closure(component)
-        objects = capture_objects(
-            plaintext / "objects", object_keys, self.modes
+            self.unsealed_slices.append(unsealed)
+            self.user_closure_entries.update(unsealed.user_closure_entries)
+            self.verified_makerspace_ids.add(item.makerspace_id)
+        object_plan.assert_complete()
+        self.reservation_capture = self.reservation_capture.bind_object_plan(
+            object_plan,
+            {item.makerspace_id: item.slice_id for item in self.frozen_slices},
         )
-        object_plan.bind_component(component, plaintext / "objects", objects)
-        closure_entries = self._user_closure(plaintext)
-        self.user_closure_entries.update(closure_entries)
-        write_json(
-            plaintext / "user-closure-ledger.json",
-            [{
-                "disposition": disposition,
-                "source_user_pk": int(source_pk),
-                "reason_code": reason_code,
-            } for disposition, source_pk, reason_code in closure_entries],
-        )
-        staged_deks = enumerate_staged_deks(item.makerspace_id)
-        sealed_deks = seal_staged_deks(
-            staged_deks, item.public_recipients, plaintext / "keys" / "deks"
-        )
-        write_json(
-            plaintext / "inverse" / "boundary-deltas.json",
-            boundary_deltas(item.makerspace_id),
-        )
-        write_json(
-            plaintext / "slice-manifest.json",
-            {
-                "format": COMPOUND_ARCHIVE_FORMAT,
-                "slice_id": item.slice_id,
-                "makerspace_id": item.makerspace_id,
-                "recipient_fingerprints": list(item.recipient_fingerprints),
-                "custody_state": item.custody_state,
-                "storage": {"objects": objects},
-                "sealed_deks": sealed_deks,
-            },
-        )
-        verify_unsealed_slice(
-            item.makerspace_id, plaintext, objects,
-            staged_deks=staged_deks, sealed_deks=sealed_deks,
-        )
-        self.verified_makerspace_ids.add(item.makerspace_id)
-        slices_root.mkdir(parents=True, exist_ok=True)
-        plain_tar = work_root / f"{item.slice_id}.tar"
-        encrypted = slices_root / f"{item.slice_id}.tar.age"
-        with tarfile.open(plain_tar, "w") as bundle:
-            bundle.add(plaintext, arcname=".")
-        command = ["age"]
-        for public_recipient in item.public_recipients:
-            command += ["-r", public_recipient]
-        command += ["-o", str(encrypted), str(plain_tar)]
-        try:
-            subprocess.run(
-                command,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-            )
-        except (OSError, subprocess.CalledProcessError) as exc:
-            raise BackupBuildError(
-                "A sovereign archive slice could not be encrypted."
-            ) from exc
-        content_ledger = build_content_ledger(plaintext)
-        return {
-            "component_id": item.slice_id,
-            "slice_id": item.slice_id,
-            "makerspace_id": item.makerspace_id,
-            "path": f"slices/{item.slice_id}.tar.age",
-            "size_bytes": encrypted.stat().st_size,
-            "ciphertext_sha256": sha256_file(encrypted),
-            "recipient_fingerprints": list(item.recipient_fingerprints),
-            "custody_state": item.custody_state,
-            "object_ledger_count": len(objects),
-            "object_ledger_digest": _json_digest(objects),
-            "content_ledger_count": len(content_ledger),
-            "content_ledger_digest": _json_digest(content_ledger),
-        }
-
-    @staticmethod
-    def _user_closure(plaintext):
-        path = plaintext / "rows" / "global_user_references.json"
-        try:
-            values = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise BackupBuildError("A sovereign user-closure ledger is unreadable.") from exc
-        return tuple(sorted({
-            ("stubbed", str(item["id"]), "sovereign-global-user-reference")
-            for item in values
-        }))
+        self.require_verified_slice_coverage()
+        self.user_closure_digest = user_closure_digest(self.user_closure_entries)
 
     def promotion_snapshot(self):
         slices = {item.makerspace_id: item for item in self.frozen_slices}
@@ -224,11 +156,9 @@ class CompoundCapture:
 
     def require_verified_slice_coverage(self):
         expected = {item.makerspace_id for item in self.frozen_slices}
-        emitted = {
-            entry.get("makerspace_id")
-            for entry in self.slice_entries
-            if isinstance(entry, dict)
-        }
+        emitted = {item.frozen.makerspace_id for item in self.unsealed_slices}
+        if self.slice_entries:
+            emitted = {item.get("makerspace_id") for item in self.slice_entries}
         if expected != emitted or expected != self.verified_makerspace_ids:
             raise BackupBuildError(
                 "Readable-main exclusion requires one verified slice per sovereign makerspace."
@@ -249,16 +179,35 @@ class CompoundCapture:
                 self.root / "database.dump",
                 makerspace_ids,
                 self.expected_main_ledger,
+                sequence_facts=self.reservation_capture.sequence_facts,
             )
+            reconstruction_pass = verify_reconstruction(
+                self.root / "database.dump",
+                self.unsealed_slices,
+                table_rules(),
+                self.expected_full_ledger,
+                self.reservation_capture,
+                postgres_major=server_major(),
+            )
+            self.slice_entries = [
+                seal_verified_slice(item, self.root / "slices", self.verifier_root)
+                for item in self.unsealed_slices
+            ]
             if self.object_plan is None:
                 raise BackupBuildError("Compound object ownership proof is missing.")
             self.object_plan.verify_component(
                 MAIN_COMPONENT, manifest["storage"]["objects"]
             )
             _verify_sealed_slices(self.root, self.slice_entries)
+            self.source_partition_proof = verify_and_sign_source_partition(
+                self,
+                detailed_manifest=manifest,
+                reconstruction_pass=reconstruction_pass,
+            )
             result = dict(manifest)
         finally:
             shutil.rmtree(build_root, ignore_errors=True)
+            shutil.rmtree(self.verifier_root, ignore_errors=True)
         covered = [
             value for value in result["covered_makerspace_ids"]
             if value not in makerspace_ids
@@ -267,6 +216,9 @@ class CompoundCapture:
         result["excluded_makerspace_ids"] = list(makerspace_ids)
         result["partial"] = bool(makerspace_ids)
         return result
+
+    def cleanup_verifier_material(self):
+        shutil.rmtree(self.verifier_root, ignore_errors=True)
 
 
 def add_slice_metadata(manifest, *, slices, recipients):
@@ -288,12 +240,3 @@ def _verify_sealed_slices(root, entries):
             or sha256_file(path) != entry["ciphertext_sha256"]
         ):
             raise BackupBuildError("A sealed sovereign slice failed ciphertext verification.")
-
-
-def _json_digest(value):
-    import hashlib
-
-    encoded = json.dumps(
-        value, sort_keys=True, separators=(",", ":"), default=str
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()

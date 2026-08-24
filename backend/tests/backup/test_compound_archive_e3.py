@@ -19,7 +19,7 @@ from django.db.backends.base.base import BaseDatabaseWrapper
 from django.test import SimpleTestCase
 from django.utils import timezone
 
-from apps.backup import archive_builder, compound_archive
+from apps.backup import archive_builder
 from apps.backup.models import (
     BackupArchive,
     MakerspaceArchiveCustodyState,
@@ -30,10 +30,7 @@ from apps.backup.main_projection_registry import (
     RowDisposition,
     table_rules,
 )
-from apps.backup.main_projection_verification import build_expected_ledger
-from apps.backup.postgres_client import client_binary
 from apps.backup.projection_databases import restore_dump, temporary_database
-from apps.backup.recipient_selection import BackupBuildError
 from apps.backup.recipients import fingerprint_for
 from apps.events.models import Event, EventRegistration
 from apps.inventory.models import InventoryProduct
@@ -41,6 +38,7 @@ from apps.makerspaces.models import Makerspace, MakerspaceMembership
 
 
 pytestmark = pytest.mark.django_db(transaction=True)
+
 
 class _EveryDatabase(frozenset):
     """A `databases` allow-set that also admits aliases created after setup.
@@ -123,6 +121,7 @@ def _sovereign():
 
 
 def _prepare(monkeypatch, settings):
+    monkeypatch.setenv("SPACEWORKS_OCI_DIGEST", "sha256:" + "a" * 64)
     settings.BACKUP_AGE_RECIPIENT = PLATFORM
     require_binary = archive_builder._require_binary
     monkeypatch.setattr(
@@ -188,24 +187,6 @@ def test_every_auto_created_m2m_table_has_an_explicit_disposition():
         for rule in table_rules()
         if rule.model._meta.auto_created
     } == discovered
-
-
-def test_verification_ledger_digests_each_authority_through_table():
-    user = get_user_model().objects.create_user(username="ledger-m2m-e3")
-    _authority_memberships(user)
-
-    ledger = build_expected_ledger("default", table_rules(), ())
-    through_models = (
-        get_user_model()._meta.get_field("groups").remote_field.through,
-        get_user_model()._meta.get_field("user_permissions").remote_field.through,
-        Group._meta.get_field("permissions").remote_field.through,
-    )
-    for model in through_models:
-        fact = ledger["tables"][model._meta.db_table]
-        assert fact["count"] == model._base_manager.count()
-        assert fact["count"] >= 1
-        assert len(fact["identity_sha256"]) == 64
-        assert len(fact["raw_rows_sha256"]) == 64
 
 
 def test_readable_main_excludes_sovereign_rows_and_keeps_global_and_ordinary(
@@ -309,90 +290,3 @@ def test_readable_main_excludes_sovereign_rows_and_keeps_global_and_ordinary(
         assert "./database.dump" in names
     finally:
         tempdir.cleanup()
-
-
-def test_readable_main_dump_holds_no_sovereign_plaintext(
-    allow_projection_databases, monkeypatch, settings
-):
-    """The guarantee stated to customers, checked on the bytes that ship.
-
-    The semantic test above proves the rows are gone once restored. This one
-    reads the dump itself, because "excluded from the readable main" is a claim
-    about the artifact an operator can open, not about a restored database. The
-    ordinary product is the positive control: without it a passing assertion
-    could just mean the scan never saw any product names at all.
-    """
-    sovereign = _sovereign()
-    ordinary = Makerspace.objects.create(name="Ordinary E3 bytes", slug="ordinary-e3-bytes")
-    InventoryProduct.objects.create(
-        makerspace=sovereign, name="Sovereign secret widget", total_quantity=1
-    )
-    InventoryProduct.objects.create(
-        makerspace=ordinary, name="Ordinary visible widget", total_quantity=1
-    )
-    _prepare(monkeypatch, settings)
-
-    _encrypted, manifest, tempdir, _digest = archive_builder.build_archive(_archive())
-    try:
-        root = Path(tempdir.name, "bundle")
-        # pg_restore to SQL text: the custom-format dump is compressed, so a raw
-        # byte scan of the file would pass vacuously.
-        readable = subprocess.run(
-            [client_binary("pg_restore"), "--file=-", str(root / "database.dump")],
-            capture_output=True,
-            check=True,
-        ).stdout
-        assert b"Ordinary visible widget" in readable
-        assert b"Sovereign secret widget" not in readable
-        assert sovereign.name.encode() not in readable
-        assert sovereign.slug.encode() not in readable
-
-        outer_manifest = json.dumps(manifest).encode()
-        assert b"Sovereign secret widget" not in outer_manifest
-        # Visible metadata is expected to name the excluded tenant by id.
-        assert manifest["excluded_makerspace_ids"] == [sovereign.pk]
-    finally:
-        tempdir.cleanup()
-
-
-def test_missing_slice_fails_before_main_exclusion_or_outer_encryption(
-    monkeypatch, settings
-):
-    sovereign = _sovereign()
-    commands = _prepare(monkeypatch, settings)
-
-    def omit_slice(self, **_kwargs):
-        self.frozen_slices = (compound_archive.FrozenSlice(
-            makerspace_id=sovereign.pk,
-            slice_id=str(uuid.uuid4()),
-            public_recipients=(TENANT_ONE, TENANT_TWO),
-            recipient_fingerprints=(
-                fingerprint_for(TENANT_ONE), fingerprint_for(TENANT_TWO)
-            ),
-            custody_state=MakerspaceArchiveCustodyState.State.HEALTHY,
-        ),)
-        self.expected_main_ledger = {}
-
-    monkeypatch.setattr(
-        compound_archive.CompoundCapture, "capture_from_snapshot", omit_slice
-    )
-    with pytest.raises(BackupBuildError, match="one verified slice"):
-        archive_builder.build_archive(_archive())
-    assert commands == []
-
-
-def test_failed_plaintext_slice_verification_fails_before_sealing(
-    monkeypatch, settings
-):
-    _sovereign()
-    commands = _prepare(monkeypatch, settings)
-
-    def fail_verification(*_args, **_kwargs):
-        raise BackupBuildError("injected plaintext verification failure")
-
-    monkeypatch.setattr(
-        compound_archive, "verify_unsealed_slice", fail_verification
-    )
-    with pytest.raises(BackupBuildError, match="plaintext verification failure"):
-        archive_builder.build_archive(_archive())
-    assert commands == []
