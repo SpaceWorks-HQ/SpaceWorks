@@ -24,3 +24,4 @@ HOST_CONFIG_IMAGE="${image}:${tag}"
 export SPACEWORKS_HOST_CONFIG_BUILD=0
 source "$ROOT/scripts/setup-host-orchestration.sh"
 prepare_compose_wrapper
+install_producer_capability

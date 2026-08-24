@@ -229,6 +229,7 @@ if ! grep -q '^BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY=' .env; then
   refresh_compose_config
   "${COMPOSE[@]}" up -d
 fi
+install_producer_capability
 
 say "Waiting for the app to be ready..."
 ready=0

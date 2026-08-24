@@ -1884,6 +1884,28 @@ available with leftover staging retries cleanup only. Staging is deleted after p
 cleanup failure never demotes a verified final. A failed newer run may set `last_error`, but must preserve
 the prior artifact and `last_success_at`.
 
+**Compound production is admitted only by the separate host-installed producer-capability marker (Lane E
+P1, 2026-08-24).** This is not the H1 restore-state marker and is not an entrypoint launch grant. The root
+installer writes `/var/lib/spaceworks/host/public/producer-capability.json` mode `0444` through file fsync,
+same-directory atomic replacement and parent-directory fsync, after the archive verification public key is
+installed. It records SHA-256 for the installed `host-capability.py`, `import-backup.sh`, `restore.sh`,
+`spaceworks-compose.sh` and `validate-compose-wrapper.py` host scripts, SHA-256 for the image's actual common
+entrypoint, the closed supported compound-protocol range, only the verification-key fingerprint, and a
+length-framed digest of the installed Django migration files. It never records or receives the private
+archive-signing key.
+
+`backup/archive_builder.py` checks this marker only for deployment/compound builds and does so before
+recipient resolution, temporary workspace creation, capture bytes, encryption, staging upload or artifact
+ledger persistence. The marker and directory must be root-owned and non-writable by non-root principals,
+and the marker must be exactly mode `0444`. The producer re-hashes every privileged script from the
+read-only host scripts mount, the common entrypoint from the running image and the installed migration
+files; recorded versions never substitute for those byte comparisons. It also proves the protocol to be
+emitted is inside the marker range, derives the public identity of the configured private signing key,
+requires it to equal the configured verification key, and compares its fingerprint with the marker. A
+missing, unreadable, malformed, misowned, wrong-mode, locally modified or rolled-back input refuses with a
+stable reason code. Ordinary makerspace/single archives do not read this marker and remain available on
+hosts that do not have one.
+
 **Lane E activation is one switch over two state machines (E6, 2026-08-23).**
 `Makerspace.superadmin_access_enabled` is live platform authority;
 `B1ActivationState.state` is the deployment-archive guarantee (`on`, `off_pending`, `off_effective`). They

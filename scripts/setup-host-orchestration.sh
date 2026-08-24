@@ -57,6 +57,18 @@ prepare_compose_wrapper() {
     /repo/scripts/host-capability.py init-keys --state-dir /state
 }
 
+install_producer_capability() {
+  HOST_STATE_DIR="${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}"
+  grep -E '^BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY=' "$ROOT/.env" | \
+    docker run --rm -i --user 0:0 --entrypoint python \
+    -v "$ROOT/scripts:/installed-scripts:ro" \
+    -v "$HOST_STATE_DIR:/state" "$HOST_CONFIG_IMAGE" \
+    /app/scripts/install_producer_capability.py \
+    --marker /state/public/producer-capability.json \
+    --scripts-dir /installed-scripts --entrypoint /app/scripts/spaceworks_entrypoint.py \
+    --migrations-dir /app/apps
+}
+
 configure_setup_stripe() {
   SETUP_STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
   SETUP_STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \

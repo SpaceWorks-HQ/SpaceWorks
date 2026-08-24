@@ -148,6 +148,8 @@ services:
       BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY: ${BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY:-}
       BACKUP_OPS_DIR: /var/lib/spaceworks/ops/work
       SPACEWORKS_HOST_MARKER_PATH: /run/spaceworks-host/restore-marker.json
+      BACKUP_PRODUCER_CAPABILITY_MARKER_PATH: /run/spaceworks-host/producer-capability.json
+      BACKUP_PRODUCER_PRIVILEGED_SCRIPTS_DIR: /run/spaceworks-privileged-scripts
     command: ["--role", "backend", "sh", "-c", "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000"]
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/', timeout=3).read()\""]
@@ -159,6 +161,7 @@ services:
     volumes:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
     depends_on:
       db:
         condition: service_healthy
@@ -225,6 +228,7 @@ services:
     volumes:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
     depends_on:
       db:
         condition: service_healthy
