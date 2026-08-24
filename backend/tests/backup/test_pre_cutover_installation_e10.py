@@ -9,6 +9,7 @@ import pytest
 
 from apps.backup import reservation_enforcement
 from apps.backup.models import B1FenceContinuity, B1ReservationEntry
+from tests.backup.e7_reservation_test_helpers import persist_restore_state
 
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -47,8 +48,10 @@ def test_single_fence_install_rolls_back_at_each_internal_boundary(
 ):
     """The existing one-entry primitive must never leave half a fence behind."""
 
-    operation_id, component_id = uuid.uuid4(), uuid.uuid4()
+    component_id = uuid.uuid4()
     fact = _fence(component_id)
+    operation_id, state_component_id = persist_restore_state(fact)
+    assert state_component_id == component_id
     if boundary == "before_reservation_row":
         monkeypatch.setattr(
             reservation_enforcement,
