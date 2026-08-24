@@ -126,6 +126,20 @@ def validate_artifact_rows(artifact, archive, components, associations):
             raise ArtifactLedgerMismatch("A component or recipient association changed.")
 
 
+def independently_recomputed_user_closure_digest(artifact):
+    recomputed = artifact.frozen_promotion_snapshot.get("user_closure_digest")
+    claimed = artifact.outer_manifest.get("user_closure_digest")
+    if (
+        not isinstance(recomputed, str)
+        or not isinstance(claimed, str)
+        or not hmac.compare_digest(recomputed, claimed)
+    ):
+        raise ArtifactLedgerMismatch(
+            "The independently recomputed user-closure digest differs from the manifest."
+        )
+    return recomputed
+
+
 def _valid_recipients_by_space(recipients):
     result = {}
     for recipient in recipients:

@@ -5,7 +5,9 @@ import json
 
 from apps.backup.digests import sha256_file
 from apps.backup.outer_manifest_validation import component_id
+from apps.backup.recipient_selection import BackupBuildError
 from apps.backup.recipients import fingerprint_for
+from apps.backup.user_closure import user_closure_digest
 
 
 def component_ciphertext_ledger(capture, detailed_manifest, root):
@@ -37,6 +39,37 @@ def component_ciphertext_ledger(capture, detailed_manifest, root):
 
 def reservation_fence_ledger(capture):
     return capture.reservation_capture.manifest_facts()
+
+
+def closure_digest_from_slice_ledgers(unsealed_slices):
+    """Rebuild the canonical closure digest from the plaintext slice ledgers."""
+    entries = []
+    for item in unsealed_slices:
+        try:
+            values = json.loads(
+                (item.plaintext / "user-closure-ledger.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise BackupBuildError(
+                "A sovereign user-closure ledger is unreadable."
+            ) from exc
+        if not isinstance(values, list):
+            raise BackupBuildError("A sovereign user-closure ledger is malformed.")
+        for value in values:
+            if not isinstance(value, dict) or set(value) != {
+                "disposition", "source_user_pk", "reason_code"
+            }:
+                raise BackupBuildError(
+                    "A sovereign user-closure ledger is malformed."
+                )
+            entries.append((
+                value["disposition"],
+                value["source_user_pk"],
+                value["reason_code"],
+            ))
+    return user_closure_digest(entries)
 
 
 def digest_json(value):

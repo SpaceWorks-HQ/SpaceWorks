@@ -9,6 +9,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.audit import services as audit
 from apps.backup.custody import validate_deployment_custody
+from apps.backup.digests import SUPPORTED_ARCHIVE_FORMATS
 from apps.backup.models import BackupArchive, DeploymentRecoveryState, RestoreOperation
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,15 @@ ALLOWED_STAGE_TRANSITIONS = {
 def request_restore(actor, archive, kind):
     if archive.scope != BackupArchive.Scope.DEPLOYMENT:
         raise ValidationError("Only full-deployment archives can be restored by Phase 5A.")
+    manifest = archive.manifest
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("format") not in SUPPORTED_ARCHIVE_FORMATS
+    ):
+        raise ValidationError(
+            "Restore refused [format_unsupported]: "
+            "the deployment archive format is unsupported."
+        )
     if archive.status != BackupArchive.Status.AVAILABLE:
         raise ValidationError("The selected archive is not available.")
     state = _locked_state()

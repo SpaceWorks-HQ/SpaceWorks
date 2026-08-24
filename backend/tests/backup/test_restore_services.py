@@ -18,7 +18,13 @@ from apps.backup.models import (
     RestoreOperation,
 )
 from apps.makerspaces.models import Makerspace
-from apps.backup.restore_services import decide_restore, enter_quiescence, record_restore_diff, set_stage
+from apps.backup.restore_services import (
+    decide_restore,
+    enter_quiescence,
+    record_restore_diff,
+    request_restore,
+    set_stage,
+)
 from apps.operations.models import PeriodicTaskRun
 
 
@@ -65,6 +71,28 @@ def test_archive_retention_comes_from_operator_settings():
 
     assert before + timedelta(days=10, hours=23) < archive.expires_at
     assert archive.expires_at < before + timedelta(days=11, minutes=1)
+
+
+def test_restore_request_refuses_unsupported_format_before_side_effects():
+    actor = User.objects.create_superuser(
+        username="restore-wrong-format", password="secret"
+    )
+    archive = BackupArchive.objects.create(
+        scope=BackupArchive.Scope.DEPLOYMENT,
+        requested_by=actor,
+        status=BackupArchive.Status.AVAILABLE,
+        object_key="backup-archives/deployment/wrong-format.tar.age",
+        manifest={"format": "spaceworks-tenant-dump-v1"},
+        age_encrypted=True,
+        expires_at=timezone.now() + timedelta(days=1),
+    )
+
+    with pytest.raises(ValidationError, match="format_unsupported"):
+        request_restore(actor, archive, RestoreOperation.Kind.ROLLBACK_IN_PLACE)
+
+    assert not RestoreOperation.objects.exists()
+    assert not DeploymentRecoveryState.objects.exists()
+    assert not AuditLog.objects.filter(action="backup.restore_requested").exists()
 
 
 def test_expired_operator_window_persists_an_ordinary_non_destructive_abort():
