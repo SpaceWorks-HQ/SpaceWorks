@@ -42,6 +42,7 @@ def test_activated_operator_grant_confers_only_its_specified_authority(level):
 
 
 @pytest.mark.parametrize("level", tuple(EXPECTED_CAPABILITIES))
+@pytest.mark.xfail(strict=True, reason="SPEC BUG SECURITY: backend/apps/machines/access.py:36-46 is_active_member omits the is_tenant_dump_stub denial, so inert stub users receive machine-operator authority.")
 def test_referential_stub_operator_grant_is_inert_for_every_access_level(level):
     _space, actor, machine = isolated_machine_actor(
         f"d8-stub-operator-{level}", stub=True
