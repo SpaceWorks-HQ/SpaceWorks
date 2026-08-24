@@ -38,6 +38,7 @@ from apps.backup.postgres_client import (
     PostgresClientUnavailable,
     client_binary,
 )
+from apps.backup.producer_capability import assert_producer_capability
 from apps.backup.recipient_selection import BackupBuildError
 
 
@@ -61,6 +62,7 @@ class ArchiveBuildResult:
 def build_archive(archive):
     if archive.scope == BackupArchive.Scope.DEPLOYMENT:
         assert_deployment_fully_restored()
+        assert_producer_capability()
     else:
         assert_restored(archive.makerspace_id)
     selected_recipients = recipients.selection_for(archive)

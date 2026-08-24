@@ -173,6 +173,8 @@ services:
       BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY: ${BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY:-}
       BACKUP_OPS_DIR: /var/lib/spaceworks/ops/work
       SPACEWORKS_HOST_MARKER_PATH: /run/spaceworks-host/restore-marker.json
+      BACKUP_PRODUCER_CAPABILITY_MARKER_PATH: /run/spaceworks-host/producer-capability.json
+      BACKUP_PRODUCER_PRIVILEGED_SCRIPTS_DIR: /run/spaceworks-privileged-scripts
     # One list item keeps the shell command intact; see the folded-scalar invariant.
     command: ["--role", "backend", "sh", "-c", "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout 30 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile -"]
     healthcheck:
@@ -194,6 +196,7 @@ services:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
   orchestration-init:
     <<: *host-bootstrap
     depends_on:
@@ -229,6 +232,7 @@ services:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
     depends_on:
       db:
         condition: service_healthy

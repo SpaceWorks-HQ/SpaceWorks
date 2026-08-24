@@ -114,6 +114,8 @@ x-app-env: &app-env
   # without also running a worker would queue tasks nothing ever consumes.
   CELERY_BROKER_URL: ""
   SPACEWORKS_HOST_MARKER_PATH: /run/spaceworks-host/restore-marker.json
+  BACKUP_PRODUCER_CAPABILITY_MARKER_PATH: /run/spaceworks-host/producer-capability.json
+  BACKUP_PRODUCER_PRIVILEGED_SCRIPTS_DIR: /run/spaceworks-privileged-scripts
 
 services:
   orchestration-init:
@@ -169,6 +171,7 @@ services:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
     # Keep the whole gunicorn invocation on ONE line: in a YAML folded scalar a
     # more-indented line keeps its newline, and a newline inside `sh -c` ends the
     # command -- gunicorn then runs bare on its 127.0.0.1 default while the healthcheck,
@@ -196,6 +199,7 @@ services:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
     # A sleep loop rather than a cron daemon: the image runs unprivileged as uid 10001
     # and ships no crond, and `--due-only` already makes the cadence idempotent, so the
     # loop only has to be frequent enough -- not accurate.

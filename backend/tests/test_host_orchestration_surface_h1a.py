@@ -22,6 +22,11 @@ COMPOSE_ROLES = {
     "docker-compose.prod.yml": {"backend": "backend", "worker": "worker", "beat": "beat", "migrate": "migrate"},
     "docker-compose.cloud.yml": {"backend": "backend", "cron": "cron", "migrate": "migrate"},
 }
+PRODUCER_SERVICES = {
+    "docker-compose.yml": {"backend", "worker"},
+    "docker-compose.prod.yml": {"backend", "worker"},
+    "docker-compose.cloud.yml": {"backend", "cron"},
+}
 
 
 def _compose(name):
@@ -35,6 +40,42 @@ def test_dockerfile_installs_the_single_common_entrypoint():
     assert "--uid 10001 --gid app app" in dockerfile
     assert 'ENTRYPOINT ["python", "/app/scripts/spaceworks_entrypoint.py"]' in dockerfile
     assert dockerfile.count("ENTRYPOINT") == 1
+
+
+def test_setup_installs_producer_capability_after_archive_key_creation():
+    setup = (ROOT / "setup.sh").read_text(encoding="utf-8")
+    helper = (ROOT / "scripts" / "setup-host-orchestration.sh").read_text(
+        encoding="utf-8"
+    )
+    initializer = (ROOT / "scripts" / "init-host-orchestration.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert setup.index("install_producer_capability") > setup.index(
+        "BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY"
+    )
+    assert "/app/scripts/install_producer_capability.py" in helper
+    assert "--scripts-dir /installed-scripts" in helper
+    assert 'grep -E \'^BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY=\'' in helper
+    installer = helper.split("install_producer_capability()", 1)[1].split(
+        "configure_setup_stripe()", 1
+    )[0]
+    assert '-v "$ROOT:/repo:ro"' not in installer
+    assert "install_producer_capability" in initializer
+
+
+@pytest.mark.parametrize("name", COMPOSE_ROLES)
+def test_producer_roles_see_marker_and_installed_scripts_read_only(name):
+    services = _compose(name)["services"]
+    for service_name in PRODUCER_SERVICES[name]:
+        service = services[service_name]
+        assert service["environment"]["BACKUP_PRODUCER_CAPABILITY_MARKER_PATH"] == (
+            "/run/spaceworks-host/producer-capability.json"
+        )
+        assert any(
+            str(volume).endswith(":/run/spaceworks-privileged-scripts:ro")
+            for volume in service["volumes"]
+        )
 
 
 def test_bundled_host_scripts_route_management_commands_through_explicit_role():
