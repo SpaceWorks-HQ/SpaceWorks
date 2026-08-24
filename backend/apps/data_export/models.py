@@ -228,6 +228,10 @@ OMITTED_MODELS = {
     "backup.PlatformBackupSettings": "Platform backup configuration and age recipient.",
     "backup.RestoreOperation": "Deployment restore lifecycle state.",
     "backup.RestoreRollbackObject": "Deployment restore object-rollback journal.",
+    "backup.B1RestoreOperationState": "Deployment-local compound-restore stage state.",
+    "backup.B1RestoreComponentState": "Deployment-local opaque-slice restore state.",
+    "backup.B1ReservationEntry": "Deployment-local restore reservation and fence facts.",
+    "backup.B1FenceContinuity": "Deployment-local fence-continuity proof journal.",
 }
 
 NOT_TENANT_MODELS = {

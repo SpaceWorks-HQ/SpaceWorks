@@ -20,6 +20,10 @@ from apps.backup.models import (
 from apps.backup.recipients import fingerprint_for
 from apps.backup.user_closure import user_closure_digest
 from apps.makerspaces.models import Makerspace
+from tests.backup.e7_manifest_test_facts import (
+    bind_source_partition_proof,
+    empty_reservation_capture,
+)
 
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -58,6 +62,10 @@ def _prepared(tmp_path):
             custody_state=MakerspaceArchiveCustodyState.State.DEGRADED_ONE_RECIPIENT,
         ),),
         expected_main_ledger={"catalog": "verified"},
+        source_catalog_digest="a" * 64,
+        platform_recipients=frozenset({f"age1plat{uuid.uuid4().hex}"}),
+        reservation_capture=empty_reservation_capture(),
+        source_partition_proof=None,
         user_closure_digest=user_closure_digest(
             (("stubbed", "1", "sovereign-global-user-reference"),)
         ),
@@ -78,11 +86,18 @@ def _prepared(tmp_path):
     detailed = {
         "format": "spaceworks-phase5a-v3",
         "snapshot_at": timezone.now().isoformat(),
-        "build": {"git_sha": "e5"},
+        "build": {"git_sha": "e5", "source_hash": "e5-source"},
+        "oci_digest": "sha256:" + "a" * 64,
+        "postgres": {
+            "source_server_major": 16,
+            "client": "pg_dump (PostgreSQL) 16.10",
+            "supported_source_majors": [14, 15, 16, 17],
+        },
         "recipient_fingerprints": ["d" * 64],
         "storage": {"objects": []},
         "contents": [],
     }
+    bind_source_partition_proof(capture, archive, detailed, tmp_path)
     manifest = outer_manifest.build_outer_manifest(
         archive=archive, capture=capture, detailed_manifest=detailed, root=tmp_path
     )

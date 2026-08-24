@@ -299,3 +299,9 @@ from .models_tenant_exit_custody import (  # noqa: E402,F401
     MakerspaceTenantExitCustodyState,
     TenantExitCustodyAlarmDelivery,
 )
+from .models_restore_reservations import (  # noqa: E402,F401
+    B1FenceContinuity,
+    B1ReservationEntry,
+    B1RestoreComponentState,
+    B1RestoreOperationState,
+)

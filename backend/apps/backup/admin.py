@@ -5,6 +5,10 @@ from apps.backup.models import (
     ArchiveCustodyAlarmDelivery,
     ArchiveRecipientReservation,
     B1ActivationState,
+    B1FenceContinuity,
+    B1ReservationEntry,
+    B1RestoreComponentState,
+    B1RestoreOperationState,
     BackupArchive,
     BackupArtifactComponent,
     BackupArtifactLedger,
@@ -128,5 +132,12 @@ for model in (
     BackupArtifactLedger,
     BackupArtifactComponent,
     BackupComponentRecipient,
+    B1RestoreOperationState,
+    B1RestoreComponentState,
+    B1ReservationEntry,
+    B1FenceContinuity,
+    # MakerspaceTenantExitCustodyState and TenantExitCustodyAlarmDelivery are NOT listed here:
+    # both carry dedicated @admin.register classes above, and registering them twice raises
+    # AlreadyRegistered at import time.
 ):
     admin.site.register(model, ReadOnlyBackupAdmin)

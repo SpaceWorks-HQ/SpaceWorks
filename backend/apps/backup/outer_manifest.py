@@ -6,10 +6,13 @@ import json
 
 from django.conf import settings
 
-from apps.backup.digests import sha256_file
+from apps.backup.outer_manifest_facts import (
+    component_ciphertext_ledger,
+    reservation_fence_ledger,
+)
 from apps.backup.recipient_selection import BackupBuildError
 from apps.backup.outer_manifest_validation import (
-    component_id,
+    component_id,  # noqa: F401  re-exported: outer_manifest is component_id's public home
     validate_unsigned_manifest,
 )
 from apps.ed25519 import (
@@ -29,32 +32,17 @@ def build_outer_manifest(*, archive, capture, detailed_manifest, root):
     retained = tuple(capture.frozen_population_ids)
     sovereign = tuple(item.makerspace_id for item in capture.frozen_slices)
     readable = tuple(value for value in retained if value not in set(sovereign))
-    main_id = component_id(capture.capture_id, "main")
-    main_path = root / "database.dump"
-    main = {
-        "component_id": main_id,
-        "kind": "main",
-        "path": "database.dump",
-        "size_bytes": main_path.stat().st_size,
-        "ciphertext_sha256": sha256_file(main_path),
-        "schema_catalog_digest": _digest_json(capture.expected_main_ledger),
-        "sequence_policy": "source-high-water-over-all-components",
-        "recipient_fingerprints": sorted(
-            detailed_manifest.get("recipient_fingerprints", ())
-        ),
-    }
-    slices = []
-    for item in capture.slice_entries:
-        slices.append({
-            "component_id": item["component_id"],
-            "kind": "slice",
-            "makerspace_id": item["makerspace_id"],
-            "ciphertext_path": item["path"],
-            "size_bytes": item["size_bytes"],
-            "ciphertext_sha256": item["ciphertext_sha256"],
-            "recipient_fingerprints": sorted(item["recipient_fingerprints"]),
-        })
-    component_ledger = [main, *slices]
+    component_ledger = component_ciphertext_ledger(
+        capture, detailed_manifest, root
+    )
+    main, *slices = component_ledger
+    main_id = main["component_id"]
+    reservation_facts = reservation_fence_ledger(capture)
+    if capture.source_partition_proof is None:
+        raise BackupBuildError(
+            "The verified source-partition proof is missing from the outer manifest."
+        )
+    detailed_postgres = detailed_manifest["postgres"]
     object_ledgers = [{
         "component_id": main_id,
         "count": len(detailed_manifest.get("storage", {}).get("objects", ())),
@@ -89,6 +77,13 @@ def build_outer_manifest(*, archive, capture, detailed_manifest, root):
             "build": detailed_manifest["build"],
             "oci_digest": detailed_manifest.get("oci_digest", ""),
         },
+        "postgres": {
+            "source_server_major": detailed_postgres["source_server_major"],
+            "client": detailed_postgres["client"],
+            "supported_source_majors": list(
+                detailed_postgres["supported_source_majors"]
+            ),
+        },
         "makerspace_sets": {
             "retained": list(retained),
             "readable_main": list(readable),
@@ -98,8 +93,8 @@ def build_outer_manifest(*, archive, capture, detailed_manifest, root):
         "slice_components": slices,
         "object_ledgers": object_ledgers,
         "content_ledgers": content_ledgers,
-        "reservation_commitments": [],
-        "broad_fence_scopes": [],
+        **reservation_facts,
+        "source_partition_proof": capture.source_partition_proof,
         "not_restored_seeds": [{
             "component_id": item["component_id"],
             "makerspace_id": item["makerspace_id"],

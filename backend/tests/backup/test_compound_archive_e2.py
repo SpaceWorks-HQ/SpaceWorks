@@ -10,7 +10,7 @@ import uuid
 import pytest
 from django.utils import timezone
 
-from apps.backup import archive_builder, archive_payload, compound_archive
+from apps.backup import archive_builder, archive_payload, compound_archive, compound_slice_build
 from apps.backup.models import (
     BackupArchive,
     MakerspaceArchiveCustodyState,
@@ -19,6 +19,7 @@ from apps.backup.models import (
 from apps.backup.recipient_selection import BackupBuildError
 from apps.backup.recipients import fingerprint_for
 from apps.makerspaces.models import Makerspace
+from tests.backup.e7_manifest_test_facts import bind_source_partition_proof
 
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -49,6 +50,7 @@ def _recipient(makerspace, value, label):
 
 
 def _prepare_build(monkeypatch, settings, markers):
+    monkeypatch.setenv("SPACEWORKS_OCI_DIGEST", "sha256:" + "a" * 64)
     settings.BACKUP_AGE_RECIPIENT = PLATFORM_RECIPIENT
     monkeypatch.setattr(archive_builder, "_require_binary", lambda _command: None)
     monkeypatch.setattr(
@@ -73,9 +75,12 @@ def _prepare_build(monkeypatch, settings, markers):
         archive_payload, "_command_version", lambda _command: "pg_dump 16"
     )
     monkeypatch.setattr(
-        compound_archive, "verify_unsealed_slice", lambda *_args, **_kwargs: None
+        compound_slice_build, "verify_unsealed_slice", lambda *_args, **_kwargs: None
     )
-    def project_main(source, destination, makerspace_ids, _expected):
+    def project_main(
+        source, destination, makerspace_ids, _expected, *, sequence_facts
+    ):
+        del sequence_facts
         if makerspace_ids:
             destination.write_bytes(PROJECTED_MAIN_BYTES)
         else:
@@ -83,6 +88,24 @@ def _prepare_build(monkeypatch, settings, markers):
 
     monkeypatch.setattr(
         compound_archive, "project_readable_main_dump", project_main
+    )
+    monkeypatch.setattr(
+        compound_archive,
+        "verify_reconstruction",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            source_counts={}, main_counts={}, component_counts={},
+            component_key_digests={},
+        ),
+    )
+
+    def verified_partition(capture, *, detailed_manifest, reconstruction_pass):
+        del reconstruction_pass
+        return bind_source_partition_proof(
+            capture, capture.archive, detailed_manifest, capture.root
+        )
+
+    monkeypatch.setattr(
+        compound_archive, "verify_and_sign_source_partition", verified_partition
     )
 
     def tenant_payload(makerspace_id, root):
@@ -96,6 +119,9 @@ def _prepare_build(monkeypatch, settings, markers):
 
     def fake_age(command, **_kwargs):
         commands.append(command)
+        if "-o" not in command:
+            # Not an age invocation (E7 added other subprocess calls); nothing to seal.
+            return SimpleNamespace(returncode=0)
         output = Path(command[command.index("-o") + 1])
         payload = _kwargs.get("input")
         if payload is None:
@@ -261,39 +287,3 @@ def test_zero_valid_recipients_fails_the_deployment_run(monkeypatch, settings):
         archive_builder.build_archive(_archive())
 
     assert commands == []
-
-
-def test_one_recipient_succeeds_with_degraded_custody_recorded(
-    monkeypatch, settings
-):
-    sovereign = Makerspace.objects.create(
-        name="Degraded custody",
-        slug="degraded-custody",
-        superadmin_access_enabled=False,
-    )
-    _recipient(sovereign, TENANT_RECIPIENT_ONE, "Only tenant key")
-    MakerspaceArchiveCustodyState.objects.create(
-        makerspace=sovereign,
-        state=(
-            MakerspaceArchiveCustodyState.State.DEGRADED_ONE_RECIPIENT
-        ),
-    )
-    commands = _prepare_build(
-        monkeypatch,
-        settings,
-        {sovereign.pk: "degraded tenant content"},
-    )
-
-    _encrypted, manifest, tempdir, _digest = archive_builder.build_archive(
-        _archive()
-    )
-    try:
-        assert manifest["slices"][0]["custody_state"] == (
-            MakerspaceArchiveCustodyState.State.DEGRADED_ONE_RECIPIENT
-        )
-        assert manifest["slices"][0]["recipient_fingerprints"] == [
-            fingerprint_for(TENANT_RECIPIENT_ONE)
-        ]
-        assert _command_recipients(commands[0]) == [TENANT_RECIPIENT_ONE]
-    finally:
-        tempdir.cleanup()

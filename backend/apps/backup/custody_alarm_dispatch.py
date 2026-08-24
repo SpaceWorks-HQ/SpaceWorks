@@ -9,6 +9,7 @@ from apps.integrations.dispatch import dispatch_email
 from apps.integrations.models import EmailLog
 from apps.integrations.smtp_validation import sanitize_email_error
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.servability import servable_queryset
 from apps.notifications.models import Notification
 
 from .custody_alarm_recipients import alarm_message
@@ -69,9 +70,12 @@ def _claim_next(*, makerspace_id, delivery_model=ArchiveCustodyAlarmDelivery):
                 claimed_at__lt=expired_at,
             )
         )
-        candidates = delivery_model.objects.filter(
-            ready,
-            attempts__lt=MAX_ATTEMPTS,
+        candidates = servable_queryset(
+            delivery_model.objects.filter(
+                ready,
+                attempts__lt=MAX_ATTEMPTS,
+            ),
+            relation="makerspace",
         )
         if makerspace_id is not None:
             candidates = candidates.filter(makerspace_id=makerspace_id)

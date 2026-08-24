@@ -1846,11 +1846,14 @@ argv, log, exception or database row. Missing, duplicate, extra, unsupported or 
 any sealed-inventory or ciphertext-ledger mismatch fail the slice before outer sealing.
 
 **Lane E promotion is a signed, staged, durable protocol (E5, 2026-08-23).** The readable outer manifest
-is an allowlist: capture/build identity, frozen retained/readable/sovereign ID sets, opaque component facts,
-component-level object/content ledger digests and counts, reservation/fence facts, not-restored seeds and
-the versioned length-framed `user_closure_digest`. Raw identity tuples remain inside sealed slices. Raw
-rows, object keys, low-entropy unique values, boundary endpoints, W8 payloads and inverse deltas must never
-be added to that manifest. Its Ed25519 signature binds canonical manifest bytes plus the component ledger;
+is an allowlist: capture/build identity, source PostgreSQL/client compatibility facts, frozen
+retained/readable/sovereign ID sets, opaque component facts, component-level object/content ledger digests
+and counts, reservation/fence facts, not-restored seeds and the versioned length-framed
+`user_closure_digest`. Raw identity tuples remain inside sealed slices. Raw rows, object keys, low-entropy
+unique values, boundary endpoints, W8 payloads and inverse deltas must never be added to that manifest. The
+source build and PostgreSQL major are signed compatibility facts because restore preflight must reject an
+incompatible target before decryption or deployment mutation. Its Ed25519 signature binds canonical
+manifest bytes plus the component ledger;
 the artifact carries only the signer fingerprint and signature, never a public or private signing key.
 Verification trusts `BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY` from the host channel, while the producer alone gets
 `BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY`. A manifest-provided key can never authenticate itself.
@@ -1903,6 +1906,88 @@ recipient associations and recipient lifecycle facts remain unchanged. Capture a
 flag/state divergence even if the deployment check was skipped. Rollout is deliberately conservative:
 existing flag-on rows seed `on`, existing flag-off rows seed `off_pending` regardless of recipient count or
 historical artifacts, and migration 0013 asserts one activation row for every retained makerspace.
+
+**Lane E restore reservations are database enforcement, not advisory metadata (E7, 2026-08-23).**
+Rehydrating an installed `B1ReservationEntry` installs a PostgreSQL row trigger on the registered target
+table in the same transaction. Numeric ranges reject explicit reserved identities; high-entropy
+commitments evaluate the reproduced index predicate and ordered expressions with the target-verified SQL
+canonicalizers before applying `reservation-key-v1`; low-entropy unique rules fence the affected writes;
+relationship fences cover inbound/endpoint and semantic-reference inserts, updates and deletes; and
+object-namespace fences cover creation, overwrite and deletion. The signed manifest fact remains unchanged:
+target-only executable SQL is derived from the reproduced catalog and stored only in the immutable local
+reservation row. An unknown constraint, definition or canonicalizer refuses installation.
+
+Relationship-fence ownership is evaluated through each boundary rule's derived `target_predicate`, not the
+target table's direct ownership predicate. A retained/global target may have no direct predicate while the
+boundary still carries a transitive makerspace path; treating that valid absence as an empty match would
+omit required fences and permit later writes to collide with an opaque slice.
+
+Outer-manifest validation rejects non-positive makerspace identities and validates sequence values as a
+coherent PostgreSQL range, not merely as integers: increments are non-zero, cache sizes are positive,
+captured/installed/next values stay within bounds, and `next = installed + increment`.
+
+The main-component header binds two different facts: `schema_catalog_digest` is the digest of the physical
+PostgreSQL catalog, while `semantic_digest` is the readable-main row/reference verification digest. They are
+not aliases and must not be collapsed into the former field's old semantic-only meaning.
+
+Physical-catalog and E7 unique-rule identities use the same named, proved catalog canonicalizer on both the
+live-source and dump-restored definitions. Its sole accepted deparse equivalence is a literal
+`character varying[]` cast to `text[]` at array level versus the same ordered literals cast from
+`character varying` to `text` element by element. Literal bytes, order and all surrounding constraint/index
+SQL remain exact. Non-literal arrays, mixed cast shapes and every unrecognised rendering receive no
+normalization; if their text differs, the catalog digest and unique-rule reproduction checks refuse the
+artifact. Never add general whitespace, parenthesis or arbitrary-cast tolerance to this comparison.
+
+The operation/component bindings are database foreign keys. Restore-operation proof identity, reservation
+facts and fence-continuity facts cannot be updated or deleted through ORM, Celery, cron, management commands
+or raw SQL. The operation-stage trigger permits only the next §8.4 step (or a typed fail-closed transition),
+and component state cannot jump directly from pending to restored. A component in any non-restored state is
+part of canonical makerspace servability: RBAC, machine-role resolution, tenant worker/fan-out gates and
+scheduled servability queries all deny it. PostgreSQL also rejects creation of a `Makerspace` at that
+reserved identity, so an opaque tenant can never be mistaken for an empty/new tenant.
+
+The source-proof module exposes neither a verifier-pass builder nor a signing function. Only the independent
+`source_verifier` constructs the `pass` result and opens the host signing identity, after reconstruction,
+catalog, reservation-key and readable-main non-occupancy verification. OCI identity is required from the
+real build environment and is exactly `sha256:` plus 64 lowercase hexadecimal digits; it is never synthesized
+from a build label. Target manifest validation reproduces every canonicalizer identity rather than accepting
+an unknown digest-shaped label.
+
+A deployment or tenant backup is refused while its scope contains a non-restored component. This applies at
+the archive builder boundary shared by HTTP, Celery, beat and the beat-less scheduled runner, preventing a
+follow-on backup from representing an opaque tenant as an absent/empty tenant.
+
+**Lane E delayed slice merge is fill-only and tenant-authorized (E8, 2026-08-24).** A tenant identity enters
+only through a consumed input stream and is sent to `age-keygen`/`age` through stdin; it is never a command
+argument, environment value, path, journal fact, log value, exception detail or database field, and its
+transient mutable buffer is cleared before final verification. Before decryption, the merge verifies the
+host-trusted outer signature, immutable restore/artifact/capture/component bindings, the stored ciphertext
+size and digest, and the derived recipient fingerprint. Plaintext exists only in a mode-`0700` scratch tree
+or an operation-owned staging schema while the component remains not-restored. Staging and application use
+raw fixture values and declared inverse deltas; mapped field getters are never part of the merge.
+
+`spaceworks_b1_merge` is a `NOLOGIN`, `NOINHERIT`, non-superuser PostgreSQL role with no sequence privileges
+and no delete grant. It can insert only a row reproduced byte-for-byte in the operation schema, and can
+update only a registered inverse-delta column from its exact projected value to its exact preimage. The
+database trigger also binds every write to an advisory-locked `merging` component, while E7's reservation
+trigger bypasses only that same component's reservations. Therefore the merge role cannot claim another
+component's slot, overwrite an occupied identity, mutate an undeclared main-owned value or call `setval`.
+
+W8 payloads are checked as one exact set, decrypted through the same transient identity, and rewrapped to
+the configured target broker with the original makerspace/version AAD; only target-wrapped bytes enter raw
+staging. Authenticated cross-component dependencies are persisted as component IDs plus reason codes. If a
+required opaque component identity is absent, all plaintext staging and merge-staged object bytes are
+discarded, the checkpoint resets to `dependency_wait`, and the original opaque slice remains the only
+tenant payload. A cross-linked group uses one ordered lock set and one database apply transaction.
+
+Database rows commit while every component is still not-restored. Object bytes then move from hashed
+merge-staging locators to create-only final keys under a mode-`0600`, file-and-directory-fsynced host journal.
+Any post-apply failure leaves the component `merging`, its reservations intact and the journal resumable;
+pre-apply terminal failure may mark it `failed` but still cannot release reservations. Only after raw rows,
+inverse boundaries, promoted object bytes, target DEKs, constraints and installed reservations verify does
+the final transaction drop plaintext staging, mark the whole locked group `restored`, delete only that
+group's reservation entries and release now-unused reservation triggers. Canonical servability therefore
+cannot expose a half-merged makerspace: addressability changes only at that final commit.
 
 **The PostgreSQL client major must equal the server major for anything that dumps or restores THIS
 deployment**, and `apps/backup/postgres_client.py` is the only place that resolves those binaries. The

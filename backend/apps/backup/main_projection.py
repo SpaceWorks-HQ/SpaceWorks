@@ -24,7 +24,7 @@ from apps.backup.recipient_selection import BackupBuildError
 
 
 def project_readable_main_dump(
-    source_dump, destination, makerspace_ids, expected_ledger
+    source_dump, destination, makerspace_ids, expected_ledger, *, sequence_facts=()
 ):
     """Project, dump, independently restore, and verify the readable main."""
     rules = table_rules()
@@ -32,12 +32,14 @@ def project_readable_main_dump(
         restore_dump(source_dump, database_name)
         assert_catalog_matches(using, rules)
         _apply_projection(using, rules, makerspace_ids)
+        _install_sequence_high_water(using, sequence_facts)
         dump_database(database_name, destination)
     with temporary_database("verification") as (using, database_name):
         restore_dump(destination, database_name)
         verify_readable_main(
             using, rules, makerspace_ids, expected_ledger
         )
+        _verify_sequence_high_water(using, sequence_facts)
     if not Path(destination).is_file() or Path(destination).stat().st_size <= 0:
         raise BackupBuildError("The verified readable-main dump is empty.")
 
@@ -73,6 +75,40 @@ def _apply_projection(using, rules, makerspace_ids):
                 _apply_marker(cursor, rule.model, marker)
             for table in sorted(EMPTIED_NON_MODEL_TABLES):
                 cursor.execute(f"DELETE FROM {cursor.db.ops.quote_name(table)}")
+
+
+def _install_sequence_high_water(using, facts):
+    connection = connections[using]
+    quote = connection.ops.quote_name
+    with connection.cursor() as cursor:
+        for fact in facts:
+            qualified = f"{quote(fact['schema'])}.{quote(fact['sequence'])}"
+            cursor.execute(
+                "SELECT pg_catalog.setval(%s::regclass, %s, %s)",
+                [
+                    qualified,
+                    fact["installed_last_value"],
+                    fact["installed_is_called"],
+                ],
+            )
+
+
+def _verify_sequence_high_water(using, facts):
+    connection = connections[using]
+    quote = connection.ops.quote_name
+    with connection.cursor() as cursor:
+        for fact in facts:
+            cursor.execute(
+                f"SELECT last_value, is_called FROM "
+                f"{quote(fact['schema'])}.{quote(fact['sequence'])}"
+            )
+            if tuple(cursor.fetchone()) != (
+                fact["installed_last_value"],
+                fact["installed_is_called"],
+            ):
+                raise BackupBuildError(
+                    f"Readable-main sequence {fact['sequence']} lost its high-water."
+                )
 
 
 def _mark_queryset(cursor, using, queryset, name):

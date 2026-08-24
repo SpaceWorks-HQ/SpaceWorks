@@ -3,6 +3,7 @@
 import uuid
 
 from apps.backup.recipient_selection import BackupBuildError
+from apps.backup.outer_reservation_validation import validate_reservation_manifest
 
 
 def component_id(capture_id, kind, makerspace_id=None):
@@ -17,6 +18,34 @@ def validate_unsigned_manifest(manifest, *, protocol_version):
             raise ValueError
         capture_id = uuid.UUID(str(manifest["capture_id"]))
         uuid.UUID(str(manifest["artifact_id"]))
+        build_identity = manifest["build_identity"]
+        postgres = manifest["postgres"]
+        if (
+            not isinstance(build_identity, dict)
+            or set(build_identity) != {"build", "oci_digest"}
+            or not isinstance(build_identity["build"], dict)
+            or not isinstance(build_identity["build"].get("source_hash"), str)
+            or not build_identity["build"]["source_hash"]
+            or not isinstance(build_identity["oci_digest"], str)
+            or not isinstance(postgres, dict)
+            or set(postgres) != {
+                "source_server_major", "client", "supported_source_majors"
+            }
+            or type(postgres["source_server_major"]) is not int
+            or not 10 <= postgres["source_server_major"] <= 99
+            or not isinstance(postgres["client"], str)
+            or not postgres["client"]
+            or not isinstance(postgres["supported_source_majors"], list)
+            or postgres["supported_source_majors"]
+            != sorted(set(postgres["supported_source_majors"]))
+            or any(
+                type(value) is not int or not 10 <= value <= 99
+                for value in postgres["supported_source_majors"]
+            )
+            or postgres["source_server_major"]
+            not in postgres["supported_source_majors"]
+        ):
+            raise ValueError
         sets = manifest["makerspace_sets"]
         retained = sets["retained"]
         readable = sets["readable_main"]
@@ -24,6 +53,7 @@ def validate_unsigned_manifest(manifest, *, protocol_version):
         if any(
             values != sorted(set(values))
             or any(type(value) is not int for value in values)
+            or any(value <= 0 for value in values)
             for values in (retained, readable, sovereign)
         ):
             raise ValueError
@@ -37,6 +67,8 @@ def validate_unsigned_manifest(manifest, *, protocol_version):
             main["kind"] != "main"
             or main["component_id"] != component_id(capture_id, "main")
             or not _is_digest(main["ciphertext_sha256"])
+            or not _is_digest(main["schema_catalog_digest"])
+            or not _is_digest(main["semantic_digest"])
             or main_fingerprints != sorted(set(main_fingerprints))
             or any(not _is_digest(value) for value in main_fingerprints)
         ):
@@ -85,6 +117,7 @@ def validate_unsigned_manifest(manifest, *, protocol_version):
             or not _is_digest(manifest["user_closure_digest"])
         ):
             raise ValueError
+        validate_reservation_manifest(manifest, components)
     except (KeyError, TypeError, ValueError) as exc:
         raise BackupBuildError("The outer archive manifest structure is invalid.") from exc
 

@@ -19,6 +19,7 @@ from apps.backup.archive_payload import _build_info
 from apps.backup.archive_import import import_disaster_archive
 from apps.backup.management.commands.backup_control import Command
 from apps.backup.models import BackupArchive, RestoreOperation
+from apps.makerspaces.models import Makerspace
 
 
 def _restore(stage=RestoreOperation.Stage.CLAIMED, *, archive_sha256=""):
@@ -61,6 +62,7 @@ def _manifest(restore, *, format_name="spaceworks-phase5a-v2", contents=None):
     return manifest
 
 
+@pytest.mark.django_db
 def test_built_archive_manifest_contains_streamed_content_ledger(
     monkeypatch, settings
 ):
@@ -115,8 +117,18 @@ def test_built_archive_manifest_contains_streamed_content_ledger(
 
     monkeypatch.setattr(archive_builder.storage, "client", lambda: Client())
 
+    makerspace = Makerspace.objects.create(
+        name="Digest ledger makerspace", slug=f"digest-ledger-{uuid.uuid4().hex}"
+    )
+    archive = BackupArchive.objects.create(
+        scope=BackupArchive.Scope.MAKERSPACE,
+        makerspace=makerspace,
+        superadmin_access_at_decision=True,
+        object_key=f"backup-archives/makerspace/{uuid.uuid4()}.tar.age",
+        expires_at=timezone.now() + timedelta(days=1),
+    )
     encrypted, manifest, tempdir, archive_sha256 = archive_builder.build_archive(
-        SimpleNamespace(id=uuid.uuid4(), scope=BackupArchive.Scope.MAKERSPACE)
+        archive
     )
     try:
         root = Path(tempdir.name, "bundle")

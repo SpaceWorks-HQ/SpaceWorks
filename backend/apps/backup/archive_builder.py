@@ -32,6 +32,7 @@ from apps.backup.archive_payload import (
 from apps.backup.compound_archive import CompoundCapture, add_slice_metadata
 from apps.backup.digests import build_content_ledger, sha256_file
 from apps.backup.models import BackupArchive, DeploymentRecoveryState
+from apps.backup.not_restored import assert_deployment_fully_restored, assert_restored
 from apps.backup.outer_manifest import build_outer_manifest
 from apps.backup.postgres_client import (
     PostgresClientUnavailable,
@@ -58,6 +59,10 @@ class ArchiveBuildResult:
 
 
 def build_archive(archive):
+    if archive.scope == BackupArchive.Scope.DEPLOYMENT:
+        assert_deployment_fully_restored()
+    else:
+        assert_restored(archive.makerspace_id)
     selected_recipients = recipients.selection_for(archive)
     _require_binary("age")
     if archive.scope == BackupArchive.Scope.DEPLOYMENT:

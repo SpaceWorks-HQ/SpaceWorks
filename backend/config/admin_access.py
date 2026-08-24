@@ -89,6 +89,8 @@ GLOBAL_ADMIN_MODELS = {
     "tenant_migration.tenantdumpcapture",
     "backup.b1activationstate", "backup.backupartifactledger",
     "backup.backupartifactcomponent", "backup.backupcomponentrecipient",
+    "backup.b1restoreoperationstate", "backup.b1restorecomponentstate",
+    "backup.b1reservationentry", "backup.b1fencecontinuity",
     "encryption.piiglobalwritefence",
     "token_blacklist.blacklistedtoken",
     "token_blacklist.outstandingtoken",
