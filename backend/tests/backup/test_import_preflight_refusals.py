@@ -9,6 +9,7 @@ from apps.backup.models import BackupArchive, RestoreOperation
 from tests.backup.import_preflight_test_support import (
     POSTGRES_MAJOR,
     SOURCE_HASH,
+    SUPPORTED_SOURCE_MAJORS,
     make_import_fixture,
     preflight_kwargs,
 )
@@ -65,6 +66,7 @@ def _apply_refusal(case, fixture, settings):
         fixture.manifest["postgres"] = {
             "source_server_major": 15,
             "client": "pg_dump (PostgreSQL) 15.8",
+            "supported_source_majors": list(SUPPORTED_SOURCE_MAJORS),
         }
         fixture.write()
     elif case == "source_build":
@@ -73,8 +75,7 @@ def _apply_refusal(case, fixture, settings):
         fixture.manifest["build"] = changed_build.copy()
         fixture.write()
     elif case == "component_policy":
-        fixture.manifest["main_component"]["size_bytes"] = 0
-        fixture.manifest["contents"][0]["size"] = 0
+        fixture.manifest["content_ledgers"][0]["count"] = 0
         fixture.write()
     return expected
 
