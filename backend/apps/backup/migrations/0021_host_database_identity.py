@@ -37,7 +37,11 @@ def seed_active_identity(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("backup", "0015_tenant_exit_custody")]
+    # Re-chained at merge: this was authored in a worktree where 0016-0019 did not exist, so it
+    # pointed at 0015 and left the graph with two leaf nodes. The files are deliberately NOT
+    # renumbered - a 0020 gap is valid, and renaming risks mismatching names already recorded in
+    # django_migrations.
+    dependencies = [("backup", "0019_b1_delayed_slice_merge")]
 
     operations = [
         migrations.CreateModel(

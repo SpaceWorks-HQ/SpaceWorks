@@ -38,7 +38,7 @@ class TenantDumpCatalogError(AssertionError):
 
 # SHA-256 of the ordered model/table/field graph produced by ``catalog_schema``.
 # Updating it is an explicit review act; runtime introspection never blesses drift.
-CATALOG_SCHEMA_SHA256 = "56d7dd6861558878a6ea0c4b0d7fcb0f5ada681a3ec10d913943e5ec5587706a"
+CATALOG_SCHEMA_SHA256 = "52d664dfabc3421af59d5e4af4f08a12625a8422d804ed1406eb87af7a7847b4"
 
 
 def catalog_models(apps_registry=apps):
