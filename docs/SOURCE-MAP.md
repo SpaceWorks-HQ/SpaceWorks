@@ -100,6 +100,12 @@
   the bounded child operation and emit only the tenant-recipient ciphertext;
   `tenant_dump_recipients.py` keeps `outer_recipients` and `tenant_dek_recipients` distinct, and
   `tenant_dump_envelope.py` owns the declared key-member presence/absence ledger plus streaming outer seal;
+  `tenant_dump_target.py` binds D5's pre-destructive identity proof to reconstruction, with
+  `tenant_dump_target_identities.py` enforcing read-only mode-0600 tenant mounts,
+  `tenant_dump_target_protocol.py`/`tenant_dump_target_helper.py`/`tenant_dump_target_deks.py` owning the
+  key-free parent plus bounded target decrypt/rewrap child, and `tenant_dump_target_readiness.py` rebuilding
+  target search derivations and authenticated readiness; `tenant_dump_target_custody.py` re-proves carried
+  recipient public metadata and independently derives Part A versus Lane D custody and decision-19b routing;
   `tenant_dump_manifest.py` and `tenant_dump_lineage.py` bind D4 custody facts and parent/policy digests;
   `tenant_dump_publication.py` owns recipient revalidation, refusal cleanup and the atomic
   pending-to-published/download transition; `tenant_dump_audit_anchors.py` supplies the fail-closed

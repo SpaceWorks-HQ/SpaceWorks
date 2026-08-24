@@ -2078,6 +2078,36 @@ the plaintext derived directory is removed before derivation commits. The deriva
 whenever this custody/layout contract changes, and publication re-verifies the source mode, mapped findings,
 key inventory and content-ledger declaration against the immutable capture.
 
+**Lane D D5 reconstructs target cryptography and custody only from tenant-held proof.** Before any target
+state is changed, `tenant_dump_target_identities.py` accepts only absolute regular files that are mode `0600`
+on a non-root read-only host mount. Raw identities in argv or environment are refused. Each file is streamed
+to `age-keygen -y`, and the resulting canonical recipient/fingerprint set must equal the frozen tenant-DEK
+recipient set exactly; the platform-only outer identity therefore cannot pass. The path and identity bytes are
+never copied into target operation storage or database state.
+
+After restore, source broker rows, generic/event blind indexes and search generations must all be absent.
+`tenant_dump_target_deks.py` binds the earlier identity preflight to the exact manifest and inner-ciphertext
+digest, then starts one bounded process group. Only `tenant_dump_target_helper.py` opens the identity mounts,
+streams the inner age plaintext, compares every `(makerspace_id, version, status)` record to the manifest and
+feeds the iterator to `import_keys.install_streamed_deks`. That installer wraps under the configured target
+broker while preserving the source makerspace PK and version and commits exactly one ACTIVE row. The parent
+handles no plaintext DEK; helper failure kills its process group and the database transaction rolls back.
+`dek_cache_disabled()` clears both sides of the sensitive scope. This is the same bounded application-level
+retention guarantee as D4, not secure zeroization: the helper, target broker, Python buffers and privileged
+target host can observe plaintext transiently, and process dumps or swap are not claimed to be protected.
+
+The target creates a fresh generation bound to its own `PII_SEARCH_HASH_KEY`, rebuilds every generic and event
+blind index, runs strict encryption readiness and performs authenticated deterministic sample decrypts while
+the makerspace remains `IMPORTING`. Imported archive-recipient rows retain only canonical public metadata:
+source challenge and `verified_at` state, reservations, both custody-state rows and both alarm outboxes are
+refused if restored. Matching mounted identities pass the normal target challenge/verification path, gain
+target reservations and a new `tenant_migration.target_archive_recipient_verified` audit event. Recomputing
+under the makerspace-first custody lock always leaves Part A `not_applicable` because target superadmin access
+is forced on; Lane D independently derives healthy/degraded/zero. Zero refuses readiness. One requires a
+positive degraded revision and every current decision-19b intent. Routing is explicitly rerunnable after the
+target superadmin is created, so missing repair-capable or mailable tenant staff must gain a durable operator
+escalation before activation readiness succeeds.
+
 - **Phase 4's archive projection DECRYPTS mapped PII.** `archive.source_value` reads fields through
   `getattr`, and `ScopedPiiModelMixin.__getattribute__` decrypts — so a PORTABLE archive built on it
   contains **plaintext**, and the target then calls `parse_envelope()` on plaintext and aborts.

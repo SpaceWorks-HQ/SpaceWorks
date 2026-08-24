@@ -19,3 +19,11 @@ class TenantDumpCustodyError(TenantDumpBuildError):
 
 class TenantDumpPublicationRefused(TenantDumpBuildError):
     """A frozen lineage can no longer be made discoverable."""
+
+
+class TenantDumpTargetError(TenantDumpBuildError):
+    """The target cannot safely reconstruct one Lane D tenant."""
+
+    def __init__(self, message, *, code="target_reconstruction_refused"):
+        self.code = code
+        super().__init__(message)

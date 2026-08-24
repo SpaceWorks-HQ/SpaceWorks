@@ -201,6 +201,25 @@ def _require_activation_ready(job):
         raise TransitionConflictError(
             "Target activation requires a completed, verified import."
         )
+    _require_lane_d_readiness(job)
+
+
+def _require_lane_d_readiness(job):
+    """Re-run D5 target readiness on the activation path, not only at DEK install time.
+
+    Sections 2.4-2.5 prove readiness once when the tenant DEKs are installed, but activation is a
+    separate, later transition: encryption or recipient custody can regress in between. Called from
+    _require_activation_ready, so it runs both in the outer pre-check and again inside the locked
+    transaction - a readiness failure must block the transition itself, not just the preflight.
+    Imported locally because apps.tenant_migration.tenant_dump_target imports back into this app.
+    """
+    from .tenant_dump_lineage import FORMAT
+    from .tenant_dump_target import assert_target_d5_activation_ready
+
+    report = job.verification_report
+    if not isinstance(report, dict) or report.get("format") != FORMAT:
+        return
+    assert_target_d5_activation_ready(job.target_makerspace_id)
 
 
 def _require_superuser(actor):

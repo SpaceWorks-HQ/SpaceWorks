@@ -7,10 +7,24 @@ from .insertion_errors import ArchiveFormatError
 
 
 def install_carried_deks(makerspace, carried_keys):
+    """Legacy archive adapter; Lane D calls the streaming primitive in its child."""
+    return install_streamed_deks(
+        makerspace,
+        sorted(carried_keys, key=lambda item: item["version"]),
+        preserved_makerspace_id=makerspace.pk,
+    )
+
+
+def install_streamed_deks(makerspace, carried_keys, *, preserved_makerspace_id):
+    """Wrap an iterator of plaintext records without materializing that iterator."""
+    if preserved_makerspace_id != makerspace.pk:
+        raise ArchiveFormatError(
+            "The target makerspace id must preserve the source encryption identity."
+        )
     broker = services.configured_broker()
     installed = []
     seen = set()
-    for record in sorted(carried_keys, key=lambda item: item["version"]):
+    for record in carried_keys:
         version = int(record["version"])
         if version in seen or version < 1:
             raise ArchiveFormatError("Carried DEK versions must be unique and positive.")
