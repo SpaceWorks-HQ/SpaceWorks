@@ -10,134 +10,28 @@ This module must NOT import ``apps.makerspaces.models``. ``models`` imports the
 derived helpers from here, so the reverse edge would be a circular import.
 """
 
-from dataclasses import dataclass, field
-
-# How a key is actually enforced at runtime. The drift guard
-# (tests/makerspaces/test_module_registry.py) parses the codebase and asserts the
-# declared value matches reality, so a new module cannot ship unenforced by accident.
-GUARD = "guard"  # module_enabled(...) / require_module(...) call sites
-FEATURE_PARENT = "feature_parent"  # only enforced as the parent module of a feature
-NONE = "none"  # deliberately unenforced (must be justified in `description`)
-
-
-# Operator-facing grouping. The module keys below stay the enforcement primitives --
-# every `require_module` call site, every stored `enabled_modules` row and the drift
-# guard are untouched by this layer. A group is only what the console *shows*, so an
-# operator picks from a handful of switches instead of nearly thirty keys.
-#
-# Collapsing the keys into nine real modules was the alternative and was rejected: it
-# would have meant rewriting every call site and migrating every tenant's stored JSON,
-# where a key that failed to migrate reads as *off* and silently removes surfaces from a
-# live makerspace. This gets the same operator experience with none of that risk, and it
-# is what keeps "add a module later" a one-entry change.
-GROUP_INVENTORY = "inventory"
-GROUP_STOCKTAKE = "stocktake"
-GROUP_MACHINES = "machines"
-GROUP_EVENTS = "events"
-GROUP_BOOKINGS = "bookings"
-GROUP_MEMBERSHIP = "membership"
-GROUP_NOTIFICATIONS = "notifications"
-GROUP_REPORTS = "reports"
-GROUP_PAYMENTS = "payments"
-GROUP_ACCOUNTS = "accounts"
-GROUP_MOBILE = "mobile"
-GROUP_UPDATES = "updates"
-
-
-@dataclass(frozen=True)
-class GroupDefinition:
-    key: str
-    label: str
-    description: str
-    # Inventory is a permanent heading rather than a switch: it absorbs the six core
-    # keys, and core exists because the Hard Rules make the loan spine *the system* --
-    # issuing hardware requires a box QR scan AND an issue photo.
-    always_on: bool = False
-
-
-GROUPS = (
-    GroupDefinition(
-        GROUP_INVENTORY, "Inventory",
-        "The hardware catalogue, request workflow, QR/evidence spine and everything "
-        "that moves stock. Always on.",
-        always_on=True,
-    ),
-    GroupDefinition(
-        GROUP_STOCKTAKE, "Stocktake", "Scan-first stock counts and variance reporting.",
-    ),
-    GroupDefinition(
-        GROUP_MACHINES, "Machines",
-        "Machine registry, the service/print queue and preventive maintenance. "
-        "Warranty tracking for machines lives here too.",
-    ),
-    GroupDefinition(GROUP_EVENTS, "Events", "Event scheduling and registrations."),
-    GroupDefinition(GROUP_BOOKINGS, "Bookings", "Resource booking and public self-booking."),
-    GroupDefinition(
-        GROUP_MEMBERSHIP, "Membership",
-        "Community membership: join requests, waivers, referrals, member activity and "
-        "presence check-in.",
-    ),
-    GroupDefinition(
-        GROUP_NOTIFICATIONS, "Notifications",
-        "The in-app inbox and every outbound channel: email, Telegram, Slack, "
-        "Mattermost and Discord. API-client issuance sits here.",
-    ),
-    GroupDefinition(
-        GROUP_REPORTS, "Reports",
-        "Analytics, the report registry and CSV/XLSX exports. Standalone rather than "
-        "part of Inventory, because switching Inventory off would otherwise kill the "
-        "machine and event reports too.",
-    ),
-    GroupDefinition(
-        GROUP_PAYMENTS, "Payments",
-        "Taking money online for machine jobs, bookings, event registrations and "
-        "membership dues.",
-    ),
-    GroupDefinition(
-        GROUP_ACCOUNTS, "Accounts",
-        "The member-facing identity ecosystem: self sign-up, social and phone login, "
-        "and the member area. Staff always sign in with a password regardless.",
-    ),
-    GroupDefinition(
-        GROUP_MOBILE, "Mobile apps",
-        "Attested device sessions, native push and the in-app payment sheet.",
-    ),
-    GroupDefinition(
-        GROUP_UPDATES, "Updates",
-        "In-app release control. A deployment updated by its own host tooling ships "
-        "none of it.",
-    ),
+from apps.makerspaces.module_registry_definitions import (
+    FEATURE_PARENT,
+    GROUP_ACCOUNTS,
+    GROUP_BOOKINGS,
+    GROUP_EVENTS,
+    GROUP_INVENTORY,
+    GROUP_KEYS,
+    GROUP_MACHINES,
+    GROUP_MEMBERSHIP,
+    GROUP_MOBILE,
+    GROUP_NOTIFICATIONS,
+    GROUP_PAYMENTS,
+    GROUP_REPORTS,
+    GROUP_STOCKTAKE,
+    GROUP_UPDATES,
+    GROUPS,
+    GROUPS_BY_KEY,
+    GUARD,
+    NONE,
+    GroupDefinition,
+    ModuleDefinition,
 )
-
-GROUPS_BY_KEY = {group.key: group for group in GROUPS}
-GROUP_KEYS = frozenset(GROUPS_BY_KEY)
-
-
-@dataclass(frozen=True)
-class ModuleDefinition:
-    key: str
-    label: str
-    description: str
-    app_label: str
-    enforcement: str
-    # The operator-facing heading this key sits under. Deliberately has NO default: a
-    # module that forgets it would silently vanish from the console it is meant to be
-    # administered from, so `_validate_registry` refuses the registry instead.
-    group: str
-    # Modules that must also be enabled for this one to be valid. Replaces the
-    # hardcoded printing -> machine_service branch in `validate_capabilities`.
-    requires_modules: tuple[str, ...] = ()
-    # Modules are opt-in: a new makerspace installs core plus whatever profile the
-    # operator chose. Core modules are always on and need not set this.
-    default_enabled: bool = False
-    # Core modules are not toggleable: the system is incoherent without them. The
-    # Hard Rules require a box QR scan AND an issue photo to hand hardware over, so
-    # evidence/QR/scanner are core alongside the catalogue, request flow and staff API.
-    is_core: bool = False
-    # False => an internal master switch that must never appear in the bootstrap
-    # `modules`/`workflows` arrays, or the byte-for-byte payload invariant breaks.
-    frontend_exposed: bool = True
-    frontend_workflows: tuple[str, ...] = field(default_factory=tuple)
 
 
 MODULES = (
@@ -312,145 +206,27 @@ BY_KEY = {definition.key: definition for definition in MODULES}
 MODULE_KEYS = frozenset(BY_KEY)
 
 
-def default_enabled_module_keys():
-    """Enabled-by-default module keys for a new makerspace (a fresh list every call).
+from apps.makerspaces import module_registry_helpers as _registry_helpers  # noqa: E402
 
-    Core is always included; everything else is opt-in and arrives via an install
-    profile or `install_module`.
+_registry_helpers.BY_KEY = BY_KEY
+_registry_helpers.GROUPS = GROUPS
+_registry_helpers.GROUPS_BY_KEY = GROUPS_BY_KEY
+_registry_helpers.MODULES = MODULES
 
-    Returned fresh because this backs a JSONField default: handing out the registry's
-    own collection would let one makerspace's row mutate every future default.
-    """
-    return [
-        definition.key
-        for definition in MODULES
-        if definition.default_enabled or definition.is_core
-    ]
-
-
-def core_module_keys():
-    """Keys that are always on and must not be disabled."""
-    return frozenset(definition.key for definition in MODULES if definition.is_core)
-
-
-def module_workflows():
-    """Frontend workflow names per module, for modules exposed to the frontend."""
-    return {
-        definition.key: list(definition.frontend_workflows)
-        for definition in MODULES
-        if definition.frontend_exposed and definition.frontend_workflows
-    }
-
-
-def modules_by_group():
-    """Group key -> the modules under it, in registry order.
-
-    The console renders this: one heading per group, the keys underneath. Returned
-    fresh, and built from ``GROUPS`` rather than from the modules, so a group with no
-    modules still appears (and so the order is the declared one, not hash order).
-    """
-    grouped = {group.key: [] for group in GROUPS}
-    for definition in MODULES:
-        grouped[definition.group].append(definition)
-    return grouped
-
-
-def group_for(key):
-    """The group a module key belongs to, or ``None`` for an unknown legacy key.
-
-    Unknown keys have no group for the same reason they stay frontend-exposed:
-    ``_canonical_modules`` preserves them, and inventing a group would file a tenant's
-    stored capability under a heading the registry knows nothing about.
-    """
-    definition = BY_KEY.get(key)
-    return None if definition is None else definition.group
-
-
-def group_module_keys(group_key):
-    """Every module key under a group, core included."""
-    return tuple(
-        definition.key for definition in MODULES if definition.group == group_key
-    )
-
-
-def group_is_always_on(group_key):
-    """Whether a group may be switched off at all.
-
-    A group is always on when it is declared so, and also whenever it contains a core
-    key -- the console must not offer a master toggle that ``_canonical_modules`` would
-    silently undo by adding core back on the next write.
-    """
-    group = GROUPS_BY_KEY.get(group_key)
-    if group is None:
-        return False
-    if group.always_on:
-        return True
-    return any(BY_KEY[key].is_core for key in group_module_keys(group_key))
-
-
-def module_dependencies():
-    """Module -> modules it requires."""
-    return {
-        definition.key: tuple(definition.requires_modules)
-        for definition in MODULES
-        if definition.requires_modules
-    }
-
-
-def with_dependencies(keys):
-    """Expand keys to include everything they transitively require.
-
-    Installing `printing` must pull in `machine_service`, or the install immediately
-    fails the very dependency rule the registry declares.
-    """
-    resolved, queue = set(), list(keys)
-    while queue:
-        key = queue.pop()
-        if key in resolved:
-            continue
-        resolved.add(key)
-        definition = BY_KEY.get(key)
-        if definition is not None:
-            queue.extend(definition.requires_modules)
-    return resolved
-
-
-def dependents_of(key, among):
-    """Which of `among` require `key` -- i.e. what breaks if `key` is removed."""
-    return sorted(
-        candidate
-        for candidate in among
-        if candidate in BY_KEY and key in BY_KEY[candidate].requires_modules
-    )
-
-
-def module_available(key):
-    """Whether the app owning this module ships runtime surfaces in this deployment.
-
-    Orthogonal to per-makerspace enablement, and deliberately not merged with it: a
-    tombstoned app's key stays in a tenant's stored `enabled_modules` (uninstall
-    retains data and is reversible, and a deployment-level decision must not rewrite
-    tenant rows), but nothing the key names is reachable, so every consumer has to
-    read it as off.
-
-    Unknown legacy keys have no owning app and stay available, for the same reason
-    `is_frontend_exposed` keeps them: filtering them out would silently drop a
-    capability the registry has not learned about yet.
-    """
-    from apps.separability.registry import runtime_active
-
-    definition = BY_KEY.get(key)
-    return True if definition is None else runtime_active(definition.app_label)
-
-
-def is_frontend_exposed(key):
-    """Whether a key may appear in the bootstrap payload.
-
-    Unknown (legacy) keys stay exposed: `_canonical_modules` deliberately preserves
-    them, so filtering them out here would silently drop a tenant's stored capability.
-    """
-    definition = BY_KEY.get(key)
-    return True if definition is None else definition.frontend_exposed
+from apps.makerspaces.module_registry_helpers import (  # noqa: E402
+    core_module_keys,
+    default_enabled_module_keys,
+    dependents_of,
+    group_for,
+    group_is_always_on,
+    group_module_keys,
+    is_frontend_exposed,
+    module_available,
+    module_dependencies,
+    module_workflows,
+    modules_by_group,
+    with_dependencies,
+)
 
 
 class ImproperlyConfiguredRegistry(Exception):
