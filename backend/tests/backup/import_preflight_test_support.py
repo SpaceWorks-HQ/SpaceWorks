@@ -4,14 +4,20 @@ import io
 import json
 from pathlib import Path
 import tarfile
+from types import SimpleNamespace
 import uuid
 
 from apps.backup import outer_manifest
 from apps.backup.archive_payload import CONTINUITY_KEYS
+from tests.backup.e7_manifest_test_facts import (
+    bind_source_partition_proof,
+    empty_reservation_capture,
+)
 
 
 SOURCE_HASH = "a" * 64
 POSTGRES_MAJOR = 16
+SUPPORTED_SOURCE_MAJORS = [14, 15, 16, 17]
 
 
 @dataclass
@@ -68,91 +74,65 @@ def make_import_fixture(tmp_path):
     slice_bytes = b"opaque tenant slice"
     artifact_id = uuid.uuid4()
     capture_id = uuid.uuid4()
-    main_id = outer_manifest.component_id(capture_id, "main")
     slice_id = outer_manifest.component_id(capture_id, "slice", 7)
-    main = {
-        "component_id": main_id,
-        "kind": "main",
-        "path": "database.dump",
-        "size_bytes": len(database),
-        "ciphertext_sha256": hashlib.sha256(database).hexdigest(),
-        "schema_catalog_digest": "b" * 64,
-        "sequence_policy": "source-high-water-over-all-components",
-        "recipient_fingerprints": [],
-    }
-    slice_component = {
-        "component_id": slice_id,
-        "kind": "slice",
-        "makerspace_id": 7,
-        "ciphertext_path": f"slices/{slice_id}.tar.age",
-        "size_bytes": len(slice_bytes),
-        "ciphertext_sha256": hashlib.sha256(slice_bytes).hexdigest(),
-        "recipient_fingerprints": ["c" * 64],
-    }
-    manifest = {
+    slice_path = f"slices/{slice_id}.tar.age"
+    slice_digest = hashlib.sha256(slice_bytes).hexdigest()
+    (root / "database.dump").write_bytes(database)
+    capture = SimpleNamespace(
+        capture_id=capture_id,
+        frozen_population_ids=(7,),
+        frozen_slices=(SimpleNamespace(
+            makerspace_id=7, custody_state="healthy"
+        ),),
+        expected_main_ledger={"fixture": "import-preflight"},
+        source_catalog_digest="b" * 64,
+        platform_recipients=frozenset(),
+        reservation_capture=empty_reservation_capture(),
+        source_partition_proof=None,
+        user_closure_digest="2" * 64,
+        slice_entries=[{
+            "component_id": slice_id,
+            "makerspace_id": 7,
+            "path": slice_path,
+            "size_bytes": len(slice_bytes),
+            "ciphertext_sha256": slice_digest,
+            "recipient_fingerprints": ["c" * 64],
+            "object_ledger_count": 0,
+            "object_ledger_digest": "e" * 64,
+            "content_ledger_count": 1,
+            "content_ledger_digest": "1" * 64,
+        }],
+    )
+    archive = SimpleNamespace(pk=artifact_id)
+    detailed_manifest = {
         "format": "spaceworks-phase5a-v3",
-        "protocol_version": outer_manifest.PROTOCOL_VERSION,
-        "artifact_id": str(artifact_id),
-        "capture_id": str(capture_id),
-        "source_timestamp": "2026-08-24T00:00:00+00:00",
-        "build_identity": {
-            "build": {"source_hash": SOURCE_HASH}, "oci_digest": ""
-        },
+        "snapshot_at": "2026-08-24T00:00:00+00:00",
+        "build": {"source_hash": SOURCE_HASH},
+        "oci_digest": "sha256:" + "9" * 64,
         "postgres": {
             "source_server_major": POSTGRES_MAJOR,
             "client": f"pg_dump (PostgreSQL) {POSTGRES_MAJOR}.4",
+            "supported_source_majors": list(SUPPORTED_SOURCE_MAJORS),
         },
-        "makerspace_sets": {
-            "retained": [7], "readable_main": [], "sovereign": [7]
-        },
-        "main_component": main,
-        "slice_components": [slice_component],
-        "object_ledgers": [
-            {"component_id": main_id, "count": 0, "digest": "d" * 64},
-            {"component_id": slice_id, "count": 0, "digest": "e" * 64},
-        ],
-        "content_ledgers": [
-            {"component_id": main_id, "count": 2, "digest": "f" * 64},
-            {"component_id": slice_id, "count": 1, "digest": "1" * 64},
-        ],
-        "reservation_commitments": [],
-        "broad_fence_scopes": [],
-        "not_restored_seeds": [{
-            "component_id": slice_id, "makerspace_id": 7, "state": "pending"
-        }],
-        "user_closure_digest": "2" * 64,
-        "archive_id": str(artifact_id),
-        "scope": "deployment",
-        "age_encrypted": True,
-        "snapshot_at": "2026-08-24T00:00:00+00:00",
-        "build": {"source_hash": SOURCE_HASH},
-        "oci_digest": "",
-        "covered_makerspace_ids": [],
-        "excluded_makerspace_ids": [7],
-        "partial": True,
         "recipient_fingerprints": [],
-        "slices": [{
-            "slice_id": slice_id,
-            "component_id": slice_id,
-            "makerspace_id": 7,
-            "path": slice_component["ciphertext_path"],
-            "size_bytes": slice_component["size_bytes"],
-            "ciphertext_sha256": slice_component["ciphertext_sha256"],
-            "recipient_fingerprints": slice_component["recipient_fingerprints"],
-            "custody_state": "healthy",
-        }],
+        "storage": {"objects": []},
         "contents": [
             {
-                "path": main["path"], "size": main["size_bytes"],
-                "sha256": main["ciphertext_sha256"],
+                "path": "database.dump", "size": len(database),
+                "sha256": hashlib.sha256(database).hexdigest(),
             },
             {
-                "path": slice_component["ciphertext_path"],
-                "size": slice_component["size_bytes"],
-                "sha256": slice_component["ciphertext_sha256"],
+                "path": "keys/env.json", "size": 1, "sha256": "d" * 64,
             },
         ],
     }
+    bind_source_partition_proof(capture, archive, detailed_manifest, root)
+    manifest = outer_manifest.build_outer_manifest(
+        archive=archive,
+        capture=capture,
+        detailed_manifest=detailed_manifest,
+        root=root,
+    )
     fixture = ImportFixture(
         root=root,
         encrypted=encrypted,
@@ -162,8 +142,8 @@ def make_import_fixture(tmp_path):
         manifest=manifest,
         secrets={name: f"value-for-{name}" for name in CONTINUITY_KEYS},
         members={
-            main["path"]: database,
-            slice_component["ciphertext_path"]: slice_bytes,
+            "database.dump": database,
+            slice_path: slice_bytes,
         },
     )
     fixture.write()
