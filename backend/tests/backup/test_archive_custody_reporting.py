@@ -88,6 +88,10 @@ def test_readiness_counts_below_floor_custody_rows(monkeypatch):
         with with_makerspace_custody_lock(makerspace.pk):
             pass
     monkeypatch.setattr("apps.encryption.readiness.assert_ready", lambda: None)
+    monkeypatch.setattr(
+        "apps.backup.host_readiness.assert_host_ready",
+        lambda _path: {"marker_state": "normal"},
+    )
 
     response = APIClient().get(reverse("readiness"))
 

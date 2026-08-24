@@ -32,9 +32,9 @@ history intact. Deleting rows is a separate, deliberate second command — see [
 data](#deleting-a-modules-data).
 
 ```bash
-docker compose exec backend python manage.py list_modules
-docker compose exec backend python manage.py install_module bookings
-docker compose exec backend python manage.py uninstall_module bookings
+docker compose run --rm --no-deps backend --role management python manage.py list_modules
+docker compose run --rm --no-deps backend --role management python manage.py install_module bookings
+docker compose run --rm --no-deps backend --role management python manage.py uninstall_module bookings
 ```
 
 A module another installed module depends on cannot be uninstalled until the dependant goes first, and
@@ -497,8 +497,8 @@ Uninstalling only hides. If you also want a module's rows *gone*, that is a sepa
 step — so that no single command can both hide and destroy:
 
 ```bash
-docker compose exec backend python manage.py purge_module_data bookings --list
-docker compose exec backend python manage.py purge_module_data bookings --makerspace my-space
+docker compose run --rm --no-deps backend --role management python manage.py purge_module_data bookings --list
+docker compose run --rm --no-deps backend --role management python manage.py purge_module_data bookings --makerspace my-space
 ```
 
 - **The module must already be uninstalled.** Purging an installed module is refused.

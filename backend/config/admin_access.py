@@ -73,7 +73,7 @@ GLOBAL_ADMIN_MODELS = {
     "backup.backuparchive",
     "backup.restoreoperation",
     "backup.deploymentrecoverystate",
-    "backup.backuplease",
+    "backup.deploymentdatabaseidentity", "backup.backuplease",
     "backup.restorerollbackobject",
     # Fingerprint reservations are deliberately deployment-global and permanent:
     # `makerspace_id_snapshot` is a plain integer, not an FK, so a reservation

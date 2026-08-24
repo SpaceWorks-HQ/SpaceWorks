@@ -1,8 +1,7 @@
-from urllib.parse import urlsplit
-
 from rest_framework import serializers
 
 from apps.apiclients.models import ApiClient, ApiKeyRequest
+from apps.apiclients.origin_validation import validate_exact_origins
 from apps.apiclients.scope_grants import (
     actor_may_grant_privileged_scopes,
     validate_grantable_scopes,
@@ -39,12 +38,10 @@ class ApiClientSerializer(serializers.ModelSerializer):
         ]
 
     def validate_allowed_origins(self, value):
-        if not value:
-            raise serializers.ValidationError("At least one frontend origin is required.")
-        for origin in value:
-            if not isinstance(origin, str) or not origin.startswith(("http://", "https://")):
-                raise serializers.ValidationError("Origins must be exact http(s) URLs.")
-        return value
+        try:
+            return validate_exact_origins(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
 
     def validate_scopes(self, value):
         try:
@@ -150,21 +147,7 @@ class ApiKeyRequestSerializer(serializers.ModelSerializer):
         ]
 
     def validate_allowed_origins(self, value):
-        # Store the same bare origin shape browsers send in their Origin header.
-        if not value:
-            raise serializers.ValidationError("At least one frontend origin is required.")
-        if not isinstance(value, list):
-            raise serializers.ValidationError("Origins must be a list of http(s) URLs.")
-        normalized = []
-        for origin in value:
-            if not isinstance(origin, str):
-                raise serializers.ValidationError("Origins must be exact http(s) URLs.")
-            parts = urlsplit(origin.strip())
-            if parts.scheme not in ("http", "https") or not parts.netloc:
-                raise serializers.ValidationError("Origins must be exact http(s) URLs.")
-            if parts.path not in ("", "/") or parts.query or parts.fragment:
-                raise serializers.ValidationError(
-                    "Origins must be a bare scheme://host[:port] with no path."
-                )
-            normalized.append(f"{parts.scheme}://{parts.netloc}")
-        return normalized
+        try:
+            return validate_exact_origins(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc

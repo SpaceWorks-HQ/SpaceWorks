@@ -10,8 +10,8 @@ command -v crontab >/dev/null 2>&1 || {
   exit 1
 }
 
-COMPOSE=(docker compose -f docker-compose.prod.yml)
-"${COMPOSE[@]}" exec -T backend python manage.py update_control set-auto on >/dev/null
+COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)
+"${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py update_control set-auto on >/dev/null
 
 MARKER="# Space Works automatic production update"
 JOB="0 3 * * 0 cd '$ROOT' && bash '$ROOT/scripts/update.sh' >> '$ROOT/backups/auto-update.log' 2>&1"

@@ -18,6 +18,7 @@ from apps.backup.models import (
     RestoreRollbackObject,
     TenantExitCustodyAlarmDelivery,
 )
+from apps.backup.models_host_identity import DeploymentDatabaseIdentity
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -128,5 +129,6 @@ for model in (
     BackupArtifactLedger,
     BackupArtifactComponent,
     BackupComponentRecipient,
+    DeploymentDatabaseIdentity,
 ):
     admin.site.register(model, ReadOnlyBackupAdmin)

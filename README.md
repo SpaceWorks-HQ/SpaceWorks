@@ -74,7 +74,7 @@ in any addresses; the compose file passes them in). Pick one path:
 git clone https://github.com/SpaceWorks-HQ/SpaceWorks.git
 cd SpaceWorks
 bash setup.sh                                          # macOS / Linux
-powershell -ExecutionPolicy Bypass -File setup.ps1     # Windows
+wsl bash setup.sh                                      # Windows, from WSL2
 ```
 
 It prints your URL and login when it finishes and offers to install seven-day, backup-first production update checks. Super Admins can control
@@ -85,7 +85,8 @@ after `cp .env.example .env` (fill in the few values it asks for):
 
 ```bash
 export MAKERSPACE_IMAGE_TAG=latest        # or pin a release, e.g. 0.5.1-main.42.a1b2c3d4e5f6
-docker compose -f docker-compose.prod.yml up -d
+bash scripts/init-host-orchestration.sh   # one-time root-owned pointer/key/config state
+scripts/spaceworks-compose.sh bundled up -d
 ```
 
 This pulls **`ghcr.io/spaceworks-hq/spaceworks-backend`** + **`ghcr.io/spaceworks-hq/spaceworks-frontend`** and brings up the
@@ -136,9 +137,9 @@ console shows you:
 retained** and reinstalling brings it back:
 
 ```bash
-docker compose exec backend python manage.py list_modules
-docker compose exec backend python manage.py install_module bookings
-docker compose exec backend python manage.py uninstall_module bookings
+docker compose run --rm --no-deps backend --role management python manage.py list_modules
+docker compose run --rm --no-deps backend --role management python manage.py install_module bookings
+docker compose run --rm --no-deps backend --role management python manage.py uninstall_module bookings
 ```
 
 Core modules cannot be uninstalled, nor can one another installed module depends on.
@@ -149,8 +150,8 @@ Uninstalling only hides. If you also want a module's rows *gone*, that is a sepa
 second step — so that no single command can both hide and destroy:
 
 ```bash
-docker compose exec backend python manage.py purge_module_data bookings --list
-docker compose exec backend python manage.py purge_module_data bookings --makerspace my-space
+docker compose run --rm --no-deps backend --role management python manage.py purge_module_data bookings --list
+docker compose run --rm --no-deps backend --role management python manage.py purge_module_data bookings --makerspace my-space
 ```
 
 - **The module must already be uninstalled.** Purging an installed module is refused.
@@ -356,7 +357,7 @@ Uninstalling is per makerspace. A deployment that will *never* use an area can d
 too — no routes, no admin, no OpenAPI paths — while keeping every row and migration:
 
 ```bash
-docker compose exec backend python manage.py suggest_tombstones   # prints the line to paste
+docker compose run --rm --no-deps backend --role management python manage.py suggest_tombstones   # prints the line to paste
 ```
 
 Add the result to `.env` as `TOMBSTONED_APPS=`. It is deliberately conservative: an app is only
@@ -474,20 +475,20 @@ third party. The [Quick start](#quick-start) above is the recommended path. Afte
 Create the first superadmin + makerspace (the wizard does this for you; for a manual instance):
 
 ```bash
-docker compose -f docker-compose.prod.yml exec backend python manage.py setup_instance
+scripts/spaceworks-compose.sh bundled run --rm --no-deps backend --role management python manage.py setup_instance
 ```
 
 With no arguments it seeds **`superadmin` / `super123`** and forces a password change on first login.
 Guided installs can receive each successful `main` release automatically with a backup and readiness
 check. If deployment fails, the application containers return to the previous retained release. Run
-`scripts/update.sh --force` (macOS/Linux) or `scripts/update.ps1 -Force` (Windows) for an immediate
+`scripts/update.sh --force` on Linux (or from WSL2 on Windows) for an immediate
 update; see **[docs/self-hosting.md](docs/self-hosting.md)** for scheduling, pinning, TLS, and recovery.
 
 **No server of your own?** Space Works is multi-tenant — partner with a nearby makerspace to run your space
-as a tenant on their instance. **Prefer managed Postgres?** Point `DATABASE_URL` at any managed
-Postgres (e.g. Supabase) and host the app anywhere; a fully-managed free-tier path is documented in
-**[docs/supabase-deployment.md](docs/supabase-deployment.md)** (best for demo/pilot, not dependable
-production).
+as a tenant on their instance. **Prefer managed Postgres?** The database URL must live in the versioned
+pointer/CAS adapter, never ambient shell state. The Cloud static-environment initializer and D7 provider
+callbacks are not implemented yet, so the older Supabase path is suitable only for a non-H1 demo—not a
+supported restore topology.
 
 ### Moving a makerspace onto its own server
 

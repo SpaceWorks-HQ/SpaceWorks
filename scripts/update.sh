@@ -10,7 +10,7 @@ mkdir -p "$OPS_DIR"
 exec 8>"$OPS_DIR/operation.lock"
 flock -n 8 || { printf '[Space Works updater] Another deployment operation is running; skipping.\n'; exit 0; }
 
-COMPOSE=(docker compose -f docker-compose.prod.yml)
+COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)
 LOCK_DIR="$ROOT/.spaceworks-update.lock"
 VERSION_FILE="$ROOT/.spaceworks-version"
 RELEASE_API="https://api.github.com/repos/SpaceWorks-HQ/SpaceWorks/releases/latest"
@@ -75,7 +75,7 @@ cleanup() {
         failure_message="Update and automatic rollback failed. Restore the database backup and previous image tag manually."
       fi
     fi
-    "${COMPOSE[@]}" exec -T backend python manage.py update_control fail \
+    "${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py update_control fail \
       --message "$failure_message" >/dev/null 2>&1 || true
   fi
   rm -f "$LOCK_DIR/pid"
@@ -101,7 +101,7 @@ if [[ -f "$VERSION_FILE" ]]; then
 fi
 previous_version="$current"
 
-decision="$("${COMPOSE[@]}" exec -T backend python manage.py update_control claim \
+decision="$("${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py update_control claim \
   --current="$current" --available="$version" "${force_arg[@]}")" \
   || die "The running Space Works backend could not accept the update check."
 decision="$(printf '%s\n' "$decision" | tr -d '\r' | tail -n 1)"
@@ -126,7 +126,7 @@ say "Creating database backup backups/$backup_name."
   'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip -c > "/backups/'"$backup_name"'"'
 "${COMPOSE[@]}" exec -T db test -s "/backups/$backup_name" \
   || die "Database backup was not created; update cancelled."
-"${COMPOSE[@]}" exec -T backend python manage.py update_control record-backup \
+"${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py update_control record-backup \
   --name "$backup_name" >/dev/null
 
 say "Pulling immutable release images."
@@ -139,7 +139,7 @@ deployment_started=1
 wait_for_backend || die "Release $version did not become ready. The backup is backups/$backup_name."
 
 printf '%s\n' "$version" > "$VERSION_FILE"
-"${COMPOSE[@]}" exec -T backend python manage.py update_control complete \
+"${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py update_control complete \
   --version "$version" >/dev/null
 update_complete=1
 find "$ROOT/backups" -maxdepth 1 -type f -name 'pre-update-*.sql.gz' -mtime +14 -delete

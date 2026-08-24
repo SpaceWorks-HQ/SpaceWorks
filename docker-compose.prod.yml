@@ -1,16 +1,33 @@
-# Container logs are unbounded by default — a chatty worker will fill the host disk
-# and take the database down with it. Every long-running service caps its json-file
-# log below; one-shot services (migrate, createbuckets) are exempt by design.
 x-logging: &default-logging
   driver: json-file
   options:
     max-size: "10m"
     max-file: "5"
-
-# Without this the stack does not come back after a host reboot or an OOM kill —
-# the single most common way a self-hosted deployment silently goes down.
+# Required for recovery after host reboot or OOM.
 x-restart: &default-restart unless-stopped
-
+x-spaceworks-host-orchestration:
+  scheduler:
+    mode: image
+    services: [beat]
+  pointer:
+    mode: atomic-file
+    path: /var/lib/spaceworks/ops/database-pointer.env
+    static_environment: .env
+  database_identity: endpoint-plus-queried-uuid
+  writer_services: [backend, worker, beat]
+  sibling_lifecycle: bundled-owned-database
+x-host-bootstrap: &host-bootstrap
+  image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+  user: "0:0"
+  entrypoint: ["python", "/app/scripts/bootstrap_host_orchestration.py"]
+  environment: &host-bootstrap-env
+    DATABASE_URL: postgres://${POSTGRES_USER:-makerspace}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-makerspace_manager}
+    SPACEWORKS_RUNTIME_DATABASE_URL: ${DATABASE_URL:?use scripts/spaceworks-compose.sh}
+    SPACEWORKS_HOST_MARKER_WRITE_PATH: /host-state/restore-marker.json
+    SPACEWORKS_SCHEDULER_MODE: image
+    SPACEWORKS_SCHEDULER_SERVICES: beat
+  volumes:
+    - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/host-state
 services:
   db:
     image: postgres:16
@@ -28,11 +45,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
-
   minio:
-    # Pinned, not :latest — an unpinned tag means the storage layer can change
-    # under a running deployment on any `docker compose pull`, and it makes a
-    # rollback impossible to reproduce.
     image: minio/minio:${MINIO_IMAGE_TAG:-RELEASE.2025-09-07T16-13-09Z}
     restart: *default-restart
     logging: *default-logging
@@ -44,8 +57,7 @@ services:
       # `mc cors set` in createbuckets, which exits 1 on any current mc release
       # ("decoding xml: EOF" — mc now sends S3 XML, not the JSON that was written).
       # Because backend depends_on createbuckets completing successfully, that
-      # failure left backend and frontend stuck in Created: setup.sh could never
-      # bring the app up at all. Defaults to * only so an unset value cannot brick
+      # Failure would leave backend and frontend stuck in Created. The * default avoids bricking
       # uploads; setup.sh pins it to the real origin.
       MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOWED_ORIGINS:-*}
     ports:
@@ -58,7 +70,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
-
   createbuckets:
     image: minio/mc:${MC_IMAGE_TAG:-RELEASE.2025-08-13T08-35-41Z}
     depends_on:
@@ -88,7 +99,6 @@ services:
       mc version enable "local/$$PUBLIC_IMAGE_BUCKET";
       mc anonymous set download "local/$$PUBLIC_IMAGE_BUCKET";
       '
-
   redis:
     image: redis:7-alpine
     restart: *default-restart
@@ -98,7 +108,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
-
   backend:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
     restart: *default-restart
@@ -107,7 +116,8 @@ services:
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
       DEBUG: "False"
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:?set ALLOWED_HOSTS}
-      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-makerspace}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-makerspace_manager}}
+      DATABASE_URL: ${DATABASE_URL:?use scripts/spaceworks-compose.sh}
+      SPACEWORKS_DB_POINTER_GENERATION: ${SPACEWORKS_DB_POINTER_GENERATION:?use scripts/spaceworks-compose.sh}
       MANAGED_POSTGRES: ${MANAGED_POSTGRES:-False}
       CONN_MAX_AGE: ${CONN_MAX_AGE:-0}
       DISABLE_SERVER_SIDE_CURSORS: ${DISABLE_SERVER_SIDE_CURSORS:-False}
@@ -161,27 +171,15 @@ services:
       BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
       BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY: ${BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY:-}
       BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY: ${BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY:-}
-      BACKUP_OPS_DIR: /var/lib/spaceworks/ops
-    # Gunicorn's defaults are one synchronous worker with a 30s hard timeout and no
-    # request log — a single slow upload or Stripe call then blocks the entire site,
-    # and nothing is recorded. Workers default to 3 (a sane 2-core box); raise
-    # GUNICORN_WORKERS toward (2 x cores + 1) on bigger hosts.
-    # Keep the whole gunicorn invocation on ONE line. In a YAML folded scalar (>) a
-    # more-indented line keeps its newline instead of folding to a space, and a newline
-    # inside `sh -c` ends the command — split the flags across lines and gunicorn runs
-    # bare, silently falling back to its 127.0.0.1 default while each flag becomes a
-    # failing command. The container healthcheck probes localhost, so it still reports
-    # healthy while nginx gets connection-refused and every request 502s.
-    command: >
-      sh -c "python manage.py collectstatic --noinput &&
-      gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout 30 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile -"
+      BACKUP_OPS_DIR: /var/lib/spaceworks/ops/work
+      SPACEWORKS_HOST_MARKER_PATH: /run/spaceworks-host/restore-marker.json
+    # One list item keeps the shell command intact; see the folded-scalar invariant.
+    command: ["--role", "backend", "sh", "-c", "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout 30 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile -"]
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/readiness/', timeout=3).read()\""]
       interval: 10s
       timeout: 5s
       retries: 6
-      # collectstatic runs before gunicorn binds; without a grace period the first
-      # few probes fail and depends_on: service_healthy can give up on a slow host.
       start_period: 45s
     depends_on:
       db:
@@ -190,34 +188,53 @@ services:
         condition: service_healthy
       createbuckets:
         condition: service_completed_successfully
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
     volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
-
-  migrate:
-    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
-    environment: *backend-env
-    command: python manage.py migrate
-    volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+  orchestration-init:
+    <<: *host-bootstrap
     depends_on:
       db:
         condition: service_healthy
+  migrate:
+    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgres://${POSTGRES_USER:-makerspace}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-makerspace_manager}
+    command: ["--role", "migrate", "python", "manage.py", "migrate"]
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+    depends_on:
+      orchestration-init:
+        condition: service_completed_successfully
+
+  orchestration-ready:
+    <<: *host-bootstrap
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   worker:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
     restart: *default-restart
     logging: *default-logging
     environment: *backend-env
-    command: celery -A config worker -l info --concurrency ${CELERY_CONCURRENCY:-4}
+    command: ["--role", "worker", "celery", "-A", "config", "worker", "-l", "info", "--concurrency", "${CELERY_CONCURRENCY:-4}"]
     volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
 
   beat:
@@ -225,19 +242,40 @@ services:
     restart: *default-restart
     logging: *default-logging
     environment: *backend-env
-    # Explicit --schedule: beat otherwise writes its shelve into the CWD, which is
-    # no longer writable now that the image drops to an unprivileged user. The named
-    # volume preserves last-run timestamps so a restart doesn't re-fire every task.
-    command: celery -A config beat -l info --schedule /var/lib/celery/celerybeat-schedule
+    command: ["--role", "beat", "celery", "-A", "config", "beat", "-l", "info", "--schedule", "/var/lib/celery/celerybeat-schedule"]
     volumes:
       - celerybeat_data:/var/lib/celery
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      orchestration-ready:
+        condition: service_completed_successfully
+
+  candidate-backend:
+    profiles: [host-recovery]
+    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+    environment: *backend-env
+    command: ["--role", "backend", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "1", "--access-logfile", "-", "--error-logfile", "-"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/readiness/', timeout=3).read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      createbuckets:
         condition: service_completed_successfully
 
   frontend:

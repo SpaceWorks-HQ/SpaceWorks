@@ -6,15 +6,18 @@ This project is Docker-first for operators who do not want to build Django or Vi
 
 Use the production Compose file when deploying published images:
 
-```powershell
-Copy-Item .env.example .env
-docker compose -f docker-compose.prod.yml up -d
+```bash
+cp .env.example .env
+# Fill the required values, then provision the root-owned pointer/key/config state once.
+bash scripts/init-host-orchestration.sh
+scripts/spaceworks-compose.sh bundled up -d
 ```
 
 Set these values before first boot:
 
 ```env
 POSTGRES_PASSWORD=replace-with-a-strong-password
+POSTGRES_APP_PASSWORD=replace-with-a-different-strong-password
 SECRET_KEY=replace-with-a-long-random-secret
 ALLOWED_HOSTS=inventory.example.org
 CORS_ALLOWED_ORIGINS=https://inventory.example.org
@@ -37,11 +40,13 @@ MAKERSPACE_FRONTEND_IMAGE=ghcr.io/spaceworks-hq/spaceworks-frontend
 Until the GHCR images are published publicly, build locally with the build overlay:
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker/compose.build.yml up -d --build
+SPACEWORKS_COMPOSE_BUILD_LAYER=1 scripts/spaceworks-compose.sh bundled up -d --build
 ```
 
-For a guided first run that generates secrets and `.env` for you, use the `setup.sh` / `setup.ps1`
-scripts at the repo root (see [setup-for-makerspaces.md](setup-for-makerspaces.md)).
+For a guided first run that generates secrets, the atomic pointer and `.env`, use `setup.sh` at the repo
+root (see [setup-for-makerspaces.md](setup-for-makerspaces.md)). H1 host orchestration requires Linux host
+`flock`, ownership and Unix-socket semantics; on Windows run the Linux installer inside WSL2. PowerShell's
+direct Compose path is not a supported recovery topology.
 
 > The frontend container's nginx proxies `/api/`, `/static/`, and the docs routes to the backend.
 > The **single published port (80)** serves the public app, the React staff console at `/admin`,
@@ -53,11 +58,11 @@ scripts at the repo root (see [setup-for-makerspaces.md](setup-for-makerspaces.m
 
 Create the first superadmin and makerspace:
 
-```powershell
-docker compose -f docker-compose.prod.yml exec backend python manage.py setup_instance `
-  --username admin `
-  --email admin@example.org `
-  --password "replace-with-a-strong-password" `
+```bash
+scripts/spaceworks-compose.sh bundled run --rm --no-deps backend --role management python manage.py setup_instance \
+  --username admin \
+  --email admin@example.org \
+  --password "replace-with-a-strong-password" \
   --makerspace-name "My Makerspace"
 ```
 
@@ -76,10 +81,15 @@ The Compose files include health checks for Postgres, backend readiness, and fro
 
 ## Scheduled Jobs
 
-Return reminder emails are sent by a management command. Schedule it every 15-60 minutes with cron, systemd timers, Windows Task Scheduler, or your hosting platform's scheduler:
+Return reminder emails are sent by a management command. The bundled Compose profiles run it through the
+role-aware image entrypoint. An external cron, systemd timer, Windows Task Scheduler, or provider scheduler
+must additionally be disabled by its control plane unless the host restore marker is `normal` or
+`acknowledged-normal` (or it must call the same host gate); otherwise that topology is refused because it
+can retain credentials and bypass the
+container marker. Once that fence is configured, schedule it every 15-60 minutes:
 
-```powershell
-docker compose -f docker-compose.prod.yml exec backend python manage.py send_return_reminders
+```bash
+scripts/spaceworks-compose.sh bundled run --rm --no-deps backend --role management python manage.py send_return_reminders
 ```
 
 The command is idempotent. It only sends reminders for issued or partially returned requests whose `return_due_at` is in the past and whose reminder has not already been sent. Requests returned before the due time are skipped.
@@ -100,15 +110,13 @@ manual requests still work without installing anything automatically.
 Install or repair the schedule manually with:
 
 ```bash
-bash scripts/install-auto-update.sh                 # macOS / Linux cron
-powershell -ExecutionPolicy Bypass -File scripts/install-auto-update.ps1  # Windows Task Scheduler
+bash scripts/install-auto-update.sh  # Linux, or WSL2 on Windows
 ```
 
 Run an immediate checked update with:
 
 ```bash
 bash scripts/update.sh --force
-powershell -ExecutionPolicy Bypass -File scripts/update.ps1 -Force
 ```
 
 Pre-update database dumps are written to `backups/` and retained for 14 days. Each compressed dump
@@ -128,9 +136,9 @@ compatible with the immediately previous application release. If application rol
 For a manual deployment, set `MAKERSPACE_IMAGE_TAG` to a release such as
 `0.5.1-main.42.a1b2c3d4e5f6`, then run:
 
-```powershell
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
+```bash
+scripts/spaceworks-compose.sh bundled pull
+scripts/spaceworks-compose.sh bundled up -d
 ```
 
 Do not schedule a blind container watcher: application images must not restart without the migration
@@ -167,7 +175,7 @@ MINIO_CORS_ALLOWED_ORIGINS=https://inventory.example.org
 ```
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker/compose.tls.yml --profile tls up -d
+SPACEWORKS_COMPOSE_LAYER=tls scripts/spaceworks-compose.sh bundled --profile tls up -d
 ```
 
 The overlay enables `ENABLE_HTTPS=true` and `TRUST_X_FORWARDED_PROTO=true` for the backend. Caddy is
@@ -211,7 +219,7 @@ box; it stays dormant here.) End-to-end:
    ```
 
    ```bash
-   docker compose -f docker-compose.prod.yml -f docker/compose.tls.yml --profile tls up -d
+   SPACEWORKS_COMPOSE_LAYER=tls scripts/spaceworks-compose.sh bundled --profile tls up -d
    ```
 
    Caddy (`deploy/Caddyfile`) terminates HTTPS and forwards both the public site and the `/admin`
@@ -236,10 +244,11 @@ If an instance flips from managed → self-host after deploy, run
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `POSTGRES_PASSWORD` | yes | Database password (also used to build `DATABASE_URL`) |
+| `POSTGRES_PASSWORD` | yes | Maintenance/owner database password; never used by application processes |
+| `POSTGRES_APP_PASSWORD` | yes | Separate non-owner runtime database password used by backend/worker/beat/cron |
 | `SECRET_KEY` | yes | Django cryptographic secret |
 | `ALLOWED_HOSTS` | yes | Comma-separated hostnames the backend will serve |
-| `DATABASE_URL` | no | Overrides the default Postgres URL (e.g. point at Supabase) |
+| `DATABASE_URL` | no | Never put this in static `.env`; the atomic ops pointer is its only Compose source |
 | `CORS_ALLOWED_ORIGINS` | no | Browser origins allowed to call the API |
 | `API_CLIENT_ENC_KEY` | recommended | Fernet key encrypting integration secrets at rest |
 | `MINIO_ROOT_USER` | yes | MinIO/S3 access key used by the backend |
@@ -298,11 +307,11 @@ Operational data lives in Postgres and object files live in the `minio_data` Doc
 both before upgrades:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec -T db \
+scripts/spaceworks-compose.sh bundled exec -T db \
   pg_dump -U makerspace makerspace_manager > backup-$(date +%F).sql
 
 mkdir -p backups
-docker compose -f docker-compose.prod.yml run --rm --entrypoint sh \
+scripts/spaceworks-compose.sh bundled run --rm --entrypoint sh \
   -v "$PWD/backups:/backup" \
   minio \
   -c 'tar -czf /backup/minio-$(date +%F).tgz -C /data .'

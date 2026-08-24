@@ -1,3 +1,15 @@
+x-spaceworks-host-orchestration:
+  scheduler:
+    mode: image
+    services: [beat]
+  pointer:
+    mode: atomic-file
+    path: /var/lib/spaceworks/ops/database-pointer.env
+    static_environment: .env
+  database_identity: endpoint-plus-queried-uuid
+  writer_services: [backend, worker, beat]
+  sibling_lifecycle: bundled-owned-database
+
 services:
   db:
     image: postgres:16
@@ -77,7 +89,8 @@ services:
       SECRET_KEY: ${SECRET_KEY:-dev-insecure-change-me}
       DEBUG: ${DEBUG:-False}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
-      DATABASE_URL: ${DATABASE_URL:-postgres://makerspace:makerspace@db:5432/makerspace_manager}
+      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_APP_USER:-spaceworks_app}:${POSTGRES_APP_PASSWORD:-spaceworks-app-dev}@db:5432/makerspace_manager}
+      SPACEWORKS_DB_POINTER_GENERATION: ${SPACEWORKS_DB_POINTER_GENERATION:-1}
       MANAGED_POSTGRES: ${MANAGED_POSTGRES:-False}
       CONN_MAX_AGE: ${CONN_MAX_AGE:-0}
       DISABLE_SERVER_SIDE_CURSORS: ${DISABLE_SERVER_SIDE_CURSORS:-False}
@@ -133,10 +146,9 @@ services:
       BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
       BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY: ${BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY:-}
       BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY: ${BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY:-}
-      BACKUP_OPS_DIR: /var/lib/spaceworks/ops
-    command: >
-      sh -c "python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+      BACKUP_OPS_DIR: /var/lib/spaceworks/ops/work
+      SPACEWORKS_HOST_MARKER_PATH: /run/spaceworks-host/restore-marker.json
+    command: ["--role", "backend", "sh", "-c", "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000"]
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/', timeout=3).read()\""]
       interval: 10s
@@ -146,40 +158,79 @@ services:
       - "8001:8000"
     volumes:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
+
+  orchestration-init:
+    build:
+      context: ./backend
+    user: "0:0"
+    entrypoint: ["python", "/app/scripts/bootstrap_host_orchestration.py"]
+    environment:
+      DATABASE_URL: postgres://makerspace:makerspace@db:5432/makerspace_manager
+      SPACEWORKS_RUNTIME_DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_APP_USER:-spaceworks_app}:${POSTGRES_APP_PASSWORD:-spaceworks-app-dev}@db:5432/makerspace_manager}
+      SPACEWORKS_HOST_MARKER_WRITE_PATH: /host-state/restore-marker.json
+      SPACEWORKS_SCHEDULER_MODE: image
+      SPACEWORKS_SCHEDULER_SERVICES: beat
+    volumes:
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/host-state
+    depends_on:
+      db:
+        condition: service_healthy
 
   migrate:
     build:
       context: ./backend
     container_name: spaceworks-migrate
-    environment: *backend-env
-    command: python manage.py migrate
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgres://makerspace:makerspace@db:5432/makerspace_manager
+    command: ["--role", "migrate", "python", "manage.py", "migrate"]
     volumes:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     depends_on:
-      db:
-        condition: service_healthy
+      orchestration-init:
+        condition: service_completed_successfully
+
+  orchestration-ready:
+    build:
+      context: ./backend
+    user: "0:0"
+    entrypoint: ["python", "/app/scripts/bootstrap_host_orchestration.py"]
+    environment:
+      DATABASE_URL: postgres://makerspace:makerspace@db:5432/makerspace_manager
+      SPACEWORKS_RUNTIME_DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_APP_USER:-spaceworks_app}:${POSTGRES_APP_PASSWORD:-spaceworks-app-dev}@db:5432/makerspace_manager}
+      SPACEWORKS_HOST_MARKER_WRITE_PATH: /host-state/restore-marker.json
+      SPACEWORKS_SCHEDULER_MODE: image
+      SPACEWORKS_SCHEDULER_SERVICES: beat
+    volumes:
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/host-state
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
   worker:
     build:
       context: ./backend
     container_name: spaceworks-worker
     restart: unless-stopped
     environment: *backend-env
-    command: celery -A config worker -l info
+    command: ["--role", "worker", "celery", "-A", "config", "worker", "-l", "info"]
     volumes:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
 
   beat:
@@ -193,17 +244,33 @@ services:
     # straight into the repo working tree; the container also no longer runs as
     # root, so /app is not writable anyway. The named volume keeps the last-run
     # timestamps across restarts so periodic tasks don't all re-fire on boot.
-    command: celery -A config beat -l info --schedule /var/lib/celery/celerybeat-schedule
+    command: ["--role", "beat", "celery", "-A", "config", "beat", "-l", "info", "--schedule", "/var/lib/celery/celerybeat-schedule"]
     volumes:
       - celerybeat_data:/var/lib/celery
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
+
+  candidate-backend:
+    profiles: [host-recovery]
+    build:
+      context: ./backend
+    environment: *backend-env
+    command: ["--role", "backend", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     build:
@@ -227,7 +294,6 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-
 volumes:
   makerspace_manager_pgdata:
   minio_data:

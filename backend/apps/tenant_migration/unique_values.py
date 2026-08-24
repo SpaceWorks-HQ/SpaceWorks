@@ -91,6 +91,10 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
         UniqueValueDisposition.DROP_ROW,
         "API clients are dropped with their omitted credentials.",
     ),
+    ("apiclients.ApiClient", "field:import_provenance_digest"): _policy(
+        UniqueValueDisposition.DROP_ROW,
+        "Source API clients are dropped; target reissuance creates fresh provenance.",
+    ),
     ("audit.AuditLog", "field:event_uuid"): _policy(
         NULL,
         "Audit integrity identity is omitted; the target reseals its own rows.",

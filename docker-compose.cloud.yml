@@ -12,8 +12,10 @@
 # CELERY_BEAT_SCHEDULE is beat's business, and there is no beat here -- so
 # `send_return_reminders` (a duty-of-care message in the accountability flow) simply
 # never fires. The `cron` service below is not optional garnish; it is what replaces
-# beat. If you run this stack on a platform that supplies its own scheduler, drop the
-# service and register these instead:
+# beat. An external scheduler is unsupported unless its topology declaration names the
+# shared host gate or provider control-plane disablement in every state except `normal`
+# and `acknowledged-normal`; merely dropping this service is now refused. After declaring that boundary,
+# register these commands with the provider:
 #
 #   */15 * * * *  python manage.py run_scheduled_tasks --due-only
 #   */30 * * * *  python manage.py flush_email_outbox
@@ -35,6 +37,18 @@ x-logging: &default-logging
 
 x-restart: &default-restart unless-stopped
 
+x-spaceworks-host-orchestration:
+  scheduler:
+    mode: image
+    services: [cron]
+  pointer:
+    mode: atomic-file
+    path: /var/lib/spaceworks/ops/database-pointer.env
+    static_environment: /etc/spaceworks/cloud.env
+  database_identity: endpoint-plus-queried-uuid
+  writer_services: [backend, cron]
+  sibling_lifecycle: provider-isolated-database
+
 x-app-env: &app-env
   SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
   DEBUG: "False"
@@ -43,6 +57,7 @@ x-app-env: &app-env
   # those hosts forbid session_replication_role, so immutability triggers are suspended
   # through the app.allow_immutable_delete GUC instead.
   DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+  SPACEWORKS_DB_POINTER_GENERATION: ${SPACEWORKS_DB_POINTER_GENERATION:?use scripts/spaceworks-compose.sh}
   MANAGED_POSTGRES: ${MANAGED_POSTGRES:-True}
   # Pooled connections matter more here than on a local box: a managed Postgres charges
   # for connections and a cold one per request is most of the request.
@@ -93,20 +108,57 @@ x-app-env: &app-env
   BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
   BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY: ${BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY:-}
   BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY: ${BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY:-}
-  BACKUP_OPS_DIR: /var/lib/spaceworks/ops
+  BACKUP_OPS_DIR: /var/lib/spaceworks/ops/work
   # Left EMPTY on purpose. Blank => CELERY_TASK_ALWAYS_EAGER defaults True and tasks run
   # inline in this process, which is the whole point of the profile. Setting it here
   # without also running a worker would queue tasks nothing ever consumes.
   CELERY_BROKER_URL: ""
+  SPACEWORKS_HOST_MARKER_PATH: /run/spaceworks-host/restore-marker.json
 
 services:
+  orchestration-init:
+    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+    user: "0:0"
+    entrypoint: ["python", "/app/scripts/bootstrap_host_orchestration.py"]
+    environment:
+      DATABASE_URL: ${SPACEWORKS_MAINTENANCE_DATABASE_URL:?set SPACEWORKS_MAINTENANCE_DATABASE_URL}
+      SPACEWORKS_RUNTIME_DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      SPACEWORKS_HOST_MARKER_WRITE_PATH: /host-state/restore-marker.json
+      SPACEWORKS_SCHEDULER_MODE: image
+      SPACEWORKS_SCHEDULER_SERVICES: cron
+    volumes:
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/host-state
+
   migrate:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
-    environment: *app-env
-    command: python manage.py migrate
+    environment:
+      <<: *app-env
+      DATABASE_URL: ${SPACEWORKS_MAINTENANCE_DATABASE_URL:?set SPACEWORKS_MAINTENANCE_DATABASE_URL}
+    command: ["--role", "migrate", "python", "manage.py", "migrate"]
     logging: *default-logging
     volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+    depends_on:
+      orchestration-init:
+        condition: service_completed_successfully
+
+  orchestration-ready:
+    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+    user: "0:0"
+    entrypoint: ["python", "/app/scripts/bootstrap_host_orchestration.py"]
+    environment:
+      DATABASE_URL: ${SPACEWORKS_MAINTENANCE_DATABASE_URL:?set SPACEWORKS_MAINTENANCE_DATABASE_URL}
+      SPACEWORKS_RUNTIME_DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      SPACEWORKS_HOST_MARKER_WRITE_PATH: /host-state/restore-marker.json
+      SPACEWORKS_SCHEDULER_MODE: image
+      SPACEWORKS_SCHEDULER_SERVICES: cron
+    volumes:
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/host-state
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   backend:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
@@ -114,14 +166,14 @@ services:
     logging: *default-logging
     environment: *app-env
     volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     # Keep the whole gunicorn invocation on ONE line: in a YAML folded scalar a
     # more-indented line keeps its newline, and a newline inside `sh -c` ends the
     # command -- gunicorn then runs bare on its 127.0.0.1 default while the healthcheck,
     # which probes localhost, still reports healthy.
-    command: >
-      sh -c "python manage.py collectstatic --noinput &&
-      gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout 30 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile -"
+    command: ["--role", "backend", "sh", "-c", "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout 30 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile -"]
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     healthcheck:
@@ -131,7 +183,7 @@ services:
       retries: 6
       start_period: 45s
     depends_on:
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
 
   # Replaces Celery beat. Without this, return reminders stop and nothing reports it.
@@ -141,19 +193,31 @@ services:
     logging: *default-logging
     environment: *app-env
     volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     # A sleep loop rather than a cron daemon: the image runs unprivileged as uid 10001
     # and ships no crond, and `--due-only` already makes the cadence idempotent, so the
     # loop only has to be frequent enough -- not accurate.
-    command: >
-      sh -c "while true; do
-      python manage.py run_scheduled_tasks --due-only || true;
-      python manage.py flush_email_outbox || true;
-      sleep ${CRON_INTERVAL_SECONDS:-900};
-      done"
+    command: ["--role", "cron", "sh", "-c", "while true; do python manage.py run_scheduled_tasks --due-only || true; python manage.py flush_email_outbox || true; sleep ${CRON_INTERVAL_SECONDS:-900}; done"]
     depends_on:
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
+
+  candidate-backend:
+    profiles: [host-recovery]
+    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+    environment: *app-env
+    command: ["--role", "backend", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "1", "--access-logfile", "-", "--error-logfile", "-"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/readiness/', timeout=3).read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
 
   frontend:
     image: ${MAKERSPACE_FRONTEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-frontend}:${MAKERSPACE_IMAGE_TAG:-latest}

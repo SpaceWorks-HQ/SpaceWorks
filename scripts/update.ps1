@@ -6,6 +6,8 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
+throw "The H1 production updater requires the Linux Compose wrapper. Run scripts/update.sh inside WSL2."
+
 $compose = @("compose", "-f", "docker-compose.prod.yml")
 $lockPath = Join-Path $root ".spaceworks-update.lock"
 $versionPath = Join-Path $root ".spaceworks-version"
@@ -66,7 +68,7 @@ try {
   $current = if (Test-Path $versionPath) { (Get-Content -Raw $versionPath).Trim() } else { "" }
   $claimArgs = @("--current=$current", "--available=$version")
   if ($Force) { $claimArgs += "--force" }
-  $decisionOutput = docker @compose exec -T backend python manage.py update_control claim @claimArgs
+  $decisionOutput = docker @compose run --rm --no-deps -T backend --role management python manage.py update_control claim @claimArgs
   Assert-DockerSuccess "The running Space Works backend could not accept the update check."
   $decision = ([string[]]$decisionOutput)[-1].Trim()
   if ($decision -ne "run") {
@@ -88,7 +90,7 @@ try {
   Assert-DockerSuccess "Database backup failed; update cancelled."
   docker @compose exec -T db test -s "/backups/$backupName"
   Assert-DockerSuccess "Database backup was empty; update cancelled."
-  docker @compose exec -T backend python manage.py update_control record-backup --name $backupName *> $null
+  docker @compose run --rm --no-deps -T backend --role management python manage.py update_control record-backup --name $backupName *> $null
   Assert-DockerSuccess "The database backup was created but its status could not be recorded."
 
   Say "Pulling immutable release images."
@@ -103,7 +105,7 @@ try {
   if (-not (Wait-BackendReady)) { throw "Release $version did not become ready. The backup is backups/$backupName." }
 
   [IO.File]::WriteAllText($versionPath, "$version`n", $utf8)
-  docker @compose exec -T backend python manage.py update_control complete --version $version *> $null
+  docker @compose run --rm --no-deps -T backend --role management python manage.py update_control complete --version $version *> $null
   Assert-DockerSuccess "Release $version is running but its status could not be recorded."
   $completed = $true
   Get-ChildItem -LiteralPath $backupDir -Filter "pre-update-*.sql.gz" -File |
@@ -126,7 +128,7 @@ catch {
         $failureMessage = "Update and automatic rollback failed. Restore the database backup and previous image tag manually."
       }
     }
-    docker @compose exec -T backend python manage.py update_control fail --message $failureMessage *> $null
+    docker @compose run --rm --no-deps -T backend --role management python manage.py update_control fail --message $failureMessage *> $null
   }
   throw $updateError
 }

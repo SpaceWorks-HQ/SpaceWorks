@@ -71,6 +71,10 @@ def _apply_projection(using, rules, makerspace_ids):
                 ))
             for rule, marker in reversed(table_markers):
                 _apply_marker(cursor, rule.model, marker)
+            for rule in rules:
+                if rule.disposition == RowDisposition.OMIT_OPERATIONAL:
+                    table = cursor.db.ops.quote_name(rule.model._meta.db_table)
+                    cursor.execute(f"DELETE FROM {table}")
             for table in sorted(EMPTIED_NON_MODEL_TABLES):
                 cursor.execute(f"DELETE FROM {cursor.db.ops.quote_name(table)}")
 

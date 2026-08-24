@@ -32,7 +32,9 @@
   `scope_registry.py`/`scope_registry_routes.py` — the single source of truth for which protected route each
   scope authorizes, keyed on the versioned `view_name`. `checks.py` is the deployment-time guard that a
   widened `HMAC_PROTECTED_PATH_PREFIXES` has no unregistered routes. Verification itself lives in
-  `apps/inventory/middleware.py`.
+  `apps/inventory/middleware.py`. `origin_validation.py` is the shared exact-origin boundary, and
+  `ApiClientImportApproval` plus the import-provenance/delivery fields are Lane D's append-only,
+  artifact-bound API-client reset record.
 - `backend/apps/audit/` — append-only `AuditLog` + `audit.record(...)` (Postgres-trigger immutable), with
   signing/batch models in `models_signing.py`, verification phases behind the `integrity.py` barrel, and
   object-store/HTTP collector protocols behind the `anchors.py` barrel.
@@ -67,7 +69,10 @@
   `auth_generation`. `custody.py` is the makerspace-first/recipient-PK serialization boundary;
   `tenant_exit_custody.py` derives Lane D's independent tenant-only floor, while
   `tenant_exit_custody_alarms.py` reuses the decision-19b recipient selectors and parameterized durable
-  dispatcher for its retryable outbox.
+  dispatcher for its retryable outbox. The `host_*` modules own H1's marker, consume-only capability socket,
+  signed grant, run ledger, supervisor and atomic pointer; `database_grants.py` is its independent
+  PostgreSQL role boundary. `cloud_environment.py` captures Cloud Compose interpolation into durable static
+  configuration without consulting later ambient shells.
 - `backend/apps/data_export/` — Space-Manager data export (Phase 4). Per-fidelity (`REDACTED`/`PORTABLE`)
   disposition registry over models, fields, datasets, traversals and the global-user reference closure, with
   **drift guards that refuse an unclassified model or field**. Its `guards._equal(subject, declared,
@@ -104,6 +109,14 @@
   `tenant_dump_publication.py` owns recipient revalidation, refusal cleanup and the atomic
   pending-to-published/download transition; `tenant_dump_audit_anchors.py` supplies the fail-closed
   external-anchor absence proof;
+  `tenant_restore_orchestrator.py` is the D7 §5.4 ordered target-restore spine over H1;
+  `tenant_restore_activation.py` owns crash-safe pointer/marker re-entry and writer restart, with
+  `tenant_restore_preflight.py`, `tenant_restore_database*.py`, `tenant_restore_sibling.py`,
+  `tenant_restore_pgpass.py`, `tenant_restore_pointer.py` and `tenant_restore_scheduler.py` owning
+  topology/privilege/lifecycle/credential-minimization/CAS/callback refusal boundaries;
+  `tenant_restore_target_state.py`, `tenant_restore_objects.py`, `tenant_restore_api_clients.py`,
+  `tenant_restore_superadmin.py` and `host_credential_delivery.py` own target-import gating, pre-ledgered
+  object effects, approved authority reset and durable one-time credential delivery;
   `verification.py` (pre-commit), audit-reference domains behind the `audit_references.py` barrel, and
   `target_cutover.py` (pre-activation + `IMPORTING → ACTIVE`);
   `receipts.py`/`receipt_crypto.py`/`cutover.py` (signed single-use handoff); `views_*.py` (superadmin REST).

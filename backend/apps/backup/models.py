@@ -221,6 +221,7 @@ class RestoreOperation(models.Model):
 class DeploymentRecoveryState(models.Model):
     class Mode(models.TextChoices):
         NORMAL = "normal", "Normal"
+        TARGET_IMPORT = "target_import", "Target import"
         QUIESCED = "quiesced", "Quiesced"
         QUARANTINED = "quarantined", "Quarantined"
 
@@ -290,9 +291,7 @@ class RestoreRollbackObject(models.Model):
             )
         ]
 
-
-# Keep the public model import surface stable while the custody outbox lives in its
-# own module; this file is already at the repository's size ceiling.
+# Stable public model imports; custody and artifact implementations stay split out.
 from .models_custody_alarm import ArchiveCustodyAlarmDelivery  # noqa: E402,F401
 from .models_artifact_ledger import B1ActivationState, BackupArtifactComponent, BackupArtifactLedger, BackupComponentRecipient  # noqa: E402,F401
 from .models_tenant_exit_custody import (  # noqa: E402,F401

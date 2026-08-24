@@ -93,6 +93,12 @@ Use `render.yaml` from the repository root as the Render Blueprint. It creates:
 - a Render Starter Docker web service for the Django backend;
 - a Render worker service for Celery email delivery;
 - a Render Redis instance for the Celery broker;
+
+The H1 host-orchestration boundary now requires a root-owned, fsynced marker mount and a distinct
+maintenance database credential. Render does not supply that host mount through this Blueprint, so the
+application image deliberately refuses to start until an orchestrator adapter provides it. Do not treat a
+plain Blueprint deploy as restore-capable or bypass the image entrypoint; use the bundled Compose topology
+for H1, or add the external-orchestrator adapter specified for Phase D7 (not yet implemented).
 - a static frontend service for the Vite app;
 - an env var group matching `.env.production.example`.
 
@@ -167,7 +173,9 @@ and the same prefix for `setup_instance`.
 ## 6. Schedule return reminders
 
 Set a long random `CRON_SECRET`, then schedule a daily POST from cron-job.org,
-GitHub Actions, or another free cron:
+GitHub Actions, or another free cron only after its provider control plane is configured to disable the
+job unless the SpaceWorks host marker is `normal` or `acknowledged-normal`. An external scheduler without that independent
+fence is not a supported restore topology:
 
 ```text
 POST https://<backend-host>/api/v1/internal/cron/return-reminders

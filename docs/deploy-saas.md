@@ -51,14 +51,14 @@ the trusted-proxy host middleware becomes the effective host boundary in SaaS mo
 Start the layered stack:
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker/compose.saas.yml up -d
+SPACEWORKS_COMPOSE_LAYER=saas scripts/spaceworks-compose.sh bundled up -d
 ```
 
 Create the first superadmin and makerspace with an explicit strong password:
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker/compose.saas.yml exec backend \
-  python manage.py setup_instance \
+SPACEWORKS_COMPOSE_LAYER=saas scripts/spaceworks-compose.sh bundled \
+  run --rm --no-deps backend --role management python manage.py setup_instance \
   --username admin \
   --email admin@space-works.tech \
   --password 'REPLACE_WITH_A_STRONG_PASSWORD' \
@@ -81,8 +81,8 @@ mode on a database that already holds evidence/print/image/document objects, run
 usage is counted, and re-run it periodically to repair any drift:**
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker/compose.saas.yml exec backend \
-  python manage.py recompute_storage        # all spaces; pass a slug/id to scope to one
+SPACEWORKS_COMPOSE_LAYER=saas scripts/spaceworks-compose.sh bundled \
+  run --rm --no-deps backend --role management python manage.py recompute_storage
 ```
 
 ## 4. Provision a platform subdomain

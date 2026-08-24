@@ -6,7 +6,7 @@
 #   ./scripts/dev-docker.sh up -d --build      # first run (builds images)
 #   ./scripts/dev-docker.sh up -d              # afterwards
 #   ./scripts/dev-docker.sh logs -f backend
-#   ./scripts/dev-docker.sh exec backend python manage.py seed_demo
+#   ./scripts/dev-docker.sh run --rm --no-deps backend --role management python manage.py seed_demo
 #   ./scripts/dev-docker.sh restart worker beat
 #   ./scripts/dev-docker.sh down
 #

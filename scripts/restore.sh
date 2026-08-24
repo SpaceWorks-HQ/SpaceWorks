@@ -5,20 +5,18 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-COMPOSE=(docker compose -f docker-compose.prod.yml)
+COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)
 OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
 RESTORE_ID="${1:-}"
-IDENTITY_FILE="${BACKUP_AGE_IDENTITY_FILE:-$OPS_DIR/age-identity.txt}"
+OPS_WORK_DIR="$OPS_DIR/work"
+IDENTITY_FILE="${BACKUP_AGE_IDENTITY_FILE:-$OPS_WORK_DIR/age-identity.txt}"
 
 say() { printf '[Space Works restore] %s\n' "$*"; }
 die() { printf '[Space Works restore] ERROR: %s\n' "$*" >&2; exit 1; }
 backend_stopped=0
 control() {
-  if [[ "$backend_stopped" == 1 ]]; then
-    "${COMPOSE[@]}" run --rm --no-deps -T backend python manage.py backup_control "$@"
-  else
-    "${COMPOSE[@]}" exec -T backend python manage.py backup_control "$@"
-  fi
+  "${COMPOSE[@]}" run --rm --no-deps -T backend \
+    --role management python manage.py backup_control "$@"
 }
 
 [[ "$RESTORE_ID" =~ ^[0-9a-fA-F-]{36}$ ]] || die "Usage: scripts/restore.sh <restore-uuid>"
@@ -30,7 +28,7 @@ command -v flock >/dev/null 2>&1 || die "flock is required; Windows cannot run i
 exec 9>"$OPS_DIR/operation.lock"
 flock -n 9 || die "Another backup, restore, verification, or update is running."
 
-WORK="$OPS_DIR/restore-$RESTORE_ID"
+WORK="$OPS_WORK_DIR/restore-$RESTORE_ID"
 ARCHIVE="$WORK/archive.tar.age"
 PLAIN="$WORK/archive.tar"
 BUNDLE="$WORK/bundle"
@@ -72,7 +70,7 @@ cleanup() {
         'pg_restore --clean --if-exists --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
         < "$PRE_DB" >/dev/null 2>&1 || true
       control reconcile-journal "$RESTORE_ID" \
-        --journal "/var/lib/spaceworks/ops/restore-$RESTORE_ID/swap-journal.jsonl" \
+        --journal "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/swap-journal.jsonl" \
         >/dev/null 2>&1 || true
       control fail "$RESTORE_ID" --message "Privileged host restore failed; inspect $JOURNAL." \
         >/dev/null 2>&1 || true
@@ -107,7 +105,7 @@ if [[ -f "$DESTRUCTIVE_MARKER" ]]; then
     'pg_restore --clean --if-exists --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
     < "$PRE_DB"
   control reconcile-journal "$RESTORE_ID" \
-    --journal "/var/lib/spaceworks/ops/restore-$RESTORE_ID/swap-journal.jsonl" >/dev/null
+    --journal "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/swap-journal.jsonl" >/dev/null
   control rollback-objects "$RESTORE_ID" >/dev/null
   control fail "$RESTORE_ID" --message \
     "Interrupted destructive restore was rolled back from the durable host journal." >/dev/null
@@ -130,14 +128,14 @@ requested_by="$(printf '%s' "$metadata" | sed -n 's/.*"requested_by": \([0-9]*\)
 backend_container="$("${COMPOSE[@]}" ps -q backend)"
 image_id="$(docker inspect --format '{{.Image}}' "$backend_container")"
 oci_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image_id" 2>/dev/null || true)"
-control export-archive "$RESTORE_ID" --output "/var/lib/spaceworks/ops/restore-$RESTORE_ID/archive.tar.age" >/dev/null
+control export-archive "$RESTORE_ID" --output "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar.age" >/dev/null
 "${COMPOSE[@]}" exec -T backend age -d \
   -i "${IDENTITY_FILE/$OPS_DIR/\/var\/lib\/spaceworks\/ops}" \
-  -o "/var/lib/spaceworks/ops/restore-$RESTORE_ID/archive.tar" \
-  "/var/lib/spaceworks/ops/restore-$RESTORE_ID/archive.tar.age"
+  -o "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar" \
+  "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar.age"
 "${COMPOSE[@]}" exec -T backend python - \
-  "/var/lib/spaceworks/ops/restore-$RESTORE_ID/archive.tar" \
-  "/var/lib/spaceworks/ops/restore-$RESTORE_ID/bundle" <<'PY'
+  "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar" \
+  "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle" <<'PY'
 import pathlib
 import sys
 import tarfile
@@ -149,8 +147,8 @@ PY
 [[ -s "$BUNDLE/manifest.json" && -s "$BUNDLE/database.dump" ]] \
   || die "The archive is missing its manifest or database dump."
 control preflight "$RESTORE_ID" \
-  --manifest "/var/lib/spaceworks/ops/restore-$RESTORE_ID/bundle/manifest.json" \
-  --bundle "/var/lib/spaceworks/ops/restore-$RESTORE_ID/bundle" \
+  --manifest "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle/manifest.json" \
+  --bundle "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle" \
   --current-oci-digest "$oci_digest" >/dev/null
 
 drain_seconds="$(control quiesce "$RESTORE_ID" | tail -n 1)"
@@ -196,7 +194,7 @@ else
 fi
 
 control export-control "$RESTORE_ID" \
-  --output "/var/lib/spaceworks/ops/restore-$RESTORE_ID/restore-control.json" \
+  --output "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/restore-control.json" \
   --decision "$decision" >/dev/null
 
 printf '%s\n' "$RESTORE_ID" > "$DESTRUCTIVE_MARKER"
@@ -212,11 +210,11 @@ say "Replacing the database."
 
 control rehydrate "$RESTORE_ID" --archive-id "$archive_id" --kind "$kind" \
   --requested-by "$requested_by" \
-  --control-record "/var/lib/spaceworks/ops/restore-$RESTORE_ID/restore-control.json" \
-  --manifest "/var/lib/spaceworks/ops/restore-$RESTORE_ID/bundle/manifest.json" >/dev/null
-control restore-objects "$RESTORE_ID" --bundle-root "/var/lib/spaceworks/ops/restore-$RESTORE_ID/bundle" \
-  --manifest "/var/lib/spaceworks/ops/restore-$RESTORE_ID/bundle/manifest.json" \
-  --journal "/var/lib/spaceworks/ops/restore-$RESTORE_ID/swap-journal.jsonl" >/dev/null
+  --control-record "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/restore-control.json" \
+  --manifest "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle/manifest.json" >/dev/null
+control restore-objects "$RESTORE_ID" --bundle-root "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle" \
+  --manifest "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle/manifest.json" \
+  --journal "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/swap-journal.jsonl" >/dev/null
 control stage "$RESTORE_ID" validating >/dev/null
 control validate "$RESTORE_ID" >/dev/null
 
