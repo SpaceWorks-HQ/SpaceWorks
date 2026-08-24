@@ -54,6 +54,8 @@ def _manifest(restore, format_name, contents=None):
         "build": {"source_hash": _build_info()["source_hash"]},
         "settings": {},
     }
+    if format_name == "spaceworks-phase5a-v3":
+        value["partial"] = False
     if contents is not None:
         value["contents"] = contents
     return value
@@ -65,7 +67,7 @@ def _permit_remaining_preflight(monkeypatch, settings, tmp_path):
         Command, "_check_setting_policies", staticmethod(lambda _archived: None)
     )
     monkeypatch.setattr(
-        "apps.backup.management.commands.backup_control.shutil.which",
+        "apps.backup.backup_control_preflight.shutil.which",
         lambda _command: "/usr/bin/tool",
     )
 
@@ -87,7 +89,7 @@ def _permit_remaining_preflight(monkeypatch, settings, tmp_path):
             return Cursor()
 
     monkeypatch.setattr(
-        "apps.backup.management.commands.backup_control.connections",
+        "apps.backup.backup_control_preflight.connections",
         {"default": Connection()},
     )
 
@@ -169,7 +171,10 @@ def test_legacy_preflight_refuses_compound_readable_main(tmp_path):
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
-    with pytest.raises(CommandError, match="legacy restore path"):
+    with pytest.raises(
+        CommandError,
+        match=r"scripts/restore\.sh legacy path cannot hand off this compound archive",
+    ):
         call_command(
             "backup_control", "preflight", str(restore.pk),
             "--manifest", str(manifest_path), "--bundle", str(tmp_path),

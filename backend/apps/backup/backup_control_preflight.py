@@ -23,6 +23,14 @@ from apps.backup.models import BackupArchive, RestoreOperation
 from apps.backup.restore_services import set_stage
 
 
+# The v1/v2 builders predate the routing field; absence means a full legacy
+# archive. V3 and later manifests must declare the boolean explicitly.
+_FORMATS_WITHOUT_PARTIAL_DECLARATION = frozenset({
+    "spaceworks-phase5a-v1",
+    "spaceworks-phase5a-v2",
+})
+
+
 def run_restore_preflight(
     restore_id,
     manifest_path,
@@ -45,17 +53,24 @@ def run_restore_preflight(
         manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise CommandError("The authenticated archive manifest is unreadable.") from exc
+    format_name = manifest.get("format")
+    partial = manifest.get("partial")
     if (
-        manifest.get("format") not in SUPPORTED_ARCHIVE_FORMATS
+        "partial" not in manifest
+        and format_name in _FORMATS_WITHOUT_PARTIAL_DECLARATION
+    ):
+        partial = False
+    if (
+        format_name not in SUPPORTED_ARCHIVE_FORMATS
         or manifest.get("scope") != BackupArchive.Scope.DEPLOYMENT
         or manifest.get("archive_id") != str(archive.pk)
         or manifest.get("age_encrypted") is not True
-        or type(manifest.get("partial")) is not bool
+        or type(partial) is not bool
     ):
         raise CommandError(
             "The authenticated archive manifest does not match the restore intent."
         )
-    if manifest["partial"]:
+    if partial:
         return _compound_handoff(
             archive,
             manifest,
