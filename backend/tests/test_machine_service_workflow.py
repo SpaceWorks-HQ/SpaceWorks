@@ -8,7 +8,7 @@ from django.test import override_settings
 
 from apps.audit.models import AuditLog
 from apps.inventory import availability
-from apps.machines import role_scope, service_workflow
+from apps.machines import role_scope, service_workflow_actions as service_workflow
 from apps.machines.models import (
     Machine,
     MachineConsumable,
@@ -59,8 +59,8 @@ def test_allowed_edges_are_audited_and_notified_after_commit(monkeypatch):
     space, actor = make_space("service-workflow-edges"), make_user("service-manager")
     notices = []
     callbacks = []
-    monkeypatch.setattr("apps.machines.service_workflow.notify_service_status", lambda row, event: notices.append(event))
-    monkeypatch.setattr("apps.machines.service_workflow.transaction.on_commit", callbacks.append)
+    monkeypatch.setattr("apps.machines.service_workflow_helpers.notify_service_status", lambda row, event: notices.append(event))
+    monkeypatch.setattr("apps.machines.service_workflow_helpers.transaction.on_commit", callbacks.append)
     with transaction.atomic():
         row = request(space, actor=actor)
         assert notices == []
@@ -141,7 +141,7 @@ def test_submit_acquires_the_pii_fence_before_locking_the_machine(monkeypatch):
     original = service_workflow._locked_submission_machine
 
     monkeypatch.setattr(
-        "apps.machines.service_workflow._assert_submission_write_allowed",
+        "apps.machines.service_workflow_actions._assert_submission_write_allowed",
         lambda value: calls.append(("fence", value.pk)),
     )
 
@@ -149,7 +149,7 @@ def test_submit_acquires_the_pii_fence_before_locking_the_machine(monkeypatch):
         assert calls == [("fence", target.pk)]
         return original(value)
 
-    monkeypatch.setattr("apps.machines.service_workflow._locked_submission_machine", locked)
+    monkeypatch.setattr("apps.machines.service_workflow_actions._locked_submission_machine", locked)
     request(space, target=target)
 
 
