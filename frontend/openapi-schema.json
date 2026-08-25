@@ -51762,11 +51762,12 @@
             "RecoveryStateModeEnum": {
                 "enum": [
                     "normal",
+                    "target_import",
                     "quiesced",
                     "quarantined"
                 ],
                 "type": "string",
-                "description": "* `normal` - Normal\n* `quiesced` - Quiesced\n* `quarantined` - Quarantined"
+                "description": "* `normal` - Normal\n* `target_import` - Target import\n* `quiesced` - Quiesced\n* `quarantined` - Quarantined"
             },
             "RecoveryUnavailable": {
                 "type": "object",

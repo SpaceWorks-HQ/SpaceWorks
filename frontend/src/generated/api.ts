@@ -4742,7 +4742,7 @@ export type RecoveryState = {
   "updated_at": string;
 };
 
-export type RecoveryStateModeEnum = "normal" | "quiesced" | "quarantined";
+export type RecoveryStateModeEnum = "normal" | "target_import" | "quiesced" | "quarantined";
 
 export type RecoveryUnavailable = {
   "detail": string;
