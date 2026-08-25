@@ -139,6 +139,8 @@ def build_outer_manifest(*, archive, capture, detailed_manifest, root):
             "sha256": item["ciphertext_sha256"],
         } for item in slices)],
     })
+    if detailed_manifest.get("backup_run_id") is not None:
+        manifest["backup_run_id"] = detailed_manifest["backup_run_id"]
     validate_unsigned_manifest(manifest, protocol_version=PROTOCOL_VERSION)
     manifest["archive_signature"] = _signature(manifest, component_ledger)
     return manifest

@@ -62,7 +62,11 @@
   signed readable manifest, `artifact_ledger.py` + `models_artifact_ledger.py` own durable component and
   recipient custody, `activation.py` owns the access-switch/activation transition, and
   `artifact_protocol.py`/`promotion.py`/`reconciliation.py` own staged upload and the single availability
-  transaction. Archive builder, `restore_diff`, the global quarantine
+  transaction. `services.py` is the stable barrel over archive/access/lease/run lifecycle modules;
+  `models_runs.py` + `runs.py` own scheduled-run cohort and coverage proofs, while `services_runs.py`
+  orchestrates their serialized builds. `archive_metadata.py` owns stable build/settings manifest facts;
+  `backup_control_preflight.py` remains the E9b restore validator behind the `restore_preflight.py`
+  compatibility surface. Archive builder, `restore_diff`, the global quarantine
   `middleware.py` + `route_policy.py`, `recovery.py`, `object_restore.py`,
   `operation_lock.py`, and the privileged host scripts (`scripts/restore.sh`, `scripts/import-backup.sh`)
   that mirror `apps/updates`. Project JWT classes (`accounts/tokens.py`, `token_guard.py`) stamp

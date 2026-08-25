@@ -4,12 +4,12 @@ export type BackupArchive = {
   id: string;
   scope: "deployment" | "makerspace";
   makerspace: number | null;
-  status: "pending" | "running" | "available" | "failed" | "expired";
+  status: "pending" | "running" | "promoting" | "available" | "failed" | "expired";
   manifest: { snapshot_at?: string; postgres?: { source_server_major?: number } };
   size_bytes: number;
   age_encrypted: boolean;
   failure_detail: string;
-  expires_at: string;
+  expires_at: string | null;
   created_at: string;
   purge_warning: string;
 };

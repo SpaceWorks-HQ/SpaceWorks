@@ -41,7 +41,7 @@ def persist_pending(archive, build, size_bytes):
         "outer_manifest": manifest,
         "frozen_promotion_snapshot": build.promotion_snapshot,
         "expected_size_bytes": size_bytes,
-        "staging_locator": staging_locator(archive.pk),
+        "staging_locator": archive.staging_object_key or staging_locator(archive.pk),
         "final_locator": final_locator(archive.pk),
         "predecessor_artifact_id_snapshot": predecessor_id,
         "predecessor_success_at_snapshot": predecessor_success_at,

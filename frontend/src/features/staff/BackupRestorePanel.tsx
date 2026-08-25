@@ -89,6 +89,6 @@ function RestoreDecision({ operation, onDecide }: { operation: Awaited<ReturnTyp
 }
 
 function ActionButton({ label, pending, onClick }: { label: string; pending: boolean; onClick: () => void }) { return <button className="desk-button-primary w-fit" type="button" disabled={pending} onClick={onClick}>{pending ? "Requesting…" : label}</button>; }
-function pollArchives(query: { state: { data?: BackupArchive[] } }) { return query.state.data?.some((row) => row.status === "pending" || row.status === "running") ? 2000 : false; }
+function pollArchives(query: { state: { data?: BackupArchive[] } }) { return query.state.data?.some((row) => row.status === "pending" || row.status === "running" || row.status === "promoting") ? 2000 : false; }
 function formatDate(value?: string | null) { return value ? new Date(value).toLocaleString() : "Never"; }
 function formatBytes(value: number) { return value ? `${(value / 1024 / 1024).toFixed(1)} MB` : "—"; }

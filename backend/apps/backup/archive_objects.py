@@ -22,6 +22,9 @@ NON_OBJECT_KEY_FIELDS = frozenset({
     ("audit.AuditSigningKeyRotation", "old_key"),
     ("backup.RestoreRollbackObject", "module_key"),
     ("backup.RestoreRollbackObject", "source_key"),
+    # Run-owned promotion staging is retry coordination, not durable archive
+    # content. The final object and artifact ledger are the restore authority.
+    ("backup.BackupArchive", "staging_object_key"),
     ("integrations.PlatformPushSettings", "apns_private_key"),
     ("makerspaces.Makerspace", "public_api_key"),
     ("payments.MakerspacePaymentSettings", "stripe_publishable_key"),

@@ -1,6 +1,7 @@
 """Persist supervisor facts outside a database that is about to be replaced."""
 
 import json
+from datetime import timedelta
 from pathlib import Path
 
 import logging
@@ -9,7 +10,13 @@ from django.core.management import call_command
 from django.db import transaction
 from django.utils import timezone
 
-from apps.backup.models import BackupArchive, DeploymentRecoveryState, RestoreOperation
+from apps.backup import storage
+from apps.backup.models import (
+    BackupArchive,
+    DeploymentRecoveryState,
+    PlatformBackupSettings,
+    RestoreOperation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +45,34 @@ def rehydrate_control_record(restore_id, options):
 
     control = json.loads(Path(options["control_record"]).read_text(encoding="utf-8"))
     manifest = json.loads(Path(options["manifest"]).read_text(encoding="utf-8"))
-    BackupArchive.objects.filter(pk=options["archive_id"]).update(
-        status=BackupArchive.Status.AVAILABLE,
-        manifest=manifest,
-        age_encrypted=True,
-        completed_at=timezone.now(),
-        failure_detail="",
+    completed_at = timezone.now()
+    archive = BackupArchive.objects.select_for_update().get(
+        pk=options["archive_id"]
+    )
+    archive.status = BackupArchive.Status.AVAILABLE
+    archive.manifest = manifest
+    archive.age_encrypted = True
+    archive.completed_at = completed_at
+    archive.failure_detail = ""
+    if archive.expires_at is None:
+        archive.expires_at = completed_at + timedelta(
+            days=PlatformBackupSettings.load().retention_days
+        )
+    archive.save(
+        update_fields=(
+            "status",
+            "manifest",
+            "age_encrypted",
+            "completed_at",
+            "failure_detail",
+            "expires_at",
+            "updated_at",
+        )
+    )
+    transaction.on_commit(
+        lambda: storage.delete_archive_prefix(
+            f"backup-archives/staging/{archive.pk}/"
+        )
     )
     requested_by = User.objects.filter(
         username=control.get("requested_by_username", "")

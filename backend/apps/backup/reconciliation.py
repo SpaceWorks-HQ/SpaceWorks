@@ -2,9 +2,6 @@
 
 import logging
 
-from django.utils import timezone
-
-from apps.audit import services as audit
 from apps.backup import storage
 from apps.backup.artifact_ledger import (
     ArtifactLedgerMismatch,
@@ -13,8 +10,9 @@ from apps.backup.artifact_ledger import (
     mark_final_verified,
     mark_staging_verified,
 )
-from apps.backup.models import BackupArchive, BackupArtifactLedger, PlatformBackupSettings
+from apps.backup.models import BackupArchive, BackupArtifactLedger
 from apps.backup.promotion import promote_verified_artifact
+from apps.backup.services_archive_failures import _fail_archive
 
 
 logger = logging.getLogger(__name__)
@@ -107,25 +105,19 @@ def _tombstone(artifact_id, exc):
     if not mark_failed(artifact_id, "reconciliation_mismatch"):
         return
     row = BackupArtifactLedger.objects.get(pk=artifact_id)
-    storage.delete_archive(row.staging_locator)
-    storage.delete_archive(row.final_locator)
     detail = str(exc).strip()[:500] or "Artifact reconciliation failed closed."
     archive = BackupArchive.objects.filter(pk=row.archive_uuid_snapshot).first()
     if archive and archive.status in {
         BackupArchive.Status.PENDING,
         BackupArchive.Status.RUNNING,
+        BackupArchive.Status.PROMOTING,
     }:
-        BackupArchive.objects.filter(pk=archive.pk).update(
-            status=BackupArchive.Status.FAILED,
-            failure_detail=detail,
-            completed_at=timezone.now(),
+        _fail_archive(
+            archive.pk,
+            archive.build_holder,
+            detail,
+            expected_status=archive.status,
         )
-        PlatformBackupSettings.objects.update_or_create(
-            pk=1, defaults={"last_error": detail}
-        )
-        audit.record(
-            archive.requested_by,
-            "backup.archive_failed",
-            target=archive,
-            meta={"scope": archive.scope, "failure_detail": detail},
-        )
+        return
+    storage.delete_archive(row.staging_locator)
+    storage.delete_archive(row.final_locator)

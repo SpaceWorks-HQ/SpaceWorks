@@ -218,6 +218,11 @@ OMITTED_MODELS = {
     "backup.MakerspaceTenantExitCustodyState": "Deployment-local Lane D custody state, independently recomputed from recipients.",
     "backup.TenantExitCustodyAlarmDelivery": "Deployment-local Lane D custody alarm delivery and retry state.",
     "backup.BackupLease": "Deployment scheduler lease.",
+    "backup.BackupRun": "Deployment backup coverage run state.",
+    "backup.BackupRunCoverage": (
+        "Deployment backup coverage proof; it names a makerspace but is "
+        "deployment coordination state, not portable tenant data."
+    ),
     "backup.B1ActivationState": "Deployment-local Lane E activation state.",
     "backup.BackupArtifactLedger": "Durable deployment backup artifact operations.",
     "backup.BackupArtifactComponent": "Durable deployment backup component operations.",

@@ -71,6 +71,7 @@ GLOBAL_ADMIN_MODELS = {
     "backup.restoreoperation",
     "backup.deploymentrecoverystate",
     "backup.deploymentdatabaseidentity", "backup.backuplease",
+    "backup.backuprun", "backup.backupruncoverage",
     "backup.restorerollbackobject",
     # Fingerprint reservations are deliberately deployment-global and permanent:
     # `makerspace_id_snapshot` is a plain integer, not an FK, so a reservation
@@ -92,4 +93,3 @@ GLOBAL_ADMIN_MODELS = {
     "token_blacklist.blacklistedtoken",
     "token_blacklist.outstandingtoken",
 }
-

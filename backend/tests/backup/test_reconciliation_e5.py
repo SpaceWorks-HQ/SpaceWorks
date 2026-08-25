@@ -66,6 +66,9 @@ def test_pending_without_remote_bytes_is_failed_and_tombstoned(monkeypatch, tmp_
     _space, _recipient, archive, ledger, _size, _digest = _prepared(tmp_path)
     monkeypatch.setattr(reconciliation.storage, "object_exists", lambda _key: False)
     monkeypatch.setattr(reconciliation.storage, "delete_archive", lambda _key: True)
+    monkeypatch.setattr(
+        reconciliation.storage, "delete_archive_prefix", lambda _prefix: True
+    )
 
     assert reconciliation.reconcile_artifact_uploads() == 1
 
@@ -155,6 +158,9 @@ def test_failed_new_run_preserves_previous_success(monkeypatch, tmp_path):
     settings_row.save(update_fields=("last_success_at", "updated_at"))
     _space, _recipient, failed, _ledger, _size, _digest = _prepared(tmp_path)
     monkeypatch.setattr(services.storage, "delete_archive", lambda _key: True)
+    monkeypatch.setattr(
+        services.storage, "delete_archive_prefix", lambda _prefix: True
+    )
 
     services._fail_archive(failed, "injected new-run failure")
 
