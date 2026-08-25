@@ -152,11 +152,11 @@ def _coverage_failures(run, coverage_rows, archives, now):
                 "missing" if not rows else "duplicate"
             )
             continue
-        failures[makerspace_id].extend(
-            _coverage_row_errors(
-                run, rows[0], archives.get(rows[0].archive_id), enabled, now
-            )
+        row_errors = _coverage_row_errors(
+            run, rows[0], archives.get(rows[0].archive_id), enabled, now
         )
+        if row_errors:
+            failures[makerspace_id].extend(row_errors)
     return dict(failures)
 
 

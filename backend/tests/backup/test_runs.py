@@ -23,7 +23,7 @@ pytestmark = pytest.mark.django_db
 def _space(label, **overrides):
     return Makerspace.objects.create(
         name=label,
-        slug=f"{label}-{uuid.uuid4().hex[:8]}",
+        slug=f"{label[:17]}-{uuid.uuid4().hex}",
         **overrides,
     )
 
@@ -37,6 +37,9 @@ def _archive(*, makerspace=None, covered_ids=(), run=None):
             else BackupArchive.Scope.DEPLOYMENT
         ),
         makerspace=makerspace,
+        superadmin_access_at_decision=(
+            makerspace.superadmin_access_enabled if makerspace else None
+        ),
         backup_run=run,
         status=BackupArchive.Status.AVAILABLE,
         object_key=f"backup-runs/{uuid.uuid4()}.tar.age",
