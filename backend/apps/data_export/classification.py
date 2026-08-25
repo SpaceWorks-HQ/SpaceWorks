@@ -47,7 +47,7 @@ EXPORTED_MODEL_FIELDS = {
     "machines.Machine": "id makerspace machine_type name location notes status firmware_version camera_feed_url image_key is_public is_active service_file_policy type_payload legacy_print_printer_id created_at updated_at created_by",
     "machines.MachineConsumable": "id machine measurement product label remaining low_threshold note created_by created_at",
     "machines.MachineConsumableAdjustment": "id consumable_pool makerspace kind quantity_delta metering_unit consumed_quantity service_request usage_entry reason created_by created_at legacy_filament_adjustment_id",
-    "machines.MachineConsumablePool": "id makerspace machine material color brand unit lot_code initial_grams remaining_grams low_threshold_grams is_active opened_at legacy_filament_spool_id created_by created_at updated_at",
+    "machines.MachineConsumablePool": "id makerspace machine machine_type material color color_hex brand unit lot_code initial_grams remaining_grams low_threshold_grams is_active is_public opened_at legacy_filament_spool_id created_by created_at updated_at",
     "machines.MachineDocument": "id machine doc_type object_key original_filename content_type size_bytes uploaded_by created_at",
     "machines.MachineErrorLog": "id machine severity message logged_by created_at",
     "machines.MachineOperator": "id machine user access_level assigned_by assigned_at",
