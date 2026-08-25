@@ -7,12 +7,12 @@ from django.utils import timezone
 
 from apps.backup.not_restored import TenantNotRestored, assert_restored
 from apps.tenant_migration.gate_errors import SourceMigrationGateClosed
-from apps.tenant_migration.gate_locks import acquire_shared, shared_session
+from apps.tenant_migration.gate_locks import acquire_shared, shared_boundary
 from apps.tenant_migration.models_source_gate import SourceMigrationGate
 
 
 _archive_authority = ContextVar("source_migration_archive_authority", default=None)
-_boundary_session_locks = ContextVar("source_gate_boundary_session_locks", default=())
+_boundary_shared_locks = ContextVar("source_gate_boundary_shared_locks", default=())
 logger = logging.getLogger(__name__)
 
 
@@ -23,13 +23,13 @@ def assert_write_allowed(makerspace_id):
         acquire_shared(makerspace_id)
         _assert_gate_state(makerspace_id)
         return
-    if makerspace_id in _boundary_session_locks.get():
+    if makerspace_id in _boundary_shared_locks.get():
         _assert_gate_state(makerspace_id)
         return
     # A direct non-transactional assertion is supported for boundary-style callers.
     # Request/task boundaries use ``boundary_tenant_write`` so this same lock remains
     # held after validation and through their entire dispatch.
-    with shared_session(makerspace_id):
+    with shared_boundary(makerspace_id):
         _assert_gate_state(makerspace_id)
 
 
@@ -55,17 +55,17 @@ def _assert_gate_state(makerspace_id):
 
 @contextmanager
 def boundary_tenant_write(makerspace_id):
-    """Validate and hold a session lock without changing dispatch transactions."""
+    """Validate under a dedicated lock transaction without transacting dispatch."""
     makerspace_id = int(makerspace_id)
-    with shared_session(makerspace_id):
-        token = _boundary_session_locks.set(
-            _boundary_session_locks.get() + (makerspace_id,)
+    with shared_boundary(makerspace_id):
+        token = _boundary_shared_locks.set(
+            _boundary_shared_locks.get() + (makerspace_id,)
         )
         try:
             assert_write_allowed(makerspace_id)
             yield
         finally:
-            _boundary_session_locks.reset(token)
+            _boundary_shared_locks.reset(token)
 
 
 @contextmanager

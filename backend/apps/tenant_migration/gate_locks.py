@@ -1,6 +1,9 @@
 from contextlib import contextmanager
 
-from django.db import connection, transaction
+import psycopg2
+from django.db import connection, connections, transaction
+
+from apps.tenant_migration.gate_errors import SourceMigrationGateUnavailable
 
 
 # PostgreSQL advisory locks are keyed by a pair of signed int32 values. These values
@@ -51,19 +54,10 @@ def _execute(function, makerspace_id):
         )
 
 
-def _release_session_shared(makerspace_id):
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT pg_advisory_unlock_shared(%s, %s)",
-            [SOURCE_GATE_LOCK_NAMESPACE, int(makerspace_id)],
-        )
-        return bool(cursor.fetchone()[0])
-
-
 @contextmanager
-def shared_session(makerspace_id):
-    """Hold one reference-counted session lock and always release that reference."""
-    lock = _SessionSharedLock(makerspace_id)
+def shared_boundary(makerspace_id):
+    """Hold one shared-lock reference without transacting on the caller connection."""
+    lock = _BoundarySharedLock(makerspace_id)
     try:
         lock.acquire()
         yield lock
@@ -71,48 +65,91 @@ def shared_session(makerspace_id):
         lock.release()
 
 
-class _SessionSharedLock:
-    """One session-lock reference whose release operation is idempotent."""
+class _BoundarySharedLock:
+    """One idempotent reference held by a dedicated lock-only transaction."""
 
     def __init__(self, makerspace_id):
         self.makerspace_id = int(makerspace_id)
         self.acquired = False
-        self.database_session = None
+        self.lock_connection = None
 
     def acquire(self):
         if self.acquired:
             return
-        _execute("pg_advisory_lock_shared", self.makerspace_id)
-        self.database_session = connection.connection
-        self.acquired = True
+        lock_connection = None
+        try:
+            lock_connection = _new_lock_connection()
+            self.lock_connection = lock_connection
+            lock_connection.autocommit = False
+            with lock_connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT pg_advisory_xact_lock_shared(%s, %s),
+                           pg_backend_pid()
+                    """,
+                    [SOURCE_GATE_LOCK_NAMESPACE, self.makerspace_id],
+                )
+                lock_backend_pid = cursor.fetchone()[1]
+                cursor.execute(
+                    """
+                    SELECT pg_backend_pid(), EXISTS (
+                        SELECT 1 FROM pg_locks
+                        WHERE locktype = 'advisory'
+                          AND pid = pg_backend_pid()
+                          AND classid = %s AND objid = %s
+                          AND granted
+                    )
+                    """,
+                    [SOURCE_GATE_LOCK_NAMESPACE, self.makerspace_id],
+                )
+                retained_backend_pid, lock_is_held = cursor.fetchone()
+                if retained_backend_pid != lock_backend_pid or not lock_is_held:
+                    raise RuntimeError("The shared advisory lock was not retained.")
+            self.acquired = True
+        except Exception as exc:
+            if lock_connection is not None:
+                try:
+                    lock_connection.close()
+                except Exception:
+                    pass
+            self.lock_connection = None
+            raise SourceMigrationGateUnavailable(
+                "The source migration write gate is unavailable."
+            ) from exc
 
     def release(self):
         if not self.acquired:
             return
+        lock_connection = self.lock_connection
+        release_error = None
         try:
-            # Closing a database connection releases all of that session's advisory
-            # locks. Never issue the matching unlock on a replacement session: it
-            # could consume a reference acquired independently on that connection.
-            if connection.connection is self.database_session:
-                if not _release_session_shared(self.makerspace_id):
-                    connection.close()
-                    raise RuntimeError(
-                        "The source migration session-lock reference was lost."
-                    )
-        except Exception:
-            # If PostgreSQL could not execute the unlock, closing the owning session
-            # is the only reliable way to release every advisory lock it still owns.
-            if connection.connection is self.database_session:
-                connection.close()
-            raise
+            lock_connection.rollback()
+        except Exception as exc:
+            release_error = exc
+        try:
+            lock_connection.close()
+        except Exception as exc:
+            release_error = release_error or exc
         finally:
-            self.database_session = None
+            self.lock_connection = None
             self.acquired = False
+        if release_error is not None:
+            raise SourceMigrationGateUnavailable(
+                "The source migration write gate could not be released safely."
+            ) from release_error
+
+
+def _new_lock_connection():
+    # Bypass Django's connection lifecycle: this transaction exists only to pin
+    # one PostgreSQL backend and hold the source-gate advisory lock. Each call
+    # must return a distinct connection so nested boundaries remain independent.
+    params = connections["default"].get_connection_params()
+    return psycopg2.connect(**params)
 
 
 @contextmanager
-def unscoped_writer_shared_session():
-    with shared_session(UNSCOPED_WRITER_LOCK_KEY):
+def unscoped_writer_shared_boundary():
+    with shared_boundary(UNSCOPED_WRITER_LOCK_KEY):
         yield
 
 
