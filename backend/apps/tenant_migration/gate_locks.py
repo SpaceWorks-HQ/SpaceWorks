@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 
+import psycopg2
 from django.db import connection, connections, transaction
 
 from apps.tenant_migration.gate_errors import SourceMigrationGateUnavailable
@@ -79,8 +80,7 @@ class _BoundarySharedLock:
         try:
             lock_connection = _new_lock_connection()
             self.lock_connection = lock_connection
-            lock_connection.ensure_connection()
-            lock_connection.set_autocommit(False)
+            lock_connection.autocommit = False
             with lock_connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -140,7 +140,11 @@ class _BoundarySharedLock:
 
 
 def _new_lock_connection():
-    return connections["default"].copy(alias="source_migration_gate_lock")
+    # Bypass Django's connection lifecycle: this transaction exists only to pin
+    # one PostgreSQL backend and hold the source-gate advisory lock. Each call
+    # must return a distinct connection so nested boundaries remain independent.
+    params = connections["default"].get_connection_params()
+    return psycopg2.connect(**params)
 
 
 @contextmanager

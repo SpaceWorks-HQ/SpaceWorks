@@ -29,9 +29,11 @@ def test_shared_writer_blocks_exclusive_and_exclusive_refuses_tenant_write(
         lambda _request: dispatches.append(True) or HttpResponse(status=204)
     )
 
+    new_lock_connection = gate_locks._new_lock_connection
+
     def lock_connection_with_timeout():
-        lock_connection = connections["default"].copy()
-        lock_connection.ensure_connection()
+        lock_connection = new_lock_connection()
+        lock_connection.autocommit = True
         with lock_connection.cursor() as cursor:
             cursor.execute("SET lock_timeout = '100ms'")
         return lock_connection
@@ -227,7 +229,12 @@ class _BrokenLockConnection:
     def __init__(self):
         self.close_calls = 0
 
-    def ensure_connection(self):
+    @property
+    def autocommit(self):
+        return False
+
+    @autocommit.setter
+    def autocommit(self, _enabled):
         raise RuntimeError("pooler cannot establish a lock transaction")
 
     def close(self):
@@ -239,10 +246,8 @@ class _LostLockConnection(_BrokenLockConnection):
         super().__init__()
         self.fetches = iter(((None, 101), (102, False)))
 
-    def ensure_connection(self):
-        pass
-
-    def set_autocommit(self, _enabled):
+    @_BrokenLockConnection.autocommit.setter
+    def autocommit(self, _enabled):
         pass
 
     def cursor(self):
