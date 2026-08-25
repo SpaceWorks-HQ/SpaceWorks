@@ -2287,21 +2287,26 @@ escalation before activation readiness succeeds.
   the latter is unsatisfiable for a legitimately linked target superadmin, since `rbac` grants
   superusers everything.
 
-**The source gate holds a SESSION-scoped advisory lock; it must NEVER wrap the request or the task
-in a transaction.** The drain guarantee needs every tenant writer to hold a shared advisory lock
-that quiescence's exclusive acquisition must wait on — but the first implementation got that by
-wrapping every state-changing request in `transaction.atomic()` and giving Celery a `task_cls` that
-did the same. The full suite refused it, and the two failures are the argument: SMTP then ran inside
-a transaction (`test_deliver_email_task_releases_lock_before_smtp` is an existing invariant test
-asserting `in_atomic_block` is 0), and the delivery task's `attempts` increment was **rolled back**
-by the very SMTP failure it was counting, so a failing send recorded zero attempts. Session locks
-(`pg_advisory_lock_shared` / `pg_advisory_unlock_shared`, released in `finally`, holding the physical
-connection so a reopened connection cannot release another session's reference) give the identical
-race-freedom — session and transaction advisory locks share one lock space — with none of that.
-`assert_write_allowed` therefore supports three shapes: inside an existing `atomic()` it takes the
-transaction-scoped lock, at a request/task boundary it uses the already-held session lock, and a
-direct non-atomic call takes a temporary session one. External I/O inside a lock-holding transaction
-stays banned; this is that rule applied to the gate itself.
+**The source gate uses transaction-scoped advisory locks, including through a transaction pooler;
+it must NEVER wrap the application request or task connection in a transaction.** The drain guarantee
+needs every tenant writer to hold a shared advisory lock that quiescence's exclusive acquisition must
+wait on. Request/task boundaries therefore open a dedicated lock-only database connection, begin a
+transaction there, acquire `pg_advisory_xact_lock_shared`, and keep that transaction open only for the
+boundary lifetime. A direct PostgreSQL connection retains that transaction, and a transaction pooler pins
+one backend until it ends, so no lock or unlock statement can land on a replacement backend. The normal
+application connection remains outside `atomic()`: SMTP and other external calls still observe
+`in_atomic_block == 0`, and an external failure cannot roll back an earlier attempts increment.
+Before dispatch, the lock connection queries `pg_locks` on its own backend and refuses unless the exact
+namespace/key lock is still granted; a runtime that cannot retain the transaction lock is never assumed safe.
+
+Acquisition or transaction setup failure raises the typed `SourceMigrationGateUnavailable` before dispatch;
+HTTP returns 503 and tasks fail, so an unknown or unsupported runtime refuses the write. Release is one
+idempotent rollback/close per acquired reference, and nested boundaries retain independent shared references.
+`assert_write_allowed` therefore supports three shapes: inside an existing `atomic()` it takes the shared
+lock in that transaction, at a request/task boundary it uses the already-held dedicated lock transaction,
+and a direct non-atomic call takes a temporary dedicated lock transaction. External I/O inside an
+application lock-holding transaction stays banned; the separate lock-only transaction does not contain
+application writes or external I/O.
 
 **The gate may refuse a request; it may never CHANGE one.** `_makerspace_id()` resolved the tenant
 with `get_public_makerspace()`, which raises `Http404` for an unknown, archived or non-public slug —

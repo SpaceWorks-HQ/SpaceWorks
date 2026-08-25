@@ -12,6 +12,12 @@ class SourceMigrationGateClosed(SourceMigrationGateError):
         self.purpose = purpose
 
 
+class SourceMigrationGateUnavailable(SourceMigrationGateError):
+    """The lock boundary could not prove that a tenant write is safe."""
+
+    code = "tenant_migration_gate_unavailable"
+
+
 class SourceMigrationOwnershipError(SourceMigrationGateError):
     """An owner, fencing token, or lease no longer grants authority."""
 

@@ -83,15 +83,17 @@ def test_frozen_source_migration_control_routes_reach_views_instead_of_423(
     locked_routes = []
     from apps.tenant_migration import middleware as gate_middleware
 
-    real_shared_session = gate_middleware.shared_session
+    real_shared_boundary = gate_middleware.shared_boundary
 
     @contextmanager
-    def observed_shared_session(makerspace_id):
+    def observed_shared_boundary(makerspace_id):
         locked_routes.append(makerspace_id)
-        with real_shared_session(makerspace_id):
+        with real_shared_boundary(makerspace_id):
             yield
 
-    monkeypatch.setattr(gate_middleware, "shared_session", observed_shared_session)
+    monkeypatch.setattr(
+        gate_middleware, "shared_boundary", observed_shared_boundary
+    )
     monkeypatch.setattr(
         "apps.tenant_migration.views_cutover.claim_completed_export",
         lambda *_args, **_kwargs: None,

@@ -7,10 +7,13 @@ from apps.makerspaces.models import Makerspace
 from apps.makerspaces.origin_scope import origin_scoped_makerspace_id
 from apps.makerspaces.origin_scope_routes import authoritative_route_resolution
 from apps.makerspaces.servability import servable_queryset
-from apps.tenant_migration.gate_errors import SourceMigrationGateClosed
+from apps.tenant_migration.gate_errors import (
+    SourceMigrationGateClosed,
+    SourceMigrationGateUnavailable,
+)
 from apps.tenant_migration.gate_locks import (
-    shared_session,
-    unscoped_writer_shared_session,
+    shared_boundary,
+    unscoped_writer_shared_boundary,
 )
 from apps.tenant_migration.gate_policy import HTTP_EXEMPTIONS
 from apps.tenant_migration.gate_runtime import boundary_tenant_write
@@ -38,19 +41,23 @@ class SourceMigrationGateMiddleware:
             refusal_exempt = match.view_name in HTTP_EXEMPTIONS
             if makerspace_ids:
                 with ExitStack() as locks:
-                    lock = shared_session if refusal_exempt else boundary_tenant_write
+                    lock = shared_boundary if refusal_exempt else boundary_tenant_write
                     for makerspace_id in makerspace_ids:
                         locks.enter_context(lock(makerspace_id))
                     return self.get_response(request)
-            with unscoped_writer_shared_session():
+            with unscoped_writer_shared_boundary():
                 return self.get_response(request)
         except SourceMigrationGateClosed as exc:
             return _locked_response(exc)
+        except SourceMigrationGateUnavailable as exc:
+            return _unavailable_response(exc)
 
     def process_exception(self, request, exception):
         """Render refusals raised after authentication resolves the tenant."""
         if isinstance(exception, SourceMigrationGateClosed):
             return _locked_response(exception)
+        if isinstance(exception, SourceMigrationGateUnavailable):
+            return _unavailable_response(exception)
         return None
 
 
@@ -117,3 +124,7 @@ def _locked_response(exc):
     if getattr(exc, "purpose", None):
         payload["purpose"] = exc.purpose
     return JsonResponse(payload, status=423)
+
+
+def _unavailable_response(exc):
+    return JsonResponse({"detail": str(exc), "code": exc.code}, status=503)
