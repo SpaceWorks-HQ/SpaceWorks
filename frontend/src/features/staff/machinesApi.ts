@@ -35,6 +35,8 @@ export type MeteringUnit = "weight" | "volume" | "length" | "count" | "minutes";
 export type MachineTypeCapabilityConfig = {
   metering_unit: MeteringUnit;
   requires_booking: boolean;
+  accepted_materials?: string[];
+  accepted_colours?: string[];
 };
 
 export type Machine = {

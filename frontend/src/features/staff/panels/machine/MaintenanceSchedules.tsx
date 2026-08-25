@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { EmptyState } from "../../../../components/ui";
+import { ConfirmDialog, EmptyState } from "../../../../components/ui";
 import {
   useCreateMaintenanceSchedule,
   useDeactivateMaintenanceSchedule,
@@ -28,6 +28,7 @@ export function MaintenanceSchedules({
   const [draft, setDraft] = useState<ScheduleInput>(emptySchedule);
   const [editing, setEditing] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<ScheduleInput>(emptySchedule);
+  const [deactivateId, setDeactivateId] = useState<number | null>(null);
   const create = useCreateMaintenanceSchedule(makerspaceId, machineId);
   const update = useUpdateMaintenanceSchedule(makerspaceId, machineId);
   const deactivate = useDeactivateMaintenanceSchedule(makerspaceId, machineId);
@@ -147,11 +148,7 @@ export function MaintenanceSchedules({
                     className="desk-button-danger"
                     type="button"
                     disabled={deactivate.isPending}
-                    onClick={() => {
-                      if (window.confirm("Deactivate this maintenance schedule?")) {
-                        deactivate.mutate(schedule.id);
-                      }
-                    }}
+                    onClick={() => setDeactivateId(schedule.id)}
                   >
                     Deactivate
                   </button>
@@ -179,6 +176,20 @@ export function MaintenanceSchedules({
       {[create.error, update.error, deactivate.error].map((error, index) =>
         error instanceof Error ? <p key={index} className="text-sm text-danger">{error.message}</p> : null,
       )}
+      <ConfirmDialog
+        open={deactivateId !== null}
+        title="Deactivate maintenance schedule?"
+        message="Deactivate this maintenance schedule?"
+        confirmLabel="Deactivate schedule"
+        tone="danger"
+        pending={deactivate.isPending}
+        onConfirm={() => {
+          if (deactivateId !== null) {
+            deactivate.mutate(deactivateId, { onSuccess: () => setDeactivateId(null) });
+          }
+        }}
+        onCancel={() => setDeactivateId(null)}
+      />
     </section>
   );
 }

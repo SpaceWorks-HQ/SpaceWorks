@@ -3739,6 +3739,10 @@ export type PatchedPlatformUpdateSettings = {
   "updated_at"?: string;
 };
 
+export type PatchedPrinterPoolVisibility = {
+  "is_public"?: boolean;
+};
+
 export type PatchedReturnPolicy = {
   "id"?: number;
   "default_loan_days"?: number;
@@ -3937,8 +3941,10 @@ export type PresenceStart = {
 export type PrinterPool = {
   "id": number;
   "machine_id": number | null;
+  "machine_type_id": number | null;
   "material": string;
   "color"?: string;
+  "color_hex"?: string;
   "brand"?: string;
   "lot_code"?: string;
   "unit"?: PrinterPoolUnitEnum;
@@ -3946,6 +3952,7 @@ export type PrinterPool = {
   "remaining_grams": string;
   "low_threshold_grams"?: string | null;
   "is_active": boolean;
+  "is_public"?: boolean;
   "opened_at"?: string | null;
   "created_at": string;
   "updated_at": string;
@@ -3958,8 +3965,11 @@ export type PrinterPoolCorrection = {
 
 export type PrinterPoolCreate = {
   "machine_id"?: number | null;
+  "machine_type_id"?: number | null;
+  "is_public"?: boolean;
   "material": string;
   "color"?: string;
+  "color_hex"?: string;
   "brand"?: string;
   "lot_code"?: string;
   "unit"?: PrinterPoolCreateUnitEnum;

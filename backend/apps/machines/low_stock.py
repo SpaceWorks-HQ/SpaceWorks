@@ -45,7 +45,12 @@ def maybe_flag_low_stock(actor, pool):
                 makerspace=locked.makerspace,
                 kind=ToBuyItem.Kind.PRINTING,
                 machine_type_id=(
-                    locked.machine.machine_type_id if locked.machine_id is not None else None
+                    locked.machine_type_id
+                    or (
+                        locked.machine.machine_type_id
+                        if locked.machine_id is not None
+                        else None
+                    )
                 ),
                 name=name,
                 quantity=1,

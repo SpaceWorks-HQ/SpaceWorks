@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { staffRequest } from "../../lib/api";
 import { Panel } from "./StaffPanels";
 
@@ -32,6 +34,19 @@ export function DirectLoanList({
   loans: DirectLoan[];
   onReturn: (loan: DirectLoan) => void;
 }) {
+  const [evidenceError, setEvidenceError] = useState<{ loanId: number; message: string } | null>(null);
+  const openEvidence = async (loanId: number, evidenceId: number) => {
+    setEvidenceError(null);
+    try {
+      const res = await staffRequest<{ url: string }>(`/admin/evidence/${evidenceId}`);
+      window.open(res.url, "_blank", "noopener");
+    } catch (error) {
+      setEvidenceError({
+        loanId,
+        message: error instanceof Error ? error.message : "Could not load evidence photo.",
+      });
+    }
+  };
   return (
     <Panel title="Direct handout loans">
       <div className="grid gap-2">
@@ -61,16 +76,19 @@ export function DirectLoanList({
             {loan.issue_evidence_id || (loan.status !== "checked_out" && loan.return_evidence_id) ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {loan.issue_evidence_id ? (
-                  <button className="desk-button text-xs" type="button" onClick={() => openEvidence(loan.issue_evidence_id as number)}>
+                  <button className="desk-button text-xs" type="button" onClick={() => void openEvidence(loan.id, loan.issue_evidence_id as number)}>
                     View issue photo
                   </button>
                 ) : null}
                 {loan.status !== "checked_out" && loan.return_evidence_id ? (
-                  <button className="desk-button text-xs" type="button" onClick={() => openEvidence(loan.return_evidence_id as number)}>
+                  <button className="desk-button text-xs" type="button" onClick={() => void openEvidence(loan.id, loan.return_evidence_id as number)}>
                     View return photo
                   </button>
                 ) : null}
                 {loan.status !== "checked_out" && loan.return_notes ? <p className="text-xs text-muted">{loan.return_notes}</p> : null}
+                {evidenceError?.loanId === loan.id ? (
+                  <p className="w-full text-sm text-danger" role="alert">{evidenceError.message}</p>
+                ) : null}
               </div>
             ) : null}
           </article>
@@ -99,14 +117,5 @@ function directLoanStatusLabel(status: string) {
       return "Returned";
     default:
       return status.replace(/_/g, " ");
-  }
-}
-
-async function openEvidence(id: number) {
-  try {
-    const res = await staffRequest<{ url: string }>(`/admin/evidence/${id}`);
-    window.open(res.url, "_blank", "noopener");
-  } catch (error) {
-    window.alert(error instanceof Error ? error.message : "Could not load evidence photo.");
   }
 }

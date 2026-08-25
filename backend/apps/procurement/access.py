@@ -115,10 +115,16 @@ def provenance_machine_type_id(item):
     """
     if item.resulting_machine_id is not None:
         return item.resulting_machine.machine_type_id
-    if item.source_pool_id is not None and item.source_pool.machine_id is not None:
-        return item.source_pool.machine.machine_type_id
-    if item.resulting_pool_id is not None and item.resulting_pool.machine_id is not None:
-        return item.resulting_pool.machine.machine_type_id
+    if item.source_pool_id is not None:
+        if item.source_pool.machine_type_id is not None:
+            return item.source_pool.machine_type_id
+        if item.source_pool.machine_id is not None:
+            return item.source_pool.machine.machine_type_id
+    if item.resulting_pool_id is not None:
+        if item.resulting_pool.machine_type_id is not None:
+            return item.resulting_pool.machine_type_id
+        if item.resulting_pool.machine_id is not None:
+            return item.resulting_pool.machine.machine_type_id
     return None
 
 

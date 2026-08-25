@@ -8,7 +8,7 @@ from django.db.models.functions import Coalesce
 
 from apps.machines import role_scope
 from apps.machines.models import Machine, MachineServiceRequest, MachineUsageEntry, ServiceRequestConsumption
-from apps.machines.printer_capabilities import PRINTER_SLUG
+from apps.machines.printer_capabilities import resolve_global_printer_type
 from apps.payments.models import Payment
 from apps.operations.report_registry import ReportResult
 from apps.operations.report_scope import scoped_ids
@@ -77,9 +77,14 @@ def build_printer_service_report(makerspace_id, *, limit=None, date_range=None, 
     ids = scoped_ids(makerspace_id, "machine_service")
     aggregate = makerspace_id is None
     terminal = Q(status__in=COMPLETED) | Q(status=MachineServiceRequest.Status.FAILED)
-    requests = MachineServiceRequest.objects.filter(
-        makerspace_id__in=ids, assigned_machine__machine_type__slug=PRINTER_SLUG,
-    ).filter(_request_scope_q(machine_scope)).filter(terminal).order_by()
+    printer_type = resolve_global_printer_type()
+    if printer_type is None:
+        requests = MachineServiceRequest.objects.none()
+    else:
+        requests = MachineServiceRequest.objects.filter(
+            makerspace_id__in=ids,
+            assigned_machine__machine_type=printer_type,
+        ).filter(_request_scope_q(machine_scope)).filter(terminal).order_by()
     if date_range:
         requests = requests.filter(_date_filter("completed_at", date_range) | _date_filter("failed_at", date_range))
     payment_totals = defaultdict(lambda: [Decimal("0.00"), Decimal("0.00")])
@@ -103,7 +108,14 @@ def build_printer_service_report(makerspace_id, *, limit=None, date_range=None, 
         payment_due=Coalesce(Sum("payment_amount", filter=Q(payment_status="pending")), Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2))),
         payment_paid=Coalesce(Sum("payment_amount", filter=Q(payment_status="paid")), Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2))),
     )
-    manual = MachineUsageEntry.objects.filter(machine__makerspace_id__in=ids, machine__machine_type__slug=PRINTER_SLUG, source=MachineUsageEntry.Source.TYPED_MANUAL).order_by()
+    if printer_type is None:
+        manual = MachineUsageEntry.objects.none()
+    else:
+        manual = MachineUsageEntry.objects.filter(
+            machine__makerspace_id__in=ids,
+            machine__machine_type=printer_type,
+            source=MachineUsageEntry.Source.TYPED_MANUAL,
+        ).order_by()
     if date_range:
         manual = manual.filter(_date_filter("created_at", date_range))
     manual_values = ["machine_id"] + (["machine__makerspace_id"] if aggregate else [])

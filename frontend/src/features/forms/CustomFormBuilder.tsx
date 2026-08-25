@@ -1,4 +1,6 @@
-import type { ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
+
+import { ConfirmDialog } from "../../components/ui";
 
 import {
   CHOICE_QUESTION_TYPES,
@@ -84,18 +86,21 @@ function QuestionEditor({ question, index, count, onChange, onMove, onRemove }: 
   onRemove: () => void;
 }) {
   const choice = CHOICE_QUESTION_TYPES.has(question.type);
+  const [pendingType, setPendingType] = useState<CustomQuestionType | null>(null);
+  const applyType = (type: CustomQuestionType) => onChange({
+    ...question,
+    type,
+    options: CHOICE_QUESTION_TYPES.has(type)
+      ? (question.options.length ? question.options : [""])
+      : [],
+  });
   const changeType = (event: ChangeEvent<HTMLSelectElement>) => {
     const type = event.target.value as CustomQuestionType;
     if (choice && !CHOICE_QUESTION_TYPES.has(type) && question.options.length > 0) {
-      if (!window.confirm("Changing this type will remove its choices. Continue?")) return;
+      setPendingType(type);
+      return;
     }
-    onChange({
-      ...question,
-      type,
-      options: CHOICE_QUESTION_TYPES.has(type)
-        ? (question.options.length ? question.options : [""])
-        : [],
-    });
+    applyType(type);
   };
 
   return (
@@ -123,6 +128,18 @@ function QuestionEditor({ question, index, count, onChange, onMove, onRemove }: 
         Required question
       </label>
       {choice ? <OptionsEditor question={question} onChange={onChange} /> : null}
+      <ConfirmDialog
+        open={pendingType !== null}
+        title="Change answer type?"
+        message="Changing this type will remove its choices. Continue?"
+        confirmLabel="Change type"
+        tone="danger"
+        onConfirm={() => {
+          if (pendingType !== null) applyType(pendingType);
+          setPendingType(null);
+        }}
+        onCancel={() => setPendingType(null)}
+      />
     </div>
   );
 }

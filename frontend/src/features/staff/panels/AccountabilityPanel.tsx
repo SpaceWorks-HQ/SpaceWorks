@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { Modal } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import { invalidateInventoryViews } from "../queryInvalidation";
 import { Panel, type Makerspace, useStaffGet } from "./shared";
@@ -44,6 +45,9 @@ const OUTCOME_OPTIONS: Array<{ value: TriageOutcome; label: string }> = [
 
 export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: Makerspace; isSuperadmin: boolean }) {
   const queryClient = useQueryClient();
+  const restrictionFormId = useId();
+  const [restrictionTarget, setRestrictionTarget] = useState<Pick<Offender, "requester_id" | "username"> | null>(null);
+  const [restrictionReason, setRestrictionReason] = useState("");
   const report = useStaffGet<AccountabilityResponse>(["accountability", makerspace.id], `/admin/makerspace/${makerspace.id}/accountability`);
   const data = report.data;
 
@@ -67,6 +71,17 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
     mutationFn: (userId: number) => staffRequest(`/admin/users/${userId}/restore-access`, { method: "POST" }),
     onSuccess: refresh,
   });
+  const closeRestrictionDialog = () => {
+    setRestrictionTarget(null);
+    setRestrictionReason("");
+  };
+  const submitRestriction = (event: FormEvent) => {
+    event.preventDefault();
+    const target = restrictionTarget;
+    const reason = restrictionReason.trim();
+    closeRestrictionDialog();
+    if (target && reason) restrict.mutate({ userId: target.requester_id, reason });
+  };
 
   return (
     <div className="grid gap-4">
@@ -136,10 +151,7 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
                             className="desk-button-danger"
                             type="button"
                             disabled={restrict.isPending}
-                            onClick={() => {
-                              const reason = window.prompt("Reason for restricting this requester?");
-                              if (reason && reason.trim()) restrict.mutate({ userId: row.requester_id, reason: reason.trim() });
-                            }}
+                            onClick={() => setRestrictionTarget({ requester_id: row.requester_id, username: row.username })}
                           >
                             Restrict
                           </button>
@@ -182,6 +194,36 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
       </Panel>
       {restrict.error ? <p className="text-sm text-danger">{(restrict.error as Error).message}</p> : null}
       {restore.error ? <p className="text-sm text-danger">{(restore.error as Error).message}</p> : null}
+      <Modal
+        open={restrictionTarget !== null}
+        onClose={closeRestrictionDialog}
+        title="Restrict requester?"
+        footer={(
+          <div className="desk-actions flex flex-wrap justify-end gap-2">
+            <button className="desk-button-secondary" type="button" onClick={closeRestrictionDialog}>Cancel</button>
+            {/* Submit no-ops on a blank reason, so leaving it enabled renders a dead button that
+                reports nothing. Disabling states the requirement instead of failing silently. */}
+            <button className="desk-button-danger" type="submit" form={restrictionFormId} disabled={!restrictionReason.trim() || restrict.isPending}>
+              {restrict.isPending ? "Restricting..." : "Restrict requester"}
+            </button>
+          </div>
+        )}
+      >
+        <form id={restrictionFormId} className="grid gap-3" onSubmit={submitRestriction}>
+          <p className="text-sm text-muted">
+            Restrict {restrictionTarget?.username ?? "this requester"} from making new requests.
+          </p>
+          <label className="eyebrow grid gap-2">
+            <span>Reason for restriction</span>
+            <textarea
+              className="desk-input min-h-24"
+              required
+              value={restrictionReason}
+              onChange={(event) => setRestrictionReason(event.target.value)}
+            />
+          </label>
+        </form>
+      </Modal>
     </div>
   );
 }

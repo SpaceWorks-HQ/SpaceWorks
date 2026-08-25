@@ -12,18 +12,22 @@ type RequestAttributionFields = {
   issued_by?: RequestActor | null;
 };
 
-// Evidence object keys are never exposed; fetch a short-lived signed URL on click and open it.
-async function openEvidence(id: number) {
-  try {
-    const res = await staffRequest<{ url: string }>(`/admin/evidence/${id}`);
-    window.open(res.url, "_blank", "noopener");
-  } catch (error) {
-    window.alert(error instanceof Error ? error.message : "Could not load evidence photo.");
-  }
-}
-
 export function RequestList({ rows, actions, canViewAudit = false }: { rows: HardwareRequest[]; actions: (row: HardwareRequest) => React.ReactNode; canViewAudit?: boolean }) {
   const [timelineId, setTimelineId] = useState<number | null>(null);
+  const [evidenceError, setEvidenceError] = useState<{ requestId: number; message: string } | null>(null);
+  // Evidence object keys are never exposed; fetch a short-lived signed URL on click and open it.
+  const openEvidence = async (requestId: number, evidenceId: number) => {
+    setEvidenceError(null);
+    try {
+      const res = await staffRequest<{ url: string }>(`/admin/evidence/${evidenceId}`);
+      window.open(res.url, "_blank", "noopener");
+    } catch (error) {
+      setEvidenceError({
+        requestId,
+        message: error instanceof Error ? error.message : "Could not load evidence photo.",
+      });
+    }
+  };
   if (!rows.length) return <p className="text-sm text-ink/60">No requests.</p>;
   return (
     <div className="overflow-hidden rounded-md border border-line">
@@ -70,13 +74,16 @@ export function RequestList({ rows, actions, canViewAudit = false }: { rows: Har
           {row.issue_evidence_id || (row.return_evidence_ids?.length ?? 0) > 0 ? (
             <div className="desk-actions mt-2 flex flex-wrap gap-2 text-xs">
               {row.issue_evidence_id ? (
-                <button className="desk-button-ghost" type="button" onClick={() => openEvidence(row.issue_evidence_id as number)}>View issue photo</button>
+                <button className="desk-button-ghost" type="button" onClick={() => void openEvidence(row.id, row.issue_evidence_id as number)}>View issue photo</button>
               ) : null}
               {(row.return_evidence_ids ?? []).map((id, index) => (
-                <button className="desk-button-ghost" key={id} type="button" onClick={() => openEvidence(id)}>
+                <button className="desk-button-ghost" key={id} type="button" onClick={() => void openEvidence(row.id, id)}>
                   View return photo{(row.return_evidence_ids?.length ?? 0) > 1 ? ` ${index + 1}` : ""}
                 </button>
               ))}
+              {evidenceError?.requestId === row.id ? (
+                <p className="w-full text-sm text-danger" role="alert">{evidenceError.message}</p>
+              ) : null}
             </div>
           ) : null}
           {timelineId === row.id ? <RequestTimelineBlock requestId={row.id} /> : null}
@@ -131,5 +138,4 @@ function statusBadgeClassName(status: string) {
       return "";
   }
 }
-
 

@@ -182,9 +182,15 @@ class ServiceQueueAdmin(_ReadOnlyMachineChildAdmin):
 
 @admin.register(MachineConsumablePool)
 class MachineConsumablePoolAdmin(_ReadOnlyMachineChildAdmin):
-    list_display = ("id", "label", "makerspace", "machine", "remaining_grams", "is_active")
-    list_filter = ("is_active", "material")
-    search_fields = ("material", "color", "brand", "machine__name")
+    list_display = (
+        "id", "label", "makerspace", "machine", "machine_type", "remaining_grams",
+        "is_active", "is_public",
+    )
+    list_filter = ("is_active", "is_public", "material", "machine_type")
+    search_fields = (
+        "material", "color", "brand", "machine__name", "machine_type__name",
+        "machine_type__slug",
+    )
 
 
 @admin.register(MachineConsumableAdjustment)
