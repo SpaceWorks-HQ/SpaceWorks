@@ -236,6 +236,7 @@ FK_POLICIES = {
     ("machines.RoleMachineScope", "role"): ForeignKeyPolicy(ReferenceDisposition.DROP_ROW, "Role scopes are never remapped to Member."),
     ("machines.RoleMachineTypeScope", "role"): ForeignKeyPolicy(ReferenceDisposition.DROP_ROW, "Role scopes are never remapped to Member."),
     ("machines.Machine", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
+    ("machines.MachineConsumablePool", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("machines.MakerspaceMachineTypePricing", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("machines.ServiceQueue", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("procurement.ToBuyItem", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
