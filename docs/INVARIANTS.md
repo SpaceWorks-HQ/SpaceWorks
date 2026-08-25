@@ -2220,8 +2220,8 @@ streams a length-framed `(makerspace_id, version, status, DEK bytes)` payload to
 every `tenant_dek_recipient`; ciphertext returns through anonymous stdout. Failures terminate and reap child
 processes, close pipes/caches, and remove partial ciphertext and staging before a generic secret-free error.
 The bounded guarantee is only that no Lane-D-created persistent application output retains a plaintext DEK
-after this operation. Python buffers, privileged host observation, process dumps and swap remain outside that
-application-level guarantee; cache clearing is best effort and is not secure zeroization.
+after this operation. Python buffers, privileged host observation, process dumps, OS core dumps and swap
+remain outside that application-level guarantee; cache clearing is best effort and is not secure zeroization.
 
 Only `keys/tenant-deks.age`, its ciphertext size/digest and the non-secret retained-key inventory enter the
 sanitized bundle. The bundle itself is streamed directly into the outer age envelope without a plaintext tar;
