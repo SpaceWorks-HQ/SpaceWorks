@@ -221,6 +221,11 @@ thirteen modules under it are optional.
   records and consumable pools hang off it.
 - **What it adds** — the Machines console, machine detail, per-machine documents and images, consumables
   and usage. `MANAGE_MACHINES` is scoped per role, so a maintainer can be narrowed to specific machines.
+  A consumable pool is scoped to **either** one machine or one machine type, never both, so a filament
+  colour can be shared across every printer of a type instead of being re-entered per machine. Each pool
+  also carries a hex swatch for the staff console and its own public/private flag. A public pool appears
+  in the public printing form as material and colour name only — never the hex value, the lot code or
+  the remaining grams — and only while it is active with stock left.
 - **Without it** — the whole machine side of the product disappears: no registry, no service queue
   (which needs machines to point at), no maintenance schedules, no per-machine consumables. A pure tool
   library runs exactly like this — see the `lending` profile.
