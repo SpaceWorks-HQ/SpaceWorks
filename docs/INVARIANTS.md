@@ -2224,10 +2224,17 @@ after this operation. Python buffers, privileged host observation, process dumps
 remain outside that application-level guarantee; cache clearing is best effort and is not secure zeroization.
 
 Only `keys/tenant-deks.age`, its ciphertext size/digest and the non-secret retained-key inventory enter the
-sanitized bundle. The bundle itself is streamed directly into the outer age envelope without a plaintext tar;
-the plaintext derived directory is removed before derivation commits. The derivation-policy version is bumped
-whenever this custody/layout contract changes, and publication re-verifies the source mode, mapped findings,
-key inventory and content-ledger declaration against the immutable capture.
+sanitized inner bundle. Its payload-member ledger is a positive allowlist: `database.dump`, the conditional
+tenant-DEK envelope and opaque SHA-256-named private/public object members; `manifest.json` is admitted only as
+the encrypted inner manifest at the sealing boundary. The inner bundle is streamed directly into `payload.age`
+without a plaintext tar on disk. A canonical two-member outer tar then carries separately readable
+`outer-manifest.json` plus that ciphertext. The outer manifest has an exact structural allowlist containing
+only artifact/capture identities, recipient fingerprints, ciphertext size/digest, source-build/PostgreSQL
+compatibility facts and content-ledger digest/count; its reader validates the canonical wrapper and re-hashes
+`payload.age` before any caller may decrypt it. The plaintext derived directory is removed before derivation
+commits. The derivation-policy version is bumped whenever this custody/layout contract changes, and publication
+re-verifies the source mode, mapped findings, key inventory and content-ledger declaration against the immutable
+capture.
 
 **Lane D D5 reconstructs target cryptography and custody only from tenant-held proof.** Before any target
 state is changed, `tenant_dump_target_identities.py` accepts only absolute regular files that are mode `0600`

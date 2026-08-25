@@ -34,6 +34,7 @@ from .tenant_dump_lineage import (
     derivation_policy_digest,
 )
 from .tenant_dump_objects import package_staged_objects
+from . import tenant_dump_outer_manifest_facts as outer_facts
 from .tenant_dump_pii import ENCRYPTED, scan_mapped_pii, source_pii_mode
 from .tenant_dump_publication import revalidate_before_encryption
 from .tenant_dump_recipients import recipient_sets
@@ -118,7 +119,24 @@ def derive_tenant_dump(capture_id, *, database=None):
         manifest_path.chmod(0o600)
         frozen = revalidate_before_encryption(capture.pk, stage="outer")
         recipients = recipient_sets(capture, frozen)
-        seal_outer_bundle(bundle, artifact, recipients.outer_recipients)
+        seal_outer_bundle(
+            bundle,
+            artifact,
+            recipients.outer_recipients,
+            artifact_id=capture.pk,
+            capture_id=capture.pk,
+            outer_recipient_fingerprints=outer_facts.recipient_fingerprint_facts(
+                recipients.outer_recipients
+            ),
+            tenant_dek_recipient_fingerprints=outer_facts.recipient_fingerprint_facts(
+                recipients.tenant_dek_recipients
+            ),
+            source_build=outer_facts.source_build_fact(),
+            postgres_major=capture.source_postgres_major,
+            compatibility=outer_facts.compatibility_facts(
+                capture, manifest["contents"], policy_digest, pii_mode
+            ),
+        )
         shutil.rmtree(bundle)
         _complete_derivation(capture.pk, manifest, policy_digest)
         return artifact, manifest

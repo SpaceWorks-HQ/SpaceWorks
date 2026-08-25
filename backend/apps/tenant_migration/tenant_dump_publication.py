@@ -28,6 +28,7 @@ from .tenant_dump_errors import (
     TenantDumpVerificationError,
 )
 from .tenant_dump_lineage import verify_artifact_lineage
+from .tenant_dump_outer_artifact import read_outer_manifest
 from .tenant_dump_staging import delete_owned_root
 
 
@@ -52,6 +53,14 @@ def revalidate_before_encryption(capture_id, *, stage):
 def register_unpublished_artifact(capture_id, encrypted_path):
     """Upload sealed bytes under a non-discoverable key for final publication."""
     encrypted_path = Path(encrypted_path)
+    outer_manifest = read_outer_manifest(encrypted_path)
+    if (
+        outer_manifest["artifact_id"] != str(capture_id)
+        or outer_manifest["capture_id"] != str(capture_id)
+    ):
+        raise TenantDumpBuildError(
+            "The readable Lane D outer manifest names another capture."
+        )
     try:
         size = encrypted_path.stat().st_size
         digest = sha256_file(encrypted_path)
