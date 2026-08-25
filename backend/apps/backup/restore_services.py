@@ -53,7 +53,11 @@ def request_restore(actor, archive, kind):
             "Restore refused [format_unsupported]: "
             "the deployment archive format is unsupported."
         )
-    if archive.status != BackupArchive.Status.AVAILABLE:
+    if (
+        archive.status != BackupArchive.Status.AVAILABLE
+        or archive.expires_at is None
+        or archive.expires_at <= timezone.now()
+    ):
         raise ValidationError("The selected archive is not available.")
     state = _locked_state()
     if state.mode != DeploymentRecoveryState.Mode.NORMAL:

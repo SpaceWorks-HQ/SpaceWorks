@@ -1,8 +1,6 @@
 """Database and object-storage payload assembly for backup archives."""
-import hashlib
 import json
 import os
-from pathlib import Path
 import subprocess
 
 from django.apps import apps
@@ -10,6 +8,10 @@ from django.conf import settings
 from django.db import connection, transaction
 
 from apps.backup import storage
+from apps.backup.archive_metadata import (
+    build_info as _build_info,
+    settings_manifest as _settings_manifest,
+)
 from apps.backup.archive_objects import (
     NON_OBJECT_KEY_FIELDS,
     OBJECT_FIELD_NAMES,
@@ -22,7 +24,6 @@ from apps.backup.object_ownership import MAIN_COMPONENT, build_object_ownership_
 from apps.backup.postgres_client import client_binary
 from apps.backup.models import ARCHIVE_PURGE_WARNING, BackupArchive
 from apps.backup.raw_projection import canonical_owner_q, no_decrypt_guard, raw_records
-from apps.backup.settings_policy import POLICIES, Policy
 from apps.backup.tenant_projection import project_raw_dataset
 from apps.data_export.datasets import DATASET_SPECS
 
@@ -45,10 +46,17 @@ def _snapshot_payload(archive, root, modes, selected_recipients, *, compound_cap
             cursor.execute("SELECT pg_export_snapshot()")
             snapshot_id = cursor.fetchone()[0]
         if archive.scope == BackupArchive.Scope.DEPLOYMENT:
-            Makerspace = apps.get_model("makerspaces.Makerspace")
-            covered_makerspace_ids = list(
-                Makerspace.objects.order_by("pk").values_list("pk", flat=True)
-            )
+            if archive.backup_run_id:
+                covered_makerspace_ids = sorted(
+                    int(key)
+                    for key, enabled in archive.backup_run.flag_snapshot.items()
+                    if enabled is True
+                )
+            else:
+                Makerspace = apps.get_model("makerspaces.Makerspace")
+                covered_makerspace_ids = list(
+                    Makerspace.objects.order_by("pk").values_list("pk", flat=True)
+                )
             _pg_dump(root / "database.dump", snapshot_id)
             if compound_capture is None:
                 object_keys = _object_closure()
@@ -77,6 +85,9 @@ def _snapshot_payload(archive, root, modes, selected_recipients, *, compound_cap
     return {
         "format": "spaceworks-phase5a-v3",
         "archive_id": str(archive.pk),
+        "backup_run_id": (
+            str(archive.backup_run_id) if archive.backup_run_id else None
+        ),
         "scope": archive.scope,
         "makerspace_id": archive.makerspace_id,
         "recipients": selected_recipients,
@@ -176,37 +187,6 @@ def _storage_modes():
 def _write_continuity_keys(path):
     values = {name: os.environ.get(name, "") for name in CONTINUITY_KEYS}
     _write_json(path, values)
-
-
-def _settings_manifest():
-    result = {}
-    for name, entry in POLICIES.items():
-        if entry.policy == Policy.EXCLUDED:
-            continue
-        raw = os.environ.get(name, "")
-        if entry.policy == Policy.EXACT_FINGERPRINT:
-            fact = {"fingerprint": hashlib.sha256(raw.encode()).hexdigest()}
-        elif entry.policy == Policy.CAPABILITY_PROBE:
-            # Infrastructure credentials never enter the database-backed manifest.
-            fact = {"configured": bool(raw)}
-        else:
-            fact = {"value": raw}
-        result[name] = {
-            "policy": entry.policy,
-            "blocks_restore": entry.blocks_restore,
-            **fact,
-        }
-    return result
-
-
-def _build_info():
-    path = Path("/app/BUILD_INFO.json")
-    if path.exists():
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            pass
-    return {"git_sha": "unknown", "git_describe": "unknown", "built_at": "unknown", "source_hash": "unknown"}
 
 
 def _write_json(path, value):

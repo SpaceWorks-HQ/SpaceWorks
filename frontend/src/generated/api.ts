@@ -856,12 +856,12 @@ export type BackupArchive = {
   "failure_detail": string;
   "started_at": string | null;
   "completed_at": string | null;
-  "expires_at": string;
+  "expires_at": string | null;
   "created_at": string;
   "purge_warning": string;
 };
 
-export type BackupArchiveStatusEnum = "pending" | "running" | "available" | "failed" | "expired";
+export type BackupArchiveStatusEnum = "pending" | "running" | "promoting" | "available" | "failed" | "expired";
 
 export type BackupDownload = {
   "url": string;

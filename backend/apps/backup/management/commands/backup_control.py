@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from apps.backup import storage
 from apps.backup.models import DeploymentRecoveryState, RestoreOperation
-from apps.backup.backup_control_preflight import run_restore_preflight
+from apps.backup.restore_preflight import run_restore_preflight
 from apps.backup.management.commands.backup_preflight import (
     build_info,
     check_setting_policies,

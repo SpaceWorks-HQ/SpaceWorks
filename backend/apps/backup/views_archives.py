@@ -29,7 +29,11 @@ class DeploymentArchiveListCreateView(APIView):
         rows = BackupArchive.objects.filter(
             scope=BackupArchive.Scope.DEPLOYMENT
         ).exclude(
-            status__in=(BackupArchive.Status.PENDING, BackupArchive.Status.RUNNING)
+            status__in=(
+                BackupArchive.Status.PENDING,
+                BackupArchive.Status.RUNNING,
+                BackupArchive.Status.PROMOTING,
+            )
         )[:30]
         return Response(BackupArchiveSerializer(rows, many=True).data)
 
@@ -54,7 +58,11 @@ class MakerspaceArchiveListCreateView(APIView):
         rows = BackupArchive.objects.filter(
             scope=BackupArchive.Scope.MAKERSPACE, makerspace=makerspace
         ).exclude(
-            status__in=(BackupArchive.Status.PENDING, BackupArchive.Status.RUNNING)
+            status__in=(
+                BackupArchive.Status.PENDING,
+                BackupArchive.Status.RUNNING,
+                BackupArchive.Status.PROMOTING,
+            )
         )[:30]
         return Response(BackupArchiveSerializer(rows, many=True).data)
 

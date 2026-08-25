@@ -35990,7 +35990,8 @@
                     "expires_at": {
                         "type": "string",
                         "format": "date-time",
-                        "readOnly": true
+                        "readOnly": true,
+                        "nullable": true
                     },
                     "created_at": {
                         "type": "string",
@@ -36022,12 +36023,13 @@
                 "enum": [
                     "pending",
                     "running",
+                    "promoting",
                     "available",
                     "failed",
                     "expired"
                 ],
                 "type": "string",
-                "description": "* `pending` - Pending\n* `running` - Running\n* `available` - Available\n* `failed` - Failed\n* `expired` - Expired"
+                "description": "* `pending` - Pending\n* `running` - Running\n* `promoting` - Promoting\n* `available` - Available\n* `failed` - Failed\n* `expired` - Expired"
             },
             "BackupDownload": {
                 "type": "object",

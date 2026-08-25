@@ -18,6 +18,8 @@ def validate_unsigned_manifest(manifest, *, protocol_version):
             raise ValueError
         capture_id = uuid.UUID(str(manifest["capture_id"]))
         uuid.UUID(str(manifest["artifact_id"]))
+        if "backup_run_id" in manifest:
+            uuid.UUID(str(manifest["backup_run_id"]))
         build_identity = manifest["build_identity"]
         postgres = manifest["postgres"]
         if (

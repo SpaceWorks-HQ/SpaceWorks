@@ -60,17 +60,27 @@ def test_backup_has_its_own_idempotent_lease_not_a_periodic_task_claim(settings)
     assert PeriodicTaskRun.objects.count() == 0
 
 
-def test_archive_retention_comes_from_operator_settings():
+def test_backup_lease_renewal_is_holder_fenced(settings):
+    settings.BACKUP_LEASE_SECONDS = 60
+    owner, stranger = uuid.uuid4(), uuid.uuid4()
+    assert services._claim_lease(owner) is True
+    before = BackupLease.objects.get(name="deployment-backup").leased_until
+
+    assert services._renew_lease(stranger) is False
+    assert BackupLease.objects.get(name="deployment-backup").leased_until == before
+    assert services._renew_lease(owner) is True
+    assert BackupLease.objects.get(name="deployment-backup").leased_until >= before
+
+
+def test_archive_expiry_is_deferred_until_successful_promotion():
     actor = User.objects.create_superuser(username="retention-super", password="secret")
     row = PlatformBackupSettings.load()
     row.retention_days = 11
     row.save(update_fields=("retention_days", "updated_at"))
-    before = timezone.now()
 
     archive = services.create_archive(actor, scope=BackupArchive.Scope.DEPLOYMENT)
 
-    assert before + timedelta(days=10, hours=23) < archive.expires_at
-    assert archive.expires_at < before + timedelta(days=11, minutes=1)
+    assert archive.expires_at is None
 
 
 def test_restore_request_refuses_unsupported_format_before_side_effects():

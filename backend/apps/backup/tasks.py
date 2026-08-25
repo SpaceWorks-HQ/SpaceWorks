@@ -1,7 +1,7 @@
 from celery import shared_task
 
 from apps.backup.services import purge_expired_archives, run_archive, schedule_deployment_backup
-from apps.backup.models import BackupArchive
+from apps.backup.models import BackupArchive, BackupRun
 from apps.backup.object_restore import cleanup_expired_rollback_objects
 from apps.backup.custody_alarms import deliver_archive_custody_alarms
 from apps.backup.reconciliation import reconcile_artifact_uploads
@@ -18,8 +18,8 @@ def run_backup_archive_task(self, archive_id):
 
 @shared_task(bind=True, max_retries=0)
 def scheduled_deployment_backup_task(self):
-    archive = schedule_deployment_backup()
-    return bool(archive and archive.status == BackupArchive.Status.AVAILABLE)
+    run = schedule_deployment_backup()
+    return bool(run and run.status == BackupRun.Status.COMPLETE)
 
 
 @shared_task(bind=True, max_retries=0)
