@@ -156,11 +156,10 @@ console shows you:
 | **Machines** | Machine registry, the service/print queue, maintenance and warranty |
 | **Events** | Event scheduling and registrations, QR check-in at the door, and cross-makerspace collaborative events |
 | **Bookings** | Resource booking and public self-booking |
-| **Membership** | Join requests, waivers, referrals, member activity, maker profiles and presence |
+| **Membership** | Join requests, waivers, referrals, member activity, maker profiles, presence — and the member-facing identity ecosystem |
 | **Notifications** | The in-app inbox and every outbound channel |
 | **Reports** | Analytics, the report registry and CSV/XLSX exports |
 | **Payments** | Taking money online, through Stripe or Razorpay |
-| **Accounts** | The member-facing identity ecosystem — see below |
 | **Mobile apps** | Attested device sessions, native push and the in-app payment sheet |
 | **Updates** | In-app release control |
 
@@ -241,6 +240,7 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | **Events** | [`events`](docs/MODULES.md#events) | | | Scheduling, registrations, QR check-in, collaborative events |
 | **Bookings** | [`bookings`](docs/MODULES.md#bookings) | | | Resource booking and public self-booking |
 | **Membership** | [`membership`](docs/MODULES.md#membership) | | | Join requests, waivers, referrals, maker profiles |
+| | [`member_accounts`](docs/MODULES.md#member_accounts) | | | Member sign-up and member sign-in |
 | **Notifications** | [`notifications`](docs/MODULES.md#notifications) | | | The in-app inbox |
 | | [`email`](docs/MODULES.md#email) | | | Outbound email |
 | | [`telegram`](docs/MODULES.md#telegram) | | | Telegram alerts and accept/reject buttons |
@@ -249,7 +249,6 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | | [`discord`](docs/MODULES.md#discord) | | | Discord alerts |
 | **Reports** | [`reports`](docs/MODULES.md#reports) | | | Analytics, the ledger and CSV/XLSX export |
 | **Payments** | [`payments`](docs/MODULES.md#payments) | | ● | Taking money online (Stripe or Razorpay) |
-| **Accounts** | [`member_accounts`](docs/MODULES.md#member_accounts) | | | The member identity ecosystem — sign-up and member sign-in |
 | **Mobile apps** | [`mobile`](docs/MODULES.md#mobile) | | | Attested device sessions, native push, payment sheet |
 | **Updates** | [`updates`](docs/MODULES.md#updates) | | ● | In-app release control |
 
@@ -307,7 +306,7 @@ for the whole deployment.
 
 ### Running without member accounts
 
-Turning **Accounts** off removes the member-account *ecosystem*: nobody signs themselves up, and the
+Turning **Member accounts** off removes the member-account *ecosystem*: nobody signs themselves up, and the
 member area, phone sign-in and the built-in Google/Apple buttons all go with it. It does **not** remove
 identity, and it never touches staff sign-in — a deployment that could switch off its own staff logins
 could not be administered.

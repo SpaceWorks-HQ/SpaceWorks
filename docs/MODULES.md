@@ -315,6 +315,26 @@ Required by `printing`.
 
 ---
 
+### member_accounts
+
+Required by `mobile`.
+
+- **What it is** — the member-facing identity ecosystem: self sign-up, and the built-in password, social
+  and phone sign-in.
+- **What it adds** — member registration, the member area, Google/Apple buttons, phone + SMS login.
+- **Without it** — nobody signs themselves up and the member-facing login methods go away. **Staff sign-in
+  is never gated** — a space that could switch off its own staff logins could not be administered — and
+  external identity (generic OIDC) plus the member-domain APIs keep working. Members are then created by
+  staff as walk-in records. `mobile` cannot be installed while this is off.
+- **Deployment-level reading.** Sign-up and social/phone sign-in resolve *before* a makerspace is chosen,
+  so this key is read as "does any live makerspace run it", and it fails **open** on a box with no
+  makerspaces yet — otherwise a fresh install could not bootstrap its first space.
+- **Data** — `purge_module_data` reports it stores no data of its own to purge separately; user accounts
+  are platform state.
+
+---
+
+
 ## Notifications
 
 Each channel is its own module, so a space that lives in Discord ships no Slack surface at all. Turning a
@@ -402,27 +422,6 @@ stored credential**, so re-enabling needs no re-entry.
 - **Data** — **payments are never purged by a module purge.** A charge is the record of money that really
   changed hands, so receipts stay readable and a pending charge stays payable, waivable and markable
   paid, keeping the description it was raised under. Only purging the whole makerspace removes them.
-
----
-
-## Accounts
-
-### member_accounts
-
-Required by `mobile`.
-
-- **What it is** — the member-facing identity ecosystem: self sign-up, and the built-in password, social
-  and phone sign-in.
-- **What it adds** — member registration, the member area, Google/Apple buttons, phone + SMS login.
-- **Without it** — nobody signs themselves up and the member-facing login methods go away. **Staff sign-in
-  is never gated** — a space that could switch off its own staff logins could not be administered — and
-  external identity (generic OIDC) plus the member-domain APIs keep working. Members are then created by
-  staff as walk-in records. `mobile` cannot be installed while this is off.
-- **Deployment-level reading.** Sign-up and social/phone sign-in resolve *before* a makerspace is chosen,
-  so this key is read as "does any live makerspace run it", and it fails **open** on a box with no
-  makerspaces yet — otherwise a fresh install could not bootstrap its first space.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately; user accounts
-  are platform state.
 
 ---
 

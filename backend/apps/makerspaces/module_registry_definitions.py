@@ -27,7 +27,6 @@ GROUP_MEMBERSHIP = "membership"
 GROUP_NOTIFICATIONS = "notifications"
 GROUP_REPORTS = "reports"
 GROUP_PAYMENTS = "payments"
-GROUP_ACCOUNTS = "accounts"
 GROUP_MOBILE = "mobile"
 GROUP_UPDATES = "updates"
 
@@ -63,7 +62,9 @@ GROUPS = (
     GroupDefinition(
         GROUP_MEMBERSHIP, "Membership",
         "Community membership: join requests, waivers, referrals, member activity and "
-        "presence check-in.",
+        "presence check-in, plus the member-facing identity ecosystem - self sign-up, "
+        "social and phone login, and the member area. Staff always sign in with a "
+        "password regardless of anything in this group.",
     ),
     GroupDefinition(
         GROUP_NOTIFICATIONS, "Notifications",
@@ -80,11 +81,6 @@ GROUPS = (
         GROUP_PAYMENTS, "Payments",
         "Taking money online for machine jobs, bookings, event registrations and "
         "membership dues.",
-    ),
-    GroupDefinition(
-        GROUP_ACCOUNTS, "Accounts",
-        "The member-facing identity ecosystem: self sign-up, social and phone login, "
-        "and the member area. Staff always sign in with a password regardless.",
     ),
     GroupDefinition(
         GROUP_MOBILE, "Mobile apps",

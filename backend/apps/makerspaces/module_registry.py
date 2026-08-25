@@ -12,7 +12,6 @@ derived helpers from here, so the reverse edge would be a circular import.
 
 from apps.makerspaces.module_registry_definitions import (
     FEATURE_PARENT,
-    GROUP_ACCOUNTS,
     GROUP_BOOKINGS,
     GROUP_EVENTS,
     GROUP_INVENTORY,
@@ -184,7 +183,7 @@ MODULES = (
         "member_accounts", "Member accounts",
         "Member self-service enrolment and built-in password, social and phone login. "
         "Staff sign-in, external identity and member-domain APIs are unaffected.",
-        "accounts", GUARD, group=GROUP_ACCOUNTS,
+        "accounts", GUARD, group=GROUP_MEMBERSHIP,
     ),
     # Requires `member_accounts` because a device grant is bound to a user: without
     # member accounts there is no identity for a phone to hold.
