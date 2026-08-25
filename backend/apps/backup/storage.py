@@ -57,6 +57,11 @@ def upload_archive(key, path):
         raise BackupStorageError("The encrypted backup archive could not be stored.") from exc
 
 
+def copy_archive(source_key, destination_key):
+    """Compatibility name for the create-only final-object promotion primitive."""
+    return create_final_from_staging(source_key, destination_key)
+
+
 def open_archive(key):
     try:
         return client(public_endpoint=True).get_object(
@@ -75,6 +80,69 @@ def delete_archive(key):
         return True
     except (BotoCoreError, ClientError):
         logger.exception("backup_archive_delete_failed", extra={"object_key": key})
+        return False
+
+
+def delete_archive_prefix(prefix):
+    """Delete every retained version and current object below a staging prefix."""
+    try:
+        s3 = client()
+        bucket = settings.AWS_STORAGE_BUCKET_NAME
+        key_marker = version_marker = None
+        found_versions = False
+        try:
+            while True:
+                params = {"Bucket": bucket, "Prefix": prefix}
+                if key_marker:
+                    params["KeyMarker"] = key_marker
+                if version_marker:
+                    params["VersionIdMarker"] = version_marker
+                page = s3.list_object_versions(**params)
+                objects = [
+                    {"Key": item["Key"], "VersionId": item["VersionId"]}
+                    for group in (
+                        page.get("Versions", []),
+                        page.get("DeleteMarkers", []),
+                    )
+                    for item in group
+                ]
+                if objects:
+                    found_versions = True
+                    s3.delete_objects(
+                        Bucket=bucket,
+                        Delete={"Objects": objects, "Quiet": True},
+                    )
+                if not page.get("IsTruncated"):
+                    break
+                key_marker = page.get("NextKeyMarker")
+                version_marker = page.get("NextVersionIdMarker")
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            if code not in {"NotImplemented", "InvalidRequest", "501"}:
+                raise
+        if not found_versions:
+            continuation_token = None
+            while True:
+                params = {"Bucket": bucket, "Prefix": prefix}
+                if continuation_token:
+                    params["ContinuationToken"] = continuation_token
+                page = s3.list_objects_v2(**params)
+                objects = [
+                    {"Key": item["Key"]} for item in page.get("Contents", [])
+                ]
+                if objects:
+                    s3.delete_objects(
+                        Bucket=bucket,
+                        Delete={"Objects": objects, "Quiet": True},
+                    )
+                if not page.get("IsTruncated"):
+                    break
+                continuation_token = page.get("NextContinuationToken")
+        return True
+    except (BotoCoreError, ClientError):
+        logger.exception(
+            "backup_archive_prefix_delete_failed", extra={"prefix": prefix}
+        )
         return False
 
 

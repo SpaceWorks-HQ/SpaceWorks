@@ -1,6 +1,7 @@
 """The single no-I/O transaction that makes a Lane E artifact available."""
 
 import uuid
+from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
@@ -95,6 +96,7 @@ def _promote_atomic(artifact_id, retained_ids, sovereign_ids, artifact_ids):
         or artifact.final_verified_sha256 != artifact.outer_sha256
     ):
         raise ArtifactLedgerMismatch("The verified final storage facts changed.")
+    _enter_promotion_state(archive)
     validate_frozen_state(
         artifact, spaces, recipients, activations, settings_row, artifacts
     )
@@ -139,9 +141,11 @@ def _promote_atomic(artifact_id, retained_ids, sovereign_ids, artifact_ids):
     archive.age_encrypted = True
     archive.completed_at = now
     archive.failure_detail = ""
+    if archive.expires_at is None:
+        archive.expires_at = now + timedelta(days=settings_row.retention_days)
     archive.save(update_fields=(
         "status", "object_key", "manifest", "size_bytes", "archive_sha256",
-        "age_encrypted", "completed_at", "failure_detail", "updated_at",
+        "age_encrypted", "completed_at", "expires_at", "failure_detail", "updated_at",
     ))
     for makerspace, activation in pending:
         audit.record(
@@ -164,10 +168,21 @@ def _promote_atomic(artifact_id, retained_ids, sovereign_ids, artifact_ids):
             "user_closure_digest": closure_digest,
         },
     )
-    settings_row.last_success_at = now
-    settings_row.last_error = ""
-    settings_row.save(update_fields=("last_success_at", "last_error", "updated_at"))
+    if archive.backup_run_id is None:
+        settings_row.last_success_at = now
+        settings_row.last_error = ""
+        settings_row.save(
+            update_fields=("last_success_at", "last_error", "updated_at")
+        )
     return archive
+
+
+def _enter_promotion_state(archive):
+    if archive.status == BackupArchive.Status.RUNNING:
+        archive.status = BackupArchive.Status.PROMOTING
+        archive.save(update_fields=("status", "updated_at"))
+    elif archive.status != BackupArchive.Status.PROMOTING:
+        raise ArtifactLedgerMismatch("The archive is not owned for promotion.")
 
 
 def _lock_makerspaces(ids):

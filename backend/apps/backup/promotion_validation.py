@@ -101,9 +101,32 @@ def validate_artifact_rows(artifact, archive, components, associations):
         or manifest["format"] != artifact.format
         or manifest_digest(manifest) != artifact.outer_manifest_sha256
         or archive.pk != artifact.archive_uuid_snapshot
-        or archive.status != BackupArchive.Status.RUNNING
+        or archive.status != BackupArchive.Status.PROMOTING
+        or manifest.get("backup_run_id")
+        != (str(archive.backup_run_id) if archive.backup_run_id else None)
     ):
         raise ArtifactLedgerMismatch("The artifact or archive identity changed.")
+    if archive.backup_run_id is not None:
+        try:
+            run_flags = {
+                int(key): value
+                for key, value in archive.backup_run.flag_snapshot.items()
+            }
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise ArtifactLedgerMismatch(
+                "The backup run flag snapshot is malformed."
+            ) from exc
+        frozen_flags = {
+            item["makerspace_id"]: item["superadmin_access_enabled"]
+            for item in artifact.frozen_promotion_snapshot["retained"]
+        }
+        if (
+            any(type(value) is not bool for value in run_flags.values())
+            or any(frozen_flags.get(key) is not value for key, value in run_flags.items())
+        ):
+            raise ArtifactLedgerMismatch(
+                "The backup run cohort conflicts with the retained promotion snapshot."
+            )
     expected = component_specs(manifest)
     actual = {str(item.component_id): item for item in components}
     if set(actual) != {str(item["component_id"]) for item in expected}:

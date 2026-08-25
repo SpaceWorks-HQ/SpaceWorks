@@ -39,6 +39,7 @@ class BackupArchive(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         RUNNING = "running", "Running"
+        PROMOTING = "promoting", "Promoting"
         AVAILABLE = "available", "Available"
         FAILED = "failed", "Failed"
         EXPIRED = "expired", "Expired"
@@ -55,8 +56,17 @@ class BackupArchive(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
         related_name="requested_backup_archives",
     )
+    backup_run = models.ForeignKey(
+        "backup.BackupRun",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="archives",
+    )
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    build_holder = models.UUIDField(null=True, blank=True)
     object_key = models.CharField(max_length=512, unique=True)
+    staging_object_key = models.CharField(max_length=512, null=True, blank=True)
     manifest = models.JSONField(default=dict, blank=True)
     size_bytes = models.PositiveBigIntegerField(default=0)
     archive_sha256 = models.CharField(max_length=64, blank=True)
@@ -64,7 +74,7 @@ class BackupArchive(models.Model):
     failure_detail = models.CharField(max_length=500, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
-    expires_at = models.DateTimeField()
+    expires_at = models.DateTimeField(null=True, blank=True)
     download_token_digest = models.CharField(max_length=64, blank=True)
     download_token_expires_at = models.DateTimeField(null=True, blank=True)
     download_token_consumed_at = models.DateTimeField(null=True, blank=True)
@@ -82,7 +92,14 @@ class BackupArchive(models.Model):
                     | models.Q(legacy_pre_decision_snapshot=True)
                 ),
                 name="backup_makerspace_decision_snapshot_present",
-            )
+            ),
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(status="available")
+                    | models.Q(expires_at__isnull=False)
+                ),
+                name="backup_available_requires_expiry",
+            ),
         ]
 
 
@@ -190,3 +207,4 @@ from .models_restore_reservations import (  # noqa: E402,F401
     B1RestoreComponentState,
     B1RestoreOperationState,
 )
+from .models_runs import BackupRun, BackupRunCoverage  # noqa: E402,F401

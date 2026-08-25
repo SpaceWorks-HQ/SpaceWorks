@@ -23,7 +23,11 @@ class DownloadTokenError(RuntimeError):
 @transaction.atomic
 def issue_download_token(archive, actor):
     locked = BackupArchive.objects.select_for_update().get(pk=archive.pk)
-    if locked.status != BackupArchive.Status.AVAILABLE or locked.expires_at <= timezone.now():
+    if (
+        locked.status != BackupArchive.Status.AVAILABLE
+        or locked.expires_at is None
+        or locked.expires_at <= timezone.now()
+    ):
         raise ValidationError("This backup archive is not available for download.")
     raw = secrets.token_urlsafe(32)
     locked.download_token_digest = hashlib.sha256(raw.encode()).hexdigest()
@@ -48,7 +52,10 @@ def consume_download_token(archive_id, raw):
     now = timezone.now()
     expected = hashlib.sha256(raw.encode()).hexdigest()
     valid = bool(
-        archive and archive.status == BackupArchive.Status.AVAILABLE
+        archive
+        and archive.status == BackupArchive.Status.AVAILABLE
+        and archive.expires_at
+        and archive.expires_at > now
         and archive.download_token_digest and archive.download_token_consumed_at is None
         and archive.download_token_expires_at and archive.download_token_expires_at > now
         and hmac.compare_digest(archive.download_token_digest, expected)

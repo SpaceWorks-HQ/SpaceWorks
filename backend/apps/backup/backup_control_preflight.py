@@ -8,6 +8,7 @@ import shutil
 from django.conf import settings
 from django.core.management.base import CommandError
 from django.db import connections
+from django.utils import timezone
 
 from apps.backup import storage
 from apps.backup.digests import (
@@ -45,7 +46,12 @@ def run_restore_preflight(
 ):
     restore = RestoreOperation.objects.select_related("archive").get(pk=restore_id)
     archive = restore.archive
-    if archive.status != BackupArchive.Status.AVAILABLE or not archive.age_encrypted:
+    if (
+        archive.status != BackupArchive.Status.AVAILABLE
+        or archive.expires_at is None
+        or archive.expires_at <= timezone.now()
+        or not archive.age_encrypted
+    ):
         raise CommandError(
             "The selected archive is not a completed age-encrypted deployment backup."
         )
