@@ -4060,6 +4060,58 @@
                         "description": ""
                     }
                 }
+            },
+            "patch": {
+                "operationId": "api_v1_admin_machine_service_consumable_pools_partial_update",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin machine service"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedPrinterPoolVisibility"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedPrinterPoolVisibility"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedPrinterPoolVisibility"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PrinterPool"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
             }
         },
         "/api/v1/admin/machine-service/consumable-pools/{id}/adjustments": {
@@ -47718,6 +47770,14 @@
                     }
                 }
             },
+            "PatchedPrinterPoolVisibility": {
+                "type": "object",
+                "properties": {
+                    "is_public": {
+                        "type": "boolean"
+                    }
+                }
+            },
             "PatchedReturnPolicy": {
                 "type": "object",
                 "properties": {
@@ -48545,6 +48605,11 @@
                         "readOnly": true,
                         "nullable": true
                     },
+                    "machine_type_id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
                     "material": {
                         "type": "string",
                         "maxLength": 100
@@ -48552,6 +48617,10 @@
                     "color": {
                         "type": "string",
                         "maxLength": 100
+                    },
+                    "color_hex": {
+                        "type": "string",
+                        "maxLength": 7
                     },
                     "brand": {
                         "type": "string",
@@ -48585,6 +48654,9 @@
                         "type": "boolean",
                         "readOnly": true
                     },
+                    "is_public": {
+                        "type": "boolean"
+                    },
                     "opened_at": {
                         "type": "string",
                         "format": "date-time",
@@ -48607,6 +48679,7 @@
                     "initial_grams",
                     "is_active",
                     "machine_id",
+                    "machine_type_id",
                     "material",
                     "remaining_grams",
                     "updated_at"
@@ -48637,6 +48710,15 @@
                         "minimum": 1,
                         "nullable": true
                     },
+                    "machine_type_id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "nullable": true
+                    },
+                    "is_public": {
+                        "type": "boolean",
+                        "default": true
+                    },
                     "material": {
                         "type": "string",
                         "maxLength": 100
@@ -48644,6 +48726,10 @@
                     "color": {
                         "type": "string",
                         "maxLength": 100
+                    },
+                    "color_hex": {
+                        "type": "string",
+                        "maxLength": 7
                     },
                     "brand": {
                         "type": "string",
@@ -51676,11 +51762,12 @@
             "RecoveryStateModeEnum": {
                 "enum": [
                     "normal",
+                    "target_import",
                     "quiesced",
                     "quarantined"
                 ],
                 "type": "string",
-                "description": "* `normal` - Normal\n* `quiesced` - Quiesced\n* `quarantined` - Quarantined"
+                "description": "* `normal` - Normal\n* `target_import` - Target import\n* `quiesced` - Quiesced\n* `quarantined` - Quarantined"
             },
             "RecoveryUnavailable": {
                 "type": "object",

@@ -14,6 +14,7 @@ import {
   type MachineTypeCapabilityConfig,
   type MeteringUnit,
 } from "../machinesApi";
+import { CapabilityPresetListEditor } from "./machine/CapabilityPresetListEditor";
 
 const meteringUnits: Array<{ value: MeteringUnit; label: string }> = [
   { value: "weight", label: "Weight (grams)" },
@@ -29,6 +30,38 @@ function configFor(machineType: MachineType): MachineTypeCapabilityConfig {
   return config && meteringUnits.some((unit) => unit.value === config.metering_unit)
     ? config
     : defaultConfig;
+}
+
+type PresetKey = "accepted_materials" | "accepted_colours";
+
+function withPresetList(config: MachineTypeCapabilityConfig, key: PresetKey, values: string[]) {
+  if (values.length) return { ...config, [key]: values };
+  const next = { ...config };
+  delete next[key];
+  return next;
+}
+
+function CapabilityPresetEditors({ config, disabled = false, onChange }: {
+  config: MachineTypeCapabilityConfig;
+  disabled?: boolean;
+  onChange: (config: MachineTypeCapabilityConfig) => void;
+}) {
+  return <div className="grid gap-2 md:grid-cols-2">
+    <CapabilityPresetListEditor
+      label="Materials"
+      singularLabel="Material"
+      values={config.accepted_materials ?? []}
+      disabled={disabled}
+      onChange={(values) => onChange(withPresetList(config, "accepted_materials", values))}
+    />
+    <CapabilityPresetListEditor
+      label="Colours"
+      singularLabel="Colour"
+      values={config.accepted_colours ?? []}
+      disabled={disabled}
+      onChange={(values) => onChange(withPresetList(config, "accepted_colours", values))}
+    />
+  </div>;
 }
 
 function PricingEditor({ makerspaceId, machineType, currency, canConfigure }: {
@@ -87,6 +120,7 @@ function CustomTypeRow({ makerspaceId, machineType, canConfigure, currency }: {
       <label className="eyebrow grid gap-1">Metering unit<select className="desk-input" value={config.metering_unit} disabled={!canConfigure} onChange={(event) => setConfig({ ...config, metering_unit: event.target.value as MeteringUnit })}>{meteringUnits.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}</select></label>
       {canConfigure ? <button className="desk-button-primary" type="submit" disabled={rename.isPending || !name.trim()}>{rename.isPending ? "Saving..." : "Save type"}</button> : null}
       <label className="eyebrow flex items-center gap-2 md:col-span-4"><input type="checkbox" checked={config.requires_booking} disabled={!canConfigure} onChange={(event) => setConfig({ ...config, requires_booking: event.target.checked })} /> Requires booking</label>
+      <div className="md:col-span-4"><CapabilityPresetEditors config={config} disabled={!canConfigure} onChange={setConfig} /></div>
       <p className="text-xs text-muted md:col-span-4">Slug: {machineType.slug} (fixed)</p>
       {rename.error instanceof Error ? <p className="text-sm text-danger md:col-span-4">{rename.error.message}</p> : null}
     </form>
@@ -120,6 +154,7 @@ export function MachineTypesPanel({ makerspaceId, canConfigureMachineTypes }: { 
         <label className="eyebrow grid gap-1">Metering unit<select className="desk-input" value={config.metering_unit} onChange={(event) => setConfig({ ...config, metering_unit: event.target.value as MeteringUnit })}>{meteringUnits.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}</select></label>
         <label className="eyebrow flex items-center gap-2"><input type="checkbox" checked={config.requires_booking} onChange={(event) => setConfig({ ...config, requires_booking: event.target.checked })} /> Requires booking</label>
         <button className="desk-button-primary" type="submit" disabled={create.isPending || !slug.trim() || !name.trim()}>{create.isPending ? "Creating..." : "Create type"}</button>
+        <div className="md:col-span-4"><CapabilityPresetEditors config={config} onChange={setConfig} /></div>
         {create.error instanceof Error ? <p className="text-sm text-danger md:col-span-4">{create.error.message}</p> : null}
       </form> : <p className="text-sm text-muted">You have read-only access to machine types and pricing.</p>}
       {machineTypes.isLoading ? <Skeleton className="h-20 w-full" /> : null}

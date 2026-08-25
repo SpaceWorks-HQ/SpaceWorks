@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 
+import { ConfirmDialog } from "../../../../components/ui";
 import {
   uploadToContract,
   useDeleteMaintenanceDocument,
@@ -22,6 +23,7 @@ export function MaintenanceDocuments({
   const [file, setFile] = useState<File | null>(null);
   const [pendingKey, setPendingKey] = useState("");
   const [uploadError, setUploadError] = useState<Error | null>(null);
+  const [deleteDocumentId, setDeleteDocumentId] = useState<number | null>(null);
   const presign = usePresignMaintenanceDocument(logId);
   const finalize = useFinalizeMaintenanceDocument(machineId, logId);
   const view = useMaintenanceDocumentUrl();
@@ -70,11 +72,7 @@ export function MaintenanceDocuments({
             <button
               className="desk-button-danger"
               type="button"
-              onClick={() => {
-                if (window.confirm("Permanently delete this maintenance attachment?")) {
-                  remove.mutate(document.id);
-                }
-              }}
+              onClick={() => setDeleteDocumentId(document.id)}
             >
               Delete
             </button>
@@ -115,6 +113,20 @@ export function MaintenanceDocuments({
       {error instanceof Error ? (
         <p className="text-sm text-danger" role="alert">{error.message}</p>
       ) : null}
+      <ConfirmDialog
+        open={deleteDocumentId !== null}
+        title="Delete maintenance attachment?"
+        message="Permanently delete this maintenance attachment?"
+        confirmLabel="Delete attachment"
+        tone="danger"
+        pending={remove.isPending}
+        onConfirm={() => {
+          if (deleteDocumentId !== null) {
+            remove.mutate(deleteDocumentId, { onSuccess: () => setDeleteDocumentId(null) });
+          }
+        }}
+        onCancel={() => setDeleteDocumentId(null)}
+      />
     </div>
   );
 }

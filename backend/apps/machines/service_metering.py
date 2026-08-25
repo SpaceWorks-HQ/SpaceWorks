@@ -6,6 +6,7 @@ from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
 from apps.audit import services as audit
+from apps.machines.consumable_scope import pool_serves_machine
 from apps.machines.metering import MeteringUnit, metering_unit_for_pool, pool_unit_for_metering
 from apps.machines.models import MachineConsumableAdjustment, MachineServiceRequest
 
@@ -75,7 +76,9 @@ def reserve_for_request(legacy, service_request, actor, *, pool, planned_grams=N
             raise ValidationError({"consumable_pool": "Consumable pool unit is incompatible with this metering unit."})
         if not locked.is_active:
             raise ValidationError({"consumable_pool": "Consumable pool is retired."})
-        if locked.makerspace_id != request.makerspace_id or (locked.machine_id and locked.machine_id != machine.pk):
+        # Keep the request-tenant assertion the scope helper does not make: it binds the pool to the
+        # MACHINE's makerspace, while the check it replaced bound it to the REQUEST's.
+        if locked.makerspace_id != request.makerspace_id or not pool_serves_machine(locked, machine):
             raise ValidationError({"consumable_pool": "Consumable pool is incompatible with this machine service request."})
         from apps.machines.printer_capabilities import is_printer_type
         from apps.machines.service_consumable_pools import _validate_pool
@@ -133,5 +136,4 @@ def reconcile_request(legacy, service_request, actor, *, actual_grams=None, actu
             request.reserved_grams = Decimal("0")
         request.save(update_fields=["actual_consumed_quantity", "reserved_quantity", "actual_consumed_grams", "reserved_grams", "updated_at"])
         return request
-
 

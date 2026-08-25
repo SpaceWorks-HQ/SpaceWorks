@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { Badge } from "../../../components/ui";
+import { Badge, ConfirmDialog } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import { EmailTemplateTypeSelector, type MachineTypeOption } from "./EmailTemplateTypeSelector";
 
@@ -53,6 +53,7 @@ export function EmailTemplateEditor({
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [debouncedDraft, setDebouncedDraft] = useState<Draft>(emptyDraft);
   const [showDefaults, setShowDefaults] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [lastFocused, setLastFocused] = useState<FocusedField>("text_body");
   const subjectRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -123,6 +124,7 @@ export function EmailTemplateEditor({
       const next = detailToDraft(updated);
       setDraft(next);
       setDebouncedDraft(next);
+      setResetDialogOpen(false);
       invalidate();
     },
   });
@@ -138,7 +140,7 @@ export function EmailTemplateEditor({
 
   const insertField = (name: string) => {
     const token = `{{ ${name} }}`;
-    const target = editorRef(lastFocused, subjectRef, textRef, htmlRef).current;
+    const target = { subject: subjectRef, text_body: textRef, html_body: htmlRef }[lastFocused].current;
     const start = target?.selectionStart ?? draft[lastFocused].length;
     const end = target?.selectionEnd ?? start;
     setDraft((current) => ({
@@ -183,7 +185,7 @@ export function EmailTemplateEditor({
         </label>
         <div className="desk-actions flex flex-wrap items-center gap-2">
           <button className="desk-button-primary" type="submit" disabled={save.isPending}>{save.isPending ? "Saving..." : "Save"}</button>
-          <button className="desk-button-danger" type="button" disabled={reset.isPending} onClick={() => window.confirm(selected.machineType ? "Reset this override to the space default?" : "Reset this email template to the built-in default?") && reset.mutate()}>
+          <button className="desk-button-danger" type="button" disabled={reset.isPending} onClick={() => setResetDialogOpen(true)}>
             {reset.isPending ? "Resetting..." : selected.machineType ? "Fall back to space default" : "Reset to built-in default"}
           </button>
           <button className="desk-button-ghost" type="button" onClick={() => setShowDefaults((open) => !open)}>{showDefaults ? "Hide default" : "View default"}</button>
@@ -191,6 +193,13 @@ export function EmailTemplateEditor({
         {save.error ? <p className="text-sm text-danger">{save.error.message}</p> : null}
         {reset.error ? <p className="text-sm text-danger">{reset.error.message}</p> : null}
       </form>
+      <ConfirmDialog
+        open={resetDialogOpen} title="Reset email template?"
+        message={selected.machineType ? "Reset this override to the space default?" : "Reset this email template to the built-in default?"}
+        confirmLabel="Reset template" tone="danger" pending={reset.isPending}
+        onConfirm={() => reset.mutate()}
+        onCancel={() => setResetDialogOpen(false)}
+      />
       {showDefaults ? <DefaultReference detail={detail.data} typeOverride={Boolean(selected.machineType)} /> : null}
       <PreviewPane preview={preview.data} loading={preview.isFetching} error={preview.error} />
     </div>
@@ -285,15 +294,4 @@ function detailToDraft(detail: TemplateDetail): Draft {
     html_body: detail.html_body,
     is_active: detail.is_active,
   };
-}
-
-function editorRef(
-  focused: FocusedField,
-  subjectRef: RefObject<HTMLInputElement | null>,
-  textRef: RefObject<HTMLTextAreaElement | null>,
-  htmlRef: RefObject<HTMLTextAreaElement | null>,
-) {
-  if (focused === "subject") return subjectRef;
-  if (focused === "html_body") return htmlRef;
-  return textRef;
 }

@@ -1,5 +1,5 @@
 import type { PrinterPool } from "../../../../generated/api";
-import type { MeteringUnit } from "../../machinesApi";
+import type { Machine, MeteringUnit } from "../../machinesApi";
 
 export type PoolUnit = "grams" | "milliliters" | "millimeters" | "count";
 
@@ -30,12 +30,22 @@ export function usablePools(
   pools: PrinterPool[],
   unit: PoolUnit | undefined,
   machineId: string,
+  machines: Machine[],
+  makerspaceId: number,
 ) {
   if (!unit) return [];
   const selectedId = Number(machineId);
+  const machine = machines.find((candidate) => candidate.id === selectedId && candidate.makerspace === makerspaceId);
+  if (!machine) return [];
   return pools.filter((pool) =>
     poolHasUnit(pool, unit) &&
-    (pool.machine_id === null || (!!selectedId && pool.machine_id === selectedId)),
+    (
+      pool.machine_id === machine.id ||
+      (
+        pool.machine_id === null &&
+        (pool.machine_type_id === null || pool.machine_type_id === machine.machine_type.id)
+      )
+    ),
   );
 }
 

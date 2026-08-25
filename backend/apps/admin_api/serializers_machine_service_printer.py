@@ -7,17 +7,21 @@ from apps.machines.models import MachineConsumablePool, MachineUsageEntry
 
 class PrinterPoolSerializer(serializers.ModelSerializer):
     machine_id = serializers.IntegerField(read_only=True, allow_null=True)
+    machine_type_id = serializers.IntegerField(read_only=True, allow_null=True)
 
     class Meta:
         model = MachineConsumablePool
-        fields = ("id", "machine_id", "material", "color", "brand", "lot_code", "unit", "initial_grams", "remaining_grams", "low_threshold_grams", "is_active", "opened_at", "created_at", "updated_at")
+        fields = ("id", "machine_id", "machine_type_id", "material", "color", "color_hex", "brand", "lot_code", "unit", "initial_grams", "remaining_grams", "low_threshold_grams", "is_active", "is_public", "opened_at", "created_at", "updated_at")
         read_only_fields = ("id", "remaining_grams", "is_active", "created_at", "updated_at")
 
 
 class PrinterPoolCreateSerializer(serializers.Serializer):
     machine_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    machine_type_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    is_public = serializers.BooleanField(required=False, default=True)
     material = serializers.CharField(max_length=100)
     color = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    color_hex = serializers.CharField(max_length=7, required=False, allow_blank=True)
     brand = serializers.CharField(max_length=100, required=False, allow_blank=True)
     lot_code = serializers.CharField(max_length=100, required=False, allow_blank=True)
     unit = serializers.ChoiceField(choices=("grams", "milliliters", "millimeters", "count"), required=False, default="grams")
@@ -27,11 +31,19 @@ class PrinterPoolCreateSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        if attrs.get("machine_id") is not None and attrs.get("machine_type_id") is not None:
+            raise serializers.ValidationError({
+                "machine_type_id": "Choose either machine_id or machine_type_id, not both."
+            })
         if attrs.get("quantity") is None and attrs.get("initial_grams") is None:
             raise serializers.ValidationError({"quantity": "quantity or initial_grams is required."})
         if attrs.get("quantity") is not None and attrs.get("initial_grams") is not None:
             raise serializers.ValidationError("Provide only quantity or initial_grams.")
         return attrs
+
+
+class PrinterPoolVisibilitySerializer(serializers.Serializer):
+    is_public = serializers.BooleanField()
 
 
 class PrinterPoolCorrectionSerializer(serializers.Serializer):

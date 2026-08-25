@@ -6,15 +6,27 @@ from django.utils import timezone
 
 from apps.inventory.public_image_storage import public_url
 from apps.machines.models import MachineServiceRequest, MachineUsageEntry
-from apps.machines.printer_capabilities import PRINTER_SLUG
+from apps.machines.printer_capabilities import resolve_global_printer_type
 
 PRINT_STATUS_KEYS = ("pending", "accepted", "printing", "completed", "collected", "failed", "rejected")
 COMPLETED = (MachineServiceRequest.Status.COMPLETED, MachineServiceRequest.Status.COLLECTED)
 
 
 def build_public_printer_stats(makerspace):
-    requests = MachineServiceRequest.objects.filter(makerspace=makerspace, queue__machine_type__slug=PRINTER_SLUG)
-    manual = MachineUsageEntry.objects.filter(machine__makerspace=makerspace, machine__machine_type__slug=PRINTER_SLUG, source=MachineUsageEntry.Source.TYPED_MANUAL)
+    printer_type = resolve_global_printer_type()
+    if printer_type is None:
+        requests = MachineServiceRequest.objects.none()
+        manual = MachineUsageEntry.objects.none()
+    else:
+        requests = MachineServiceRequest.objects.filter(
+            makerspace=makerspace,
+            queue__machine_type=printer_type,
+        )
+        manual = MachineUsageEntry.objects.filter(
+            machine__makerspace=makerspace,
+            machine__machine_type=printer_type,
+            source=MachineUsageEntry.Source.TYPED_MANUAL,
+        )
     statuses = {row["status"]: row["count"] for row in requests.values("status").annotate(count=Count("id"))}
     by_machine = {}
     for row in requests.filter(assigned_machine__isnull=False).values("assigned_machine_id", "assigned_machine__name", "run_machine_model", "assigned_machine__image_key").annotate(jobs=Count("id", filter=Q(status__in=COMPLETED)), minutes=Sum("actual_minutes"), grams=Sum("actual_consumed_grams")):
@@ -46,4 +58,3 @@ def _busiest(rows):
 
 def _hours(value): return round(float(value or 0) / 60, 2)
 def _number(value): return round(float(value or 0), 2)
-

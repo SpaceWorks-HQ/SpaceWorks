@@ -5,6 +5,8 @@ import { isBuiltinPrinterType } from "../../machinesApi";
 import type { Machine, MachineType } from "../../machinesApi";
 import { MachineServiceConsole } from "./MachineServiceConsole";
 import { PrinterServiceConsole } from "./PrinterServiceConsole";
+import { ConsumablePoolCreateForm } from "./ConsumablePoolCreateForm";
+import { MachineCreateForm } from "./MachineCreateForm";
 import { ConsumablePoolList } from "./SharedConsumablesSection";
 import type { ServiceDraft } from "./serviceDrafts";
 
@@ -16,8 +18,9 @@ type Props = {
   machineType: MachineType;
   allMachines: Machine[];
   visibleMachines: Machine[];
-  boundPools: PrinterPool[];
+  typePools: PrinterPool[];
   formPools: PrinterPool[];
+  existingPools: PrinterPool[];
   machinesLoading: boolean;
   machinesFailed: boolean;
   onSelectMachine: (machineId: number) => void;
@@ -43,8 +46,9 @@ export function MachineTypePage({
   machineType,
   allMachines,
   visibleMachines,
-  boundPools,
+  typePools,
   formPools,
+  existingPools,
   machinesLoading,
   machinesFailed,
   onSelectMachine,
@@ -57,6 +61,13 @@ export function MachineTypePage({
         <div className="hidden grid-cols-[minmax(0,2fr)_auto_auto] gap-3 border-b border-line px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-muted sm:grid">
           <span>Name</span><span>Status</span><span className="text-right">Usage</span>
         </div>
+        {canManage && machineType.can_create_machine === true ? (
+          <MachineCreateForm
+            makerspaceId={makerspaceId}
+            machineType={machineType}
+            onCreated={onSelectMachine}
+          />
+        ) : null}
         {machinesLoading ? (
           <div className="grid gap-2 p-3" aria-label={`Loading ${machineType.name} machines`}>
             <Skeleton className="h-14 w-full" />
@@ -76,7 +87,7 @@ export function MachineTypePage({
             key={machine.id}
             type="button"
             onClick={() => onSelectMachine(machine.id)}
-            className={`grid w-full gap-2 border-b border-line px-3 py-3 text-left last:border-b-0 hover:bg-surface sm:grid-cols-[minmax(0,2fr)_auto_auto] sm:items-center sm:gap-3 ${focusRing}`}
+            className={`grid min-h-11 w-full gap-2 border-b border-line px-3 py-3 text-left last:border-b-0 hover:bg-surface sm:grid-cols-[minmax(0,2fr)_auto_auto] sm:items-center sm:gap-3 ${focusRing}`}
           >
             <span className="flex min-w-0 items-center gap-3">
               {machine.image_url ? <ImageThumbnail src={machine.image_url} alt={machine.name} className="h-10 w-10" /> : null}
@@ -95,12 +106,17 @@ export function MachineTypePage({
 
       {machineServiceEnabled && canManage ? (
         <>
-          {boundPools.length ? (
-            <section className="rounded-xl border border-line bg-panel p-3">
-              <h3 className="mb-2 text-base font-semibold text-ink">Bound consumables</h3>
-              <ConsumablePoolList makerspaceId={makerspaceId} pools={boundPools} />
-            </section>
-          ) : null}
+          <section className="grid gap-4 rounded-xl border border-line bg-panel p-3" aria-labelledby={`consumables-${machineType.id}`}>
+            <div>
+              <h3 className="title-panel" id={`consumables-${machineType.id}`}>Consumables</h3>
+              <p className="mt-1 text-sm text-muted">Manage stock used by this machine type and any pools reserved for one of its machines.</p>
+            </div>
+            <ConsumablePoolCreateForm makerspaceId={makerspaceId} machineType={machineType} existingPools={existingPools} />
+            <div>
+              <h4 className="title-section mb-2">Stock</h4>
+              <ConsumablePoolList makerspaceId={makerspaceId} pools={typePools} />
+            </div>
+          </section>
           {isBuiltinPrinterType(machineType) ? (
             <PrinterServiceConsole makerspaceId={makerspaceId} canManage={canManage} printingEnabled={printingEnabled} machineType={machineType} machines={allMachines} pools={formPools} draft={draft} setDraft={setDraft} />
           ) : (
