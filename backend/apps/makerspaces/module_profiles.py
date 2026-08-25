@@ -25,7 +25,7 @@ _RECOMMENDED_EXTRAS = frozenset({
     # Member accounts and the in-app updater. A profile is an explicit set, so a key
     # that merely defaults on is NOT picked up here -- omitting them would hand a
     # freshly provisioned space no way for a member to register.
-    "accounts", "updates",
+    "member_accounts", "updates",
 })
 
 # A tool library: the hardware lending lifecycle and nothing else. No machines, no
@@ -34,15 +34,16 @@ _LENDING_EXTRAS = frozenset({
     "guest_handover", "bulk_import", "containers", "stock_transfers", "stocktake",
     "reports", "qr_print_batches", "asset_units", "email",
     # A tool library lends to people, so it needs member accounts to lend to.
-    "accounts", "updates",
+    "member_accounts", "updates",
 })
 
 # A machine shop: the machine registry, its service queue and the maintenance that keeps
 # it running. The loan spine comes along because it is core -- see the note below.
-# Deliberately WITHOUT `accounts`: this is the lean install -- a shop that runs its
+# Deliberately WITHOUT `member_accounts`: this is the lean install -- a shop that runs its
 # machines and its inventory against its own existing login (generic OIDC, or contact
-# details at the counter) and wants no member-account ecosystem at all. Adding accounts
-# is one `install_module accounts` away if they later want the community layer.
+# details at the counter) and wants no member-account ecosystem at all. Adding member
+# accounts is one `install_module member_accounts` away if they later want the community
+# layer.
 _WORKSHOP_EXTRAS = frozenset({
     "machines", "machine_service", "printing", "maintenance", "reports",
     "notifications", "email", "updates",
@@ -56,7 +57,7 @@ _CLOUD_EXTRAS = frozenset({
     "guest_handover", "containers", "stock_transfers", "stocktake", "reports",
     "asset_units", "bulk_import", "qr_print_batches",
     "machines", "machine_service", "maintenance",
-    "events", "bookings", "membership", "accounts",
+    "events", "bookings", "membership", "member_accounts",
     "notifications", "email", "payments",
 })
 

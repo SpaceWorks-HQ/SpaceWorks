@@ -1,6 +1,6 @@
 # SpaceWorks modules — what each one is, and what happens without it
 
-Space Works ships **32 modules**: 6 **core** ones that cannot be switched off, 4 that are **on by
+Space Works ships **32 modules**: 6 **core** ones that cannot be switched off, 2 that are **on by
 default**, and the rest opt-in. This page is the per-module reference the README links into — one entry
 per key, saying what it is, what it puts on screen, what disappears if you do not install it, and what
 happens to its data.
@@ -53,7 +53,7 @@ core modules cannot be uninstalled at all.
 **Membership**: [membership](#membership)
 **Notifications**: [notifications](#notifications) · [email](#email) · [telegram](#telegram) ·
 [slack](#slack) · [mattermost](#mattermost) · [discord](#discord) — **Reports**: [reports](#reports) —
-**Payments**: [payments](#payments) — **Accounts**: [accounts](#accounts) —
+**Payments**: [payments](#payments) — **Accounts**: [member_accounts](#member_accounts) —
 **Mobile apps**: [mobile](#mobile) — **Updates**: [updates](#updates)
 
 ---
@@ -305,10 +305,10 @@ Required by `printing`.
 - **What it adds** — the join-request queue, member capabilities and memberships in the console, the
   opt-in maker profile and directory, and per-member activity history.
 - **Without it** — people can still exist as members and still borrow: staff create walk-in member
-  records, and identity can come from `accounts` or an external OIDC provider. What goes is the
+  records, and identity can come from `member_accounts` or an external OIDC provider. What goes is the
   *enrolment and community* layer — no join requests to approve, no waivers, no referrals, no profiles,
   no directory. `payments.membership` becomes inert.
-- **Deliberately does not require `accounts`.** Identity can come from external OIDC or a staff-created
+- **Deliberately does not require `member_accounts`.** Identity can come from external OIDC or a staff-created
   person record, so the two are independent switches.
 - **Data** — purgeable: join requests and member profiles with their projects and imagery. Memberships,
   waivers and acceptance evidence **stay** — they are core RBAC and liability state.
@@ -407,9 +407,9 @@ stored credential**, so re-enabling needs no re-entry.
 
 ## Accounts
 
-### accounts
+### member_accounts
 
-**On by default.** Required by `mobile`.
+Required by `mobile`.
 
 - **What it is** — the member-facing identity ecosystem: self sign-up, and the built-in password, social
   and phone sign-in.
@@ -430,7 +430,7 @@ stored credential**, so re-enabling needs no re-entry.
 
 ### mobile
 
-**On by default. Requires `accounts`.**
+Requires `member_accounts`.
 
 - **What it is** — the native-app substrate: attested device sessions, native push and the in-app
   payment sheet.
@@ -451,7 +451,8 @@ stored credential**, so re-enabling needs no re-entry.
 - **What it adds** — the superadmin update surface and `UpdateState` (current / available / target
   version).
 - **Without it** — the box is updated by whatever tooling you already use (`git pull` + `docker compose
-  up -d --build`, Ansible, your own pipeline). This is a **deployment-level** key like `accounts`, read
+  up -d --build`, Ansible, your own pipeline). This is a **deployment-level** key like
+  `member_accounts`, read
   as "does any live makerspace run it", because the update console is a single-box superadmin surface
   with no tenant to scope by.
 - **Data** — `purge_module_data` reports it stores no data of its own to purge separately.
@@ -486,15 +487,15 @@ modules.
 | Profile | Modules | For |
 |---|---|---|
 | `minimal` | 6 | Core only; nothing published publicly |
-| `workshop` | 14 | A machine shop: machines, service queue, maintenance — deliberately without `accounts` |
+| `workshop` | 14 | A machine shop: machines, service queue, maintenance — deliberately without `member_accounts` |
 | `lending` | 17 | A tool library: the full lending lifecycle, no machines |
 | `recommended` | 20 | Core plus the inventory lifecycle, reports and machines (the default) |
 | `cloud` | 24 | A managed box: everything that runs on a single Django process, no worker or beat |
 | `everything` / `full` | 32 | All modules |
 
-**Installing without a profile** gives you **10 modules**: the six core ones plus `accounts`, `payments`,
-`mobile` and `updates`. Those four default on because they gate behaviour that predates them as switches —
-turning them off should be a deliberate act, not something an upgrade does to you.
+**Installing without a profile** gives you **8 modules**: the six core ones plus `payments` and
+`updates`. Member accounts and mobile apps are opt-in; installing `mobile` also installs its
+`member_accounts` dependency.
 
 ## Deleting a module's data
 

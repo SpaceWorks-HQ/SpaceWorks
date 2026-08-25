@@ -4,7 +4,7 @@ Two keys govern surfaces that have no makerspace to be scoped by:
 
 * ``updates`` -- ``PlatformUpdateSettings`` is a ``pk=1`` singleton for the whole box,
   reached from a superadmin-only console. There is no tenant to ask.
-* the platform half of ``accounts`` -- member sign-up, social sign-in and phone login
+* the platform half of ``member_accounts`` -- member sign-up, social sign-in and phone login
   all resolve *before* a makerspace is selected, which is the same reason social
   sign-in must never become a tenant feature.
 
@@ -30,7 +30,7 @@ from apps.makerspaces.servability import servable_queryset
 # strictly worse code.
 DEPLOYMENT_MODULE_KEYS = {
     "in_app_updates": "updates",
-    "member_accounts": "accounts",
+    "member_accounts": "member_accounts",
     "mobile_apps": "mobile",
 }
 
@@ -66,7 +66,7 @@ def mobile_module_enabled():
     """Whether this deployment offers native device sessions and push.
 
     Device login precedes makerspace selection (the native client sends
-    ``X-Makerspace-Id`` only after it holds a grant), so like `accounts` this has no
+    ``X-Makerspace-Id`` only after it holds a grant), so like `member_accounts` this has no
     tenant to be scoped by at the moment it must be answered.
     """
     return any_makerspace_enables(DEPLOYMENT_MODULE_KEYS["mobile_apps"])

@@ -108,7 +108,7 @@ def test_a_card_says_what_blocks_uninstalling_it(client, space, superadmin):
         for module in group["modules"]
     }
     assert modules["machine_service"]["required_by"] == ["printing"]
-    assert modules["accounts"]["required_by"] == ["mobile"]
+    assert modules["member_accounts"]["required_by"] == ["mobile"]
 
 
 def test_the_inventory_group_is_reported_as_always_on(client, space, superadmin):
@@ -180,7 +180,7 @@ def test_a_depended_on_module_cannot_be_uninstalled_from_the_console(client, spa
 
     response = auth(client, superadmin).post(
         reverse("admin-module-uninstall", args=[space.id]),
-        {"key": "accounts"},
+        {"key": "member_accounts"},
         format="json",
     )
 

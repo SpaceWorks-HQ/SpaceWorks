@@ -23,13 +23,13 @@ class ClaimHarness:
 
 
 def redeemed_claim(suffix: str) -> ClaimHarness:
-    """Issue and redeem a physical code while the accounts module is disabled."""
+    """Issue and redeem a physical code while member accounts are disabled."""
     space = Makerspace.objects.create(name=f"Claim {suffix}", slug=f"claim-{suffix}")
     space.enabled_modules = [
-        key for key in space.enabled_modules if key != "accounts"
+        key for key in space.enabled_modules if key != "member_accounts"
     ]
     space.save(update_fields=["enabled_modules", "updated_at"])
-    assert not module_enabled(space, "accounts")
+    assert not module_enabled(space, "member_accounts")
 
     staff = make_handout_member(f"claim-staff-{suffix}", space)
     member = User(

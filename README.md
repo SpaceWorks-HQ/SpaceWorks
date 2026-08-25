@@ -249,13 +249,13 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | | [`discord`](docs/MODULES.md#discord) | | | Discord alerts |
 | **Reports** | [`reports`](docs/MODULES.md#reports) | | | Analytics, the ledger and CSV/XLSX export |
 | **Payments** | [`payments`](docs/MODULES.md#payments) | | ● | Taking money online (Stripe or Razorpay) |
-| **Accounts** | [`accounts`](docs/MODULES.md#accounts) | | ● | The member identity ecosystem — sign-up and member sign-in |
-| **Mobile apps** | [`mobile`](docs/MODULES.md#mobile) | | ● | Attested device sessions, native push, payment sheet |
+| **Accounts** | [`member_accounts`](docs/MODULES.md#member_accounts) | | | The member identity ecosystem — sign-up and member sign-in |
+| **Mobile apps** | [`mobile`](docs/MODULES.md#mobile) | | | Attested device sessions, native push, payment sheet |
 | **Updates** | [`updates`](docs/MODULES.md#updates) | | ● | In-app release control |
 
-`mobile` requires `accounts`; `printing` requires `machine_service`. Installing one pulls in what it
-needs. `membership` deliberately does **not** require `accounts` — identity can come from an external
-identity provider or a staff-created walk-in record instead.
+`mobile` requires `member_accounts`; `printing` requires `machine_service`. Installing one pulls in
+what it needs. `membership` deliberately does **not** require `member_accounts` — identity can come
+from an external identity provider or a staff-created walk-in record instead.
 
 **Every module has a page.** [**docs/MODULES.md**](docs/MODULES.md) covers each of the 32 keys in turn:
 what it is, what it puts on screen, **what happens if you do not install it**, and what becomes of its
@@ -285,9 +285,8 @@ enable them.
 
 ### What you get if you choose nothing
 
-Installing without a profile gives you **10 modules**: the six core ones plus `accounts`, `payments`,
-`mobile` and `updates`. Those four are on by default because they gate behaviour that predates them
-as switches — turning them off is a deliberate act, not something an upgrade should do to you.
+Installing without a profile gives you **8 modules**: the six core ones plus `payments` and `updates`.
+Member accounts and mobile apps are opt-in; mobile pulls in `member_accounts` when installed.
 
 Everything money-related is still dormant: `payments` being installed means the *surfaces* exist,
 and no charge can be created until a Space Manager enables a `payments.<area>` feature **and** valid

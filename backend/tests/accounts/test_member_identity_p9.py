@@ -32,7 +32,7 @@ def accounts_off(makerspace, actor=None):
     """Uninstall through the real service, so dependency and feature pruning run."""
     uninstall_module(makerspace, "mobile", actor=actor)
     uninstall_module(makerspace, "membership", actor=actor)
-    uninstall_module(makerspace, "accounts", actor=actor)
+    uninstall_module(makerspace, "member_accounts", actor=actor)
 
 
 def front_desk(makerspace, username="front-desk"):

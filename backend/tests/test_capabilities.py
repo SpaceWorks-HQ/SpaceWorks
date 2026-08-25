@@ -244,15 +244,15 @@ def test_membership_payment_uses_the_registered_membership_module():
     # from external OIDC, so built-in member accounts are independent.
     makerspace = Makerspace(
         name="No membership", slug="no-membership",
-        enabled_modules=["membership", "accounts", "payments"],
+        enabled_modules=["membership", "member_accounts", "payments"],
         enabled_features=["payments.membership"],
     )
     assert feature_enabled(makerspace, "payments.membership") is True
     modules, features = validate_capabilities(
-        ["membership", "accounts", "payments"], ["payments.membership"]
+        ["membership", "member_accounts", "payments"], ["payments.membership"]
     )
     assert features == ["payments.membership"]
-    assert modules == sorted(core_module_keys() | {"membership", "accounts", "payments"})
+    assert modules == sorted(core_module_keys() | {"membership", "member_accounts", "payments"})
 
 
 def test_membership_without_builtin_member_accounts_is_valid():

@@ -126,7 +126,8 @@ MODULES = (
         "maintenance", GUARD, group=GROUP_MACHINES, frontend_workflows=("maintenance",),
     ),
     # Community enrolment/content. Identity may instead come from external OIDC or a
-    # staff-created person record, so this deliberately does not depend on `accounts`.
+    # staff-created person record, so this deliberately does not depend on
+    # `member_accounts`.
     ModuleDefinition(
         "membership", "Membership",
         "Join requests, referrals, verification, profiles, directory and member activity.",
@@ -168,13 +169,10 @@ MODULES = (
         "discord", "Discord", "Per-makerspace Discord incoming-webhook alerts.",
         "integrations", GUARD, group=GROUP_NOTIFICATIONS,
     ),
-    # The four keys below all default ENABLED, which is the opposite of every other
-    # optional module. They are not new capabilities being offered -- they are switches
-    # placed in front of substrate that has always been unconditionally present, so
-    # defaulting them off would silently remove working surfaces. Migration 0057
-    # backfills them onto existing rows for the same reason (`enabled_features` and
-    # `enabled_modules` are stored per row, so a default alone reads as OFF for every
-    # makerspace that already exists).
+    # These keys were placed in front of substrate that had been unconditionally
+    # present, so migration 0057 backfilled their original keys onto existing rows.
+    # Payments and updates remain default-enabled; member accounts and mobile are now
+    # opt-in for newly created makerspaces.
     ModuleDefinition(
         "payments", "Payments", "Online payment for machine jobs, bookings, events and dues.",
         "payments", GUARD, group=GROUP_PAYMENTS, default_enabled=True,
@@ -183,18 +181,18 @@ MODULES = (
     # a space that could switch off its own staff logins could not be administered, the
     # same reasoning that keeps the staff roster ungated by `membership` (plan A7).
     ModuleDefinition(
-        "accounts", "Member accounts",
+        "member_accounts", "Member accounts",
         "Member self-service enrolment and built-in password, social and phone login. "
         "Staff sign-in, external identity and member-domain APIs are unaffected.",
-        "accounts", GUARD, group=GROUP_ACCOUNTS, default_enabled=True,
+        "accounts", GUARD, group=GROUP_ACCOUNTS,
     ),
-    # Requires `accounts` because a device grant is bound to a user: without member
-    # accounts there is no identity for a phone to hold.
+    # Requires `member_accounts` because a device grant is bound to a user: without
+    # member accounts there is no identity for a phone to hold.
     ModuleDefinition(
         "mobile", "Mobile apps",
         "Attested device sessions, native push and the in-app payment sheet.",
         "accounts", GUARD, group=GROUP_MOBILE,
-        requires_modules=("accounts",), default_enabled=True,
+        requires_modules=("member_accounts",),
     ),
     ModuleDefinition(
         "updates", "Updates", "In-app platform release checks and controlled updates.",

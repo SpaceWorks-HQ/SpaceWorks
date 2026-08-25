@@ -212,7 +212,7 @@ def test_quota_failure_persists_unresolved_without_touching_account():
     ).exists()
 
 
-@pytest.mark.parametrize("disabled_module", ["membership", "accounts"])
+@pytest.mark.parametrize("disabled_module", ["membership", "member_accounts"])
 def test_adoption_ignores_optional_module_switches(disabled_module):
     makerspace = space(f"{disabled_module}-off-adoption")
     makerspace.enabled_modules = [
