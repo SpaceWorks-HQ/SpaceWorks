@@ -66,6 +66,16 @@ exit 91
 """
 
 
+# import-backup.sh reaches docker through scripts/spaceworks-compose.sh, which the fake
+# deployment does not contain. Forward past the compose-layer argument so DOCKER_STUB
+# stays the single place that decides how an invocation behaves.
+COMPOSE_STUB = r"""#!/usr/bin/env bash
+set -euo pipefail
+shift
+exec docker "$@"
+"""
+
+
 def _write_outer_tar(path):
     values = {
         "manifest.json": json.dumps({"format": "invalid-for-stub"}).encode(),
@@ -85,16 +95,19 @@ def test_failing_preflight_precedes_environment_and_service_mutation(tmp_path):
     ops = tmp_path / "ops"
     scripts.mkdir(parents=True)
     commands.mkdir()
-    ops.mkdir()
+    (ops / "work").mkdir(parents=True)
     copied_script = scripts / "import-backup.sh"
     copied_script.write_bytes(IMPORT_SCRIPT.read_bytes())
     copied_script.chmod(0o755)
     (scripts / "restore.sh").write_text("#!/usr/bin/env bash\nexit 99\n")
+    compose = scripts / "spaceworks-compose.sh"
+    compose.write_text(COMPOSE_STUB)
+    compose.chmod(0o755)
     (fake_root / "docker-compose.prod.yml").write_text("services: {}\n")
     original_env = b"SECRET_KEY='target-secret'\nUNRELATED='preserved'\n"
     env_file = fake_root / ".env"
     env_file.write_bytes(original_env)
-    identity = ops / "age-identity.txt"
+    identity = ops / "work" / "age-identity.txt"
     identity.write_text("AGE-SECRET-KEY-STUB\n")
     source = tmp_path / "download.tar.age"
     _write_outer_tar(source)
