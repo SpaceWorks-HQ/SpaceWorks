@@ -2,8 +2,8 @@ from dataclasses import dataclass, replace
 
 from django.utils import timezone
 
-from apps.accounts.models import User
 from apps.accounts.claim_sessions import claim_context
+from apps.accounts.models import User
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
 from apps.makerspaces.servability import is_servable
 from apps.makerspaces.waiver_state import current_acceptance
@@ -28,10 +28,24 @@ class PresenceRequired(Exception):
 
 @dataclass(frozen=True)
 class ActiveMemberPresence:
-    membership: MakerspaceMembership
+    # Membership is absent only for the request-proposal path when the makerspace has
+    # deliberately disabled its community membership module.
+    membership: MakerspaceMembership | None
     accepted_waiver: MakerspaceWaiver | None
-    # None only when the deployment has tombstoned check-in; no caller reads it.
+    # Also None for the identity-only request path; no current caller reads it there.
     session: PresenceSession | None
+
+
+def require_active_account(user, makerspace):
+    """Require a servable makerspace and an unrestricted authenticated account.
+
+    This is deliberately narrower than `require_active_member`: public borrow requests
+    are proposals that staff must accept, so a makerspace without the community
+    membership module can admit them without inventing a tenant-binding membership row.
+    Hardware and facility actions must keep using the member guards below.
+    """
+    _require_active_identity(user, makerspace)
+    return ActiveMemberPresence(None, None, None)
 
 
 def require_active_member(user, makerspace):
@@ -49,14 +63,7 @@ def require_active_member(user, makerspace):
     Keeping it as the single implementation of the membership and waiver rules is the
     point: two copies would drift, and the copy that drifted would be an auth rule.
     """
-    if not is_servable(makerspace) or not (
-        user
-        and user.is_authenticated
-        and user.pk
-        and user.is_active
-        and user.access_status == User.AccessStatus.ACTIVE
-    ):
-        raise MemberPresenceRequired()
+    _require_active_identity(user, makerspace)
     membership = MakerspaceMembership.objects.filter(
         user=user, makerspace=makerspace, status="active"
     ).select_related("accepted_waiver").first()
@@ -73,6 +80,17 @@ def require_active_member(user, makerspace):
     return ActiveMemberPresence(membership, waiver, None)
 
 
+def _require_active_identity(user, makerspace):
+    if not is_servable(makerspace) or not (
+        user
+        and user.is_authenticated
+        and user.pk
+        and user.is_active
+        and user.access_status == User.AccessStatus.ACTIVE
+    ):
+        raise MemberPresenceRequired()
+
+
 def require_active_member_presence(user, makerspace):
     """Membership, then waiver, then an open check-in session.
 
@@ -81,13 +99,15 @@ def require_active_member_presence(user, makerspace):
     changes behaviour instead of only removing a surface, so it is worth being explicit
     about why.
 
-    Six member-facing surfaces call this as a bare precondition -- self-checkout, staff
-    direct handout, public request submit, public booking, and the two public
-    machine-service surfaces. A deployment that does not ship check-in has no session for
-    any of them to find, so leaving the requirement hard would not make those flows
-    stricter, it would make every one of them refuse forever. That is a broken install,
-    which is exactly the outcome `separability.E007` exists to reject; a tombstone is
-    supposed to yield a smaller system, not a stuck one.
+    Member-facing hardware and facility surfaces call this as a bare precondition --
+    self-checkout, staff direct handout, public booking, and the two public
+    machine-service surfaces. Public request submission also calls it while the
+    membership module is enabled; with that module off, the staff-reviewed proposal
+    path uses `require_active_account` instead. A deployment that does not ship check-in
+    has no session for any guarded surface to find, so leaving the requirement hard
+    would not make those flows stricter, it would make every one of them refuse forever.
+    That is a broken install, which is exactly the outcome `separability.E007` exists to
+    reject; a tombstone is supposed to yield a smaller system, not a stuck one.
 
     Membership and the waiver are still enforced, so the identity and liability factors
     are untouched, and so are the Hard Rules' non-negotiables (a box QR scan and an

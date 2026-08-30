@@ -23,9 +23,9 @@ from apps.hardware_requests.view_helpers import (
 )
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.lookup import get_public_makerspace
-from apps.makerspaces.servability import servable_queryset
 from apps.makerspaces.platform import module_enabled
-from apps.presence.guard import require_active_member_presence
+from apps.makerspaces.servability import servable_queryset
+from apps.presence.guard import require_active_account, require_active_member_presence
 from apps.openapi import (
     PUBLIC_API_AUTH_PARAMETERS,
     PUBLIC_REQUEST_STATUS_EXAMPLE,
@@ -49,7 +49,14 @@ class RequestSubmitView(APIView):
     def post(self, request, makerspace_slug, *args, **kwargs):
         makerspace = get_public_makerspace(makerspace_slug)
         _require_module(makerspace, "request_workflow")
-        require_active_member_presence(request.user, makerspace)
+        if module_enabled(makerspace, "membership"):
+            require_active_member_presence(request.user, makerspace)
+        else:
+            # Waiver acceptance lives on MakerspaceMembership and cannot be recorded
+            # with membership off. In this configuration the flow is public request ->
+            # STAFF ACCEPT, and that staff acceptance is the control, so no waiver is
+            # enforced at proposal time.
+            require_active_account(request.user, makerspace)
         # Honeypot check FIRST, on the raw payload: a bot that fills `website` must get a
         # normal-looking success even if it also garbled a required field — otherwise a
         # validation error would reveal that the honeypot was the rejection trigger.

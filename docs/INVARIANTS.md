@@ -1632,12 +1632,14 @@ Load-bearing details that carried over unchanged:
 
 - **Registering for an event does NOT require a `PresenceSession`; check-in does.**
   `require_active_member` (identity + membership + waiver) was split out of
-  `require_active_member_presence`, and **only** `PublicEventRegistrationView` switched. The other
-  **nine invocations across six surfaces** — self-checkout ×3, direct handout, public request submit,
-  public booking, and the two machine-service surfaces — still require a session, because those are
-  hardware and facility acts where "is this member here right now" is the whole question. Signing up
-  is planning to attend; presence is proven later by the staff-scanned QR, which is stronger evidence
-  than a self-declared session.
+  `require_active_member_presence`, and **only** `PublicEventRegistrationView` switched wholesale. The
+  hardware and facility invocations — self-checkout ×3, direct handout, public booking, and the two
+  machine-service surfaces — still require a session, because "is this member here right now" is the
+  whole question. Request submission also keeps that guard while `membership` is enabled; with
+  `membership` off it uses the separate identity-only guard because a request is only a proposal and
+  staff acceptance is the control. There is no waiver check on that branch because waiver acceptance
+  can only be recorded on a membership row. Signing up for an event is planning to attend; presence is
+  proven later by the staff-scanned QR, which is stronger evidence than a self-declared session.
 - **`events.member_history.registrations_for_space` is the ONE answer to "which registrations does
   this member hold in this space"**, shared by the profile counts, the profile's recent-attended list,
   member activity and the QR lookup. It filters on **durable provenance**
