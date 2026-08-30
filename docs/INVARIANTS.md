@@ -2696,3 +2696,21 @@ directories — every `apps/*/__pycache__` was shipping inside the image. Nested
 capped `json-file` `logging` block (via `x-logging`) or container logs fill the host disk. Third-party
 images are pinned to a verified release tag — **verify a tag actually resolves before pinning it**
 (`minio/mc` release tags do not match the epoch in the image's `release` label).
+
+**GHCR retention must protect the whole OCI graph, and must fail closed.** `docker/build-push-action`
+leaves provenance attestations on by default, so every published tag is an OCI **index** whose
+platform manifest and attestation manifest are separate, **untagged** GHCR package versions. A
+retention rule that keeps versions by tag alone therefore deletes exactly those children and leaves
+every tag dangling — `docker pull` then fails with `manifest unknown` for every tag while the tag
+list still looks healthy, so the registry appears fine until someone installs. This happened: it is
+why `scripts/ghcr-retention.py` exists and why the decision is digest-based. Two rules follow.
+**First, a kept root protects its children**: discover them with
+`docker buildx imagetools inspect --raw <image>@<digest>` and retain every digest in
+`.manifests[]`. **Second, discovery failure vetoes deletion for that entire package** — treating an
+inspection error as "this index has no children" reproduces the outage precisely, so the veto is not
+caution, it is the invariant. The cleanup step is `continue-on-error: true`, which means a broken
+implementation that silently stops deleting is invisible in CI; the fixture-driven tests in
+`backend/tests/test_ghcr_retention.py` are the only thing that can catch it, and they cover both
+directions — children survive, and genuinely stale versions are still deleted. `release.yml` runs
+`scripts/verify-release-images.sh` after cleanup so a release that orphaned its own images fails at
+the release rather than at the next person's install.
