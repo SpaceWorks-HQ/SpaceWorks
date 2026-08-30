@@ -2,6 +2,7 @@
 """Validate all trusted wrapper inputs before Docker Compose sees them."""
 
 import argparse
+from pathlib import Path
 import sys
 
 
