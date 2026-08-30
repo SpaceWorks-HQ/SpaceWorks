@@ -202,6 +202,11 @@ starting a build.** These are the rules you must not violate without having read
   a spec quotes.
 - **Commits sit local and unpushed on `dev`; pushing is the owner's call alone.** Ask
   `git rev-list --count origin/dev..dev` rather than trusting a count written anywhere.
+- **MERGING IS THE OWNER'S ACT ALONE — never merge a branch yourself.** This covers every merge,
+  including `dev` -> `main`, a feature branch into `dev`, and a fast-forward that looks trivial.
+  Prepare the merge, verify it is clean, report exactly what would land, then STOP and hand it over:
+  the owner runs the `git merge` and the `git push`. This is stricter than the push rule above and
+  overrides the global config's Stage-5 "merge it into `dev`" step, which no longer applies here.
 - **Never run the Docker and host stacks at once** — they bind the same ports (:8000, :5000) and the same
   database.
 
