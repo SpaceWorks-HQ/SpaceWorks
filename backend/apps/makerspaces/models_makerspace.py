@@ -16,7 +16,7 @@ from apps.makerspaces.capabilities import (
 )
 from apps.makerspaces.module_registry import default_enabled_module_keys
 from apps.makerspaces.provenance import validate_actor_snapshot
-from apps.makerspaces.secrets import decrypt_value, encrypt_value
+from apps.makerspaces.models_makerspace_secrets import MakerspaceSecretsMixin
 from apps.makerspaces.validators import (
     DEFAULT_PRESENCE_PRESETS,
     validate_google_maps_url,
@@ -33,7 +33,7 @@ from apps.makerspaces.models import (
 )
 
 
-class Makerspace(models.Model):
+class Makerspace(MakerspaceSecretsMixin, models.Model):
     class LifecycleState(models.TextChoices):
         ACTIVE = "active", "Active"
         IMPORTING = "importing", "Importing"
@@ -258,35 +258,3 @@ class Makerspace(models.Model):
             )
         if self.geofence_enabled and not self.geofence_effective:
             raise ValidationError({"geofence_enabled": "Set both latitude and longitude before enabling the geofence."})
-
-    def set_telegram_bot_token(self, raw):
-        self.telegram_bot_token = encrypt_value(raw)
-
-    def get_telegram_bot_token(self):
-        return decrypt_value(self.telegram_bot_token)
-
-    def set_smtp_password(self, raw):
-        self.smtp_password = encrypt_value(raw)
-
-    def get_smtp_password(self):
-        return decrypt_value(self.smtp_password)
-
-    def set_slack_webhook_url(self, raw):
-        self.slack_webhook_url = encrypt_value(raw)
-
-    def get_slack_webhook_url(self):
-        return decrypt_value(self.slack_webhook_url)
-
-    def set_mattermost_webhook_url(self, raw):
-        self.mattermost_webhook_url = encrypt_value(raw)
-
-    def get_mattermost_webhook_url(self):
-        return decrypt_value(self.mattermost_webhook_url)
-
-    def set_discord_webhook_url(self, raw):
-        self.discord_webhook_url = encrypt_value(raw)
-
-    def get_discord_webhook_url(self):
-        return decrypt_value(self.discord_webhook_url)
-
-
