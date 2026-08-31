@@ -74,6 +74,10 @@ class Makerspace(MakerspaceSecretsMixin, models.Model):
     geofence_radius_m = models.PositiveIntegerField(default=25, validators=[MinValueValidator(1)])
     geofence_enabled = models.BooleanField(default=False)
     public_inventory_enabled = models.BooleanField(default=True)
+    # Account-less requests are an unauthenticated write surface, so this is an
+    # independent opt-in. In particular, it must not follow the membership module:
+    # recommended installs omit that module and must stay closed after an upgrade.
+    anonymous_requests_enabled = models.BooleanField(default=False)
     public_stats_enabled = models.BooleanField(default=False)
     public_stats_show_holder_names = models.BooleanField(default=False)
     public_print_status_lookup_policy = models.CharField(
@@ -169,6 +173,13 @@ class Makerspace(MakerspaceSecretsMixin, models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="created_makerspaces",
+    )
+    anonymous_requester = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
     )
     # Soft-delete state. archived_at IS NOT NULL â‡’ archived (single source of truth; no
     # separate boolean). Operational reachability also requires lifecycle_state=ACTIVE;

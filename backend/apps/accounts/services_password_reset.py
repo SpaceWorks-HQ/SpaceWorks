@@ -11,6 +11,7 @@ from rest_framework import serializers
 
 from apps.accounts import audit_events
 from apps.accounts.models import PasswordResetEnvelope, PasswordResetEnvelopeStatus, User
+from apps.accounts.principal_guards import is_anonymous_requester
 from apps.accounts.password_reset_crypto import (
     credential_fingerprint,
     fixed_dummy_digest,
@@ -232,6 +233,7 @@ def _credential_state_matches(user, envelope, normalized):
         and user.is_active
         and user.access_status == User.AccessStatus.ACTIVE
         and not user.is_walk_in
+        and not is_anonymous_requester(user)
         and current_email == normalized
         and hmac.compare_digest(
             envelope.credential_fingerprint,

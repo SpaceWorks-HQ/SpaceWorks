@@ -208,6 +208,12 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
         field="object_key",
         generator=_maintenance_document_key,
     ),
+    ("makerspaces.Makerspace", "field:anonymous_requester"): _policy(
+        NULL,
+        "The anonymous-request principal is a per-deployment system row, not a person: "
+        "the target creates its own lazily on the first account-less request, so importing "
+        "the source's would carry an inert User the target must never resolve to a human.",
+    ),
     ("makerspaces.Makerspace", "field:public_code"): _policy(
         UniqueValueDisposition.TARGET_CREATION,
         "Target creation preserves or regenerates the public code.",

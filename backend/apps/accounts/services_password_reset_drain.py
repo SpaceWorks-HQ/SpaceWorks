@@ -12,6 +12,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import PasswordResetEnvelope, PasswordResetEnvelopeStatus, User
+from apps.accounts.principal_guards import is_anonymous_requester
 from apps.accounts.password_reset_crypto import (
     credential_fingerprint,
     generate_otp,
@@ -234,6 +235,7 @@ def _recoverable(user):
         and user.is_active
         and user.access_status == User.AccessStatus.ACTIVE
         and not user.is_walk_in
+        and not is_anonymous_requester(user)
     )
 
 

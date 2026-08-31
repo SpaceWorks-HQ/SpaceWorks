@@ -112,6 +112,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("accounts.MemberClaimCode", "issued_by"),
         ("accounts.MemberClaimCode", "revoked_by"),
         ("accounts.OidcBrowserAttempt", "intended_user"),
+        ("makerspaces.Makerspace", "anonymous_requester"),
         ("makerspaces.MakerspaceMembership", "user"),
         ("makerspaces.MakerspaceMembership", "verified_by"),
         ("makerspaces.MakerspaceMembership", "activated_by"),

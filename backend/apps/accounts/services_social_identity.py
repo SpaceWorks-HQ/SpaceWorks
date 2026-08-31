@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.accounts.models_social import SocialIdentity, SocialSurface
+from apps.accounts.principal_guards import is_anonymous_requester
 
 
 class SocialResolutionError(Exception):
@@ -62,6 +63,7 @@ def resolve_social_identity(
                 or not verified
                 or matched.email_verified_at is None
                 or matched.is_walk_in
+                or is_anonymous_requester(matched)
             ):
                 raise SocialResolutionError("account_link_required", 409)
             user = matched
@@ -107,6 +109,8 @@ def _explicit_link(identity, user, provider, subject):
     # social-identity link is created through this function.
     if user.is_walk_in:
         raise SocialResolutionError("walk_in_record", 403)
+    if is_anonymous_requester(user):
+        raise SocialResolutionError("anonymous_requester_record", 403)
     if identity is not None:
         if identity.user_id != user.pk:
             raise SocialResolutionError("identity_conflict", 409)

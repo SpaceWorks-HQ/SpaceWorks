@@ -29,6 +29,7 @@ from rest_framework import serializers
 
 from apps.accounts import audit_events
 from apps.accounts.models import User
+from apps.accounts.principal_guards import is_anonymous_requester
 from apps.accounts.models_phone import PhoneChallengePurpose, PhoneVerificationChallenge
 from apps.accounts.phone_numbers import normalize_or_none
 from apps.integrations.sms import send_sms, sms_configured
@@ -150,7 +151,8 @@ def start_link(user, raw_phone):
     """Send a code to a number an authenticated user wants to attach."""
     if not sms_configured():
         raise SmsUnavailable
-    if User.objects.filter(pk=user.pk, is_walk_in=True).exists():
+    current = User.objects.filter(pk=user.pk).first()
+    if current is None or current.is_walk_in or is_anonymous_requester(current):
         raise serializers.ValidationError({"detail": GENERIC_CONFIRM_ERROR})
     phone_e164 = normalize_or_none(raw_phone)
     if phone_e164 is None:
@@ -207,10 +209,14 @@ def confirm_link(user, raw_phone, code):
             failure = {"detail": GENERIC_CONFIRM_ERROR}
         # This is the fifth guarded credential-writer for walk-ins. confirm_link is
         # the chokepoint because a verified phone is itself a login identity.
-        elif locked_user.is_walk_in:
+        elif locked_user.is_walk_in or is_anonymous_requester(locked_user):
             audit_events.record_auth_event(
-                locked_user,
-                "member.phone_link_refused_walk_in",
+                None if not locked_user.is_walk_in else locked_user,
+                (
+                    "member.phone_link_refused_walk_in"
+                    if locked_user.is_walk_in
+                    else "member.phone_link_refused_anonymous_requester"
+                ),
                 target=locked_user,
                 meta={},
             )
