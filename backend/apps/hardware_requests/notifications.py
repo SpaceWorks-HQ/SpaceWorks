@@ -125,7 +125,10 @@ def _notify(
 
 def _email_deliveries(request, requester_key, staff_event):
     deliveries = []
-    if request.requester_contact_email:
+    if request.requester_contact_email and request.requester_contact_verified:
+        # Account-less contact is only a claim made by the submitter. Sending any
+        # lifecycle message before verification would turn this endpoint into an
+        # email-bomb against arbitrary third parties. Staff delivery remains below.
         rendered = render_email(request, requester_key)
         deliveries.append(
             EmailDelivery(

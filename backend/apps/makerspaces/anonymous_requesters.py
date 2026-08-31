@@ -20,7 +20,13 @@ def get_or_create_anonymous_requester(makerspace):
     with transaction.atomic():
         locked_space = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
         if locked_space.anonymous_requester_id is not None:
-            return User.objects.get(pk=locked_space.anonymous_requester_id)
+            existing = User.objects.get(pk=locked_space.anonymous_requester_id)
+            # The caller handed us its own instance and will keep using it. Without
+            # this the row is created against `locked_space` and the caller's copy
+            # still reports `anonymous_requester = None`, which reads as "this space
+            # has no principal" at the very moment it just acquired one.
+            makerspace.anonymous_requester = existing
+            return existing
 
         # Reuse the existing member_<uuid> allocation namespace. The relationship is
         # the marker; inventing an anonymous_* namespace would contradict the migration
@@ -39,4 +45,6 @@ def get_or_create_anonymous_requester(makerspace):
 
         locked_space.anonymous_requester = user
         locked_space.save(update_fields=["anonymous_requester"])
+        # Same reason as above: keep the caller's instance consistent with the row.
+        makerspace.anonymous_requester = user
         return user
