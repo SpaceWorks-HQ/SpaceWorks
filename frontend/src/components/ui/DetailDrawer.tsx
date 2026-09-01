@@ -51,17 +51,24 @@ export function DetailDrawer({ open, title, onClose, children }: DetailDrawerPro
         aria-labelledby={titleId}
         ref={panelRef}
         tabIndex={-1}
-        className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col border-l border-line bg-panel shadow-xl outline-none"
+        /* `max-w-xl` (576px) was too narrow for the content this holds: the machine drawer's
+           tab row and its two-column forms both overflowed, so tabs were clipped mid-word and
+           an "Add" button sat half outside the panel. Widened, and capped at the viewport so
+           it can never exceed the screen on a small display. */
+        className="absolute right-0 top-0 flex h-full w-full max-w-[min(48rem,100vw)] flex-col border-l border-line bg-panel shadow-xl outline-none"
       >
         <header className="flex items-center gap-3 border-b border-line px-4 py-3">
-          <h2 id={titleId} className="text-sm font-semibold tracking-wide text-muted">
+          <h2 id={titleId} className="title-panel min-w-0 truncate">
             {title}
           </h2>
-          <button type="button" className="desk-button ml-auto" onClick={onClose}>
+          <button type="button" className="desk-button ml-auto shrink-0" onClick={onClose}>
             Close
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto p-4">{children}</div>
+        {/* `min-w-0` so a wide child (a table, a long unbroken string) is constrained by the
+            drawer and scrolls inside its own container, rather than stretching this flex column
+            and pushing content out past the panel edge. */}
+        <div className="min-w-0 flex-1 overflow-y-auto p-4">{children}</div>
       </aside>
     </div>
   );

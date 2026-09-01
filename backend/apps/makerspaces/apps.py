@@ -16,6 +16,7 @@ class MakerspacesConfig(AppConfig):
         from apps.makerspaces.models import Makerspace
 
         register_signal()
+        self._register_separability()
 
         def invalidate_hosting_cache(**kwargs):
             # Any write to frontend_domain / frontend_domain_status must drop the
@@ -86,3 +87,36 @@ class MakerspacesConfig(AppConfig):
             dispatch_uid="makerspaces.invalidate_hosting_cache_on_delete",
             weak=False,
         )
+
+    def _register_separability(self):
+        """Publish purge plans and the runtime-active manifest (plan B1/B2).
+
+        The manifest exists because a tombstoned app stays in ``INSTALLED_APPS`` —
+        it has to, or its historical migrations unapply — so ``apps.is_installed()``
+        answers "are the tables there?" when the caller means "are the surfaces
+        live?". ``apps/printing`` and ``apps/roadmap`` are the precedent: both are
+        installed and both are tombstoned.
+
+        Query-free and idempotent, as ready() requires.
+        """
+        from apps.makerspaces.module_purge_plans import PLANS
+        from apps.separability.registry import (
+            register_purge_plan,
+            register_runtime_app,
+            registered_purge_modules,
+            registered_runtime_apps,
+        )
+
+        already = registered_purge_modules()
+        for plan in PLANS:
+            if plan.key not in already:
+                register_purge_plan(plan.key, plan)
+
+        # The two apps whose code is already gone. Unlike the separable apps, which
+        # read their state from TOMBSTONED_APPS, these are unconditional: there is
+        # nothing left to turn back on. Everything else defaults to active, so no app
+        # has to opt in to keep working.
+        registered = registered_runtime_apps()
+        for app_label in ("printing", "roadmap"):
+            if app_label not in registered:
+                register_runtime_app(app_label, tombstoned=True)

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import {
@@ -10,6 +10,8 @@ import {
   refreshAccessToken,
   setAccessToken,
   staffRequest,
+  type PasswordLoginRequest,
+  type PasswordLoginResponse,
   type StaffAuthUser,
 } from "../../lib/api";
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
@@ -19,6 +21,7 @@ import type { SocialLoginResult } from "../auth/socialSdk";
 import { MakerspacePicker } from "./MakerspacePicker";
 import { StaffAccessDenied } from "./StaffAccessDenied";
 import { StaffWorkspace } from "./StaffWorkspace";
+import { RecoveryQuarantinePanel, type RecoveryState } from "./RecoveryQuarantinePanel";
 import {
   persistSelectedMakerspace,
   persistStaffTab,
@@ -133,10 +136,10 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
 
   const login = useMutation({
     mutationFn: (payload: { username: string; password: string }) =>
-      staffRequest<{ access: string; user: StaffAuthUser }>("/auth/login", {
+      staffRequest<PasswordLoginResponse<StaffAuthUser>>("/auth/login", {
         method: "POST",
         credentials: "include",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, surface: "staff" } satisfies PasswordLoginRequest),
       }),
     onSuccess: (data) => {
       setAccessToken(data.access);
@@ -153,6 +156,12 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
     "/admin/makerspaces",
     Boolean(user) && !user?.must_change_password,
   );
+  const recovery = useQuery({
+    queryKey: ["deployment-recovery-state"],
+    queryFn: () => staffRequest<RecoveryState>("/recovery"),
+    enabled: Boolean(user && (user.is_superuser || user.role === "superadmin")),
+    retry: false,
+  });
   const chooseMakerspace = useCallback((id: number | null) => {
     if (singleTenantLocked) return;
     if (id === null) {
@@ -228,6 +237,18 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
   }
 
   const isSuperadmin = user.is_superuser || user.role === "superadmin";
+
+  if (isSuperadmin && recovery.data?.mode === "quarantined") {
+    return (
+      <RecoveryQuarantinePanel
+        state={recovery.data}
+        onAcknowledged={(next) => {
+          queryClient.setQueryData(["deployment-recovery-state"], next);
+          queryClient.invalidateQueries({ queryKey: ["staff", "makerspaces"] });
+        }}
+      />
+    );
+  }
 
   const signOut = async () => {
     await logoutStaff();
@@ -307,6 +328,7 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
       activeMakerspace={activeMakerspace}
       actions={activeActions}
       canConfigureMachineTypes={activeMembership?.can_configure_machine_types ?? isSuperadmin}
+      isMachineOnly={activeMembership?.is_machine_only ?? false}
       collapsedGroups={collapsedGroups}
       guestOnly={guestOnly}
       isSuperadmin={isSuperadmin}

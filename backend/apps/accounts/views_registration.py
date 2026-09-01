@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.accounts.login_methods import self_registration_enabled
+from apps.accounts.member_identity import member_accounts_enabled
 from apps.accounts.serializers_registration import (
     EmailVerificationConfirmSerializer,
     MemberSignUpSerializer,
@@ -42,6 +44,14 @@ class MemberSignUpView(APIView):
     )
     def post(self, request):
         if request.data.get("website"):
+            return _generic_ack()
+        # Two switches, two different questions: `accounts` says this deployment runs a
+        # member-account ecosystem at all, `self_registration_enabled` says whether
+        # people may create their own. Sign-up needs both.
+        if not member_accounts_enabled() or not self_registration_enabled():
+            # The same generic ack the honeypot returns. A distinct error here would
+            # tell an unauthenticated caller how this deployment is configured, and the
+            # endpoint's whole contract is that it never discloses anything.
             return _generic_ack()
         serializer = MemberSignUpSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

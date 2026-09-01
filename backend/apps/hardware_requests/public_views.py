@@ -23,12 +23,13 @@ from apps.hardware_requests.view_helpers import (
 )
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.lookup import get_public_makerspace
+from apps.makerspaces.servability import servable_queryset
 from apps.makerspaces.platform import module_enabled
 from apps.presence.guard import require_active_member_presence
 from apps.openapi import (
+    PUBLIC_API_AUTH_PARAMETERS,
     PUBLIC_REQUEST_STATUS_EXAMPLE,
     PUBLIC_REQUEST_SUBMIT_EXAMPLE,
-    PUBLISHABLE_KEY_PARAMETER,
 )
 
 
@@ -40,7 +41,7 @@ class RequestSubmitView(APIView):
     @extend_schema(
         tags=["Public requests"],
         summary="Submit public borrow request",
-        parameters=[PUBLISHABLE_KEY_PARAMETER],
+        parameters=PUBLIC_API_AUTH_PARAMETERS,
         request=RequestSubmitSerializer,
         responses={201: RequestSubmitResponseSerializer, **PUBLIC_ERROR_RESPONSES},
         examples=[PUBLIC_REQUEST_SUBMIT_EXAMPLE],
@@ -101,13 +102,13 @@ class RequestStatusView(generics.RetrieveAPIView):
     def get_queryset(self):
         from apps.hardware_requests.view_helpers import request_queryset
 
-        return request_queryset().filter(makerspace__archived_at__isnull=True)
+        return servable_queryset(request_queryset(), relation="makerspace")
 
     @extend_schema(
         tags=["Public requests"],
         summary="Get request status by public token",
         auth=[],
-        parameters=[PUBLISHABLE_KEY_PARAMETER],
+        parameters=PUBLIC_API_AUTH_PARAMETERS,
         responses={200: PublicRequestStatusSerializer, 404: ERROR_404},
         examples=[PUBLIC_REQUEST_STATUS_EXAMPLE],
     )

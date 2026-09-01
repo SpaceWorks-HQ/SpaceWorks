@@ -1,4 +1,5 @@
 import json
+import socket
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -12,6 +13,24 @@ from apps.makerspaces import origin_scope
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def public_webhook_dns(monkeypatch):
+    monkeypatch.setattr(
+        "apps.integrations.webhook_validation.socket.getaddrinfo",
+        lambda _host, port, **_kwargs: [
+            (
+                socket.AF_INET,
+                socket.SOCK_STREAM,
+                socket.IPPROTO_TCP,
+                "",
+                ("93.184.216.34", port),
+            )
+        ],
+    )
+
+
 SLACK_URL = "https://hooks.example.com/services/secret-slack"
 MATTERMOST_URL = "https://chat.example.com/hooks/secret-mattermost"
 

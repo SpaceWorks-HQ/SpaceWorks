@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts import rbac
+from apps.machines import role_scope
 from apps.accounts.models import User
 from apps.admin_api.permissions import IsActiveStaff
 from apps.hardware_requests.exceptions import ErrorSerializer
@@ -46,10 +47,16 @@ class MakerspaceMachineServiceReportView(APIView):
         if not rbac.can(request.user, rbac.Action.MANAGE_MACHINES, makerspace_id):
             raise PermissionDenied()
         require_module(makerspace_id, "machine_service")
+        # The report carries per-machine hours, consumption and payment snapshots, so it
+        # is narrowed to the machines this role actually runs. An exempt actor (space
+        # manager, superadmin) resolves to an empty filter and sees the whole lab.
+        machine_scope = role_scope.manage_scope_for(request.user, makerspace_id)
         if request.query_params.get("machine_type") == "3d_printer":
-            result = build_printer_service_report(makerspace_id, date_range=_date_range(request))
+            result = build_printer_service_report(
+                makerspace_id, date_range=_date_range(request), machine_scope=machine_scope
+            )
             return Response(PrinterServiceReportSerializer({"printer_metrics": result.records}).data)
-        return Response(MachineServiceReportSerializer(report_sections(build_machine_service_report(makerspace_id, date_range=_date_range(request)))).data)
+        return Response(MachineServiceReportSerializer(report_sections(build_machine_service_report(makerspace_id, date_range=_date_range(request), machine_scope=machine_scope))).data)
 
 
 class SuperadminMachineServiceReportView(APIView):

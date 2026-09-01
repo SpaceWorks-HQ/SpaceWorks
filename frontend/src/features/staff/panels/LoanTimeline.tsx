@@ -36,7 +36,7 @@ export function RequestTimelineBlock({ requestId }: { requestId: number }) {
   const timeline = useStaffGet<RequestTimelineResponse>(["request-timeline", requestId], `/admin/requests/${requestId}/timeline?limit=200`);
   return (
     <div className="mt-3 rounded-md border border-line bg-bg p-3">
-      <h4 className="text-sm font-semibold text-ink">Loan timeline</h4>
+      <h4 className="title-section">Loan timeline</h4>
       <QueryState loading={timeline.isLoading} error={timeline.error?.message} empty={!timeline.data?.events.length} emptyLabel="No timeline events yet." />
       {timeline.data ? <EventList events={timeline.data.events} truncated={timeline.data.truncated} /> : null}
     </div>
@@ -49,8 +49,8 @@ export function ChainOfCustodyBlock({ productId }: { productId: number }) {
   return (
     <div className="grid gap-2 border-t border-line pt-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-ink">Chain of custody</h3>
-        <button className="desk-button" type="button" onClick={() => setOpen((value) => !value)}>{open ? "Hide" : "Open"}</button>
+        <h3 className="title-section">Chain of custody</h3>
+        <button className="desk-button-ghost" type="button" onClick={() => setOpen((value) => !value)}>{open ? "Hide" : "Open"}</button>
       </div>
       {open ? <QueryState loading={chain.isLoading} error={chain.error?.message} empty={!chain.data?.events.length} emptyLabel="No custody events yet." /> : null}
       {open && chain.data?.quantity_summary ? <QuantitySummaryView summary={chain.data.quantity_summary} /> : null}
@@ -96,7 +96,7 @@ function QuantitySummaryView({ summary }: { summary: QuantitySummary }) {
 function EventList({ events, truncated }: { events: TimelineEvent[]; truncated: boolean }) {
   if (!events.length) return null;
   return (
-    <ul className="mt-2 grid gap-1 text-xs text-muted">
+    <ul className="eyebrow mt-2 grid gap-1">
       {events.map((event, index) => (
         <li key={`${event.kind}-${String(event.detail.id ?? index)}-${event.at}`} className="rounded-md border border-line bg-surface px-2 py-1">
           <span className="font-medium text-ink">{humanize(event.kind)}</span> on {formatDate(event.at)}

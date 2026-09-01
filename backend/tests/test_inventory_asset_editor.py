@@ -6,6 +6,7 @@ from apps.audit.models import AuditLog
 from apps.boxes.models import Box
 from apps.inventory.models import InventoryAsset, InventoryProduct, TrackingMode
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -29,17 +30,7 @@ def make_admin(makerspace):
 
 
 def make_guest(makerspace):
-    user = User.objects.create_user(
-        username=f"guest-{makerspace.slug}",
-        role=User.Role.GUEST_ADMIN,
-        access_status=User.AccessStatus.ACTIVE,
-    )
-    MakerspaceMembership.objects.create(
-        user=user,
-        makerspace=makerspace,
-        role=MakerspaceMembership.Role.GUEST_ADMIN,
-    )
-    return user
+    return make_handout_member(f"guest-{makerspace.slug}", makerspace)
 
 
 def authed(user):

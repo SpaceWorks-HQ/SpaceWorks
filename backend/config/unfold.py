@@ -3,6 +3,8 @@ import os
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
+from apps.separability.tombstones import tombstoned_app_labels
+
 SITE_NAME = os.environ.get("ADMIN_SITE_NAME", "Space Works")
 
 
@@ -18,7 +20,24 @@ def _is_active_superuser(request):
     )
 
 
-def _item(title, icon, route):
+def _item(title, icon, route, app_label=None):
+    """Build one sidebar entry, or None when its app has been tombstoned.
+
+    Omitted rather than permission-hidden, which would not be enough: Unfold calls
+    `str(link)` on every item to compute `active` *before* it consults the permission
+    callback, so a `reverse_lazy` pointing at a route a tombstoned app no longer
+    registers raises NoReverseMatch and 500s the entire console. `_prune_navigation`
+    drops the Nones once the literal below is built.
+
+    The tombstone list is read from the environment rather than from settings, because
+    settings imports *this* module -- see `tombstones.tombstoned_app_labels`.
+
+    `route` and `separable_app` are carried on the item so the drift-guard test can
+    read them back. Unfold copies items through and only ever reads keys it knows, so
+    the extra pair is inert.
+    """
+    if app_label is not None and app_label in tombstoned_app_labels():
+        return None
     # Every admin model is superadmin-only (U-SEC), so a single permission gate
     # applies to the whole sidebar.
     return {
@@ -26,6 +45,8 @@ def _item(title, icon, route):
         "icon": icon,
         "link": reverse_lazy(route),
         "permission": _is_active_superuser,
+        "route": route,
+        "separable_app": app_label,
     }
 
 
@@ -33,8 +54,12 @@ def _managed_active_superuser(request):
     return bool(os.environ.get("PLATFORM_DOMAIN_SUFFIX", "").strip()) and _is_active_superuser(request)
 
 
-def _managed_item(title, icon, route):
-    item = _item(title, icon, route)
+def _managed_item(title, icon, route, app_label=None):
+    item = _item(title, icon, route, app_label=app_label)
+    if item is None:
+        # `_item` returns None for a tombstoned app; subscripting it here would turn a
+        # supported tombstone into a boot crash.
+        return None
     item["permission"] = _managed_active_superuser
     return item
 
@@ -68,14 +93,25 @@ UNFOLD = {
                 "title": _("Inventory"),
                 "separator": True,
                 "items": [
+                    _item(
+                        "Organizations",
+                        "corporate_fare",
+                        "admin:organizations_organization_changelist",
+                    ),
+                    _item(
+                        "Organization memberships",
+                        "group",
+                        "admin:organizations_organizationmembership_changelist",
+                    ),
                     _item("Makerspaces", "store", "admin:makerspaces_makerspace_changelist"),
+                    _item("Archive requests", "archive", "admin:makerspaces_makerspacearchiverequest_changelist"),
                     _item("Inventory", "inventory_2", "admin:inventory_inventoryproduct_changelist"),
                     _item("Categories", "category", "admin:inventory_category_changelist"),
                     _item("Asset units", "qr_code_2", "admin:inventory_inventoryasset_changelist"),
                     _item("Containers", "package_2", "admin:boxes_box_changelist"),
                     _item("Inventory adjustments", "tune", "admin:operations_inventoryadjustment_changelist"),
-                    _item("Warranties", "verified", "admin:warranty_warranty_changelist"),
-                    _item("Warranty documents", "description", "admin:warranty_warrantydocument_changelist"),
+                    _item("Warranties", "verified", "admin:warranty_warranty_changelist", app_label="warranty"),
+                    _item("Warranty documents", "description", "admin:warranty_warrantydocument_changelist", app_label="warranty"),
                 ],
             },
             {
@@ -105,7 +141,7 @@ UNFOLD = {
                 "title": _("Procurement"),
                 "separator": True,
                 "items": [
-                    _item("To-buy list", "shopping_cart", "admin:procurement_tobuyitem_changelist"),
+                    _item("To-buy list", "shopping_cart", "admin:procurement_tobuyitem_changelist", app_label="procurement"),
                 ],
             },
             {
@@ -142,9 +178,9 @@ UNFOLD = {
                     _item("API key requests", "approval", "admin:apiclients_apikeyrequest_changelist"),
                     _item("Subdomain requests", "dns", "admin:makerspaces_subdomainrequest_changelist"),
                     _item("Platform email", "mail", "admin:integrations_platformemailsettings_changelist"),
-                    _item("Software updates", "system_update", "admin:updates_platformupdatesettings_changelist"),
-                    _item("Payments", "payments", "admin:payments_makerspacepaymentsettings_changelist"),
-                    _managed_item("Stripe Connect", "account_balance", "admin:payments_platformstripeconnectsettings_changelist"),
+                    _item("Software updates", "system_update", "admin:updates_platformupdatesettings_changelist", app_label="updates"),
+                    _item("Payments", "payments", "admin:payments_makerspacepaymentsettings_changelist", app_label="payments"),
+                    _managed_item("Stripe Connect", "account_balance", "admin:payments_platformstripeconnectsettings_changelist", app_label="payments"),
                     _item("Email templates", "mail", "admin:integrations_emailtemplate_changelist"),
                     _item("Email logs", "mark_email_read", "admin:integrations_emaillog_changelist"),
                     _item("Email mutes", "notifications_off", "admin:integrations_emailnotificationmute_changelist"),
@@ -161,3 +197,21 @@ UNFOLD = {
         ],
     },
 }
+
+
+def _prune_navigation(unfold):
+    """Drop the entries `_item` returned None for, and any group left empty.
+
+    A group whose every item belonged to tombstoned apps would otherwise render as a
+    bare heading with a separator under it.
+    """
+    sidebar = unfold["SIDEBAR"]
+    sidebar["navigation"] = [
+        {**group, "items": kept}
+        for group in sidebar["navigation"]
+        if (kept := [item for item in group["items"] if item is not None])
+    ]
+    return unfold
+
+
+_prune_navigation(UNFOLD)

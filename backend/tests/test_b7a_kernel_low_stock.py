@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 
 from apps.audit.models import AuditLog
-from apps.machines.models import MachineConsumablePool
+from apps.machines.models import Machine, MachineConsumablePool, MachineType
 from apps.machines.service_consumable_pools import correct_pool, create_pool
 from apps.procurement.models import ToBuyItem
 from tests.return_helpers import make_space, make_user
@@ -29,6 +29,7 @@ def test_kernel_low_stock_creates_one_open_item_and_ignores_disabled_thresholds(
     assert (item.name, item.status, item.created_by) == (
         "Filament restock: PLA Blue", ToBuyItem.Status.REQUESTED, actor,
     )
+    assert item.machine_type_id is None
     audit = AuditLog.objects.get(action="procurement.low_stock_flagged")
     assert audit.meta == {
         "pool_id": pool.id, "remaining": "50.00", "threshold": "50.00", "to_buy_item_id": item.id,
@@ -76,3 +77,27 @@ def test_kernel_low_stock_flags_each_pool_with_its_own_provenance():
     )
     assert items.count() == 2
     assert set(items.values_list("source_pool_id", flat=True)) == {first_pool.id, second_pool.id}
+
+
+def test_kernel_low_stock_stamps_a_machine_bound_pools_type():
+    makerspace = make_space("b7a-low-stock-machine-bound")
+    actor = make_user("b7a-low-stock-machine-bound-actor")
+    machine_type = MachineType.objects.create(
+        makerspace=makerspace, slug="low-stock-laser", name="Low stock laser"
+    )
+    machine = Machine.objects.create(
+        makerspace=makerspace, machine_type=machine_type, name="Laser"
+    )
+    pool = create_pool(
+        makerspace,
+        actor,
+        machine=machine,
+        material="Coolant",
+        initial_grams="100",
+        low_threshold_grams="50",
+    )
+
+    correct_pool(pool, actor, quantity_delta="-50", reason="Production use")
+
+    item = ToBuyItem.objects.get(source_pool=pool)
+    assert item.machine_type == machine_type

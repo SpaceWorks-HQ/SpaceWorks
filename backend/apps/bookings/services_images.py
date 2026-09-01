@@ -32,6 +32,20 @@ def _active_space(space_id):
     return locked
 
 
+def _assert_active(space):
+    """Cheap unlocked pre-check, so an inactive space is refused without storage I/O.
+
+    The HEAD below is hoisted out of the row lock, which also puts it ahead of
+    `_active_space`'s validation -- and an unreachable bucket then answered 503 where the
+    caller should have got a 400 about the space. This is advisory only; `_active_space`
+    remains the authoritative check under the lock.
+    """
+    if not space.is_active:
+        raise serializers.ValidationError(
+            {'space': 'Inactive spaces cannot have images changed.'}
+        )
+
+
 @transaction.atomic
 def cleanup_unattached_space_image(space, *, object_key, storage):
     _locked_space(space.pk)
@@ -52,6 +66,12 @@ def set_space_image(
     limits,
     storage,
 ):
+    # HEADed before the row lock: an S3 round trip under a held lock turns a slow bucket
+    # into lock contention. No tenant-wide lock is needed -- a space's keys are prefixed
+    # `spaces/<makerspace_id>/<space_pk>/images/`, so only this space can claim them.
+    _assert_active(space)
+    snapshot_key = space.image_key
+    old_size = storage.object_size(snapshot_key) if snapshot_key else None
     locked = _active_space(space.pk)
     validate_space_image_key(locked, object_key, storage)
     if storage.public_image_key_in_use(locked.makerspace_id, object_key):
@@ -59,14 +79,17 @@ def set_space_image(
             {'object_key': 'This image is already in use.'}
         )
     old_key = locked.image_key
-    old_size = storage.object_size(old_key) if old_key else None
-    if old_key and old_size is None:
+    # A concurrent replacement can move `image_key` between the unlocked snapshot and this
+    # lock. Do NOT re-HEAD here to recover the size: that would put object-storage I/O
+    # inside a held row lock, which is the thing hoisting the first HEAD was for. The size
+    # is only an input to the missing-object validation below -- the quota release does its
+    # own HEAD after commit -- so a stale snapshot simply skips that pre-check rather than
+    # trading a rare race for lock contention on every slow bucket.
+    if old_key and old_key == snapshot_key and old_size is None:
         raise serializers.ValidationError(
             {'image': 'The existing image was not found in storage.'}
         )
     limits.add_storage(locked.makerspace, size_bytes)
-    if old_key:
-        limits.free_storage(locked.makerspace, old_size)
     locked.image_key = object_key
     locked.save(update_fields=['image_key', 'updated_at'])
     audit.record(
@@ -77,23 +100,26 @@ def set_space_image(
         meta={'replaced_image': bool(old_key)},
     )
     if old_key:
-        transaction.on_commit(lambda key=old_key: storage.delete_object(key))
+        storage.release_public_image_on_commit(locked.makerspace, old_key)
     locked.refresh_from_db()
     return locked
 
 
 def remove_space_image(space, *, actor, audit, limits, storage):
+    _assert_active(space)
+    snapshot_key = space.image_key
+    old_size = storage.object_size(snapshot_key) if snapshot_key else None
     locked = _active_space(space.pk)
     if not locked.image_key:
         raise serializers.ValidationError({'image': 'This space has no image.'})
     validate_space_image_key(locked, locked.image_key, storage)
     old_key = locked.image_key
-    old_size = storage.object_size(old_key)
-    if old_size is None:
+    # Same reasoning as `set_space_image`: no re-HEAD under the lock. The size only feeds
+    # the validation below, and the post-commit release HEADs the key it actually deletes.
+    if old_key == snapshot_key and old_size is None:
         raise serializers.ValidationError(
             {'image': 'The existing image was not found in storage.'}
         )
-    limits.free_storage(locked.makerspace, old_size)
     locked.image_key = None
     locked.save(update_fields=['image_key', 'updated_at'])
     audit.record(
@@ -103,6 +129,6 @@ def remove_space_image(space, *, actor, audit, limits, storage):
         target=locked,
         meta={},
     )
-    transaction.on_commit(lambda key=old_key: storage.delete_object(key))
+    storage.release_public_image_on_commit(locked.makerspace, old_key)
     locked.refresh_from_db()
     return locked

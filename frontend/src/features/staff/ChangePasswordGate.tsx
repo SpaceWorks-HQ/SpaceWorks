@@ -37,6 +37,15 @@ export function ChangePasswordGate({ username, onChanged, onSignOut }: ChangePas
           if (canSubmit) mutation.mutate();
         }}
       >
+        <input
+          className="sr-only"
+          type="text"
+          autoComplete="username"
+          value={username}
+          readOnly
+          tabIndex={-1}
+          aria-hidden="true"
+        />
         <SpaceWorksBadge className="mb-5" />
         <p className="text-xs font-semibold tracking-wide text-accent-ink">Security</p>
         <h1 className="mt-2 text-2xl font-bold text-ink">Set a new password</h1>
@@ -44,24 +53,30 @@ export function ChangePasswordGate({ username, onChanged, onSignOut }: ChangePas
           The account <span className="font-semibold text-ink">{username}</span> is using a default
           password and must set a new one before continuing.
         </p>
-        <label className="mt-5 block text-sm font-semibold">Current password</label>
+        <label className="mt-5 block text-sm font-semibold" htmlFor="change-current-password">Current password</label>
         <input
           className="desk-input mt-1 w-full"
           type="password"
+          id="change-current-password"
+          autoComplete="current-password"
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
         />
-        <label className="mt-3 block text-sm font-semibold">New password</label>
+        <label className="mt-3 block text-sm font-semibold" htmlFor="change-new-password">New password</label>
         <input
           className="desk-input mt-1 w-full"
           type="password"
+          id="change-new-password"
+          autoComplete="new-password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
         />
-        <label className="mt-3 block text-sm font-semibold">Confirm new password</label>
+        <label className="mt-3 block text-sm font-semibold" htmlFor="change-confirm-password">Confirm new password</label>
         <input
           className="desk-input mt-1 w-full"
           type="password"
+          id="change-confirm-password"
+          autoComplete="new-password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
         />

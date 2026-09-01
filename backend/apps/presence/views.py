@@ -8,7 +8,7 @@ from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.lookup import get_public_makerspace
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 from apps.presence import services
 from apps.presence.serializers import (
     PresenceCurrentSerializer,
@@ -16,6 +16,7 @@ from apps.presence.serializers import (
     PresenceSessionSerializer,
     PresenceStartSerializer,
 )
+from apps.apiclients.throttling import MemberPrincipalRateThrottle
 
 
 ERRORS = {
@@ -29,6 +30,8 @@ ERRORS = {
 
 class PresenceStartView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [MemberPrincipalRateThrottle]
+    throttle_scope = "presence_start"
 
     @extend_schema(tags=["Presence"], request=PresenceStartSerializer, responses={201: PresenceSessionSerializer, **ERRORS})
     def post(self, request, makerspace_slug):
@@ -68,7 +71,7 @@ class PresenceRosterView(APIView):
 
     @extend_schema(tags=["Admin makerspaces"], request=None, responses={200: PresenceRosterSerializer(many=True), **ERRORS})
     def get(self, request, makerspace_id):
-        get_object_or_404(Makerspace.objects.filter(archived_at__isnull=True), pk=makerspace_id)
+        get_object_or_404(servable_queryset(), pk=makerspace_id)
         if not rbac.can(request.user, rbac.Action.MANAGE_MAKERSPACE, makerspace_id):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()

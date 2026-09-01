@@ -68,18 +68,18 @@ function ContainerRow({ container, makerspaceId, canEditInventory }: { container
         {container.location ? <span className="text-xs text-muted">{container.location}</span> : null}
         {container.is_active === false ? <span className="rounded-md bg-warn/15 px-2 py-0.5 text-xs text-warn-ink">Inactive</span> : null}
         <div className="desk-actions ml-0 flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
-          <button type="button" onClick={() => setEditing((value) => !value)}>{editing ? "Cancel" : "Edit"}</button>
-          <button type="button" onClick={() => togglePanel("contents")}>{panel === "contents" ? "Hide contents" : "Contents"}</button>
-          <button type="button" onClick={() => togglePanel("history")}>{panel === "history" ? "Hide history" : "History"}</button>
+          <button className="desk-button-ghost" type="button" onClick={() => setEditing((value) => !value)}>{editing ? "Cancel" : "Edit"}</button>
+          <button className="desk-button-ghost" type="button" onClick={() => togglePanel("contents")}>{panel === "contents" ? "Hide contents" : "Contents"}</button>
+          <button className="desk-button-ghost" type="button" onClick={() => togglePanel("history")}>{panel === "history" ? "Hide history" : "History"}</button>
         </div>
       </div>
 
       {editing ? (
         <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] md:items-end">
-          <label className="grid min-w-0 gap-1 text-xs text-muted"><span>Label</span><input className="desk-input min-w-0" value={label} onChange={(event) => setLabel(event.target.value)} /></label>
-          <label className="grid min-w-0 gap-1 text-xs text-muted"><span>Location</span><input className="desk-input min-w-0" value={location} onChange={(event) => setLocation(event.target.value)} /></label>
-          <label className="flex items-center gap-2 text-xs text-muted"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} /> Active</label>
-          <button disabled={!label.trim() || save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving..." : "Save"}</button>
+          <label className="eyebrow grid min-w-0 gap-1"><span>Label</span><input className="desk-input min-w-0" value={label} onChange={(event) => setLabel(event.target.value)} /></label>
+          <label className="eyebrow grid min-w-0 gap-1"><span>Location</span><input className="desk-input min-w-0" value={location} onChange={(event) => setLocation(event.target.value)} /></label>
+          <label className="eyebrow flex items-center gap-2"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} /> Active</label>
+          <button className="desk-button-primary" disabled={!label.trim() || save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving..." : "Save"}</button>
         </div>
       ) : null}
       {saveError ? <p className="mt-2 text-danger">{saveError}</p> : null}
@@ -87,12 +87,12 @@ function ContainerRow({ container, makerspaceId, canEditInventory }: { container
       {panel === "contents" ? (
         <div className="mt-3 grid gap-2 rounded-md border border-line bg-bg p-2">
           {contents.isLoading ? <p className="text-xs text-muted">Loading...</p> : null}
-          <p className="text-xs font-semibold text-ink">Products</p>
+          <h4 className="title-section">Products</h4>
           {contents.error instanceof Error ? <p className="text-xs text-danger">{contents.error.message}</p> : null}
           {!contents.isLoading && !contents.error && contents.data?.products.length ? contents.data.products.map((product) => (
             <p key={product.id} className="text-xs text-muted">{product.name} - {product.available_quantity} available</p>
           )) : !contents.isLoading && !contents.error ? <p className="text-xs text-muted">None</p> : null}
-          <p className="mt-1 text-xs font-semibold text-ink">Asset units</p>
+          <h4 className="title-section mt-1">Asset units</h4>
           {!contents.isLoading && !contents.error && contents.data?.assets.length ? contents.data.assets.map((asset) => (
             <AssetQrRow key={asset.id} asset={asset} canEditInventory={canEditInventory} />
           )) : !contents.isLoading && !contents.error ? <p className="text-xs text-muted">None</p> : null}
@@ -107,7 +107,7 @@ function ContainerRow({ container, makerspaceId, canEditInventory }: { container
           {history.isLoading ? <p className="text-xs text-muted">Loading...</p> : null}
           {history.error instanceof Error ? <p className="text-xs text-danger">{history.error.message}</p> : null}
           {!history.isLoading && !history.error && history.data?.scans.length ? history.data.scans.map((scan) => (
-            <p key={scan.id} className="text-xs text-muted">{new Date(scan.created_at).toLocaleString()} - {scan.context || "scan"} - {scan.source === "box_scan" ? "reviewed handover" : "QR scan"}</p>
+            <p key={scan.id} className="font-mono text-xs text-muted">{new Date(scan.created_at).toLocaleString()} - {scan.context || "scan"} - {scan.source === "box_scan" ? "reviewed handover" : "QR scan"}</p>
           )) : !history.isLoading && !history.error ? <p className="text-xs text-muted">No scan history.</p> : null}
         </div>
       ) : null}
@@ -128,8 +128,8 @@ function AssetQrRow({ asset, canEditInventory }: { asset: { id: number; asset_ta
     <div className="min-w-0 rounded-md border border-line bg-surface p-2">
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
         <span className="min-w-0 break-words">{asset.asset_tag} ({asset.status})</span>
-        <button type="button" className="text-accent-ink" disabled={show.isPending} onClick={() => show.mutate()}>{qrId ? "QR shown" : "Show QR"}</button>
-        <button type="button" className="text-accent-ink" onClick={() => setShowWarranty((value) => !value)}>
+        <button type="button" className="desk-button-ghost" disabled={show.isPending} onClick={() => show.mutate()}>{qrId ? "QR shown" : "Show QR"}</button>
+        <button type="button" className="desk-button-ghost" onClick={() => setShowWarranty((value) => !value)}>
           {showWarranty ? "Hide warranty" : "Warranty"}
         </button>
         {qrId ? <QrImage qrId={qrId} label={asset.asset_tag} /> : null}

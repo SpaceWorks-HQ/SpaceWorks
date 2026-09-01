@@ -3,6 +3,8 @@ from django.utils import timezone
 
 from apps.audit import services as audit
 from apps.evidence.models import EvidencePhoto
+from apps.evidence.finalization import charge_storage_once
+from apps.hardware_requests.direct_loan_returns import validate_evidence_upload
 from apps.hardware_requests.models import PublicProblemReport, RequesterAccountability
 from apps.hardware_requests.workflow_errors import InvalidTransition, RequestValidationError, ReturnValidationError
 from apps.inventory import availability
@@ -23,6 +25,12 @@ ASSET_STATUS_OUTCOMES = {
 
 def triage_problem_report(report, actor, *, outcome, resolutions, note, evidence_id=None):
     note = str(note or "").strip()
+    if report.resolved_at is not None:
+        raise InvalidTransition("Problem report has already been triaged.")
+    evidence = _evidence(report, evidence_id)
+    finalized = (
+        validate_evidence_upload(evidence, label="Triage") if evidence is not None else None
+    )
     with transaction.atomic():
         locked = (
             PublicProblemReport.objects.select_for_update()
@@ -32,7 +40,8 @@ def triage_problem_report(report, actor, *, outcome, resolutions, note, evidence
         if locked.resolved_at is not None:
             raise InvalidTransition("Problem report has already been triaged.")
 
-        evidence = _evidence(locked, evidence_id)
+        if finalized is not None:
+            charge_storage_once(evidence, finalized.size)
         quantities = []
         if outcome != PublicProblemReport.Outcome.NO_ISSUE:
             validated = _validated_resolutions(locked, resolutions)

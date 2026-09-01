@@ -217,7 +217,9 @@ def _product_admin_payload(product, **extra):
     return data
 
 
-def test_admin_product_image_upload_validates_and_deletes_old_after_save(monkeypatch, settings):
+def test_admin_product_image_upload_validates_and_deletes_old_after_save(
+    monkeypatch, settings, django_capture_on_commit_callbacks
+):
     settings.PUBLIC_IMAGE_MAX_BYTES = 5
     space = make_space("admin-image-product")
     product = make_product(
@@ -240,14 +242,18 @@ def test_admin_product_image_upload_validates_and_deletes_old_after_save(monkeyp
     monkeypatch.setattr("apps.inventory.public_image_storage.put_bytes", put_bytes)
     monkeypatch.setattr("apps.inventory.public_image_storage.delete_object", delete_object)
 
-    response = admin_client(make_superadmin("admin-image-product-super")).post(
-        reverse("admin:inventory_inventoryproduct_change", args=[product.pk]),
-        _product_admin_payload(
-            product,
-            image_upload=SimpleUploadedFile("new.png", b"abc", content_type="image/png"),
-            _save="Save",
-        ),
-    )
+    # The replaced object is now deleted on_commit rather than inline, so a rollback can
+    # never destroy a file whose row came back. The ordering this test exists for still
+    # holds -- and holds more strongly: the delete now cannot precede the commit.
+    with django_capture_on_commit_callbacks(execute=True):
+        response = admin_client(make_superadmin("admin-image-product-super")).post(
+            reverse("admin:inventory_inventoryproduct_change", args=[product.pk]),
+            _product_admin_payload(
+                product,
+                image_upload=SimpleUploadedFile("new.png", b"abc", content_type="image/png"),
+                _save="Save",
+            ),
+        )
 
     assert response.status_code == 302
     product.refresh_from_db()
@@ -281,7 +287,7 @@ def test_admin_product_image_upload_validates_and_deletes_old_after_save(monkeyp
     assert events == events[:2]
 
 
-def test_admin_image_clear(monkeypatch):
+def test_admin_image_clear(monkeypatch, django_capture_on_commit_callbacks):
     deleted = []
     stored = []
     monkeypatch.setattr(
@@ -296,10 +302,12 @@ def test_admin_image_clear(monkeypatch):
     product = make_product(space, image_key=f"items/{space.id}/old.png")
     client = admin_client(make_superadmin("admin-image-clear-super"))
 
-    clear = client.post(
-        reverse("admin:inventory_inventoryproduct_change", args=[product.pk]),
-        _product_admin_payload(product, clear_image="on", _save="Save"),
-    )
+    # Cleared objects are deleted on_commit now, so the callbacks must run to observe it.
+    with django_capture_on_commit_callbacks(execute=True):
+        clear = client.post(
+            reverse("admin:inventory_inventoryproduct_change", args=[product.pk]),
+            _product_admin_payload(product, clear_image="on", _save="Save"),
+        )
     assert clear.status_code == 302
     product.refresh_from_db()
     assert product.image_key == ""

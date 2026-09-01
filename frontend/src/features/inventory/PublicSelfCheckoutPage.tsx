@@ -28,21 +28,21 @@ function formatStatus(status: string) {
 
 function ResultCard({ result }: { result: PublicToolLoanResult }) {
   return (
-    <div className="rounded-xl border border-tone-mint bg-tone-mint px-3 py-3 text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]">
-      <p className="text-xs font-semibold tracking-wide">
+    <div className="rounded-xl border border-success bg-success px-3 py-3 text-on-success dark:bg-success/15 dark:text-success-ink">
+      <p className="eyebrow text-on-success dark:text-success-ink">
         {formatStatus(result.status)}
       </p>
-      <h2 className="mt-1 text-lg font-semibold">
+      <h2 className="title-panel mt-1 text-on-success dark:text-success-ink">
         {result.items.map((item) => item.product_name).join(", ") || "Tool loan"}
       </h2>
       <div className="mt-3 space-y-2">
         {result.items.map((item) => (
           <div
-            className="flex items-center justify-between gap-3 rounded-lg border border-tone-mint-ink/20 bg-panel/80 px-3 py-2 text-sm"
+            className="flex items-center justify-between gap-3 rounded-lg border border-on-success/20 bg-panel/80 px-3 py-2 text-sm"
             key={item.product_name}
           >
             <span>{item.product_name}</span>
-            <span className="font-semibold">x{item.quantity}</span>
+            <span className="font-mono font-semibold">x{item.quantity}</span>
           </div>
         ))}
       </div>
@@ -114,16 +114,18 @@ export function PublicSelfCheckoutPage() {
     <main className="desk-shell">
       <header className="border-b border-line bg-panel">
         <div className="mx-auto flex max-w-screen-xl flex-col gap-4 px-5 py-6 sm:px-8">
-          <p className="text-sm font-semibold tracking-wide text-accent-ink">
+          <p className="eyebrow text-secondary-ink">
             Public Tool Checkout
           </p>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="min-w-0">
-              <MakerspaceBrand
-                name={displayName}
-                logoUrl={bootstrap?.makerspace.logo_url}
-                size="lg"
-              />
+              <h1 className="title-page">
+                <MakerspaceBrand
+                  name={displayName}
+                  logoUrl={bootstrap?.makerspace.logo_url}
+                  size="lg"
+                />
+              </h1>
               <p className="mt-2 text-sm text-muted">
                 Scan a physical tool label to check it out or return it.
               </p>
@@ -152,10 +154,10 @@ export function PublicSelfCheckoutPage() {
         ) : null}
         {!bootstrapQuery.isLoading && !bootstrapQuery.isError && !enabled ? (
           <Card>
-            <p className="text-xs font-semibold tracking-wide text-accent-ink">
+            <p className="eyebrow text-secondary-ink">
               Self-checkout
             </p>
-            <h2 className="mt-2 text-xl font-semibold text-ink">
+            <h2 className="title-panel mt-2">
               Self-checkout is not enabled for this makerspace.
             </h2>
             <Link className="desk-button mt-4" to={tenantPath()}>
@@ -173,7 +175,9 @@ export function PublicSelfCheckoutPage() {
               <button
                 aria-pressed={mode === "checkout"}
                 className={
-                  mode === "checkout" ? "desk-tab desk-tab-active" : "desk-tab"
+                  mode === "checkout"
+                    ? "desk-tab desk-tab-active border-secondary bg-secondary text-on-secondary hover:bg-secondary hover:text-on-secondary"
+                    : "desk-tab hover:text-secondary-ink"
                 }
                 type="button"
                 onClick={() => setMode("checkout")}
@@ -183,7 +187,9 @@ export function PublicSelfCheckoutPage() {
               <button
                 aria-pressed={mode === "return"}
                 className={
-                  mode === "return" ? "desk-tab desk-tab-active" : "desk-tab"
+                  mode === "return"
+                    ? "desk-tab desk-tab-active border-secondary bg-secondary text-on-secondary hover:bg-secondary hover:text-on-secondary"
+                    : "desk-tab hover:text-secondary-ink"
                 }
                 type="button"
                 onClick={() => setMode("return")}
@@ -211,7 +217,7 @@ export function PublicSelfCheckoutPage() {
                     onUploaded={setReturnEvidenceId}
                   />
                   <label className="mt-3 block">
-                    <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+                    <span className="eyebrow mb-1 block">
                       Return condition notes
                     </span>
                     <textarea

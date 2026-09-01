@@ -2,6 +2,34 @@ from apps.payments import stripe_client
 from apps.payments.resolution import PaymentSource
 
 
+def test_cancel_payment_intent_uses_the_payment_source_account(monkeypatch):
+    calls = []
+
+    class PaymentIntents:
+        def cancel(self, intent_id, *, options):
+            calls.append((intent_id, options))
+            return {"id": intent_id, "status": "canceled"}
+
+    class FakeStripe:
+        class StripeClient:
+            def __init__(self, *, api_key):
+                assert api_key == "sk_platform"
+                self.v1 = type(
+                    "V1", (), {"payment_intents": PaymentIntents()}
+                )()
+
+    monkeypatch.setattr(stripe_client, "_stripe_module", lambda: FakeStripe)
+    source = PaymentSource(
+        provider="connect",
+        secret_key="sk_platform",
+        webhook_secret="whsec_platform",
+        connected_account_id="acct_cancel",
+    )
+
+    assert stripe_client.cancel_payment_intent(source, "pi_cancel") is True
+    assert calls == [("pi_cancel", {"stripe_account": "acct_cancel"})]
+
+
 def test_expire_accepts_an_already_closed_session_after_authoritative_retrieval(
     monkeypatch,
 ):

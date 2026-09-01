@@ -60,10 +60,10 @@ export function ProductQuickViewModal({
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
             <div className="min-w-0">
-              <p className="font-mono text-xs font-semibold uppercase tracking-wide text-accent-ink">
+              <p className="eyebrow text-secondary-ink">
                 ID: {String(product.id).padStart(4, "0")}
               </p>
-              <h2 className="mt-2 break-words font-display text-3xl font-bold leading-tight text-ink">
+              <h2 className="title-page mt-2 break-words leading-tight">
                 {product.name}
               </h2>
             </div>
@@ -71,14 +71,16 @@ export function ProductQuickViewModal({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <span className="chip chip-active">{trackingLabel(product)}</span>
+            <span className="chip chip-active border-secondary bg-secondary text-on-secondary">
+              {trackingLabel(product)}
+            </span>
             {product.category_name ? (
               <span className="chip">{product.category_name}</span>
             ) : null}
           </div>
 
           <div className="rounded-xl border border-line bg-bg p-4">
-            <h3 className="font-mono text-xs font-semibold uppercase tracking-wide text-muted">
+            <h3 className="title-section">
               Description
             </h3>
             <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-ink">

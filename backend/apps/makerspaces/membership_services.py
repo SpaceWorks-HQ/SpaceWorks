@@ -8,6 +8,7 @@ from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.audit import services as audit
 from apps.makerspaces import role_services
+from apps.makerspaces.guards import require_module
 from apps.makerspaces.membership_activation import _activate_membership
 from apps.makerspaces.membership_verification import (
     set_can_refer,
@@ -49,6 +50,19 @@ def _eligible_user(user):
 
 def _approvable_user(user):
     return bool(user and user.is_active and user.email)
+
+
+def _is_community_invitation(role):
+    """Whether an invitation is for plain community membership rather than staff.
+
+    `invite_membership` issues both down one path, discriminated by the assigned role:
+    the protected Member role (and any custom role granting no actions) confers no
+    staff authority, so it is a community invitation and belongs to the `membership`
+    module. A role granting actions is a staff invitation, which must keep working
+    with `membership` off -- MakerspaceMembership is core RBAC state, and locking
+    staff administration behind an optional module would strand the makerspace.
+    """
+    return not role.granted_actions
 
 
 def _member_role(makerspace):
@@ -110,6 +124,8 @@ def invite_membership(actor, makerspace, invite_email, assigned_role):
         if role.makerspace_id != makerspace.pk:
             raise ValidationError({"role_id": "Role must belong to this makerspace."})
         role_services.can_assign_role(actor, makerspace, role)
+        if _is_community_invitation(role):
+            require_module(makerspace, "membership")
         user = User.objects.filter(email__iexact=email).first()
         try:
             request = MembershipRequest.objects.create(
@@ -137,6 +153,9 @@ def refer_membership(actor, makerspace, invite_email):
         actor_membership = MakerspaceMembership.objects.select_for_update().filter(
             makerspace=makerspace, user=actor, status="active"
         ).first()
+        # Additive: the module gate sits alongside the existing readiness checks and
+        # does not replace them.
+        require_module(makerspace, "membership")
         if not makerspace.referrals_enabled or not actor_membership or not actor_membership.can_refer:
             raise PermissionDenied()
         target = User.objects.filter(email__iexact=email).first()

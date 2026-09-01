@@ -1,0 +1,13 @@
+// Project settings for SpaceWorks. Backend venv lives at backend/.venv,
+// which is below the worktree root, so Zed's default venv detection
+// (which only looks at the root) misses it.
+{
+  "terminal": {
+    "detect_venv": {
+      "on": {
+        "directories": ["backend/.venv", ".venv"],
+        "activate_script": "default"
+      }
+    }
+  }
+}

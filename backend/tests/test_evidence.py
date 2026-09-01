@@ -9,6 +9,7 @@ from apps.audit.models import AuditLog
 from apps.evidence.models import EvidencePhoto
 from apps.evidence.storage import StorageUnavailable
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -169,12 +170,7 @@ def test_admin_member_can_request_put_upload_url(monkeypatch, settings):
 def test_guest_admin_member_can_request_upload_url(monkeypatch):
     mock_upload(monkeypatch)
     makerspace = make_space("upload-guest")
-    user = make_member(
-        "upload-guest-user",
-        makerspace,
-        membership_role="guest_admin",
-        role=User.Role.GUEST_ADMIN,
-    )
+    user = make_handout_member("upload-guest-user", makerspace)
 
     response = authenticated_client(user).post(
         upload_url(makerspace),
@@ -442,6 +438,50 @@ def test_evidence_detail_returns_409_when_object_is_missing(monkeypatch):
 
     assert response.status_code == 409
     assert AuditLog.objects.count() == 0
+
+
+def test_evidence_detail_serves_a_staged_upload_before_promotion(monkeypatch):
+    """An uploaded photo lives in staging until a workflow promotes it.
+
+    Presigned uploads (POST and PUT alike) target the staging key so the final,
+    immutable object is never client-writable. The read path must therefore fall
+    back to staging, or a photo the user just uploaded reads as never uploaded.
+    """
+    makerspace = make_space("detail-staged-object")
+    user = make_member("detail-staged-user", makerspace)
+    photo = make_photo(makerspace, user)
+    staged = f"staging/{photo.object_key}"
+    monkeypatch.setattr(
+        "apps.evidence.views.object_exists",
+        lambda object_key: object_key == staged,
+    )
+    signed = []
+    monkeypatch.setattr(
+        "apps.evidence.views.presigned_get_url",
+        lambda object_key: signed.append(object_key) or "http://minio/get",
+    )
+
+    response = authenticated_client(user).get(detail_url(photo))
+
+    assert response.status_code == 200
+    assert signed == [staged]
+
+
+def test_evidence_detail_prefers_the_promoted_object_over_staging(monkeypatch):
+    makerspace = make_space("detail-promoted-object")
+    user = make_member("detail-promoted-user", makerspace)
+    photo = make_photo(makerspace, user)
+    monkeypatch.setattr("apps.evidence.views.object_exists", lambda object_key: True)
+    signed = []
+    monkeypatch.setattr(
+        "apps.evidence.views.presigned_get_url",
+        lambda object_key: signed.append(object_key) or "http://minio/get",
+    )
+
+    response = authenticated_client(user).get(detail_url(photo))
+
+    assert response.status_code == 200
+    assert signed == [photo.object_key]
 
 
 def test_evidence_detail_returns_503_when_object_exists_check_fails(monkeypatch):

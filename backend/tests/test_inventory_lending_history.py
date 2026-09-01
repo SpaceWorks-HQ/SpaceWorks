@@ -13,6 +13,7 @@ from tests.return_helpers import (
     make_space,
     make_user,
 )
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -97,12 +98,7 @@ def test_inventory_lending_history_resolves_readable_label_for_checkin_hash():
 
 def test_inventory_lending_history_is_hidden_from_guest_admin():
     makerspace = make_space("lending-history-guest")
-    guest = make_member(
-        "lending-history-guest-admin",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("lending-history-guest-admin", makerspace)
     product = make_product(makerspace, name="Logic Probe")
 
     response = authenticated_client(guest).get(

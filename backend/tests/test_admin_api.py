@@ -18,6 +18,7 @@ from tests.return_helpers import (
     make_space,
     make_user,
 )
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -653,12 +654,7 @@ def test_inventory_quantity_adjustment_updates_buckets_and_audit():
 
 def test_inventory_quantity_adjustment_requires_edit_inventory_in_tenant():
     makerspace = make_space("inventory-adjust-rbac")
-    guest = make_member(
-        "inventory-adjust-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("inventory-adjust-guest", makerspace)
     product = make_product(makerspace, name="Blocked Wire")
 
     response = authenticated_client(guest).post(
@@ -675,12 +671,7 @@ def test_inventory_quantity_adjustment_requires_edit_inventory_in_tenant():
 def test_inventory_quantity_adjustment_hides_cross_tenant_product_before_permission():
     own_space = make_space("inventory-adjust-own")
     other_space = make_space("inventory-adjust-other")
-    guest = make_member(
-        "inventory-adjust-cross-guest",
-        own_space,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("inventory-adjust-cross-guest", own_space)
     other_product = make_product(other_space, name="Other Wire")
 
     response = authenticated_client(guest).post(
@@ -703,7 +694,11 @@ def test_api_client_rest_allows_makerspace_admin_and_scopes_others():
 
     created = admin_client.post(
         f"/api/v1/admin/makerspace/{makerspace.id}/api-clients",
-        {"label": "Public web", "allowed_origins": ["https://lab.example.com"]},
+        {
+            "label": "Public web",
+            "allowed_origins": ["https://lab.example.com"],
+            "scopes": ["public:read"],
+        },
         format="json",
     )
     assert created.status_code == 201
@@ -731,16 +726,11 @@ def test_api_client_rest_allows_makerspace_admin_and_scopes_others():
         {"label": "X", "allowed_origins": ["https://x.example.com"]},
         format="json",
     )
-    assert denied_create.status_code in (403, 404)
+    assert denied_create.status_code == 404
     assert other_client.get(f"/api/v1/admin/api-clients/{created.data['id']}").status_code == 404
 
     # A non-MANAGE_MAKERSPACE member (guest admin) is denied.
-    guest = make_member(
-        "client-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("client-guest", makerspace)
     denied_guest = authenticated_client(guest).get(
         f"/api/v1/admin/makerspace/{makerspace.id}/api-clients"
     )
@@ -763,10 +753,7 @@ def test_api_client_rest_allows_makerspace_admin_and_scopes_others():
     assert makerspace.cors_allowed_origins == ["https://lab.example.com"]
 
 
-def test_api_client_makerspace_admin_cannot_escalate_privileged_fields():
-    # Review fix (P2): widening API-client management to MANAGE_MAKERSPACE must NOT let a
-    # makerspace admin set the privileged knobs. Tier/scopes/client_type are forced to safe
-    # defaults on create and preserved (not escalated) on update â€” superadmin-only.
+def test_api_client_makerspace_admin_can_set_only_tenant_scopes():
     makerspace = make_space("client-escalate")
     admin = make_member("client-escalate-admin", makerspace)  # SPACE_MANAGER
     admin_client = authenticated_client(admin)
@@ -777,29 +764,29 @@ def test_api_client_makerspace_admin_cannot_escalate_privileged_fields():
             "label": "Sneaky",
             "allowed_origins": ["https://lab.example.com"],
             "rate_limit_tier": "trusted",
-            "scopes": ["admin:write", "inventory:write"],
+            "scopes": ["public:write"],
             "client_type": "server",
         },
         format="json",
     )
     assert created.status_code == 201
     assert created.data["rate_limit_tier"] == "standard"  # ignored, not "trusted"
-    assert created.data["scopes"] == []  # ignored, not the admin-supplied scopes
+    assert created.data["scopes"] == ["public:write"]
 
     obj = ApiClient.objects.get(id=created.data["id"])
     assert obj.rate_limit_tier == "standard"
-    assert obj.scopes == []
+    assert obj.scopes == ["public:write"]
 
-    # A PATCH attempting escalation is also ignored.
+    # Trust knobs remain silently ignored, while a forbidden scope fails closed.
     patched = admin_client.patch(
         f"/api/v1/admin/api-clients/{created.data['id']}",
         {"rate_limit_tier": "trusted", "scopes": ["admin:write"]},
         format="json",
     )
-    assert patched.status_code == 200
+    assert patched.status_code == 400
     obj.refresh_from_db()
     assert obj.rate_limit_tier == "standard"
-    assert obj.scopes == []
+    assert obj.scopes == ["public:write"]
 
     # A superadmin may still set the privileged knobs.
     superadmin = make_user(
@@ -841,7 +828,7 @@ def test_hidden_makerspace_superadmin_member_cannot_escalate_api_client_fields()
             "label": "Hidden web",
             "allowed_origins": ["https://hidden.example.com"],
             "rate_limit_tier": "trusted",
-            "scopes": ["admin:write"],
+            "scopes": ["public:read"],
             "client_type": "server",
         },
         format="json",
@@ -853,10 +840,10 @@ def test_hidden_makerspace_superadmin_member_cannot_escalate_api_client_fields()
     )
 
     assert created.status_code == 201
-    assert patched.status_code == 200
+    assert patched.status_code == 400
     obj = ApiClient.objects.get(id=created.data["id"])
     assert obj.rate_limit_tier == "standard"
-    assert obj.scopes == []
+    assert obj.scopes == ["public:read"]
 
 
 def test_member_can_request_api_key_without_secret_exposure():
@@ -1088,6 +1075,7 @@ def test_api_client_secret_rotation_returns_new_secret_once():
         makerspace=makerspace,
         allowed_origins=["https://lab.example.com"],
         created_by=admin,
+        scopes=["public:read"],
     )
     client = authenticated_client(admin)
 
@@ -1126,7 +1114,7 @@ def test_admin_cannot_manage_other_makerspace_api_clients():
         format="json",
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 404
     assert ApiClient.objects.count() == 0
 
 

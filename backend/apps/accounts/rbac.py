@@ -1,21 +1,65 @@
-"""Single source of truth for role permissions + makerspace scoping (PRD §4)."""
-import logging
+"""Single source of truth for role permissions + makerspace scoping (PRD §4).
 
-from django.db.models import F, Q
+The implementation is split by dependency layer; this module keeps the public import
+surface stable and owns the path-pinned tenant-servability delegation bodies.
+"""
+
+from django.db.models import F
 
 from apps.accounts.models import User
-from apps.makerspaces.models import MakerspaceMembership
 
-ALL = object()  # sentinel: unrestricted (superadmin)
+from .rbac_actions import (
+    ALL,
+    ALL_ACTIONS,
+    HANDOUT_ACTIONS,
+    IMPLIED_ACTIONS,
+    ORGANIZATION_GRANTABLE_ACTIONS,
+    ROLE_FORBIDDEN_ACTIONS,
+    ROLE_GRANTABLE_ACTIONS,
+    ROLE_SUPERADMIN_ASSIGNABLE_ACTIONS,
+    Action,
+    _HANDOUT_MUTATIONS,
+    _MEMBERSHIP_ROLE_ACTIONS,
+    _action_scope_filters,
+    actions_for_membership,
+    actions_for_organization_membership,
+    actions_satisfying,
+    expand_implied_actions,
+)
+from .rbac_memberships import (
+    _membership_for,
+    _membership_is_space_manager,
+    membership_role,
+)
+from .rbac_organizations import (
+    _org_actions_for,
+    _organization_authority_memberships,
+    _org_scope_for_action,
+    has_any_org_authority,
+)
+from .rbac_superadmin import (
+    _id_in,
+    _is_superadmin,
+    _superadmin_hidden_to_exclude,
+    hide_from_superadmin,
+    superadmin_hidden_block_applies,
+    superadmin_hidden_makerspace_ids,
+)
 
 
 def resolve_scope(actor):
     """Return the set of makerspace ids the actor may act in, or ALL."""
-    if actor is None or not getattr(actor, "is_authenticated", False):
+    if _actor_refused(actor):
         return set()
     if actor.is_superuser or actor.role == User.Role.SUPERADMIN:
         return _superadmin_visible_ids(actor, None)
-    scope = set(actor.makerspace_memberships.filter(status="active").values_list("makerspace_id", flat=True))
+    # Organization grants confer actions, not identity, so they never widen this
+    # action-agnostic scope (or scope_by_makerspace(), which derives from it).
+    scope = set(
+        actor.makerspace_memberships.filter(status="active").values_list(
+            "makerspace_id", flat=True
+        )
+    )
     return _exclude_archived_ids(scope)
 
 
@@ -29,160 +73,12 @@ def scope_by_makerspace(actor, queryset, makerspace_field="makerspace_id"):
     return queryset.filter(**{f"{makerspace_field}__in": scope})
 
 
-class Action:
-    MANAGE_EVENTS = 'manage_events'
-    MANAGE_BOOKINGS = 'manage_bookings'
-    VIEW_INVENTORY = "view_inventory"
-    EDIT_INVENTORY = "edit_inventory"
-    ACCEPT_REQUEST = "accept_request"
-    REJECT_REQUEST = "reject_request"
-    ASSIGN_BOX = "assign_box"
-    ISSUE_REQUEST = "issue_request"
-    ISSUE_DIRECT_LOAN = "issue_direct_loan"  # create a handout with NO reviewed request
-    RETURN_REQUEST = "return_request"
-    UPLOAD_EVIDENCE = "upload_evidence"
-    MANAGE_QR = "manage_qr"
-    MANAGE_PRINTING = "manage_printing"
-    MANAGE_MACHINES = "manage_machines"
-    VIEW_AUDIT = "view_audit"
-    TRANSFER_STOCK = "transfer_stock"        # superadmin only
-    MANAGE_STAFF = "manage_staff"            # superadmin only
-    MANAGE_MAKERSPACE = "manage_makerspace"  # superadmin only
-
-
-IMPLIED_ACTIONS = {
-    Action.MANAGE_MACHINES: {Action.MANAGE_PRINTING},
-}
-
-
-def expand_implied_actions(actions) -> set:
-    """Materialize the authority implied by an already-granted action set."""
-    expanded = set(actions)
-    pending = list(expanded)
-    while pending:
-        action = pending.pop()
-        for implied in IMPLIED_ACTIONS.get(action, ()):
-            if implied not in expanded:
-                expanded.add(implied)
-                pending.append(implied)
-    return expanded
-
-
-def actions_satisfying(requested_action) -> frozenset:
-    """Return actions whose grant satisfies ``requested_action``.
-
-    This is the reverse direction of ``expand_implied_actions`` for database
-    filtering, where a JSON containment query can only inspect stored grants.
-    """
-    satisfying = {requested_action}
-    pending = [requested_action]
-    while pending:
-        action = pending.pop()
-        for grant, implied in IMPLIED_ACTIONS.items():
-            if action in implied and grant not in satisfying:
-                satisfying.add(grant)
-                pending.append(grant)
-    return frozenset(satisfying)
-
-
-_SPACE_MANAGER_ACTIONS = {
-    Action.VIEW_INVENTORY, Action.EDIT_INVENTORY, Action.ACCEPT_REQUEST,
-    Action.REJECT_REQUEST, Action.ASSIGN_BOX, Action.ISSUE_REQUEST,
-    Action.ISSUE_DIRECT_LOAN, Action.RETURN_REQUEST, Action.UPLOAD_EVIDENCE,
-    Action.MANAGE_QR, Action.MANAGE_PRINTING, Action.VIEW_AUDIT,
-    Action.MANAGE_MAKERSPACE, Action.MANAGE_MACHINES, Action.MANAGE_EVENTS,
-    Action.MANAGE_BOOKINGS,
-}
-# Guest admins are handout-only: accepted request handovers, direct handout, returns,
-# and evidence upload. They still cannot review requests or edit inventory setup.
-_GUEST_ADMIN_ACTIONS = {
-    Action.VIEW_INVENTORY, Action.ASSIGN_BOX, Action.ISSUE_REQUEST,
-    Action.ISSUE_DIRECT_LOAN, Action.RETURN_REQUEST, Action.UPLOAD_EVIDENCE,
-}
-_PRINT_MANAGER_ACTIONS = {
-    Action.MANAGE_PRINTING,
-}
-# Machine Manager: makerspace-wide machine authority. MANAGE_MACHINES alone unlocks the
-# full machine lifecycle plus maintenance/warranty/usage/docs, which already gate on
-# machine access — so no extra action is required (Part I).
-_MACHINE_MANAGER_ACTIONS = {
-    Action.MANAGE_MACHINES,
-}
-_INVENTORY_MANAGER_ACTIONS = {
-    Action.VIEW_INVENTORY, Action.EDIT_INVENTORY, Action.ACCEPT_REQUEST,
-    Action.REJECT_REQUEST, Action.ASSIGN_BOX, Action.ISSUE_REQUEST,
-    Action.ISSUE_DIRECT_LOAN, Action.RETURN_REQUEST, Action.UPLOAD_EVIDENCE,
-    Action.MANAGE_QR, Action.VIEW_AUDIT,
-}
-# Authority for non-superadmins is keyed on the PER-MAKERSPACE membership role,
-# NOT the global User.role (review fix #3). A user who is globally `space_manager` but only a
-# guest_admin member of makerspace B gets only guest_admin actions in B.
-_MEMBERSHIP_ROLE_ACTIONS = {
-    MakerspaceMembership.Role.SPACE_MANAGER: _SPACE_MANAGER_ACTIONS,
-    MakerspaceMembership.Role.GUEST_ADMIN: _GUEST_ADMIN_ACTIONS,
-    MakerspaceMembership.Role.INVENTORY_MANAGER: _INVENTORY_MANAGER_ACTIONS,
-    # Kept as the raw legacy value so an unmigrated/null-FK membership remains
-    # session-compatible after the protected default is retired.
-    "print_manager": _PRINT_MANAGER_ACTIONS,
-    MakerspaceMembership.Role.MACHINE_MANAGER: _MACHINE_MANAGER_ACTIONS,
-}
-
-
-ALL_ACTIONS = frozenset(
-    value
-    for name, value in vars(Action).items()
-    if name.isupper() and isinstance(value, str)
-)
-ROLE_FORBIDDEN_ACTIONS = frozenset({
-    Action.TRANSFER_STOCK,
-    Action.MANAGE_STAFF,
-})
-ROLE_GRANTABLE_ACTIONS = frozenset(ALL_ACTIONS - ROLE_FORBIDDEN_ACTIONS)
-ROLE_SUPERADMIN_ASSIGNABLE_ACTIONS = frozenset({Action.MANAGE_MAKERSPACE})
-HANDOUT_ACTIONS = frozenset(_GUEST_ADMIN_ACTIONS)
-_HANDOUT_MUTATIONS = frozenset(HANDOUT_ACTIONS - {Action.VIEW_INVENTORY})
-
-
-def actions_for_membership(membership) -> set:
-    """Resolve role actions for a membership, failing closed on invalid role data."""
-    if membership is None or getattr(membership, "status", "active") != "active":
-        return set()
-    if membership.assigned_role_id is not None:
-        role = membership.assigned_role
-        if role.makerspace_id != membership.makerspace_id:
-            return set()
-        value = role.granted_actions
-        if not isinstance(value, list):
-            logging.getLogger(__name__).warning(
-                "Ignoring malformed granted actions on an assigned makerspace role."
-            )
-            return set()
-        return expand_implied_actions({
-            action
-            for action in value
-            if isinstance(action, str) and action in ROLE_GRANTABLE_ACTIONS
-        })
-    return expand_implied_actions(_MEMBERSHIP_ROLE_ACTIONS.get(membership.role, set()))
-
-
-def _action_scope_filters(action):
-    """Build assigned-role and legacy-role filters for an action scope query."""
-    satisfying = actions_satisfying(action)
-    assigned_filter = Q()
-    for granted_action in satisfying:
-        assigned_filter |= Q(assigned_role__granted_actions__contains=[granted_action])
-    legacy_roles = [
-        role
-        for role, actions in _MEMBERSHIP_ROLE_ACTIONS.items()
-        if actions & satisfying
-    ]
-    return assigned_filter, legacy_roles
-
-
 def makerspaces_for_action(actor, action):
     """Return makerspace ids where actor's membership role grants action, or ALL."""
-    if actor is None or not getattr(actor, "is_authenticated", False):
+    if _actor_refused(actor):
         return set()
+    # Organization grants never enter this superadmin branch: hidden-space authority
+    # must continue to come only from an explicit makerspace membership.
     if actor.is_superuser or actor.role == User.Role.SUPERADMIN:
         return _superadmin_visible_ids(actor, action)
     if action in ROLE_FORBIDDEN_ACTIONS:
@@ -206,7 +102,8 @@ def makerspaces_for_action(actor, action):
         if legacy_roles
         else set()
     )
-    return _exclude_archived_ids(assigned_scope | legacy_scope)
+    org_scope = _org_scope_for_action(actor, action)
+    return _exclude_archived_ids(assigned_scope | legacy_scope | org_scope)
 
 
 def makerspaces_for_actions(actor, *actions):
@@ -235,33 +132,39 @@ def scope_by_action(actor, action, queryset, field="makerspace_id"):
     return queryset.filter(**{f"{field}__in": scope})
 
 
-def membership_role(actor, makerspace_id):
-    """Return the actor's MakerspaceMembership.role for this makerspace, or None."""
-    membership = actor.makerspace_memberships.filter(
-        status="active",
-        makerspace_id=makerspace_id
-    ).first()
-    return membership.role if membership else None
+def scope_by_visibility_or_action(actor, action, queryset, field="makerspace_id"):
+    """Admit rows the actor can SEE, leaving 403-vs-404 to the permission check.
 
-
-def _membership_for(actor, makerspace_id) -> MakerspaceMembership | None:
-    return actor.makerspace_memberships.select_related("assigned_role").filter(
-        status="active",
-        makerspace_id=makerspace_id
-    ).first()
+    Visible means local membership scope UNION the action's scope (including org
+    grants). The handler still calls ``can`` afterwards and returns 403 from there.
+    """
+    scope = resolve_scope(actor)
+    if scope is ALL:
+        return queryset
+    action_scope = makerspaces_for_action(actor, action)
+    if action_scope is ALL:
+        return queryset
+    visible = scope | action_scope
+    if not visible:
+        return queryset.none()
+    return queryset.filter(**{f"{field}__in": visible})
 
 
 def effective_actions(actor, makerspace_id) -> set:
     """Return the membership-effective actions for an actor in one makerspace."""
-    if actor is None or not getattr(actor, "is_authenticated", False):
+    if _actor_refused(actor):
         return set()
     if _id_in(makerspace_id, archived_makerspace_ids()):
         return set()
+    # Organization grants never enter this superadmin branch: hidden-space authority
+    # must continue to come only from an explicit makerspace membership.
     if actor.is_superuser or actor.role == User.Role.SUPERADMIN:
         if _id_in(makerspace_id, superadmin_hidden_makerspace_ids()):
             return actions_for_membership(_membership_for(actor, makerspace_id))
         return set(ROLE_GRANTABLE_ACTIONS)
-    return actions_for_membership(_membership_for(actor, makerspace_id))
+    return actions_for_membership(
+        _membership_for(actor, makerspace_id)
+    ) | _org_actions_for(actor, makerspace_id)
 
 
 def is_space_manager_identity(actor, makerspace_id) -> bool:
@@ -270,7 +173,7 @@ def is_space_manager_identity(actor, makerspace_id) -> bool:
     This deliberately does not infer identity from actions: Machine Managers and
     custom roles granted manage_machines cannot configure types or pricing.
     """
-    if actor is None or not getattr(actor, "is_authenticated", False):
+    if _actor_refused(actor):
         return False
     if _id_in(makerspace_id, archived_makerspace_ids()):
         return False
@@ -279,17 +182,10 @@ def is_space_manager_identity(actor, makerspace_id) -> bool:
         if _id_in(makerspace_id, superadmin_hidden_makerspace_ids()):
             # In a hard-hidden makerspace a global superadmin is limited to their
             # explicit membership's role, so only a space-manager membership grants
-            # the identity — an Inventory/Machine Manager membership does not.
+            # the identity -- an Inventory/Machine Manager membership does not.
             return bool(membership and _membership_is_space_manager(membership))
         return True
     return bool(membership and _membership_is_space_manager(membership))
-
-
-def _membership_is_space_manager(membership) -> bool:
-    if membership.assigned_role_id is not None:
-        role = membership.assigned_role
-        return bool(role and role.makerspace_id == membership.makerspace_id and role.legacy_role == "space_manager")
-    return membership.role == MakerspaceMembership.Role.SPACE_MANAGER
 
 
 def is_handout_only(actor, makerspace_id) -> bool:
@@ -305,10 +201,12 @@ def can(actor, action, makerspace_id=None):
 
     Superadmin: everything. Everyone else: authority is per-makerspace, so a
     makerspace_id is required and the membership role decides the allowed actions."""
-    if actor is None or not getattr(actor, "is_authenticated", False):
+    if _actor_refused(actor):
         return False
     if makerspace_id is not None and _id_in(makerspace_id, archived_makerspace_ids()):
         return False
+    # Organization grants never enter this superadmin branch: hidden-space authority
+    # must continue to come only from an explicit makerspace membership.
     if actor.is_superuser or actor.role == User.Role.SUPERADMIN:
         if makerspace_id is None:
             return True
@@ -321,28 +219,24 @@ def can(actor, action, makerspace_id=None):
         return True
     if makerspace_id is None:
         return False
-    return action in actions_for_membership(_membership_for(actor, makerspace_id))
-
-
-def superadmin_hidden_makerspace_ids():
-    from apps.makerspaces.models import Makerspace
-
-    return set(
-        Makerspace.objects.filter(
-            superadmin_access_enabled=False,
-        )
-        .values_list("id", flat=True)
-    )
+    if action in actions_for_membership(_membership_for(actor, makerspace_id)):
+        return True
+    return action in _org_actions_for(actor, makerspace_id)
 
 
 def archived_makerspace_ids():
-    from apps.makerspaces.models import Makerspace
+    """Compatibility name for every makerspace normal RBAC must exclude."""
+    from apps.makerspaces.servability import unservable_makerspace_ids
 
-    return set(
-        Makerspace.objects.filter(archived_at__isnull=False).values_list(
-            "id",
-            flat=True,
-        )
+    return unservable_makerspace_ids()
+
+
+def _actor_refused(actor):
+    """Tenant-dump stubs never become principals through later field edits."""
+    return bool(
+        actor is None
+        or not getattr(actor, "is_authenticated", False)
+        or getattr(actor, "is_tenant_dump_stub", False)
     )
 
 
@@ -351,93 +245,11 @@ def _exclude_archived_ids(scope):
     return scope - archived if archived else scope
 
 
-def _id_in(makerspace_id, ids):
-    if makerspace_id in ids:
-        return True
-    try:
-        return int(makerspace_id) in ids
-    except (TypeError, ValueError):
-        return False
-
-
-def _is_superadmin(actor):
-    return bool(
-        actor is not None
-        and getattr(actor, "is_authenticated", False)
-        and (actor.is_superuser or actor.role == User.Role.SUPERADMIN)
-    )
-
-
-def _superadmin_hidden_to_exclude(actor, action=None):
-    """Hidden makerspace ids a GLOBAL superadmin must be cut off from.
-
-    A makerspace with superadmin_access_enabled=False is excluded UNLESS the
-    superadmin holds an explicit MakerspaceMembership there (granting `action`,
-    when given) — a superadmin who is also a real member keeps that membership's
-    role-scoped access, but never global superpower (review fix #2)."""
-    hidden = superadmin_hidden_makerspace_ids()
-    if not hidden:
-        return set()
-    memberships = actor.makerspace_memberships.filter(makerspace_id__in=hidden, status="active")
-    if action is None:
-        member_ok = set(memberships.values_list("makerspace_id", flat=True))
-    elif action in ROLE_FORBIDDEN_ACTIONS:
-        member_ok = set()
-    else:
-        assigned_filter, legacy_roles = _action_scope_filters(action)
-        assigned_ok = set(
-            memberships.filter(
-                assigned_role__isnull=False,
-                assigned_role__makerspace=F("makerspace"),
-            ).filter(assigned_filter).values_list("makerspace_id", flat=True)
-        )
-        legacy_ok = (
-            set(
-                memberships.filter(
-                    assigned_role__isnull=True,
-                    role__in=legacy_roles,
-                ).values_list("makerspace_id", flat=True)
-            )
-            if legacy_roles
-            else set()
-        )
-        member_ok = assigned_ok | legacy_ok
-    return hidden - member_ok
-
-
 def _superadmin_visible_ids(actor, action=None):
-    """Concrete id set a global superadmin may act in (all makerspaces minus the
-    hard-hidden, non-member ones and archived ones). Returns ALL when there is
-    no exclusion so the fast path is preserved for the common case."""
+    """Concrete ids a global superadmin may act in, or ALL when unrestricted."""
     excluded = _superadmin_hidden_to_exclude(actor, action) | archived_makerspace_ids()
     if not excluded:
         return ALL
     from apps.makerspaces.models import Makerspace
 
     return set(Makerspace.objects.exclude(id__in=excluded).values_list("id", flat=True))
-
-
-def superadmin_hidden_block_applies(actor, makerspace_id, action=None):
-    """True when a global superadmin must be HARD-blocked from `makerspace_id`."""
-    if not _is_superadmin(actor) or makerspace_id is None:
-        return False
-    if not _id_in(makerspace_id, superadmin_hidden_makerspace_ids()):
-        return False
-    membership = _membership_for(actor, makerspace_id)
-    if membership is None:
-        return True  # no membership -> global superpower is withheld
-    if action is None:
-        return False  # legitimate member: membership role governs, not blocked
-    return action not in actions_for_membership(membership)
-
-
-def hide_from_superadmin(actor, queryset, field="makerspace_id"):
-    """Exclude hard-hidden makerspaces for a global superadmin. Delegates to the
-    same policy as the RBAC scopes so a superadmin who is an explicit member of a
-    hidden space is NOT excluded (no contradiction with scope_by_action)."""
-    if not _is_superadmin(actor):
-        return queryset
-    excluded = _superadmin_hidden_to_exclude(actor, None)
-    if not excluded:
-        return queryset
-    return queryset.exclude(**{f"{field}__in": excluded})

@@ -47,16 +47,24 @@ stack is unaffected unless you set them.
    the backend re-validates object size at attach time (`1 ≤ size ≤ *_MAX_BYTES`) since PUT has
    no upload-time `content-length-range`.
 
-### ⚠️ Known limitation — PUT overwrite window (managed mode only)
-A presigned PUT URL carries no upload-time size policy and the object key stays writable until
-the URL expires (`EVIDENCE_URL_TTL_SECONDS` / `PRINT_URL_TTL_SECONDS`, default 300s). A verified
-requester could upload a valid file, get it attached, then overwrite the same key with an
-oversized/zero-byte file before expiry — the recorded `size_bytes` would no longer match the
-stored object. This extends the already-accepted "presigned upload can overwrite its key until
-expiry" risk (documented for POST in `CLAUDE.md`). Mitigations: keep the TTLs short (the default
-5 min), monitor Storage usage against the 1 GB cap, and lower `PRINT_UPLOAD_MAX_BYTES`. A full
-fix (upload to a staging key, then server-side copy to an immutable final key after validation)
-is deliberately **not** implemented — it's only relevant in this optional demo/pilot mode.
+### How PUT mode closes the overwrite window
+A presigned PUT URL carries no upload-time size policy, and the key it names stays writable
+until the URL expires (`EVIDENCE_URL_TTL_SECONDS` / `PRINT_URL_TTL_SECONDS`, default 300s). PUT
+mode therefore never presigns the final key. The client uploads to a **staging key**, and
+`finalize_upload` (`backend/apps/evidence/storage.py`) does the promotion server-side:
+
+1. HEAD the staging object and reject a size outside `1 ≤ size ≤ *_MAX_BYTES`.
+2. Server-side copy staging → the final key, then delete staging.
+3. **Re-HEAD the final object** and delete it if the size drifted.
+
+Step 3 is what makes the window closed rather than merely narrow. The final key is never
+client-writable, so its post-copy size is authoritative — a racing oversized PUT to the still-
+writable staging key between steps 1 and 2 promotes an object that step 3 then rejects. The
+recorded `size_bytes` cannot disagree with the stored object.
+
+Operationally you should still keep the TTLs short and watch Storage usage against the free
+tier's 1 GB cap, but the size contract holds in PUT mode exactly as it does for POST, where
+S3's `content-length-range` condition enforces it at upload time.
 
 Create a second **public** Storage bucket for catalog imagery and set:
 
@@ -75,7 +83,10 @@ photos and print files must remain in the private `AWS_STORAGE_BUCKET_NAME`.
 `pg_cron` can only run SQL, so it can't call `manage.py send_return_reminders`. Instead:
 
 1. Set `CRON_SECRET` to a long random value.
-2. Schedule a daily `POST https://<your-django-host>/api/v1/internal/cron/return-reminders`
+2. Configure the scheduler control plane to disable the job unless the SpaceWorks host marker is `normal`
+   or `acknowledged-normal`; a remote scheduler is not fenced by the image entrypoint and is unsupported
+   without this.
+3. Schedule a daily `POST https://<your-django-host>/api/v1/internal/cron/return-reminders`
    with header `X-Cron-Secret: <CRON_SECRET>` from GitHub Actions cron, cron-job.org, or
    Supabase `pg_cron` + `pg_net`. The endpoint **404s** until `CRON_SECRET` is set and returns
    **403** on a wrong secret; the management command still works for manual runs.

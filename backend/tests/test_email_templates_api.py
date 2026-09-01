@@ -147,7 +147,16 @@ def test_space_manager_and_superadmin_see_both_streams_and_can_patch():
         client = client_for(actor)
         listed = client.get(list_url(makerspace))
         assert listed.status_code == 200
-        assert streams(listed) == {"hardware", "printing"}
+        # A space manager holds every stream's action, so they see all six. The narrower
+        # roles below are what pin the per-stream scoping.
+        assert streams(listed) == {
+            "hardware",
+            "printing",
+            "events",
+            "bookings",
+            "maintenance",
+            "membership",
+        }
 
         hardware = client.patch(
             detail_url(makerspace, "hardware", "requester", "request_received"),

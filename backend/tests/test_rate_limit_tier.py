@@ -60,6 +60,7 @@ def _issue_server_client(makerspace, *, tier):
         makerspace=makerspace,
         allowed_origins=[ORIGIN],
         client_type="server",
+        scopes=["public:read"],
         rate_limit_tier=tier,
     )
 
@@ -70,6 +71,7 @@ def _issue_browser_client(makerspace, *, tier):
         makerspace=makerspace,
         allowed_origins=[ORIGIN],
         client_type="browser",
+        scopes=["public:read"],
         rate_limit_tier=tier,
     )
     return client

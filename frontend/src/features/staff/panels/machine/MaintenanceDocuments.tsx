@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 
+import { ConfirmDialog } from "../../../../components/ui";
 import {
   uploadToContract,
   useDeleteMaintenanceDocument,
@@ -22,6 +23,7 @@ export function MaintenanceDocuments({
   const [file, setFile] = useState<File | null>(null);
   const [pendingKey, setPendingKey] = useState("");
   const [uploadError, setUploadError] = useState<Error | null>(null);
+  const [deleteDocumentId, setDeleteDocumentId] = useState<number | null>(null);
   const presign = usePresignMaintenanceDocument(logId);
   const finalize = useFinalizeMaintenanceDocument(machineId, logId);
   const view = useMaintenanceDocumentUrl();
@@ -57,24 +59,20 @@ export function MaintenanceDocuments({
 
   return (
     <div className="mt-3 grid gap-2 border-t border-line pt-3">
-      <span className="text-xs font-semibold text-muted">Attachments</span>
+      <h4 className="title-section">Attachments</h4>
       {documents.map((document) => (
         <div key={document.id} className="flex flex-wrap items-center gap-2 text-xs">
           <span className="min-w-0 flex-1 text-muted">
             Attachment #{document.id} · {formatBytes(document.size_bytes)}
           </span>
-          <button className="desk-button" type="button" onClick={() => view.mutate(document.id)}>
+          <button className="desk-button-ghost" type="button" onClick={() => view.mutate(document.id)}>
             Download
           </button>
           {canDelete && !retired ? (
             <button
-              className="desk-button"
+              className="desk-button-danger"
               type="button"
-              onClick={() => {
-                if (window.confirm("Permanently delete this maintenance attachment?")) {
-                  remove.mutate(document.id);
-                }
-              }}
+              onClick={() => setDeleteDocumentId(document.id)}
             >
               Delete
             </button>
@@ -84,7 +82,7 @@ export function MaintenanceDocuments({
       {!documents.length ? <span className="text-xs text-muted">No attachments.</span> : null}
       {!retired ? (
         <div className="flex flex-wrap items-end gap-2">
-          <label className="grid min-w-0 flex-1 gap-1 text-xs font-semibold text-muted">
+          <label className="eyebrow grid min-w-0 flex-1 gap-1">
             Add supporting document
             <input
               ref={input}
@@ -98,7 +96,7 @@ export function MaintenanceDocuments({
             />
           </label>
           <button
-            className="desk-button"
+            className="desk-button-primary"
             type="button"
             disabled={!file || presign.isPending || finalize.isPending}
             onClick={() => void upload()}
@@ -115,6 +113,20 @@ export function MaintenanceDocuments({
       {error instanceof Error ? (
         <p className="text-sm text-danger" role="alert">{error.message}</p>
       ) : null}
+      <ConfirmDialog
+        open={deleteDocumentId !== null}
+        title="Delete maintenance attachment?"
+        message="Permanently delete this maintenance attachment?"
+        confirmLabel="Delete attachment"
+        tone="danger"
+        pending={remove.isPending}
+        onConfirm={() => {
+          if (deleteDocumentId !== null) {
+            remove.mutate(deleteDocumentId, { onSuccess: () => setDeleteDocumentId(null) });
+          }
+        }}
+        onCancel={() => setDeleteDocumentId(null)}
+      />
     </div>
   );
 }

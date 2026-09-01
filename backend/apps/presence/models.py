@@ -16,11 +16,19 @@ class PresenceSession(models.Model):
     class EndReason(models.TextChoices):
         SUPERSEDED = "superseded", "Superseded"
         MEMBERSHIP_REVOKED = "membership_revoked", "Membership revoked"
+        CLAIM_REVOKED = "claim_revoked", "Claim revoked"
         USER_ENDED = "user_ended", "User ended"
 
     member = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     makerspace = models.ForeignKey(Makerspace, on_delete=models.CASCADE)
     membership = models.ForeignKey(MakerspaceMembership, on_delete=models.PROTECT)
+    created_via_claim_session = models.ForeignKey(
+        "accounts.MemberClaimCode",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="presence_sessions",
+    )
     started_at = models.DateTimeField()
     expires_at = models.DateTimeField()
     ended_at = models.DateTimeField(null=True, blank=True)

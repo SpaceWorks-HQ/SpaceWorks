@@ -21,10 +21,23 @@ def push_configured():
 
 
 def deliver_native_push(log):
+    # Additive master switch (plan A6): the platform credential check below still runs,
+    # so enabling the feature on an unconfigured platform delivers nothing.
+    from apps.makerspaces.platform import feature_enabled
+
+    if log.makerspace_id and not feature_enabled(log.makerspace, "mobile.push"):
+        return False
     settings_row = PlatformPushSettings.load()
     if not (settings_row.fcm_configured or settings_row.apns_configured):
         return False
-    user_ids = staff_user_ids_for_feature(log.makerspace, log.feature, event=log.event)
+    from apps.integrations.destinations import NotificationScope
+
+    user_ids = staff_user_ids_for_feature(
+        log.makerspace,
+        log.feature,
+        event=log.event,
+        scope=NotificationScope.from_dict((log.payload or {}).get("scope")),
+    )
     devices = PushDevice.objects.filter(
         makerspace=log.makerspace, user_id__in=user_ids, active=True,
         device_grant__status="active", user__is_active=True, user__access_status="active",

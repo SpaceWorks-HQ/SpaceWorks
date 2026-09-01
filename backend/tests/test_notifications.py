@@ -5,6 +5,7 @@ from apps.accounts.models import User
 from apps.makerspaces.models import MakerspaceMembership
 from apps.notifications.models import Notification
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -31,12 +32,7 @@ def enable_notifications(makerspace):
 
 
 def make_guest(username, makerspace):
-    return make_member(
-        username,
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    return make_handout_member(username, makerspace)
 
 
 def make_print_manager(username, makerspace):
@@ -50,6 +46,12 @@ def make_print_manager(username, makerspace):
 
 def test_notifications_module_disabled_returns_400():
     makerspace = make_space("notif-module-off")
+    # `notifications` is a registered, installable module now, so the disabled path has
+    # to be set up explicitly rather than inherited from the default.
+    makerspace.enabled_modules = [
+        key for key in makerspace.enabled_modules if key != "notifications"
+    ]
+    makerspace.save(update_fields=["enabled_modules"])
     manager = make_member("notif-module-off-manager", makerspace)
 
     response = authenticated_client(manager).get(list_url(makerspace))

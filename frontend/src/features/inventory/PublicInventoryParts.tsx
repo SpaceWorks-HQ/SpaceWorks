@@ -25,8 +25,8 @@ export function LoadingState() {
 
 export function EmptyState({ query }: { query: string }) {
   return (
-    <Card className="mx-auto max-w-lg text-center">
-      <h2 className="text-xl font-semibold text-ink">
+    <Card className="mx-auto max-w-lg border-secondary text-center">
+      <h2 className="title-panel">
         {query ? "No matching items." : "No public items yet."}
       </h2>
       <p className="mt-2 text-sm leading-6 text-muted">
@@ -40,8 +40,8 @@ export function EmptyState({ query }: { query: string }) {
 
 export function ErrorState({ error }: { error: Error }) {
   return (
-    <Card className="mx-auto max-w-lg text-center">
-      <h2 className="text-xl font-semibold text-ink">{error.message}</h2>
+    <Card className="mx-auto max-w-lg border-secondary text-center">
+      <h2 className="title-panel">{error.message}</h2>
       <p className="mt-2 text-sm leading-6 text-muted">
         This makerspace may not exist or its public inventory is disabled.
       </p>
@@ -60,12 +60,12 @@ export function CatalogSidebar({
 }) {
   const itemClass = (active: boolean) =>
     active
-      ? "desk-nav-item desk-nav-item-active shrink-0 whitespace-nowrap lg:shrink lg:whitespace-normal"
-      : "desk-nav-item shrink-0 whitespace-nowrap lg:shrink lg:whitespace-normal";
+      ? "desk-nav-item desk-nav-item-active shrink-0 whitespace-nowrap border-secondary bg-secondary text-on-secondary hover:border-secondary hover:bg-secondary hover:text-on-secondary lg:shrink lg:whitespace-normal"
+      : "desk-nav-item shrink-0 whitespace-nowrap hover:border-secondary hover:bg-secondary/15 lg:shrink lg:whitespace-normal";
   const countClass = (active: boolean) =>
     active
-      ? "ml-2 text-xs text-on-accent/80"
-      : "ml-2 rounded-full bg-tone-yellow px-1.5 text-xs text-tone-yellow-ink dark:bg-[#332b00] dark:text-[#fcdf46]";
+      ? "ml-2 font-mono text-xs text-on-secondary/80"
+      : "ml-2 rounded-full bg-warn px-1.5 font-mono text-xs text-on-warn dark:bg-warn/15 dark:text-warn-ink";
 
   return (
     <Card
@@ -73,9 +73,9 @@ export function CatalogSidebar({
       padding="sm"
     >
       <nav aria-label="Catalog browse">
-        <p className="px-3 text-xs font-semibold tracking-wide text-muted">
+        <h2 className="title-section px-3">
           Browse
-        </p>
+        </h2>
         <div className="mt-2 flex gap-2 overflow-x-auto lg:block lg:space-y-1 lg:overflow-visible">
           <button
             aria-current={view.kind === "all" ? "page" : undefined}
@@ -116,9 +116,9 @@ export function CatalogSidebar({
         {categories.length > 0 ? (
           <>
             <div className="my-3 border-t border-line" />
-            <p className="px-3 text-xs font-semibold tracking-wide text-muted">
+            <h3 className="title-section px-3">
               Categories
-            </p>
+            </h3>
             <div className="mt-2 flex gap-2 overflow-x-auto lg:block lg:space-y-1 lg:overflow-visible">
               {categories.map((category) => {
                 const active =

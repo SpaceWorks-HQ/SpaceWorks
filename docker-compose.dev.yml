@@ -1,0 +1,95 @@
+# Live-reload development layer — the whole stack in Docker, nothing on the host.
+#
+#   ./scripts/dev-docker.sh up -d --build
+#
+# The base docker-compose.yml stays production-shaped (gunicorn + nginx serving a
+# baked dist) because that is what a makerspace operator actually runs. This file
+# replaces only what has to differ while you are building: `./backend` and
+# `./frontend` are bind-mounted, Django runs under the autoreloading dev server,
+# and the frontend runs the Vite dev server with HMR instead of nginx. No host
+# virtualenv and no host `npm install` are required.
+#
+# Use scripts/dev-docker.sh rather than calling `docker compose -f ...` by hand:
+# passing any -f disables the automatic merge of docker-compose.override.yml, and
+# that override is where machine-specific infrastructure port remaps live.
+services:
+  backend:
+    # runserver instead of gunicorn: it autoreloads on save, and with DEBUG on it
+    # serves the /control/ + /docs/ assets straight from the staticfiles finders,
+    # so the dev container never needs a collectstatic pass.
+    command: ["--role", "backend", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+    # The image drops to its own unprivileged uid (10001), but ./backend is
+    # bind-mounted below and owned by you — and `makemigrations` has to write new
+    # migration files back into it. Run as the host user so anything the container
+    # generates lands owned by you instead of by a uid you can't delete without sudo.
+    # Override in a .env file if your host uid is not 1000: DEV_UID=... DEV_GID=...
+    user: "${DEV_UID:-1000}:${DEV_GID:-1000}"
+    environment:
+      DEBUG: "True"
+      # Vite proxies with changeOrigin, so Django can see `Host: backend`.
+      ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      # The browser Origin is the Vite dev server. It must be allowed or the
+      # staff-console refresh/logout CSRF check 403s and a page reload drops the
+      # session back to the login screen.
+      CORS_ALLOWED_ORIGINS: http://localhost:5000,http://localhost:5173
+    ports: !override
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      # Two test suites read repo files by walking up from their own path, which
+      # with ./backend mounted at /app lands at the filesystem root:
+      #   tests/test_capabilities.py     -> parents[2] / "frontend"  -> /frontend
+      #   tests/encryption/test_doc_help -> parents[3] / "docs"      -> /docs
+      # Mount both read-only there or `exec backend pytest` reports false failures
+      # (a phantom feature-drift, and a missing PII runbook).
+      - ./frontend:/frontend:ro
+      - ./docs:/docs:ro
+
+  # Migrations run from the mounted tree, so a migration you just wrote applies
+  # without rebuilding the image.
+  migrate:
+    volumes:
+      - ./backend:/app
+
+  # Celery has no autoreload: restart these two after changing task code
+  # (`./scripts/dev-docker.sh restart worker beat`).
+  worker:
+    volumes:
+      - ./backend:/app
+
+  beat:
+    volumes:
+      - ./backend:/app
+
+  candidate-backend:
+    command: ["--role", "backend", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    # Tag the dev target separately. Without this both topologies derive the same
+    # `spaceworks-frontend` name, so whichever built last owns it — and a later
+    # `docker compose up -d` (prod, no --build) silently runs this dev image:
+    # CMD is `npm run dev`, nginx never starts, 8080->80 points at a dead port and
+    # the container sits unhealthy while its logs read a perfectly normal
+    # "VITE ready". Frontend is the only service overriding build.target, so it is
+    # the only one that needs this.
+    image: spaceworks-frontend-dev
+    build:
+      target: dev
+      # The VITE_* build args only feed the production `npm run build`; leaving
+      # them set against the dev target just produces "unused build arg" warnings.
+      args: !reset null
+    environment:
+      # On the compose network the backend is `backend:8000`, never localhost.
+      VITE_DEV_PROXY_TARGET: http://backend:8000
+    ports: !override
+      - "5000:5000"
+    volumes:
+      - ./frontend:/app
+      # Anonymous volume so the image's node_modules survives the bind mount
+      # above (which would otherwise shadow it with the host tree). After
+      # changing package.json, recreate it: `dev-docker.sh up -d --build -V frontend`.
+      - /app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/ >/dev/null"]

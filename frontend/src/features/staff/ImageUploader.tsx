@@ -38,13 +38,21 @@ async function rejectOversizePublicImage(file: File) {
   }
 }
 
-export async function uploadPublicImage(endpoint: string, file: File) {
+export async function uploadPublicImage(
+  endpoint: string,
+  file: File,
+  // Extra fields carried on BOTH the presign and the attach — the member profile
+  // endpoints use one triple for the avatar and for each project image, discriminated
+  // by `project_id`, and the attach needs it as much as the presign does.
+  extraBody: Record<string, unknown> = {},
+) {
   await rejectOversizePublicImage(file);
   const presigned = await staffRequest<PresignResponse>(endpoint, {
     method: "POST",
     body: JSON.stringify({
       content_type: file.type || "application/octet-stream",
       filename: file.name,
+      ...extraBody,
     }),
   });
 
@@ -65,7 +73,7 @@ export async function uploadPublicImage(endpoint: string, file: File) {
 
   await staffRequest(endpoint, {
     method: "PUT",
-    body: JSON.stringify({ object_key: presigned.object_key }),
+    body: JSON.stringify({ object_key: presigned.object_key, ...extraBody }),
   });
 }
 type ImageUploaderProps = {
@@ -81,6 +89,10 @@ type ImageUploaderProps = {
   fit?: "cover" | "contain";
   /** square preview (logos/thumbnails) vs wide banner preview (cover images). */
   shape?: "square" | "wide";
+  /** Extra fields sent with presign, attach and clear (e.g. `{ project_id }`). */
+  extraBody?: Record<string, unknown>;
+  /** Query string appended to the clear request, which carries no body. */
+  clearQuery?: string;
 };
 
 /**
@@ -97,6 +109,8 @@ export function ImageUploader({
   disabled = false,
   fit = "cover",
   shape = "square",
+  extraBody,
+  clearQuery = "",
 }: ImageUploaderProps) {
   const inputId = useId();
   const objectUrlRef = useRef<string | null>(null);
@@ -132,7 +146,7 @@ export function ImageUploader({
     setStatus("uploading");
     setError("");
     try {
-      await uploadPublicImage(endpoint, file);
+      await uploadPublicImage(endpoint, file, extraBody);
       setStatus("idle");
       setLocalPreview(file);
       onChanged();
@@ -148,7 +162,7 @@ export function ImageUploader({
     setStatus("uploading");
     setError("");
     try {
-      await staffRequest(endpoint, { method: "DELETE" });
+      await staffRequest(`${endpoint}${clearQuery}`, { method: "DELETE" });
       setStatus("idle");
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
@@ -195,7 +209,7 @@ export function ImageUploader({
           {preview ? (
             <button
               type="button"
-              className="font-mono text-xs uppercase text-danger hover:underline disabled:opacity-50"
+              className="desk-button-ghost px-0 font-mono text-xs uppercase text-danger"
               disabled={disabled || status === "uploading"}
               onClick={clearImage}
             >

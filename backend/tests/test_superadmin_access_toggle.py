@@ -4,6 +4,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.audit import services as audit
+from apps.backup.models import B1ActivationState, MakerspaceArchiveRecipient
 from apps.makerspaces.models import MakerspaceMembership
 from tests.return_helpers import (
     authenticated_client,
@@ -29,6 +30,25 @@ def makerspace_detail_url(makerspace):
     return reverse("admin-makerspace", kwargs={"pk": makerspace.id})
 
 
+def add_verified_recipients(makerspace, count=2):
+    for index in range(count):
+        MakerspaceArchiveRecipient.objects.create(
+            makerspace=makerspace,
+            public_recipient=f"age1toggle{makerspace.pk}{index}",
+            fingerprint=f"{makerspace.pk:032x}{index:032x}",
+            label=f"Custodian {index}",
+            verified_at=timezone.now(),
+        )
+
+
+def configure_platform_email():
+    from apps.integrations.models import PlatformEmailSettings
+
+    cfg = PlatformEmailSettings.load()
+    cfg.smtp_host = "smtp.example.com"
+    cfg.save(update_fields=["smtp_host"])
+
+
 def test_superadmin_cannot_re_enable_but_makerspace_admin_can():
     space = make_space("access-toggle")
     space_manager = make_member("access-toggle-manager", space)
@@ -36,11 +56,8 @@ def test_superadmin_cannot_re_enable_but_makerspace_admin_can():
 
     # Disabling superadmin access now requires a usable instance Platform Email
     # (so locked-out staff always have a forgot-password recovery path).
-    from apps.integrations.models import PlatformEmailSettings
-
-    cfg = PlatformEmailSettings.load()
-    cfg.smtp_host = "smtp.example.com"
-    cfg.save(update_fields=["smtp_host"])
+    configure_platform_email()
+    add_verified_recipients(space)
 
     disabled = authenticated_client(superadmin).patch(
         makerspace_detail_url(space),
@@ -50,6 +67,7 @@ def test_superadmin_cannot_re_enable_but_makerspace_admin_can():
     assert disabled.status_code == 200
     space.refresh_from_db()
     assert space.superadmin_access_enabled is False
+    assert B1ActivationState.objects.get(makerspace=space).state == "off_pending"
 
     # Hard hide: once disabled, the space is RBAC-invisible to the superadmin, so
     # the re-enable PATCH 404s (it can't resolve the object) — re-enable stays a
@@ -62,6 +80,7 @@ def test_superadmin_cannot_re_enable_but_makerspace_admin_can():
     assert regrant.status_code == 404
     space.refresh_from_db()
     assert space.superadmin_access_enabled is False
+    assert B1ActivationState.objects.get(makerspace=space).state == "off_pending"
 
     restored = authenticated_client(space_manager).patch(
         makerspace_detail_url(space),
@@ -71,6 +90,66 @@ def test_superadmin_cannot_re_enable_but_makerspace_admin_can():
     assert restored.status_code == 200
     space.refresh_from_db()
     assert space.superadmin_access_enabled is True
+    assert B1ActivationState.objects.get(makerspace=space).state == "on"
+
+
+def test_makerspace_creation_rejects_superadmin_access_already_off():
+    superadmin = make_superadmin("access-create-off-super")
+
+    response = authenticated_client(superadmin).post(
+        reverse("admin-makerspaces"),
+        {
+            "name": "Born hidden",
+            "slug": "born-hidden",
+            "superadmin_access_enabled": False,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert "create" in str(response.data["superadmin_access_enabled"]).lower()
+    assert "two archive recipients" in str(
+        response.data["superadmin_access_enabled"]
+    ).lower()
+
+
+def test_switching_off_below_two_verified_recipients_is_rejected():
+    space = make_space("access-floor-rejected")
+    actor = make_member("access-floor-rejected-manager", space)
+    configure_platform_email()
+    add_verified_recipients(space, count=1)
+
+    response = authenticated_client(actor).patch(
+        makerspace_detail_url(space),
+        {"superadmin_access_enabled": False},
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert "two archive recipients" in str(
+        response.data["superadmin_access_enabled"]
+    ).lower()
+    space.refresh_from_db()
+    assert space.superadmin_access_enabled is True
+
+
+def test_switching_off_with_two_verified_recipients_succeeds_and_surfaces_state():
+    space = make_space("access-floor-accepted")
+    actor = make_member("access-floor-accepted-manager", space)
+    configure_platform_email()
+    add_verified_recipients(space)
+
+    response = authenticated_client(actor).patch(
+        makerspace_detail_url(space),
+        {"superadmin_access_enabled": False},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["archive_custody_state"] == "healthy"
+    space.refresh_from_db()
+    assert space.superadmin_access_enabled is False
+    assert B1ActivationState.objects.get(makerspace=space).state == "off_pending"
 
 
 def test_superadmin_aggregates_hide_disabled_space():

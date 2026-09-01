@@ -194,15 +194,15 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
 }
 
 function PendingActions({ row, disabled, openModal, setAcceptRow, setRejectRow, setDueRow }: QueueActionProps & { setAcceptRow: Setter; setRejectRow: Setter; setDueRow: Setter }) {
-  return <><button disabled={disabled} onClick={() => openModal(setAcceptRow, row)}>Accept</button><button disabled={disabled} onClick={() => openModal(setRejectRow, row)}>Reject</button><button disabled={disabled} onClick={() => openModal(setDueRow, row)}>Set due</button></>;
+  return <><button className="desk-button-success" disabled={disabled} onClick={() => openModal(setAcceptRow, row)}>Accept</button><button className="desk-button-danger" disabled={disabled} onClick={() => openModal(setRejectRow, row)}>Reject</button><button className="desk-button-warn" disabled={disabled} onClick={() => openModal(setDueRow, row)}>Set due</button></>;
 }
 
 function AcceptedActions({ row, disabled, openModal, setAssignIssueRow, setDueRow }: QueueActionProps & { setAssignIssueRow: Setter; setDueRow: Setter }) {
-  return <><button disabled={disabled} onClick={() => openModal(setAssignIssueRow, row)}>Assign + issue</button><button disabled={disabled} onClick={() => openModal(setDueRow, row)}>Set due</button></>;
+  return <><button className="desk-button-primary" disabled={disabled} onClick={() => openModal(setAssignIssueRow, row)}>Assign + issue</button><button className="desk-button-warn" disabled={disabled} onClick={() => openModal(setDueRow, row)}>Set due</button></>;
 }
 
 function ActiveActions({ row, disabled, openModal, setDueRow, setReturnRow }: QueueActionProps & { setDueRow: Setter; setReturnRow: Setter }) {
-  return <><button disabled={disabled} onClick={() => openModal(setDueRow, row)}>Set due</button><button disabled={disabled} onClick={() => openModal(setReturnRow, row)}>Return</button></>;
+  return <><button className="desk-button-warn" disabled={disabled} onClick={() => openModal(setDueRow, row)}>Set due</button><button className="desk-button-success" disabled={disabled} onClick={() => openModal(setReturnRow, row)}>Return</button></>;
 }
 
 function HistoryPanel({
@@ -230,7 +230,7 @@ function HistoryPanel({
 }) {
   return (
     <Panel title="History">
-      <button type="button" className="text-sm text-accent-ink" onClick={onToggle}>{show ? "Hide history" : "Show history (returned / rejected / closed with issue)"}</button>
+      <button type="button" className="desk-button-ghost" onClick={onToggle}>{show ? "Hide history" : "Show history (returned / rejected / closed with issue)"}</button>
       {show ? (
         <div className="mt-3">
           {loading ? <p className="text-sm text-muted">Loading history...</p> : null}
@@ -256,7 +256,6 @@ function localDateTimeValue(value: string) {
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
-
 
 
 

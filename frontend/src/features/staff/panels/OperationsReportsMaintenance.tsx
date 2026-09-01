@@ -14,7 +14,7 @@ export function OperationsReportsMaintenance(props: FablabPanelProps) {
           <p className="mt-3 text-xs text-muted">Recorded costs remain per makerspace and are never combined across makerspaces.</p>
           <div className="mt-4 space-y-6">{groups.map((group) => (
             <section key={group.makerspaceId} className="rounded-md border border-line p-4">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">{props.makerspaceName(group.makerspaceId)}</h4>
+              <h4 className="eyebrow">{props.makerspaceName(group.makerspaceId)}</h4>
               <MaintenanceReport rows={group.rows} data={group.data} />
             </section>
           ))}</div>

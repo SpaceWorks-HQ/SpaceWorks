@@ -6,8 +6,9 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, FloatField, IntegerField, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 
+from apps.machines import role_scope
 from apps.machines.models import Machine, MachineServiceRequest, MachineUsageEntry, ServiceRequestConsumption
-from apps.machines.printer_capabilities import PRINTER_SLUG
+from apps.machines.printer_capabilities import resolve_global_printer_type
 from apps.payments.models import Payment
 from apps.operations.report_registry import ReportResult
 from apps.operations.report_scope import scoped_ids
@@ -24,13 +25,39 @@ FIELDS = (
 )
 
 
-def build_machine_service_report(makerspace_id, *, limit=None, date_range=None):
-    """Build flat rows so registry JSON/export consumers share one report source."""
+def _request_scope_q(machine_scope, prefix=""):
+    """Scope Q for a MachineServiceRequest, optionally reached through a relation.
+
+    Mirrors `role_scope.SERVICE_REQUEST_*_PATHS`, prefixed for callers that reach the
+    request through a FK (the consumption ledger). `None` means "no actor to scope by"
+    -- the report registry and the superadmin aggregate -- and matches everything.
+    """
+    if machine_scope is None:
+        return Q()
+    return role_scope.scope_q_for(
+        machine_scope,
+        machine_id_paths=tuple(
+            f"{prefix}{path}" for path in role_scope.SERVICE_REQUEST_MACHINE_PATHS
+        ),
+        type_id_paths=tuple(
+            f"{prefix}{path}" for path in role_scope.SERVICE_REQUEST_TYPE_PATHS
+        ),
+    )
+
+
+def build_machine_service_report(makerspace_id, *, limit=None, date_range=None, machine_scope=None):
+    """Build flat rows so registry JSON/export consumers share one report source.
+
+    ``machine_scope`` is a resolved `role_scope` scope for a staff caller whose
+    MANAGE_MACHINES grant is narrowed to some of the lab's machines. Left ``None`` by the
+    report registry and the superadmin aggregate, where there is no single actor to scope
+    by -- and an exempt actor resolves to an empty Q, so their report is unchanged.
+    """
     aggregate = makerspace_id is None
     ids = scoped_ids(makerspace_id, "machine_service")
-    status_rows = _status_rows(ids, aggregate, date_range)
-    machine_rows = _machine_rows(ids, aggregate, date_range)
-    consumption_rows = _consumption_rows(ids, aggregate, date_range)
+    status_rows = _status_rows(ids, aggregate, date_range, machine_scope)
+    machine_rows = _machine_rows(ids, aggregate, date_range, machine_scope)
+    consumption_rows = _consumption_rows(ids, aggregate, date_range, machine_scope)
     failed_usage = _failed_usage(consumption_rows)
     records = [*status_rows, *machine_rows, *consumption_rows]
     records.extend(_failure_rows(machine_rows, failed_usage, aggregate))
@@ -41,7 +68,7 @@ def build_machine_service_report(makerspace_id, *, limit=None, date_range=None):
     return ReportResult(fields, records)
 
 
-def build_printer_service_report(makerspace_id, *, limit=None, date_range=None):
+def build_printer_service_report(makerspace_id, *, limit=None, date_range=None, machine_scope=None):
     """Type-pack projection for printer hours, filament and payment snapshots.
 
     It is intentionally a report-registry builder seam, not a printer endpoint:
@@ -50,9 +77,14 @@ def build_printer_service_report(makerspace_id, *, limit=None, date_range=None):
     ids = scoped_ids(makerspace_id, "machine_service")
     aggregate = makerspace_id is None
     terminal = Q(status__in=COMPLETED) | Q(status=MachineServiceRequest.Status.FAILED)
-    requests = MachineServiceRequest.objects.filter(
-        makerspace_id__in=ids, assigned_machine__machine_type__slug=PRINTER_SLUG,
-    ).filter(terminal).order_by()
+    printer_type = resolve_global_printer_type()
+    if printer_type is None:
+        requests = MachineServiceRequest.objects.none()
+    else:
+        requests = MachineServiceRequest.objects.filter(
+            makerspace_id__in=ids,
+            assigned_machine__machine_type=printer_type,
+        ).filter(_request_scope_q(machine_scope)).filter(terminal).order_by()
     if date_range:
         requests = requests.filter(_date_filter("completed_at", date_range) | _date_filter("failed_at", date_range))
     payment_totals = defaultdict(lambda: [Decimal("0.00"), Decimal("0.00")])
@@ -76,7 +108,14 @@ def build_printer_service_report(makerspace_id, *, limit=None, date_range=None):
         payment_due=Coalesce(Sum("payment_amount", filter=Q(payment_status="pending")), Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2))),
         payment_paid=Coalesce(Sum("payment_amount", filter=Q(payment_status="paid")), Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2))),
     )
-    manual = MachineUsageEntry.objects.filter(machine__makerspace_id__in=ids, machine__machine_type__slug=PRINTER_SLUG, source=MachineUsageEntry.Source.TYPED_MANUAL).order_by()
+    if printer_type is None:
+        manual = MachineUsageEntry.objects.none()
+    else:
+        manual = MachineUsageEntry.objects.filter(
+            machine__makerspace_id__in=ids,
+            machine__machine_type=printer_type,
+            source=MachineUsageEntry.Source.TYPED_MANUAL,
+        ).order_by()
     if date_range:
         manual = manual.filter(_date_filter("created_at", date_range))
     manual_values = ["machine_id"] + (["machine__makerspace_id"] if aggregate else [])
@@ -113,11 +152,13 @@ def report_sections(result):
     return sections
 
 
-def _status_rows(ids, aggregate, date_range):
+def _status_rows(ids, aggregate, date_range, machine_scope=None):
     created = _date_filter("created_at", date_range)
     # .order_by() strips the model's Meta ordering (by created_at) so it can't leak
     # into the GROUP BY of the values()/annotate() aggregation.
-    requests = MachineServiceRequest.objects.filter(makerspace_id__in=ids).order_by()
+    requests = MachineServiceRequest.objects.filter(
+        makerspace_id__in=ids
+    ).filter(_request_scope_q(machine_scope)).order_by()
     rows = requests.values("makerspace_id") if aggregate else requests.annotate(_group=Value(1)).values("_group")
     rows = rows.annotate(
         submitted=Count("id", filter=created),
@@ -131,7 +172,7 @@ def _status_rows(ids, aggregate, date_range):
     return [_record("status", row, aggregate) for row in rows]
 
 
-def _machine_rows(ids, aggregate, date_range):
+def _machine_rows(ids, aggregate, date_range, machine_scope=None):
     created = _date_filter("created_at", date_range)
     completed = _date_filter("completed_at", date_range)
     failed = _date_filter("failed_at", date_range)
@@ -151,6 +192,10 @@ def _machine_rows(ids, aggregate, date_range):
     qs = Machine.objects.filter(
         makerspace_id__in=ids,
         assigned_service_requests__assigned_machine__makerspace_id=F("makerspace_id"),
+    ).filter(
+        role_scope.scope_q_for(
+            machine_scope, machine_id_paths=("id",), type_id_paths=("machine_type_id",)
+        ) if machine_scope is not None else Q()
     ).order_by().distinct().values("id", "makerspace_id", "name", "machine_type__name").annotate(
         requested=Coalesce(Subquery(stats.values("requested")[:1], output_field=IntegerField()), Value(0)),
         completed_count=Coalesce(Subquery(stats.values("completed_count")[:1], output_field=IntegerField()), Value(0)),
@@ -161,7 +206,7 @@ def _machine_rows(ids, aggregate, date_range):
     return [_record("machine", row, aggregate) for row in qs]
 
 
-def _consumption_rows(ids, aggregate, date_range):
+def _consumption_rows(ids, aggregate, date_range, machine_scope=None):
     completed = _date_filter("service_request__completed_at", date_range)
     failed = _date_filter("service_request__failed_at", date_range)
     # Ledger rows are windowed by the parent terminal timestamp, rather than their
@@ -173,7 +218,7 @@ def _consumption_rows(ids, aggregate, date_range):
     rows = ServiceRequestConsumption.objects.filter(
         service_request__makerspace_id__in=ids,
         service_request__assigned_machine__isnull=False,
-    ).filter(qualifying).order_by().values(*values).annotate(
+    ).filter(_request_scope_q(machine_scope, prefix="service_request__")).filter(qualifying).order_by().values(*values).annotate(
         completed_amount=Coalesce(Sum("quantity", filter=Q(outcome=ServiceRequestConsumption.Outcome.COMPLETED) & completed), Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2))),
         failed_partial_amount=Coalesce(Sum("quantity", filter=Q(outcome=ServiceRequestConsumption.Outcome.FAILED) & failed), Value(Decimal("0.00"), output_field=DecimalField(max_digits=12, decimal_places=2))),
     )

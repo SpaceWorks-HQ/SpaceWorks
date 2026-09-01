@@ -105,7 +105,10 @@ jobs:
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: v${{ needs.prepare.outputs.base }}
+          # Product name then version, e.g. "SpaceWorks 0.7.5". The immutable `tag_name`
+          # above keeps its full `v<base>-main.<run>.<sha>` form -- the title is what a
+          # human reads on the releases page, the tag is what a deployment pins to.
+          name: SpaceWorks ${{ needs.prepare.outputs.base }}
           generate_release_notes: true
           make_latest: false
           body: |
@@ -126,6 +129,8 @@ jobs:
       group: main-release-promotion
       cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v4
+
       - name: Check whether this is still the main branch head
         id: head
         shell: bash
@@ -231,29 +236,14 @@ jobs:
           done <<< "$release_tags"
           previous_version="${previous_release_tag#v}"
 
-          for package in spaceworks-backend spaceworks-frontend; do
-            if ! package_versions="$(retry gh api --paginate \
-              "orgs/${OWNER}/packages/container/${package}/versions?per_page=100" \
-              --jq '.[] | [.id, (.metadata.container.tags // [] | join(","))] | @tsv')"; then
-              echo "::warning::Could not list ${package} versions after retries."
-              continue
-            fi
-            while IFS=$'\t' read -r version_id tags; do
-              [[ -z "$version_id" ]] && continue
-              if [[ -n "$previous_version" && ",${tags}," == *",${previous_version},"* ]]; then
-                continue
-              fi
-              case ",${tags}," in
-                *",${VERSION},"*|*",sha-${SHORT_SHA},"*|*",${SERIES},"*|*",main,"*|*",latest,"*)
-                  continue
-                  ;;
-              esac
-              if ! retry gh api --method DELETE \
-                "orgs/${OWNER}/packages/container/${package}/versions/${version_id}"; then
-                echo "::warning::Could not remove ${package} version ${version_id} after retries."
-              fi
-            done <<< "$package_versions"
-          done
+          python3 scripts/ghcr-retention.py \
+            --owner "$OWNER" \
+            --package spaceworks-backend \
+            --package spaceworks-frontend \
+            --version "$VERSION" \
+            --sha-tag "sha-${SHORT_SHA}" \
+            --series "$SERIES" \
+            --previous-version "$previous_version"
 
           for package in osmm-backend osmm-frontend; do
             if output="$(retry gh api --method DELETE \
@@ -265,3 +255,12 @@ jobs:
               echo "::warning::Could not remove legacy package ${package}: ${output}"
             fi
           done
+
+      # Gated like every other step here: a superseded run must not fail because a
+      # newer run's retention has already aged this version out.
+      - name: Verify immutable release images are pullable
+        if: steps.head.outputs.current == 'true'
+        shell: bash
+        env:
+          GHCR_OWNER: ${{ needs.prepare.outputs.registry_owner }}
+        run: ./scripts/verify-release-images.sh "${{ needs.prepare.outputs.version }}"

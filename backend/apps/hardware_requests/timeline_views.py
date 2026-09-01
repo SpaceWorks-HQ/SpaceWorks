@@ -1,4 +1,4 @@
-﻿from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response

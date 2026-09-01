@@ -120,6 +120,14 @@ class ScopedPiiModelMixin(models.Model):
         return makerspace_id_for(self, fields_for(self)[0])
 
     def save(self, *args, **kwargs):
+        if settings.PII_ENCRYPTION_ENABLED and not fields_for(self):
+            # Backstop for the fail-OPEN gap; see UnmappedPiiModel. Every mixin
+            # subclass is registered, so this never fires in a checked process.
+            from apps.encryption.crypto import UnmappedPiiModel
+
+            raise UnmappedPiiModel(
+                f"{type(self)._meta.label} has no scoped-PII registration."
+            )
         update_fields = kwargs.get("update_fields")
         update_fields = None if update_fields is None else set(update_fields)
         is_new = self._state.adding

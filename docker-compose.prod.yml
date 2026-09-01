@@ -1,6 +1,38 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+# Required for recovery after host reboot or OOM.
+x-restart: &default-restart unless-stopped
+x-spaceworks-host-orchestration:
+  scheduler:
+    mode: image
+    services: [beat]
+  pointer:
+    mode: atomic-file
+    path: /var/lib/spaceworks/ops/database-pointer.env
+    static_environment: .env
+  database_identity: endpoint-plus-queried-uuid
+  writer_services: [backend, worker, beat]
+  sibling_lifecycle: bundled-owned-database
+x-host-bootstrap: &host-bootstrap
+  image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+  user: "0:0"
+  entrypoint: ["python", "/app/scripts/bootstrap_host_orchestration.py"]
+  environment: &host-bootstrap-env
+    DATABASE_URL: postgres://${POSTGRES_USER:-makerspace}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-makerspace_manager}
+    SPACEWORKS_RUNTIME_DATABASE_URL: ${DATABASE_URL:?use scripts/spaceworks-compose.sh}
+    SPACEWORKS_HOST_MARKER_WRITE_PATH: /host-state/restore-marker.json
+    SPACEWORKS_SCHEDULER_MODE: image
+    SPACEWORKS_SCHEDULER_SERVICES: beat
+  volumes:
+    - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/host-state
 services:
   db:
     image: postgres:16
+    restart: *default-restart
+    logging: *default-logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-makerspace}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
@@ -13,13 +45,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
-
   minio:
-    image: minio/minio:latest
+    image: minio/minio:${MINIO_IMAGE_TAG:-RELEASE.2025-09-07T16-13-09Z}
+    restart: *default-restart
+    logging: *default-logging
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      # Server-level CORS, comma-separated. This replaces the old per-bucket
+      # `mc cors set` in createbuckets, which exits 1 on any current mc release
+      # ("decoding xml: EOF" — mc now sends S3 XML, not the JSON that was written).
+      # Because backend depends_on createbuckets completing successfully, that
+      # Failure would leave backend and frontend stuck in Created. The * default avoids bricking
+      # uploads; setup.sh pins it to the real origin.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOWED_ORIGINS:-*}
     ports:
       - "${MINIO_API_BIND:-0.0.0.0}:${MINIO_API_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_BIND:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001"
@@ -30,9 +70,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
-
   createbuckets:
-    image: minio/mc:latest
+    image: minio/mc:${MC_IMAGE_TAG:-RELEASE.2025-08-13T08-35-41Z}
     depends_on:
       minio:
         condition: service_healthy
@@ -41,45 +80,44 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
       AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-evidence}
       PUBLIC_IMAGE_BUCKET: ${PUBLIC_IMAGE_BUCKET:-public-images}
-      MINIO_CORS_ALLOWED_ORIGINS_JSON: '${MINIO_CORS_ALLOWED_ORIGINS_JSON:-["http://localhost"]}'
+    # Buckets and their anonymous policies only. CORS moved to MINIO_API_CORS_ALLOW_ORIGIN
+    # on the minio service (see above) — `mc cors set` is not usable here. `set -e` so a
+    # genuine bucket failure still surfaces as a non-zero exit rather than a silent
+    # half-provisioned storage layer.
     entrypoint: |
       /bin/sh -c '
+      set -e;
+      if [ "$$AWS_STORAGE_BUCKET_NAME" = "$$PUBLIC_IMAGE_BUCKET" ]; then
+        echo "Private and public storage bucket names must be different." >&2;
+        exit 1;
+      fi;
       until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do sleep 1; done;
       mc mb --ignore-existing "local/$$AWS_STORAGE_BUCKET_NAME";
+      mc version enable "local/$$AWS_STORAGE_BUCKET_NAME";
       mc anonymous set none "local/$$AWS_STORAGE_BUCKET_NAME";
-      cat > /tmp/cors.json <<EOF
-      [
-        {
-          "AllowedOrigins": $$MINIO_CORS_ALLOWED_ORIGINS_JSON,
-          "AllowedMethods": ["PUT", "POST", "GET", "HEAD"],
-          "AllowedHeaders": ["*"],
-          "ExposeHeaders": ["ETag"],
-          "MaxAgeSeconds": 3000
-        }
-      ]
-      EOF
-      mc cors set "local/$$AWS_STORAGE_BUCKET_NAME" /tmp/cors.json;
       mc mb --ignore-existing "local/$$PUBLIC_IMAGE_BUCKET";
+      mc version enable "local/$$PUBLIC_IMAGE_BUCKET";
       mc anonymous set download "local/$$PUBLIC_IMAGE_BUCKET";
-      mc cors set "local/$$PUBLIC_IMAGE_BUCKET" /tmp/cors.json;
       '
-
   redis:
     image: redis:7-alpine
-    restart: unless-stopped
+    restart: *default-restart
+    logging: *default-logging
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 6
-
   backend:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+    restart: *default-restart
+    logging: *default-logging
     environment: &backend-env
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
       DEBUG: "False"
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:?set ALLOWED_HOSTS}
-      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-makerspace}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-makerspace_manager}}
+      DATABASE_URL: ${DATABASE_URL:?use scripts/spaceworks-compose.sh}
+      SPACEWORKS_DB_POINTER_GENERATION: ${SPACEWORKS_DB_POINTER_GENERATION:?use scripts/spaceworks-compose.sh}
       MANAGED_POSTGRES: ${MANAGED_POSTGRES:-False}
       CONN_MAX_AGE: ${CONN_MAX_AGE:-0}
       DISABLE_SERVER_SIDE_CURSORS: ${DISABLE_SERVER_SIDE_CURSORS:-False}
@@ -88,10 +126,29 @@ services:
       # paths (e.g. "/reset-password?...") and password reset is unusable.
       PUBLIC_APP_BASE_URL: ${PUBLIC_APP_BASE_URL:-}
       API_CLIENT_ENC_KEY: ${API_CLIENT_ENC_KEY:-}
+      AUDIT_MAC_MASTER_KEY: ${AUDIT_MAC_MASTER_KEY:-}
+      AUDIT_ATTESTATION_DEPLOYMENT_ID: ${AUDIT_ATTESTATION_DEPLOYMENT_ID:-}
+      AUDIT_ATTESTATION_ANCHOR_BACKEND: ${AUDIT_ATTESTATION_ANCHOR_BACKEND:-}
+      AUDIT_ATTESTATION_S3_BUCKET: ${AUDIT_ATTESTATION_S3_BUCKET:-}
+      AUDIT_ATTESTATION_S3_PREFIX: ${AUDIT_ATTESTATION_S3_PREFIX:-}
+      AUDIT_ATTESTATION_RETENTION_DAYS: ${AUDIT_ATTESTATION_RETENTION_DAYS:-2555}
+      AUDIT_ATTESTATION_S3_OBJECT_LOCK_MODE: ${AUDIT_ATTESTATION_S3_OBJECT_LOCK_MODE:-}
+      AUDIT_ATTESTATION_S3_ENDPOINT_URL: ${AUDIT_ATTESTATION_S3_ENDPOINT_URL:-}
+      AUDIT_ATTESTATION_S3_ACCESS_KEY_ID: ${AUDIT_ATTESTATION_S3_ACCESS_KEY_ID:-}
+      AUDIT_ATTESTATION_S3_SECRET_ACCESS_KEY: ${AUDIT_ATTESTATION_S3_SECRET_ACCESS_KEY:-}
+      AUDIT_ATTESTATION_S3_REGION_NAME: ${AUDIT_ATTESTATION_S3_REGION_NAME:-}
+      AUDIT_ATTESTATION_HTTP_URL: ${AUDIT_ATTESTATION_HTTP_URL:-}
+      AUDIT_ATTESTATION_HTTP_BEARER_TOKEN: ${AUDIT_ATTESTATION_HTTP_BEARER_TOKEN:-}
+      AUDIT_ATTESTATION_HTTP_TIMEOUT: ${AUDIT_ATTESTATION_HTTP_TIMEOUT:-10}
       # Security hardening. Keep ENABLE_HTTPS=false for this HTTP-behind-nginx stack;
       # set it true only when a TLS proxy forwards X-Forwarded-Proto: https.
       ENABLE_HTTPS: ${ENABLE_HTTPS:-false}
       TRUST_X_FORWARDED_PROTO: ${TRUST_X_FORWARDED_PROTO:-false}
+      # The nginx frontend container is the one proxy in front of gunicorn, and it
+      # appends the client to X-Forwarded-For. Unset, DRF keys throttles on REMOTE_ADDR,
+      # which is nginx -- so every user shares one rate-limit bucket. Set this to 2 if a
+      # TLS proxy (Caddy, Traefik, a cloud load balancer) is put in front of nginx.
+      TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-1}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
       AXES_FAILURE_LIMIT: ${AXES_FAILURE_LIMIT:-5}
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
@@ -111,14 +168,21 @@ services:
       STORAGE_PRESIGN_METHOD: ${STORAGE_PRESIGN_METHOD:-post}
       CRON_SECRET: ${CRON_SECRET:-}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-    command: >
-      sh -c "python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+      BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY: ${BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY:-}
+      BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY: ${BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY:-}
+      BACKUP_OPS_DIR: /var/lib/spaceworks/ops/work
+      SPACEWORKS_HOST_MARKER_PATH: /run/spaceworks-host/restore-marker.json
+      BACKUP_PRODUCER_CAPABILITY_MARKER_PATH: /run/spaceworks-host/producer-capability.json
+      BACKUP_PRODUCER_PRIVILEGED_SCRIPTS_DIR: /run/spaceworks-privileged-scripts
+    # One list item keeps the shell command intact; see the folded-scalar invariant.
+    command: ["--role", "backend", "sh", "-c", "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout 30 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile -"]
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/readiness/', timeout=3).read()\""]
       interval: 10s
       timeout: 5s
       retries: 6
+      start_period: 45s
     depends_on:
       db:
         condition: service_healthy
@@ -126,44 +190,102 @@ services:
         condition: service_healthy
       createbuckets:
         condition: service_completed_successfully
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
-
-  migrate:
-    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
-    environment: *backend-env
-    command: python manage.py migrate
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
+  orchestration-init:
+    <<: *host-bootstrap
     depends_on:
       db:
         condition: service_healthy
+  migrate:
+    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgres://${POSTGRES_USER:-makerspace}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-makerspace_manager}
+    command: ["--role", "migrate", "python", "manage.py", "migrate"]
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+    depends_on:
+      orchestration-init:
+        condition: service_completed_successfully
+
+  orchestration-ready:
+    <<: *host-bootstrap
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   worker:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
-    restart: unless-stopped
+    restart: *default-restart
+    logging: *default-logging
     environment: *backend-env
-    command: celery -A config worker -l info
+    command: ["--role", "worker", "celery", "-A", "config", "worker", "-l", "info", "--concurrency", "${CELERY_CONCURRENCY:-4}"]
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
 
   beat:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
-    restart: unless-stopped
+    restart: *default-restart
+    logging: *default-logging
     environment: *backend-env
-    command: celery -A config beat -l info
+    command: ["--role", "beat", "celery", "-A", "config", "beat", "-l", "info", "--schedule", "/var/lib/celery/celerybeat-schedule"]
+    volumes:
+      - celerybeat_data:/var/lib/celery
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      orchestration-ready:
+        condition: service_completed_successfully
+
+  candidate-backend:
+    profiles: [host-recovery]
+    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+    environment: *backend-env
+    command: ["--role", "backend", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "1", "--access-logfile", "-", "--error-logfile", "-"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/readiness/', timeout=3).read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      createbuckets:
         condition: service_completed_successfully
 
   frontend:
     image: ${MAKERSPACE_FRONTEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-frontend}:${MAKERSPACE_IMAGE_TAG:-latest}
+    restart: *default-restart
+    logging: *default-logging
     ports:
       - "${HTTP_PORT:-80}:80"
     healthcheck:
@@ -171,6 +293,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+      start_period: 15s
     depends_on:
       backend:
         condition: service_healthy
@@ -178,3 +301,4 @@ services:
 volumes:
   makerspace_manager_pgdata:
   minio_data:
+  celerybeat_data:

@@ -3,7 +3,7 @@ from django.utils.html import format_html
 from unfold.admin import ModelAdmin
 
 from apps.evidence.models import EvidencePhoto
-from apps.evidence.storage import presigned_get_url
+from apps.evidence.storage import object_exists, presigned_get_url, staging_key
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -39,7 +39,14 @@ class EvidencePhotoAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         if not obj or not getattr(obj, "object_key", ""):
             return "(no image)"
         try:
-            url = presigned_get_url(obj.object_key)
+            # Same staging fallback as the API read path: evidence that has been
+            # uploaded but not yet promoted by a workflow still lives in staging.
+            # The list-view thumb deliberately skips this — one HEAD per row is a
+            # worse trade than a missing thumbnail on an unconsumed upload.
+            key = obj.object_key
+            if not object_exists(key) and object_exists(staging_key(key)):
+                key = staging_key(key)
+            url = presigned_get_url(key)
         except Exception:
             return "(image unavailable)"
         if not url:

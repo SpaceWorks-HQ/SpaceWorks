@@ -7,7 +7,6 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.audit import services as audit
 from apps.evidence.responses import storage_unavailable_response
@@ -22,55 +21,41 @@ from apps.procurement.serializers import (
     ToBuyReceiptUploadResponseSerializer,
     ToBuyReceiptUrlSerializer,
 )
-from apps.procurement.views_items import MODULE_KEY, PROCUREMENT_ERROR_RESPONSES
-
-
-def _procurement_scope(user):
-    return rbac.makerspaces_for_actions(
-        user,
-        rbac.Action.EDIT_INVENTORY,
-        rbac.Action.MANAGE_PRINTING,
-    )
-
-
-def _scope_items(user):
-    queryset = ToBuyItem.objects.select_related("makerspace")
-    scope = _procurement_scope(user)
-    if scope is rbac.ALL:
-        return queryset
-    if not scope:
-        return queryset.none()
-    return queryset.filter(makerspace_id__in=scope)
+from apps.procurement.views_common import MODULE_KEY, PROCUREMENT_ERROR_RESPONSES
 
 
 def resolve_item(user, pk):
-    item = get_object_or_404(_scope_items(user), pk=pk)
-    require_module(item.makerspace, MODULE_KEY)
-    if item.kind not in access.viewable_kinds(user, item.makerspace_id):
+    makerspace_id = ToBuyItem.objects.filter(pk=pk).values_list(
+        "makerspace_id", flat=True
+    ).first()
+    if makerspace_id is None:
         raise Http404()
+    item = get_object_or_404(
+        access.scope_items(
+            ToBuyItem.objects.select_related("makerspace", "machine_type"),
+            user,
+            makerspace_id,
+        ),
+        pk=pk,
+    )
+    require_module(item.makerspace, MODULE_KEY)
     return item
 
 
-def _scope_receipts(user):
-    queryset = ToBuyReceipt.objects.select_related(
-        "to_buy_item",
-        "to_buy_item__makerspace",
-        "uploaded_by",
-    )
-    scope = _procurement_scope(user)
-    if scope is rbac.ALL:
-        return queryset
-    if not scope:
-        return queryset.none()
-    return queryset.filter(to_buy_item__makerspace_id__in=scope)
-
-
 def resolve_receipt(user, pk):
-    receipt = get_object_or_404(_scope_receipts(user), pk=pk)
-    item = receipt.to_buy_item
-    require_module(item.makerspace, MODULE_KEY)
-    if item.kind not in access.viewable_kinds(user, item.makerspace_id):
+    item_id = ToBuyReceipt.objects.filter(pk=pk).values_list(
+        "to_buy_item_id", flat=True
+    ).first()
+    if item_id is None:
         raise Http404()
+    item = resolve_item(user, item_id)
+    receipt = get_object_or_404(
+        ToBuyReceipt.objects.select_related("uploaded_by"),
+        pk=pk,
+        to_buy_item=item,
+    )
+    require_module(item.makerspace, MODULE_KEY)
+    receipt.to_buy_item = item
     return receipt
 
 
@@ -208,4 +193,3 @@ class ToBuyReceiptDeleteView(APIView):
         )
         receipt.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-

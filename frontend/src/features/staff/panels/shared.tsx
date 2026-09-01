@@ -29,6 +29,7 @@ export type Makerspace = {
   staff_notifications_enabled?: boolean;
   booking_requester_notifications_enabled?: boolean;
   public_stats_enabled?: boolean;
+  public_stats_show_holder_names?: boolean;
   public_print_status_lookup_policy?: "token_only" | "email_unverified";
   membership_policy?: "request" | "open" | "invite_only";
   membership_dues_amount?: string;
@@ -38,6 +39,9 @@ export type Makerspace = {
   cover_image_url?: string | null;
   enabled_modules?: string[];
   enabled_features?: string[];
+  // Separable apps this deployment does not ship. Empty unless TOMBSTONED_APPS is set,
+  // and only meaningful for tabs no module key describes (see TAB_APPS in staffTabs).
+  unavailable_apps?: string[];
   resource_limit_overrides?: Record<string, unknown>;
   branding_config?: {
     display_name?: string;
@@ -100,7 +104,7 @@ export function Panel({ title, children }: { title: string; children: React.Reac
   return (
     <section className="desk-panel overflow-hidden">
       <div className="border-b border-line px-4 py-3">
-        <h2 className="text-sm font-semibold tracking-wide text-muted">{title}</h2>
+        <h2 className="title-panel">{title}</h2>
       </div>
       <div className="desk-panel-body min-w-0 p-4">
         {children}

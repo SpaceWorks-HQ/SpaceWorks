@@ -45,6 +45,7 @@ def _get_or_create(membership, actor):
                 amount=makerspace.membership_dues_amount,
                 currency=currency,
                 created_by=actor,
+                subject_label="Membership dues",
             )
     except IntegrityError:
         return Payment.objects.get(**lookup)

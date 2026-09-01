@@ -1,0 +1,69 @@
+"""OpenAPI serializers for browser session endpoints."""
+
+from drf_spectacular.utils import inline_serializer
+from rest_framework import serializers
+
+
+AuthMembershipSerializer = inline_serializer(
+    name="AuthMembership",
+    fields={
+        "id": serializers.IntegerField(),
+        "slug": serializers.CharField(),
+        # An organization-derived entry claims no role: organization grants confer
+        # actions, never identity, so role/role_id/role_slug are null there and
+        # role_name carries the organization's name.
+        "role": serializers.CharField(allow_null=True),
+        "role_id": serializers.IntegerField(allow_null=True),
+        "role_name": serializers.CharField(),
+        "role_slug": serializers.CharField(allow_null=True),
+        "source": serializers.ChoiceField(choices=["membership", "organization"]),
+        "actions": serializers.ListField(child=serializers.CharField()),
+        "can_configure_machine_types": serializers.BooleanField(),
+        "is_machine_only": serializers.BooleanField(),
+        "can_refer": serializers.BooleanField(),
+        "can_verify": serializers.BooleanField(),
+        "verified_at": serializers.DateTimeField(allow_null=True),
+        "referrals_enabled": serializers.BooleanField(),
+    },
+)
+UserPayloadSerializer = inline_serializer(
+    name="AuthUserPayload",
+    fields={
+        "id": serializers.IntegerField(),
+        "username": serializers.CharField(),
+        "email": serializers.EmailField(),
+        "display_name": serializers.CharField(),
+        "phone": serializers.CharField(),
+        "email_verified": serializers.BooleanField(),
+        "role": serializers.CharField(),
+        "is_superuser": serializers.BooleanField(),
+        "must_change_password": serializers.BooleanField(),
+        "makerspaces": serializers.ListField(child=AuthMembershipSerializer),
+    },
+)
+LoginRequestSerializer = inline_serializer(
+    name="LoginRequest",
+    fields={
+        "username": serializers.CharField(),
+        "password": serializers.CharField(write_only=True),
+        "surface": serializers.ChoiceField(
+            choices=("member", "staff"), default="member", required=False
+        ),
+    },
+)
+LoginResponseSerializer = inline_serializer(
+    name="LoginResponse",
+    fields={
+        "access": serializers.CharField(),
+        "surface": serializers.ChoiceField(
+            choices=("member", "staff", "verification_only")
+        ),
+        "user": UserPayloadSerializer,
+    },
+)
+RefreshResponseSerializer = inline_serializer(
+    name="RefreshResponse", fields={"access": serializers.CharField()}
+)
+LogoutResponseSerializer = inline_serializer(
+    name="LogoutResponse", fields={"detail": serializers.CharField()}
+)

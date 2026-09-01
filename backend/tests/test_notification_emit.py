@@ -15,6 +15,15 @@ def _enable_notifications(makerspace):
     makerspace.save(update_fields=["enabled_modules"])
 
 
+def _disable_notifications(makerspace):
+    # `notifications` is a registered, installable module now, so a test asserting the
+    # disabled path has to turn it off rather than rely on it being unreachable.
+    makerspace.enabled_modules = [
+        key for key in makerspace.enabled_modules if key != "notifications"
+    ]
+    makerspace.save(update_fields=["enabled_modules"])
+
+
 def test_emit_creates_row_when_module_enabled(django_capture_on_commit_callbacks):
     space = make_space("emit-on")
     _enable_notifications(space)
@@ -28,6 +37,7 @@ def test_emit_creates_row_when_module_enabled(django_capture_on_commit_callbacks
 
 def test_emit_noop_when_module_disabled(django_capture_on_commit_callbacks):
     space = make_space("emit-off")
+    _disable_notifications(space)
     with django_capture_on_commit_callbacks(execute=True):
         emit_notification(space, title="Hello", event="test.event")
     assert not Notification.objects.filter(makerspace=space).exists()

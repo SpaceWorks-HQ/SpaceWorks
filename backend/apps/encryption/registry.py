@@ -39,6 +39,26 @@ for _field in ALL_FIELDS:
 BY_MODEL = {label: tuple(fields) for label, fields in BY_MODEL.items()}
 
 
+def fields_for_label(model_label):
+    """Accessor for callers holding a label rather than a model.
+
+    Call this instead of importing ``BY_MODEL``. A module-level ``from ... import
+    BY_MODEL`` binds whatever the map contained at import time, which stops being
+    the truth the moment registration becomes per-app (plan B2).
+    """
+    return BY_MODEL.get(model_label, ())
+
+
+def all_fields():
+    """Accessor for the full field list; see ``fields_for_label`` for why."""
+    return ALL_FIELDS
+
+
+def registered_labels():
+    """Accessor for every mapped model label; see ``fields_for_label`` for why."""
+    return tuple(BY_MODEL)
+
+
 def fields_for(model_or_instance):
     meta = model_or_instance._meta
     return BY_MODEL.get(meta.label, ())

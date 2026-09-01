@@ -8,6 +8,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.boxes.models import Box, QrCode, QrScanEvent
 from apps.evidence.models import EvidencePhoto
+from apps.evidence.finalization import charge_storage_once
 from apps.hardware_requests.models import (
     HardwareRequest,
     HardwareRequestItem,
@@ -35,15 +36,37 @@ from apps.hardware_requests.workflow_errors import (
 from apps.hardware_requests.direct_loan_returns import validate_evidence_upload
 from apps.inventory import availability
 from apps.inventory.models import InventoryAsset, InventoryProduct
+from apps.makerspaces.guards import require_feature, require_feature_locked
+from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import is_servable
 from apps.notifications.emit import emit_notification
 
 
 def checkout_tool(makerspace, requester, payload, *, evidence_id, remark=""):
-    due_at = timezone.now() + timedelta(days=(makerspace.default_loan_days or 7))
+    # Gate on the feature and on servability BEFORE touching evidence. Promotion moved
+    # out of the transaction so its row locks never span S3 I/O, and moving the evidence
+    # work up with it put it ahead of the feature check -- so a makerspace with
+    # self-checkout disabled reported an evidence error instead of the feature error, and
+    # promoted an upload on the way there. The locked recheck below is still the
+    # authority; this is the cheap pre-check that keeps the ordering honest.
+    # By pk, not by the instance the caller handed us: require_feature() trusts a
+    # Makerspace argument as-is, so a stale in-memory copy would pass a gate the stored
+    # row has already closed.
+    current = require_feature(makerspace.pk, "inventory.self_checkout")
+    if not is_servable(current):
+        raise RequestValidationError("Makerspace is not available.")
+    evidence = _public_evidence(
+        makerspace, requester, evidence_id, EvidencePhoto.EvidenceType.ISSUE
+    )
+    finalized = validate_evidence_upload(evidence, label="Issue")
     with transaction.atomic():
-        evidence = _public_evidence(makerspace, requester, evidence_id, EvidencePhoto.EvidenceType.ISSUE)
+        makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+        makerspace = require_feature_locked(makerspace, "inventory.self_checkout")
+        if not is_servable(makerspace):
+            raise RequestValidationError("Makerspace is not available.")
+        due_at = timezone.now() + timedelta(days=(makerspace.default_loan_days or 7))
         _lock_unused_evidence(evidence, issue=True)
-        validate_evidence_upload(evidence, label="Issue")
+        charge_storage_once(evidence, finalized.size)
         qr = _locked_qr(makerspace, payload)
         if qr_has_active_loan(makerspace, qr):
             raise InvalidTransition("This QR code is already checked out.")
@@ -105,10 +128,21 @@ def return_tool(
     remark = str(remark or "").strip()
     if not remark:
         raise RequestValidationError("Return remark is required.")
+    # Same ordering rule as checkout_tool: an unservable makerspace must not reach
+    # evidence handling. Re-read for the same stale-instance reason; the locked recheck
+    # inside the transaction remains the authority.
+    if not is_servable(Makerspace.objects.get(pk=makerspace.pk)):
+        raise RequestValidationError("Makerspace is not available.")
+    evidence = _public_evidence(
+        makerspace, requester, evidence_id, EvidencePhoto.EvidenceType.RETURN
+    )
+    finalized = validate_evidence_upload(evidence, label="Return")
     with transaction.atomic():
-        evidence = _public_evidence(makerspace, requester, evidence_id, EvidencePhoto.EvidenceType.RETURN)
+        makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+        if not is_servable(makerspace):
+            raise RequestValidationError("Makerspace is not available.")
         _lock_unused_evidence(evidence, issue=False)
-        validate_evidence_upload(evidence, label="Return")
+        charge_storage_once(evidence, finalized.size)
         qr = _locked_qr(makerspace, payload)
         loan = (
             PublicToolLoan.objects.select_for_update()
@@ -249,4 +283,3 @@ __all__ = [
     "timezone",
     "transaction",
 ]
-

@@ -7,7 +7,14 @@ from unfold.admin import ModelAdmin, TabularInline
 from apps.makerspaces.admin_capabilities import MakerspaceAdminForm, MakerspaceCapabilityAdminMixin
 from apps.makerspaces.admin_images import MakerspaceImageAdminMixin
 from apps.makerspaces.admin_subdomains import SubdomainRequestAdmin
-from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceWaiver, MembershipRequest
+from apps.makerspaces.admin_archive_requests import MakerspaceArchiveRequestAdmin
+from apps.makerspaces.admin_imports import (  # noqa: F401
+    ImportedUserReconciliationAdmin,
+    PendingImportedMembershipAdmin,
+)
+from apps.makerspaces.models import (
+    Makerspace, MakerspaceArchiveRequest, MakerspaceMembership,
+)
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -72,6 +79,8 @@ class MakerspaceAdmin(MakerspaceImageAdminMixin, MakerspaceCapabilityAdminMixin,
                     "slug",
                     "location",
                     "public_inventory_enabled",
+                    "public_stats_enabled",
+                    "public_stats_show_holder_names",
                     "frontend_domain",
                     "hidden_from_central_directory",
                     "default_loan_days",
@@ -98,6 +107,20 @@ class MakerspaceAdmin(MakerspaceImageAdminMixin, MakerspaceCapabilityAdminMixin,
     )
     readonly_fields = ("logo_preview", "cover_preview")
     inlines = (MakerspaceMembershipInline,)
+
+    def save_model(self, request, obj, form, change):
+        """Initialise archive-custody state for makerspaces created via /control/.
+
+        The control-plane admin saves the model directly, so it never reaches the
+        admin-API serializer that seeds this row. Without it a new makerspace has no
+        custody state, which makes readiness UNDERCOUNT below-floor spaces and the API
+        return null until some later recipient mutation happens to create it.
+        """
+        super().save_model(request, obj, form, change)
+        if not change:
+            from apps.backup.custody import initialize_custody_state
+
+            initialize_custody_state(obj.pk)
 
     def has_change_permission(self, request, obj=None):
         if obj is not None and not obj.superadmin_access_enabled:
@@ -151,7 +174,37 @@ class MakerspaceAdmin(MakerspaceImageAdminMixin, MakerspaceCapabilityAdminMixin,
     def archive_makerspaces(self, request, queryset):
         from apps.makerspaces import lifecycle
 
-        for makerspace in list(queryset):
+        makerspaces = list(queryset)
+        if "confirm_archive" not in request.POST:
+            pending_by_makerspace = {
+                archive_request.makerspace_id: archive_request
+                for archive_request in MakerspaceArchiveRequest.objects.filter(
+                    makerspace__in=makerspaces,
+                    status=MakerspaceArchiveRequest.Status.PENDING,
+                ).select_related("requested_by")
+            }
+            context = {
+                **self.admin_site.each_context(request),
+                "title": "Archive selected makerspaces",
+                "makerspaces": [
+                    {
+                        "object": makerspace,
+                        "pending_archive_request": pending_by_makerspace.get(makerspace.pk),
+                        **lifecycle.archive_impact(makerspace),
+                    }
+                    for makerspace in makerspaces
+                ],
+                "opts": self.model._meta,
+                "action_name": "archive_makerspaces",
+                "action_checkbox_name": ACTION_CHECKBOX_NAME,
+            }
+            return TemplateResponse(
+                request,
+                "admin/makerspaces/archive_confirmation.html",
+                context,
+            )
+
+        for makerspace in makerspaces:
             try:
                 lifecycle.archive(makerspace, request.user)
             except ValidationError as err:
@@ -235,34 +288,10 @@ class MakerspaceAdmin(MakerspaceImageAdminMixin, MakerspaceCapabilityAdminMixin,
         return None
 
 
-@admin.register(MakerspaceMembership)
-class MakerspaceMembershipAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
-    list_display = ("user", "makerspace", "role", "created_at")
-    list_filter = ("makerspace", "role")
-    search_fields = ("user__username", "user__email")
-    autocomplete_fields = ("user", "makerspace")
-    readonly_fields = ("can_refer", "can_verify", "verified_at", "verified_by", "created_at")
-
-
-@admin.register(MakerspaceWaiver)
-class MakerspaceWaiverAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
-    list_display = ("makerspace", "version", "is_active", "created_at", "superseded_at")
-    readonly_fields = ("makerspace", "body", "version", "is_active", "created_by", "created_at", "superseded_at")
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return request.method in ("GET", "HEAD") and super().has_change_permission(request, obj)
-
-
-@admin.register(MembershipRequest)
-class MembershipRequestAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
-    list_display = ("makerspace", "kind", "state", "user", "invite_email", "created_at")
-    readonly_fields = tuple(field.name for field in MembershipRequest._meta.fields)
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return request.method in ("GET", "HEAD") and super().has_change_permission(request, obj)
+from apps.makerspaces.admin_memberships import (  # noqa: E402,F401
+    MakerspaceMembershipAdmin,
+    MakerspaceWaiverAdmin,
+    MemberProfileAdmin,
+    MemberProjectAdmin,
+    MembershipRequestAdmin,
+)

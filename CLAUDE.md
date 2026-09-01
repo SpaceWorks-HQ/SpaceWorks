@@ -1,458 +1,285 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working with code in this repository.
 
-> **On this file's structure.** The durable, load-bearing rules live in the lower half
-> ("Cross-cutting invariants", "Project Status", "Engineering Conventions", "Architecture",
-> "Hard Rules"). The chronological batch history was condensed into the "Condensed changelog"
-> — full detail lives in `git log` and in the assistant's memory files. When editing a shipped
-> feature, prefer `git log`/`git blame` for its history; use the invariants section for the rules
-> you must not regress.
+> **This file has two names, and they must stay byte-identical.** `CLAUDE.md` and `AGENTS.md` are the *same
+> document* under the two filenames the tooling looks for — Claude Code reads the first, Codex and
+> other-model agents (GPT, Gemini, Copilot, Cursor) read the second. **Any edit to one must be copied to the
+> other in the same commit**; `diff CLAUDE.md AGENTS.md` must print nothing, and that emptiness is the drift
+> guard. Do not let them diverge into a "full" and a "summary" version: `AGENTS.md` was once a hand-written
+> short mirror and silently rotted for months, still routing state transitions through the tombstoned
+> `apps/printing/workflow.py`. One document with two names cannot rot in only one of them.
 
-## Current work — FabLab expansion (branch `dev`)
+> **This file is orientation; the reference material lives in five sibling docs.** Order here: what the
+> system is, the two architectural rules, the state machine, tenancy, the Hard Rules, the engineering
+> conventions, the standing rules for working in the repo, then routers into the reference docs.
+>
+> - **`docs/INVARIANTS.md`** — the long-form load-bearing "do not regress" rules, read **per area, on
+>   demand**. The "Invariants" section below is the index of which section to open.
+> - **`docs/SOURCE-MAP.md`** — what each backend app and frontend directory owns.
+> - **`docs/DEV-WORKFLOW.md`** — program state, the Codex gates, worktrees, the test harness and the three
+>   local run topologies. Read it **before starting a build**.
+> - **`docs/PROJECT-STATUS.md`** — what exists today: control plane, security posture, installer, releases.
+> - **`docs/PROJECT-HISTORY.md`** — the condensed changelog.
+>
+> All five were split out when this file crossed the harness's memory-file size limit; **nothing was
+> dropped in the move**, and none of them has an `AGENTS.md`-style twin — both names of this document point
+> at those same paths, so edit them in place. Rules an agent must obey without knowing to look them up stay
+> *here*; the siblings hold what you consult on purpose. When changing a shipped feature, prefer
+> `git log`/`git blame` for its history and `docs/INVARIANTS.md` for the rules you must not break.
 
-Active multi-part FabLab program built on `dev` via a **Codex-driven workflow** (Codex writes specs
-and code in parallel where files don't collide; Claude orchestrates, verifies each phase, and commits
-phase-per-commit with three co-author trailers). Per user direction, the **single user QA is deferred
-to the very end** (after all Parts) — no per-Part QA gate. Specs live (gitignored) under
-`docs/superpowers/specs/2026-07-1*`.
+## What This System Is
 
-**Shipped on `dev` (see condensed changelog for the module list):** Events, Bookings, Maintenance,
-Analytics/reports, Machine Manager role + delegated role assignment, public
-self-booking + shared custom forms, per-feature×per-channel notification matrix (Slack/Mattermost),
-scoped PII encryption (Parts H1–H4), custom editable per-makerspace roles (Part L), and **Phase C**.
-Phase C is complete on `dev`: capabilities toggles; Stripe payments C.2/C.3; advisory geofenced
-check-in C.7; C.3 hardening; C.6 custom machine-type config; unified per-space pricing; self-serve
-raw Stripe credentials + managed Stripe Connect; reconciliation; booking/event/membership charges;
-attested mobile device sessions + native push + Stripe PaymentSheet; and Google/Apple social sign-in
-for member and staff surfaces. The one deferred end-to-end user QA remains an owner-run release gate.
+A multi-tenant system for managing community hardware loans across makerspaces. The central concern is
+**traceability of physical handovers**: every issue and return must produce evidence (QR scans + photos +
+remarks + audit log) so that accountability for lost/damaged hardware is never ambiguous. Public users
+browse and request; when self-checkout is enabled they may also issue/return eligible QR tools after
+authentication and evidence upload. Staff physically issue reviewed requests and direct handouts according
+to action scope.
 
-**Standing build conventions for this program:**
-- **Parallel Codex via git worktree.** A second track runs in a sibling worktree
-  (e.g. `../IM-nbuild` on its own branch) with a dedicated test DB, so two Codex builds don't collide
-  on shared files (`rbac.py`, `origin_scope.py`, `admin_api/urls.py`, `openapi-schema.json`, `api.ts`).
-  Worktrees are fresh checkouts → **gitignored files (e.g. `backend/.env`) must be copied in**. Cap at
-  2 heavy builds. At the end: merge the worktree branch → `dev`, `git worktree remove`, drop its DB.
-- **Codex gotchas.** Run Codex with skill-free prompts that skip reading this file, in the
-  **background** (`run_in_background:true`) — the 10-min foreground ceiling is too short. Stage-4 =
-  `codex exec review --uncommitted` (no `--sandbox`, no custom prompt; findings at the literal tail).
-  If Codex dies with Windows `-1073741502` / "host exited during handshake", it's desktop-heap
-  exhaustion — kill **only** codex PIDs (never `node.exe` = harness/MCP); a reboot clears it.
-  **Never `git add`/stage before a Codex workspace-write run** — a non-empty staged index makes
-  Codex's `apply_patch` silently fail with a misleading "workspace/tests/ is read-only" or
-  "staged index is read-only" error (no files written). Keep the index clean during
-  implementation; only `git add` right before the Stage-4 `codex review` (so it sees new
-  untracked files), then `git reset` before the next Codex build.
-- **Test harness.** Local `spaceworks-db` (:5433), `spaceworks-redis`, `spaceworks-minio` (:9100) must be running. Run
-  tests with `DATABASE_URL="postgres://makerspace:makerspace@localhost:5433/makerspace_manager"` (or
-  the worktree's dedicated DB). **Never run two `pytest` procs against one DB** (TRUNCATE-FK teardown
-  races + false concurrency failures) and **never run the full suite concurrently with `codex review`**
-  (it runs its own pytest). If a background full-suite is killed by the environment, run it as
-  **foreground chunks** (`pytest tests/<subdirs>`, `tests/test_[a-l]*.py`, `tests/test_[m-z]*.py`).
-  Pre-existing non-regression: `test_machine_image_presign_finalize_delete_and_audit` fails because
-  MinIO is on :9100 vs the test default :9000.
-- **Migration heads drift.** Specs quote stale migration numbers; every Codex prompt must
-  `ls backend/apps/<app>/migrations/` and chain off the **actual** leaf, not the spec number. A new
-  migration whose dep is a rewound app can break migration-executor tests (rewind the full graph
-  forward in the test's `finally`).
+## Architecture: Concepts That Span Multiple Modules
 
-## Cross-cutting invariants (from shipped batches — do not regress)
+UIs and the Telegram bot are thin clients over an API server composed of deep modules. Two architectural
+rules are load-bearing and easy to violate if you only read one module:
 
-These rules were established across many batches and are load-bearing beyond any single module:
+1. **The Request Workflow Module is the single source of truth for state transitions.** Telegram callbacks,
+   the web admin panel, and the guest-admin app must all route through the *same* workflow service — never
+   mutate `HardwareRequest.status` directly. The Telegram module in particular must call the workflow
+   module, not the database. This is what keeps web and bot behavior consistent and audited.
 
-**Self-host vs managed SaaS (all managed features dormant by default).** `PLATFORM_DOMAIN_SUFFIX`
-blank/whitespace ⇒ `domain_verification.is_self_host()` is True ⇒ **every managed feature is inert**
-and single-domain behavior is byte-for-byte unchanged (self-hosters unaffected). Self-host trusts a
-superadmin-set custom `frontend_domain` immediately (no DNS TXT challenge — the challenge only ever
-defended the shared managed box). The self-host branch is strictly superadmin-only (the staff-origin/
-CORS allowlist is process-global; letting any tenant set a trusted origin is a cross-tenant token-theft
-vector). Managed mode adds `<slug>.space-works.tech` provisioning + tenant self-serve custom domains on one
-shared instance (no per-tenant DB). **VERIFIED is the trust gate** — a `frontend_domain` grants CORS/
-staff-origin/bootstrap/Host/TLS trust only when `frontend_domain_status=VERIFIED` and non-archived.
+2. **The Inventory Availability Module owns all quantity math.** Reserve / issue / return / mark-lost all
+   flow through it. No other module computes available/reserved/issued counts. The invariant "availability
+   never goes below zero" lives here.
 
-**Managed fair-use limits (dormant on self-host).** `apps/makerspaces/limits.py` `resource_limit(ms, key)`
-(self-host → None = unlimited; per-space `resource_limit_overrides` JSON, else `MANAGED_RESOURCE_LIMITS`)
-+ `check_quota(ms, key, *, adding)` called **inside each creation service's `transaction.atomic()`**
-(self-locks the makerspace row; raises DRF 400 `{"limit": …}` / typed `limit_reached` at cap). Storage
-counter (`add_storage`/`free_storage`) charged at finalize; `recompute_storage` management command is the
-authoritative reconciler. Email daily cap via `integrations.DailyEmailCounter`.
+### Module responsibilities
 
-**One domain per makerspace.** `Makerspace.frontend_domain` (case-insensitively unique) is the single
-frontend-registry field (the old per-type `TenantFrontend` model is deleted). Two origin helpers in
-`platform.py`: `makerspace_staff_origins` (ONLY the exact `https://<frontend_domain>`, feeds refresh/
-logout CSRF + the origin→tenant guard) vs `makerspace_public_origins` (that ∪ `cors_allowed_origins`,
-feeds general CORS + publishable-key validation) — so an API-client/public origin can make
-publishable-key calls but **can never mint a staff session**. `origin_scope.py` hard-scopes a browser
-staff request to its domain's makerspace; origin-less (server) requests fall back to `MakerspaceMembership`.
+- **Auth & RBAC** — enforces the role/action matrix AND makerspace scoping on every query. Super Admin is
+  global; every other role is a per-makerspace membership resolved through an editable `MakerspaceRole` row,
+  action-based. `roles.DEFAULT_ROLE_DEFINITIONS` + `MEMBER_ROLE_DEFINITION` seed **four** protected defaults
+  per makerspace — Space Manager, Inventory Manager, Machine Manager, Member. **Guest Admin and Print
+  Manager are both retired** — handover is a custom role, and `print_manager` survives only as the frozen
+  legacy fallback in `_MEMBERSHIP_ROLE_ACTIONS` (migrations and enum archaeology under **Handover roles**
+  in `docs/INVARIANTS.md`). Inventory Manager is membership-only and covers the full hardware lifecycle but
+  not printing, staff, or makerspace settings. Also verifies Telegram actors and blocks
+  restricted/suspended users. Interface: `can(actor, action, resource)`,
+  `scope_by_makerspace(actor, query)`, `assertTelegramActorCan(...)`.
+- **Request Workflow** — owns the state machine, emits audit logs, triggers Telegram alerts, coordinates
+  inventory reservation/issue/return.
+- **Inventory Availability** — quantity math + asset status for QR-tracked tools.
+- **QR Code & Box** — generates/resolves/revokes QR codes, assigns boxes to requests, tracks scan history.
+- **Evidence Photo** — immutable issue/return photo storage linked to actor + request + QR scans; object
+  storage, never public.
+- **Check-In API Client** — **RETIRED** (`73a480c`, Part M7). `apps/checkin/` no longer exists and there is
+  no `CHECKIN_MODE` setting. Requester identity now comes from authenticated member accounts, so there is no
+  external verify dependency left to fail safe on.
+- **Telegram Integration** — sends per-makerspace group alerts and processes accept/reject callbacks
+  (delegating to Request Workflow).
 
-**Superadmin access is a HARD block, not a soft hide.** `Makerspace.superadmin_access_enabled=False`
-excludes the space for a GLOBAL superadmin across `rbac.can`/`scope_by_action`/`makerspaces_for_action(s)`
-etc. (a superadmin with an explicit membership keeps only that role's actions). Status contract: hidden
-→ **403** on action/permission-gated endpoints, **404** on object-lookup detail + re-enable PATCH,
-**empty 200** on scope-filtered lists. Existence stays visible as a slim row (governance). True→False is
-rejected unless Platform Email is configured (forgot-password recovery). Re-enable is space-manager-only.
-Break-glass: superadmin may create a fresh SPACE_MANAGER / reset a hidden-only SM. Application-layer only
-(DB/`manage.py` access always overrides).
+## Request State Machine
 
-**Makerspace archive → purge (superadmin, `/control/` only).** `Makerspace.archived_at` is the
-single soft-delete flag; archive scoping is threaded through central rbac + all aggregates + public +
-token-status surfaces (archived is invisible everywhere but `/control/`). `lifecycle.py` is the single
-lifecycle source. **Purge** is break-glass: collects S3 keys, writes a platform-scoped audit, then in
-one `transaction.atomic()` suspends immutability triggers **transaction-scoped** and deletes the full
-`PROTECT` object graph in verified dependency order, then best-effort deletes S3.
-- Self-host: `SET LOCAL session_replication_role='replica'` (all triggers off; FK off — ORM does
-  CASCADE/SET_NULL in Python).
-- Managed Postgres (`MANAGED_POSTGRES=True`, e.g. Supabase forbids `session_replication_role`):
-  `SET LOCAL app.allow_immutable_delete='on'` (only OUR immutability triggers bypass; FK stays on).
-- **Every append-only/immutability trigger is purge-aware**: DELETE allowed only under GUC
-  `current_setting('app.allow_immutable_delete', true)='on'`; UPDATE always blocked (audit/0003 style).
-  A new PROTECT-FK + immutable model must add itself to the purge graph **and** the drift-guard.
+```
+draft → pending_approval → {rejected | accepted}
+accepted → issued → {partially_returned | returned | closed_with_issue}
+```
 
-**Object storage.** Two buckets per env: a private evidence/docs bucket and a separate **public-read**
-image bucket (`PUBLIC_IMAGE_BUCKET`, served via `PUBLIC_IMAGE_BASE_URL`, kept distinct from the signing
-host). New file types use the **prefix model** (single shared bucket, isolated by
-`<module>/<makerspace_id>/<machine_or_resource_id>/<category>/<uuid>` — NOT bucket-per-makerspace, which
-would hit S3's ~100-bucket limit) — applied to NEW files only, no re-keying. Presign follows
-`STORAGE_PRESIGN_METHOD` (POST for MinIO, PUT for Supabase; PUT-mode re-validates size server-side at
-attach). Object keys are identifiers, not secrets — privacy is the private bucket + short-lived signed
-URLs. Upload validation: strict magic-sniff for PDF/image; the private maker/CAD allowlist
-(`apps/maker_file_formats.py`) accepts STL/OBJ/3MF/STEP/etc. on ext+MIME (+signature for 3MF/STEP);
-public-image + evidence buckets stay strictly image-only.
+The workflow module enforces *allowed* transitions only. `closed_with_issue` and the
+accountability/access-restriction flow (PRD §6.5) are how lost/damaged hardware ties back to a requester's
+`access_status`.
 
-**Reports/analytics extend one registry** (never a parallel system). `apps/operations/report_registry.py`
-holds canonical `ReportDefinition`s (module-gated, `report_scope.eligible_makerspaces` excludes archived
-+ reports-disabled + superadmin-hidden). FabLab domain builders (`reports_events`/`_bookings`/
-`_maintenance`/`_machine_usage`/`_inventory` + fail-safe `reports_health`) mirror printing's date-range
-contract; **aggregate output groups by `makerspace_id` and never flattens cross-tenant data**. Per-makerspace
-report rows are gated by query-level scope (no per-row Python check → no N+1).
+## Multi-Tenancy (Makerspace Scoping)
 
-**Scoped PII encryption (Part H, `apps/encryption/`; dormant unless enabled).** Per-makerspace DEK via a
-key broker (local/AWS-KMS), AAD-authenticated envelope crypto, `ScopedPiiModelMixin` on the 6 PII-holding
-models with a save-boundary that single-INSERTs envelopes + dual-read cache. Blind-index search
-(domain-separated HMAC bloom + exact + event-email hashes) for enabled deployments; disabled deployments
-search plaintext via ORM. Write-fence (`PiiGlobalWriteFence`/`PiiMakerspaceWriteFence` + PG
-`pii_assert_mapped_write_allowed()` triggers with global-then-tenant advisory locks) blocks mapped writes
-during maintenance; mapped services acquire the fence **before** their domain row lock. Enabling is a
-staged dual-read rollout; `decrypt_scoped_pii` is the fenced rollback. **Encryption is never enabled
-before H3 (search) ships.**
+Every domain entity is scoped to a `makerspace_id`. A makerspace owns its inventory, public URL, Space
+Managers, Inventory Managers, its own custom roles (handover included), Telegram group chat ID, QR
+namespace, and audit-log scope. **Any list/query for makerspace-scoped staff actors must be scoped through
+the Auth module** — forgetting this is a cross-tenant data leak, not just a bug.
 
-**Custom editable per-makerspace roles (Part L).** The 5 legacy roles are now editable protected default
-`Role` rows; authority is **action-based** via the assigned role (dual-read with legacy fallback:
-`rbac.actions_for_membership` resolves assigned-role-first, tenant-match-else-fail-closed, strips
-unknown/forbidden actions, null-FK → frozen legacy). `can()`/`makerspaces_for_action()`/hidden-block all
-route through it. `/auth/me` + `/auth/login` carry typed effective `actions` per membership; the frontend
-`staffAccess.ts` derives every capability from action strings, not role names. Role CRUD +
-membership/role-assignment APIs enforce non-escalation (can't grant a role you don't hold; can't touch a
-MANAGE_MAKERSPACE target/role) with makerspace-first lock ordering.
+## Hard Rules Baked Into Workflows (don't regress these)
 
-**Two-level capabilities (modules + features).** `Makerspace.enabled_modules` (whole modules) is
-**superadmin-only** — edited only in the `/control/` capability matrix; a staff-API PATCH containing
-`enabled_modules` is a hard **403**. `Makerspace.enabled_features` (namespaced sub-features via the
-`apps/makerspaces/capabilities.py` registry — `payments.machines|bookings|events|membership`,
-`inventory.self_checkout`) is **Space-Manager-writable** (`MANAGE_MAKERSPACE`), validated so a feature can
-be enabled only when its parent module (and any `requires_*`) is on, and audited (`makerspace.features_changed`).
-A `FeatureDefinition.parent_module` of **None** = a standalone feature with no module prerequisite (effective
-purely when enabled) — `inventory.self_checkout` is standalone (self-checkout + staff direct handouts are
-per-makerspace loan capabilities independent of the public catalogue; they must NOT be reparented under
-`public_inventory`). `feature_enabled`/`require_feature` (typed key `feature`) mirror the module guards;
-bootstrap exposes effective `features: string[]` + feature-workflows. `payments.*` keys are **dormant
-substrate** in the capabilities layer — enforcement lands in the payment tracks (C.2/C.3), not here. The
-`/control/` matrix widget must derive its disable rule from each feature's real `parent_module` (never
-disable a parentless feature — a disabled checkbox is omitted from POST and would silently clear the
-capability). Widget templates live in the **app** templates dir (`apps/<app>/templates/...`), not project
-`templates/`, so the form renderer (app-dirs only) finds them.
+- Reviewed-request hardware **cannot be issued** without both a box QR scan and an issue photo.
+- Public self-checkout and staff direct handout **cannot be issued** without uploaded issue evidence and an
+  eligible scanned/selected tool.
+- Hardware **cannot be returned** without a return photo and a return remark/notes.
+- Issued quantity cannot exceed accepted quantity without authorized workflow permission.
+- **Guest Admin is no longer a built-in role**; handover staff get a **custom role** holding the handout
+  actions. It issues accepted requests, creates **direct handouts**, processes scoped returns and uploads
+  evidence — through the same evidence/QR/remark/audit workflow as staff — and still cannot accept/reject
+  requests, edit inventory or manage QR unless granted those actions. `rbac.HANDOUT_ACTIONS` is no longer a
+  cap on what a role may hold; it only defines what counts as handover-only for `rbac.is_handout_only`,
+  which decides how narrow the console is. The `guest-admin/` **URL paths** in `hardware_requests/urls.py`
+  are the handover API surface (module key `guest_handover`), not the role — renaming them would break
+  clients. Full detail: **Handover roles** in `docs/INVARIANTS.md`.
+- Public request submission requires an **authenticated member** (`RequestSubmitView` → `IsAuthenticated`),
+  and request lookup is scoped to that verified identity — it never matches free-text contact fields (no
+  enumeration by known email/phone). Since the Check-In retirement (`73a480c`) this is enforced by member
+  auth rather than an external verify call.
+- Inventory Managers can run the full hardware lifecycle but **cannot** manage printing, staff, or
+  makerspace settings.
+- Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks
+  active status.
+- **Every presigned upload lands on the staging key; the final object key is never client-writable.** A workflow promotes it exactly once, so an accepted evidence photo cannot be replaced through a still-valid presign. Read paths — the evidence endpoint, the admin preview, and backup/tenant-migration object capture — therefore fall back to the staging key, or an uploaded-but-unconsumed photo reads as missing.
+- Evidence photos and QR scan records are **immutable**; audit logs are **append-only**.
+- Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos,
+  requester history, or hidden counts. Public visibility is governed per-item by `is_public`,
+  `show_public_count`, and `public_availability_mode` (`exact_count | status_only | hidden`).
 
-**Payments (Stripe, C.2/C.3; dormant until configured).** `apps/payments.Payment` is the **single payment
-authority** (one row per subject via unique `(makerspace, subject_type, subject_id)`; positive amount;
-statuses pending/paid_online/paid_offline/waived/canceled; terminal rows immutable — **enforced by a Postgres
-BEFORE UPDATE/DELETE trigger that blocks terminal-row mutation AND blocks DELETE unless the purge GUC
-`app.allow_immutable_delete='on'` is set; `Payment`+`ProcessedStripeEvent` are in the lifecycle purge graph**).
-Effective online payment = `feature_enabled(ms,"payments.<domain>")` AND `MakerspacePaymentSettings.is_configured`
-— blank creds fail closed; no platform-wide Stripe fallback (a **Stripe-Connect creds track** for managed hosting
-is planned, self-host stays per-makerspace raw keys). The webhook settles both synchronous
-(`checkout.session.completed` payment_status=paid) and **asynchronous** (`checkout.session.async_payment_succeeded`,
-matched by session id) charges. **Machine-service pricing lives in `apps/machines.MakerspaceMachineTypePricing`
-(per makerspace × machine_type; built-in AND custom types; `rate_per_unit`/`flat_fee`/`payment_enabled`),
-NOT in `MachineType.capability_config` (which is structural-only — no pricing/payment keys); currency = the
-makerspace default currency snapshotted into `Payment`; the charge quantity is `service_payments.effective_quantity`
-(minutes→`actual_minutes`, else `actual_consumed_quantity`, else grams). Configuring machine types AND their
-pricing is gated by `rbac.is_space_manager_identity` (space-manager membership only — NOT `MANAGE_MACHINES`
-breadth — honoring archived/hard-hidden scoping; surfaced to the console via the per-membership
-`can_configure_machine_types` flag).** **Never-block:** machine `complete()`/`collect()` succeed even if
-Payment creation or Stripe checkout fails; checkout is created post-commit best-effort (and can be regenerated
-on demand via the member endpoint). **Webhook always settles:** `apply_webhook_event` verifies the
-per-makerspace signature on `request.body`, is idempotent via `ProcessedStripeEvent`, and settles a matching
-pending Payment to paid_online **regardless of the live feature toggle** (a real charge is never stranded); a
-paid event for an already-terminal payment is audited (`payment.paid_after_terminal`), not dropped. Reconciling
-(mark_offline/waive) best-effort **expires** any live Checkout session. Checkout return URLs come from
-`platform.member_area_url` (VERIFIED custom domain → `/member`, else shared `/m/<slug>/member`). Legacy
-`MachineServiceRequest.payment_*` are **read-only historic** (a backfill migration maps them into Payment);
-refunds are out of scope. Amounts are staff-private (serializer split); requesters/members see status + own
-checkout link only.
+> The machine-scoping program (`MANAGE_MACHINES` per role, the Machines console, procurement and dashboard
+> narrowing) is documentation of an invariant, not a workflow rule, and lives under **Machine scoping** in
+> `docs/INVARIANTS.md`.
 
-**Payment credentials, subjects, and reconciliation (Phase C final tracks).** Self-hosted makerspaces
-may manage their own encrypted Stripe credentials; managed hosting resolves through platform Stripe
-Connect without exposing secret values. Credential mutation validates live Stripe ownership and protects
-in-flight checkout/webhook sessions. Booking, event-registration, membership-dues, and machine-service
-charges all create the same immutable `Payment` subject rows. Reconciliation is makerspace-scoped through
-RBAC, reports/dashboard aggregates never flatten tenants, and offline/waive actions audit the actor and
-best-effort expire live online sessions.
+## Engineering Conventions (apply to all code written here)
 
-**Native clients use attested device grants, never browser-token shortcuts.** Device login starts with a
-short-lived attestation challenge and creates a revocable `DeviceGrant`; access tokens carry
-`device_grant_id`, refresh tokens rotate in a grant family, and replay revokes that family. Native
-makerspace selection uses `X-Makerspace-Id` only with a valid grant and active scoped membership. Push
-tokens are encrypted with an HMAC dedup fingerprint, owned by a device grant, and disabled when a provider
-reports them invalid. Native Stripe PaymentSheet delegates to the same Payment/Connect resolution and
-idempotency rules as web checkout.
+- **Every edit to this file must be made to BOTH `CLAUDE.md` and `AGENTS.md`, in the same commit.** They are
+  one document under two filenames; `diff CLAUDE.md AGENTS.md` must print nothing. `docs/INVARIANTS.md` has
+  no twin — both names point at that one path, so edit it in place.
+- **Follow the global Claude config.** The gated workflow in `~/.claude/CLAUDE.md` (Stages 1–6, Codex
+  delegation, mandatory review/QA gates) governs all work in this repo. Repo-specific rules below add to it;
+  they do not override it.
+- **Document every API endpoint in Swagger / OpenAPI.** Every route in the API surface (PRD §14) must have
+  an OpenAPI spec entry — request/response schemas, auth requirements, and error responses. Keep the spec in
+  sync with the code; an undocumented endpoint is incomplete.
+- **Keep files modular — target ~200 lines per file, hard ceiling ~300.** One clear responsibility per file.
+  When a module file grows past the target, split it (route handlers, validation, and service logic in
+  separate files). The deep modules in §12 are logical boundaries, not single files. **Established split
+  pattern:** when an app's `views.py`/`serializers.py`/`admin.py`/`services.py` outgrows the ceiling, split
+  classes/functions into domain submodules (`views_*`, `serializers_*`, `admin_*`, `services_*`) and keep
+  the original file as a **thin re-export barrel** (explicit `from .submodule import (...)`, never
+  `import *`) so `from app.views import X` and `views.X` keep resolving; for `admin.py` the barrel must
+  still import the admin submodules so the `@admin.register` side effects fire. **The ceiling is enforced
+  on what you touch, and it is NOT currently met repo-wide: 37 backend files exceed 300 lines** — largest
+  first, `config/settings.py` (929, the accepted exception — Django settings are conventionally a single
+  file), `admin_api/urls.py` (825), `makerspaces/models.py` (682), `accounts/rbac.py` (609),
+  `inventory/availability.py` (596), `admin_api/serializers_makerspaces.py` (561),
+  `makerspaces/module_registry.py` (503), `machines/role_scope.py` (489). Measured 2026-08-20; an earlier
+  version of this line claimed every file but `settings.py` was compliant, which was false by 36 files.
+  **Split an over-ceiling file in its own commit before adding to it**, and when splitting one that other
+  modules import from, check for guards pinned to its path: `tests/makerspaces/test_tenant_servability_guard.py`
+  pins two function *bodies* to `accounts/rbac.py` by `(path, function)`, and
+  `tenant_migration/authority_guards.py` pins whole *files* via `AUTHORIZATION_SOURCES` — the latter goes
+  silently blind rather than failing if you move code out from under it.
+- **Production-level code, not prototype code.** Validate all inputs at the boundary, handle external-service
+  failure explicitly (especially outbound integrations — Stripe, Telegram, SMTP, object storage — fail safe,
+  never crash a request flow), use structured logging, return consistent typed error responses, and never
+  leave `TODO`/stub auth or scoping in a merged path. Every state-changing endpoint must emit its audit log
+  entry (PRD §11). Honor the immutability/append-only and makerspace-scoping invariants as enforced code,
+  not convention.
 
-**Social identity is global; authorization remains per makerspace.** `SocialIdentity(provider, sub)` links
-Google/Apple to the global `User`; it never grants a role. Provider JWTs are server-verified against bounded,
-cached static JWKS endpoints and one-time origin/device-bound nonces. Auto-linking is allowed only when both
-provider and local email are verified; staff social login never creates an account or membership. Social
-tokens carry `surface=member|staff`: member tokens are rejected by staff APIs, while staff tokens require
-the exact trusted staff origin and matching tenant scope on access and refresh. Provider secrets remain
-write-only/encrypted, and unconfigured social auth is omitted from public config.
+## Learning And Explanation Contract
 
-**Presence geofence is ADVISORY, not an access gate (C.7).** Browser-supplied coordinates are spoofable, so
-`presence.geofence.evaluate_geofence` only classifies a reading (in_range / distance+accuracy buckets, raw
-coords never stored) and records it in the `presence.started` audit — it **never blocks** session creation, and
-the client never hard-blocks check-in on a location error. Do **not** convert it into a fail-closed gate
-without adding an unforgeable proximity factor (owner decision). Dormant/self-host safe: no geo config ⇒ no
-check and the `geofence_enabled` bootstrap flag is **omitted entirely** (byte-for-byte-unchanged invariant).
+This repo is also being used to learn production Django, DRF, React, and TanStack Query. When making
+changes:
 
-**Console parity principle.** Every backend lifecycle capability reachable in the Django `/control/`
-admin must have a React staff-console surface — a capability with no console surface is a latent
-dead/broken feature for normal staff. New workflow actions ship their staff UI in the same batch.
+- Explain the reason for each meaningful change in plain language, briefly but deep enough to show the
+  production tradeoff.
+- For small diffs, explicitly state what changed, why it changed, and what behavior it protects.
+- Tie backend changes back to Django/DRF concepts (models, serializers, viewsets/APIViews, permissions,
+  transactions, migrations, service modules) and frontend changes to React/TanStack Query concepts
+  (component state, server state, query keys, mutations, invalidation, loading/error states, cache refresh).
+- Avoid unexplained "magic" abstractions. If an abstraction is introduced, explain the repeated problem it
+  removes.
+- Prefer teaching through this project's real workflows: request creation, accept/reject, issue, return, QR
+  scan, evidence upload, and audit log.
 
-## Condensed changelog (newest first — full detail in `git log`)
+The goal is not just to ship code, but to understand why each production-quality decision exists.
 
-Each line names a shipped feature and, where useful, the load-bearing rule it introduced (folded into the
-invariants above). Use `git log --oneline`/`git blame` for the implementing commits and per-file history.
+## Working in this repo — the standing rules
 
-- **Phase C final tracks** (2026-07-23, `dev`): encrypted per-space Stripe credentials + managed Stripe
-  Connect (`3b43f47`); makerspace-scoped reconciliation dashboard/reports (`1ad63f5`); unified booking,
-  event-registration, and membership-dues Payment subjects (`159a88f`, hardened by `396cb27`); attested
-  device grants, rotating native refresh, native push, and Stripe PaymentSheet (`1aa2029`); server-verified
-  Google/Apple member + staff social sign-in with surface/origin enforcement (`ad2fe42`).
-- **Phase C — capabilities + payments + geofence** (2026-07-21/22, `dev`): Track 1 two-level module/feature
-  toggles (`41e6a2a`); C.2 Stripe foundation — per-makerspace encrypted creds + verify-only webhook
-  (`92eda37`); C.3 machine-service payments — `apps/payments.Payment` as the single payment authority,
-  gated non-blocking charge at machine `complete()`, idempotent webhook settlement, member/staff surfaces
-  + reconciliation, legacy `payment_*` → read-only historic with a backfill migration (`9c1d928`); C.7
-  **advisory** geofenced presence check-in — records proximity buckets, never blocks (`007ef55`);
-  C.3-hardening — `Payment` DELETE-immutability trigger + purge-graph wiring + async Stripe checkout
-  settlement (`c8225c0`); **C.6 + P1-A** — custom machine-type config (SM-identity authority) + generic
-  non-gram `MachineServiceConsole` + seed migration `0017`, and the unified per-space
-  `MakerspaceMachineTypePricing` override (pricing out of `capability_config`, built-ins priceable per-space,
-  migration `0018` fail-safe backfill) (`8d39cb0`).
-- **FabLab Parts C–N + L + H + Settings + K** (2026-07-16→18, `dev`): Events, Bookings (+ public
-  self-booking + shared `forms_schema` custom forms + structured event location), Maintenance, Analytics
-  reports, public Roadmap (later tombstoned), Machine Manager role + SM-delegated role assignment, per-feature×per-channel
-  notification matrix (Slack/Mattermost), scoped PII encryption H1–H4, custom roles L, machine service
-  requests N (in worktree). New apps: `events`, `bookings`, `maintenance`, `roadmap`, `forms_schema`,
-  `encryption`, machine-service models under `machines`.
-- **Machines module M1 + M1.5** (2026-07-14/15): generic `apps/machines/` (types/machine/operators/usage/
-  docs/errors), 3-tier authz (`MANAGE_MACHINES` + type-managers via `MachineType.managing_action` +
-  per-machine operators), services single-source-of-truth, printer auto-link, custom types, photo,
-  warranty (3rd host), consumables (count via inventory + grams ledger), public exposure.
-- **Self-host-first + SaaS hosting Parts A/B + space-works.tech** (2026-07-15/16): self-host custom-domain
-  auto-trust, managed fair-use limits + subdomain request→approve, one-shared-instance multi-tenant
-  hosting (all dormant on blank `PLATFORM_DOMAIN_SUFFIX`). AGPL relicense + repo professionalization.
-- **Audit fixes + dependency upgrade P1–P17** (2026-07-08): integration health center, scan-first
-  stocktake, ops dashboard, notifications app + inbox + fail-safe emit hooks; force-latest upgrade to
-  Django 6 / React 19 / Vite 8 / Tailwind 4 / TS 6.
-- **Manager fixes P5–P10** (2026-06-30): direct-loan return resolutions + accountability + public
-  report-a-problem, unified asset editor, optional partial approval, accountability dashboard,
-  actionable warranty/reports UI.
-- **Email/async stack** (2026-06-21): `EmailLog` outbox + single `dispatch_email` choke point + Celery/
-  Redis async delivery + retry. Per-makerspace staff-notification recipient matrix.
-- **Print filament grams / payment / manual logs** (2026-06-16/28): requester grams estimate, failed-%
-  → printer hours, manual-log outcomes, staff-private cash payment on prints (never exposed to requester
-  — enforced by serializer split), top-requesters leaderboard by email.
-- **Warranty tracking** (2026-06-27): `apps/warranty/` (asset XOR printer XOR machine host, private
-  bill/doc uploads, display-only status; per-host RBAC; public-leak invariant tested).
-- **UI reskins** (frontend-only): pastel "notebook" theme (2026-06-22, fill/`-ink` token split),
-  Blueprint redesign + item/makerspace imagery (2026-06-20).
-- **Collaborative self-governance** (2026-06-16): superadmin-access toggle (later hard block),
-  API-client self-serve, admin + self-service password resets, Platform Email settings.
-- **Console-parity + workflow surfacing** (2026-06-16): broken-at-handover + to-be-fixed shelf,
-  ledger specific-unit + staff-return evidence, direct-handout UX, lending history, QR rebind,
-  surfacing ~10 orphaned backend lifecycles into the React console.
-- **Deploy / production** (2026-06-19): single-tenant branded frontend, Supabase free-tier dual-mode
-  (env-toggled; localhost default unchanged), lean-paid production deploy artifacts + perf hardening.
+**The full account — program state, the Codex gates, worktrees, the test harness, the three local run
+topologies and every trap that has already cost a session — is in `docs/DEV-WORKFLOW.md`. Read it before
+starting a build.** These are the rules you must not violate without having read it:
 
-## Project Status
+- **The Codex gates are LIVE** (Stages 1/2/4 of `~/.claude/CLAUDE.md`), but **re-check `codex doctor`**
+  rather than trusting any written claim — that one line has gone stale silently for weeks before.
+- **Name Codex in a `Co-Authored-By` trailer only on work Codex actually wrote.** Attribution, not
+  ceremony: this overrides the unconditional three-trailer rule in the global config, and the trailer set
+  is decided per commit by who really wrote the code.
+- **Never `git add`/stage before a Codex workspace-write run** — a non-empty index makes `apply_patch`
+  silently fail with a misleading "read-only" error and no files written.
+- **The test baseline is ZERO reds** — any failure is a NEW regression, not background noise. Run
+  `./scripts/dev-local.sh test` with `spaceworks-db` (:5433), `spaceworks-redis` (:6379) and
+  `spaceworks-minio` (:9200) up. **Never run two `pytest` procs against one DB**, and never run the full
+  suite concurrently with `codex review` (it runs its own).
+- **Chain every new migration off the ACTUAL leaf** — `ls backend/apps/<app>/migrations/`, never the number
+  a spec quotes.
+- **Commits sit local and unpushed on `dev`; pushing is the owner's call alone.** Ask
+  `git rev-list --count origin/dev..dev` rather than trusting a count written anywhere.
+- **MERGING IS THE OWNER'S ACT ALONE — never merge a branch yourself.** This covers every merge,
+  including `dev` -> `main`, a feature branch into `dev`, and a fast-forward that looks trivial.
+  Prepare the merge, verify it is clean, report exactly what would land, then STOP and hand it over:
+  the owner runs the `git merge` and the `git push`. This is stricter than the push rule above and
+  overrides the global config's Stage-5 "merge it into `dev`" step, which no longer applies here.
+- **Never run the Docker and host stacks at once** — they bind the same ports (:8000, :5000) and the same
+  database.
 
-### Admin control plane (superadmin-only)
+```bash
+./scripts/dev-docker.sh up -d --build                          # default: all in Docker, live reload
+./scripts/dev-docker.sh exec backend pytest
+./scripts/dev-local.sh infra && ./scripts/dev-local.sh test    # host fallback: faster pytest
+```
 
-The **Unfold Django admin is the Super Admin's sole control plane**, mounted at **`/control/`**
-(NOT `/admin/` — `/admin` belongs to the React staff console SPA route), locked to superadmins, and
-**not exposed on the public frontend port** (`frontend/nginx.conf` does not proxy it — makerspace staff
-on port 80 can never reach the Django console; the superadmin reaches `/control/` only via direct backend
-access). Gated two ways: `config.admin_access.AdminSuperuserOnlyMiddleware` (denies any authenticated
-non-superadmin; the `/api/v1/admin/...` React staff APIs are NOT gated) and
-`config.admin_access.SuperuserOnlyModelAdmin` (first base of every `ModelAdmin`). Superadmin operations
-are Django admin **actions that route through the existing services** (never mutating status directly);
-issue/return remain React-only. Superadmin monitoring surfaces (QR ZIP, inline QR/photo previews, print
-file downloads) are read-only and guard storage failures.
+Public inventory page: `http://localhost:5000/m/makerspace`. API: `http://localhost:8000/api` — Swagger UI
+at `/docs/`, ReDoc at `/redoc/`, schema at `/schema/`.
 
-**U-SEC:** django-axes admin-login lockout, scoped `login`/`public_request_submit` throttles + write-only
-`website` honeypot on public submit, production-gated security headers, always-on CSP via django-csp 4,
-and a `pip-audit` CI job. The global CSP `script-src` omits `'unsafe-eval'`; a tiny
-`config.admin_access.AdminCspEvalMiddleware` appends `'unsafe-eval'` to `script-src` **and** the S3 public
-origin to `img-src` **only for `/control/` responses** (django-unfold ships eval-requiring Alpine.js; the
-JSON API + public docs stay on the strict policy). Design spec:
-`docs/superpowers/specs/2026-06-13-superadmin-admin-control-plane-design.md`.
+## Project Status — in `docs/PROJECT-STATUS.md`
 
-**Django admin coverage** is complete (every domain model registered; immutable/workflow-owned models
-read-only; a `list_filter` per makerspace-scoped admin). The Unfold sidebar (`config/unfold.py`) is
-curated into grouped sections; a test asserts every sidebar link resolves. A drift-guard test
-(`tests/test_admin_hidden_scope.py`) walks every registered admin and forces an explicit scoped/global
-decision (via `NESTED_MAKERSPACE_LOOKUPS` / `GLOBAL_ADMIN_MODELS`) so a new admin can't silently leak
-across the superadmin hide/archive scoping.
+**What exists today lives in `docs/PROJECT-STATUS.md`** — the superadmin-only `/control/` control plane and
+its two gates, the U-SEC security posture (axes, throttles, CSP), the non-technical installer, the
+`SpaceWorks <version>` release-title convention, per-makerspace encrypted integrations, and overall
+implementation status. Read it to find out whether something already exists and how it is wired; the rules
+those areas impose are in `docs/INVARIANTS.md`.
 
-**Non-technical install:** `setup.sh` / `setup.ps1` (first-run wizard: Docker check → generate secrets
-incl. Fernet `API_CLIENT_ENC_KEY` → write `.env` → build → `setup_instance` → print URL/creds),
-`docker/compose.build.yml`, and `docs/setup-for-makerspaces.md`. TLS is env-gated (`ENABLE_HTTPS`,
-default off). First-run `setup_instance` seeds `superadmin`/`super123` + `must_change_password` (surfaced
-by login + `/auth/me`, cleared by `/auth/change-password`).
-
-**Per-makerspace integrations are backend-only and never leak.** `Makerspace` holds per-tenant
-`telegram_bot_token` + `smtp_*`; secrets are encrypted at rest with `API_CLIENT_ENC_KEY` via
-`apps/makerspaces/secrets.py` and decrypted only in delivery code. The staff serializer exposes them
-**write-only** + a `*_set` boolean. Bootstrap returns only frontend-safe config (module flags, not
-secrets). No shared-integration entity exists — makerspaces sharing SMTP/Telegram enter the same
-credentials per space (stored/encrypted independently).
-
-**Implementation status.** The multi-frontend platform and open operations/reporting PRDs are implemented
-end-to-end (public browse, auth/RBAC, API-client HMAC, QR/box, audit/evidence, 3D Printing Manager,
-Hardware Request Workflow, procurement "To Buy", stock transfers incl. true cross-makerspace movement,
-stocktake, analytics/ledger/exports, Users CRUD, the FabLab modules in the changelog). The detailed PRDs
-(`docs/prd-*.md`) are **internal planning docs kept local only** (gitignored); "PRD §N" references point
-to those. Google Sheets OAuth publishing, native apps, and physical label-printer control remain out of
-scope.
+Two facts from it that bite outside their own area: the Django admin is at **`/control/`**, not `/admin/`
+(that is the React staff console SPA route), and superadmin operations are admin **actions routed through
+the existing services** — never direct status mutation.
 
 Stack (in use):
 
 - **Backend:** Django 6 + Django REST Framework (`backend/`). Requires Python 3.12+.
 - **Frontend:** React 19 + Vite 8 + TypeScript (`frontend/`). Requires Node 20.19+ / 22.12+.
-- **Server-state management:** TanStack Query v5
-- **Database:** PostgreSQL 16 (via `docker-compose.yml`)
+- **Server state:** TanStack Query v5. **Database:** PostgreSQL 16 (via `docker-compose.yml`). **Admin
+  theme:** django-unfold; site name via `ADMIN_SITE_NAME` (default "Space Works").
 - **Styling:** Tailwind CSS 4 (CSS-first; `src/index.css` uses `@import "tailwindcss"` + `@config
   "../tailwind.config.ts"`; PostCSS via `@tailwindcss/postcss`) with CSS-variable light/dark theme tokens.
   Light default; dark toggle persisted locally.
 - **API documentation:** drf-spectacular / OpenAPI (snapshot `frontend/openapi-schema.json` + generated
   `frontend/src/generated/api.ts`; regenerate both when routes/models change — spectacular needs
   `--format openapi-json`).
-- **Admin theme:** django-unfold; site name via `ADMIN_SITE_NAME` (default "Space Works").
 - **Telegram:** request alerts, test alerts, authenticated webhook accept/reject callbacks.
 
-### Local development
+## Current source map — in `docs/SOURCE-MAP.md`
 
-```bash
-# 1. Database
-docker compose up -d db
+**The per-app/per-directory source map lives in `docs/SOURCE-MAP.md`** — what each `backend/apps/*` and
+`frontend/src/*` directory owns, which file is the single source of truth for what, and which apps are
+tombstoned. Read it when you need to find where something lives; it is a lookup table, not a rule set. Like
+the other sibling docs it has no `AGENTS.md` twin — edit it in place, in the same commit as the code
+that moved.
 
-# 2. Backend (from backend/)  —  copy .env.example to .env if needed
-cd backend
-pip install -r requirements.txt
-python manage.py makemigrations accounts makerspaces inventory
-python manage.py migrate
-python manage.py seed_demo
-python manage.py runserver            # http://localhost:8000
+The four entry points worth knowing without opening it: `apps/hardware_requests/workflow.py` is the **only**
+place request state transitions happen, `apps/inventory/availability.py` is the **only** place quantity
+counts change, `apps/makerspaces/module_registry.py` is the single source of truth for module keys, and
+`apps/accounts/rbac.py` is the Auth & RBAC module every scoped query must go through.
 
-# 3. Frontend (from frontend/)
-cd frontend
-npm install
-npm run dev                           # http://localhost:5000
+**Adding or changing a module key means editing `docs/MODULES.md` in the same commit** — it is the
+user-facing page the README links every module name into (what the module is, what it adds, what
+happens without it, what a purge deletes), and it is hand-written prose over the registry's facts, so
+nothing regenerates it for you.
 
-# Tests (from backend/, DB must be up)
-cd backend && pytest
-```
+## Public availability rule (resolves PRD §5's two overlapping fields)
 
-- Public inventory page: `http://localhost:5000/m/makerspace`
-- API: `http://localhost:8000/api` — Swagger UI at `/docs/`, ReDoc at `/redoc/`, schema at `/schema/`.
-
-### Current source map (real paths)
-
-- `backend/config/` — Django project (`settings.py`, `urls.py`, wsgi/asgi). All API routes under `/api/`.
-  `config/admin_access.py` holds the `/control/` gating, CSP middleware, and the hidden-scope drift-guard
-  registries (`NESTED_MAKERSPACE_LOOKUPS`, `GLOBAL_ADMIN_MODELS`).
-- `backend/apps/accounts/` — custom `User` model (`AUTH_USER_MODEL`), browser JWT auth, attested device
-  grants/rotating refresh families, Google/Apple social identities + nonce/JWKS verification, and `rbac.py` (the Auth &
-  RBAC module: `can(...)`, action-based `actions_for_membership`/`makerspaces_for_action`/`scope_by_action`,
-  makerspace scoping, superadmin hide/archive exclusion).
-- `backend/apps/makerspaces/` — `Makerspace` model (tenant root; unique `slug`; `frontend_domain`,
-  module flags, `resource_limit_overrides`, `archived_at`, `superadmin_access_enabled`), bootstrap views,
-  dynamic CORS, module guards, `platform.py` origin helpers, `limits.py` (fair-use quotas), `lifecycle.py`
-  (archive/purge), `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`
-  (managed subdomains), `secrets.py`.
-- `backend/apps/audit/` — append-only `AuditLog` + `audit.record(...)` (Postgres-trigger immutable).
-- `backend/apps/evidence/` — immutable evidence photos, S3 storage helpers, signed upload/view URLs gated
-  by per-makerspace `UPLOAD_EVIDENCE` + active status.
-- `backend/apps/boxes/` — `QrCode`/`Box` payloads, immutable `BoxScan`/`QrScanEvent`, `qr_render.py`
-  (namespaced standalone SVG shared by QR-print + batch ZIP), QR rebind. Camera scanner at
-  `frontend/src/components/ui/QrScanner.tsx` (native `BarcodeDetector` + `zxing-wasm` fallback).
-- `backend/apps/admin_api/` — staff REST surface: makerspaces, inventory CRUD + per-makerspace category
-  CRUD (`EDIT_INVENTORY`), bulk import, staff/membership + role management, user restrict/restore,
-  API-client issuance, audit reads, warranty, email-log, notification-recipient, FabLab report views.
-- `backend/apps/operations/` — open operations/reporting: health, stock transfers (intra + true
-  cross-makerspace), stocktake, adjustments, ledger, `report_registry.py` + `report_scope.py` +
-  `reports_*` builders, CSV/XLSX exports, container APIs, QR print batches (`qr_zip.py`), dashboard,
-  accountability. `views.py`/`services.py` are thin re-export barrels over `views_*`/`services_*`.
-- `backend/apps/integrations/` — Telegram/email/Slack/Mattermost/native-push delivery, encrypted FCM/APNs
-  platform credentials + device registrations, `dispatch_email` choke point +
-  `EmailLog` outbox + Celery task, webhook (auth via `X-Telegram-Bot-Api-Secret-Token` vs
-  `TELEGRAM_WEBHOOK_SECRET`, fail-closed), `PlatformEmailSettings`, `DailyEmailCounter`, staff-notification
-  recipient matrix.
-- `backend/apps/updates/` — singleton platform update state, audited superadmin controls, and the
-  `update_control` management command used by the privileged host scheduler. The web process never gets
-  Docker-socket access; host scripts claim queued/automatic releases and report check/backup/result state.
-- `backend/apps/inventory/` — `InventoryProduct`/`InventoryAsset`, `availability.py` (**the only place**
-  available/reserved/issued/damaged/lost counts change: `reserve_for_request`, `issue_items`/`return_items`,
-  `issue_available`/`return_to_available`, `consume_available`; row-locked, never-below-zero,
-  `InsufficientStock`), `public_availability.py` (public availability service), allowlist-only public
-  serializers/views, `public_image_storage.py`, `seed_demo`.
-- `backend/apps/hardware_requests/` — Hardware Request Workflow: `HardwareRequest`/`HardwareRequestItem`,
-  `HardwareRequestItemAsset` through-model, immutable `ReturnEvent`/`RequesterAccountability`,
-  `PublicToolLoan`, `PublicProblemReport`. `workflow.py` is the **single source of truth** for state
-  transitions (atomic + row-locked + audited; also `assign_box`/`issue_request`/`return_items`);
-  `permissions.py`, `exceptions.py` (workflow→HTTP map + `ErrorSerializer._EXCEPTION_MAP`),
-  `notifications.py` (Telegram seam), public submit/verify/status views, `send_return_reminders` command.
-- `backend/apps/payments/` — immutable multi-subject Payment authority, per-space raw credentials + managed
-  Stripe Connect resolution, checkout/webhook settlement, reconciliation, and native PaymentSheet intents.
-- `backend/apps/printing/` — **TOMBSTONED** (Project B). Contains only an `AppConfig` and an empty
-  `models.py`; it stays in `INSTALLED_APPS` solely so its historical migrations remain installed. 3D
-  printing is now a `MachineType` inside `apps/machines/` — look there, not here.
-- `backend/apps/warranty/`, `apps/machines/`, `apps/maintenance/`, `apps/events/`, `apps/bookings/`,
-  `apps/forms_schema/`, `apps/encryption/`, `apps/procurement/`, `apps/notifications/`,
-  `apps/operations/report_registry.py` — the FabLab + governance modules (see condensed changelog).
-- `backend/apps/roadmap/` — **TOMBSTONED**: the `RoadmapItem` model is retained for migration history
-  only. No URLs, no serializers, no admin surface, no frontend.
-  `tests/roadmap/test_removed_surfaces.py` asserts the surfaces stay removed.
-- `backend/tests/` — pytest behavior tests (external behavior, not implementation).
-- `frontend/src/features/inventory/` — public catalog/detail/self-checkout + `ProductCard`/
-  `AvailabilityBadge`. `frontend/src/features/staff/` — staff console panels (grouped nav via
-  `StaffApp.tsx` `TAB_GROUPS`; capabilities from action-based `staffAccess.ts`; payment reconciliation and
-  platform credential panels). `frontend/src/features/auth/` + `members/MemberAuthPanel.tsx` provide the
-  provider-config-driven social/member auth surfaces. `frontend/src/features/
-  printing|bookings|forms|...` — feature slices. `frontend/src/lib/`, `components/ui/`, `types/`,
-  `generated/api.ts`.
-
-### Public availability rule (resolves PRD §5's two overlapping fields)
-
-`public_availability_mode` is the master display switch; `show_public_count` is a safety gate for exact counts:
+`public_availability_mode` is the master display switch; `show_public_count` is a safety gate for exact
+counts:
 
 - `is_public = false` → product excluded from the public list entirely.
 - mode `hidden` → product listed, `availability: null`.
 - mode `status_only` → `{ mode: "status_only", label }`.
-- mode `exact_count` → exact `count` **only if** `show_public_count = true`; otherwise falls back to `status_only`.
-- Status label: `available ≤ 0` or `total ≤ 0` → `Unavailable`; `available ≤ ceil(total × 0.2)` → `Limited`; else `Available`.
+- mode `exact_count` → exact `count` **only if** `show_public_count = true`; otherwise falls back to
+  `status_only`.
+- Status label: `available ≤ 0` or `total ≤ 0` → `Unavailable`; `available ≤ ceil(total × 0.2)` → `Limited`;
+  else `Available`.
 
-The API response is DRF-paginated (`PageNumberPagination`, page size 24): `{ count, next, previous, results }`. This is the standing convention for all list endpoints.
+The API response is DRF-paginated (`PageNumberPagination`, page size 24): `{ count, next, previous, results }`.
+This is the standing convention for all list endpoints.
 
-### Audit + evidence conventions
+## Audit + evidence conventions
 
 - Audit writes go through `apps.audit.services.record(actor, action, ...)`. `AuditLog` is append-only in
   model methods and by Postgres triggers; state-changing services must emit entries.
@@ -465,74 +292,44 @@ The API response is DRF-paginated (`PageNumberPagination`, page size 24): `{ cou
   (dockerized backend needs `http://minio:9000` vs `http://localhost:9000`).
 - Object keys are identifiers, not secrets — privacy is the private bucket + short-lived signed URLs.
 
-## Learning And Explanation Contract
+## Invariants (do not regress) — in `docs/INVARIANTS.md`
 
-This repo is also being used to learn production Django, DRF, React, and TanStack Query through the inventory manager project. When making changes:
+**The long-form load-bearing rules live in `docs/INVARIANTS.md`, not in this file.** They were split out
+when this file crossed the harness's memory-file size limit; **nothing was dropped in the move**, and that
+document has no `AGENTS.md`-style twin — both names of this one point at that path.
 
-- Explain the reason for each meaningful change in plain language.
-- Keep explanations brief but logically deep enough to show the production tradeoff.
-- For small diffs, explicitly state what changed, why it changed, and what behavior it protects.
-- Tie backend changes back to Django/DRF concepts such as models, serializers, viewsets/APIViews, permissions, transactions, migrations, and service modules.
-- Tie frontend changes back to React/TanStack Query concepts such as component state, server state, query keys, mutations, invalidation, loading/error states, and cache refresh.
-- Avoid unexplained "magic" abstractions. If an abstraction is introduced, explain the repeated problem it removes.
-- Prefer teaching through this project's real workflows: request creation, accept/reject, issue, return, QR scan, evidence upload, and audit log.
+They are reference material, read **per area, on demand**: before you touch code in one of the areas below,
+open that section and read it. Do not read the whole document, and do not assume an area has no rules
+because none are quoted here — this index is a router, not a summary.
 
-The goal is not just to ship code, but to understand why each production-quality decision exists.
+| Section of `docs/INVARIANTS.md` | Before you touch |
+| --- | --- |
+| **Cross-cutting invariants** | self-host vs managed SaaS and fair-use limits; `frontend_domain` and origin scoping; superadmin hide/archive/purge; archival vs member money; the two-key archive request; public borrower names; public image fields and storage accounting; rate-limit cache; object storage; the report registry; scoped PII encryption; custom roles; `module_registry` and opt-in modules; module install/uninstall/purge; the `email` module gate; A6 master switches; two-level capabilities; the `membership` module; payments, credentials and reconciliation; native device grants; OIDC, social, phone and login-method switches; walk-in/account-less identity; maker profiles; staff event registration; notifications v2; presence geofence; the colour vocabulary; the accessibility floor; console parity |
+| **Handover roles and the retired Guest Admin** | handout/front-desk custom roles, `rbac.HANDOUT_ACTIONS`, `is_handout_only`, the retired `guest_admin`/`print_manager` enum members and their migrations |
+| **Separability and tombstoning** | `apps/separability/`, `TOMBSTONED_APPS`, `SEPARABLE_APPS`, retention vs runtime registries, adding a PII-holding model |
+| **Machine scoping** | `MANAGE_MACHINES`, `machines/role_scope.py`, the Machines console, machine-service surfaces, procurement narrowing, dashboard scoping, delegated recipient rules |
+| **Events program invariants** | `apps/events/`, registration vs presence, member history and provenance, collaborative events, host waivers, QR check-in |
+| **Backup, restore and tenant migration** | `apps/backup/`, `apps/data_export/`, `apps/tenant_migration/`, the deployment recovery gate, the source gate lock protocol, archive projection |
+| **Organization accounts and organization-derived authority** | `apps/organizations/`, `OrganizationMembership`, the rbac org branch, `resolve_scope` vs `scope_by_action`, the auth payload `source` field, `EventOrganizer`, org purge scoping |
+| **API client scopes and the protected-route registry** | `apps/apiclients/scope_registry*.py`, `legacy:v1`, unknown-route denial, target resolution, the system check, the HMAC signed message and nonce namespace. The client-facing protocol is written up in `docs/api-client-protocol.md` |
+| **Container / deployment invariants** | `Dockerfile`, the compose files, Celery beat, MinIO/CORS, browser-facing storage URLs, production compose defaults |
 
-## Engineering Conventions (apply to all code written here)
+Two rules are repeated here because they bite outside their own area: **a new model must be classified in
+`apps/data_export` and have its `accounts.User` FKs decided, or the drift guards refuse the build**, and
+**`select_for_update()` cannot be combined with `select_related()` across a nullable FK** — Postgres rejects
+it outright.
 
-- **Follow the global Claude config.** The gated workflow in `~/.claude/CLAUDE.md` (Stages 1–6, Codex delegation, mandatory review/QA gates) governs all work in this repo. Repo-specific rules below add to it; they do not override it.
-- **Document every API endpoint in Swagger / OpenAPI.** Every route in the API surface (PRD §14) must have an OpenAPI spec entry — request/response schemas, auth requirements, and error responses. Keep the spec in sync with the code; an undocumented endpoint is incomplete.
-- **Keep files modular — target ~200 lines per file, hard ceiling ~300.** One clear responsibility per file. When a module file grows past the target, split it (e.g. route handlers, validation, and service logic in separate files). The deep modules in §12 are logical boundaries, not single files. **Established split pattern:** when an app's `views.py`/`serializers.py`/`admin.py`/`services.py` outgrows the ceiling, split classes/functions into domain submodules (`views_*`, `serializers_*`, `admin_*`, `services_*`) and keep the original file as a **thin re-export barrel** (explicit `from .submodule import (...)`, never `import *`) so `from app.views import X` and `views.X` keep resolving; for `admin.py` the barrel must still import the admin submodules so the `@admin.register` side effects fire. Every backend code file is within the ceiling **except `backend/config/settings.py`** — Django settings are conventionally a single file (accepted exception).
-- **Production-level code, not prototype code.** Validate all inputs at the boundary, handle external-service failure explicitly (especially outbound integrations — Stripe, Telegram, SMTP, object storage — fail safe, never crash a request flow), use structured logging, return consistent typed error responses, and never leave `TODO`/stub auth or scoping in a merged path. Every state-changing endpoint must emit its audit log entry (PRD §11). Honor the immutability/append-only and makerspace-scoping invariants already documented above as enforced code, not convention.
+## Condensed changelog — in `docs/PROJECT-HISTORY.md`
 
-## What This System Is
+**The condensed changelog lives in `docs/PROJECT-HISTORY.md`** — one line per shipped batch, newest first,
+from Phase 5B (2026-08-17/18) back to the first production deploy (2026-06-19). It was split out with the
+invariants when this file crossed the harness's memory-file size limit; nothing was dropped. Like
+`docs/INVARIANTS.md` it has no `AGENTS.md` twin — both names of this document point at that one path.
 
-A multi-tenant system for managing community hardware loans across makerspaces. The central concern is **traceability of physical handovers**: every issue and return must produce evidence (QR scans + photos + remarks + audit log) so that accountability for lost/damaged hardware is never ambiguous. Public users browse and request; when self-checkout is enabled they may also issue/return eligible QR tools after authentication and evidence upload. Staff physically issue reviewed requests and direct handouts according to action scope.
-
-## Architecture: Concepts That Span Multiple Modules
-
-The PRD specifies a layered design where UIs and the Telegram bot are thin clients over an API server composed of deep modules. Two architectural rules are load-bearing and easy to violate if you only read one module:
-
-1. **The Request Workflow Module is the single source of truth for state transitions.** Telegram callbacks, the web admin panel, and the guest-admin app must all route through the *same* workflow service — never mutate `HardwareRequest.status` directly. The Telegram module in particular must call the workflow module, not the database. This is what keeps web and bot behavior consistent and audited.
-
-2. **The Inventory Availability Module owns all quantity math.** Reserve / issue / return / mark-lost all flow through it. No other module computes available/reserved/issued counts. The invariant "availability never goes below zero" lives here.
-
-### Module responsibilities
-
-- **Auth & RBAC** — enforces the role/action matrix AND makerspace scoping on every query. Super Admin is global; Space Manager, Inventory Manager, Guest Admin, Print Manager, Machine Manager are per-makerspace memberships (now resolved via editable custom roles, action-based). Inventory Manager is membership-only and covers the full hardware lifecycle but not printing, staff, or makerspace settings. Also verifies Telegram actors and blocks restricted/suspended users. Interface: `can(actor, action, resource)`, `scope_by_makerspace(actor, query)`, `assertTelegramActorCan(...)`.
-- **Request Workflow** — owns the state machine, emits audit logs, triggers Telegram alerts, coordinates inventory reservation/issue/return.
-- **Inventory Availability** — quantity math + asset status for QR-tracked tools.
-- **QR Code & Box** — generates/resolves/revokes QR codes, assigns boxes to requests, tracks scan history.
-- **Evidence Photo** — immutable issue/return photo storage linked to actor + request + QR scans; object storage, never public.
-- **Check-In API Client** — **RETIRED** (`73a480c`, Part M7). `apps/checkin/` no longer exists and there is no `CHECKIN_MODE` setting. Requester identity now comes from authenticated member accounts, so there is no external verify dependency left to fail safe on.
-- **Telegram Integration** — sends per-makerspace group alerts and processes accept/reject callbacks (delegating to Request Workflow).
-
-## Request State Machine
-
-```
-draft → pending_approval → {rejected | accepted}
-accepted → issued → {partially_returned | returned | closed_with_issue}
-```
-
-The workflow module enforces *allowed* transitions only. `closed_with_issue` and the accountability/access-restriction flow (PRD §6.5) are how lost/damaged hardware ties back to a requester's `access_status`.
-
-## Multi-Tenancy (Makerspace Scoping)
-
-Every domain entity is scoped to a `makerspace_id`. A makerspace owns its inventory, public URL, Space Managers, Inventory Managers, Guest Admins, Telegram group chat ID, QR namespace, and audit-log scope. **Any list/query for makerspace-scoped staff actors must be scoped through the Auth module** — forgetting this is a cross-tenant data leak, not just a bug.
-
-## Hard Rules Baked Into Workflows (don't regress these)
-
-- Reviewed-request hardware **cannot be issued** without both a box QR scan and an issue photo.
-- Public self-checkout and staff direct handout **cannot be issued** without uploaded issue evidence and an eligible scanned/selected tool.
-- Hardware **cannot be returned** without a return photo and a return remark/notes.
-- Issued quantity cannot exceed accepted quantity without authorized workflow permission.
-- Guest Admins can issue accepted requests and process scoped returns through the same evidence/QR/remark/audit workflow as staff. They **cannot** accept/reject, edit inventory, manage QR, or create direct handouts. Direct handouts (a loan with no reviewed request) require the dedicated `ISSUE_DIRECT_LOAN` action, granted only to Space Manager + Inventory Manager.
-- Public request submission requires an **authenticated member** (`RequestSubmitView` → `IsAuthenticated`), and request lookup is scoped to that verified identity — it never matches free-text contact fields (no enumeration by known email/phone). The anti-enumeration invariant is unchanged; since the Check-In retirement (`73a480c`) it is enforced by member auth rather than an external verify call.
-- Inventory Managers can run the full hardware lifecycle but **cannot** manage printing, staff, or makerspace settings.
-- Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks active status.
-- Evidence photos and QR scan records are **immutable**; audit logs are **append-only**.
-- Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos, requester history, or hidden counts. Public visibility is governed per-item by `is_public`, `show_public_count`, and `public_availability_mode` (`exact_count | status_only | hidden`).
+Read it when you need to know **when and why a feature landed**, or which decisions were considered and
+dropped (per-destination Telegram bot tokens; SAML and per-makerspace auth credentials). The rules those
+batches introduced are in `docs/INVARIANTS.md`, not there. For implementing commits and per-file history,
+use `git log --oneline` / `git blame`.
 
 ## Key References in the PRD
 

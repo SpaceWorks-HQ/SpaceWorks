@@ -25,7 +25,7 @@ def member_with_phone(username, makerspace):
 
 
 def enable_payments(makerspace, domain, *, currency="usd"):
-    makerspace.enabled_features = [f"payments.{domain}"]
+    makerspace.enabled_features = ["payments.enabled", f"payments.{domain}"]
     makerspace.save(update_fields=["enabled_features", "updated_at"])
     settings = configured_settings(makerspace)
     settings.default_currency = currency

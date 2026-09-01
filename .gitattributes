@@ -1,0 +1,28 @@
+# Line endings.
+#
+# Without this file nothing normalizes: `core.autocrlf` was unset, and a checkout
+# touched from Windows converted 1,116 tracked files to CRLF. That is not cosmetic —
+# a CRLF `scripts/update.sh` fails outright on Linux ("syntax error near unexpected
+# token $'{\r'"), which is the self-host auto-update path, and every commit made from
+# such a tree buries its real diff under ~1,100 line-ending-only files.
+#
+# `eol=lf` (not just `text=auto`) forces LF in the working tree on every platform, so
+# shell scripts and Docker entrypoints stay executable wherever they are checked out.
+* text=auto eol=lf
+
+# Binary — never touched, never diffed as text.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.otf    binary
+*.zip    binary
+*.gz     binary
+*.stl    binary
+*.3mf    binary
+*.step   binary

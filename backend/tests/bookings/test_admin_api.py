@@ -15,6 +15,7 @@ from apps.bookings.models import BookableSpace, Booking
 from apps.makerspaces import origin_scope
 from apps.makerspaces import limits
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.handout_roles import grant_handout
 
 pytestmark = pytest.mark.django_db
 
@@ -164,7 +165,6 @@ def test_invisible_object_scopes_return_404_before_permission():
 @pytest.mark.parametrize(
     'role',
     [
-        MakerspaceMembership.Role.GUEST_ADMIN,
         MakerspaceMembership.Role.INVENTORY_MANAGER,
         MakerspaceMembership.Role.PRINT_MANAGER,
     ],
@@ -173,6 +173,18 @@ def test_visible_underprivileged_roles_get_403(role):
     makerspace = tenant(f'booking-denied-{role}')
     actor = user(f'booking-denied-user-{role}')
     grant(actor, makerspace, role)
+    target = space(makerspace)
+    assert client_for(actor).get(
+        reverse('admin-bookable-space-detail', kwargs={'pk': target.pk})
+    ).status_code == 403
+
+
+def test_visible_front_desk_role_gets_403():
+    """Separate from the parametrized legacy roles because handover is a custom role now:
+    there is no enum member to feed the parametrize list."""
+    makerspace = tenant('booking-denied-front-desk')
+    actor = user('booking-denied-user-front-desk')
+    grant_handout(actor, makerspace)
     target = space(makerspace)
     assert client_for(actor).get(
         reverse('admin-bookable-space-detail', kwargs={'pk': target.pk})

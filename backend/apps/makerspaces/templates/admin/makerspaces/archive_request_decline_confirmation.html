@@ -1,0 +1,29 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="{{ action_name }}">
+  <input type="hidden" name="confirm_decline" value="1">
+  {% for archive_request in archive_requests %}
+    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ archive_request.pk }}">
+  {% endfor %}
+
+  <p>The resolution note is required and will be emailed to each requester.</p>
+  <p>
+    <label for="id_resolution_note">Resolution note</label><br>
+    <textarea id="id_resolution_note" name="resolution_note" maxlength="2000" required rows="5"></textarea>
+  </p>
+
+  <ul>
+    {% for archive_request in archive_requests %}
+      <li>{{ archive_request.makerspace }} — requested {{ archive_request.requested_at }}</li>
+    {% endfor %}
+  </ul>
+
+  <div class="submit-row">
+    <input type="submit" value="Decline archive requests" class="default">
+    <a href=".">Cancel</a>
+  </div>
+</form>
+{% endblock %}

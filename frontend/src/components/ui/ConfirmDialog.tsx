@@ -34,7 +34,7 @@ export function ConfirmDialog({
             {cancelLabel}
           </button>
           <button
-            className={tone === "danger" ? "desk-button bg-danger text-bg hover:bg-danger/90 hover:text-bg" : "desk-button"}
+            className={tone === "danger" ? "desk-button-danger" : "desk-button"}
             type="button"
             disabled={pending}
             onClick={onConfirm}

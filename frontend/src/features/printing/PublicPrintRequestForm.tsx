@@ -1,7 +1,7 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 
-import { Card } from "../../components/ui/Card";
+import { Card, EmptyState } from "../../components/ui";
 import { FilePicker, TextArea, TextInput } from "./PublicPrintRequestParts";
 import type { PublicFilamentPool } from "./publicApi";
 
@@ -80,11 +80,12 @@ export function PrintDetailsForm({
   onWebsiteChange,
   onSubmit,
 }: PrintDetailsFormProps) {
+  const noAvailablePools = poolsQuery.isSuccess && (poolsQuery.data?.length ?? 0) === 0;
   return (
     <Card>
-      <p className="text-xs font-semibold tracking-wide text-accent-ink">
+      <h2 className="title-panel text-secondary-ink">
         Print Details
-      </p>
+      </h2>
       <form className="mt-4 space-y-4" onSubmit={onSubmit}>
         {/* Honeypot: hidden from humans; bots that autofill it trigger the server decoy. */}
         <input
@@ -114,43 +115,53 @@ export function PrintDetailsForm({
             onChange={(value) => updateField("preferredSettings", value)}
           />
           <div className="grid gap-4 md:grid-cols-2">
+            {noAvailablePools ? (
+              <div>
+                <span className="eyebrow mb-1 block">Filament / material</span>
+                <EmptyState
+                  title="No filament currently available"
+                  description="There is no filament available to choose right now. You can still submit without a preference, and staff will confirm the options."
+                />
+              </div>
+            ) : (
+              <label className="block">
+                <span className="eyebrow mb-1 block">
+                  Filament / material
+                </span>
+                <select
+                  className="desk-input w-full"
+                  value={form.consumablePoolId}
+                  onChange={(event) =>
+                    updateField("consumablePoolId", event.target.value)
+                  }
+                >
+                  <option value="">No preference</option>
+                  {groupPoolsByMaterial(poolsQuery.data ?? []).map(([material, pools]) => (
+                    <optgroup key={material} label={material}>
+                      {pools.map((pool) => (
+                        <option key={pool.id} value={pool.id}>
+                          {pool.color || "Default color"}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                {poolsQuery.isLoading ? (
+                  <p className="mt-1 text-xs text-muted">Loading filament...</p>
+                ) : null}
+                {poolsQuery.isError ? (
+                  <p className="mt-1 text-xs text-danger">
+                    {poolsQuery.error.message}
+                  </p>
+                ) : null}
+              </label>
+            )}
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
-                Filament / material
-              </span>
-              <select
-                className="desk-input w-full"
-                value={form.consumablePoolId}
-                onChange={(event) =>
-                  updateField("consumablePoolId", event.target.value)
-                }
-              >
-                <option value="">No preference</option>
-                {groupPoolsByMaterial(poolsQuery.data ?? []).map(([material, pools]) => (
-                  <optgroup key={material} label={material}>
-                    {pools.map((pool) => (
-                      <option key={pool.id} value={pool.id}>
-                        {pool.color || "Default color"}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-              {poolsQuery.isLoading ? (
-                <p className="mt-1 text-xs text-muted">Loading filament...</p>
-              ) : null}
-              {poolsQuery.isError ? (
-                <p className="mt-1 text-xs text-danger">
-                  {poolsQuery.error.message}
-                </p>
-              ) : null}
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+              <span className="eyebrow mb-1 block">
                 Quantity
               </span>
               <input
-                className="desk-input w-full"
+                className="desk-input w-full font-mono"
                 min={1}
                 type="number"
                 value={form.quantity}
@@ -160,11 +171,11 @@ export function PrintDetailsForm({
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+              <span className="eyebrow mb-1 block">
                 Estimated filament (g) &mdash; optional
               </span>
               <input
-                className="desk-input w-full"
+                className="desk-input w-full font-mono"
                 min={0}
                 step="0.01"
                 type="number"

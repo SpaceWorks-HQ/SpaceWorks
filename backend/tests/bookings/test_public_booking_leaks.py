@@ -227,7 +227,8 @@ def test_recursive_leak_sweep_across_all_public_booking_payloads(monkeypatch):
                 for interval in response.data['availability']
             )
     assert submitted.status_code == 201
-    assert submitted.data == {'status': Booking.Status.CONFIRMED}
+    # A space created without an override now defaults to approval-required.
+    assert submitted.data == {'status': Booking.Status.PENDING}
 
     assert_no_private_value(listed.data, all_private | submitted_sentinels)
     assert_no_private_value(hidden_payload.data, all_private | submitted_sentinels)

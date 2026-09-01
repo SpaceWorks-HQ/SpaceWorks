@@ -3,10 +3,27 @@ from rest_framework import generics, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from django.http import Http404
+
 from apps.admin_api.permissions import IsActiveSuperAdmin
 from apps.audit import services as audit
+from apps.makerspaces.deployment_modules import updates_module_enabled
 from apps.updates import services
 from apps.updates.models import PlatformUpdateSettings
+
+
+def _require_updates_module():
+    """404 the in-app updater when the deployment does not run it.
+
+    `PlatformUpdateSettings` is a pk=1 singleton for the whole box, so there is no
+    makerspace to scope the module by -- see `makerspaces.deployment_modules` for why
+    this reads as "does any live makerspace run it" rather than being threaded per
+    tenant. 404 rather than 403: an uninstalled surface should not exist, and the
+    console prunes the panel the same way a tombstoned app's sidebar entry is dropped
+    rather than permission-hidden.
+    """
+    if not updates_module_enabled():
+        raise Http404
 
 
 class PlatformUpdateSettingsSerializer(serializers.ModelSerializer):
@@ -51,6 +68,7 @@ class PlatformUpdateSettingsView(generics.RetrieveUpdateAPIView):
     http_method_names = ["get", "patch", "head", "options"]
 
     def get_object(self):
+        _require_updates_module()
         return PlatformUpdateSettings.load()
 
     def perform_update(self, serializer):
@@ -75,6 +93,7 @@ class PlatformUpdateRequestView(APIView):
     permission_classes = [IsActiveSuperAdmin]
 
     def post(self, request):
+        _require_updates_module()
         instance = services.queue_update()
         audit.record(
             request.user,

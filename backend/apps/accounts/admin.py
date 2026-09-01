@@ -2,16 +2,24 @@ from django import forms
 from django.contrib import admin
 from django.contrib import messages
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.admin import GroupAdmin as DjangoGroupAdmin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group
 from django.db import transaction
+from django.http import HttpResponseRedirect
 from django.template.response import TemplateResponse
+from django.urls import reverse
+from django.utils.translation import gettext
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from rest_framework.exceptions import APIException
 
-from apps.accounts.models import User
+from apps.accounts.models import NativeAppRegistration, User
+from apps.accounts.transition_services import (
+    WalkInTransitionError,
+    transition_walk_in_to_account,
+)
 from apps.admin_api.services_user_access import reset_user_password
 from apps.audit import services as audit
 from apps.makerspaces import limits
@@ -66,6 +74,49 @@ class UserAdmin(SuperuserOnlyModelAdmin, DjangoUserAdmin, ModelAdmin):
         "makerspace_memberships__makerspace",
     )
     inlines = (MakerspaceMembershipInline,)
+
+    def user_change_password(self, request, id, form_url=""):
+        """Make the inherited password form an explicit account transition."""
+        user = self.get_object(request, id)
+        if (
+            request.method != "POST"
+            or user is None
+            or not user.is_walk_in
+            or not self.has_change_permission(request, user)
+        ):
+            return super().user_change_password(request, id, form_url)
+
+        form = self.change_password_form(user, request.POST)
+        if not form.is_valid() or not form.cleaned_data["set_usable_password"]:
+            return super().user_change_password(request, id, form_url)
+
+        password = form.cleaned_data["password1"]
+
+        def write_password(locked_user):
+            locked_user.set_password(password)
+            locked_user.save(update_fields=["password"])
+
+        try:
+            user = transition_walk_in_to_account(
+                user,
+                actor=request.user,
+                credential_writer=write_password,
+            )
+        except WalkInTransitionError:
+            # A concurrent transition won the row lock. The record is now an ordinary
+            # account, so the inherited form is again the correct writer.
+            return super().user_change_password(request, id, form_url)
+
+        form.user = user
+        self.log_change(request, user, self.construct_change_message(request, form, None))
+        messages.success(request, gettext("Password changed successfully."))
+        update_session_auth_hash(request, user)
+        return HttpResponseRedirect(
+            reverse(
+                f"{self.admin_site.name}:{user._meta.app_label}_{user._meta.model_name}_change",
+                args=(user.pk,),
+            )
+        )
 
     @admin.action(description="Reset selected user passwords")
     def reset_password_selected(self, request, queryset):
@@ -174,9 +225,37 @@ class UserAdmin(SuperuserOnlyModelAdmin, DjangoUserAdmin, ModelAdmin):
             )
 
 
+@admin.register(NativeAppRegistration)
+class NativeAppRegistrationAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    list_display = (
+        "app_id", "platform", "environment", "makerspace", "status", "updated_at",
+    )
+    list_filter = ("status", "platform", "environment", "makerspace")
+    search_fields = ("app_id", "verifier_config_key", "makerspace__name")
+    autocomplete_fields = ("makerspace", "approved_by")
+    readonly_fields = ("created_at", "updated_at")
+
+    def save_model(self, request, obj, form, change):
+        """Route a revocation through the service so live grants are settled too.
+
+        Saving `status = revoked` on the row alone would leave existing grants and refresh
+        tokens intact, so re-approving later would resurrect them.
+        """
+        becoming_revoked = (
+            obj.status == NativeAppRegistration.Status.REVOKED
+            and (not change or "status" in (form.changed_data or []))
+        )
+        super().save_model(request, obj, form, change)
+        if becoming_revoked:
+            from apps.accounts.services_native_apps import revoke_registration
+
+            revoke_registration(obj, actor=request.user)
+
+
 admin.site.unregister(Group)
 
-from apps.accounts import admin_social  # noqa: E402,F401
+from apps.accounts import admin_claim, admin_social  # noqa: E402,F401
+from apps.accounts import admin_password_reset  # noqa: E402,F401
 
 
 @admin.register(Group)

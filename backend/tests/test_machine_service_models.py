@@ -11,6 +11,7 @@ from django.utils import timezone
 from apps.makerspaces import limits
 from apps.makerspaces import lifecycle
 from apps.makerspaces.models import DEFAULT_ENABLED_MODULES, Makerspace
+from apps.makerspaces.module_profiles import EVERYTHING, profile_modules
 from apps.makerspaces.platform import MODULE_WORKFLOWS, bootstrap_payload
 from apps.admin_api.serializers_makerspaces import MakerspaceSerializer
 from apps.machines.models import (
@@ -170,7 +171,9 @@ def test_module_migration_default_workflow_and_valid_disable():
     migration.disable_machine_service(apps, None)
     makerspace.refresh_from_db()
     assert makerspace.enabled_modules == ["custom", "machines"]
-    assert "machine_service" in DEFAULT_ENABLED_MODULES
+    # Opt-in: installable rather than on by default.
+    assert "machine_service" not in DEFAULT_ENABLED_MODULES
+    assert "machine_service" in profile_modules(EVERYTHING)
     assert MODULE_WORKFLOWS["machine_service"] == ["machine_service_requests"]
     assert "machine_service" in bootstrap_payload(make_space("service-module-default"))["modules"]
     serializer = MakerspaceSerializer(

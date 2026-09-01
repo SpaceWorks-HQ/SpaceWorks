@@ -31,7 +31,10 @@ class SocialIdentity(models.Model):
         on_delete=models.CASCADE,
         related_name="social_identities",
     )
-    provider = models.CharField(max_length=16, choices=SocialProvider.choices)
+    # 64 and no `choices`: a generic OIDC provider is stored as `oidc:<slug>`, which is
+    # open-ended by design. Validity is decided by `models_oidc.provider_for_slug`, which
+    # answers from configuration -- an enum could never list them.
+    provider = models.CharField(max_length=64)
     provider_sub = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -48,7 +51,7 @@ class SocialIdentity(models.Model):
 
 
 class SocialLoginNonce(models.Model):
-    provider = models.CharField(max_length=16, choices=SocialProvider.choices)
+    provider = models.CharField(max_length=64)
     surface = models.CharField(max_length=16, choices=SocialSurface.choices)
     delivery = models.CharField(max_length=16, choices=SocialDelivery.choices)
     client_platform = models.CharField(
@@ -63,6 +66,13 @@ class SocialLoginNonce(models.Model):
         on_delete=models.CASCADE,
         related_name="social_login_nonces",
     )
+    attestation_challenge = models.ForeignKey(
+        "accounts.DeviceAttestationChallenge",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="social_login_nonces",
+    )
     expires_at = models.DateTimeField()
     consumed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -71,6 +81,28 @@ class SocialLoginNonce(models.Model):
         indexes = [
             models.Index(
                 fields=["expires_at", "consumed_at"], name="social_nonce_use_idx"
+            )
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        delivery=SocialDelivery.WEB,
+                        device_grant__isnull=True,
+                        attestation_challenge__isnull=True,
+                    )
+                    | models.Q(
+                        delivery=SocialDelivery.DEVICE,
+                        device_grant__isnull=False,
+                        attestation_challenge__isnull=True,
+                    )
+                    | models.Q(
+                        delivery=SocialDelivery.DEVICE,
+                        device_grant__isnull=True,
+                        attestation_challenge__isnull=False,
+                    )
+                ),
+                name="social_nonce_delivery_anchor_ck",
             )
         ]
 

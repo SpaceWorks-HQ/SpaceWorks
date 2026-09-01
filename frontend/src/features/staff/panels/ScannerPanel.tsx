@@ -209,10 +209,10 @@ export function ScannerPanel({ makerspace, isSuperadmin, makerspaces }: {
           onChange={(event) => setPayload(event.target.value)}
           onKeyDown={(event) => { if (event.key === "Enter") doResolve(payload); }}
         />
-        <button className="desk-button w-full sm:w-auto" type="button" disabled={!payload.trim() || resolve.isPending} onClick={() => doResolve(payload)}>
+        <button className="desk-button-primary w-full sm:w-auto" type="button" disabled={!payload.trim() || resolve.isPending} onClick={() => doResolve(payload)}>
           {resolve.isPending ? "Resolving..." : "Resolve"}
         </button>
-        <button className="desk-button w-full sm:w-auto" type="button" onClick={() => { setScanNote(""); setShowScanner(true); }}>Scan camera</button>
+        <button className="desk-button-ghost w-full sm:w-auto" type="button" onClick={() => { setScanNote(""); setShowScanner(true); }}>Scan camera</button>
       </div>
       {scanNote && resolve.isPending ? <p className="mt-2 text-sm text-accent-ink">{scanNote}</p> : null}
       {resolveError ? <p className="mt-2 text-sm text-danger">{resolveError}</p> : null}
@@ -220,28 +220,28 @@ export function ScannerPanel({ makerspace, isSuperadmin, makerspaces }: {
 
       {resolved && target ? (
         <div className="mt-4 rounded-md border border-line bg-surface p-3">
-          <p className="text-sm font-semibold text-ink">
+          <h3 className="title-section">
             {target.type === "box" ? `Box: ${target.label} (${target.code})`
               : target.type === "product" ? `Product: ${target.name}`
               : `Asset: ${target.asset_tag} - ${target.product} (${target.status})`}
-          </p>
-          <p className="mt-1 text-xs text-muted">QR #{resolved.qr.id} - {resolved.qr.status}</p>
+          </h3>
+          <p className="mt-1 font-mono text-xs text-muted">QR #{resolved.qr.id} - {resolved.qr.status}</p>
           <div className="desk-actions mt-3 flex flex-wrap gap-2 text-sm">
             {actions.includes("contents") && target.type === "box" ? (
-              <button type="button" disabled={loadContents.isPending} onClick={() => loadContents.mutate(target.id)}>View contents</button>
+              <button className="desk-button-ghost" type="button" disabled={loadContents.isPending} onClick={() => loadContents.mutate(target.id)}>View contents</button>
             ) : null}
             {actions.includes("revoke") ? (
-              <button type="button" className="text-danger" disabled={revoke.isPending} onClick={() => revoke.mutate(resolved.qr.id)}>
+              <button type="button" className="desk-button-danger" disabled={revoke.isPending} onClick={() => revoke.mutate(resolved.qr.id)}>
                 {revoke.isPending ? "Revoking..." : "Revoke QR"}
               </button>
             ) : null}
             {canRebind ? (
-              <button type="button" onClick={() => setShowRebind((open) => !open)}>
+              <button className="desk-button-ghost" type="button" onClick={() => setShowRebind((open) => !open)}>
                 Rename & rebind
               </button>
             ) : null}
             {canMoveAsset ? (
-              <button type="button" onClick={() => setShowMove((open) => !open)}>
+              <button className="desk-button-ghost" type="button" onClick={() => setShowMove((open) => !open)}>
                 Move to makerspace
               </button>
             ) : null}
@@ -255,7 +255,7 @@ export function ScannerPanel({ makerspace, isSuperadmin, makerspaces }: {
               }}
             >
               <label className="grid gap-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted">QR makerspace</span>
+                <span className="eyebrow">QR makerspace</span>
                 <input
                   className="desk-input"
                   value={rebindMakerspace?.name ?? `Makerspace #${rebindMakerspaceId}`}
@@ -263,7 +263,7 @@ export function ScannerPanel({ makerspace, isSuperadmin, makerspaces }: {
                 />
               </label>
               <label className="grid gap-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted">Target product</span>
+                <span className="eyebrow">Target product</span>
                 <select
                   className="desk-input"
                   value={selectedProductId}
@@ -283,10 +283,10 @@ export function ScannerPanel({ makerspace, isSuperadmin, makerspaces }: {
                 onChange={(event) => setNewName(event.target.value)}
               />
               <div className="flex flex-wrap gap-2">
-                <button className="desk-button" type="submit" disabled={!selectedProductId || rebind.isPending}>
+                <button className="desk-button-primary" type="submit" disabled={!selectedProductId || rebind.isPending}>
                   {rebind.isPending ? "Saving..." : "Save"}
                 </button>
-                <button className="desk-button" type="button" onClick={() => setShowRebind(false)}>Cancel</button>
+                <button className="desk-button-ghost" type="button" onClick={() => setShowRebind(false)}>Cancel</button>
               </div>
               {productError ? <p className="text-sm text-danger">{productError}</p> : null}
               {rebindError ? <p className="text-sm text-danger">{rebindError}</p> : null}
@@ -301,7 +301,7 @@ export function ScannerPanel({ makerspace, isSuperadmin, makerspaces }: {
               }}
             >
               <label className="grid gap-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted">Destination makerspace</span>
+                <span className="eyebrow">Destination makerspace</span>
                 <select
                   className="desk-input"
                   required
@@ -318,7 +318,7 @@ export function ScannerPanel({ makerspace, isSuperadmin, makerspaces }: {
                 </select>
               </label>
               <label className="grid gap-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted">Destination product</span>
+                <span className="eyebrow">Destination product</span>
                 <select
                   className="desk-input"
                   value={destProductId}
@@ -339,10 +339,10 @@ export function ScannerPanel({ makerspace, isSuperadmin, makerspaces }: {
                 onChange={(event) => setMoveTag(event.target.value)}
               />
               <div className="flex flex-wrap gap-2">
-                <button className="desk-button" type="submit" disabled={!destMakerspaceId || moveAsset.isPending}>
+                <button className="desk-button-primary" type="submit" disabled={!destMakerspaceId || moveAsset.isPending}>
                   {moveAsset.isPending ? "Moving..." : "Move"}
                 </button>
-                <button className="desk-button" type="button" onClick={() => setShowMove(false)}>Cancel</button>
+                <button className="desk-button-ghost" type="button" onClick={() => setShowMove(false)}>Cancel</button>
               </div>
               {destinationProductError ? <p className="text-sm text-danger">{destinationProductError}</p> : null}
               {moveError ? <p className="text-sm text-danger">{moveError}</p> : null}
@@ -357,7 +357,7 @@ export function ScannerPanel({ makerspace, isSuperadmin, makerspaces }: {
           {revokeError ? <p className="mt-2 text-sm text-danger">{revokeError}</p> : null}
           {contents ? (
             <div className="mt-3 rounded-md border border-line bg-bg p-2 text-xs text-muted">
-              <p className="font-semibold text-ink">Contents</p>
+              <h4 className="title-section">Contents</h4>
               {contents.products.map((product) => <p key={`p-${product.id}`}>{product.name} - {product.available_quantity} available</p>)}
               {contents.assets.map((asset) => <p key={`a-${asset.id}`}>{asset.asset_tag} ({asset.status})</p>)}
               {!contents.products.length && !contents.assets.length ? <p>Empty.</p> : null}

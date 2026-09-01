@@ -8,13 +8,14 @@ import { type Makerspace, useStaffGet } from "./StaffPanels";
 type ApiSettings = {
   slack_webhook_url_set: boolean;
   mattermost_webhook_url_set: boolean;
+  discord_webhook_url_set: boolean;
 };
 
 type ProviderCardProps = {
   configured: boolean;
   label: string;
   makerspaceId: number;
-  provider: "slack" | "mattermost";
+  provider: "slack" | "mattermost" | "discord";
 };
 
 // Read webhook state under a dedicated cache key (same endpoint) so saving/clearing a
@@ -38,11 +39,13 @@ export function MakerspaceWebhookSettings({ makerspace }: { makerspace: Makerspa
       <div className="grid max-w-2xl gap-2">
         <h3 className="text-base font-semibold text-ink">Chat webhooks</h3>
         <p className="text-sm text-muted">
-          Add incoming webhook URLs for Slack and Mattermost. Saving a webhook configures the
-          destination; enable delivery separately in the notification channel matrix below.
+          Add incoming webhook URLs for Slack, Mattermost or Discord. Saving a webhook
+          configures the destination; enable delivery separately in the notification channel
+          matrix below. Each channel is also its own module, so a space ships only the ones
+          it uses.
         </p>
       </div>
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
         <ProviderCard
           configured={settings.data?.slack_webhook_url_set ?? false}
           label="Slack"
@@ -54,6 +57,12 @@ export function MakerspaceWebhookSettings({ makerspace }: { makerspace: Makerspa
           label="Mattermost"
           makerspaceId={makerspace.id}
           provider="mattermost"
+        />
+        <ProviderCard
+          configured={settings.data?.discord_webhook_url_set ?? false}
+          label="Discord"
+          makerspaceId={makerspace.id}
+          provider="discord"
         />
       </div>
       {settings.isLoading ? (

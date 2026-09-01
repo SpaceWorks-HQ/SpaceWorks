@@ -14,7 +14,7 @@ def test_seed_demo_creates_three_spaces_staff_and_inventory():
 
     spaces = {space.slug: space for space in Makerspace.objects.all()}
     assert set(spaces) == {"alpha-lab", "beta-workshop", "gamma-fab"}
-    assert spaces["beta-workshop"].superadmin_access_enabled is False
+    assert spaces["beta-workshop"].superadmin_access_enabled is True
     assert spaces["beta-workshop"].location == "North Wing - Woodshop"
 
     for username in ("superadmin", "alpha_manager", "beta_manager", "gamma_manager"):

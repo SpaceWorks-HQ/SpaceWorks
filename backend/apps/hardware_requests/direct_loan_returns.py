@@ -5,6 +5,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.boxes.models import QrCode, QrScanEvent
 from apps.evidence import storage
+from apps.evidence.finalization import charge_storage_once
 from apps.evidence.models import EvidencePhoto
 from apps.hardware_requests.direct_loan_audit import record_item_logs
 from apps.hardware_requests.models import PublicToolLoan, ReturnEvent
@@ -23,7 +24,6 @@ from apps.hardware_requests.workflow_errors import (
 )
 from apps.inventory import availability
 from apps.inventory.models import InventoryAsset, TrackingMode
-from apps.makerspaces.limits import add_storage
 
 
 def return_direct_loan(
@@ -45,6 +45,10 @@ def return_direct_loan(
     ).first()
     if evidence is None:
         raise RequestValidationError("Invalid return evidence.")
+    if loan.status != PublicToolLoan.Status.CHECKED_OUT:
+        raise InvalidTransition("Direct loan is not currently checked out.")
+
+    finalized = validate_evidence_upload(evidence, label="Return")
 
     with transaction.atomic():
         locked = (
@@ -60,7 +64,7 @@ def return_direct_loan(
             or ReturnEvent.objects.filter(evidence=evidence).exists()
         ):
             raise ReturnValidationError("Evidence already used.")
-        validate_evidence_upload(evidence, label="Return")
+        charge_storage_once(evidence, finalized.size)
         return_qr = _return_scan_qr(locked, qr_payload)
         outstanding = [
             item
@@ -236,22 +240,14 @@ def _return_scan_qr(loan, qr_payload):
 
 
 def validate_evidence_upload(evidence, *, label):
-    if settings.STORAGE_PRESIGN_METHOD == "put":
-        size = storage.finalize_upload(evidence.object_key, settings.EVIDENCE_MAX_BYTES)
-        if size is None:
-            raise EvidenceNotUploaded(f"{label} evidence has not been uploaded.")
-        if not (1 <= size <= settings.EVIDENCE_MAX_BYTES):
-            raise ReturnValidationError(
-                f"{label} evidence is invalid or exceeds the size limit."
-            )
-        # Charge managed storage with the size finalize already computed (no extra HEAD);
-        # recompute_storage reconciles POST-mode + other object types.
-        add_storage(evidence.makerspace, size)
     try:
-        storage.validate_evidence_object(evidence.object_key)
+        result = storage.finalize_upload(evidence, settings.EVIDENCE_MAX_BYTES)
     except storage.EvidenceObjectValidationError as exc:
         if exc.code == "missing":
             raise EvidenceNotUploaded(f"{label} evidence has not been uploaded.") from exc
         raise ReturnValidationError(
             f"{label} evidence is invalid or exceeds the size limit."
         ) from exc
+    if result is None:
+        raise EvidenceNotUploaded(f"{label} evidence has not been uploaded.")
+    return result

@@ -17,6 +17,7 @@ from apps.operations.models import (
     StocktakeSession,
 )
 from tests.return_helpers import authenticated_client, make_box, make_member, make_product, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -536,12 +537,7 @@ def test_reports_export_csv_and_xlsx():
 
 def test_guest_admin_cannot_view_hardware_reports():
     makerspace = make_space("ops-reports-guest")
-    guest = make_member(
-        "ops-reports-guest-user",
-        makerspace,
-        membership_role="guest_admin",
-        role="guest_admin",
-    )
+    guest = make_handout_member("ops-reports-guest-user", makerspace)
     client = authenticated_client(guest)
 
     analytics = client.get(f"/api/v1/admin/makerspace/{makerspace.id}/analytics/summary")
@@ -846,7 +842,7 @@ def test_qr_batch_items_enforce_manage_qr_rbac_and_makerspace_scope():
     space_a = make_space("ops-qr-scope-a")
     space_b = make_space("ops-qr-scope-b")
     manager_a = make_member("ops-qr-scope-manager-a", space_a)
-    guest_a = make_member("ops-qr-scope-guest-a", space_a, membership_role="guest_admin", role="guest_admin")
+    guest_a = make_handout_member("ops-qr-scope-guest-a", space_a)
     box_b = make_box(space_b, "Foreign Bin")
     qr_b = QrCode.objects.create(
         makerspace=space_b,

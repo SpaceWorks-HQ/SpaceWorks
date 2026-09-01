@@ -1,11 +1,11 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
+from apps.separability.tombstones import app_is_tombstoned
 from apps.warranty.models import Warranty, WarrantyDocument
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
-@admin.register(Warranty)
 class WarrantyAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     list_display = (
         "id",
@@ -38,7 +38,6 @@ class WarrantyAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         return None
 
 
-@admin.register(WarrantyDocument)
 class WarrantyDocumentAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     list_display = ("id", "warranty", "original_filename", "content_type", "size_bytes", "created_at")
     list_filter = ("content_type",)
@@ -58,3 +57,12 @@ class WarrantyDocumentAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+# Registered rather than decorated: the admin screens are runtime surfaces a tombstone
+# removes, while the rows stay reachable through the ORM and the purge path. The
+# setting is consulted instead of the manifest because admin autodiscovery runs before
+# this app's ready(). See separability.tombstones.app_is_tombstoned.
+if not app_is_tombstoned("warranty"):
+    admin.site.register(Warranty, WarrantyAdmin)
+    admin.site.register(WarrantyDocument, WarrantyDocumentAdmin)

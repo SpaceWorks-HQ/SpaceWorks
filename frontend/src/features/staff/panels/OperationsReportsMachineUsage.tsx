@@ -12,7 +12,7 @@ export function OperationsReportsMachineUsage(props: FablabPanelProps) {
       <DataState loading={query.isLoading} error={query.error} empty={!rows.length}>
         {props.aggregate ? <div className="mt-4 space-y-6">{groups.map((group) => (
           <section key={group.makerspaceId} className="rounded-md border border-line p-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">{props.makerspaceName(group.makerspaceId)}</h4>
+            <h4 className="eyebrow">{props.makerspaceName(group.makerspaceId)}</h4>
             <MachineUsageReport rows={group.rows} data={group.data} />
           </section>
         ))}</div> : <MachineUsageReport rows={rows} data={query.data} />}

@@ -4,14 +4,19 @@ from django.utils import timezone
 from apps.accounts import rbac
 from apps.hardware_requests import notifications
 from apps.hardware_requests.models import HardwareRequest
+from apps.makerspaces.servability import archived_or_inactive_makerspace_ids
 from apps.notifications.emit import emit_notification
+from apps.tenant_migration.gate_runtime import fanout_tenant_write
 
 
 def run_return_reminders(*, now=None, limit=200) -> dict:
     now = now or timezone.now()
     limit = max(int(limit), 1)
+    # Only the archived/inactive half: a pending (not-restored) tenant must still
+    # reach the not-restored gate so the skip is recorded rather than prefiltered.
+    unavailable_makerspace_ids = archived_or_inactive_makerspace_ids()
     excluded_makerspace_ids = (
-        rbac.archived_makerspace_ids() | rbac.superadmin_hidden_makerspace_ids()
+        unavailable_makerspace_ids | rbac.superadmin_hidden_makerspace_ids()
     )
     queryset = (
         HardwareRequest.objects.select_related("makerspace", "requester")
@@ -26,36 +31,42 @@ def run_return_reminders(*, now=None, limit=200) -> dict:
         .exclude(makerspace_id__in=excluded_makerspace_ids)
         .order_by("return_due_at", "id")[:limit]
     )
-    sent_count = 0
-    skipped_count = 0
+    counts = {"sent": 0, "skipped": 0}
     for hardware_request in queryset:
-        with transaction.atomic():
-            claimed = HardwareRequest.objects.filter(
-                pk=hardware_request.pk,
-                return_reminder_sent_at__isnull=True,
-            ).update(return_reminder_sent_at=now)
-        if not claimed:
-            continue
-        try:
-            sent = notifications.notify_return_due(hardware_request)
-        except Exception:
+        with fanout_tenant_write(
+            hardware_request.makerspace_id,
+            operation="return_reminder",
+            counts=counts,
+        ) as should_process:
+            if not should_process:
+                continue
+            with transaction.atomic():
+                claimed = HardwareRequest.objects.filter(
+                    pk=hardware_request.pk,
+                    return_reminder_sent_at__isnull=True,
+                ).update(return_reminder_sent_at=now)
+            if not claimed:
+                continue
+            try:
+                sent = notifications.notify_return_due(hardware_request)
+            except Exception:
+                HardwareRequest.objects.filter(pk=hardware_request.pk).update(
+                    return_reminder_sent_at=None
+                )
+                raise
+            if sent:
+                counts["sent"] += 1
+                emit_notification(
+                    hardware_request.makerspace,
+                    level="warning",
+                    event="loan.overdue",
+                    title="Overdue loan reminder sent",
+                    body=f"Request #{hardware_request.pk} is overdue; a reminder was sent.",
+                )
+                continue
             HardwareRequest.objects.filter(pk=hardware_request.pk).update(
                 return_reminder_sent_at=None
             )
-            raise
-        if sent:
-            sent_count += 1
-            emit_notification(
-                hardware_request.makerspace,
-                level="warning",
-                event="loan.overdue",
-                title="Overdue loan reminder sent",
-                body=f"Request #{hardware_request.pk} is overdue; a reminder was sent.",
-            )
-            continue
-        HardwareRequest.objects.filter(pk=hardware_request.pk).update(
-            return_reminder_sent_at=None
-        )
-        skipped_count += 1
+            counts["skipped"] += 1
 
-    return {"sent": sent_count, "skipped": skipped_count}
+    return counts

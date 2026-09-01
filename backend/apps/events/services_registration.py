@@ -9,20 +9,42 @@ from apps.events.capacity import fresh_registration_status
 from apps.events.exceptions import DuplicateRegistration, EventInvalidTransition
 from apps.events.models import EventRegistration
 from apps.forms_schema.validation import validate_answers
+from apps.makerspaces.guards import require_module_locked
 
 
 @transaction.atomic
 def register(
     event, *, member=None, name=None, email=None, phone=None,
-    custom_answers=None, actor=None,
+    custom_answers=None, actor=None, staff_registration=False,
+    via_makerspace=None, collaborative=False,
 ):
+    """Register someone for an event.
+
+    `staff_registration` and `collaborative` each relax exactly one condition: the
+    `is_public` requirement. That flag answers "does this event appear in the public
+    catalogue", while staff at the door and members of accepted collaborators are not
+    the public. Every other rule (published, not ended, capacity, duplicates, the
+    custom form, the write fence, and payment) is identical, because this is the same
+    service and the state machine has one home.
+
+    `collaborative=True` is a trusted internal capability restricted to the enforcing
+    member view. That view proves an accepted EventCollaborator exists; this service
+    deliberately does not re-derive the actor's makerspace membership.
+    """
     from apps.events.services import _audit, _locked_event, _refresh, _validate
 
     assert_mapped_write_allowed(event.makerspace_id)
     if member is not None:
         name = member.display_name or member.get_full_name() or member.username
-        email = member.email
-        phone = member.phone
+        # Account first, caller's value as the fallback -- the same rule as `phone` just
+        # below, and for the same reason: a walk-in record may carry neither, and the
+        # registration model requires both.
+        email = member.email or email
+        # The account wins, but a caller-supplied number is kept as the fallback: a
+        # registration needs a contact number (`EventRegistration.phone` is non-blank),
+        # and an account without one would otherwise be a dead end nobody at the desk
+        # could resolve. The public path passes none, so it is unchanged.
+        phone = member.phone or phone
     name = (name or "").strip()
     normalized_email = (email or "").strip().lower()
     phone = (phone or "").strip()
@@ -36,7 +58,15 @@ def register(
             makerspace_id=event.makerspace_id, event_id=event.pk,
         )
     locked = _locked_event(event.pk)
-    if not locked.is_public or locked.status != locked.Status.PUBLISHED or locked.ends_at < timezone.now():
+    # register() previously lacked this locked module check. Keep event-then-makerspace
+    # ordering: publish() takes the event lock first, so taking the makerspace first
+    # here would create a deadlock pair with it.
+    require_module_locked(locked.makerspace, "events")
+    if (
+        (not locked.is_public and not staff_registration and not collaborative)
+        or locked.status != locked.Status.PUBLISHED
+        or locked.ends_at < timezone.now()
+    ):
         raise EventInvalidTransition("This event is not open for registration.")
     custom_answers = validate_answers(locked.custom_form, custom_answers)
     status = fresh_registration_status(locked)
@@ -45,16 +75,25 @@ def register(
     )
     if existing and existing.status == EventRegistration.Status.CANCELLED:
         existing.member = member or existing.member
+        existing.registered_via_makerspace = via_makerspace or locked.makerspace
+        # Written together, but they diverge later: a purge clears the provenance above and
+        # leaves this one, so a charge raised after that purge still reaches the member.
+        existing.payment_via_makerspace = via_makerspace or locked.makerspace
         existing.name, existing.email, existing.phone = name, normalized_email, phone
         existing.custom_answers, existing.status, existing.created_at = custom_answers, status, timezone.now()
         _validate(existing)
-        existing.save(update_fields=["member", "name", "email", "phone", "custom_answers", "status", "created_at"])
+        existing.save(update_fields=[
+            "member", "registered_via_makerspace", "payment_via_makerspace", "name",
+            "email", "phone", "custom_answers", "status", "created_at",
+        ])
         return _record_registration(locked, actor, existing, status)
     if existing:
         raise DuplicateRegistration("A registration already exists for this email.", fresh_status=status)
     registration = EventRegistration(
         event=locked, member=member, name=name, email=normalized_email,
         phone=phone, custom_answers=custom_answers, status=status,
+        registered_via_makerspace=via_makerspace or locked.makerspace,
+        payment_via_makerspace=via_makerspace or locked.makerspace,
     )
     _validate(registration)
     registration.save()

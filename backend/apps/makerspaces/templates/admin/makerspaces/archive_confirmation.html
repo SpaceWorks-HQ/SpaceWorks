@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="{{ action_name }}">
+  <input type="hidden" name="confirm_archive" value="1">
+  {% for row in makerspaces %}
+    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ row.object.pk }}">
+  {% endfor %}
+
+  <p>
+    These unsettled-charge counts are ADVISORY and may change before the archive runs.
+    Archiving does NOT block on unsettled charges.
+  </p>
+  <p>
+    If a makerspace has a pending archive request, direct archival will approve that
+    request automatically and notify its requester.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Name</th>
+        <th scope="col">Slug</th>
+        <th scope="col">Owned pending</th>
+        <th scope="col">Routed pending</th>
+        <th scope="col">Total pending</th>
+        <th scope="col">Pending archive request</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in makerspaces %}
+        <tr>
+          <td>{{ row.object.name }}</td>
+          <td><code>{{ row.object.slug }}</code></td>
+          <td>{{ row.owned_pending }}</td>
+          <td>{{ row.routed_pending }}</td>
+          <td>{{ row.total_pending }}</td>
+          <td>
+            {% if row.pending_archive_request %}
+              <strong>Will be approved.</strong><br>
+              {{ row.pending_archive_request.reason|linebreaksbr }}
+            {% else %}
+              None
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="submit-row">
+    <input type="submit" value="Archive makerspaces" class="default">
+    <a href=".">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -62,9 +62,9 @@ export function ProcurementReceipts({ itemId, receipts, onChanged }: { itemId: n
       <div className="grid gap-1">
         {receipts.length ? receipts.map((receipt) => (
           <div key={receipt.id} className="flex min-w-0 flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-2 py-1 text-xs">
-            <span className="min-w-0 flex-1 text-muted">{formatDateTime(receipt.created_at)}</span>
-            <button type="button" className="desk-button text-xs" onClick={() => openReceipt(receipt.id)}>View</button>
-            <button type="button" className="desk-button text-xs text-danger" disabled={remove.isPending} onClick={() => remove.mutate(receipt.id)}>Delete</button>
+            <span className="min-w-0 flex-1 font-mono text-muted">{formatDateTime(receipt.created_at)}</span>
+            <button type="button" className="desk-button-ghost text-xs" onClick={() => openReceipt(receipt.id)}>View</button>
+            <button type="button" className="desk-button-danger text-xs" disabled={remove.isPending} onClick={() => remove.mutate(receipt.id)}>Delete</button>
           </div>
         )) : <p className="text-xs text-muted">No receipts.</p>}
       </div>

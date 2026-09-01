@@ -8,10 +8,14 @@ export type StatTone = "blue" | "yellow" | "mint" | "pink";
 // across the reskin. Each stat box picks one so the grid reads as a colourful
 // palette rather than a wall of identical surface tiles.
 export const STAT_TONE_CLASS: Record<StatTone, string> = {
-  blue: "border-tone-blue bg-tone-blue text-tone-blue-ink dark:bg-[#0b2a38] dark:text-[#7dd3fc]",
-  yellow: "border-tone-yellow bg-tone-yellow text-tone-yellow-ink dark:bg-[#332b00] dark:text-[#fcdf46]",
-  mint: "border-tone-mint bg-tone-mint text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]",
-  pink: "border-tone-pink bg-tone-pink text-tone-pink-ink dark:bg-[#3a1326] dark:text-[#f9a8d4]",
+  blue:
+    "border-accent bg-accent text-on-accent dark:bg-accent/15 dark:text-accent-ink",
+  yellow:
+    "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+  mint:
+    "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  pink:
+    "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
 };
 
 export function StatTile({
@@ -25,8 +29,8 @@ export function StatTile({
 }) {
   return (
     <div className={`rounded-md border p-3 ${STAT_TONE_CLASS[tone]}`}>
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="mt-1 text-xs opacity-70">{label}</p>
+      <p className="font-mono text-2xl font-bold">{value}</p>
+      <p className="eyebrow mt-1 text-current opacity-70">{label}</p>
     </div>
   );
 }
@@ -41,7 +45,7 @@ export function Section({
   return (
     <section className="desk-panel overflow-hidden">
       <div className="border-b border-line bg-surface px-4 py-3">
-        <h2 className="text-lg font-semibold text-ink">{title}</h2>
+        <h2 className="title-panel">{title}</h2>
       </div>
       <div className="space-y-4 p-4">{children}</div>
     </section>
@@ -66,7 +70,7 @@ export function CompactList({
           <span className="min-w-0 flex-1 truncate text-ink" title={row.label}>
             {row.label}
           </span>
-          <span className="shrink-0 text-right text-xs text-muted">{row.value}</span>
+          <span className="eyebrow shrink-0 text-right">{row.value}</span>
         </li>
       ))}
     </ul>
@@ -98,9 +102,9 @@ export function BarChart({
               {row.label}
             </span>
             <div className="h-3 overflow-hidden rounded bg-bg">
-              <div className="h-full rounded bg-accent" style={{ width }} />
+              <div className="h-full rounded bg-secondary" style={{ width }} />
             </div>
-            <span className="min-w-14 text-right text-xs text-muted">
+            <span className="eyebrow min-w-14 text-right">
               {formatNumber(row.value)} {valueLabel}
             </span>
           </div>

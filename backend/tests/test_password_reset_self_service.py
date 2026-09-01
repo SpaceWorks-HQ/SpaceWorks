@@ -1,6 +1,7 @@
 import pytest
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
+from django.test import override_settings
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -24,6 +25,9 @@ def uid_for(user):
     return urlsafe_base64_encode(force_bytes(user.pk))
 
 
+@override_settings(
+    DEBUG=True, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+)
 def test_forgot_password_is_enumeration_safe():
     cache.clear()
     user = make_user(
@@ -157,5 +161,4 @@ def test_platform_email_settings_superadmin_only_and_write_only_password(monkeyp
     assert fetched.data["smtp_password_set"] is True
     assert fetched.data["smtp_host"] == "smtp.example.com"
     assert "secret" not in str(fetched.data)
-
 

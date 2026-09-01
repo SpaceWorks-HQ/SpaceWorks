@@ -43,7 +43,7 @@ export function DocumentsTab({ machineId, canEdit }: { machineId: number; canEdi
 
   return (
     <section>
-      <h3 className="mb-3 text-sm font-semibold text-ink">Documents</h3>
+      <h3 className="title-section mb-3">Documents</h3>
       {documents.isLoading ? <p className="text-sm text-muted">Loading documents...</p> : null}
       {documents.error instanceof Error ? <p className="text-sm text-danger">{documents.error.message}</p> : null}
       {!documents.isLoading && !documents.error && !items.length ? (
@@ -56,10 +56,10 @@ export function DocumentsTab({ machineId, canEdit }: { machineId: number; canEdi
               <strong className="block truncate text-ink">{document.original_filename}</strong>
               <span className="text-xs text-muted">{document.doc_type} · {formatBytes(document.size_bytes)}</span>
             </span>
-            <button className="desk-button" type="button" disabled={view.isPending}
+            <button className="desk-button-ghost" type="button" disabled={view.isPending}
               onClick={() => view.mutate(document.id)}>View</button>
             {canEdit ? (
-              <button className="desk-button" type="button" disabled={remove.isPending}
+              <button className="desk-button-danger" type="button" disabled={remove.isPending}
                 onClick={() => remove.mutate(document.id)}>Delete</button>
             ) : null}
           </div>
@@ -68,12 +68,12 @@ export function DocumentsTab({ machineId, canEdit }: { machineId: number; canEdi
       {canEdit ? (
         <form className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto] sm:items-end"
           onSubmit={(event) => { event.preventDefault(); upload.mutate(); }}>
-          <label className="grid gap-1 text-xs font-semibold text-muted">File
+          <label className="eyebrow grid gap-1">File
             <input ref={fileInput} className="desk-input" type="file"
               accept=".pdf,.jpg,.jpeg,.png,.webp,.stl,.3mf,.step,.stp,.obj,.amf,.ply,.gcode,.gco,.iges,.igs,.dxf"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)} required />
           </label>
-          <label className="grid gap-1 text-xs font-semibold text-muted">Document type
+          <label className="eyebrow grid gap-1">Document type
             <input className="desk-input" maxLength={16} value={docType}
               onChange={(event) => setDocType(event.target.value)} required />
           </label>

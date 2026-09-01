@@ -1,0 +1,13 @@
+# Ruff is the Python linter/formatter that Zed's built-in Python support runs.
+# `src` tells ruff's isort that the import root is backend/, so `apps.*` and
+# `config.*` are sorted as first-party. Without this, ruff moves
+# `from config...` above `from django...`, which contradicts the whole codebase.
+src = ["backend"]
+
+exclude = [
+    ".venv",
+    "**/migrations",
+    "backend/staticfiles",
+    "frontend",
+    "backups",
+]

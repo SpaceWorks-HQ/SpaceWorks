@@ -4,6 +4,7 @@ import pytest
 
 from apps.audit.models import AuditLog
 from apps.boxes.models import BoxScan
+from apps.evidence.storage import EvidenceValidationResult
 from apps.hardware_requests.models import (
     HardwareRequest,
     RequesterAccountability,
@@ -26,14 +27,17 @@ pytestmark = pytest.mark.django_db
 
 def test_happy_full_good_return_moves_stock_audits_and_notifies(
     monkeypatch,
+    settings,
     django_capture_on_commit_callbacks,
 ):
+    settings.STORAGE_PRESIGN_METHOD = "post"
     makerspace = make_space("return-happy")
     admin = make_member("return-happy-admin", makerspace)
     product = make_product(makerspace)
     hardware_request = make_issued_request(makerspace, admin, [(product, 2)])
     evidence = make_return_evidence(makerspace, admin)
-    monkeypatch.setattr("apps.evidence.storage.object_exists", Mock(return_value=True))
+    finalize = Mock(return_value=EvidenceValidationResult(size=123, content_type="image/png"))
+    monkeypatch.setattr("apps.evidence.storage.finalize_upload", finalize)
     notify = Mock()
     monkeypatch.setattr(
         "apps.hardware_requests.notifications.notify_request_returned",
@@ -48,6 +52,7 @@ def test_happy_full_good_return_moves_stock_audits_and_notifies(
         )
 
     assert response.status_code == 200
+    finalize.assert_called_once_with(evidence, settings.EVIDENCE_MAX_BYTES)
     hardware_request.refresh_from_db()
     assert hardware_request.status == HardwareRequest.Status.RETURNED
     assert hardware_request.closed_by == admin

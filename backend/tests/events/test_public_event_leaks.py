@@ -26,10 +26,15 @@ EXPECTED_FIELDS = {
     'custom_form',
     'capacity',
     'availability',
+    'image_url',
     'status',
+    'organizers',
 }
 FORBIDDEN_KEYS = {
     'id',
+    # The resolved URL is public; the underlying object key is not part of the
+    # contract and must never appear in the payload.
+    'image_key',
     'pk',
     'makerspace',
     'makerspace_id',

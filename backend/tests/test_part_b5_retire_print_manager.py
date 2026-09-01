@@ -40,6 +40,8 @@ def test_machine_manager_implies_printing_for_actions_scopes_and_permission():
     assert rbac.can(actor, rbac.Action.MANAGE_PRINTING, makerspace.id)
     assert rbac.effective_actions(actor, makerspace.id) == {
         rbac.Action.MANAGE_MACHINES, rbac.Action.MANAGE_PRINTING,
+        # Also implied by MANAGE_MACHINES, so job handover comes with the machines.
+        rbac.Action.COLLECT_SERVICE_REQUEST,
     }
     assert rbac.makerspaces_for_action(actor, rbac.Action.MANAGE_PRINTING) == {makerspace.id}
 

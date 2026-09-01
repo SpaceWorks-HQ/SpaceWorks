@@ -57,10 +57,14 @@ def test_seeded_default_role_includes_metadata_and_effective_actions():
         "role_slug": membership.assigned_role.slug,
         "actions": sorted(rbac.effective_actions(user, makerspace.id)),
         "can_configure_machine_types": False,
+        # An Inventory Manager holds no MANAGE_MACHINES, so machine scoping has nothing to
+        # say about it and every console surface stays.
+        "is_machine_only": False,
         "can_refer": True,
         "can_verify": False,
         "verified_at": None,
         "referrals_enabled": False,
+        "source": "membership",
     }
     assert payload["actions"] == sorted(membership.assigned_role.granted_actions)
 
@@ -93,7 +97,10 @@ def test_custom_role_includes_its_assigned_actions():
 def test_null_assigned_role_uses_legacy_metadata_and_actions():
     makerspace = make_space("auth-payload-fallback")
     user = active_staff("auth-payload-fallback-user")
-    role = MakerspaceMembership.Role.GUEST_ADMIN
+    # PRINT_MANAGER, because it is the legacy string still carried by
+    # `rbac._MEMBERSHIP_ROLE_ACTIONS` as the frozen null-FK fallback. `guest_admin` used to
+    # serve here and no longer can: migration 0053 emptied it and the enum member is gone.
+    role = MakerspaceMembership.Role.PRINT_MANAGER
     MakerspaceMembership.objects.create(user=user, makerspace=makerspace, role=role)
 
     payload = membership_payload(user, makerspace)

@@ -4,6 +4,7 @@ import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 
 import { downloadStaffFile, staffRequest } from "../../../lib/api";
 import {
+  groupProcurementRows,
   ProcurementRow,
   itemTotal,
   labelStatus,
@@ -12,6 +13,11 @@ import {
   type ToBuyItem,
   type ToBuyStatus,
 } from "./ProcurementPanelRows";
+import {
+  procurementMachineTypeOptions,
+  procurementMachineTypeRequired,
+  type ProcurementMachineTypeOptions,
+} from "./ProcurementPanelTypes";
 import { ProcurementMoveModal } from "./ProcurementMoveModal";
 import { Panel, type Makerspace, useStaffGet } from "./shared";
 
@@ -26,6 +32,7 @@ type Form = {
   vendor_name: string;
   actual_unit_cost: string;
   kind: Kind;
+  machine_type: string;
 };
 
 const emptyForm: Form = {
@@ -36,9 +43,18 @@ const emptyForm: Form = {
   vendor_name: "",
   actual_unit_cost: "",
   kind: "hardware",
+  machine_type: "",
 };
 
-export function ProcurementPanel({ makerspace, canChooseKind = false }: { makerspace: Makerspace; canChooseKind?: boolean }) {
+type ProcurementPanelProps = {
+  makerspace: Makerspace;
+  canChooseKind?: boolean;
+};
+
+export function ProcurementPanel({
+  makerspace,
+  canChooseKind = false,
+}: ProcurementPanelProps) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<Form>(emptyForm);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("requested");
@@ -47,6 +63,14 @@ export function ProcurementPanel({ makerspace, canChooseKind = false }: { makers
   const statusParam = statusFilter === "all" ? "" : `&status=${statusFilter}`;
   const queryKey = ["procurement", makerspace.id, statusFilter];
   const items = useStaffGet<ToBuyItem[]>(queryKey, `${base}?limit=200${statusParam}`);
+  const machineTypes = useStaffGet<ProcurementMachineTypeOptions>(
+    ["procurement-machine-types", makerspace.id, form.kind],
+    `${base}/machine-types?kind=${form.kind}`,
+  );
+  const typeOptions = procurementMachineTypeOptions(machineTypes.data);
+  // Server-derived, and it already accounts for the stream, so it needs no local
+  // `createsPrintingByDefault` qualifier.
+  const requiresMachineType = procurementMachineTypeRequired(machineTypes.data);
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["procurement", makerspace.id] });
 
   const create = useMutation({
@@ -61,6 +85,7 @@ export function ProcurementPanel({ makerspace, canChooseKind = false }: { makers
           estimated_unit_cost: form.estimated_unit_cost ? Number(form.estimated_unit_cost) : null,
           vendor_name: form.vendor_name,
           actual_unit_cost: form.actual_unit_cost ? Number(form.actual_unit_cost) : null,
+          machine_type: form.machine_type ? Number(form.machine_type) : null,
         }),
       });
     },
@@ -103,15 +128,32 @@ export function ProcurementPanel({ makerspace, canChooseKind = false }: { makers
         Shopping list for {makerspace.name}. Track requested, approved, ordered, and received purchases with receipts.
       </p>
 
-      <form className="grid gap-2 sm:grid-cols-2 xl:grid-cols-8" onSubmit={(event) => { event.preventDefault(); if (form.name.trim()) create.mutate(); }}>
+      <form className="grid gap-2 sm:grid-cols-2 xl:grid-cols-8" onSubmit={(event) => { event.preventDefault(); if (form.name.trim() && (!requiresMachineType || form.machine_type)) create.mutate(); }}>
         <input className="desk-input xl:col-span-2" placeholder="Item name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <input className="desk-input" type="number" min={1} placeholder="Qty" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
         <input className="desk-input" placeholder="Link (optional)" value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} />
         <input className="desk-input" type="number" min={0} step="0.01" placeholder="Est. unit cost" value={form.estimated_unit_cost} onChange={(e) => setForm({ ...form, estimated_unit_cost: e.target.value })} />
         <input className="desk-input" placeholder="Vendor" value={form.vendor_name} onChange={(e) => setForm({ ...form, vendor_name: e.target.value })} />
         <input className="desk-input" type="number" min={0} step="0.01" placeholder="Actual unit cost" value={form.actual_unit_cost} onChange={(e) => setForm({ ...form, actual_unit_cost: e.target.value })} />
-        {canChooseKind ? <KindSelect value={form.kind} onChange={(kind) => setForm({ ...form, kind })} /> : <AddButton disabled={create.isPending || !form.name.trim()} label="Add" />}
-        {canChooseKind ? <AddButton disabled={create.isPending || !form.name.trim()} label="Add item" className="xl:col-span-8" /> : null}
+        <label className="eyebrow grid gap-1">
+          Machine type
+          <select
+            className="desk-input"
+            value={form.machine_type}
+            onChange={(event) => setForm({ ...form, machine_type: event.target.value })}
+            required={requiresMachineType}
+          >
+            <option value="">{requiresMachineType ? "Select a type" : "Unassigned"}</option>
+            {typeOptions.map((machineType) => (
+              <option key={machineType.id} value={machineType.id}>{machineType.name}</option>
+            ))}
+          </select>
+          {requiresMachineType && !machineTypes.isLoading && !typeOptions.length ? (
+            <span className="normal-case tracking-normal text-danger">No machine types are linked to your role.</span>
+          ) : null}
+        </label>
+        {canChooseKind ? <KindSelect value={form.kind} onChange={(kind) => setForm({ ...form, kind })} /> : <AddButton disabled={create.isPending || !form.name.trim() || (requiresMachineType && !form.machine_type)} label="Add" />}
+        {canChooseKind ? <AddButton disabled={create.isPending || !form.name.trim() || (requiresMachineType && !form.machine_type)} label="Add item" className="xl:col-span-8" /> : null}
       </form>
       <MutationErrors create={create.error} update={update.error} remove={remove.error} exportError={exportToBuy.error} />
 
@@ -120,7 +162,7 @@ export function ProcurementPanel({ makerspace, canChooseKind = false }: { makers
           <Metric label="Visible estimated total" value={formatAmount(visibleEstimatedTotal)} />
           <Metric label="Open budget" value={formatAmount(openBudget)} />
           <Metric label="Received actual total" value={formatAmount(receivedTotal)} />
-          <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-muted">
+          <label className="eyebrow grid gap-1">
             Status
             <select className="desk-input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
               <option value="all">All</option>
@@ -129,8 +171,8 @@ export function ProcurementPanel({ makerspace, canChooseKind = false }: { makers
           </label>
         </div>
         <div className="flex flex-wrap gap-2 justify-self-start lg:justify-self-end">
-          <button className="desk-button" type="button" disabled={exportToBuy.isPending} onClick={() => exportToBuy.mutate("csv")}>Export CSV</button>
-          <button className="desk-button" type="button" disabled={exportToBuy.isPending} onClick={() => exportToBuy.mutate("xlsx")}>Export XLSX</button>
+          <button className="desk-button-ghost" type="button" disabled={exportToBuy.isPending} onClick={() => exportToBuy.mutate("csv")}>Export CSV</button>
+          <button className="desk-button-ghost" type="button" disabled={exportToBuy.isPending} onClick={() => exportToBuy.mutate("xlsx")}>Export XLSX</button>
         </div>
       </div>
       <ProcurementTable rows={rows} items={items} update={update} remove={remove} invalidate={invalidate} makerspaceSlug={makerspace.slug} onMove={setMoveTarget} />
@@ -147,15 +189,33 @@ function ProcurementTable({ rows, items, update, remove, invalidate, makerspaceS
   return (
     <div className="mt-3 max-h-[32rem] overflow-x-auto overflow-y-auto rounded-md border border-line">
       <table className="min-w-[1180px] divide-y divide-line text-left text-sm">
-        <thead className="sticky top-0 bg-surface text-xs uppercase tracking-wide text-muted">
-          <tr>{["kind", "item", "qty", "link", "est.", "vendor", "actual", "purchaser", "ordered", "received", "receipts", "status", "moved", ""].map((header) => <th key={header} className="whitespace-nowrap px-3 py-2 font-semibold">{header}</th>)}</tr>
+        <thead className="eyebrow sticky top-0 bg-surface">
+          <tr>{["kind", "item", "qty", "link", "est.", "vendor", "actual", "purchaser", "ordered", "received", "receipts", "status", "moved", ""].map((header) => <th key={header} className="whitespace-nowrap px-3 py-2">{header}</th>)}</tr>
         </thead>
         <tbody className="divide-y divide-line bg-bg text-ink">
-          {rows.map((item) => <ProcurementRow key={item.id} item={item} makerspaceSlug={makerspaceSlug} updatePending={update.isPending} deletePending={remove.isPending} onSave={(draft) => update.mutate({ id: item.id, payload: { status: draft.status, vendor_name: draft.vendor_name, actual_unit_cost: draft.actual_unit_cost ? Number(draft.actual_unit_cost) : null } })} onDelete={() => remove.mutate(item.id)} onMove={() => onMove(item)} onReceiptsChanged={invalidate} />)}
+          {groupProcurementRows(rows).map((group) => (
+            <GroupedRows
+              key={group.key}
+              label={group.label}
+              rows={group.rows}
+              makerspaceSlug={makerspaceSlug}
+              update={update}
+              remove={remove}
+              invalidate={invalidate}
+              onMove={onMove}
+            />
+          ))}
         </tbody>
       </table>
     </div>
   );
+}
+
+function GroupedRows({ label, rows, makerspaceSlug, update, remove, invalidate, onMove }: { label: string; rows: ToBuyItem[]; makerspaceSlug: string; update: UseMutationResult<unknown, Error, UpdateVariables>; remove: UseMutationResult<unknown, Error, number>; invalidate: () => void; onMove: (item: ToBuyItem) => void }) {
+  return <>
+    <tr className="bg-surface"><th className="eyebrow px-3 py-2" colSpan={14}>{label}</th></tr>
+    {rows.map((item) => <ProcurementRow key={item.id} item={item} makerspaceSlug={makerspaceSlug} updatePending={update.isPending} deletePending={remove.isPending} onSave={(draft) => update.mutate({ id: item.id, payload: { status: draft.status, vendor_name: draft.vendor_name, actual_unit_cost: draft.actual_unit_cost ? Number(draft.actual_unit_cost) : null } })} onDelete={() => remove.mutate(item.id)} onMove={() => onMove(item)} onReceiptsChanged={invalidate} />)}
+  </>;
 }
 
 function KindSelect({ value, onChange }: { value: Kind; onChange: (kind: Kind) => void }) {
@@ -176,8 +236,10 @@ function formatAmount(value: number) {
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-md border border-line bg-bg px-3 py-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p><p className="mt-1 text-lg font-semibold text-ink">{value}</p></div>;
+  const tones: Record<string, string> = {
+    "Visible estimated total": "border-accent bg-accent/15",
+    "Open budget": "border-warn bg-warn/15",
+    "Received actual total": "border-success bg-success/15",
+  };
+  return <div className={`rounded-md border px-3 py-2 ${tones[label] ?? "border-secondary bg-secondary/15"}`}><p className="eyebrow">{label}</p><p className="mt-1 font-mono text-lg font-semibold text-ink">{value}</p></div>;
 }
-
-
-

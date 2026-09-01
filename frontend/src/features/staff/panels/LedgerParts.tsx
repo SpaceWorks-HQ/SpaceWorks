@@ -36,7 +36,7 @@ export function LedgerSkeleton({ aggregate }: { aggregate: boolean }) {
   return (
     <div className="overflow-x-auto rounded-md border border-line">
       <table className="min-w-[760px] divide-y divide-line text-left text-sm" aria-hidden="true">
-        <thead className="bg-bg text-xs font-semibold uppercase text-muted">
+        <thead className="eyebrow bg-bg">
           <tr>
             {["Item", "Holder", "Qty", "Out since", "Due", "Source", aggregate ? "Makerspace" : ""]
               .filter(Boolean)
@@ -90,7 +90,7 @@ export function SortableHeader({
     <th className={`whitespace-nowrap px-3 py-2 ${align === "right" ? "text-right" : "text-left"}`}>
       <button
         type="button"
-        className={`inline-flex items-center gap-1 hover:text-accent-ink ${align === "right" ? "justify-end" : ""}`}
+        className={`desk-button-ghost ${align === "right" ? "justify-end" : ""}`}
         onClick={() => onSort(sortKey)}
       >
         {label}

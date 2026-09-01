@@ -1,5 +1,4 @@
 """Private attachment storage for machine service requests."""
-
 from dataclasses import dataclass
 import logging
 import uuid
@@ -23,6 +22,7 @@ from apps.machines import storage as machine_storage
 from apps.machines.models import Machine, MachineServiceRequest, ServiceRequestFile
 from apps.machines.service_file_policies import get_policy, policy_for_machine, policy_for_queue
 from apps.makerspaces import limits
+from apps.object_storage import delete_all_versions
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +155,9 @@ def object_size(object_key):
 
 def delete_object(object_key):
     try:
-        _client().delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=object_key)
+        delete_all_versions(
+            _client(), bucket=settings.AWS_STORAGE_BUCKET_NAME, key=object_key
+        )
     except (BotoCoreError, ClientError):
         logger.exception("Failed to delete machine service object %s.", object_key)
 
@@ -220,7 +222,15 @@ def validate_service_object(file, policy):
 
 
 def finalize_file(service_request, *, file_id, actor):
-    file = ServiceRequestFile.objects.select_related("makerspace", "machine__makerspace", "queue__makerspace").get(pk=file_id)
+    try:
+        file = ServiceRequestFile.objects.select_related(
+            "makerspace", "machine__makerspace", "queue__makerspace"
+        ).get(pk=file_id, owner_user_id=actor.pk)
+    except ServiceRequestFile.DoesNotExist as exc:
+        raise ValidationError(
+            {"file_id": "Attachment is unavailable for this request."},
+            code="invalid_attachment",
+        ) from exc
     # Refuse an already-attached file before touching object storage so a retry or
     # concurrent finalize can never delete the live object a committed record points at.
     if file.service_request_id is not None or file.attached_at is not None:
@@ -236,9 +246,13 @@ def finalize_file(service_request, *, file_id, actor):
                 "bucket__machine__makerspace", "queue__makerspace"
             ).get(pk=service_request.pk)
             locked_file = ServiceRequestFile.objects.select_for_update().get(pk=file.pk)
-            if locked_file.service_request_id is not None or locked_file.makerspace_id != locked_request.makerspace_id or (
-                locked_request.queue_id and locked_file.queue_id != locked_request.queue_id
-            ) or (locked_request.bucket_id and locked_file.machine_id != locked_request.bucket.machine_id):
+            if (
+                locked_file.owner_user_id != actor.pk
+                or locked_file.service_request_id is not None
+                or locked_file.makerspace_id != locked_request.makerspace_id
+                or (locked_request.queue_id and locked_file.queue_id != locked_request.queue_id)
+                or (locked_request.bucket_id and locked_file.machine_id != locked_request.bucket.machine_id)
+            ):
                 raise ValidationError({"file_id": "Attachment is unavailable for this request."}, code="invalid_attachment")
             limits.add_storage(locked_request.makerspace, result.size)
             locked_file.service_request = locked_request

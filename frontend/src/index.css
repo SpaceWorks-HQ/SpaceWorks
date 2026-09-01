@@ -51,9 +51,16 @@
     --color-bg: 250 249 244;
     --color-surface: 239 238 233;
     --color-panel: 255 255 255;
-    --color-muted: 107 119 128;
+    /* Darkened from 107 119 128, which measured 4.35:1 on --color-bg and 3.95:1
+       on --color-surface — below the 4.5:1 AA floor for body text on the two
+       backgrounds it sits on most. This value clears 4.98:1 everywhere. */
+    --color-muted: 92 103 112;
     --color-line: 227 225 216;
     --color-outline: 196 193 182;
+    /* Focus indicator. Deliberately not the pastel accent: at the /40 alpha the
+       rings used to carry it, the indicator fell below the 3:1 that WCAG 2.2
+       SC 2.4.11 wants against adjacent colours. */
+    --color-focus: 12 74 110;
     --color-success: 116 221 156;
     --color-success-ink: 0 50 27;
     --color-warn: 252 223 70;
@@ -62,14 +69,6 @@
     --color-info-ink: 0 55 74;
     --color-danger: 164 36 59;
     --color-danger-ink: 90 22 32;
-    --color-tone-blue: 125 211 252;
-    --color-tone-blue-ink: 0 55 74;
-    --color-tone-yellow: 252 223 70;
-    --color-tone-yellow-ink: 61 52 0;
-    --color-tone-mint: 116 221 156;
-    --color-tone-mint-ink: 0 50 27;
-    --color-tone-pink: 249 168 212;
-    --color-tone-pink-ink: 90 22 51;
     --shadow-color: 31 46 53;
   }
 
@@ -92,9 +91,11 @@
     --color-bg: 22 22 28;
     --color-surface: 38 40 51;
     --color-panel: 29 30 38;
+    /* Dark-mode muted already measured 5.58:1 at worst, so it is unchanged. */
     --color-muted: 154 160 173;
     --color-line: 51 52 63;
     --color-outline: 71 73 86;
+    --color-focus: 186 230 253;
     --color-success: 116 221 156;
     --color-success-ink: 116 221 156;
     --color-warn: 252 223 70;
@@ -103,14 +104,6 @@
     --color-info-ink: 125 211 252;
     --color-danger: 244 114 127;
     --color-danger-ink: 90 22 32;
-    --color-tone-blue: 125 211 252;
-    --color-tone-blue-ink: 0 55 74;
-    --color-tone-yellow: 252 223 70;
-    --color-tone-yellow-ink: 61 52 0;
-    --color-tone-mint: 116 221 156;
-    --color-tone-mint-ink: 0 50 27;
-    --color-tone-pink: 249 168 212;
-    --color-tone-pink-ink: 90 22 51;
     --shadow-color: 0 0 0;
   }
 
@@ -193,6 +186,28 @@
     transform: translateY(-2px);
   }
 
+  /* --- type scale -------------------------------------------------------------------
+     The base layer already maps every h1-h6 to Clash Display, and 107 of ~224 components
+     use real heading elements -- so the display face was never "unused", it was SUPPRESSED
+     by the size and colour those headings carried (`Panel` rendered its h2 as
+     `text-sm font-semibold text-muted`). These four classes are the scale at which it
+     reads, and they keep the decision in one place instead of in 200 class strings.
+
+     `.eyebrow` is the JetBrains Mono voice for labels, units and column headers. `font-mono`
+     was already healthy in 28 files; this names the pattern so it stops being ad hoc. */
+  .title-page {
+    @apply text-2xl font-semibold tracking-tight text-ink;
+  }
+  .title-panel {
+    @apply text-lg font-semibold tracking-tight text-ink;
+  }
+  .title-section {
+    @apply text-base font-semibold text-ink;
+  }
+  .eyebrow {
+    @apply font-mono text-[11px] font-semibold uppercase tracking-wide text-muted;
+  }
+
   .chip {
     @apply inline-flex items-center gap-1 rounded-full border border-outline bg-surface px-2 py-1 font-mono text-xs font-medium text-ink;
   }
@@ -219,6 +234,13 @@
     @apply bg-danger text-bg;
   }
 
+  .skip-link {
+    @apply sr-only;
+  }
+  .skip-link:focus-visible {
+    @apply not-sr-only fixed left-4 top-4 z-[100] rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold text-ink shadow-soft-lg outline-2 outline-offset-2 outline-focus;
+  }
+
   .desk-shell {
     @apply min-h-screen min-w-0 bg-bg text-ink;
     background: rgb(var(--color-bg));
@@ -229,19 +251,53 @@
   }
 
   .desk-input {
-    @apply rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink outline-none transition placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/25;
+    @apply min-h-11 rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink transition placeholder:text-muted focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus;
   }
 
   .desk-button {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm font-medium text-ink transition-all hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-panel;
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm font-medium text-ink transition-all hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-panel;
   }
 
   .desk-button-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-accent px-3 py-2 text-sm font-semibold text-on-accent shadow-soft transition-all hover:-translate-y-0.5 hover:bg-accent-bright hover:text-on-accent hover:shadow-soft-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-accent disabled:hover:shadow-soft;
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-accent px-3 py-2 text-sm font-semibold text-on-accent shadow-soft transition-all hover:-translate-y-0.5 hover:bg-accent-bright hover:text-on-accent hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-accent disabled:hover:shadow-soft;
+  }
+
+  /* --- the rest of the button family ------------------------------------------------
+     `desk-button` (253 uses) and `desk-button-primary` (97) already covered neutral and
+     primary. These are the variants components were spelling out inline, each slightly
+     differently -- which is how a button ends up with a colour nothing else in the product
+     uses. Every one keeps the 44px target and the same focus-visible ring, and every fill
+     pairs with its FIXED `on-*` ink so it survives dark mode.
+
+     `-secondary` is the public/member primary: on a stranger-facing surface pink is the
+     interaction colour, and a page whose only call to action is sky-blue does not belong to
+     the same product as its own logo. */
+  .desk-button-secondary {
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-secondary px-3 py-2 text-sm font-semibold text-on-secondary shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-soft;
+  }
+
+  .desk-button-success {
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-success px-3 py-2 text-sm font-semibold text-on-success shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-soft;
+  }
+
+  .desk-button-warn {
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-warn px-3 py-2 text-sm font-semibold text-on-warn shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-soft;
+  }
+
+  /* Destructive. `text-bg` rather than an `on-*` token because `danger` is the one
+     non-pastel and is dark in both themes. */
+  .desk-button-danger {
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-danger bg-danger px-3 py-2 text-sm font-semibold text-bg shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-soft;
+  }
+
+  /* Tertiary: no fill, no border, for a link-like action sitting beside a real button. Still
+     44px and still focus-visible, because "quiet" must not mean "unreachable by keyboard". */
+  .desk-button-ghost {
+    @apply min-h-11 inline-flex items-center justify-center gap-2 rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-accent-ink transition-colors hover:bg-accent/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .desk-nav-item {
-    @apply flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border-l border-transparent px-3 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:bg-accent/15 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30;
+    @apply min-h-11 flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border-l border-transparent px-3 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:bg-accent/15 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus;
   }
 
   .desk-nav-item-active {
@@ -249,7 +305,7 @@
   }
 
   .desk-tab {
-    @apply flex-1 rounded-lg border border-transparent px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply flex-1 rounded-lg border border-transparent px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .desk-tab-active {
@@ -257,7 +313,7 @@
   }
 
   .desk-actions button {
-    @apply inline-flex items-center justify-center rounded-lg border border-line px-2 py-1 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-lg border border-line px-2 py-1 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .desk-actions button:not([class*="bg-"]) {
@@ -288,6 +344,6 @@
   .desk-panel-body
     > div:not(.desk-actions)
     > button:not([class*="desk-"]):not([class*="text-"]):not([class*="bg-"]) {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-accent px-3 py-2 text-sm font-semibold text-on-accent shadow-soft transition-all hover:-translate-y-0.5 hover:bg-accent-bright hover:text-on-accent hover:shadow-soft-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-accent px-3 py-2 text-sm font-semibold text-on-accent shadow-soft transition-all hover:-translate-y-0.5 hover:bg-accent-bright hover:text-on-accent hover:shadow-soft-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus;
   }
 }

@@ -1,10 +1,32 @@
 from rest_framework import serializers
 
+from apps.machines.models import MachineType
 from apps.procurement.models import ToBuyItem, ToBuyReceipt
 
 
 class ErrorSerializer(serializers.Serializer):
     detail = serializers.CharField(required=False)
+
+
+class ToBuyMachineTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MachineType
+        fields = ["id", "name"]
+        read_only_fields = fields
+
+
+class ToBuyMachineTypeOptionsSerializer(serializers.Serializer):
+    """Options plus a SERVER-derived answer to "must the caller pick one?".
+
+    The console must not infer this from effective actions. A null-`assigned_role`
+    legacy membership is scope-exempt and cannot be expressed that way, and "holds
+    MANAGE_MACHINES" is not the same question as "is narrowed by machine scope" -- a role
+    holding MANAGE_MAKERSPACE holds both and is exempt. Deriving it here keeps one answer
+    on the server, the same reason the dashboard carries `scope_mode`.
+    """
+
+    machine_type_required = serializers.BooleanField()
+    results = ToBuyMachineTypeSerializer(many=True)
 
 
 class ToBuyReceiptSerializer(serializers.ModelSerializer):
@@ -40,6 +62,12 @@ class ToBuyItemSerializer(serializers.ModelSerializer):
         default=None,
     )
     receipts = ToBuyReceiptSerializer(many=True, read_only=True)
+    machine_type_name = serializers.CharField(
+        source="machine_type.name",
+        read_only=True,
+        default=None,
+        allow_null=True,
+    )
     # Declared explicitly with min_value=1 so the OpenAPI schema advertises
     # minimum: 1 - matching the server rule that quantity must be >= 1.
     quantity = serializers.IntegerField(min_value=1, default=1)
@@ -50,6 +78,8 @@ class ToBuyItemSerializer(serializers.ModelSerializer):
             "id",
             "makerspace",
             "kind",
+            "machine_type",
+            "machine_type_name",
             "name",
             "quantity",
             "link",
@@ -76,6 +106,7 @@ class ToBuyItemSerializer(serializers.ModelSerializer):
             "id",
             "makerspace",
             "kind",
+            "machine_type_name",
             "purchaser",
             "purchaser_username",
             "ordered_at",

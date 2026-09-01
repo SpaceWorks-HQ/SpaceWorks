@@ -1,17 +1,25 @@
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
+from apps.bookings.models import BookableSpace
+from apps.data_export import storage as export_storage
+from apps.data_export.models import DataExportJob
+from apps.events.models import Event
 from apps.evidence import storage as evidence_storage
 from apps.evidence.models import EvidencePhoto
 from apps.inventory import public_image_storage
 from apps.inventory.models import InventoryProduct
 from apps.machines import storage as machine_storage
 from apps.machines.models import Machine, MachineDocument, ServiceRequestFile
-from apps.makerspaces.models import Makerspace
+from apps.maintenance import storage as maintenance_storage
+from apps.maintenance.models import MaintenanceLogDocument
+from apps.makerspaces.models import Makerspace, MemberProfile, MemberProject
+from apps.makerspaces.servability import servable_queryset
 from apps.procurement import storage as procurement_storage
 from apps.procurement.models import ToBuyReceipt
 from apps.warranty import storage as warranty_storage
 from apps.warranty.models import WarrantyDocument
+from apps.backup.models import RestoreRollbackObject
 
 
 class StorageReadError(Exception):
@@ -26,7 +34,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         selector = options["makerspace"]
-        makerspaces = Makerspace.objects.all()
+        makerspaces = servable_queryset()
         if selector:
             lookup = Q(slug=selector)
             if selector.isdigit():
@@ -34,8 +42,6 @@ class Command(BaseCommand):
             makerspaces = makerspaces.filter(lookup)
             if not makerspaces.exists():
                 raise CommandError(f"Makerspace {selector!r} was not found.")
-        else:
-            makerspaces = makerspaces.filter(archived_at__isnull=True)
         for makerspace in makerspaces.order_by("pk"):
             try:
                 values = {
@@ -45,6 +51,25 @@ class Command(BaseCommand):
                     "machine_documents": self._sum(((key, None) for key in MachineDocument.objects.filter(machine__makerspace=makerspace).values_list("object_key", flat=True)), machine_storage.object_size),
                     "warranty_documents": self._sum(((key, None) for key in WarrantyDocument.objects.filter(warranty__makerspace=makerspace).values_list("object_key", flat=True)), warranty_storage.object_size),
                     "procurement_receipts": self._sum(((key, None) for key in ToBuyReceipt.objects.filter(to_buy_item__makerspace=makerspace).values_list("object_key", flat=True)), procurement_storage.object_size),
+                    # Charged on upload by `maintenance/services_documents.py` and collected by
+                    # both the makerspace purge and the `maintenance` module purge plan, but
+                    # absent here -- so this command, which is the AUTHORITATIVE reconciler,
+                    # wrote a total omitting every maintenance document and silently lowered a
+                    # space's recorded usage. Reached through the log's machine; the rows carry
+                    # `size_bytes`, so a HEAD that cannot see the object falls back to it.
+                    "maintenance_documents": self._sum(MaintenanceLogDocument.objects.filter(log__machine__makerspace=makerspace).values_list("object_key", "size_bytes"), maintenance_storage.object_size, True),
+                    "data_exports": self._sum(
+                        DataExportJob.objects.filter(
+                            makerspace=makerspace,
+                            status=DataExportJob.Status.AVAILABLE,
+                        ).values_list("object_key", "accounted_size_bytes"),
+                        export_storage.object_size,
+                        True,
+                    ),
+                    "restore_rollback_objects": sum(
+                        RestoreRollbackObject.objects.filter(makerspace=makerspace)
+                        .values_list("size_bytes", flat=True)
+                    ),
                 }
             except StorageReadError as exc:
                 self.stdout.write(self.style.WARNING(f"{makerspace.slug}: usage left unchanged due to storage read error for {exc}."))
@@ -71,4 +96,22 @@ class Command(BaseCommand):
         keys = {makerspace.logo_key, makerspace.cover_image_key}
         keys.update(InventoryProduct.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
         keys.update(Machine.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
+        keys.update(Event.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
+        # BookableSpace images are charged on upload and collected by lifecycle purge,
+        # but were missing here, so the reconciler wrote a total that omitted them and
+        # silently lowered a space's recorded usage. apps/bookings/storage.py is a thin
+        # wrapper over public_image_storage, so these live in the same bucket.
+        keys.update(BookableSpace.objects.filter(makerspace=makerspace).values_list("image_key", flat=True))
+        # Member avatars and project images, reached through the membership: the profile
+        # carries no makerspace column, being hung off MakerspaceMembership.
+        keys.update(
+            MemberProfile.objects.filter(membership__makerspace=makerspace).values_list(
+                "avatar_key", flat=True
+            )
+        )
+        keys.update(
+            MemberProject.objects.filter(
+                profile__membership__makerspace=makerspace
+            ).values_list("image_key", flat=True)
+        )
         return {key for key in keys if key}

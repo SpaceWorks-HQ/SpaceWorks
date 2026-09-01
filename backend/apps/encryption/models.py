@@ -108,7 +108,7 @@ class PiiBlindIndex(models.Model):
     def clean(self):
         allowed = {
             (field.model_label, field.field_name): field.index_kind
-            for field in __import__("apps.encryption.registry", fromlist=["ALL_FIELDS"]).ALL_FIELDS
+            for field in __import__("apps.encryption.registry", fromlist=["all_fields"]).all_fields()
             if field.index_kind in {"bloom", "bloom_exact"}
         }
         kind = allowed.get((self.model_label, self.field_name))
@@ -140,6 +140,7 @@ class _FenceModel(models.Model):
         ENABLE_TRANSITION = "enable_transition", "Enable transition"
         DECRYPT_ROLLBACK = "decrypt_rollback", "Decrypt rollback"
         SEARCH_ROTATION = "search_rotation", "Search rotation"
+        TENANT_IMPORT = "tenant_import", "Tenant import"
 
     state = models.CharField(max_length=8, choices=State.choices, default=State.OPEN)
     operation_id = models.UUIDField(null=True, blank=True)

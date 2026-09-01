@@ -9,9 +9,10 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
+from apps.admin_api.serializers_machine_types import MachineTypeAccessSerializer
 from apps.audit import services as audit
-from apps.machines import access
-from apps.machines.models import MachineType
+from apps.machines import access, role_scope
+from apps.machines.models import Machine, MachineType
 from apps.machines.serializers import (
     MachineTypeCreateSerializer,
     MachineTypeSerializer,
@@ -27,16 +28,48 @@ class MachineTypeListCreateView(APIView):
         tags=['Admin machines'],
         summary='List machine types for a makerspace',
         request=None,
-        responses={200: MachineTypeSerializer(many=True)},
+        responses={200: MachineTypeAccessSerializer(many=True)},
     )
     def get(self, request, makerspace_id, *args, **kwargs):
         require_module(makerspace_id, 'machines')
         if not access.can_see_machines(request.user, makerspace_id):
             raise PermissionDenied()
-        queryset = MachineType.objects.filter(
+        applicable = list(MachineType.objects.filter(
             Q(makerspace__isnull=True) | Q(makerspace_id=makerspace_id)
+        ))
+        manage_granted = rbac.can(
+            request.user, rbac.Action.MANAGE_MACHINES, makerspace_id
         )
-        return Response(MachineTypeSerializer(queryset, many=True).data)
+        machine_scope = role_scope.manage_scope_for(request.user, makerspace_id)
+        direct_actions = {
+            action
+            for action in {row.managing_action for row in applicable if row.managing_action}
+            if rbac.can(request.user, action, makerspace_id)
+            and role_scope.grants_directly(request.user, makerspace_id, action)
+        }
+
+        if manage_granted and machine_scope is role_scope.EXEMPT:
+            reachable_ids = {row.pk for row in applicable}
+        else:
+            linked_type_ids = machine_scope[0] if manage_granted else frozenset()
+            reachable_ids = set(linked_type_ids)
+            reachable_ids.update(
+                access.scope_machines_for_actor(
+                    request.user,
+                    Machine.objects.filter(makerspace_id=makerspace_id),
+                ).values_list("machine_type_id", flat=True)
+            )
+            reachable_ids.update(
+                row.pk for row in applicable if row.managing_action in direct_actions
+            )
+
+        rows = [row for row in applicable if row.pk in reachable_ids]
+        for row in rows:
+            row.can_create_machine = (
+                manage_granted
+                and role_scope.scope_covers_type(machine_scope, row)
+            ) or row.managing_action in direct_actions
+        return Response(MachineTypeAccessSerializer(rows, many=True).data)
 
     @extend_schema(
         tags=['Admin machines'],

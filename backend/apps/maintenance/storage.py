@@ -17,6 +17,7 @@ from apps.maker_file_formats import (
     has_required_signature,
     sniff_pdf_or_image,
 )
+from apps.object_storage import delete_all_versions
 
 
 logger = logging.getLogger(__name__)
@@ -117,9 +118,8 @@ def presigned_upload(object_key, content_type):
 
 def delete_object(object_key):
     try:
-        _client().delete_object(
-            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-            Key=object_key,
+        delete_all_versions(
+            _client(), bucket=settings.AWS_STORAGE_BUCKET_NAME, key=object_key
         )
     except (BotoCoreError, ClientError):
         logger.exception("Failed to delete maintenance document %s.", object_key)

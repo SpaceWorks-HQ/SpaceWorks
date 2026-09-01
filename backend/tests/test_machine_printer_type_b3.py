@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytest
 from rest_framework.exceptions import ValidationError
 
+from apps.machines import role_scope
 from apps.machines.models import Machine, MachineServiceRequest, MachineType, ServiceQueue
 from apps.machines.serializers import MachineSerializer
 from apps.machines.service_consumable_pools import create_pool, log_typed_manual_usage
@@ -47,7 +48,7 @@ def test_printer_type_contract_drives_full_generic_lifecycle():
     )
     assert request.assigned_machine_id is None
     accept(request, actor, estimated_minutes=30)
-    started = start(request, actor, machine_id=target.id, consumable_pool_id=pool.id, planned_grams="20")
+    started = start(request, actor, role_scope.EXEMPT, machine_id=target.id, consumable_pool_id=pool.id, planned_grams="20")
     assert started.run_machine_model == "MK4"
     assert (started.run_consumable_material, started.run_consumable_color) == ("PLA", "Blue")
     complete(started, actor, actual_minutes=25, consumptions=[], actual_grams="12")
@@ -92,9 +93,9 @@ def test_printer_contract_rejects_invalid_model_pool_and_cross_tenant_or_type_al
     other_type = MachineType.objects.create(makerspace=space, slug="b3-non-printer", name="Non printer")
     wrong = Machine.objects.create(makerspace=space, machine_type=other_type, name="Other")
     with pytest.raises(ServiceMachineUnavailable):
-        start(request, actor, machine_id=foreign.id)
+        start(request, actor, role_scope.EXEMPT, machine_id=foreign.id)
     with pytest.raises(ServiceMachineUnavailable):
-        start(request, actor, machine_id=wrong.id)
+        start(request, actor, role_scope.EXEMPT, machine_id=wrong.id)
 
     ordinary = Machine.objects.create(makerspace=space, machine_type=other_type, name="Legacy machine")
     legacy = submit(ordinary, requester, actor=actor, requester_name="Requester", contact_email="r@example.test", contact_phone="1", title="Repair")

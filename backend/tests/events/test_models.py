@@ -156,15 +156,15 @@ def test_events_module_migration_forward_is_idempotent_and_reverse_is_targeted()
     assert second.enabled_modules == ["another-custom"]
 
 
-def test_new_makerspaces_enable_events_by_default():
-    makerspace = make_space("events-enabled-by-default")
+def test_events_is_an_installable_module():
+    # Modules are opt-in, so `events` is no longer on by default. It must still be a
+    # registered module that the `everything` profile installs. (The old assertion
+    # pinned its position within enabled_modules, which canonicalization sorts anyway.)
+    from apps.makerspaces.models import DEFAULT_ENABLED_MODULES
+    from apps.makerspaces.module_profiles import EVERYTHING, profile_modules
 
-    assert "events" in makerspace.enabled_modules
-    # events is a FabLab default enabled after the machines block; don't assert
-    # exact adjacency (machine_service now sits between machines and events).
-    assert makerspace.enabled_modules.index("events") > (
-        makerspace.enabled_modules.index("machines")
-    )
+    assert "events" not in DEFAULT_ENABLED_MODULES
+    assert "events" in profile_modules(EVERYTHING)
 
 
 def test_public_token_is_generated_unique_immutable_and_not_the_internal_id():

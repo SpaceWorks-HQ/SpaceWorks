@@ -7,6 +7,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.boxes.models import Box, QrCode, QrScanEvent
 from apps.evidence.models import EvidencePhoto
+from apps.evidence.finalization import charge_storage_once
 from apps.hardware_requests.models import HardwareRequest, PublicToolLoan
 from apps.hardware_requests.direct_loan_audit import record_item_logs
 from apps.hardware_requests.direct_loan_returns import return_direct_loan, validate_evidence_upload
@@ -43,15 +44,15 @@ def issue_direct_loan(
     ).first()
     if evidence is None:
         raise RequestValidationError("Invalid issue evidence.")
+    if container_id is None and not qr_payloads and not items:
+        raise RequestValidationError("Provide qr_payloads, items, or a container.")
+    finalized = validate_evidence_upload(evidence, label="Issue")
     due_at = timezone.now() + timedelta(days=(makerspace.default_loan_days or 7))
     with transaction.atomic():
         EvidencePhoto.objects.select_for_update().get(pk=evidence.pk)
         if HardwareRequest.objects.filter(issue_evidence=evidence).exists():
             raise RequestValidationError("Evidence already used.")
-        validate_evidence_upload(evidence, label="Issue")
-        if container_id is None and not qr_payloads and not items:
-            raise RequestValidationError("Provide qr_payloads, items, or a container.")
-
+        charge_storage_once(evidence, finalized.size)
         container = None
         if container_id is not None:
             container = (
@@ -243,5 +244,3 @@ def _manual_product(makerspace, product_id):
             "Individual-tracked products require scanned asset QR codes for handout."
         )
     return product
-
-

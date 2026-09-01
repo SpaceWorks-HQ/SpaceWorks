@@ -9,6 +9,8 @@ import { DirectLoanList, type DirectLoan } from "./DirectLoanList";
 import { invalidateInventoryViews } from "./queryInvalidation";
 import { DirectLoanReturnModal, type DirectLoanResolution } from "./DirectLoanReturnModal";
 import { Panel, type Makerspace, useStaffGet } from "./StaffPanels";
+import { WalkInMemberForm } from "./WalkInMemberForm";
+import { MemberClaimCodes, type ClaimableMember } from "./MemberClaimCodes";
 import { EvidenceUpload } from "./panels/EvidenceUpload";
 
 type ProductOption = {
@@ -23,7 +25,11 @@ type ProductOption = {
 };
 type ContainerOption = { id: number; label: string };
 type ContainerResponse = ContainerOption[] | { results: ContainerOption[] };
-type DirectLoanMember = { user_id: number; display_name: string; username: string };
+// Phase 7 D4 replaced the inline shape with ClaimableMember, which the claim-code
+// surface also consumes: a member the desk can hand a tool to is the same member the
+// desk can issue a claim code for, so one type keeps the two panels honest.
+type DirectLoanMember = ClaimableMember;
+type DirectLoanMemberResponse = DirectLoanMember[] | { results: DirectLoanMember[] };
 type LineDraft = { key: number; productId: string; quantity: string };
 type ScannedPayload = { payload: string; label: string };
 type ReturnLoanPayload = { loanId: number; evidenceId: number; notes: string; qrPayload: string; resolutions: DirectLoanResolution[] };
@@ -81,9 +87,18 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
     ["containers-all", makerspace.id],
     `/admin/makerspace/${makerspace.id}/containers?page_size=1000`,
   );
-  const members = useStaffGet<DirectLoanMember[]>(
+  // The endpoint is a DRF ListAPIView, so it answers with the paginated envelope, not a
+  // bare array — the same unwrap `containerOptions` below already does. Typing it as an
+  // array made `.map` a runtime TypeError that took the whole panel down with it.
+  const members = useStaffGet<DirectLoanMemberResponse>(
     ["direct-loan-members", makerspace.id],
-    `/admin/makerspace/${makerspace.id}/direct-loan-members`,
+    `/admin/makerspace/${makerspace.id}/direct-loan-members?page_size=1000`,
+  );
+  const memberOptions = Array.isArray(members.data)
+    ? members.data
+    : members.data?.results ?? [];
+  const selectedMember = memberOptions.find(
+    (member) => String(member.user_id) === borrowerId,
   );
   const containerOptions = Array.isArray(containers.data)
     ? containers.data
@@ -126,6 +141,18 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
       setIssueRemark("Issued from direct handout.");
       setIssueUploadKey((key) => key + 1);
     },
+  });
+  const witnessWaiver = useMutation({
+    mutationFn: () => {
+      if (!selectedMember) throw new Error("Select a member first.");
+      return staffRequest(
+        `/admin/memberships/${selectedMember.membership_id}/waiver/witness`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+    },
+    onSuccess: () => queryClient.invalidateQueries({
+      queryKey: ["members", makerspace.id],
+    }),
   });
   const pastedQrPayloads = qrPayloads.split("\n").map((value) => value.trim()).filter(Boolean);
   const validManualLines = lineRows.filter((line) => {
@@ -247,16 +274,35 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
           className="desk-input mt-1 w-full"
           value={borrowerId}
           disabled={members.isLoading}
-          onChange={(event) => setBorrowerId(event.target.value)}
+          onChange={(event) => {
+            setBorrowerId(event.target.value);
+            witnessWaiver.reset();
+          }}
         >
           <option value="">Select an active member</option>
-          {(members.data ?? []).map((member) => (
+          {memberOptions.map((member) => (
             <option key={member.user_id} value={member.user_id}>
               {member.display_name || member.username}
             </option>
           ))}
         </select>
         {members.error ? <p className="mt-2 text-sm text-danger">{members.error.message}</p> : null}
+        {selectedMember ? (
+          <button
+            className="desk-button mt-2"
+            type="button"
+            disabled={witnessWaiver.isPending}
+            onClick={() => witnessWaiver.mutate()}
+          >
+            Record witnessed waiver acceptance
+          </button>
+        ) : null}
+        {witnessWaiver.isSuccess ? <p className="mt-2 text-sm text-success-ink">Waiver acceptance recorded.</p> : null}
+        {witnessWaiver.error ? <p className="mt-2 text-sm text-danger">{witnessWaiver.error.message}</p> : null}
+        <WalkInMemberForm
+          makerspaceId={makerspace.id}
+          onCreated={(userId) => setBorrowerId(String(userId))}
+        />
         <label className="mt-4 block text-sm font-medium text-ink" htmlFor="direct-loan-container">Container (optional)</label>
         <div className="mt-1 flex flex-col gap-2 md:flex-row">
           <select
@@ -285,7 +331,7 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
         {containerScanError ? <p className="mt-1 text-sm text-danger">{containerScanError}</p> : null}
         <div className="mt-4">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-ink">Items</h3>
+            <h3 className="title-section">Items</h3>
             <button className="desk-button" type="button" onClick={addLine}>Add item</button>
           </div>
           <div className="grid gap-2">
@@ -313,7 +359,7 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
         </div>
         <div className="mt-4">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-ink">QR payloads</h3>
+            <h3 className="title-section">QR payloads</h3>
             <button className="desk-button" type="button" onClick={() => setShowScanner(true)}>Scan QR</button>
           </div>
           {scanned.length ? (
@@ -321,7 +367,7 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
               {scanned.map((item) => (
                 <span key={item.payload} className="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-1 text-sm text-ink">
                   {item.label}
-                  <button className="text-muted hover:text-danger" type="button" onClick={() => removeScanned(item.payload)}>Remove</button>
+                  <button className="desk-button-ghost px-2 text-danger" type="button" onClick={() => removeScanned(item.payload)}>Remove</button>
                 </span>
               ))}
             </div>
@@ -343,7 +389,7 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
             onUploaded={setIssueEvidenceId}
           />
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+            <span className="eyebrow mb-1 block">
               Issue remark
             </span>
             <textarea
@@ -364,6 +410,7 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
         {showScanner ? <QrScanner onScan={handleScan} onClose={() => setShowScanner(false)} /> : null}
         {showContainerScanner ? <QrScanner onScan={handleContainerScan} onClose={() => setShowContainerScanner(false)} /> : null}
       </Panel>
+      <MemberClaimCodes makerspaceId={makerspace.id} members={memberOptions} />
       <DirectLoanList loans={loans.results} onReturn={openReturnModal} />
       <Pagination page={loans.page} totalPages={loans.totalPages} onChange={loans.setPage} count={loans.count} pageSize={loans.pageSize} />
       <DirectLoanReturnModal

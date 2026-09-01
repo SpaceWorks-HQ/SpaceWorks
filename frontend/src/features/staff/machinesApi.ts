@@ -14,13 +14,29 @@ export type MachineType = {
   is_builtin: boolean;
   managing_action: string;
   makerspace: number | null;
+  // Present only on the machine-type LIST response, which is the one serializer that
+  // resolves it against an actor. The same type is nested inside machine rows, where
+  // there is no actor context and the field is genuinely absent -- so it is optional,
+  // and an absent value correctly reads as "no creation authority proven".
+  can_create_machine?: boolean;
   capability_config?: MachineTypeCapabilityConfig;
 };
+
+// Mirrors backend `printer_capabilities.is_printer_type`: the built-in printer is the GLOBAL
+// type, not merely one slugged `3d_printer`. A makerspace may legally create a local type with
+// that slug, and matching on the slug alone would mount the printer console for it -- applying
+// printer-only fields to a generic service and querying the same slug from two sections, which
+// duplicates and mixes their jobs.
+export function isBuiltinPrinterType(machineType: Pick<MachineType, "slug" | "makerspace"> | undefined) {
+  return !!machineType && machineType.makerspace === null && machineType.slug === "3d_printer";
+}
 
 export type MeteringUnit = "weight" | "volume" | "length" | "count" | "minutes";
 export type MachineTypeCapabilityConfig = {
   metering_unit: MeteringUnit;
   requires_booking: boolean;
+  accepted_materials?: string[];
+  accepted_colours?: string[];
 };
 
 export type Machine = {
@@ -140,8 +156,32 @@ export type MachinePayload = {
 };
 export type MachinePatch = Partial<MachinePayload> & { status?: MachineStatus };
 
-export function getMachines(makerspaceId: number) {
-  return staffRequest<MachineListResponse<Machine>>(`/admin/makerspace/${makerspaceId}/machines`);
+// Hard stop on the page walk below. The backend pages at 200 with a 500 maximum, so 50
+// pages is 10,000 machines -- far past any real fleet. It exists so a server that always
+// returns a `next` cannot spin this loop forever.
+const MAX_MACHINE_PAGES = 50;
+
+export async function getMachines(makerspaceId: number) {
+  // EVERY page, not just the first. The console now states a machine COUNT and a status
+  // roll-up per machine type, and a truncated list turns those from "a long list, cut off"
+  // into a wrong number presented as fact.
+  //
+  // Paged with an explicit `?page=N` rather than by following DRF's `next`: `next` is an
+  // ABSOLUTE url, while `staffRequest` prefixes everything it is given with the API base --
+  // handing it straight over builds a malformed request.
+  const first = await staffRequest<MachineListResponse<Machine>>(
+    `/admin/makerspace/${makerspaceId}/machines`,
+  );
+  const results = [...first.results];
+  let next = first.next;
+  for (let page = 2; next && page <= MAX_MACHINE_PAGES; page += 1) {
+    const response = await staffRequest<MachineListResponse<Machine>>(
+      `/admin/makerspace/${makerspaceId}/machines?page=${page}`,
+    );
+    results.push(...response.results);
+    next = response.next;
+  }
+  return { ...first, results };
 }
 
 export function createMachine(makerspaceId: number, payload: MachinePayload) {

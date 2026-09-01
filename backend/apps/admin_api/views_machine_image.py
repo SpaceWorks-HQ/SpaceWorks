@@ -93,7 +93,7 @@ class MachineImageView(APIView):
             )
         if not public_image_storage.is_safe_object_key(object_key):
             raise ValidationError({"object_key": "Invalid image object key."})
-        if public_image_storage.public_image_key_in_use(
+        if object_key and public_image_storage.public_image_key_in_use(
             machine.makerspace_id,
             object_key,
             machine_id=machine.pk,
@@ -122,7 +122,7 @@ class MachineImageView(APIView):
             raise ValidationError({"object_key": "Uploaded file is not a valid image."})
         old_key = machine.image_key
         if object_key != old_key:
-            add_storage(machine.makerspace, public_image_storage.object_size(object_key))
+            add_storage(machine.makerspace, result.size)
         machine = services.update_image(machine, request.user, object_key)
         return self._response(request, machine)
 

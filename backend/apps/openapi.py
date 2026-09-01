@@ -12,6 +12,29 @@ PUBLISHABLE_KEY_PARAMETER = OpenApiParameter(
     ),
 )
 
+API_CLIENT_NONCE_PARAMETER = OpenApiParameter(
+    name="X-Nonce",
+    type=str,
+    location=OpenApiParameter.HEADER,
+    required=False,
+    description=(
+        "Unique, unpredictable nonce for HMAC-authenticated server API clients "
+        "(1-128 characters: letters, digits, `.`, `_`, `~`, or `-`). Include it "
+        "between `X-Timestamp` and the raw body in the signed bytes: "
+        "`METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY`. It is optional only for "
+        "publishable-key/browser authentication and during the temporary legacy "
+        "rollout while `APICLIENT_REQUIRE_NONCE` is disabled."
+    ),
+)
+
+# A LIST, not a tuple: drf-spectacular's get_override_parameters does
+# `super().get_override_parameters() + parameters`, so a tuple raises
+# "can only concatenate list (not tuple) to list" and breaks schema generation outright.
+PUBLIC_API_AUTH_PARAMETERS = [
+    PUBLISHABLE_KEY_PARAMETER,
+    API_CLIENT_NONCE_PARAMETER,
+]
+
 PUBLIC_REQUEST_SUBMIT_EXAMPLE = OpenApiExample(
     "Submit public equipment request",
     value={
@@ -141,6 +164,6 @@ PUBLIC_TOOL_CHECKOUT_EXAMPLE = OpenApiExample(
 
 LOGIN_EXAMPLE = OpenApiExample(
     "Staff login",
-    value={"username": "admin", "password": "secret-password"},
+    value={"username": "admin", "password": "secret-password", "surface": "staff"},
     request_only=True,
 )

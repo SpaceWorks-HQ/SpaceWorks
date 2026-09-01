@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.makerspaces.models import Makerspace
 from apps.operations.report_registry import ReportResult
 from apps.operations.report_scope import eligible_makerspaces
+from apps.separability.registry import runtime_active
 
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ def _empty_record(space, aggregate):
     record = {}
     modules = set(space["enabled_modules"] or [])
     for section, metrics in SECTION_FIELDS.items():
-        enabled = apps.is_installed(f"apps.{section}") and section in modules
+        enabled = runtime_active(section) and section in modules
         record[f"{section}_enabled"] = enabled
         record[f"{section}_available"] = False
         record.update({metric: None for metric in metrics})
@@ -76,9 +77,12 @@ def _zero_values(section):
     values = {field: 0 for field in SECTION_FIELDS[section]}
     if section == "events":
         values["events_completed_attendance_rate_percent"] = None
+        values["_events_completed_attended"] = 0
+        values["_events_completed_confirmed"] = 0
     if section == "bookings":
         values["bookings_reserved_hours"] = Decimal("0.00")
         values["bookings_reservation_utilization_percent"] = None
+        values["_bookings_window_hours"] = None
     if section == "machines":
         values["machines_usage_hours"] = Decimal("0.00")
     if section == "maintenance":
@@ -107,6 +111,10 @@ def _event_rows(ids, date_range):
             "makerspace_id": row["id"], "events_in_period": row["events"],
             "events_registrations": row["registrations"], "events_attended": row["attended"],
             "events_completed_attendance_rate_percent": round(row["completed_attended"] / denominator * 100, 2) if denominator else None,
+            # Private inputs are retained in ReportResult.records but omitted from
+            # FIELDS, so legacy single-space responses and exports do not change.
+            "_events_completed_attended": row["completed_attended"],
+            "_events_completed_confirmed": denominator,
         })
     return result
 
@@ -147,6 +155,7 @@ def _booking_rows(ids, date_range, now):
             "bookings_non_cancelled": row["bookings"], "bookings_reserved_hours": reserved,
             "bookings_upcoming": row["upcoming"], "bookings_no_shows": row["no_shows"],
             "bookings_reservation_utilization_percent": round(float(reserved / window * 100), 2) if window else None,
+            "_bookings_window_hours": window,
         })
     return result
 

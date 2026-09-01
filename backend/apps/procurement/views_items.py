@@ -1,77 +1,26 @@
-from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics
-from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.views import APIView
+from rest_framework.exceptions import PermissionDenied
 
-from apps.accounts import rbac
-from apps.admin_api.exports import csv_response, xlsx_response
 from apps.admin_api.permissions import IsActiveStaff
 from apps.audit import services as audit
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
-from apps.procurement.serializers import ErrorSerializer, ToBuyItemSerializer
+from apps.procurement.serializers import ToBuyItemSerializer
 from apps.procurement import access
 from apps.procurement.models import ToBuyItem
-
-
-MODULE_KEY = "procurement"
-DEFAULT_LIST_LIMIT = 200
-MAX_LIST_LIMIT = 500
-
-
-PROCUREMENT_ERROR_RESPONSES = {
-    400: OpenApiResponse(ErrorSerializer, description="Invalid request."),
-    401: OpenApiResponse(description="Authentication credentials were not provided."),
-    403: OpenApiResponse(description="Permission denied."),
-    404: OpenApiResponse(description="Not found."),
-}
-
-
-def _list_limit(request):
-    raw = request.query_params.get("limit", DEFAULT_LIST_LIMIT)
-    try:
-        value = int(raw)
-    except (TypeError, ValueError):
-        return DEFAULT_LIST_LIMIT
-    if value < 1:
-        return DEFAULT_LIST_LIMIT
-    return min(value, MAX_LIST_LIMIT)
-
-
-STATUS_PARAM = OpenApiParameter(
-    "status",
-    OpenApiTypes.STR,
-    OpenApiParameter.QUERY,
-    enum=ToBuyItem.Status.values,
-    description="Filter by procurement item status.",
+from apps.procurement.views_common import (
+    KIND_PARAM,
+    MODULE_KEY,
+    PROCUREMENT_ERROR_RESPONSES,
+    STATUS_PARAM,
+    apply_status_filter,
+    list_limit,
+    receipt_queryset_related,
 )
-
-
-def _apply_status_filter(queryset, request):
-    status = request.query_params.get("status")
-    if status in ToBuyItem.Status.values:
-        return queryset.filter(status=status)
-    return queryset
-
-
-KIND_PARAM = OpenApiParameter(
-    "kind",
-    OpenApiTypes.STR,
-    OpenApiParameter.QUERY,
-    enum=[ToBuyItem.Kind.HARDWARE, ToBuyItem.Kind.PRINTING],
-    description="Stream to add to. Honored only for makerspace admins/superadmin; "
-    "other roles are auto-tagged by role.",
-)
-
-
-def receipt_queryset_related(queryset):
-    return queryset.select_related("created_by", "purchaser").prefetch_related(
-        "receipts__uploaded_by"
-    )
 
 
 @extend_schema(tags=["Procurement"])
@@ -83,12 +32,9 @@ class ToBuyListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         makerspace_id = self.kwargs["makerspace_id"]
         require_module(get_object_or_404(Makerspace, pk=makerspace_id), MODULE_KEY)
-        kinds = access.viewable_kinds(self.request.user, makerspace_id)
-        if not kinds:
-            return ToBuyItem.objects.none()
-        limit = _list_limit(self.request)
-        queryset = ToBuyItem.objects.filter(makerspace_id=makerspace_id, kind__in=kinds)
-        queryset = _apply_status_filter(queryset, self.request)
+        limit = list_limit(self.request)
+        queryset = access.scope_items(ToBuyItem.objects.all(), self.request.user, makerspace_id)
+        queryset = apply_status_filter(queryset, self.request)
         return receipt_queryset_related(queryset).order_by("-created_at", "-id")[:limit]
 
     @extend_schema(
@@ -114,6 +60,13 @@ class ToBuyListCreateView(generics.ListCreateAPIView):
             makerspace_id,
             self.request.query_params.get("kind"),
         )
+        machine_type = serializer.validated_data.get("machine_type")
+        access.validate_machine_type(
+            self.request.user,
+            makerspace_id,
+            kind,
+            machine_type,
+        )
         item = serializer.save(
             makerspace=makerspace,
             kind=kind,
@@ -134,26 +87,29 @@ class ToBuyDetailView(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ["get", "patch", "delete", "head", "options"]
 
     def get_queryset(self):
-        # 404-before-403: limit to makerspaces where the actor has any procurement
-        # access; get_object() then narrows to the viewable stream.
-        scope = rbac.makerspaces_for_actions(
-            self.request.user,
-            rbac.Action.EDIT_INVENTORY,
-            rbac.Action.MANAGE_PRINTING,
-        )
+        makerspace_id = ToBuyItem.objects.filter(
+            pk=self.kwargs.get("pk")
+        ).values_list("makerspace_id", flat=True).first()
         queryset = receipt_queryset_related(ToBuyItem.objects.all())
-        if scope is rbac.ALL:
-            return queryset
-        if not scope:
+        if makerspace_id is None:
             return queryset.none()
-        return queryset.filter(makerspace_id__in=scope)
+        return access.scope_items(
+            queryset,
+            self.request.user,
+            makerspace_id,
+        )
 
     def get_object(self):
         obj = super().get_object()
         require_module(obj.makerspace, MODULE_KEY)
-        if obj.kind not in access.viewable_kinds(self.request.user, obj.makerspace_id):
-            raise Http404()
-        return obj
+        return get_object_or_404(
+            access.scope_items(
+                receipt_queryset_related(ToBuyItem.objects.all()),
+                self.request.user,
+                obj.makerspace_id,
+            ),
+            pk=obj.pk,
+        )
 
     def _assert_can_manage(self, item):
         if not access.can_manage_kind(self.request.user, item.makerspace_id, item.kind):
@@ -173,6 +129,16 @@ class ToBuyDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_update(self, serializer):
         self._assert_can_manage(serializer.instance)
+        machine_type = serializer.validated_data.get(
+            "machine_type", serializer.instance.machine_type
+        )
+        access.validate_machine_type(
+            self.request.user,
+            serializer.instance.makerspace_id,
+            serializer.instance.kind,
+            machine_type,
+        )
+        access.validate_machine_type_provenance(serializer.instance, machine_type)
         previous_status = serializer.instance.status
         item = serializer.save()
         updates = []
@@ -207,78 +173,12 @@ class ToBuyDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance.delete()
 
 
-@extend_schema(tags=["Procurement"])
-class ToBuyExportView(APIView):
-    permission_classes = [IsActiveStaff]
-    serializer_class = ToBuyItemSerializer
-
-    @extend_schema(
-        summary="Export to-buy items as CSV or XLSX",
-        parameters=[
-            STATUS_PARAM,
-            OpenApiParameter(
-                "format",
-                OpenApiTypes.STR,
-                OpenApiParameter.QUERY,
-                enum=["csv", "xlsx"],
-            ),
-        ],
-        responses={
-            (200, "text/csv"): OpenApiTypes.STR,
-            (
-                200,
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            ): OpenApiTypes.BINARY,
-            **PROCUREMENT_ERROR_RESPONSES,
-        },
-    )
-    def get(self, request, makerspace_id, *args, **kwargs):
-        require_module(get_object_or_404(Makerspace, pk=makerspace_id), MODULE_KEY)
-        kinds = access.viewable_kinds(request.user, makerspace_id)
-        if not kinds:
-            raise PermissionDenied()
-        fmt = request.query_params.get("format", "csv")
-        if fmt not in {"csv", "xlsx"}:
-            raise ValidationError({"format": "Use csv or xlsx."})
-        items = ToBuyItem.objects.filter(makerspace_id=makerspace_id, kind__in=kinds)
-        items = (
-            _apply_status_filter(items, request)
-            .select_related("created_by", "purchaser")
-            .order_by("-created_at", "-id")
-        )
-        rows = [
-            [
-                "kind",
-                "name",
-                "quantity",
-                "link",
-                "status",
-                "estimated_unit_cost",
-                "vendor_name",
-                "actual_unit_cost",
-                "purchaser",
-                "ordered_at",
-                "received_at",
-                "added_by",
-                "created_at",
-            ]
-        ]
-        for item in items:
-            rows.append([
-                item.kind,
-                item.name,
-                item.quantity,
-                item.link,
-                item.status,
-                item.estimated_unit_cost if item.estimated_unit_cost is not None else "",
-                item.vendor_name,
-                item.actual_unit_cost if item.actual_unit_cost is not None else "",
-                item.purchaser.username if item.purchaser else "",
-                item.ordered_at.isoformat() if item.ordered_at else "",
-                item.received_at.isoformat() if item.received_at else "",
-                item.created_by.username if item.created_by else "",
-                item.created_at.isoformat(),
-            ])
-        if fmt == "xlsx":
-            return xlsx_response(rows, "to-buy.xlsx")
-        return csv_response(rows, "to-buy.csv")
+__all__ = [
+    "KIND_PARAM",
+    "MODULE_KEY",
+    "PROCUREMENT_ERROR_RESPONSES",
+    "STATUS_PARAM",
+    "ToBuyDetailView",
+    "ToBuyListCreateView",
+    "receipt_queryset_related",
+]

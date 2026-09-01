@@ -14,16 +14,16 @@ type PublicToolScanPanelProps = {
 
 function LoanResult({ loan }: { loan: PublicToolLoan }) {
   return (
-    <div className="rounded-xl border border-tone-mint bg-tone-mint px-3 py-2 text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]">
-      <p className="text-sm font-semibold capitalize">
+    <div className="rounded-xl border border-success bg-success px-3 py-2 text-on-success dark:bg-success/15 dark:text-success-ink">
+      <h3 className="title-section capitalize text-on-success dark:text-success-ink">
         {loan.status.replace(/_/g, " ")}: {loan.items.map((item) => item.product_name).join(", ") || "Tool loan"}
-      </p>
-      <p className="mt-1 break-all text-xs">{loan.public_token}</p>
+      </h3>
+      <p className="mt-1 break-all font-mono text-xs">{loan.public_token}</p>
       <div className="mt-2 space-y-1">
         {loan.items.map((item) => (
           <div className="flex justify-between gap-3 text-xs" key={item.product_name}>
             <span>{item.product_name}</span>
-            <span>x{item.quantity}</span>
+            <span className="font-mono">x{item.quantity}</span>
           </div>
         ))}
       </div>
@@ -85,10 +85,10 @@ export function PublicToolScanPanel({ makerspaceSlug }: PublicToolScanPanelProps
 
   return (
     <Card>
-      <p className="text-xs font-semibold tracking-wide text-accent-ink">
+      <p className="eyebrow text-secondary-ink">
         QR Tool Checkout
       </p>
-      <h2 className="mt-2 text-xl font-semibold text-ink">Scan public tool</h2>
+      <h2 className="title-panel mt-2">Scan public tool</h2>
       <p className="mt-2 text-sm leading-6 text-muted">
         Upload the required photo, then scan the tool QR with your camera.
       </p>
@@ -100,11 +100,11 @@ export function PublicToolScanPanel({ makerspaceSlug }: PublicToolScanPanelProps
         Scan QR with camera
       </button>
       {scannedToken ? (
-        <p className="mt-2 inline-flex items-center gap-2 rounded-lg border border-tone-mint bg-tone-mint px-3 py-1 text-sm font-semibold text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]">
+        <p className="mt-2 inline-flex items-center gap-2 rounded-lg border border-success bg-success px-3 py-1 text-sm font-semibold text-on-success dark:bg-success/15 dark:text-success-ink">
           Scanned OK
           <button
             type="button"
-            className="text-xs font-normal underline"
+            className="min-h-11 px-2 text-xs font-normal underline"
             onClick={() => setScannedToken("")}
           >
             clear
@@ -113,7 +113,7 @@ export function PublicToolScanPanel({ makerspaceSlug }: PublicToolScanPanelProps
       ) : null}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <section className="rounded-lg border border-line p-3">
-          <h3 className="text-sm font-semibold text-ink">Check out</h3>
+          <h3 className="title-section">Check out</h3>
           <div className="mt-3">
             <PublicEvidenceUpload
               key={`issue-${uploadKey}`}
@@ -133,7 +133,7 @@ export function PublicToolScanPanel({ makerspaceSlug }: PublicToolScanPanelProps
           </button>
         </section>
         <section className="rounded-lg border border-line p-3">
-          <h3 className="text-sm font-semibold text-ink">Return</h3>
+          <h3 className="title-section">Return</h3>
           <div className="mt-3">
             <PublicEvidenceUpload
               key={`return-${uploadKey}`}
@@ -144,7 +144,7 @@ export function PublicToolScanPanel({ makerspaceSlug }: PublicToolScanPanelProps
             />
           </div>
           <label className="mt-3 block">
-            <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+            <span className="eyebrow mb-1 block">
               Return condition notes
             </span>
             <textarea
@@ -163,7 +163,7 @@ export function PublicToolScanPanel({ makerspaceSlug }: PublicToolScanPanelProps
           </label>
           {reportProblem ? (
             <label className="mt-2 block">
-              <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+              <span className="eyebrow mb-1 block">
                 What's wrong? (staff will review)
               </span>
               <textarea

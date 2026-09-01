@@ -1,10 +1,28 @@
 from rest_framework import serializers
 
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.platform import available_modules
+from apps.separability.tombstones import unavailable_apps
 
 
 class MakerspaceSwitcherSerializer(serializers.ModelSerializer):
     """Minimal makerspace row for the staff console switcher."""
+
+    enabled_modules = serializers.SerializerMethodField()
+    unavailable_apps = serializers.SerializerMethodField()
+
+    def get_enabled_modules(self, obj) -> list[str]:
+        # The console turns these keys straight into tabs, so it must be told what
+        # this deployment actually serves. A tombstoned app's key stays stored on the
+        # row -- uninstall retains data -- but shipping it here would render a tab
+        # whose every request 404s.
+        return available_modules(obj)
+
+    def get_unavailable_apps(self, obj) -> list[str]:
+        # Covers the tabs `enabled_modules` cannot: `warranty` is gated by core
+        # `staff_admin` and owns no module key, so tombstoning it drops no key and
+        # the tab would survive. Empty on every deployment that tombstones nothing.
+        return unavailable_apps()
 
     class Meta:
         model = Makerspace
@@ -19,6 +37,7 @@ class MakerspaceSwitcherSerializer(serializers.ModelSerializer):
             # switcher-slim role such as machine_manager / print_manager.
             "enabled_modules",
             "enabled_features",
+            "unavailable_apps",
         ]
         read_only_fields = fields
 

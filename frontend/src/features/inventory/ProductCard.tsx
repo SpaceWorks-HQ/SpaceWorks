@@ -26,7 +26,10 @@ function statusChip(availability: Availability): { text: string; cls: string } |
     return { text: "Unavailable", cls: "chip" };
   }
   if (label === "Limited") {
-    return { text: count != null ? `Limited (${count})` : "Limited", cls: "chip chip-active" };
+    return {
+      text: count != null ? `Limited (${count})` : "Limited",
+      cls: "chip border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
+    };
   }
   return {
     text: count != null ? `Available (${count})` : "Available",
@@ -48,7 +51,7 @@ export function ProductCard({
   return (
     <article className="group flex h-full flex-col rounded-xl border border-line bg-panel shadow-soft transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-soft-lg">
       <button
-        className="relative h-44 overflow-hidden rounded-t-xl border-b border-line bg-surface text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="relative h-44 overflow-hidden rounded-t-xl border-b border-line bg-surface text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         type="button"
         onClick={onOpenDetails}
         aria-label={`Open details for ${product.name}`}
@@ -73,14 +76,16 @@ export function ProductCard({
       </button>
 
       <div className="flex flex-1 flex-col p-4">
-        <button
-          className="break-words text-left font-display text-lg font-semibold leading-tight text-ink underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-          type="button"
-          onClick={onOpenDetails}
-        >
-          {product.name}
-        </button>
-        <p className="mt-1 font-mono text-xs uppercase text-muted">{idLabel}</p>
+        <h2 className="title-panel">
+          <button
+            className="min-h-11 break-words text-left underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            type="button"
+            onClick={onOpenDetails}
+          >
+            {product.name}
+          </button>
+        </h2>
+        <p className="eyebrow mt-1">{idLabel}</p>
         <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted">
           {product.description || "No description provided."}
         </p>
@@ -94,19 +99,19 @@ export function ProductCard({
           <div className="flex items-center rounded-lg border border-line bg-bg">
             <button
               aria-label={`Remove ${product.name}`}
-              className="h-9 w-9 font-mono text-lg font-semibold text-ink transition hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:text-muted"
+              className="h-11 w-11 font-mono text-lg font-semibold text-ink transition hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:text-muted"
               disabled={quantity === 0}
               type="button"
               onClick={onDecrement}
             >
               -
             </button>
-            <span className="grid h-9 min-w-10 place-items-center border-x border-line px-2 font-mono text-sm font-semibold text-ink">
+            <span className="grid h-11 min-w-11 place-items-center border-x border-line px-2 font-mono text-sm font-semibold text-ink">
               {quantity}
             </span>
             <button
               aria-label={`Add ${product.name}`}
-              className="h-9 w-9 font-mono text-lg font-semibold text-ink transition hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:text-muted"
+              className="h-11 w-11 font-mono text-lg font-semibold text-ink transition hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:text-muted"
               disabled={disabled}
               type="button"
               onClick={onIncrement}
@@ -115,7 +120,7 @@ export function ProductCard({
             </button>
           </div>
           <button
-            className="min-w-0 break-words font-mono text-xs font-semibold tracking-tight text-secondary-ink underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="inline-flex min-h-11 min-w-0 items-center break-words font-mono text-xs font-semibold tracking-tight text-secondary-ink underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             type="button"
             onClick={onOpenDetails}
           >

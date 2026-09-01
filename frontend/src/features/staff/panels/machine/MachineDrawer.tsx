@@ -60,23 +60,23 @@ export function MachineDrawer({
               {details.machine_type.name} · {details.usage_hours} total hours
             </span>
           </div>
-          <div className="overflow-x-auto border-b border-line" role="tablist" aria-label="Machine details">
-            <div className="flex min-w-max gap-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === tab}
-                  className={activeTab === tab
-                    ? "border-b-2 border-accent px-3 py-2 text-sm font-semibold text-ink"
-                    : "border-b-2 border-transparent px-3 py-2 text-sm text-muted hover:text-ink"}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
+          {/* WRAPS rather than scrolls. `min-w-max` inside `overflow-x-auto` is right for a
+              genuinely wide child like a table, but for six short labels it produced a row
+              clipped mid-word at the panel edge with the remaining tabs reachable only by a
+              horizontal scroll nobody notices. Wrapping shows every tab at every width. */}
+          <div className="flex flex-wrap gap-1 border-b border-line pb-2" role="tablist" aria-label="Machine details">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab}
+                className={activeTab === tab ? "desk-button-primary" : "desk-button-ghost"}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
           <div role="tabpanel">
             {activeTab === "Overview" ? (

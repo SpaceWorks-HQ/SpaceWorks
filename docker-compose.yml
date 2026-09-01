@@ -1,3 +1,15 @@
+x-spaceworks-host-orchestration:
+  scheduler:
+    mode: image
+    services: [beat]
+  pointer:
+    mode: atomic-file
+    path: /var/lib/spaceworks/ops/database-pointer.env
+    static_environment: .env
+  database_identity: endpoint-plus-queried-uuid
+  writer_services: [backend, worker, beat]
+  sibling_lifecycle: bundled-owned-database
+
 services:
   db:
     image: postgres:16
@@ -48,8 +60,10 @@ services:
       /bin/sh -c '
       until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
       mc mb --ignore-existing local/evidence;
+      mc version enable local/evidence;
       mc anonymous set none local/evidence;
       mc mb --ignore-existing local/public-images;
+      mc version enable local/public-images;
       mc anonymous set download local/public-images;
       '
 
@@ -75,12 +89,27 @@ services:
       SECRET_KEY: ${SECRET_KEY:-dev-insecure-change-me}
       DEBUG: ${DEBUG:-False}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
-      DATABASE_URL: ${DATABASE_URL:-postgres://makerspace:makerspace@db:5432/makerspace_manager}
+      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_APP_USER:-spaceworks_app}:${POSTGRES_APP_PASSWORD:-spaceworks-app-dev}@db:5432/makerspace_manager}
+      SPACEWORKS_DB_POINTER_GENERATION: ${SPACEWORKS_DB_POINTER_GENERATION:-1}
       MANAGED_POSTGRES: ${MANAGED_POSTGRES:-False}
       CONN_MAX_AGE: ${CONN_MAX_AGE:-0}
       DISABLE_SERVER_SIDE_CURSORS: ${DISABLE_SERVER_SIDE_CURSORS:-False}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://localhost:5173}
       API_CLIENT_ENC_KEY: ${API_CLIENT_ENC_KEY:-}
+      AUDIT_MAC_MASTER_KEY: ${AUDIT_MAC_MASTER_KEY:-}
+      AUDIT_ATTESTATION_DEPLOYMENT_ID: ${AUDIT_ATTESTATION_DEPLOYMENT_ID:-}
+      AUDIT_ATTESTATION_ANCHOR_BACKEND: ${AUDIT_ATTESTATION_ANCHOR_BACKEND:-}
+      AUDIT_ATTESTATION_S3_BUCKET: ${AUDIT_ATTESTATION_S3_BUCKET:-}
+      AUDIT_ATTESTATION_S3_PREFIX: ${AUDIT_ATTESTATION_S3_PREFIX:-}
+      AUDIT_ATTESTATION_RETENTION_DAYS: ${AUDIT_ATTESTATION_RETENTION_DAYS:-2555}
+      AUDIT_ATTESTATION_S3_OBJECT_LOCK_MODE: ${AUDIT_ATTESTATION_S3_OBJECT_LOCK_MODE:-}
+      AUDIT_ATTESTATION_S3_ENDPOINT_URL: ${AUDIT_ATTESTATION_S3_ENDPOINT_URL:-}
+      AUDIT_ATTESTATION_S3_ACCESS_KEY_ID: ${AUDIT_ATTESTATION_S3_ACCESS_KEY_ID:-}
+      AUDIT_ATTESTATION_S3_SECRET_ACCESS_KEY: ${AUDIT_ATTESTATION_S3_SECRET_ACCESS_KEY:-}
+      AUDIT_ATTESTATION_S3_REGION_NAME: ${AUDIT_ATTESTATION_S3_REGION_NAME:-}
+      AUDIT_ATTESTATION_HTTP_URL: ${AUDIT_ATTESTATION_HTTP_URL:-}
+      AUDIT_ATTESTATION_HTTP_BEARER_TOKEN: ${AUDIT_ATTESTATION_HTTP_BEARER_TOKEN:-}
+      AUDIT_ATTESTATION_HTTP_TIMEOUT: ${AUDIT_ATTESTATION_HTTP_TIMEOUT:-10}
       # Dev serves the frontend same-origin behind nginx over plain http://localhost, where a
       # SameSite=None/Secure=True cookie (the prod default) is silently dropped by browsers,
       # so the 7-day refresh session never persists. Lax + non-secure makes it stick in dev.
@@ -100,6 +129,7 @@ services:
       HMAC_CLIENT_ID: ${HMAC_CLIENT_ID:-}
       HMAC_SECRET: ${HMAC_SECRET:-}
       HMAC_MAX_CLOCK_SKEW_SECONDS: ${HMAC_MAX_CLOCK_SKEW_SECONDS:-300}
+      APICLIENT_REQUIRE_NONCE: ${APICLIENT_REQUIRE_NONCE:-False}
       HMAC_PROTECTED_PATH_PREFIXES: ${HMAC_PROTECTED_PATH_PREFIXES:-/api/public/,/api/v1/public/}
       CRON_SECRET: ${CRON_SECRET:-}
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
@@ -113,9 +143,14 @@ services:
       PUBLIC_APP_BASE_URL: ${PUBLIC_APP_BASE_URL:-}
       STRIPE_CONNECT_REDIRECT_URI: ${STRIPE_CONNECT_REDIRECT_URI:-}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-    command: >
-      sh -c "python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+      BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY: ${BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY:-}
+      BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY: ${BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY:-}
+      BACKUP_OPS_DIR: /var/lib/spaceworks/ops/work
+      SPACEWORKS_HOST_MARKER_PATH: /run/spaceworks-host/restore-marker.json
+      BACKUP_PRODUCER_CAPABILITY_MARKER_PATH: /run/spaceworks-host/producer-capability.json
+      BACKUP_PRODUCER_PRIVILEGED_SCRIPTS_DIR: /run/spaceworks-privileged-scripts
+    command: ["--role", "backend", "sh", "-c", "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000"]
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/', timeout=3).read()\""]
       interval: 10s
@@ -123,36 +158,83 @@ services:
       retries: 6
     ports:
       - "8001:8000"
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
+
+  orchestration-init:
+    build:
+      context: ./backend
+    user: "0:0"
+    entrypoint: ["python", "/app/scripts/bootstrap_host_orchestration.py"]
+    environment:
+      DATABASE_URL: postgres://makerspace:makerspace@db:5432/makerspace_manager
+      SPACEWORKS_RUNTIME_DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_APP_USER:-spaceworks_app}:${POSTGRES_APP_PASSWORD:-spaceworks-app-dev}@db:5432/makerspace_manager}
+      SPACEWORKS_HOST_MARKER_WRITE_PATH: /host-state/restore-marker.json
+      SPACEWORKS_SCHEDULER_MODE: image
+      SPACEWORKS_SCHEDULER_SERVICES: beat
+    volumes:
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/host-state
+    depends_on:
+      db:
+        condition: service_healthy
 
   migrate:
     build:
       context: ./backend
     container_name: spaceworks-migrate
-    environment: *backend-env
-    command: python manage.py migrate
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgres://makerspace:makerspace@db:5432/makerspace_manager
+    command: ["--role", "migrate", "python", "manage.py", "migrate"]
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     depends_on:
-      db:
-        condition: service_healthy
+      orchestration-init:
+        condition: service_completed_successfully
+
+  orchestration-ready:
+    build:
+      context: ./backend
+    user: "0:0"
+    entrypoint: ["python", "/app/scripts/bootstrap_host_orchestration.py"]
+    environment:
+      DATABASE_URL: postgres://makerspace:makerspace@db:5432/makerspace_manager
+      SPACEWORKS_RUNTIME_DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_APP_USER:-spaceworks_app}:${POSTGRES_APP_PASSWORD:-spaceworks-app-dev}@db:5432/makerspace_manager}
+      SPACEWORKS_HOST_MARKER_WRITE_PATH: /host-state/restore-marker.json
+      SPACEWORKS_SCHEDULER_MODE: image
+      SPACEWORKS_SCHEDULER_SERVICES: beat
+    volumes:
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/host-state
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
   worker:
     build:
       context: ./backend
     container_name: spaceworks-worker
     restart: unless-stopped
     environment: *backend-env
-    command: celery -A config worker -l info
+    command: ["--role", "worker", "celery", "-A", "config", "worker", "-l", "info"]
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
 
   beat:
@@ -161,14 +243,38 @@ services:
     container_name: spaceworks-beat
     restart: unless-stopped
     environment: *backend-env
-    command: celery -A config beat -l info
+    # --schedule is explicit because beat otherwise drops its shelve in the CWD
+    # (/app). Under the dev bind mount that wrote a root-owned celerybeat-schedule
+    # straight into the repo working tree; the container also no longer runs as
+    # root, so /app is not writable anyway. The named volume keeps the last-run
+    # timestamps across restarts so periodic tasks don't all re-fire on boot.
+    command: ["--role", "beat", "celery", "-A", "config", "beat", "-l", "info", "--schedule", "/var/lib/celery/celerybeat-schedule"]
+    volumes:
+      - celerybeat_data:/var/lib/celery
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      orchestration-ready:
         condition: service_completed_successfully
+
+  candidate-backend:
+    profiles: [host-recovery]
+    build:
+      context: ./backend
+    environment: *backend-env
+    command: ["--role", "backend", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     build:
@@ -192,7 +298,7 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-
 volumes:
   makerspace_manager_pgdata:
   minio_data:
+  celerybeat_data:

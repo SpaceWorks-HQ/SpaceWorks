@@ -11,6 +11,7 @@ from apps.makerspaces.models import MakerspaceMembership
 from apps.procurement.models import ToBuyItem, ToBuyReceipt
 from tests.return_helpers import authenticated_client, make_member, make_print_manager, make_space
 from tests.test_procurement import make_inventory_manager, make_space_manager
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -53,7 +54,9 @@ def mock_receipt_storage(monkeypatch, *, size=123, content_type="application/pdf
     return delete
 
 
-def test_receipt_presign_finalize_list_signed_url_delete(monkeypatch):
+def test_receipt_presign_finalize_list_signed_url_delete(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     delete = mock_receipt_storage(monkeypatch)
     makerspace = make_space("proc-receipts")
     manager = make_inventory_manager("proc-receipts-manager", makerspace)
@@ -71,7 +74,10 @@ def test_receipt_presign_finalize_list_signed_url_delete(monkeypatch):
     listed = client.get(receipt_list_url(item))
     signed = client.get(receipt_url(receipt))
     duplicate = client.post(receipt_list_url(item), {"object_key": object_key}, format="json")
-    deleted = client.delete(receipt_detail_url(receipt))
+    # The receipt object deletion is deferred to on_commit so a rollback can never destroy
+    # a file whose row came back; the callbacks must run for it to be observable here.
+    with django_capture_on_commit_callbacks(execute=True):
+        deleted = client.delete(receipt_detail_url(receipt))
 
     assert presign.status_code == 201
     assert object_key.startswith(f"procurement/{makerspace.id}/")
@@ -105,12 +111,7 @@ def test_receipt_cross_tenant_and_stream_rbac(monkeypatch):
     inventory_manager = make_inventory_manager("proc-receipt-inv", makerspace)
     print_manager = make_print_manager("proc-receipt-print", makerspace)
     other_member = make_member("proc-receipt-other", other_space)
-    guest_admin = make_member(
-        "proc-receipt-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("proc-receipt-guest", makerspace)
 
     assert authenticated_client(print_manager).post(receipt_presign_url(hardware_item), {"filename": "r.pdf", "content_type": "application/pdf"}, format="json").status_code == 404
     assert authenticated_client(inventory_manager).post(receipt_presign_url(printing_item), {"filename": "r.pdf", "content_type": "application/pdf"}, format="json").status_code == 404

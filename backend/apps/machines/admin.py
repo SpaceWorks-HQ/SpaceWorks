@@ -12,6 +12,8 @@ from apps.machines.models import (
     MachineType,
     MachineUsageEntry,
     PrintingCutoverRepair,
+    RoleMachineScope,
+    RoleMachineTypeScope,
     PrintingCutoverState,
     MachineConsumablePool,
     MachineConsumableAdjustment,
@@ -180,9 +182,15 @@ class ServiceQueueAdmin(_ReadOnlyMachineChildAdmin):
 
 @admin.register(MachineConsumablePool)
 class MachineConsumablePoolAdmin(_ReadOnlyMachineChildAdmin):
-    list_display = ("id", "label", "makerspace", "machine", "remaining_grams", "is_active")
-    list_filter = ("is_active", "material")
-    search_fields = ("material", "color", "brand", "machine__name")
+    list_display = (
+        "id", "label", "makerspace", "machine", "machine_type", "remaining_grams",
+        "is_active", "is_public",
+    )
+    list_filter = ("is_active", "is_public", "material", "machine_type")
+    search_fields = (
+        "material", "color", "brand", "machine__name", "machine_type__name",
+        "machine_type__slug",
+    )
 
 
 @admin.register(MachineConsumableAdjustment)
@@ -214,3 +222,32 @@ class ServiceRequestConsumptionAdmin(_ReadOnlyMachineChildAdmin):
     list_filter = ("outcome", "measurement", "machine_consumable__machine")
     search_fields = ("service_request__title", "machine_consumable__label", "machine_consumable__machine__name")
     raw_id_fields = ("service_request", "machine_consumable", "product", "created_by")
+
+
+@admin.register(RoleMachineTypeScope)
+class RoleMachineTypeScopeAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    """Which machine types a role's MANAGE_MACHINES grant reaches.
+
+    Writable here on purpose: this is the break-glass surface for a deployment that has
+    scoped a role down to nothing by accident, and the alternative is a shell. Staff edit
+    these through the role editor, which enforces the tenant match; the admin is
+    superadmin-only and `role_scope` re-checks the makerspace at resolution anyway, so a
+    bad row written here is inert rather than a cross-tenant leak.
+    """
+
+    list_display = ("id", "role", "machine_type", "created_at")
+    list_filter = ("role__makerspace",)
+    search_fields = ("role__name", "machine_type__name")
+    raw_id_fields = ("role", "machine_type")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(RoleMachineScope)
+class RoleMachineScopeAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    """Which individual machines a role's MANAGE_MACHINES grant reaches."""
+
+    list_display = ("id", "role", "machine", "created_at")
+    list_filter = ("role__makerspace",)
+    search_fields = ("role__name", "machine__name")
+    raw_id_fields = ("role", "machine")
+    readonly_fields = ("created_at",)

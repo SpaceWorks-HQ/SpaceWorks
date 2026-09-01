@@ -38,7 +38,7 @@ export function UsersTable({ rows, makerspaceNames, loading, assignableRoles, on
     <>
       <div className="overflow-x-auto rounded-md border border-line bg-bg">
         <table className="w-full min-w-[860px] text-left text-sm">
-          <thead className="bg-surface text-xs uppercase text-muted"><tr className="border-b border-line">{["Username", "Email", "Role", "Makerspace", "Access", ""].map((header) => <th key={header} className="px-3 py-2 font-semibold">{header}</th>)}</tr></thead>
+          <thead className="eyebrow bg-surface"><tr className="border-b border-line">{["Username", "Email", "Role", "Makerspace", "Access", ""].map((header) => <th key={header} className="px-3 py-2">{header}</th>)}</tr></thead>
           <tbody>{rows.map((membership) => <tr key={membership.id} className="border-b border-line last:border-b-0">
             <td className="px-3 py-2 font-semibold text-ink"><span className="block max-w-40 break-words">{membership.user.username}</span></td>
             <td className="px-3 py-2 text-muted"><span className="block max-w-56 break-all">{membership.user.email || "-"}</span></td>
@@ -46,11 +46,11 @@ export function UsersTable({ rows, makerspaceNames, loading, assignableRoles, on
             <td className="px-3 py-2 text-ink">{makerspaceNames.get(membership.makerspace_id) ?? membership.makerspace_slug}</td>
             <td className="px-3 py-2"><AccessBadge status={membership.user.access_status} /></td>
             <td className="px-3 py-2"><div className="desk-actions flex flex-wrap justify-end gap-2">
-              <button className="desk-button" type="button" disabled={!assignableRoles.length} onClick={() => openChange(membership)}>Change role</button>
-              <button className="desk-button" type="button" onClick={() => onRestrict(membership)}>Restrict</button>
-              <button className="desk-button" type="button" onClick={() => onResetPassword(membership)}>Reset password</button>
-              <button className="desk-button" type="button" disabled={membership.user.access_status === "active"} onClick={() => onRestore(membership)}>Restore</button>
-              <button className="desk-button text-danger" type="button" onClick={() => onRevoke(membership)}>Revoke</button>
+              <button className="desk-button-ghost" type="button" disabled={!assignableRoles.length} onClick={() => openChange(membership)}>Change role</button>
+              <button className="desk-button-danger" type="button" onClick={() => onRestrict(membership)}>Restrict</button>
+              <button className="desk-button-warn" type="button" onClick={() => onResetPassword(membership)}>Reset password</button>
+              <button className="desk-button-success" type="button" disabled={membership.user.access_status === "active"} onClick={() => onRestore(membership)}>Restore</button>
+              <button className="desk-button-danger" type="button" onClick={() => onRevoke(membership)}>Revoke</button>
             </div></td>
           </tr>)}</tbody>
         </table>
@@ -71,7 +71,7 @@ function ChangeRoleModal({ target, roleId, roles, pending, error, onClose, onCha
   onSubmit: () => void;
 }) {
   useEffect(() => { if (target && roleId === "" && roles[0]) onChange(roles[0].id); }, [target, roleId, roles, onChange]);
-  return <Modal open={Boolean(target)} onClose={onClose} title={target ? `Change role for ${target.user.username}` : "Change role"} footer={<div className="desk-actions flex justify-end gap-2"><button className="desk-button" type="button" disabled={pending} onClick={onClose}>Cancel</button><button className="desk-button-primary" type="button" disabled={roleId === "" || pending} onClick={onSubmit}>{pending ? "Saving..." : "Save role"}</button></div>}><div className="grid gap-2"><label className="grid gap-1 text-sm font-semibold text-ink">Role<select className="desk-input w-full" value={roleId} onChange={(event) => onChange(Number(event.target.value))}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>{error ? <p className="text-sm text-danger">{error}</p> : null}</div></Modal>;
+  return <Modal open={Boolean(target)} onClose={onClose} title={target ? `Change role for ${target.user.username}` : "Change role"} footer={<div className="desk-actions flex justify-end gap-2"><button className="desk-button-ghost" type="button" disabled={pending} onClick={onClose}>Cancel</button><button className="desk-button-primary" type="button" disabled={roleId === "" || pending} onClick={onSubmit}>{pending ? "Saving..." : "Save role"}</button></div>}><div className="grid gap-2"><label className="grid gap-1"><span className="eyebrow">Role</span><select className="desk-input w-full" value={roleId} onChange={(event) => onChange(Number(event.target.value))}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>{error ? <p className="text-sm text-danger">{error}</p> : null}</div></Modal>;
 }
 
 function AccessBadge({ status }: { status: string }) {

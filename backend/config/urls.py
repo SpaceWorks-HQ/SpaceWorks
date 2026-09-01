@@ -8,11 +8,40 @@ from drf_spectacular.views import (
 )
 
 from apps.admin_api.views_hosting import TlsCheckView
-from apps.payments.views import StripeWebhookView
+from apps.data_export.views import DataExportDownloadView
+from apps.backup.views_archives import BackupArchiveDownloadView
+from apps.backup.views_recovery import RecoveryStateView
+from apps.payments.views import RazorpayWebhookView, StripeWebhookView
 from apps.payments.views_connect import (
     StripeConnectCallbackView,
     StripeConnectWebhookView,
 )
+from apps.separability.registry import runtime_active
+
+
+def separable_paths(app_label, *routes):
+    """Already-built paths for a separable app, kept in place while it is active.
+
+    The `separable` helper below takes a urlconf module to include; these three Stripe
+    routes are declared inline because they are single views rather than an app urlconf,
+    so they need the same gate in a different shape.
+    """
+    return list(routes) if runtime_active(app_label) else []
+
+
+def separable(app_label, route, urlconf, **kwargs):
+    """Routes for a separable app, spliced in place -- empty while it is tombstoned.
+
+    Returns a list so call sites can `*`-unpack it and keep the entry at its original
+    position: URL resolution is order-sensitive, and appending conditional routes at
+    the end of the list would change which pattern wins.
+
+    `include()` is called only when the app is active, deliberately. A tombstoned app
+    may have had its views deleted (`apps/printing` and `apps/roadmap` are the
+    precedent), and importing its urlconf to then discard it would crash on exactly
+    the deployments this exists to support.
+    """
+    return [path(route, include(urlconf), **kwargs)] if runtime_active(app_label) else []
 
 
 def docs_root(_request):
@@ -39,21 +68,51 @@ def docs_root(_request):
 
 urlpatterns = [
     path(
-        "api/v1/webhooks/stripe/connect",
-        StripeConnectWebhookView.as_view(),
-        name="stripe-connect-webhook",
+        "api/v1/backups/download/<uuid:archive_id>/<str:token>",
+        BackupArchiveDownloadView.as_view(),
+        name="backup-archive-download",
     ),
     path(
-        "api/v1/payments/connect/callback",
-        StripeConnectCallbackView.as_view(),
-        name="stripe-connect-callback",
+        "api/v1/recovery",
+        RecoveryStateView.as_view(),
+        name="backup-recovery-state",
     ),
-    path("api/v1/webhooks/stripe/<str:public_code>", StripeWebhookView.as_view(), name="stripe-webhook"),
+    path(
+        "api/v1/data-exports/download/<uuid:job_id>/<str:token>",
+        DataExportDownloadView.as_view(),
+        name="data-export-download",
+    ),
+    # Spliced, not appended: a deployment that ships no payment surfaces must not answer
+    # on the Stripe webhook either. An endpoint that accepts and verifies a charge for an
+    # app whose console is gone would settle money nobody can see or reconcile.
+    *separable_paths(
+        "payments",
+        path(
+            "api/v1/webhooks/stripe/connect",
+            StripeConnectWebhookView.as_view(),
+            name="stripe-connect-webhook",
+        ),
+        path(
+            "api/v1/payments/connect/callback",
+            StripeConnectCallbackView.as_view(),
+            name="stripe-connect-callback",
+        ),
+        path(
+            "api/v1/webhooks/stripe/<str:public_code>",
+            StripeWebhookView.as_view(),
+            name="stripe-webhook",
+        ),
+        path(
+            "api/v1/webhooks/razorpay/<str:public_code>",
+            RazorpayWebhookView.as_view(),
+            name="razorpay-webhook",
+        ),
+    ),
     path('api/v1/', include('apps.machines.urls')),
-    path('api/v1/public/', include('apps.events.urls_public')),
-    path('api/v1/public/', include('apps.bookings.urls_public')),
-    path('api/v1/public/', include('apps.presence.urls')),
-    path("api/v1/", include("apps.payments.urls")),
+    *separable("events", "api/v1/public/", "apps.events.urls_public"),
+    *separable("bookings", "api/v1/public/", "apps.bookings.urls_public"),
+    *separable("presence", "api/v1/public/", "apps.presence.urls"),
+    *separable("payments", "api/v1/", "apps.payments.urls"),
     path(
         "api/v1/internal/tls-check",
         TlsCheckView.as_view(),
@@ -70,15 +129,26 @@ urlpatterns = [
     # while /api/v1/public/... is reachable directly (and via "v1:public-inventory").
     path("api/v1/", include(("apps.inventory.urls", "inventory"), namespace="v1")),
     path("api/v1/", include("apps.makerspaces.urls")),
+    *separable("payments", "api/v1/member/", "apps.payments.urls_member"),
     path("api/v1/", include("apps.hardware_requests.urls")),
     path("api/v1/auth/", include("apps.accounts.urls")),   # staff auth surface
     path("api/v1/admin/", include("apps.admin_api.urls")),
+    # Mounted at admin_api's own prefix so the paths and route names are unchanged by
+    # the relocation, and *after* it so a relocated route can never shadow one that
+    # stayed behind. Every warranty pattern is a distinct literal, so ordering is
+    # belt-and-braces rather than load-bearing.
+    *separable("warranty", "api/v1/admin/", "apps.warranty.urls"),
+    *separable("maintenance", "api/v1/admin/", "apps.maintenance.urls"),
+    *separable("presence", "api/v1/admin/", "apps.presence.urls_admin"),
+    *separable("events", "api/v1/admin/", "apps.events.urls_admin"),
+    *separable("events", "api/v1/member/", "apps.events.urls_member"),
+    *separable("bookings", "api/v1/admin/", "apps.bookings.urls_admin"),
     path("api/v1/admin/", include("apps.boxes.urls")),
     path("api/v1/admin/", include("apps.evidence.urls")),
     path("api/v1/", include("apps.operations.urls")),
     path("api/v1/integrations/", include("apps.integrations.urls")),
-    path("api/v1/procurement/", include("apps.procurement.urls")),
-    path("api/v1/notifications/", include("apps.notifications.urls")),
+    *separable("procurement", "api/v1/procurement/", "apps.procurement.urls"),
+    *separable("notifications", "api/v1/notifications/", "apps.notifications.urls"),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/",

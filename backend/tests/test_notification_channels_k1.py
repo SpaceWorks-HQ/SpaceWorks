@@ -1,4 +1,6 @@
 """Part K1 — persistence, secrets, and default catalog for the notification matrix."""
+import socket
+
 import pytest
 
 from apps.admin_api.api_client_serializers import ApiIntegrationSettingsSerializer
@@ -20,6 +22,22 @@ from tests.return_helpers import make_space
 pytestmark = pytest.mark.django_db
 
 WEBHOOK = "https://hooks.slack.com/services/T000/B000/xyz"
+
+
+@pytest.fixture(autouse=True)
+def public_webhook_dns(monkeypatch):
+    monkeypatch.setattr(
+        "apps.integrations.webhook_validation.socket.getaddrinfo",
+        lambda _host, port, **_kwargs: [
+            (
+                socket.AF_INET,
+                socket.SOCK_STREAM,
+                socket.IPPROTO_TCP,
+                "",
+                ("93.184.216.34", port),
+            )
+        ],
+    )
 
 
 def test_webhook_fields_fernet_round_trip():
@@ -92,7 +110,7 @@ def test_webhook_validation_rejects_bad(bad):
 
 def test_webhook_validation_accepts_https_and_blank():
     assert validate_webhook_url(WEBHOOK) == WEBHOOK
-    assert validate_webhook_url("https://mm.self-hosted.internal/hooks/z") != ""
+    assert validate_webhook_url("https://mm.self-hosted.example/hooks/z") != ""
     assert validate_webhook_url("") == ""
     assert validate_webhook_url("  ") == ""
 

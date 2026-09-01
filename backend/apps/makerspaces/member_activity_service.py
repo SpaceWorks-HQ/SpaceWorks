@@ -6,23 +6,46 @@ from apps.accounts.models import User
 from apps.hardware_requests.self_checkout_models import PublicToolLoan
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.servability import servable_queryset
+from apps.makerspaces.waiver_state import current_acceptance
 from apps.presence.models import PresenceSession
+from apps.separability.registry import runtime_active
 
 
 RECENT_LIMIT = 20
 ACTIVITY_LIMIT = 50
 
 
-def active_membership(user, makerspace_id):
+def active_member_memberships(user):
+    """Every active membership this identity may act through, archived spaces INCLUDED.
+
+    The single source of truth for "is this caller allowed to act as a member at all".
+    `apps.payments.member_access` builds its archived-tolerant surfaces on this rather than
+    restating the predicate, because two copies of a security check drift and the drift is
+    invisible until someone audits both. It lives here, not in payments: `apps.payments` is a
+    separable app that a deployment may tombstone, and this module must keep working without
+    it. Archival is deliberately NOT filtered here -- each caller applies its own rule.
+    """
     if not (
         user and user.is_authenticated and user.pk and user.is_active
         and user.access_status == User.AccessStatus.ACTIVE
     ):
-        return None
+        return MakerspaceMembership.objects.none()
     return MakerspaceMembership.objects.select_related("makerspace", "accepted_waiver").filter(
-        makerspace_id=makerspace_id, user=user, status="active",
-        makerspace__archived_at__isnull=True,
+        user=user, status="active",
+    )
+
+
+def active_membership(user, makerspace_id):
+    membership = servable_queryset(
+        active_member_memberships(user).filter(makerspace_id=makerspace_id),
+        relation="makerspace",
     ).first()
+    if membership is not None:
+        # Preserve request-scoped identity context (notably claim provenance) instead
+        # of lazily loading a second, context-free User instance from the membership.
+        membership.user = user
+    return membership
 
 
 def member_activity(membership):
@@ -42,8 +65,11 @@ def member_activity(membership):
     if module_enabled(makerspace, "bookings"):
         payload["bookings"] = _bookings(makerspace.id, member, now)
     if module_enabled(makerspace, "events"):
-        payload["event_registrations"] = _event_registrations(makerspace.id, member)
-    if module_enabled(makerspace, "machine_service") and apps.is_installed("apps.machines"):
+        payload["event_registrations"] = _event_registrations(makerspace, member)
+    # runtime_active, not apps.is_installed: a tombstoned app stays in
+    # INSTALLED_APPS (its migrations must remain applied), so is_installed answers
+    # "are the tables there?" when this asks "are the surfaces live?".
+    if module_enabled(makerspace, "machine_service") and runtime_active("machines"):
         payload["machine_service_requests"] = _machine_service_requests(makerspace.id, member)
     return payload
 
@@ -78,7 +104,8 @@ def _bookings(makerspace_id, member, now):
     }
 
 
-def _event_registrations(makerspace_id, member):
+def _event_registrations(makerspace, member):
+    from apps.events.member_history import registrations_for_space
     from apps.events.models import EventRegistration
 
     waitlisted_before = EventRegistration.objects.filter(
@@ -87,16 +114,64 @@ def _event_registrations(makerspace_id, member):
         Q(created_at__lt=OuterRef("created_at"))
         | Q(created_at=OuterRef("created_at"), id__lte=OuterRef("id"))
     ).values("event_id").annotate(total=Count("id")).values("total")[:1]
-    rows = EventRegistration.objects.filter(
-        event__makerspace_id=makerspace_id, member=member,
-    ).select_related("event").annotate(
+    # Shares `registrations_for_space` with the profile surfaces deliberately. The
+    # waitlist-position subquery above is per-EVENT and stays local, but the question
+    # "which registrations does this member hold here" must have exactly one answer:
+    # when that predicate widens, a second copy here would make this endpoint and the
+    # profile disagree about the same member.
+    rows = registrations_for_space(makerspace, member).select_related("event").annotate(
         waitlist_position=Subquery(waitlisted_before, output_field=IntegerField())
-    ).only("status", "created_at", "event__title", "event__starts_at", "event__ends_at")
+    ).only(
+        "id", "checkin_token", "status", "created_at", "event__title",
+        "event__starts_at", "event__ends_at", "event__status", "event__makerspace_id",
+        "registered_via_makerspace_id", "host_waiver_id",
+    )
+    if getattr(member, "_claim_audit_context", None) is not None:
+        rows = rows.filter(event__makerspace=makerspace)
+    # Two halves of one question, and they must match `EventCheckInQrView`'s filter exactly:
+    # the REGISTRATION must be registered (a waitlisted row has nothing confirmable behind
+    # it) and the EVENT must still be checkable. `services.cancel()` changes only
+    # `Event.status` and leaves registrations REGISTERED, so gating on the registration
+    # alone would advertise an admission code for a cancelled event.
+    from apps.events.views_checkin import CHECKABLE_EVENT_STATUSES
+
+    # Hosts whose active waiver a visiting registration must have accepted. Resolved once
+    # rather than per row.
+    from apps.makerspaces.models import MakerspaceWaiver
+
+    ordered = list(rows.order_by("-event__starts_at", "-id")[:ACTIVITY_LIMIT])
+    hosts_needing_waiver = set(
+        MakerspaceWaiver.objects.filter(
+            makerspace_id__in={row.event.makerspace_id for row in ordered},
+            is_active=True,
+        ).values_list("makerspace_id", flat=True)
+    )
+
+    def usable_token(row):
+        # Must agree with `EventCheckInQrView`: a token advertised here whose QR route
+        # refuses is a code that scans to nothing.
+        visitor = (
+            row.registered_via_makerspace_id
+            and row.registered_via_makerspace_id != row.event.makerspace_id
+        )
+        if (
+            visitor
+            and row.host_waiver_id is None
+            and row.event.makerspace_id in hosts_needing_waiver
+        ):
+            return False
+        return (
+            row.status == EventRegistration.Status.REGISTERED
+            and row.event.status in CHECKABLE_EVENT_STATUSES
+        )
+
     return [{
+        "registration_id": row.id,
+        "checkin_token": str(row.checkin_token) if usable_token(row) else None,
         "event_title": row.event.title, "starts_at": row.event.starts_at,
         "ends_at": row.event.ends_at, "status": row.status,
         "waitlist_position": row.waitlist_position if row.status == EventRegistration.Status.WAITLISTED else None,
-    } for row in rows.order_by("-event__starts_at", "-id")[:ACTIVITY_LIMIT]]
+    } for row in ordered]
 
 
 def _machine_service_requests(makerspace_id, member):
@@ -147,8 +222,7 @@ def _accountability(membership):
     return {
         "membership_active": membership.status == "active",
         "waiver_acceptance_required": bool(
-            waiver and (membership.accepted_waiver_id != waiver.id
-                        or membership.waiver_version_accepted != waiver.version)
+            waiver and not current_acceptance(membership, active_waiver=waiver)
         ),
         "restriction_code": None,
     }

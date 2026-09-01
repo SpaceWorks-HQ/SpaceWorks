@@ -4,7 +4,11 @@ import pytest
 from django.test import override_settings
 
 from apps.integrations.email_templates_registry_defaults import PRINTING_REQUESTER_SUBJECTS
-from apps.integrations.models import EmailLog, EmailNotificationMute
+from apps.integrations.models import (
+    EmailLog,
+    EmailNotificationMute,
+    MachineTypeEmailTemplate,
+)
 from apps.machines.models import Machine, MachineServiceRequest, MachineType, ServiceQueue
 from apps.machines.service_printing_emails import notify_printer_service_status
 from apps.makerspaces.models import MakerspaceMembership
@@ -64,3 +68,23 @@ def test_kernel_printer_lifecycle_uses_printing_templates_and_honours_mutes():
     assert EmailLog.objects.filter(event="accepted", audience="staff", to_email=staff.email).exists()
     assert EmailLog.objects.filter(event="started", audience="requester", to_email=requester.email).exists()
     assert not EmailLog.objects.filter(event="started", audience="staff", to_email=staff.email).exists()
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+def test_kernel_printer_request_uses_machine_type_printing_override():
+    makerspace, request, requester, _staff = _printer_request("b7a-type-override")
+    MachineTypeEmailTemplate.objects.create(
+        makerspace=makerspace,
+        machine_type=request.queue.machine_type,
+        stream="printing",
+        audience="requester",
+        key="accepted",
+        subject="TYPE PRINT {{ print_request.id }}",
+        text_body="TYPE BODY {{ print_request.title }}",
+    )
+
+    notify_printer_service_status(request, "accepted", sync=True)
+
+    row = EmailLog.objects.get(event="accepted", audience="requester", to_email=requester.email)
+    assert row.subject == f"TYPE PRINT {request.pk}"
+    assert row.text_body == "TYPE BODY Kernel bracket"

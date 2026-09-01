@@ -17,6 +17,14 @@ from tests.return_helpers import make_space, make_user
 pytestmark = pytest.mark.django_db
 
 
+def test_printer_stats_require_printing_and_machine_service_modules():
+    makerspace = make_space("b7a-printing-disabled")
+    makerspace.enabled_modules = ["machine_service"]
+    makerspace.save(update_fields=["enabled_modules"])
+
+    assert build_public_stats(makerspace)["printing"] is None
+
+
 def _request(*, makerspace, queue, requester, status, title, machine=None, pool=None, minutes=0, grams="0", completed_at=None):
     return MachineServiceRequest.objects.create(
         makerspace=makerspace, queue=queue, requester=requester, assigned_machine=machine,

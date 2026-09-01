@@ -6,6 +6,17 @@ import type { Makerspace } from "./panels/shared";
 import { TAB_GROUPS, TAB_LABELS } from "./staffAccess";
 import { staffTabPath } from "./staffTabs";
 
+const GROUP_TONE_CLASSES: Record<string, string> = {
+  Operate: "border-accent/40 text-accent-ink hover:bg-accent/15",
+  Inventory: "border-secondary/40 text-secondary-ink hover:bg-secondary/15",
+  Machines: "border-success/40 text-success-ink hover:bg-success/15",
+  Events: "border-warn/40 text-warn-ink hover:bg-warn/15",
+  Bookings: "border-accent/40 text-accent-ink hover:bg-accent/15",
+  Members: "border-secondary/40 text-secondary-ink hover:bg-secondary/15",
+  Insights: "border-success/40 text-success-ink hover:bg-success/15",
+  Admin: "border-warn/40 text-warn-ink hover:bg-warn/15",
+};
+
 function NotificationUnreadBadge({ makerspaceId }: { makerspaceId: number }) {
   const query = useQuery({
     queryKey: ["notifications-unread", makerspaceId],
@@ -16,7 +27,7 @@ function NotificationUnreadBadge({ makerspaceId }: { makerspaceId: number }) {
   const count = query.data?.count ?? 0;
   if (query.isError || count <= 0) return null;
   return (
-    <span className="ml-auto shrink-0 rounded-full bg-danger px-1.5 text-xs font-semibold text-bg">
+    <span className="ml-auto shrink-0 rounded-full bg-danger px-1.5 font-mono text-xs font-semibold text-bg">
       {count > 99 ? "99+" : count}
     </span>
   );
@@ -56,19 +67,23 @@ export function StaffSidebar({
       <div className="flex min-w-0 items-center gap-3 border-b border-line px-5 py-4">
         <SpaceWorksBadge className="shrink-0" />
         <div className="min-w-0">
-          <p className="truncate font-mono text-xs uppercase text-muted">
+          <p className="eyebrow truncate">
             {guestOnly ? "Guest admin" : isSuperadmin ? "Super Admin" : printingOnly ? "Print Manager" : "Space Manager"}
           </p>
         </div>
       </div>
       <div className="p-4">
         {singleTenantLocked ? (
-          <div className="break-words rounded-lg border border-line bg-tone-blue px-3 py-2 text-sm font-semibold text-tone-blue-ink dark:bg-[#0b2a38] dark:text-[#7dd3fc]">
+          <h2 className="title-section break-words rounded-lg border border-accent bg-accent px-3 py-2 text-on-accent dark:bg-accent/15 dark:text-accent-ink">
             {activeMakerspace?.name ?? "Configured makerspace"}
-          </div>
+          </h2>
         ) : (
           <select
             className="desk-input w-full"
+            // The visible context is the option text itself, so there is no visible
+            // label to point at; without this the control is announced as just
+            // "combobox" with no indication of what it switches.
+            aria-label="Active makerspace"
             value={selected ?? ""}
             onChange={(event) => setSelected(Number(event.target.value))}
           >
@@ -79,23 +94,34 @@ export function StaffSidebar({
             ))}
           </select>
         )}
-        <nav className="mt-4 space-y-3">
+        {/* Named landmark: a staff page carries more than one nav region, and
+            "navigation" repeated twice tells a screen-reader user nothing. */}
+        <nav className="mt-4 space-y-3" aria-label="Staff sections">
           {TAB_GROUPS.map((group) => {
             const tabs = group.tabs.filter((tab) => allowedTabs.includes(tab));
             if (tabs.length === 0) return null;
             const open = !collapsedGroups.has(group.label) || tabs.includes(activeTab);
+            const groupId = `staff-nav-group-${group.label.replace(/\W+/g, "-").toLowerCase()}`;
             return (
               <div key={group.label}>
-                <button
-                  className="flex w-full items-center justify-between border-b border-line px-1 pb-1 font-display text-sm font-bold tracking-tight text-ink transition hover:text-accent-ink"
-                  type="button"
-                  onClick={() => toggleGroup(group.label)}
-                >
-                  <span className="min-w-0 truncate">{group.label}</span>
-                  <span aria-hidden>{open ? "-" : "+"}</span>
-                </button>
+                {/* A real heading, not a styled span: these are the sidebar's topic names, so a
+                    screen-reader user gets them in the heading list, and the base layer hands the
+                    display face (Clash Display) to h1-h6 only. Title case + the display voice is
+                    what makes it read as a topic rather than the mono `.eyebrow` label voice. */}
+                <h2>
+                  <button
+                    className={`desk-button-ghost w-full justify-between rounded-none border-b px-1 text-left ${GROUP_TONE_CLASSES[group.label] ?? GROUP_TONE_CLASSES.Operate}`}
+                    type="button"
+                    aria-expanded={open}
+                    aria-controls={groupId}
+                    onClick={() => toggleGroup(group.label)}
+                  >
+                    <span className="min-w-0 truncate text-base font-semibold text-inherit">{group.label}</span>
+                    <span className="font-mono text-base" aria-hidden>{open ? "−" : "+"}</span>
+                  </button>
+                </h2>
                 {open ? (
-                  <div className="mt-1 grid gap-1">
+                  <div className="mt-1 grid gap-1" id={groupId}>
                     {tabs.map((item) => (
                       <Link
                         key={item}
@@ -111,7 +137,7 @@ export function StaffSidebar({
                       </Link>
                     ))}
                   </div>
-                ) : null}
+                ) : <div id={groupId} hidden />}
               </div>
             );
           })}

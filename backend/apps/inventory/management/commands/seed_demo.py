@@ -1,8 +1,9 @@
-﻿from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 from decimal import Decimal
 
 from apps.accounts.models import User
+from apps.backup.custody import initialize_custody_state
 from apps.apiclients.models import ApiClient
 from apps.boxes.models import Box
 from apps.inventory.categories import ensure_default_categories
@@ -14,6 +15,8 @@ from apps.inventory.models import (
     TrackingMode,
 )
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from apps.makerspaces.module_install import apply_profile
+from apps.makerspaces.module_profiles import EVERYTHING
 from apps.machines.models import Machine, MachineConsumablePool, MachineServiceRequest, MachineType
 from apps.machines.service_workflow import submit as submit_service_request
 
@@ -31,7 +34,7 @@ DEMO_SPACES = [
         "name": "Beta Woodshop",
         "location": "North Wing - Woodshop",
         "manager": "beta_manager",
-        "superadmin_access_enabled": False,
+        "superadmin_access_enabled": True,
     },
     {
         "slug": "gamma-fab",
@@ -86,7 +89,15 @@ class Command(BaseCommand):
                     "created_by": superadmin,
                 },
             )
+            initialize_custody_state(makerspace.pk)
             spaces_created += int(created)
+            # Modules are opt-in, so a freshly created makerspace starts core-only and
+            # the machine-service seed below would hit `require_module` and abort the
+            # whole command. The demo data spans every module, so seed the `everything`
+            # profile - but only on creation, so a re-run never rewrites the module set
+            # of a space the operator has since tuned.
+            if created:
+                apply_profile(makerspace, EVERYTHING, actor=superadmin)
             ensure_default_categories(makerspace)
             manager = self._user(
                 spec["manager"],
@@ -118,7 +129,11 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING(f"Demo password for all accounts: {password}"))
 
     def _user(self, username, email, password, role, **flags):
-        user, _ = User.objects.get_or_create(username=username, defaults={"email": email})
+        user, created = User.objects.get_or_create(username=username, defaults={"email": email})
+        # CLI access already overrides application rules; this assertion makes an
+        # improbable collision loud instead of silently changing a person record.
+        if not created and user.is_walk_in:
+            raise CommandError(f"Cannot seed {username!r}: the existing user is a walk-in.")
         user.email = email
         user.role = role
         user.access_status = User.AccessStatus.ACTIVE

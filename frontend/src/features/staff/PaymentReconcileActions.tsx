@@ -41,12 +41,12 @@ export function PaymentReconcileActions({
   }).format(Number(payment.amount));
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-      <span className="font-semibold text-ink">Payment {amount}</span>
+      <span className="font-mono font-semibold text-ink">Payment {amount}</span>
       <StatusBadge status={payment.status} />
       {payment.status === "pending" ? (
         <>
           <button
-            className="desk-button"
+            className="desk-button-success"
             type="button"
             disabled={mutation.isPending}
             onClick={() => mutation.mutate("mark-offline")}
@@ -54,7 +54,7 @@ export function PaymentReconcileActions({
             Mark offline
           </button>
           <button
-            className="desk-button"
+            className="desk-button-warn"
             type="button"
             disabled={mutation.isPending}
             onClick={() => mutation.mutate("waive")}

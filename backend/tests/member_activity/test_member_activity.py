@@ -119,7 +119,9 @@ def test_activity_requires_active_exact_membership_but_not_presence():
 def test_disabled_capabilities_are_omitted():
     space = Makerspace.objects.create(
         name="Disabled", slug="disabled",
-        enabled_modules=["public_inventory", "request_workflow"],
+        # `membership` is required because the activity endpoint is itself a member
+        # surface (plan A7); the point of this test is the other modules being off.
+        enabled_modules=["public_inventory", "request_workflow", "membership"],
     )
     user = member(space, "disabled-member")
     response = client(user).get(activity_url(space))

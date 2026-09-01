@@ -4,10 +4,13 @@ import { StaffHeader } from "./StaffHeader";
 import { StaffSidebar } from "./StaffSidebar";
 import { StaffTabContent } from "./StaffTabContent";
 import { EmptyState } from "../../components/ui/EmptyState";
+import { SkipLink } from "../../components/SkipLink";
 import { getStaffAccess, STAFF_TAB_KEYS, TAB_LABELS } from "./staffAccess";
 import {
   filterTabsByEnabledModules,
   readStoredStaffTab,
+  keptStaffSubPath,
+  staffSubPathFromPath,
   staffTabPath,
   tabFromStaffPath,
 } from "./staffTabs";
@@ -17,6 +20,7 @@ import type { Makerspace } from "./panels/shared";
 export function StaffWorkspace({
   activeMakerspace,
   actions,
+  isMachineOnly,
   canConfigureMachineTypes,
   collapsedGroups,
   guestOnly,
@@ -33,6 +37,7 @@ export function StaffWorkspace({
 }: {
   activeMakerspace?: Makerspace;
   actions: readonly string[];
+  isMachineOnly: boolean;
   canConfigureMachineTypes: boolean;
   collapsedGroups: Set<string>;
   guestOnly: boolean;
@@ -53,6 +58,7 @@ export function StaffWorkspace({
     canChooseToBuyKind,
     canEditInventory,
     canIssueDirectLoan,
+    canCollectServiceRequests,
     canManageMakerspace,
     canManageEvents,
     canManageBookings,
@@ -65,7 +71,7 @@ export function StaffWorkspace({
     defaultTab,
     handoutOnly,
     printingOnly,
-  } = getStaffAccess(actions, isSuperadmin, singleTenantLocked, activeMakerspace?.enabled_modules ?? []);
+  } = getStaffAccess(actions, isSuperadmin, singleTenantLocked, isMachineOnly);
   const visibleMakerspaces =
     singleTenantLocked && activeMakerspace
       ? [activeMakerspace]
@@ -80,16 +86,35 @@ export function StaffWorkspace({
     : moduleAllowedTabs.includes(defaultTab)
       ? defaultTab
       : moduleAllowedTabs[0] ?? defaultTab;
+  // Without this the redirect below strips `/admin/machines/12-laser` back to
+  // `/admin/machines` on every load, because the two strings differ -- so a per-type deep
+  // link could never survive its first render. The rule lives in `keptStaffSubPath` so it
+  // is testable on its own; rendering this whole workspace to assert one path string is
+  // how that regression stays uncaught.
+  const keptSubPath = keptStaffSubPath(
+    routeTab,
+    activeTab,
+    staffSubPathFromPath(location.pathname, guestOnly),
+  );
   const activeTabPath = activeTab
-    ? staffTabPath(activeTab, guestOnly, activeMakerspace?.slug, singleTenantLocked)
+    ? staffTabPath(activeTab, guestOnly, activeMakerspace?.slug, singleTenantLocked, keptSubPath)
     : staffTabPath(defaultTab, guestOnly, activeMakerspace?.slug, singleTenantLocked);
 
-  if (!routeTabDenied && location.pathname !== activeTabPath) {
+  // Tabs OMITTED by design rather than genuinely forbidden: `requests` holds hardware rows
+  // a machine-only actor never has, and `notifications` is withheld from that same actor
+  // because the inbox cannot be machine-scoped. Both are absent from the sidebar, so a
+  // stored or deep-linked route to one is a stale bookmark, not an attempt to reach
+  // something restricted — it should land on the actor's first allowed tab rather than an
+  // access-denied page. Genuinely denied tabs still render the denial.
+  const normalizedDeniedTabs = new Set(["requests", "notifications"]);
+  const normalizeDenied = routeTabDenied && !!routeTab && normalizedDeniedTabs.has(routeTab);
+  if ((!routeTabDenied || normalizeDenied) && location.pathname !== activeTabPath) {
     return <Navigate replace to={activeTabPath} />;
   }
 
   return (
     <main className="desk-shell grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <SkipLink />
       <StaffSidebar
         activeMakerspace={activeMakerspace}
         activeTab={routeTabDenied ? "" : activeTab}
@@ -116,7 +141,7 @@ export function StaffWorkspace({
           user={user}
         />
 
-        <div className="min-w-0 p-5">
+        <div className="min-w-0 p-5" id="main-content" tabIndex={-1}>
           {routeTabDenied ? (
             <EmptyState
               title="Access denied"
@@ -140,16 +165,19 @@ export function StaffWorkspace({
               canChooseToBuyKind={canChooseToBuyKind}
               canEditInventory={canEditInventory}
               canIssueDirectLoan={canIssueDirectLoan}
+              canCollectServiceRequests={canCollectServiceRequests}
               canUseToBuy={canUseToBuy}
               canManageQr={canManageQr}
               canManageMakerspace={canManageMakerspace}
               canManageEvents={canManageEvents}
               canManageBookings={canManageBookings}
               canManageMachines={canManageMachines}
+              isMachineOnly={isMachineOnly}
               canConfigureMachineTypes={canConfigureMachineTypes}
               canSeeHardware={canSeeHardware}
               canSeePrinting={canSeePrinting}
               canViewAudit={canViewAudit}
+              singleTenantLocked={singleTenantLocked}
             />
           )}
         </div>

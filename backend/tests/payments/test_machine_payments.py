@@ -4,6 +4,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import InternalError, transaction
 
+from apps.machines import role_scope
 from apps.machines.models import Machine, MachineServiceRequest, MachineType, MakerspaceMachineTypePricing
 from apps.machines.service_workflow import accept, complete, start, submit
 from apps.payments.models import Payment
@@ -62,7 +63,7 @@ def test_payment_delete_is_immutable_outside_purge():
 
 def test_verified_webhook_is_idempotent_and_marks_matching_checkout_paid():
     space = make_space("c3-payment-webhook")
-    space.enabled_features = ["payments.machines"]
+    space.enabled_features = ["payments.enabled", "payments.machines"]
     space.save(update_fields=["enabled_features", "updated_at"])
     configured_settings(space)
     actor = make_member("c3-payment-webhook-user", space)
@@ -92,7 +93,7 @@ def test_async_checkout_webhook_settles_matching_pending_payment():
 
 def test_completion_creates_payment_and_checkout_failure_never_blocks(monkeypatch):
     space = make_space("c3-payment-complete")
-    space.enabled_features = ["payments.machines"]
+    space.enabled_features = ["payments.enabled", "payments.machines"]
     space.save(update_fields=["enabled_features", "updated_at"])
     configured_settings(space)
     actor = make_member("c3-payment-complete-user", space)
@@ -103,7 +104,7 @@ def test_completion_creates_payment_and_checkout_failure_never_blocks(monkeypatc
     )
     monkeypatch.setattr("apps.machines.service_payments.create_checkout", lambda payment: (_ for _ in ()).throw(RuntimeError("stripe unavailable")))
     accept(row, actor)
-    start(row, actor, machine_id=row.assigned_machine_id)
+    start(row, actor, role_scope.EXEMPT, machine_id=row.assigned_machine_id)
     assert complete(row, actor, actual_minutes=1, consumptions=[]).status == MachineServiceRequest.Status.COMPLETED
     payment = Payment.objects.get(subject_id=row.pk)
     assert (payment.amount, payment.currency) == (Decimal("3.00"), "usd")
@@ -142,12 +143,15 @@ def test_terminal_payment_webhook_is_audited_as_an_anomaly(monkeypatch):
 
 
 def test_member_can_generate_a_missing_checkout_url(monkeypatch):
+    import json
+
+    from apps.audit.models import AuditLog
     from rest_framework.test import APIClient
     space = make_space("c3-payment-regenerate")
     configured_settings(space)
     actor = make_member("c3-payment-regenerate-user", space)
     payment = payment_for(service_request(space, actor), actor)
-    monkeypatch.setattr("apps.payments.services.member_area_url", lambda _: "https://space.example/member")
+    monkeypatch.setattr("apps.payments.services.member_payment_return_url", lambda _: "https://space.example/member")
     monkeypatch.setattr("apps.payments.services.stripe_client.create_checkout_session", lambda *_args, **_kwargs: {"id": "cs_regenerated", "url": "https://checkout.stripe.test/cs_regenerated"})
     client = APIClient()
     client.force_authenticate(actor)
@@ -156,3 +160,14 @@ def test_member_can_generate_a_missing_checkout_url(monkeypatch):
     assert response.data["checkout_url"] == "https://checkout.stripe.test/cs_regenerated"
     payment.refresh_from_db()
     assert payment.stripe_checkout_session_id == "cs_regenerated"
+    entry = AuditLog.objects.get(
+        action="payment.checkout_created", target_id=str(payment.pk)
+    )
+    assert entry.actor == actor
+    assert entry.meta == {
+        "payment_id": payment.pk,
+        "provider": Payment.Provider.STRIPE,
+        "subject_type": Payment.SubjectType.MACHINE_SERVICE_REQUEST,
+        "subject_id": payment.subject_id,
+    }
+    assert response.data["checkout_url"] not in json.dumps(entry.meta)

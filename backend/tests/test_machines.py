@@ -28,6 +28,7 @@ from apps.makerspaces.models import MakerspaceMembership
 from apps.operations.models import InventoryAdjustment
 from apps.warranty.models import Warranty
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user
+from tests.handout_roles import grant_handout, make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -35,24 +36,14 @@ pytestmark = pytest.mark.django_db
 def test_operator_candidates_return_only_active_members_with_minimal_fields():
     makerspace = enable_machines(make_space('machines-candidates'))
     manager = make_member('machines-candidates-manager', makerspace)
-    active = make_member(
-        'machines-candidates-active',
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    active = make_handout_member('machines-candidates-active', makerspace)
     active.first_name = 'Active'
     active.last_name = 'Member'
     active.email = 'private@example.test'
     active.telegram_user_id = 'private-telegram'
     active.external_checkin_user_id = 'private-checkin'
     active.save()
-    restricted = make_member(
-        'machines-candidates-restricted',
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    restricted = make_handout_member('machines-candidates-restricted', makerspace)
     restricted.access_status = User.AccessStatus.RESTRICTED
     restricted.save(update_fields=['access_status'])
     inactive = make_user(
@@ -60,11 +51,7 @@ def test_operator_candidates_return_only_active_members_with_minimal_fields():
         access_status=User.AccessStatus.ACTIVE,
         is_active=False,
     )
-    MakerspaceMembership.objects.create(
-        makerspace=makerspace,
-        user=inactive,
-        role=MakerspaceMembership.Role.GUEST_ADMIN,
-    )
+    grant_handout(inactive, makerspace)
     machine = make_machine(makerspace)
 
     response = authenticated_client(manager).get(
@@ -97,12 +84,7 @@ def test_operator_candidates_return_only_active_members_with_minimal_fields():
 
 def test_operator_candidates_forbid_operate_only_operator():
     makerspace = enable_machines(make_space('machines-candidates-forbidden'))
-    operator = make_member(
-        'machines-candidates-operate',
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    operator = make_handout_member('machines-candidates-operate', makerspace)
     machine = make_machine(makerspace)
     MachineOperator.objects.create(
         machine=machine,
@@ -149,24 +131,9 @@ def test_operator_candidates_respect_disabled_machines_module():
 def test_machine_capability_matrix():
     makerspace = enable_machines(make_space('machines-capability-matrix'))
     machine = make_machine(makerspace)
-    operate = make_member(
-        'machines-capability-operate',
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
-    manage = make_member(
-        'machines-capability-manage',
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
-    full = make_member(
-        'machines-capability-full',
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    operate = make_handout_member('machines-capability-operate', makerspace)
+    manage = make_handout_member('machines-capability-manage', makerspace)
+    full = make_handout_member('machines-capability-full', makerspace)
     type_manager = make_member(
         'machines-capability-type-manager',
         makerspace,
@@ -377,12 +344,7 @@ def test_space_manager_can_create_machine_with_global_type_and_created_by():
 
 def test_guest_admin_without_machine_authority_gets_403_on_list():
     makerspace = enable_machines(make_space("machines-guest-list"))
-    guest = make_member(
-        "machines-guest-list-user",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("machines-guest-list-user", makerspace)
 
     response = authenticated_client(guest).get(
         reverse("admin-machines", kwargs={"makerspace_id": makerspace.id})
@@ -432,12 +394,7 @@ def test_machine_detail_is_404_across_tenants():
 def test_operator_access_levels_bound_operate_and_manage_actions():
     makerspace = enable_machines(make_space("machines-operator-levels"))
     manager = make_member("machines-operator-manager", makerspace)
-    operator = make_member(
-        "machines-operator-user",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    operator = make_handout_member("machines-operator-user", makerspace)
     machine = make_machine(makerspace)
     manager_client = authenticated_client(manager)
     operator_client = authenticated_client(operator)
@@ -490,18 +447,8 @@ def test_operator_access_levels_bound_operate_and_manage_actions():
 def test_full_operator_can_delegate_non_full_and_retire_but_cannot_grant_full():
     makerspace = enable_machines(make_space("machines-full-operator"))
     manager = make_member("machines-full-manager", makerspace)
-    full_operator = make_member(
-        "machines-full-user",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
-    target = make_member(
-        "machines-full-target",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    full_operator = make_handout_member("machines-full-user", makerspace)
+    target = make_handout_member("machines-full-target", makerspace)
     machine = make_machine(makerspace)
     assert assign_operator(
         authenticated_client(manager), machine, full_operator, "full"
@@ -542,12 +489,7 @@ def test_assigning_non_member_as_operator_returns_400():
 def test_machine_types_custom_create_scope_permissions_and_global_uniqueness():
     makerspace = enable_machines(make_space("machines-types"))
     manager = make_member("machines-types-manager", makerspace)
-    operator = make_member(
-        "machines-types-operator",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    operator = make_handout_member("machines-types-operator", makerspace)
     machine = make_machine(makerspace)
     manager_client = authenticated_client(manager)
     assert assign_operator(manager_client, machine, operator, "operate").status_code == 201
@@ -673,12 +615,7 @@ def test_machine_type_rename_is_404_across_tenants():
 
 def test_machine_type_rename_requires_manage_machines_before_validation():
     makerspace = enable_machines(make_space('machines-type-forbidden'))
-    actor = make_member(
-        'machines-type-forbidden-actor',
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    actor = make_handout_member('machines-type-forbidden-actor', makerspace)
 
     response = authenticated_client(actor).patch(
         reverse(
@@ -818,12 +755,7 @@ def test_retired_machine_is_offline_rejects_mutations_and_has_no_delete_route():
 def test_only_machine_admin_or_type_manager_can_unretire():
     makerspace = enable_machines(make_space("machines-unretire"))
     manager = make_member("machines-unretire-manager", makerspace)
-    full_operator = make_member(
-        "machines-unretire-full",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    full_operator = make_handout_member("machines-unretire-full", makerspace)
     machine = make_machine(makerspace)
     manager_client = authenticated_client(manager)
     assert assign_operator(manager_client, machine, full_operator, "full").status_code == 201
@@ -947,12 +879,7 @@ def test_machines_module_gate_returns_400_when_disabled():
 def test_operator_only_list_is_scoped_to_assigned_machines():
     makerspace = enable_machines(make_space("machines-operator-scope"))
     manager = make_member("machines-scope-manager", makerspace)
-    operator = make_member(
-        "machines-scope-operator",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    operator = make_handout_member("machines-scope-operator", makerspace)
     assigned_machine = make_machine(makerspace, name="Assigned Machine")
     make_machine(makerspace, name="Unassigned Machine")
     assert assign_operator(
@@ -1022,12 +949,7 @@ def test_publicity_toggle_requires_manage_machines_and_returns_public_preview():
 
 def test_full_operator_cannot_publish_and_normal_patch_cannot_change_publicity():
     makerspace = enable_machines(make_space('machines-publicity-operator'))
-    operator = make_member(
-        'machines-publicity-full-operator',
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    operator = make_handout_member('machines-publicity-full-operator', makerspace)
     machine = make_machine(makerspace)
     MachineOperator.objects.create(
         machine=machine,
@@ -1060,12 +982,7 @@ def test_publicity_scope_permission_and_module_checks_are_ordered():
     own = enable_machines(make_space('machines-publicity-scope-own'))
     other = enable_machines(make_space('machines-publicity-scope-other'))
     manager = make_member('machines-publicity-scope-manager', own)
-    full_operator = make_member(
-        'machines-publicity-scope-operator',
-        own,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    full_operator = make_handout_member('machines-publicity-scope-operator', own)
     own_machine = make_machine(own)
     foreign_machine = make_machine(other)
     MachineOperator.objects.create(
@@ -1177,7 +1094,9 @@ def test_machine_serializer_exposes_only_lightweight_warranty_status():
         assert field not in covered.data
 
 
-def test_machine_image_presign_finalize_delete_and_audit(monkeypatch, settings):
+def test_machine_image_presign_finalize_delete_and_audit(
+    monkeypatch, settings, django_capture_on_commit_callbacks
+):
     settings.PUBLIC_IMAGE_BASE_URL = "http://cdn.test/public-images"
     delete_object = mock_machine_image_storage(monkeypatch)
     makerspace = enable_machines(make_space("machines-image-flow"))
@@ -1203,7 +1122,12 @@ def test_machine_image_presign_finalize_delete_and_audit(monkeypatch, settings):
     assert machine.image_key == object_key
     assert AuditLog.objects.filter(action="machine.image_updated").exists()
 
-    removed = client.delete(url)
+    # `remove_image` releases the object through `release_public_image_on_commit`, so the
+    # S3 delete is deliberately deferred past the transaction -- external I/O must never
+    # run while a row lock is held. Under `django_db` nothing commits, so the callback has
+    # to be executed explicitly or the assertion below can never fire.
+    with django_capture_on_commit_callbacks(execute=True):
+        removed = client.delete(url)
 
     assert removed.status_code == 200
     assert "image_key" not in removed.data
@@ -1311,12 +1235,7 @@ def test_makerspace_purge_collection_includes_machine_image():
 def test_operate_only_operator_cannot_manage_machine_image(monkeypatch):
     mock_machine_image_storage(monkeypatch)
     makerspace = enable_machines(make_space("machines-image-operator"))
-    operator = make_member(
-        "machines-image-operator-user",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    operator = make_handout_member("machines-image-operator-user", makerspace)
     machine = make_machine(makerspace)
     MachineOperator.objects.create(
         machine=machine,
@@ -1378,12 +1297,7 @@ def _consumable_product(makerspace, name, available=10, **overrides):
 
 
 def _operate_only_user(makerspace, machine, username):
-    user = make_member(
-        username,
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    user = make_handout_member(username, makerspace)
     MachineOperator.objects.create(
         machine=machine,
         user=user,

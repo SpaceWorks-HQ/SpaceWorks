@@ -2,7 +2,10 @@ import logging
 
 from apps.accounts import rbac
 from apps.accounts.models import User
+# Aliased: `staff_emails_for_feature` has a local list called `recipients`, and shadowing
+# the module makes every reference to it an UnboundLocalError inside that function.
 from apps.integrations import notification_rules
+from apps.integrations import recipients as recipient_selection
 from apps.makerspaces.models import MakerspaceMembership
 
 logger = logging.getLogger(__name__)
@@ -24,10 +27,19 @@ _FEATURE_STREAMS = {
 _STREAM_FEATURES = {value: key for key, value in _FEATURE_STREAMS.items()}
 
 
-def staff_emails_for_feature(makerspace, feature, event=None) -> list[str]:
+def staff_emails_for_feature(makerspace, feature, event=None, scope=None) -> list[str]:
     try:
         if not getattr(makerspace, "staff_notifications_enabled", True):
             return []
+
+        # An explicit per-event selection is authoritative once one row covers this
+        # alert's subject; otherwise this falls through to action-based resolution, which is
+        # what keeps today's behaviour intact (bookings email is ON by default, so a
+        # "default nobody" reading would have silently stopped live booking mail).
+        if recipient_selection.has_selection(makerspace, feature, event, scope):
+            return recipient_selection.selected_emails(
+                makerspace, feature, event, scope
+            )
 
         required_action = _FEATURE_ACTIONS.get(feature)
         if required_action is None:
@@ -62,8 +74,13 @@ def staff_emails_for_feature(makerspace, feature, event=None) -> list[str]:
 
         seen = set()
         recipients = []
+        # The fallback predates machine scoping and is makerspace-wide, so an alert naming
+        # a machine must not mail a maintainer whose role cannot reach it.
+        admits = recipient_selection.reach_filter_for(memberships, scope)
         for membership in memberships:
             if required_action not in rbac.actions_for_membership(membership):
+                continue
+            if not admits(membership):
                 continue
             if mutable_event and notification_rules.role_muted(
                 makerspace, stream, event, membership.role
@@ -104,11 +121,17 @@ def staff_emails_for_stream(makerspace, stream, event=None) -> list[str]:
     return staff_emails_for_feature(makerspace, feature, event=event)
 
 
-def staff_user_ids_for_feature(makerspace, feature, event=None) -> list[int]:
+def staff_user_ids_for_feature(makerspace, feature, event=None, scope=None) -> list[int]:
     """Native-push recipients use the same action/mute matrix as staff email."""
     try:
         if not getattr(makerspace, "staff_notifications_enabled", True):
             return []
+        # Push is filtered by the same selection as email (D8): it is the mobile form of
+        # the member's own message, not a separate audience.
+        if recipient_selection.has_selection(makerspace, feature, event, scope):
+            return recipient_selection.selected_user_ids(
+                makerspace, feature, event, scope
+            )
         required_action = _FEATURE_ACTIONS.get(feature)
         if required_action is None:
             return []
@@ -121,8 +144,11 @@ def staff_user_ids_for_feature(makerspace, feature, event=None) -> list[int]:
             user__role=User.Role.SUPERADMIN
         ).select_related("assigned_role").order_by("id")
         result = []
+        admits = recipient_selection.reach_filter_for(memberships, scope)
         for membership in memberships:
             if required_action not in rbac.actions_for_membership(membership):
+                continue
+            if not admits(membership):
                 continue
             if mutable and notification_rules.role_muted(
                 makerspace, stream, event, membership.role

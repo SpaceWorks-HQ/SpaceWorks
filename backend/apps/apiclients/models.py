@@ -1,6 +1,7 @@
 import secrets
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.apiclients.crypto import decrypt_secret, encrypt_secret
@@ -22,6 +23,12 @@ class ApiClient(models.Model):
         max_length=64, unique=True, default=generate_client_id, editable=False
     )
     secret_encrypted = models.BinaryField(editable=False)
+    previous_secret_encrypted = models.BinaryField(
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    previous_secret_valid_until = models.DateTimeField(null=True, blank=True)
     client_type = models.CharField(
         max_length=20,
         choices=[
@@ -52,6 +59,23 @@ class ApiClient(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    last_seen_ip = models.GenericIPAddressField(null=True, blank=True)
+    import_provenance_digest = models.CharField(
+        max_length=64, null=True, blank=True, unique=True, editable=False
+    )
+    credential_delivered_at = models.DateTimeField(null=True, blank=True, editable=False)
+
+    def save(self, *args, **kwargs):
+        # Centralised here, not only in issue(): the /control/ ModelAdmin and
+        # seed_demo._sync_legacy_hmac_client() construct rows directly, and an empty
+        # scopes list is now DENIED by the authoritative registry -- those clients would
+        # 401 on every protected route with no way to repair them from the admin.
+        if not self.scopes:
+            from apps.apiclients.scope_registry import LEGACY_SCOPE
+
+            self.scopes = [LEGACY_SCOPE]
+        super().save(*args, **kwargs)
 
     def set_secret(self, raw):
         self.secret_encrypted = encrypt_secret(raw)
@@ -63,32 +87,42 @@ class ApiClient(models.Model):
         # review fix #4: an HMAC client must restrict to at least one exact origin.
         from django.core.exceptions import ValidationError
 
-        if not self.allowed_origins:
-            raise ValidationError(
-                {"allowed_origins": "At least one allowed origin is required."}
-            )
+        from apps.apiclients.origin_validation import validate_exact_origins
+
+        try:
+            self.allowed_origins = validate_exact_origins(self.allowed_origins)
+        except ValueError as exc:
+            raise ValidationError({"allowed_origins": str(exc)}) from exc
 
     @classmethod
     def issue(
         cls,
         *,
         label,
+        scopes,
         makerspace=None,
         allowed_origins=None,
         created_by=None,
         client_type="browser",
-        scopes=None,
         rate_limit_tier="standard",
+        raw_secret=None,
+        import_provenance_digest=None,
     ):
-        raw = secrets.token_urlsafe(32)
+        raw = raw_secret or secrets.token_urlsafe(32)
+        issued_scopes = list(scopes or [])
+        if not issued_scopes:
+            raise ValidationError(
+                {"scopes": "At least one API-client scope is required."}
+            )
         obj = cls(
             label=label,
             makerspace=makerspace,
             allowed_origins=allowed_origins or [],
             created_by=created_by,
             client_type=client_type,
-            scopes=scopes or [],
+            scopes=issued_scopes,
             rate_limit_tier=rate_limit_tier,
+            import_provenance_digest=import_provenance_digest,
         )
         obj.set_secret(raw)
         obj.full_clean()
@@ -142,3 +176,33 @@ class ApiKeyRequest(models.Model):
 
     def __str__(self):
         return f"{self.label} ({self.status})"
+
+
+class ApiClientImportApproval(models.Model):
+    """Immutable, artifact-bound authorization for one Lane D client reset."""
+
+    makerspace = models.ForeignKey(
+        Makerspace, on_delete=models.PROTECT, related_name="api_client_import_approvals"
+    )
+    api_client = models.OneToOneField(
+        ApiClient, on_delete=models.PROTECT, related_name="import_approval"
+    )
+    artifact_sha256 = models.CharField(max_length=64)
+    capture_id = models.UUIDField()
+    source_catalog_sha256 = models.CharField(max_length=64)
+    source_client_ref = models.CharField(max_length=64)
+    source_entry_sha256 = models.CharField(max_length=64)
+    approval_record_sha256 = models.CharField(max_length=64, unique=True)
+    host_principal = models.CharField(max_length=255)
+    approval_nonce = models.CharField(max_length=64, unique=True)
+    approved_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise RuntimeError("API-client import approvals are append-only.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise RuntimeError("API-client import approvals are append-only.")

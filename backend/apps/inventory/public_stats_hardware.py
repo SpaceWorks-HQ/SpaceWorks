@@ -129,13 +129,20 @@ def current_loans(makerspace):
     rows = []
     for item in queryset:
         loan = _public_tool_loan(item.request)
+        holder_name = 'Member'
+        if makerspace.public_stats_show_holder_names:
+            holder_name = public_display_name(
+                request=item.request,
+                requester=(loan.requester if loan else item.request.requester),
+            )
+        # "Member" removes the directly searchable identifier, but exact due/since
+        # timestamps can still let an observer who was present correlate a member
+        # with an item. Coarsening dates or suppressing current loans is a broader
+        # policy decision not taken here.
         rows.append(
             {
                 'item_name': item.product.name,
-                'holder_name': public_display_name(
-                    request=item.request,
-                    requester=(loan.requester if loan else item.request.requester),
-                ),
+                'holder_name': holder_name,
                 'due': (loan.due_at if loan else None) or item.request.return_due_at,
                 'since': (loan.checked_out_at if loan else None) or item.request.issued_at,
             }

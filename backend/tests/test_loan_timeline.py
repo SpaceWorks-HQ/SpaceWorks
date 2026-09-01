@@ -26,6 +26,7 @@ from tests.return_helpers import (
     make_space,
     make_user,
 )
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -181,12 +182,7 @@ def test_chain_of_custody_groups_asset_outcomes():
 def test_timeline_rbac_guest_gets_403_cross_tenant_gets_404():
     makerspace, _, _, _, request = _full_lifecycle_rows()
     other_space = make_space("loan-timeline-other")
-    guest = make_member(
-        "timeline-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("timeline-guest", makerspace)
     other_manager = make_member("timeline-other-manager", other_space)
 
     assert authenticated_client(guest).get(_timeline_url(request)).status_code == 403
@@ -195,12 +191,7 @@ def test_timeline_rbac_guest_gets_403_cross_tenant_gets_404():
 
 def test_non_audit_role_receives_no_requester_pii():
     _, _, _, _, request = _full_lifecycle_rows()
-    guest = make_member(
-        "timeline-no-pii-guest",
-        request.makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("timeline-no-pii-guest", request.makerspace)
 
     response = authenticated_client(guest).get(_timeline_url(request))
 

@@ -1,40 +1,14 @@
 """Lifecycle notification adapter for machine maintenance."""
 
+from apps.integrations.destinations import NotificationScope
+from apps.integrations.email_templates import render
+from apps.integrations.email_templates_fablab import maintenance_context
+from apps.integrations.email_templates_registry_fablab_defaults import (
+    MAINTENANCE_REQUESTER_BODIES,
+)
 from apps.integrations.notify import EmailDelivery, LifecyclePayload, notify_lifecycle
 from apps.integrations.staff_notifications import staff_emails_for_feature
 from apps.maintenance.models import MaintenanceLog, MaintenanceSchedule
-
-
-def _clamp(value, limit=300):
-    text = str(value or "")
-    return text if len(text) <= limit else text[: limit - 1] + "…"
-
-
-def _text(event_name, machine, schedule=None, log=None):
-    lines = [
-        f"Maintenance {event_name}.",
-        f"Machine: {machine.name}",
-    ]
-    if schedule is not None:
-        lines.extend(
-            (
-                f"Schedule: #{schedule.pk}",
-                f"Description: {_clamp(schedule.description)}",
-                f"Next due: {schedule.next_due}",
-                f"Active: {schedule.is_active}",
-            )
-        )
-    if log is not None:
-        lines.extend(
-            (
-                f"Log: #{log.pk}",
-                f"Summary: {_clamp(log.summary)}",
-                f"Performed at: {log.performed_at}",
-            )
-        )
-        if log.parts_note:
-            lines.append(f"Parts note: {_clamp(log.parts_note)}")
-    return "\n".join(lines)
 
 
 def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=False):
@@ -47,31 +21,57 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
         log = None
         if is_schedule:
             schedule = MaintenanceSchedule.objects.select_related(
-                "machine__makerspace"
+                "machine__makerspace", "machine__machine_type"
             ).get(pk=object_id)
             machine = schedule.machine
             if log_id is not None:
                 log = MaintenanceLog.objects.get(pk=log_id, machine=machine)
         else:
-            log = MaintenanceLog.objects.select_related("machine__makerspace").get(
+            log = MaintenanceLog.objects.select_related(
+                "machine__makerspace", "machine__machine_type"
+            ).get(
                 pk=object_id
             )
             machine = log.machine
-        text = _text(event_name, machine, schedule=schedule, log=log)
-        subject = f"{makerspace.name} maintenance {event_name}: {machine.name}"
+        context = maintenance_context(
+            machine,
+            event_name,
+            schedule=schedule,
+            log=log,
+            next_steps=MAINTENANCE_REQUESTER_BODIES.get(event_name, ""),
+        )
+        # The machine is what makes per-machine routing work on both sides: a chat room
+        # scoped to the laser (or to every 3D printer) matches on it, and a recipient rule
+        # narrowed the same way filters who is mailed.
+        scope = NotificationScope(machine=machine)
+        staff = render(
+            makerspace,
+            "maintenance",
+            "staff",
+            event_name,
+            context,
+            machine_type=machine.machine_type,
+        )
         emails = tuple(
             EmailDelivery(
                 to_email=recipient,
-                subject=subject,
-                text_body=text,
+                subject=staff["subject"],
+                text_body=staff["text_body"],
                 audience="staff",
                 stream="maintenance",
             )
             for recipient in staff_emails_for_feature(
-                makerspace, "maintenance", event=event_name
+                makerspace, "maintenance", event=event_name, scope=scope
             )
         )
-        return LifecyclePayload(text=text, emails=emails)
+        # This text is also the no-ChatTemplate chat fallback and the native-push body.
+        # A maintenance type override intentionally gives all three channels one wording.
+        return LifecyclePayload(
+            text=staff["text_body"],
+            emails=emails,
+            scope=scope,
+            context=context,
+        )
 
     return notify_lifecycle(
         makerspace,

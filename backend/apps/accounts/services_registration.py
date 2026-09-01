@@ -22,6 +22,7 @@ from apps.makerspaces.limits import reserve_platform_otp_quota
 logger = logging.getLogger(__name__)
 RESEND_COOLDOWN = timedelta(seconds=60)
 CHALLENGE_TTL = timedelta(minutes=10)
+SELF_REGISTRATION_HOLD_TTL = timedelta(hours=24)
 GENERIC_CONFIRM_ERROR = "Invalid or expired verification code."
 
 
@@ -48,14 +49,19 @@ def _digest(code):
 def issue_challenge(user):
     """Persist a fresh challenge and attempt delivery without exposing delivery state."""
     now = timezone.now()
-    email = _normalize_email(user.email)
     with transaction.atomic():
+        locked_user = User.objects.select_for_update().get(pk=user.pk)
+        # Staff typed this address as contact data; it is not identity proof. Returning
+        # quietly preserves the endpoint's account-enumeration-safe acknowledgement.
+        if locked_user.is_walk_in:
+            return None
+        email = _normalize_email(locked_user.email)
         if EmailVerificationChallenge.objects.filter(
-            user=user, email=email, last_sent_at__gte=now - RESEND_COOLDOWN
+            user=locked_user, email=email, last_sent_at__gte=now - RESEND_COOLDOWN
         ).exists():
             raise ChallengeCooldown
         EmailVerificationChallenge.objects.filter(
-            user=user,
+            user=locked_user,
             email=email,
             consumed_at__isnull=True,
             failed_attempts__lt=5,
@@ -63,7 +69,7 @@ def issue_challenge(user):
         ).update(consumed_at=now)
         code = _generate_otp()
         challenge = EmailVerificationChallenge.objects.create(
-            user=user,
+            user=locked_user,
             email=email,
             code_digest=_digest(code),
             expires_at=now + CHALLENGE_TTL,
@@ -77,9 +83,9 @@ def issue_challenge(user):
         except Exception:
             logger.exception("email_verification_dispatch_failed")
     audit_events.record_auth_event(
-        user,
+        locked_user,
         "member.email_verification_requested",
-        target=user,
+        target=locked_user,
         meta={"email_hash": audit_events.fingerprint(email), "email_sent": sent},
     )
     return challenge
@@ -98,15 +104,17 @@ def _record_confirm_failure(user, challenge=None):
 
 def confirm_challenge(user, code):
     now = timezone.now()
-    email = _normalize_email(user.email)
     failed = False
+    refused_walk_in = False
     with transaction.atomic():
+        locked_user = User.objects.select_for_update().get(pk=user.pk)
+        email = _normalize_email(locked_user.email)
         # Resolve ONLY the caller's own newest usable challenge for their current email.
         # A foreign user has no matching row, so guessing IDs cannot burn a victim's attempts.
         challenge = (
             EmailVerificationChallenge.objects.select_for_update()
             .filter(
-                user=user,
+                user=locked_user,
                 email=email,
                 consumed_at__isnull=True,
                 failed_attempts__lt=5,
@@ -118,26 +126,42 @@ def confirm_challenge(user, code):
         if challenge is None or not hmac.compare_digest(
             challenge.code_digest, _digest(code)
         ):
-            _record_confirm_failure(user, challenge)
+            _record_confirm_failure(locked_user, challenge)
             failed = True
         else:
             challenge.consumed_at = now
             challenge.save(update_fields=["consumed_at"])
-            User.objects.filter(pk=user.pk, email_verified_at__isnull=True).update(
-                email_verified_at=now
-            )
-            EmailVerificationChallenge.objects.filter(
-                user=user, email=challenge.email, consumed_at__isnull=True
-            ).update(consumed_at=now)
-            user.email_verified_at = now
-            audit_events.record_auth_event(
-                user,
-                "member.email_verified",
-                target=user,
-                meta={"email_hash": audit_events.fingerprint(challenge.email)},
-            )
-    if failed:
+            if locked_user.is_walk_in:
+                refused_walk_in = True
+                audit_events.record_auth_event(
+                    locked_user,
+                    "member.email_verification_refused_walk_in",
+                    target=locked_user,
+                    meta={"email_hash": audit_events.fingerprint(challenge.email)},
+                )
+            else:
+                User.objects.filter(
+                    pk=locked_user.pk, email_verified_at__isnull=True
+                ).update(email_verified_at=now)
+                EmailVerificationChallenge.objects.filter(
+                    user=locked_user,
+                    email=challenge.email,
+                    consumed_at__isnull=True,
+                ).update(consumed_at=now)
+                user.email_verified_at = now
+                audit_events.record_auth_event(
+                    locked_user,
+                    "member.email_verified",
+                    target=locked_user,
+                    meta={"email_hash": audit_events.fingerprint(challenge.email)},
+                )
+    # The refusal consumed a valid challenge and wrote an audit row. Raising inside the
+    # atomic block would roll both state changes back and silently reopen the attempt.
+    if failed or refused_walk_in:
         raise serializers.ValidationError({"detail": GENERIC_CONFIRM_ERROR})
+    from apps.makerspaces.import_adoption import adopt_pending_memberships_for_user
+
+    adopt_pending_memberships_for_user(user)
     return challenge
 
 
@@ -152,22 +176,41 @@ def register_member(display_name, email, phone, password):
         validate_password(password)
     except DjangoValidationError as exc:
         raise serializers.ValidationError({"password": list(exc.messages)}) from exc
-    user = User.objects.filter(email__iexact=email).first()
-    if user is None:
-        try:
-            with transaction.atomic():
-                user = User(
-                    username=f"member_{uuid.uuid4().hex}",
-                    display_name=display_name,
-                    email=email,
-                    phone=phone,
-                    role=User.Role.REQUESTER,
-                    is_active=True,
+    now = timezone.now()
+    with transaction.atomic():
+        user = (
+            User.objects.select_for_update().filter(email__iexact=email).first()
+        )
+        if _self_registration_is_releasable(user, now):
+            _release_self_registration(user, now)
+            user = None
+        if user is None:
+            try:
+                # The savepoint keeps a concurrent unique-email race from poisoning
+                # the outer transaction before we can resolve the winning row.
+                with transaction.atomic():
+                    user = User(
+                        username=f"member_{uuid.uuid4().hex}",
+                        display_name=display_name,
+                        email=email,
+                        phone=phone,
+                        role=User.Role.REQUESTER,
+                        is_active=True,
+                        self_registered_at=now,
+                    )
+                    user.set_password(password)
+                    user.save()
+            except IntegrityError:
+                user = (
+                    User.objects.select_for_update()
+                    .filter(email__iexact=email)
+                    .first()
                 )
-                user.set_password(password)
-                user.save()
-        except IntegrityError:
-            user = User.objects.filter(email__iexact=email).first()
+
+    # A walk-in is a person record, not an enrollable account. Silence is required
+    # here by the endpoint's account-enumeration contract.
+    if user is not None and user.is_walk_in:
+        return None
 
     audit_events.record_auth_event(
         user,
@@ -181,3 +224,52 @@ def register_member(display_name, email, phone, password):
         except ChallengeCooldown:
             pass
     return user
+
+
+def _self_registration_is_releasable(user, now):
+    """Whether a stale unverified signup may be discarded so its email is reusable.
+
+    An unproven email is not on its own proof that the record is abandoned. Releasing
+    DEACTIVATES the account, so it must be refused whenever the row carries any other
+    credential or authority -- a linked social identity, a verified phone number, or a
+    makerspace membership somebody granted. Post-P3-ii an unverified session is
+    verification-only and cannot reach the link endpoints, but migration 0022 stamps
+    `self_registered_at` onto pre-existing rows, and those predate that restriction. This
+    is the walk-in lesson in reverse: enumerate every signal that the record is a real
+    account BEFORE discarding it, rather than closing each path as someone points at it.
+    """
+    if not (
+        user
+        and user.self_registered_at is not None
+        and user.email_verified_at is None
+        and user.self_registered_at <= now - SELF_REGISTRATION_HOLD_TTL
+    ):
+        return False
+    from apps.accounts.models_social import SocialIdentity
+    from apps.makerspaces.models import MakerspaceMembership
+
+    if user.phone_e164 and user.phone_verified_at is not None:
+        return False
+    if SocialIdentity.objects.filter(user=user).exists():
+        return False
+    if MakerspaceMembership.objects.filter(user=user).exists():
+        return False
+    return True
+
+
+def _release_self_registration(user, now):
+    """Deactivate a stale unverified signup so its unproven email can be reused."""
+    email = _normalize_email(user.email)
+    EmailVerificationChallenge.objects.filter(
+        user=user, consumed_at__isnull=True
+    ).update(consumed_at=now)
+    user.email = ""
+    user.is_active = False
+    user.set_unusable_password()
+    user.save(update_fields=["email", "is_active", "password"])
+    audit_events.record_auth_event(
+        user,
+        "member.signup_expired",
+        target=user,
+        meta={"email_hash": audit_events.fingerprint(email)},
+    )

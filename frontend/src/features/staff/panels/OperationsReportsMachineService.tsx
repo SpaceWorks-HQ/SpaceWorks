@@ -31,7 +31,7 @@ export function OperationsReportsMachineService({ makerspace, aggregate, canMana
       <DataState loading={report.isLoading} error={report.error} empty={!hasRows}>
         {aggregate ? <div className="mt-4 space-y-6">{groups.map((group) => (
           <section key={group.id} className="rounded-md border border-line p-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">{makerspaceName(group.id)}</h4>
+            <h4 className="eyebrow">{makerspaceName(group.id)}</h4>
             <MachineServiceReport report={group.report} />
           </section>
         ))}</div> : <MachineServiceReport report={report.data!} />}
@@ -48,11 +48,11 @@ function MachineServiceReport({ report }: { report: Report }) {
   return <>
     {status ? <StatCards stats={[["Submitted", status.submitted], ["Completed", status.completed + status.collected], ["Failed", status.failed], ["In progress", status.in_progress]]} /> : null}
     <div className="mt-4 grid gap-4 lg:grid-cols-2">
-      <div><h5 className="text-sm font-semibold text-ink">Recorded service hours</h5><div className="mt-2"><BarChart rows={machines.slice(0, 10).map((row) => ({ label: row.machine_name, value: row.total_recorded_service_hours }))} valueLabel="hours" /></div></div>
-      <div><h5 className="text-sm font-semibold text-ink">Failures</h5><div className="mt-2"><BarChart rows={failures.slice(0, 10).map((row) => ({ label: row.machine_name, value: row.failed_count }))} valueLabel="requests" /></div></div>
+      <div><h5 className="title-section">Recorded service hours</h5><div className="mt-2"><BarChart rows={machines.slice(0, 10).map((row) => ({ label: row.machine_name, value: row.total_recorded_service_hours }))} valueLabel="hours" /></div></div>
+      <div><h5 className="title-section">Failures</h5><div className="mt-2"><BarChart rows={failures.slice(0, 10).map((row) => ({ label: row.machine_name, value: row.failed_count }))} valueLabel="requests" /></div></div>
     </div>
     <ReportTable data={table(machines)} />
-    {consumption.length ? <><h5 className="mt-5 text-sm font-semibold text-ink">Consumables</h5><ReportTable data={table(consumption)} /></> : null}
+    {consumption.length ? <><h5 className="title-section mt-5">Consumables</h5><ReportTable data={table(consumption)} /></> : null}
   </>;
 }
 

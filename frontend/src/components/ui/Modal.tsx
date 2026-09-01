@@ -68,10 +68,10 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`desk-panel flex max-h-[calc(100dvh-1.5rem)] w-full ${maxWidthClass} flex-col overflow-hidden outline-none sm:max-h-[calc(100dvh-2rem)]`}
+        className={`desk-panel flex max-h-[calc(100dvh-1.5rem)] w-full ${maxWidthClass} flex-col overflow-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:max-h-[calc(100dvh-2rem)]`}
       >
         <div className="shrink-0 border-b border-line px-4 py-3">
-          <h2 id={titleId} className="text-sm font-semibold tracking-wide text-muted">
+          <h2 id={titleId} className="title-section">
             {title}
           </h2>
         </div>

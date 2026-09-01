@@ -7,11 +7,13 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError
 
 from apps.audit import services as audit
+from apps.machines.consumable_scope import pool_serves_machine
 from apps.machines.models import (
     Machine,
     MachineConsumableAdjustment,
     MachineConsumablePool,
     MachineServiceRequest,
+    MachineType,
     MachineUsageEntry,
 )
 from apps.machines.printer_capabilities import is_printer_type, validate_pool
@@ -39,23 +41,49 @@ def _validate_pool(machine, pool, payload=None):
 
 
 @transaction.atomic
-def create_pool(makerspace, actor, *, material, initial_grams, machine=None, color="", brand="", lot_code="", low_threshold_grams=None):
+def create_pool(makerspace, actor, *, material, initial_grams, machine=None, machine_type=None, color="", color_hex="", brand="", lot_code="", low_threshold_grams=None, is_public=True):
     initial = _grams(initial_grams, "initial_grams")
     if not str(material).strip():
         raise ValidationError({"material": "Material is required."})
+    color_hex = str(color_hex).strip().lower()
+    if color_hex and (len(color_hex) != 7 or color_hex[0] != "#" or any(char not in "0123456789abcdef" for char in color_hex[1:])):
+        raise ValidationError({"color_hex": "Enter a colour in #RRGGBB format."})
+    if machine is not None and machine_type is not None:
+        raise ValidationError({"machine_type": "Choose either machine or machine_type, not both."})
     if machine is not None:
         machine = Machine.objects.select_for_update().get(pk=machine.pk)
         if machine.makerspace_id != makerspace.pk:
             raise ValidationError({"machine": "Machine must belong to this makerspace."})
+    if machine_type is not None:
+        machine_type = MachineType.objects.select_for_update().get(pk=machine_type.pk)
+        local_type = machine_type.makerspace_id == makerspace.pk
+        global_builtin = machine_type.makerspace_id is None and machine_type.is_builtin
+        if not (local_type or global_builtin):
+            raise ValidationError({
+                "machine_type": "Machine type must be global or belong to this makerspace."
+            })
     threshold = None if low_threshold_grams is None else _grams(low_threshold_grams, "low_threshold_grams")
     pool = MachineConsumablePool.objects.create(
-        makerspace=makerspace, machine=machine, material=str(material).strip(), color=str(color).strip(),
+        makerspace=makerspace, machine=machine, machine_type=machine_type,
+        material=str(material).strip(), color=str(color).strip(), color_hex=color_hex,
         brand=str(brand).strip(), lot_code=str(lot_code).strip(), initial_grams=initial,
-        remaining_grams=initial, low_threshold_grams=threshold, created_by=actor,
+        remaining_grams=initial, low_threshold_grams=threshold, is_public=is_public,
+        created_by=actor,
     )
     if machine is not None:
         _validate_pool(machine, pool)
-    _audit(actor, "machine_consumable_pool.created", pool, pool_id=pool.pk, initial_grams=str(initial))
+    scope = "machine" if machine is not None else "machine_type" if machine_type is not None else "makerspace"
+    _audit(
+        actor,
+        "machine_consumable_pool.created",
+        pool,
+        pool_id=pool.pk,
+        initial_grams=str(initial),
+        scope=scope,
+        machine_id=getattr(machine, "pk", None),
+        machine_type_id=getattr(machine_type, "pk", None),
+        is_public=is_public,
+    )
     return pool
 
 
@@ -94,7 +122,10 @@ def reserve_for_request(service_request, actor, *, pool, planned_grams, machine)
         raise ValidationError({"planned_grams": "Planned grams must be greater than zero."})
     if not locked.is_active:
         raise ValidationError({"consumable_pool": "Consumable pool is retired."})
-    if locked.makerspace_id != request.makerspace_id or (locked.machine_id and locked.machine_id != machine.pk):
+    # `pool_serves_machine` ties the pool to the MACHINE's tenant; the check it replaced tied it to
+    # the REQUEST's. Neither implies the other here -- nothing in this function validates the
+    # machine against the request -- so both are asserted rather than trading one for the other.
+    if locked.makerspace_id != request.makerspace_id or not pool_serves_machine(locked, machine):
         raise ValidationError({"consumable_pool": "Consumable pool is incompatible with this machine service request."})
     _validate_pool(machine, locked, request.capability_payload if is_printer_type(machine.machine_type) else None)
     if request.reserved_grams:
@@ -138,6 +169,21 @@ def correct_pool(pool, actor, *, quantity_delta, reason):
     return locked
 
 
+@transaction.atomic
+def set_pool_visibility(pool, actor, *, is_public):
+    locked = _locked_pool(pool)
+    if locked.is_public == is_public:
+        return locked
+    previous = locked.is_public
+    locked.is_public = is_public
+    locked.save(update_fields=["is_public", "updated_at"])
+    _audit(
+        actor, "machine_consumable_pool.visibility_changed", locked, pool_id=locked.pk,
+        **{"from": previous, "to": is_public},
+    )
+    return locked
+
+
 def _signed_grams(value, field):
     try:
         parsed = Decimal(str(value)).quantize(Decimal("0.01"))
@@ -178,7 +224,7 @@ def log_typed_manual_usage(machine, actor, *, duration_minutes, outcome, percent
     quantity = grams if quantity is None else _grams(quantity, "quantity")
     if pool is not None:
         pool = _locked_pool(pool)
-        if pool.makerspace_id != machine.makerspace_id or (pool.machine_id and pool.machine_id != machine.pk):
+        if not pool_serves_machine(pool, machine):
             raise ValidationError({"consumable_pool": "Consumable pool is incompatible with this machine."})
         _validate_pool(machine, pool)
     if service_request is not None:
@@ -208,8 +254,6 @@ def log_typed_manual_usage(machine, actor, *, duration_minutes, outcome, percent
     )
     return entry
 
-# Metering wrappers retain the grams API while allowing non-printer services to
-# reserve and reconcile a physical pool in its configured unit.
 from apps.machines.metering import MeteringUnit, metering_unit_for_pool
 from apps.machines.service_metering import _apply as _metered_apply
 from apps.machines.service_metering import reconcile_request as _metered_reconcile
@@ -229,11 +273,11 @@ def reserve_for_request(service_request, actor, *, pool, planned_grams=None, pla
 
 def reconcile_request(service_request, actor, *, actual_grams=None, actual_quantity=None, reason=""):
     return _metered_reconcile(_legacy_reconcile_request, service_request, actor, actual_grams=actual_grams, actual_quantity=actual_quantity, reason=reason)
-
 _legacy_create_pool = create_pool
 
 
-def create_pool(makerspace, actor, *, material, initial_grams=None, quantity=None, machine=None, color="", brand="", lot_code="", low_threshold_grams=None, unit="grams"):
+@transaction.atomic
+def create_pool(makerspace, actor, *, material, initial_grams=None, quantity=None, machine=None, machine_type=None, color="", color_hex="", brand="", lot_code="", low_threshold_grams=None, unit="grams", is_public=True):
     from apps.machines.metering import ConsumablePoolUnit
     if unit not in ConsumablePoolUnit.values:
         raise ValidationError({"unit": "Unsupported consumable pool unit."})
@@ -243,11 +287,13 @@ def create_pool(makerspace, actor, *, material, initial_grams=None, quantity=Non
         raise ValidationError({"quantity": "Provide quantity or initial_grams, not both."})
     if initial_grams is None:
         raise ValidationError({"quantity": "A starting quantity is required."})
-    if machine is not None and is_printer_type(machine.machine_type) and unit != ConsumablePoolUnit.GRAMS:
+    scoped_type = machine.machine_type if machine is not None else machine_type
+    if is_printer_type(scoped_type) and unit != ConsumablePoolUnit.GRAMS:
         raise ValidationError({"unit": "Printer consumable pools use grams."})
     pool = _legacy_create_pool(makerspace, actor, material=material, initial_grams=initial_grams,
-                               machine=machine, color=color, brand=brand, lot_code=lot_code,
-                               low_threshold_grams=low_threshold_grams)
+                               machine=machine, machine_type=machine_type, color=color, color_hex=color_hex, brand=brand,
+                               lot_code=lot_code, low_threshold_grams=low_threshold_grams,
+                               is_public=is_public)
     if unit != ConsumablePoolUnit.GRAMS:
         pool.unit = unit
         pool.save(update_fields=["unit", "updated_at"])

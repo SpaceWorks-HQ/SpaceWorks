@@ -8,6 +8,7 @@ from apps.boxes.models import Box
 from apps.inventory.models import Category
 from apps.makerspaces.models import MakerspaceMembership
 from tests.return_helpers import authenticated_client, make_member, make_product, make_space
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -159,12 +160,7 @@ def test_guest_admin_with_only_view_inventory_cannot_export():
     # EDIT_INVENTORY. A handout-only guest admin (VIEW_INVENTORY but not
     # EDIT_INVENTORY) must be forbidden even within its own makerspace.
     makerspace = make_space("inventory-export-guest")
-    guest = make_member(
-        "inventory-export-guest-admin",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.REQUESTER,
-    )
+    guest = make_handout_member("inventory-export-guest-admin", makerspace)
     make_product(makerspace, name="Sensitive Drill")
 
     response = authenticated_client(guest).get(export_url(makerspace))

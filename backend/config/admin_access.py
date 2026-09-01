@@ -1,52 +1,14 @@
-from urllib.parse import urlsplit
-
 from django.conf import settings
 from django.contrib.auth import logout
 from django.db import models
 from django.http import HttpResponseForbidden
 from django.urls import reverse
 
-
-# Models whose makerspace is reached via a nested relation (no direct `makerspace` FK).
-# Keyed by "app_label.model_name" (lowercase) -> ORM lookup ending in _id.
-NESTED_MAKERSPACE_LOOKUPS = {
-    "makerspaces.membershiprequest": "makerspace_id",
-    "makerspaces.makerspacewaiver": "makerspace_id",
-    "maintenance.maintenanceschedule": "machine__makerspace_id",
-    "maintenance.maintenancelog": "machine__makerspace_id",
-    "maintenance.maintenancelogdocument": "log__machine__makerspace_id",
-    "hardware_requests.hardwarerequestitemasset": "asset__makerspace_id",
-    "warranty.warrantydocument": "warranty__makerspace_id",
-    "procurement.tobuyreceipt": "to_buy_item__makerspace_id",
-    "machines.machineoperator": "machine__makerspace_id",
-    "machines.machineusageentry": "machine__makerspace_id",
-    "machines.machinedocument": "machine__makerspace_id",
-    "machines.machineerrorlog": "machine__makerspace_id",
-    "machines.machineconsumable": "machine__makerspace_id",
-    "machines.servicebucket": "machine__makerspace_id",
-    "machines.servicerequestconsumption": "service_request__makerspace_id",
-    "bookings.booking": "space__makerspace_id",
-    "presence.presencesession": "makerspace_id",
-    "payments.makerspacepaymentsettings": "makerspace_id",
-}
-
-# Registered admin models that are intentionally NOT makerspace-scoped (account/global).
-GLOBAL_ADMIN_MODELS = {
-    "accounts.user",
-    "accounts.platformsocialauthsettings",
-    "accounts.socialidentity",
-    "auth.group",
-    "axes.accessattempt",
-    "axes.accessfailurelog",
-    "axes.accesslog",
-    "integrations.platformemailsettings",
-    "integrations.platformpushsettings",
-    "payments.platformstripeconnectsettings",
-    "updates.platformupdatesettings",
-    "encryption.piiglobalwritefence",
-    "token_blacklist.blacklistedtoken",
-    "token_blacklist.outstandingtoken",
-}
+from config.admin_source_gate import AdminSourceGateMixin
+from config.admin_scope_registry import (  # noqa: F401
+    GLOBAL_ADMIN_MODELS,
+    NESTED_MAKERSPACE_LOOKUPS,
+)
 
 
 class AdminSuperuserOnlyMiddleware:
@@ -58,8 +20,26 @@ class AdminSuperuserOnlyMiddleware:
             prefix = "/control/"
         self.admin_prefix = prefix if prefix.endswith("/") else f"{prefix}/"
         self.admin_root = self.admin_prefix.rstrip("/")
+        try:
+            self.admin_login_path = reverse("admin:login")
+        except Exception:
+            self.admin_login_path = f"{self.admin_prefix}login/"
 
     def __call__(self, request):
+        if self._password_login_blocked(request):
+            # `/control/login/` is Django's own AdminSite login, so `LoginView`'s check
+            # never sees it. Refused BEFORE the form authenticates, so no session is
+            # minted; existing sessions are left alone, because a login-method switch is a
+            # policy change and not a revocation (phase 11 report, A2).
+            #
+            # This is enforced only while a superadmin can still get in another way -- see
+            # `_password_login_blocked`. Social sign-in issues JWTs for the React console
+            # and never creates a Django session, so blocking this unconditionally would
+            # make the one page that can re-enable passwords permanently unreachable the
+            # moment the last admin session expired.
+            return HttpResponseForbidden(
+                "Password sign-in is not available on this deployment."
+            )
         if self._is_admin_path(request.path):
             user = getattr(request, "user", None)
             if getattr(user, "is_authenticated", False) and not self._has_access(user):
@@ -74,6 +54,34 @@ class AdminSuperuserOnlyMiddleware:
     def _is_admin_path(self, path):
         return path == self.admin_root or path.startswith(self.admin_prefix)
 
+    def _password_login_blocked(self, request):
+        """Whether this control-plane login must be refused.
+
+        Two conditions, and the second is what stops the fix becoming the lockout:
+
+        1. Password sign-in is switched off. (`password_login_enabled` fails OPEN, like
+           every other capability read on an auth path.)
+        2. `/control/` is reachable without a password at all — i.e. this deployment has
+           a `PLATFORM_ADMIN_SSO` path. Today it does not: social sign-in mints JWTs for
+           the React console and never a Django session, so with no second route the
+           switch would seal the only page that can undo it. Until such a route exists,
+           the control plane keeps its password door and the switch governs the
+           application surfaces, which is what it is actually for.
+
+        The consequence is stated rather than hidden: with `password_enabled=False` a
+        superadmin can still sign in at `/control/`. That surface is superadmin-only,
+        rate-limited by django-axes, and deliberately not proxied on the public frontend
+        port, so it is the platform's break-glass entry — the same role Platform Email
+        plays for the superadmin-access toggle.
+        """
+        if request.method != "POST" or request.path != self.admin_login_path:
+            return False
+        if not settings.PLATFORM_ADMIN_SSO:
+            return False
+        from apps.accounts.login_methods import password_login_enabled
+
+        return not password_login_enabled()
+
     def _has_access(self, user):
         from apps.accounts.models import User
 
@@ -87,44 +95,7 @@ class AdminSuperuserOnlyMiddleware:
         )
 
 
-class AdminCspEvalMiddleware:
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        response = self.get_response(request)
-        if request.path_info == "/control" or request.path_info.startswith("/control/"):
-            # Unfold's standard Alpine build requires unsafe-eval; the Django admin is
-            # superuser-gated, so keep this exception scoped to admin responses only.
-            merged = dict(getattr(response, "_csp_update", None) or {})
-            script_src = merged.get("script-src", [])
-            if isinstance(script_src, str):
-                script_src = [script_src]
-            else:
-                script_src = list(script_src)
-            if "'unsafe-eval'" not in script_src:
-                script_src.append("'unsafe-eval'")
-            merged["script-src"] = script_src
-
-            endpoint = getattr(settings, "AWS_S3_PUBLIC_ENDPOINT_URL", "") or ""
-            if endpoint:
-                parts = urlsplit(endpoint)
-                if parts.scheme and parts.netloc:
-                    origin = f"{parts.scheme}://{parts.netloc}"
-                    img_src = merged.get("img-src", [])
-                    if isinstance(img_src, str):
-                        img_src = [img_src]
-                    else:
-                        img_src = list(img_src)
-                    if origin not in img_src:
-                        img_src.append(origin)
-                    merged["img-src"] = img_src
-
-            response._csp_update = merged
-        return response
-
-
-class SuperuserOnlyModelAdmin:
+class SuperuserOnlyModelAdmin(AdminSourceGateMixin):
     def resolve_hidden_lookup(self):
         from apps.makerspaces.models import Makerspace
 
@@ -238,3 +209,8 @@ class SuperuserOnlyModelAdmin:
 
     def has_module_permission(self, request):
         return self._has_superuser_access(request)
+
+
+# Preserve the middleware's dotted path while keeping this registry/admin module under
+# the repository's hard file-size ceiling.
+from config.admin_access_csp import AdminCspEvalMiddleware  # noqa: E402,F401

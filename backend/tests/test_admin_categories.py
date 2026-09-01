@@ -10,6 +10,7 @@ from tests.return_helpers import (
     make_product,
     make_space,
 )
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -117,12 +118,7 @@ def test_same_slug_is_allowed_in_different_makerspaces():
 
 def test_guest_admin_cannot_create_category():
     makerspace = make_space("category-guest-create")
-    guest = make_member(
-        "category-guest-create-user",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("category-guest-create-user", makerspace)
 
     response = authenticated_client(guest).post(
         category_list_url(makerspace),
@@ -147,12 +143,7 @@ def test_out_of_tenant_category_detail_is_not_found():
 
 def test_guest_admin_patch_in_tenant_is_forbidden_not_hidden():
     makerspace = make_space("category-guest-patch")
-    guest = make_member(
-        "category-guest-patch-user",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("category-guest-patch-user", makerspace)
     category = make_category(makerspace, name="Visible", slug="visible")
 
     response = authenticated_client(guest).patch(

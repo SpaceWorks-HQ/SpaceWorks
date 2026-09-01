@@ -8,9 +8,11 @@ from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.makerspaces.origin_scope_routes import (
     MAKERSPACE_KWARG_ROUTES as _MAKERSPACE_KWARG_ROUTES,
     MODEL_LOOKUPS as _MODEL_LOOKUPS,
+    TARGET_SET_LOOKUPS,
     request_route_targets,
 )
 from apps.makerspaces.platform import makerspace_staff_origins
+from apps.makerspaces.servability import servable_queryset
 
 
 NO_STAFF_ORIGIN_SCOPE = object()
@@ -33,10 +35,9 @@ def staff_origin_scope(request):
         return NO_STAFF_ORIGIN_SCOPE
     matches = {
         makerspace.id
-        for makerspace in Makerspace.objects.filter(
+        for makerspace in servable_queryset(Makerspace.objects.filter(
             frontend_domain__isnull=False,
-            archived_at__isnull=True,
-        )
+        ))
         if origin in makerspace_staff_origins(makerspace)
     }
     if not matches:
@@ -83,12 +84,11 @@ def validate_native_makerspace_scope(request, user, grant):
                 'Makerspace selection conflicts with browser origin.'
             )
 
-    memberships = MakerspaceMembership.objects.filter(
+    memberships = servable_queryset(MakerspaceMembership.objects.filter(
         user=user,
         makerspace_id=makerspace_id,
         status='active',
-        makerspace__archived_at__isnull=True,
-    ).select_related('makerspace', 'assigned_role')
+    ), relation="makerspace").select_related('makerspace', 'assigned_role')
     memberships = rbac.hide_from_superadmin(
         user, memberships, field='makerspace_id'
     )
@@ -141,7 +141,16 @@ def staff_origin_scope_allows(request, view=None):
         return True
     if scope is AMBIGUOUS_STAFF_ORIGIN_SCOPE:
         return False
-    target = _target_makerspace_id(request, view)
+    resolution = request_route_targets(request, view)
+    url_name, targets, invalid, route_recognized = resolution
+    if url_name in TARGET_SET_LOOKUPS:
+        return bool(
+            route_recognized
+            and not invalid
+            and targets
+            and targets.issubset({scope})
+        )
+    target = _target_makerspace_id(request, view, resolution=resolution)
     if target is None:
         return _global_endpoint_allowed(request)
     return target == scope
@@ -162,11 +171,14 @@ def _global_endpoint_allowed(request):
     return getattr(match, 'url_name', '') == 'admin-makerspaces'
 
 
-def _target_makerspace_id(request, view=None):
-    _url_name, targets, invalid, _native_route_allowed = request_route_targets(
-        request, view
-    )
-    if invalid or len(targets) != 1:
+def _target_makerspace_id(request, view=None, *, resolution=None):
+    if resolution is None:
+        resolution = request_route_targets(request, view)
+    _url_name, targets, invalid, route_recognized = resolution
+    # Query/body makerspace ids are merely client hints. Unless the URL registry says
+    # the route knows how to apply them, they must never turn an unknown object route
+    # into an origin-scoped grant.
+    if not route_recognized or invalid or len(targets) != 1:
         return None
     return next(iter(targets))
 

@@ -1,4 +1,5 @@
 import pytest
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
@@ -36,3 +37,22 @@ def test_guard_has_stable_membership_waiver_and_presence_contract():
     assert absent.value.code == "presence_required"
     services.start_session(user, space, 60)
     assert require_active_member_presence(user, space).accepted_waiver.pk == waiver.pk
+
+
+@pytest.mark.django_db
+def test_guard_accepts_current_staff_witnessed_waiver_evidence():
+    space = Makerspace.objects.create(name="Witness Guard", slug="witness-guard")
+    user, membership = setup_member(space)
+    staff = User.objects.create_user(username="witness", password="password")
+    waiver = publish_waiver(staff, space, "Terms", "v1")
+    MakerspaceMembership.objects.filter(pk=membership.pk).update(
+        witnessed_waiver=waiver,
+        witnessed_waiver_version=waiver.version,
+        witnessed_by=staff,
+        witnessed_at=timezone.now(),
+    )
+    services.start_session(user, space, 60)
+
+    result = require_active_member_presence(user, space)
+
+    assert result.accepted_waiver.pk == waiver.pk

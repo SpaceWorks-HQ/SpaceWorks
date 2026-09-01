@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from django.db import transaction
 
 from apps.integrations import notification_rules
+from apps.integrations.chat_templates import render_chat_text
 from apps.integrations.dispatch import dispatch_email
 from apps.integrations.dispatch_channels import dispatch_channel
 from apps.integrations.models import (
@@ -37,6 +38,15 @@ class LifecyclePayload:
     text: str
     emails: tuple[EmailDelivery, ...] = ()
     telegram_reply_markup: dict | None = None
+    # What this alert is about, for destination scoping. It rides on the payload rather
+    # than being a `notify_lifecycle` parameter because only `build()` has resolved the
+    # domain object — the caller often has just a primary key. `None` means the alert
+    # names no subject, and a room scoped to one machine will not receive it.
+    scope: object | None = None
+    # Staff-audience template variables for an editable chat body. `None` means this
+    # adapter has no editable chat wording yet and `text` is sent verbatim — which is
+    # also what happens when a space has authored no ChatTemplate row.
+    context: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -90,6 +100,11 @@ def _dispatch_email_delivery(makerspace, feature_event, delivery, sync, delivere
             extra={"makerspace_id": getattr(makerspace, "pk", None)},
         )
         return
+    if log.status == EmailLog.Status.SKIPPED:
+        # Neither delivered nor failed: the makerspace turned email off, so counting it
+        # either way misreports the lifecycle result (`notify_return_due` returns
+        # `bool(delivered_counts)`, and a skip must not read as a sent reminder).
+        return
     target = failed if log.status == EmailLog.Status.FAILED else delivered
     _increment(target, NotificationChannel.EMAIL)
 
@@ -105,10 +120,16 @@ def _run_guarded(makerspace, feature, event, build, sync):
         if enabled[NotificationChannel.EMAIL]:
             for delivery in payload.emails:
                 _dispatch_email_delivery(makerspace, event, delivery, sync, delivered, failed)
+        # Rendered once for all chat channels: one stored body per event, not one per
+        # channel. Falls back to `payload.text` whenever no row is authored.
+        chat_text = render_chat_text(
+            makerspace, feature, event, payload.text, payload.context
+        )
         for channel in (
             NotificationChannel.TELEGRAM,
             NotificationChannel.SLACK,
             NotificationChannel.MATTERMOST,
+            NotificationChannel.DISCORD,
             NotificationChannel.NATIVE_PUSH,
         ):
             if not enabled[channel]:
@@ -120,14 +141,21 @@ def _run_guarded(makerspace, feature, event, build, sync):
                     and payload.telegram_reply_markup
                     else None
                 )
-                log = dispatch_channel(
+                logs = dispatch_channel(
                     makerspace=makerspace,
                     channel=channel,
                     feature=feature,
                     event=event,
-                    text_body=payload.text,
+                    text_body=(
+                        # Native push is not a room: it is the member's own device, and
+                        # it must not inherit a chat body written for a staff channel.
+                        payload.text
+                        if channel == NotificationChannel.NATIVE_PUSH
+                        else chat_text
+                    ),
                     payload=payload_data,
                     sync=sync,
+                    scope=payload.scope,
                 )
             except Exception:
                 _increment(failed, channel)
@@ -139,8 +167,21 @@ def _run_guarded(makerspace, feature, event, build, sync):
                     },
                 )
                 continue
-            target = failed if log.status == NotificationDeliveryStatus.FAILED else delivered
-            _increment(target, channel)
+            for log in logs:
+                if log.status == NotificationDeliveryStatus.SKIPPED:
+                    # Neither delivered nor failed -- the same reasoning as the email skip
+                    # above: the makerspace uninstalled this channel's module, and counting
+                    # a skip as a delivery makes `bool(delivered_counts)` claim a reminder
+                    # went out when nothing was sent.
+                    continue
+                target = (
+                    failed
+                    if log.status == NotificationDeliveryStatus.FAILED
+                    else delivered
+                )
+                # Counted per room, so three rooms is three deliveries: the counts back
+                # `bool(delivered_counts)`, and a partial fan-out must show both sides.
+                _increment(target, channel)
     except Exception:
         logger.warning(
             "lifecycle_notification_failed",

@@ -5,30 +5,15 @@ from django.conf import settings
 from apps.inventory import public_image_storage
 from apps.integrations.email import email_enabled
 from apps.makerspaces.models import Makerspace, default_branding_config, default_theme_config
+from apps.makerspaces.servability import is_servable, servable_queryset
 from apps.makerspaces.capabilities import FEATURE_MODULES, FEATURES
+from apps.makerspaces.module_registry import is_frontend_exposed, module_available, module_workflows
+from apps.separability.registry import runtime_active
 
-
-MODULE_WORKFLOWS = {
-    "public_inventory": ["catalog"],
-    "request_workflow": ["request_submit", "request_status"],
-    "staff_admin": ["staff_inventory", "staff_requests"],
-    "guest_handover": ["guest_issue", "guest_return"],
-    "scanner": ["qr_scan", "container_lookup"],
-    "qr_management": ["qr_generate", "qr_revoke", "qr_print"],
-    "bulk_import": ["bulk_import"],
-    "containers": ["container_lookup", "container_move"],
-    "stock_transfers": ["stock_transfer"],
-    "stocktake": ["stocktake"],
-    "reports": ["analytics", "report_export"],
-    "qr_print_batches": ["qr_print_batch"],
-    "asset_units": ["asset_qr_generation"],
-    "printing": ["printing_requests"],
-    "machine_service": ["machine_service_requests"],
-    "telegram": ["telegram_alerts"],
-    "maintenance": ["maintenance"],
-    "procurement": ["procurement"],
-    "evidence_uploads": ["evidence_uploads"],
-}
+# Derived from the module registry, which also decides frontend exposure: an
+# internal master switch declares frontend_exposed=False and is dropped from both
+# the bootstrap `modules` list and these workflows.
+MODULE_WORKFLOWS = module_workflows()
 
 FEATURE_WORKFLOWS = {
     "inventory.self_checkout": ["self_checkout", "self_return"],
@@ -67,6 +52,22 @@ def member_area_url(makerspace):
     return f"{base}/m/{makerspace.slug}/member" if base and makerspace.slug else ""
 
 
+def member_payment_return_url(makerspace):
+    """Where a payer lands after checkout, including when the makerspace is archived.
+
+    `member_area_url` sends them to the tenant's own member area, which for an ARCHIVED space
+    is a dead end: its custom domain has lost bootstrap and origin trust, and `/m/<slug>/member`
+    cannot resolve the tenant either. Returning someone there immediately after they paid
+    strands them on a 404 holding a charge they have just settled. The recovery route is
+    authentication-only and always lives on the central app, so it is reachable regardless of
+    what happened to the tenant's domain.
+    """
+    if not is_servable(makerspace):
+        base = (settings.PUBLIC_APP_BASE_URL or "http://localhost:5000").rstrip("/")
+        return f"{base}/member/archived" if base else ""
+    return member_area_url(makerspace)
+
+
 def staff_payment_settings_url(makerspace=None, *, outcome):
     """Return a trusted staff settings URL without accepting browser input."""
     verified_domain = (
@@ -90,29 +91,56 @@ def staff_payment_settings_url(makerspace=None, *, outcome):
 
 def resolve_frontend(*, tenant=None, slug=None, origin=None, host=None):
     if tenant:
-        return Makerspace.objects.filter(
+        return servable_queryset(Makerspace.objects.filter(
             public_code__iexact=tenant,
-            archived_at__isnull=True,
-        ).first()
+        )).first()
     if slug:
-        return Makerspace.objects.filter(
+        return servable_queryset(Makerspace.objects.filter(
             slug=slug,
-            archived_at__isnull=True,
-        ).first()
+        )).first()
     hostname = origin_to_hostname(origin) or origin_to_hostname(host)
     if hostname:
-        return Makerspace.objects.filter(
+        return servable_queryset(Makerspace.objects.filter(
             frontend_domain__iexact=hostname,
-            archived_at__isnull=True,
-        ).first()
+        )).first()
     return None
 
 
 def module_enabled(makerspace, module_key):
-    return module_key in set(makerspace.enabled_modules or [])
+    # Two independent switches, both of which must be on: the tenant enabled the
+    # module, and this deployment still ships the app that implements it. Merging
+    # them here rather than at each call site is what makes tombstoning safe -- a
+    # guard added in future code inherits the check without knowing it exists.
+    #
+    # `allow_archived=True` is deliberate: this answers a CAPABILITY question, not a
+    # liveness one. Letting archival answer it here would tell every caller that an
+    # archived tenant's modules are "disabled", which is both false and a change to
+    # shipped behaviour -- an archived makerspace is meant to fail its own archived
+    # checks with PermissionDenied, not to report that maintenance was uninstalled.
+    # The IMPORTING/ABORTED states are new, so refusing them here adds defence in
+    # depth behind the boundary guards without altering any existing contract.
+    return (
+        is_servable(makerspace, allow_archived=True)
+        and module_key in set(makerspace.enabled_modules or [])
+        and module_available(module_key)
+    )
+
+
+def available_modules(makerspace):
+    """The tenant's stored module keys, minus any whose owning app is tombstoned.
+
+    This is what an API tells a client it can use. The raw field stays intact for
+    `/control/` and for `module_install`, which must show and edit what is stored,
+    not what happens to be reachable today.
+    """
+    return sorted(key for key in set(makerspace.enabled_modules or []) if module_available(key))
 
 
 def feature_enabled(makerspace, key):
+    # See `module_enabled`: capability, not liveness, so archival is left to the
+    # archived checks and only the new lifecycle states fail closed here.
+    if not is_servable(makerspace, allow_archived=True):
+        return False
     definition = FEATURES.get(key)
     if definition is None or key not in set(makerspace.enabled_features or []):
         return False
@@ -130,7 +158,7 @@ def feature_enabled(makerspace, key):
     ) and all(feature_enabled(makerspace, feature) for feature in definition.requires_features)
 
 def bootstrap_payload(makerspace):
-    modules = sorted(set(makerspace.enabled_modules or []))
+    modules = sorted(key for key in available_modules(makerspace) if is_frontend_exposed(key))
     features = sorted(key for key, definition in FEATURES.items() if definition.frontend_exposed and feature_enabled(makerspace, key))
     theme = default_theme_config()
     theme.update(makerspace.theme_config or {})
@@ -157,9 +185,18 @@ def bootstrap_payload(makerspace):
         "public_stats_enabled": makerspace.public_stats_enabled,
         "membership_policy": makerspace.membership_policy,
     }
-    # Advisory geofence: expose the flag ONLY when configured, so dormant/self-host bootstrap
-    # payloads stay byte-for-byte unchanged (self-host invariant).
-    if makerspace.geofence_effective:
+    # Advisory geofence: expose the flag ONLY when configured AND the feature is on, so
+    # dormant/self-host bootstrap payloads stay byte-for-byte unchanged (self-host
+    # invariant) and a disabled feature cannot leave the client asking for coordinates
+    # the backend will ignore.
+    # `presence.geofence` is a standalone feature (parent_module=None), so no module
+    # key expresses that the app is gone -- the availability check has to be explicit
+    # or a tombstoned deployment would still ask the browser for coordinates.
+    if (
+        makerspace.geofence_effective
+        and feature_enabled(makerspace, "presence.geofence")
+        and runtime_active("presence")
+    ):
         makerspace_payload["geofence_enabled"] = True
     return {
         "makerspace": makerspace_payload,

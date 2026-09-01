@@ -6,9 +6,11 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from unfold.admin import ModelAdmin
-from apps.apiclients.models import ApiClient, ApiKeyRequest
+
 from apps.apiclients.admin_forms import ApiClientAdminForm
+from apps.apiclients.models import ApiClient, ApiClientImportApproval, ApiKeyRequest
 from apps.apiclients.notifications import notify_api_key_request_resolved
+from apps.apiclients.scope_registry import LEGACY_SCOPE
 from apps.apiclients.services import sync_makerspace_origins
 from apps.audit import services as audit
 from apps.makerspaces import limits
@@ -25,6 +27,8 @@ class ApiClientAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         "makerspace",
         "makerspace_public_code",
         "is_active",
+        "last_seen_at",
+        "last_seen_ip",
         "created_at",
     )
     list_filter = ("is_active", "makerspace")
@@ -33,6 +37,8 @@ class ApiClientAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         "makerspace_public_code",
         "makerspace_public_api_key",
         "created_by",
+        "last_seen_at",
+        "last_seen_ip",
         "created_at",
         "updated_at",
     )
@@ -54,6 +60,8 @@ class ApiClientAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         "makerspace_public_code",
         "makerspace_public_api_key",
         "created_by",
+        "last_seen_at",
+        "last_seen_ip",
         "created_at",
         "updated_at",
     )
@@ -161,6 +169,7 @@ class ApiKeyRequestAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
                         allowed_origins=api_key_request.allowed_origins or [],
                         created_by=request.user,
                         client_type="server",
+                        scopes=[LEGACY_SCOPE],
                     )
             except DRFValidationError as exc:
                 self.message_user(
@@ -231,7 +240,6 @@ class ApiKeyRequestAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
                 f"Skipped {skipped_count} non-pending API key request(s).",
                 level=messages.WARNING,
             )
-
     @admin.action(description="Reject selected API key requests")
     def reject_selected(self, request, queryset):
         rejected_count = 0
@@ -274,3 +282,14 @@ class ApiKeyRequestAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
                 level=messages.WARNING,
             )
 
+
+@admin.register(ApiClientImportApproval)
+class ApiClientImportApprovalAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    list_display = ("source_client_ref", "makerspace", "api_client", "approved_at")
+    readonly_fields = tuple(field.name for field in ApiClientImportApproval._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

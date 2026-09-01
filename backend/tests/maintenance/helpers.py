@@ -2,6 +2,7 @@ from apps.accounts.models import User
 from apps.machines.models import Machine, MachineOperator, MachineType
 from apps.makerspaces.models import MakerspaceMembership
 from tests.return_helpers import make_member, make_space
+from tests.handout_roles import make_handout_member
 
 
 def make_machine_setup(slug, *, operator_level=None):
@@ -24,12 +25,7 @@ def make_machine_setup(slug, *, operator_level=None):
     )
     operator = None
     if operator_level:
-        operator = make_member(
-            f"{slug}-operator",
-            makerspace,
-            membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-            role=User.Role.GUEST_ADMIN,
-        )
+        operator = make_handout_member(f"{slug}-operator", makerspace)
         MachineOperator.objects.create(
             machine=machine,
             user=operator,

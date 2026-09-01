@@ -75,7 +75,7 @@ export function PlatformUpdatePanel() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-semibold text-ink">Automatic updates</h3>
+                <h3 className="title-section">Automatic updates</h3>
                 <span className={statusClass(data.status)}>{STATUS_COPY[data.status]}</span>
               </div>
               <p className="mt-1 text-sm text-muted">
@@ -92,16 +92,18 @@ export function PlatformUpdatePanel() {
                 role="switch"
                 aria-checked={data.automatic_updates_enabled}
                 aria-label="Automatic updates"
-                className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-50 ${
-                  data.automatic_updates_enabled ? "border-accent bg-accent" : "border-outline bg-surface"
+                className={`desk-button relative h-11 w-16 shrink-0 rounded-full p-0 ${
+                  data.automatic_updates_enabled
+                    ? "border-accent bg-accent disabled:hover:bg-accent"
+                    : "border-outline bg-surface disabled:hover:bg-surface"
                 }`}
                 disabled={busy || data.status === "running"}
                 onClick={() => toggle.mutate(!data.automatic_updates_enabled)}
               >
                 <span
                   aria-hidden="true"
-                  className={`absolute top-1 h-5 w-5 rounded-full bg-panel transition-transform duration-200 ${
-                    data.automatic_updates_enabled ? "translate-x-6" : "translate-x-1"
+                  className={`absolute top-2 h-7 w-7 rounded-full bg-panel transition-transform duration-200 ${
+                    data.automatic_updates_enabled ? "translate-x-7" : "translate-x-2"
                   }`}
                 />
               </button>
@@ -146,7 +148,7 @@ export function PlatformUpdatePanel() {
           </div>
 
           <section aria-labelledby="backup-explainer" className="border-t border-line pt-4">
-            <h3 id="backup-explainer" className="text-base font-semibold text-ink">What is the update backup?</h3>
+            <h3 id="backup-explainer" className="title-section">What is the update backup?</h3>
             <p className="mt-1 max-w-3xl text-sm text-muted">
               Before changing containers, Space Works saves a compressed PostgreSQL snapshot in the host&apos;s <code>backups/</code> folder. It can restore users, settings, inventory, requests, loans, and audit records if an update goes wrong. It is kept for 14 days.
             </p>
@@ -170,7 +172,7 @@ export function PlatformUpdatePanel() {
 }
 
 function VersionRow({ label, value }: { label: string; value: string }) {
-  return <div><dt className="text-xs font-medium text-muted">{label}</dt><dd className="mt-1 break-all font-mono text-xs text-ink">{value}</dd></div>;
+  return <div><dt className="eyebrow">{label}</dt><dd className="mt-1 break-all font-mono text-xs text-ink">{value}</dd></div>;
 }
 
 function formatDate(value: string | null) {

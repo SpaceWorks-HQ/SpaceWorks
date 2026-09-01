@@ -17,6 +17,7 @@ from tests.return_helpers import (
     make_space,
     make_user,
 )
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -105,7 +106,7 @@ def test_admin_can_create_scan_and_revoke_box_qr():
 
 def test_guest_admin_cannot_manage_qr():
     makerspace = make_space("qr-deny")
-    guest = make_member("qr-guest", makerspace, membership_role="guest_admin", role="guest_admin")
+    guest = make_handout_member("qr-guest", makerspace)
 
     response = authenticated_client(guest).post(
         "/api/v1/admin/qr/boxes",
@@ -211,12 +212,7 @@ def test_qr_actions_hide_foreign_and_non_manageable_qr_ids():
     own_space = make_space("qr-hide-own")
     foreign_space = make_space("qr-hide-foreign")
     own_admin = make_member("qr-hide-own-admin", own_space)
-    guest = make_member(
-        "qr-hide-guest",
-        own_space,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("qr-hide-guest", own_space)
     own_qr = QrCode.objects.create(
         makerspace=own_space,
         target_type=QrCode.TargetType.PRODUCT,

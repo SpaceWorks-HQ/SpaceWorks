@@ -15,6 +15,7 @@ from apps.operations import views_dashboard
 from apps.operations.models import StocktakeSession
 from apps.payments.models import Payment
 from tests.return_helpers import authenticated_client, make_member, make_product, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -31,7 +32,12 @@ def test_space_manager_gets_dashboard_with_all_count_keys():
 
     assert response.status_code == 200
     assert set(response.data) == set(views_dashboard.DashboardSerializer().fields)
-    assert all(isinstance(value, int) for value in response.data.values())
+    assert response.data["scope_mode"] == "full"
+    assert all(
+        isinstance(value, int)
+        for key, value in response.data.items()
+        if key != "scope_mode"
+    )
 
 
 def test_pending_payments_are_manager_only_and_ignore_dates_or_modules():
@@ -94,12 +100,7 @@ def test_dashboard_rejects_guest_non_member_and_archived_makerspace():
     archived = make_space("ops-dashboard-archived")
     archived.archived_at = timezone.now()
     archived.save(update_fields=["archived_at"])
-    guest = make_member(
-        "ops-dashboard-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("ops-dashboard-guest", makerspace)
     non_member = make_user("ops-dashboard-non-member", access_status=User.AccessStatus.ACTIVE)
     archived_manager = make_member("ops-dashboard-archived-manager", archived)
 

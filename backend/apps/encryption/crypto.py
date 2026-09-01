@@ -38,6 +38,18 @@ class PiiKeyUnavailable(PiiUnavailable):
         super().__init__("Protected data is unavailable.")
 
 
+class UnmappedPiiModel(PiiUnavailable):
+    """A ScopedPiiModelMixin subclass reached save() with no registered fields.
+
+    This is the fail-closed backstop for the gap that otherwise fails OPEN: an
+    unregistered mapped model takes the plain-save branch, skipping encryption, the
+    blind index and the write fence, and stores plaintext with nothing raised. The
+    separability system check refuses startup in this state, so reaching here means
+    checks were bypassed (``--skip-checks``, or a registry mutated at runtime) —
+    refuse the write rather than silently store PII in the clear.
+    """
+
+
 class LegacyPlaintextRejected(PiiUnavailable):
     def __init__(self):
         super().__init__("Protected data is unavailable.")
@@ -64,9 +76,14 @@ def _decode(value: str) -> bytes:
         raise PiiMalformedEnvelope()
     try:
         raw = value.encode("ascii")
-        return base64.b64decode(raw + b"=" * (-len(raw) % 4), altchars=b"-_", validate=True)
+        decoded = base64.b64decode(
+            raw + b"=" * (-len(raw) % 4), altchars=b"-_", validate=True
+        )
     except (UnicodeEncodeError, ValueError, binascii.Error) as exc:
         raise PiiMalformedEnvelope() from exc
+    if _encode(decoded) != value:
+        raise PiiMalformedEnvelope()
+    return decoded
 
 
 def parse_envelope(raw):

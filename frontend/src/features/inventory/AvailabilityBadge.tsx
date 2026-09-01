@@ -10,8 +10,9 @@ type Tone = "success" | "warn" | "danger" | "neutral";
 // pill matches the rest of the status boxes and stays legible in BOTH light and dark
 // modes — the old tinted success text washed out in dark "Available".
 const TONE_CLASS: Record<Tone, string> = {
-  success: "border-success bg-success text-on-success",
-  warn: "border-warn bg-warn text-on-warn",
+  success:
+    "border-success bg-success text-on-success dark:bg-success/15 dark:text-success-ink",
+  warn: "border-warn bg-warn text-on-warn dark:bg-warn/15 dark:text-warn-ink",
   danger: "border-danger bg-danger text-bg",
   neutral: "border-outline bg-surface text-muted",
 };

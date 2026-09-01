@@ -19,6 +19,7 @@ from apps.makerspaces.models import MakerspaceMembership
 from apps.warranty.models import Warranty, WarrantyDocument
 from apps.warranty.status import warranty_status
 from tests.return_helpers import authenticated_client, make_member, make_product, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -219,7 +220,9 @@ def test_printer_warranty_upsert_read_update_and_audit():
     ]
 
 
-def test_machine_warranty_upsert_and_generic_document_endpoints(monkeypatch):
+def test_machine_warranty_upsert_and_generic_document_endpoints(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     delete = mock_warranty_storage(monkeypatch)
     makerspace = make_space("warranty-machine-upsert")
     user = make_member("warranty-machine-manager", makerspace)
@@ -262,9 +265,12 @@ def test_machine_warranty_upsert_and_generic_document_endpoints(monkeypatch):
     signed = client.get(
         reverse("admin-warranty-document-url", kwargs={"pk": document.id})
     )
-    deleted = client.delete(
-        reverse("admin-warranty-document-detail", kwargs={"pk": document.id})
-    )
+    # The object deletion is deferred to on_commit so a rollback can never destroy a file
+    # whose row came back, so the callbacks have to be executed for it to be observable.
+    with django_capture_on_commit_callbacks(execute=True):
+        deleted = client.delete(
+            reverse("admin-warranty-document-detail", kwargs={"pk": document.id})
+        )
 
     assert created.status_code == 200
     assert read.status_code == 200
@@ -308,12 +314,7 @@ def test_warranty_rbac_status_code_contract():
         makerspace,
         membership_role=MakerspaceMembership.Role.PRINT_MANAGER,
     )
-    guest_admin = make_member(
-        "warranty-rbac-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("warranty-rbac-guest", makerspace)
     space_manager = make_member("warranty-rbac-space-manager", makerspace)
     other_member = make_member("warranty-rbac-other-user", other_space)
 
@@ -345,24 +346,9 @@ def test_machine_warranty_operator_type_manager_tenant_and_module_contract():
         name="Custom Machine",
         machine_type=custom_type,
     )
-    manage = make_member(
-        "warranty-machine-manage",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
-    full = make_member(
-        "warranty-machine-full",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
-    operate = make_member(
-        "warranty-machine-operate",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    manage = make_handout_member("warranty-machine-manage", makerspace)
+    full = make_handout_member("warranty-machine-full", makerspace)
+    operate = make_handout_member("warranty-machine-operate", makerspace)
     type_manager = make_member(
         "warranty-machine-type-manager",
         makerspace,
@@ -418,7 +404,9 @@ def test_machine_warranty_operator_type_manager_tenant_and_module_contract():
     assert authenticated_client(operate).get(url).status_code == 403
 
 
-def test_warranty_documents_presign_finalize_url_delete_and_guards(monkeypatch):
+def test_warranty_documents_presign_finalize_url_delete_and_guards(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     delete = mock_warranty_storage(monkeypatch)
     makerspace = make_space("warranty-docs")
     other_space = make_space("warranty-docs-other")
@@ -470,7 +458,10 @@ def test_warranty_documents_presign_finalize_url_delete_and_guards(monkeypatch):
     cross_tenant = authenticated_client(other_member).get(
         reverse("admin-warranty-document-url", kwargs={"pk": document.id})
     )
-    deleted = client.delete(reverse("admin-warranty-document-detail", kwargs={"pk": document.id}))
+    with django_capture_on_commit_callbacks(execute=True):
+        deleted = client.delete(
+            reverse("admin-warranty-document-detail", kwargs={"pk": document.id})
+        )
 
     assert presign.status_code == 201
     assert object_key.startswith(f"warranty/{makerspace.id}/")
@@ -633,12 +624,7 @@ def test_warranty_report_gates_rows_by_host_action_and_makerspace_scope():
     uncovered_printer = make_printer(makerspace, name="Printer Uncovered")
     asset_warranty = attach_asset_warranty(covered_asset, vendor_name="Asset Report Vendor")
     printer_warranty = attach_printer_warranty(covered_printer, vendor_name="Printer Report Vendor")
-    guest_admin = make_member(
-        "warranty-report-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("warranty-report-guest", makerspace)
     inventory_manager = make_member(
         "warranty-report-inventory",
         makerspace,
@@ -659,8 +645,7 @@ def test_warranty_report_gates_rows_by_host_action_and_makerspace_scope():
     space = authenticated_client(space_manager).get(url)
     cross_tenant = authenticated_client(space_manager).get(other_url)
 
-    assert guest.status_code == 200
-    assert response_rows(guest) == []
+    assert guest.status_code == 403
     assert inventory.status_code == 200
     inventory_rows = response_rows(inventory)
     assert [row["host_kind"] for row in inventory_rows] == ["asset", "asset"]
@@ -695,12 +680,7 @@ def test_warranty_report_gates_rows_by_host_action_and_makerspace_scope():
 
 def test_warranty_report_machine_rows_include_manage_and_full_not_operate():
     makerspace = make_space("warranty-report-machine-tiers")
-    actor = make_member(
-        "warranty-report-machine-operator",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    actor = make_handout_member("warranty-report-machine-operator", makerspace)
     manage_machine = make_machine(makerspace, name="Manage Machine")
     full_machine = make_machine(makerspace, name="Full Machine")
     operate_machine = make_machine(makerspace, name="Operate Machine")
@@ -857,7 +837,9 @@ def test_warranty_document_keys_are_collected_for_makerspace_purge():
     assert document.object_key in keys
 
 
-def test_cascade_delete_of_host_removes_warranty_document_object(monkeypatch):
+def test_cascade_delete_of_host_removes_warranty_document_object(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     delete = Mock()
     monkeypatch.setattr("apps.warranty.storage.delete_object", delete)
     makerspace = make_space("warranty-cascade")
@@ -873,8 +855,10 @@ def test_cascade_delete_of_host_removes_warranty_document_object(monkeypatch):
     )
 
     # Deleting the host asset CASCADEs to Warranty -> WarrantyDocument; the post_delete
-    # signal must still clean up the private object even though no view ran.
-    asset.delete()
+    # signal must still clean up the private object even though no view ran. The signal
+    # defers the storage call to on_commit, so the callbacks are executed here.
+    with django_capture_on_commit_callbacks(execute=True):
+        asset.delete()
 
     assert not WarrantyDocument.objects.filter(object_key=object_key).exists()
     delete.assert_called_once_with(object_key)

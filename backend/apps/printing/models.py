@@ -1,1 +1,1 @@
-﻿"""Tombstoned legacy printing app; its historical migrations remain installed."""
+"""Tombstoned legacy printing app; its historical migrations remain installed."""

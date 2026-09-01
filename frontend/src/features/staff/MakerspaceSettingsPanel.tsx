@@ -15,17 +15,22 @@ import { IntegrationHealthPanel } from "./IntegrationHealthPanel";
 import { MakerspaceLocationSettings } from "./MakerspaceLocationSettings";
 import { MakerspaceMembershipSettings } from "./MakerspaceMembershipSettings";
 import { MakerspacePaymentSettings } from "./MakerspacePaymentSettings";
+import { MakerspacePublicStatsSettings } from "./MakerspacePublicStatsSettings";
 import { MakerspaceSubdomainSettings } from "./MakerspaceSubdomainSettings";
 import { MakerspaceWebhookSettings } from "./MakerspaceWebhookSettings";
+import { MakerspaceArchiveRequestPanel } from "./MakerspaceArchiveRequestPanel";
+import { NotificationDestinations } from "./NotificationDestinations";
 import { NotificationMuteMatrix } from "./NotificationMuteMatrix";
+import { NotificationRecipientPicker } from "./NotificationRecipientPicker";
 import { Panel, type Makerspace, useStaffGet } from "./StaffPanels";
 
 type Props = {
   makerspace: Makerspace;
   isSuperadmin: boolean;
+  canManageMakerspace: boolean;
 };
 
-export function MakerspaceSettingsPanel({ makerspace, isSuperadmin }: Props) {
+export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMakerspace }: Props) {
   const queryClient = useQueryClient();
   const settings = useStaffGet<Makerspace>(
     ["makerspace-settings", makerspace.id],
@@ -35,8 +40,6 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin }: Props) {
     settings.data?.superadmin_access_enabled ?? makerspace.superadmin_access_enabled ?? true;
   const staffNotificationsEnabled =
     settings.data?.staff_notifications_enabled ?? makerspace.staff_notifications_enabled ?? true;
-  const publicStatsEnabled =
-    settings.data?.public_stats_enabled ?? makerspace.public_stats_enabled ?? false;
   const publicPrintStatusLookupPolicy =
     settings.data?.public_print_status_lookup_policy ?? makerspace.public_print_status_lookup_policy ?? "email_unverified";
   const enabledModules = settings.data?.enabled_modules ?? makerspace.enabled_modules ?? [];
@@ -68,18 +71,6 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin }: Props) {
     },
   });
 
-  const updatePublicStats = useMutation({
-    mutationFn: (next: boolean) =>
-      staffRequest<Makerspace>(`/admin/makerspaces/${makerspace.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ public_stats_enabled: next }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["makerspace-settings", makerspace.id] });
-      queryClient.invalidateQueries({ queryKey: ["makerspaces"] });
-      queryClient.invalidateQueries({ queryKey: ["staff", "makerspaces"] });
-    },
-  });
   const updatePrintStatusLookupPolicy = useMutation({
     mutationFn: (next: Makerspace["public_print_status_lookup_policy"]) =>
       staffRequest<Makerspace>(`/admin/makerspaces/${makerspace.id}`, {
@@ -186,36 +177,11 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin }: Props) {
             </label>
           </div>
         </div>
-        <div className="min-w-0 rounded-md border border-line bg-bg p-4">
-          <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-            <div className="grid min-w-0 max-w-2xl gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-semibold text-ink">Public stats page</h3>
-                <Badge tone={publicStatsEnabled ? "success" : "neutral"}>
-                  {publicStatsEnabled ? "On" : "Off"}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted">
-                Publish a public activity page (print hours, popular hardware, who currently has tools
-                out by name) at <code>/m/{makerspace.slug}/stats</code>. When off, the page and its API
-                return 404 and the link is hidden.
-              </p>
-              {updatePublicStats.error ? (
-                <p className="text-sm text-danger">{updatePublicStats.error.message}</p>
-              ) : null}
-            </div>
-            <label className="flex min-w-0 items-start gap-3 text-sm text-ink sm:justify-self-start md:justify-self-end">
-              <input
-                className="mt-1 h-4 w-4"
-                type="checkbox"
-                checked={publicStatsEnabled}
-                disabled={updatePublicStats.isPending}
-                onChange={(event) => updatePublicStats.mutate(event.target.checked)}
-              />
-              <span className="font-semibold">Publish public stats</span>
-            </label>
-          </div>
-        </div>
+        <MakerspacePublicStatsSettings
+          makerspace={makerspace}
+          settings={settings.data}
+          loading={settings.isLoading}
+        />
         <div className="min-w-0 rounded-md border border-line bg-bg p-4">
           <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)] md:items-start">
             <div className="grid min-w-0 max-w-2xl gap-2">
@@ -258,9 +224,18 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin }: Props) {
           settings={settings.data}
           loading={settings.isLoading}
         />
+        <MakerspaceArchiveRequestPanel
+          makerspaceId={makerspace.id}
+          canManageMakerspace={canManageMakerspace}
+        />
         <div className="min-w-0 rounded-md border border-line bg-bg p-4">
           <h3 className="text-base font-semibold text-ink">Notification channels</h3>
           <NotificationMuteMatrix makerspaceId={makerspace.id} />
+          <NotificationRecipientPicker makerspaceId={makerspace.id} />
+          <NotificationDestinations
+            availableChannels={enabledModules}
+            makerspaceId={makerspace.id}
+          />
         </div>
       </div>
     </Panel>

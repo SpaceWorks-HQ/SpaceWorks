@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { EmptyState } from "../../../../components/ui";
+import { ConfirmDialog, EmptyState } from "../../../../components/ui";
 import {
   useCreateMaintenanceSchedule,
   useDeactivateMaintenanceSchedule,
@@ -28,6 +28,7 @@ export function MaintenanceSchedules({
   const [draft, setDraft] = useState<ScheduleInput>(emptySchedule);
   const [editing, setEditing] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<ScheduleInput>(emptySchedule);
+  const [deactivateId, setDeactivateId] = useState<number | null>(null);
   const create = useCreateMaintenanceSchedule(makerspaceId, machineId);
   const update = useUpdateMaintenanceSchedule(makerspaceId, machineId);
   const deactivate = useDeactivateMaintenanceSchedule(makerspaceId, machineId);
@@ -40,7 +41,7 @@ export function MaintenanceSchedules({
     prefix: string,
   ) => (
     <>
-      <label className="grid gap-1 text-xs font-semibold text-muted">
+      <label className="eyebrow grid gap-1">
         Description
         <input
           className="desk-input"
@@ -50,7 +51,7 @@ export function MaintenanceSchedules({
           required
         />
       </label>
-      <label className="grid gap-1 text-xs font-semibold text-muted">
+      <label className="eyebrow grid gap-1">
         Interval (days)
         <input
           className="desk-input"
@@ -61,7 +62,7 @@ export function MaintenanceSchedules({
           required
         />
       </label>
-      <label className="grid gap-1 text-xs font-semibold text-muted">
+      <label className="eyebrow grid gap-1">
         Next due
         <input
           className="desk-input"
@@ -76,7 +77,7 @@ export function MaintenanceSchedules({
 
   return (
     <section className="grid gap-3" aria-labelledby="maintenance-schedules-title">
-      <h3 id="maintenance-schedules-title" className="text-sm font-semibold text-ink">
+      <h3 id="maintenance-schedules-title" className="title-section">
         Maintenance schedules
       </h3>
       {!schedules.length ? (
@@ -103,7 +104,7 @@ export function MaintenanceSchedules({
                 <button className="desk-button-primary" type="submit" disabled={update.isPending}>
                   {update.isPending ? "Saving..." : "Save schedule"}
                 </button>
-                <button className="desk-button" type="button" onClick={() => setEditing(null)}>
+                <button className="desk-button-ghost" type="button" onClick={() => setEditing(null)}>
                   Cancel
                 </button>
               </div>
@@ -126,11 +127,11 @@ export function MaintenanceSchedules({
               </span>
               {canEdit && schedule.is_active && !retired ? (
                 <div className="flex gap-2">
-                  <button className="desk-button" type="button" onClick={() => onComplete(schedule)}>
+                  <button className="desk-button-success" type="button" onClick={() => onComplete(schedule)}>
                     Complete
                   </button>
                   <button
-                    className="desk-button"
+                    className="desk-button-ghost"
                     type="button"
                     onClick={() => {
                       setEditDraft({
@@ -144,14 +145,10 @@ export function MaintenanceSchedules({
                     Edit
                   </button>
                   <button
-                    className="desk-button"
+                    className="desk-button-danger"
                     type="button"
                     disabled={deactivate.isPending}
-                    onClick={() => {
-                      if (window.confirm("Deactivate this maintenance schedule?")) {
-                        deactivate.mutate(schedule.id);
-                      }
-                    }}
+                    onClick={() => setDeactivateId(schedule.id)}
                   >
                     Deactivate
                   </button>
@@ -169,7 +166,7 @@ export function MaintenanceSchedules({
             create.mutate(draft, { onSuccess: () => setDraft(emptySchedule()) });
           }}
         >
-          <h4 className="text-sm font-semibold text-ink sm:col-span-3">New schedule</h4>
+          <h4 className="title-section sm:col-span-3">New schedule</h4>
           {fields(draft, setDraft, "New schedule")}
           <button className="desk-button-primary sm:col-span-3 sm:w-fit" type="submit" disabled={create.isPending}>
             {create.isPending ? "Creating..." : "Create schedule"}
@@ -179,6 +176,20 @@ export function MaintenanceSchedules({
       {[create.error, update.error, deactivate.error].map((error, index) =>
         error instanceof Error ? <p key={index} className="text-sm text-danger">{error.message}</p> : null,
       )}
+      <ConfirmDialog
+        open={deactivateId !== null}
+        title="Deactivate maintenance schedule?"
+        message="Deactivate this maintenance schedule?"
+        confirmLabel="Deactivate schedule"
+        tone="danger"
+        pending={deactivate.isPending}
+        onConfirm={() => {
+          if (deactivateId !== null) {
+            deactivate.mutate(deactivateId, { onSuccess: () => setDeactivateId(null) });
+          }
+        }}
+        onCancel={() => setDeactivateId(null)}
+      />
     </section>
   );
 }

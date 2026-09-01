@@ -203,7 +203,7 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
         {product.image_url ? <img src={product.image_url} alt="" className="h-full w-full object-cover" /> : <div className="blueprint-bg h-full w-full" />}
       </div>
     ) },
-    { key: "name", header: "Name", sortable: true, render: (product) => <button type="button" className="text-left font-semibold text-ink hover:text-accent-ink" onClick={() => openEdit(product)}>{product.name}</button> },
+    { key: "name", header: "Name", sortable: true, render: (product) => <button type="button" className="desk-button-ghost justify-start text-left" onClick={() => openEdit(product)}>{product.name}</button> },
     { key: "tracking_mode", header: "Mode", sortable: true, render: (product) => <span className="inline-flex items-center gap-2"><span>{product.tracking_mode}</span>{product.is_archived ? <StatusBadge status="archived" label="Archived" /> : null}</span> },
     { key: "total_quantity", header: "Total", sortable: true },
     { key: "available_quantity", header: "Available", sortable: true, render: (product) => <InventoryAvailability product={product} /> },
@@ -212,10 +212,10 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
     { key: "lost_quantity", header: "Lost", sortable: true },
     { key: "actions", header: "", render: (product) => (
       <div className="desk-actions ml-auto grid w-max grid-cols-2 gap-2">
-        <button className="desk-button w-full bg-tone-blue text-tone-blue-ink" type="button" onClick={() => openEdit(product)}>Edit</button>
-        {!product.is_archived ? <button className="desk-button w-full bg-tone-yellow text-tone-yellow-ink" type="button" disabled={product.tracking_mode === "individual" ? product.available_quantity + product.damaged_quantity <= 0 : product.available_quantity <= 0} onClick={() => openFix(product)}>To Fix</button> : null}
-        {product.is_archived ? <button className="desk-button w-full bg-tone-mint text-tone-mint-ink" type="button" disabled={unarchive.isPending} onClick={() => unarchive.mutate(product)}>Back to inventory</button> : <button className="desk-button w-full bg-tone-mint text-tone-mint-ink" type="button" onClick={() => setArchiveTarget(product)}>Archive</button>}
-        {canUseToBuy ? <button className="desk-button w-full bg-tone-pink text-tone-pink-ink" type="button" onClick={() => openToBuy(product)}>To Buy</button> : null}
+        <button className="desk-button-primary w-full" type="button" onClick={() => openEdit(product)}>Edit</button>
+        {!product.is_archived ? <button className="desk-button-warn w-full" type="button" disabled={product.tracking_mode === "individual" ? product.available_quantity + product.damaged_quantity <= 0 : product.available_quantity <= 0} onClick={() => openFix(product)}>To Fix</button> : null}
+        {product.is_archived ? <button className="desk-button-success w-full" type="button" disabled={unarchive.isPending} onClick={() => unarchive.mutate(product)}>Back to inventory</button> : <button className="desk-button-danger w-full" type="button" onClick={() => setArchiveTarget(product)}>Archive</button>}
+        {canUseToBuy ? <button className="desk-button-primary w-full" type="button" onClick={() => openToBuy(product)}>To Buy</button> : null}
       </div>
     ) },
   ];
@@ -228,14 +228,14 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
           placeholder="Filter table"
           actions={(
             <>
-              <button className="desk-button" type="button" onClick={() => { setForm(emptyForm); setAddOpen(true); }}>Add item</button>
-              <button className="desk-button" type="button" onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Show active" : "Show archived"}</button>
-              <button className="desk-button" type="button" onClick={() => setShowLowStock((value) => !value)}>{showLowStock ? "All stock" : "Low stock"}</button>
-              <button className="desk-button" type="button" onClick={() => writeStorage(storageKey, search)}>Save view</button>
-              <button className="desk-button" type="button" disabled={!selectedIds.length || bulkQr.isPending} onClick={() => { setBulkQrMessage(""); setQrConfirm(true); }}>Enable QR</button>
-              <button className="desk-button" type="button" disabled={!selectedIds.length || bulkQr.isPending} onClick={() => { setBulkQrMessage(""); setQrConfirm(false); }}>Disable QR</button>
-              <button className="desk-button" type="button" disabled={exportInventory.isPending} onClick={() => exportInventory.mutate("csv")}>{selectedIds.length ? `Export CSV (${selectedIds.length})` : "Export CSV"}</button>
-              <button className="desk-button" type="button" disabled={exportInventory.isPending} onClick={() => exportInventory.mutate("xlsx")}>{selectedIds.length ? `Export XLSX (${selectedIds.length})` : "Export XLSX"}</button>
+              <button className="desk-button-primary" type="button" onClick={() => { setForm(emptyForm); setAddOpen(true); }}>Add item</button>
+              <button className="desk-button-ghost" type="button" onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Show active" : "Show archived"}</button>
+              <button className="desk-button-ghost" type="button" onClick={() => setShowLowStock((value) => !value)}>{showLowStock ? "All stock" : "Low stock"}</button>
+              <button className="desk-button-ghost" type="button" onClick={() => writeStorage(storageKey, search)}>Save view</button>
+              <button className="desk-button-success" type="button" disabled={!selectedIds.length || bulkQr.isPending} onClick={() => { setBulkQrMessage(""); setQrConfirm(true); }}>Enable QR</button>
+              <button className="desk-button-danger" type="button" disabled={!selectedIds.length || bulkQr.isPending} onClick={() => { setBulkQrMessage(""); setQrConfirm(false); }}>Disable QR</button>
+              <button className="desk-button-ghost" type="button" disabled={exportInventory.isPending} onClick={() => exportInventory.mutate("csv")}>{selectedIds.length ? `Export CSV (${selectedIds.length})` : "Export CSV"}</button>
+              <button className="desk-button-ghost" type="button" disabled={exportInventory.isPending} onClick={() => exportInventory.mutate("xlsx")}>{selectedIds.length ? `Export XLSX (${selectedIds.length})` : "Export XLSX"}</button>
             </>
           )}
         />
@@ -254,7 +254,7 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
         {editing && canViewAudit ? <ChainOfCustodyBlock productId={editing.id} /> : null}
       </ItemModal>
       {canUseToBuy ? (
-        <Modal open={Boolean(toBuyTarget)} onClose={() => setToBuyTarget(null)} title="Add to To Buy" footer={<div className="desk-actions flex flex-wrap justify-end gap-2"><button className="desk-button" type="button" disabled={toBuy.isPending} onClick={() => setToBuyTarget(null)}>Cancel</button><button className="desk-button" type="button" disabled={toBuy.isPending} onClick={() => toBuy.mutate()}>Add</button></div>}>
+        <Modal open={Boolean(toBuyTarget)} onClose={() => setToBuyTarget(null)} title="Add to To Buy" footer={<div className="desk-actions flex flex-wrap justify-end gap-2"><button className="desk-button-ghost" type="button" disabled={toBuy.isPending} onClick={() => setToBuyTarget(null)}>Cancel</button><button className="desk-button-primary" type="button" disabled={toBuy.isPending} onClick={() => toBuy.mutate()}>Add</button></div>}>
           <div className="grid gap-3 text-sm">
             <p className="font-semibold text-ink">{toBuyTarget?.name}</p>
             <input className="desk-input" type="number" min="1" value={toBuyQty} onChange={(e) => setToBuyQty(e.target.value)} />
@@ -262,7 +262,7 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
           </div>
         </Modal>
       ) : null}
-      <Modal open={Boolean(fixTarget)} onClose={() => setFixTarget(null)} title="Move to Fix Shelf" footer={<div className="desk-actions flex flex-wrap justify-end gap-2"><button className="desk-button" type="button" disabled={moveToFix.isPending} onClick={() => setFixTarget(null)}>Cancel</button><button className="desk-button" type="button" disabled={moveToFix.isPending || !fixTarget || Number(fixQty) < 1 || Number(fixQty) > (fixTarget?.available_quantity ?? 0)} onClick={() => moveToFix.mutate()}>Move to Fix Shelf</button></div>}>
+      <Modal open={Boolean(fixTarget)} onClose={() => setFixTarget(null)} title="Move to Fix Shelf" footer={<div className="desk-actions flex flex-wrap justify-end gap-2"><button className="desk-button-ghost" type="button" disabled={moveToFix.isPending} onClick={() => setFixTarget(null)}>Cancel</button><button className="desk-button-warn" type="button" disabled={moveToFix.isPending || !fixTarget || Number(fixQty) < 1 || Number(fixQty) > (fixTarget?.available_quantity ?? 0)} onClick={() => moveToFix.mutate()}>Move to Fix Shelf</button></div>}>
         <div className="grid gap-3 text-sm">
           <p className="font-semibold text-ink">{fixTarget?.name}</p>
           <p className="text-muted">Move available units out of circulation for repair.</p>
@@ -270,7 +270,7 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
           {moveToFix.error ? <p className="text-sm text-danger">{moveToFix.error.message}</p> : null}
         </div>
       </Modal>
-      <Modal open={Boolean(assetFixTarget)} onClose={() => setAssetFixTarget(null)} title={assetFixTarget ? `Choose Asset to Fix - ${assetFixTarget.name}` : "Choose Asset to Fix"} footer={<div className="desk-actions flex flex-wrap justify-end gap-2"><button className="desk-button" type="button" onClick={() => setAssetFixTarget(null)}>Close</button></div>}>
+      <Modal open={Boolean(assetFixTarget)} onClose={() => setAssetFixTarget(null)} title={assetFixTarget ? `Choose Asset to Fix - ${assetFixTarget.name}` : "Choose Asset to Fix"} footer={<div className="desk-actions flex flex-wrap justify-end gap-2"><button className="desk-button-ghost" type="button" onClick={() => setAssetFixTarget(null)}>Close</button></div>}>
         {assetFixTarget ? <IndividualAssets productId={assetFixTarget.id} makerspaceId={makerspace.id} refreshInventory={invalidate} /> : null}
       </Modal>
       <ConfirmDialog open={Boolean(archiveTarget)} title="Archive item" message={archiveTarget ? `Archive ${archiveTarget.name}? It will be hidden from active inventory views.` : ""} confirmLabel="Archive" tone="danger" pending={archive.isPending} onCancel={() => setArchiveTarget(null)} onConfirm={() => { if (archiveTarget) archive.mutate(archiveTarget); }} />
@@ -284,7 +284,7 @@ function ItemModal({ title, open, onClose, form, setForm, categories, includeQua
   includeQuantities?: boolean; pending: boolean; error?: string; onSubmit: () => void; children?: ReactNode;
 }) {
   return (
-    <Modal open={open} onClose={onClose} title={title} footer={<div className="desk-actions flex flex-wrap justify-end gap-2"><button className="desk-button" type="button" disabled={pending} onClick={onClose}>Cancel</button><button className="desk-button" type="button" disabled={pending || !form.name.trim()} onClick={onSubmit}>Save</button></div>}>
+    <Modal open={open} onClose={onClose} title={title} footer={<div className="desk-actions flex flex-wrap justify-end gap-2"><button className="desk-button-ghost" type="button" disabled={pending} onClick={onClose}>Cancel</button><button className="desk-button-primary" type="button" disabled={pending || !form.name.trim()} onClick={onSubmit}>Save</button></div>}>
       <div className="grid gap-3 text-sm">
         <Field label="Name"><input className="desk-input" placeholder="e.g. Soldering iron" value={form.name} onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))} /></Field>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -307,11 +307,11 @@ function ItemModal({ title, open, onClose, form, setForm, categories, includeQua
 function QuantityAdjust({ product, form, setForm, pending, error, onSubmit }: { product: AdminProduct; form: AdjustmentForm; setForm: (updater: (current: AdjustmentForm) => AdjustmentForm) => void; pending: boolean; error?: string; onSubmit: () => void }) {
   return (
     <div className="grid gap-3 border-t border-line pt-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted">Adjust quantities</p>
+      <h3 className="title-section">Adjust quantities</h3>
       <div className="grid gap-2 sm:grid-cols-3"><InventoryMetric label="Available" value={product.available_quantity} /><InventoryMetric label="Damaged" value={product.damaged_quantity} /><InventoryMetric label="Lost" value={product.lost_quantity} /></div>
       <div className="grid gap-2 sm:grid-cols-3"><Field label="Â± Available"><input className="desk-input" type="number" value={form.delta_available} onChange={(e) => setForm((c) => ({ ...c, delta_available: e.target.value }))} /></Field><Field label="Â± Damaged"><input className="desk-input" type="number" value={form.delta_damaged} onChange={(e) => setForm((c) => ({ ...c, delta_damaged: e.target.value }))} /></Field><Field label="Â± Lost"><input className="desk-input" type="number" value={form.delta_lost} onChange={(e) => setForm((c) => ({ ...c, delta_lost: e.target.value }))} /></Field></div>
       <input className="desk-input" placeholder="Adjustment reason" value={form.reason} onChange={(e) => setForm((c) => ({ ...c, reason: e.target.value }))} />
-      <div className="desk-actions flex justify-end"><button className="desk-button" type="button" disabled={pending || !form.reason.trim()} onClick={onSubmit}>Apply adjustment</button></div>
+      <div className="desk-actions flex justify-end"><button className="desk-button-primary" type="button" disabled={pending || !form.reason.trim()} onClick={onSubmit}>Apply adjustment</button></div>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
     </div>
   );
@@ -324,14 +324,14 @@ function QrHistory({ title, queryKey, path }: { title: string; queryKey: unknown
   return (
     <div className="grid w-full gap-2 border-t border-line pt-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-ink">{title}</h3>
-        <button className="desk-button" type="button" onClick={() => setOpen((value) => !value)}>{open ? "Hide" : "History"}</button>
+        <h3 className="title-section">{title}</h3>
+        <button className="desk-button-ghost" type="button" onClick={() => setOpen((value) => !value)}>{open ? "Hide" : "History"}</button>
       </div>
       {open && history.isLoading ? <p className="text-sm text-muted">Loading QR history...</p> : null}
       {open && history.error ? <p className="text-sm text-danger">{history.error.message}</p> : null}
       {open && !history.isLoading && !rows.length ? <p className="text-sm text-muted">No QR scans recorded.</p> : null}
       {open && rows.length ? (
-        <ul className="grid gap-1 text-xs text-muted">
+        <ul className="eyebrow grid gap-1">
           {rows.map((scan) => (
             <li key={scan.id} className="rounded-md border border-line bg-surface px-2 py-1">
               <span className="font-medium text-ink">{humanize(scan.context)}</span> on {formatDate(scan.created_at)}{scan.actor ? ` by user #${scan.actor}` : ""}
@@ -372,7 +372,7 @@ function IndividualAssets({ productId, makerspaceId, refreshInventory }: { produ
   const rows = assets.data?.results ?? [];
   return (
     <div className="grid gap-2 border-t border-line pt-3">
-      <h3 className="text-sm font-semibold text-ink">Individual assets</h3>
+      <h3 className="title-section">Individual assets</h3>
       {assets.isLoading ? <p className="text-sm text-muted">Loading assets...</p> : null}
       {assets.error ? <p className="text-sm text-danger">{assets.error.message}</p> : null}
       {!assets.isLoading && !rows.length ? <p className="text-sm text-muted">No asset records yet.</p> : null}
@@ -388,14 +388,14 @@ function IndividualAssets({ productId, makerspaceId, refreshInventory }: { produ
               </div>
             </div>
             <div className="desk-actions flex flex-wrap gap-2">
-              <button className="desk-button" type="button" onClick={() => setEditingAssetId((current) => (current === asset.id ? null : asset.id))}>
+              <button className="desk-button-ghost" type="button" onClick={() => setEditingAssetId((current) => (current === asset.id ? null : asset.id))}>
                 {editingAssetId === asset.id ? "Close" : "Edit"}
               </button>
               <QrHistory title="Asset QR history" queryKey={["asset-qr-history", asset.id]} path={`/admin/assets/${asset.id}/qr-history`} />
               {asset.status === "maintenance" ? (
-                <button className="desk-button" type="button" disabled={action.isPending} onClick={() => action.mutate({ assetId: asset.id, action: "repair" })}>Move back to inventory</button>
+                <button className="desk-button-success" type="button" disabled={action.isPending} onClick={() => action.mutate({ assetId: asset.id, action: "repair" })}>Move back to inventory</button>
               ) : (
-                <button className="desk-button" type="button" disabled={action.isPending || !["available", "damaged"].includes(asset.status)} onClick={() => action.mutate({ assetId: asset.id, action: "shelve" })}>To Fix</button>
+                <button className="desk-button-warn" type="button" disabled={action.isPending || !["available", "damaged"].includes(asset.status)} onClick={() => action.mutate({ assetId: asset.id, action: "shelve" })}>To Fix</button>
               )}
             </div>
             {editingAssetId === asset.id ? (
@@ -416,7 +416,7 @@ function LendingHistory({ productId }: { productId: number }) {
   const recent = history.data?.recent ?? [];
   return (
     <div className="grid gap-2 border-t border-line pt-3">
-      <h3 className="text-sm font-semibold text-ink">Lending history</h3>
+      <h3 className="title-section">Lending history</h3>
       {history.isLoading ? <p className="text-sm text-muted">Loading lending history...</p> : null}
       {history.error ? <p className="text-sm text-danger">{history.error.message}</p> : null}
       {!history.isLoading && !history.error && !recent.length ? <p className="text-sm text-muted">No lending history yet.</p> : null}
@@ -469,11 +469,16 @@ function defaultToBuyQuantity(product: AdminProduct) {
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="grid gap-1"><span className="text-xs font-medium text-muted">{label}</span>{children}</label>;
+  return <label className="grid gap-1"><span className="eyebrow">{label}</span>{children}</label>;
 }
 
 function InventoryMetric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-md border border-line bg-surface p-3"><p className="text-xs font-semibold uppercase text-muted">{label}</p><p className="mt-1 text-xl font-bold text-ink">{value}</p></div>;
+  const tones: Record<string, string> = {
+    Available: "border-success bg-success/15",
+    Damaged: "border-warn bg-warn/15",
+    Lost: "border-secondary bg-secondary/15",
+  };
+  return <div className={`rounded-md border p-3 ${tones[label] ?? "border-accent bg-accent/15"}`}><p className="eyebrow">{label}</p><p className="mt-1 font-mono text-xl font-bold text-ink">{value}</p></div>;
 }
 
 function AttributionLine({ acceptedBy, issuedBy }: { acceptedBy: Actor | null; issuedBy: Actor | null }) {
@@ -496,5 +501,3 @@ function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
-
-

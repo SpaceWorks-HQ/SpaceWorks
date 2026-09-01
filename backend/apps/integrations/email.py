@@ -113,6 +113,32 @@ def send_password_reset_email(recipient, reset_url):
     return 1 if log.status == log.Status.SENT else 0
 
 
+def send_password_reset_otp(recipient, code, *, expires_in_minutes):
+    """Deliver a recovery code without persisting it or crossing a queue."""
+    from apps.integrations.dispatch import dispatch_email
+
+    subject = "Your password reset code"
+    body = (
+        "We received a request to reset your password.\n\n"
+        f"Your password reset code is: {code}\n\n"
+        f"This code expires in {expires_in_minutes} minutes and can be used once.\n\n"
+        "If you did not request this, you can ignore this email."
+    )
+    log = dispatch_email(
+        to_email=recipient,
+        subject=subject,
+        text_body=body,
+        makerspace=None,
+        stream="account",
+        event="password_reset",
+        audience="user",
+        connection="platform",
+        persist_body=False,
+        sync=True,
+    )
+    return 1 if log.status == log.Status.SENT else 0
+
+
 def send_email_verification_otp(recipient, code):
     from apps.integrations.dispatch import dispatch_email
 
@@ -169,5 +195,4 @@ def send_makerspace_email(
         )
         sent += 1 if log.status == log.Status.SENT else 0
     return sent
-
 

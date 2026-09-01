@@ -14,14 +14,15 @@ from apps.inventory.serializers import (
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.platform import module_enabled
-from apps.openapi import PUBLISHABLE_KEY_PARAMETER
+from apps.makerspaces.servability import servable_queryset
+from apps.openapi import PUBLIC_API_AUTH_PARAMETERS
 
 
 @extend_schema(
     tags=["Public inventory"],
     summary="List public makerspaces",
     description="List makerspaces that have public inventory enabled.",
-    parameters=[PUBLISHABLE_KEY_PARAMETER],
+    parameters=PUBLIC_API_AUTH_PARAMETERS,
     responses=PublicMakerspaceSerializer(many=True),
 )
 class PublicMakerspaceListView(ListAPIView):
@@ -32,10 +33,9 @@ class PublicMakerspaceListView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return Makerspace.objects.filter(
+        return servable_queryset(Makerspace.objects.filter(
             public_inventory_enabled=True,
-            archived_at__isnull=True,
-        ).exclude(hidden_from_central_directory=True).order_by("name")
+        )).exclude(hidden_from_central_directory=True).order_by("name")
 
 
 @extend_schema(
@@ -43,7 +43,7 @@ class PublicMakerspaceListView(ListAPIView):
     summary="List public inventory products",
     description="List public inventory products for a public makerspace.",
     parameters=[
-        PUBLISHABLE_KEY_PARAMETER,
+        *PUBLIC_API_AUTH_PARAMETERS,
         OpenApiParameter(
             name="makerspace_slug",
             type=str,
@@ -86,10 +86,12 @@ class PublicInventoryListView(ListAPIView):
         ):
             raise Http404
 
-        queryset = makerspace.products.select_related("category").filter(
-            is_public=True,
-            is_archived=False,
-            makerspace__archived_at__isnull=True,
+        queryset = servable_queryset(
+            makerspace.products.select_related("category").filter(
+                is_public=True,
+                is_archived=False,
+            ),
+            relation="makerspace",
         )
         query = self.request.query_params.get("q", "").strip()
         if query:
@@ -126,7 +128,7 @@ class PublicInventoryListView(ListAPIView):
 @extend_schema(
     tags=["Public inventory"],
     summary="List public inventory categories",
-    parameters=[PUBLISHABLE_KEY_PARAMETER],
+    parameters=PUBLIC_API_AUTH_PARAMETERS,
     responses=PublicCategorySerializer(many=True),
 )
 class PublicCategoryListView(ListAPIView):
@@ -158,7 +160,7 @@ class PublicCategoryListView(ListAPIView):
 @extend_schema(
     tags=["Public inventory"],
     summary="Get public inventory product detail",
-    parameters=[PUBLISHABLE_KEY_PARAMETER],
+    parameters=PUBLIC_API_AUTH_PARAMETERS,
     responses=PublicProductSerializer,
 )
 class PublicInventoryDetailView(RetrieveAPIView):
@@ -174,12 +176,10 @@ class PublicInventoryDetailView(RetrieveAPIView):
             "public_inventory",
         ):
             raise Http404
-        return (
-            makerspace.products.select_related("category")
-            .filter(
+        return servable_queryset(
+            makerspace.products.select_related("category").filter(
                 is_public=True,
                 is_archived=False,
-                makerspace__archived_at__isnull=True,
-            )
-            .order_by("name")
-        )
+            ),
+            relation="makerspace",
+        ).order_by("name")

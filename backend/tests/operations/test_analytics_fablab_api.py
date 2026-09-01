@@ -4,6 +4,7 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.makerspaces.models import MakerspaceMembership
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 
 pytestmark = pytest.mark.django_db
@@ -23,11 +24,7 @@ def test_fixed_fablab_urls_reverse_and_space_manager_can_read(name):
 
 def test_report_rbac_status_codes_match_inventory_first_resolution():
     space = make_space("analytics-rbac")
-    guest = make_member(
-        "analytics-guest", space,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("analytics-guest", space)
     printer = make_member(
         "analytics-printer", space,
         membership_role=MakerspaceMembership.Role.PRINT_MANAGER,

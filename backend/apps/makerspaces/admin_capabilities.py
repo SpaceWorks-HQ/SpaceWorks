@@ -5,7 +5,7 @@ from django import forms
 from apps.audit import services as audit
 from apps.makerspaces.capabilities import FEATURE_DEFINITIONS, validate_capabilities
 from apps.makerspaces.admin_images import MakerspaceAdminForm as ImageMakerspaceAdminForm
-from apps.makerspaces.models import DEFAULT_ENABLED_MODULES
+from apps.makerspaces.module_registry import MODULES
 
 
 class CapabilityMatrixWidget(forms.CheckboxSelectMultiple):
@@ -21,6 +21,15 @@ class CapabilityMatrixWidget(forms.CheckboxSelectMultiple):
             f"feature:{item.key}": item.parent_module for item in FEATURE_DEFINITIONS
         }
         return context
+
+
+def _module_label(definition):
+    # Core is labelled, not disabled: a disabled checkbox is omitted from POST, and
+    # unchecking core is already harmless because canonicalization adds it back.
+    suffix = " (core, always on)" if definition.is_core else ""
+    if definition.requires_modules:
+        suffix += f" (requires {', '.join(definition.requires_modules)})"
+    return f"{definition.label}{suffix}"
 
 
 def _feature_label(feature):
@@ -45,11 +54,20 @@ class MakerspaceAdminForm(ImageMakerspaceAdminForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        modules = list(DEFAULT_ENABLED_MODULES)
-        modules.extend(
-            key for key in (self.instance.enabled_modules or []) if key not in modules
+        # Sourced from the registry, not "defaults + keys already on the row". That old
+        # rule meant a module absent from the defaults could never be offered on a new
+        # makerspace -- which is why `notifications` was enforced but unreachable.
+        choices = [
+            (f"module:{definition.key}", _module_label(definition))
+            for definition in MODULES
+        ]
+        # Unknown legacy keys stay selectable so saving cannot silently drop them.
+        known = {definition.key for definition in MODULES}
+        choices.extend(
+            (f"module:{key}", f"{key.replace('_', ' ').title()} (unrecognised)")
+            for key in (self.instance.enabled_modules or [])
+            if key not in known
         )
-        choices = [(f"module:{key}", key.replace("_", " ").title()) for key in modules]
         choices.extend(
             (f"feature:{item.key}", _feature_label(item))
             for item in FEATURE_DEFINITIONS

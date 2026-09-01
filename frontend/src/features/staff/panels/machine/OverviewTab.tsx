@@ -76,7 +76,7 @@ export function OverviewTab({ machine, makerspaceId, canManageMachines, canEdit,
     <div className="grid gap-5">
       {canEdit ? (
         <section className="grid gap-3">
-          <h3 className="text-sm font-semibold text-ink">Machine photo</h3>
+          <h3 className="title-section">Machine photo</h3>
           <ImageUploader
             endpoint={machineImageEndpoint(machine.id)}
             currentUrl={machine.image_url}
@@ -86,26 +86,26 @@ export function OverviewTab({ machine, makerspaceId, canManageMachines, canEdit,
         </section>
       ) : null}
       <section className="grid gap-3">
-        <h3 className="text-sm font-semibold text-ink">Machine details</h3>
-        <label className="grid gap-1 text-xs font-semibold text-muted">Name
+        <h3 className="title-section">Machine details</h3>
+        <label className="eyebrow grid gap-1">Name
           <input className="desk-input" value={form.name} disabled={!canEdit}
             onChange={(event) => updateField("name", event.target.value)} />
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-1 text-xs font-semibold text-muted">Location
+          <label className="eyebrow grid gap-1">Location
             <input className="desk-input" value={form.location} disabled={!canEdit}
               onChange={(event) => updateField("location", event.target.value)} />
           </label>
-          <label className="grid gap-1 text-xs font-semibold text-muted">Firmware version
+          <label className="eyebrow grid gap-1">Firmware version
             <input className="desk-input" value={form.firmware_version} disabled={!canEdit}
               onChange={(event) => updateField("firmware_version", event.target.value)} />
           </label>
         </div>
-        <label className="grid gap-1 text-xs font-semibold text-muted">Camera feed URL
+        <label className="eyebrow grid gap-1">Camera feed URL
           <input className="desk-input" type="url" value={form.camera_feed_url} disabled={!canEdit}
             onChange={(event) => updateField("camera_feed_url", event.target.value)} />
         </label>
-        <label className="grid gap-1 text-xs font-semibold text-muted">Notes
+        <label className="eyebrow grid gap-1">Notes
           <textarea className="desk-input min-h-24" value={form.notes} disabled={!canEdit}
             onChange={(event) => updateField("notes", event.target.value)} />
         </label>
@@ -116,7 +116,7 @@ export function OverviewTab({ machine, makerspaceId, canManageMachines, canEdit,
         {save.error instanceof Error ? <p className="text-sm text-danger">{save.error.message}</p> : null}
       </section>
       <section className="border-t border-line pt-4">
-        <h3 className="mb-3 text-sm font-semibold text-ink">Status</h3>
+        <h3 className="title-section mb-3">Status</h3>
         <div className="flex flex-col gap-2 sm:flex-row">
           <select className="desk-input flex-1" value={status} disabled={!canOperate}
             onChange={(event) => setStatus(event.target.value as MachineStatus)}>
@@ -128,7 +128,7 @@ export function OverviewTab({ machine, makerspaceId, canManageMachines, canEdit,
             disabled={!canOperate || setStatusMutation.isPending} onClick={() => setStatusMutation.mutate()}>
             {setStatusMutation.isPending ? "Setting..." : "Set status"}
           </button>
-          <button className="desk-button" type="button" disabled={!canChangeLifecycle || lifecycle.isPending}
+          <button className={machine.is_active ? "desk-button-danger" : "desk-button-success"} type="button" disabled={!canChangeLifecycle || lifecycle.isPending}
             onClick={() => lifecycle.mutate(machine.is_active ? "retire" : "unretire")}>
             {machine.is_active ? "Retire" : "Reactivate"}
           </button>

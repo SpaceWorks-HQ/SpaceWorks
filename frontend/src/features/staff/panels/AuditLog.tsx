@@ -54,18 +54,18 @@ export function AuditLog() {
           <div key={log.id} className="rounded-md border border-line bg-surface p-2">
             <span className="font-semibold">{log.action}</span>
             <span className="ml-2 text-muted">{log.target_type}:{log.target_id}</span>
-            <span className="ml-2 text-muted">{formatLocalDateTime(log.created_at)}</span>
+            <span className="ml-2 font-mono text-muted">{formatLocalDateTime(log.created_at)}</span>
           </div>
         ))}
       </div>
       <div className="mt-3 flex items-center justify-between gap-3 text-sm">
-        <button className="desk-button" disabled={!logs.data?.previous} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+        <button className="desk-button-ghost" disabled={!logs.data?.previous} onClick={() => setPage((current) => Math.max(1, current - 1))}>
           Previous
         </button>
         <span className="text-muted">
           Page {page}{" \u2014 "}{logs.data?.count ?? 0} total
         </span>
-        <button className="desk-button" disabled={!logs.data?.next} onClick={() => setPage((current) => current + 1)}>
+        <button className="desk-button-ghost" disabled={!logs.data?.next} onClick={() => setPage((current) => current + 1)}>
           Next
         </button>
       </div>

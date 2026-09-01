@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -11,15 +11,16 @@ from apps.apiclients.throttling import ClientTierRateThrottle
 from apps.events import services
 from apps.events.exceptions import DuplicateRegistration
 from apps.events.models import Event, EventRegistration
+from apps.events.organizer_models import EventOrganizer
 from apps.events.serializers_public import (
     PublicEventRegistrationInputSerializer,
     PublicEventRegistrationResponseSerializer,
     PublicEventSerializer,
 )
 from apps.hardware_requests.exceptions import ErrorSerializer
-from apps.makerspaces.guards import require_module
+from apps.makerspaces.guards import require_module_for_servable
 from apps.makerspaces.lookup import get_public_makerspace
-from apps.presence.guard import require_active_member_presence
+from apps.presence.guard import require_active_member
 
 
 LOOSE_ERROR_SCHEMA = {'type': 'object', 'additionalProperties': {}}
@@ -32,7 +33,7 @@ PUBLIC_EVENT_ERRORS = {
 PUBLIC_EVENT_REGISTRATION_ERRORS = {
     **PUBLIC_EVENT_ERRORS,
     401: OpenApiResponse(ErrorSerializer, description='Authentication is required.'),
-    403: OpenApiResponse(ErrorSerializer, description='Active membership and presence are required.'),
+    403: OpenApiResponse(ErrorSerializer, description='Active membership and current waiver acceptance are required.'),
     409: OpenApiResponse(ErrorSerializer, description='Event state conflict.'),
 }
 
@@ -59,9 +60,15 @@ class PublicEventListView(APIView):
     )
     def get(self, request, makerspace_slug):
         makerspace = get_public_makerspace(makerspace_slug)
-        require_module(makerspace, 'events')
+        require_module_for_servable(makerspace, 'events')
         events = (
             _public_events(makerspace)
+            .prefetch_related(
+                Prefetch(
+                    'organizers',
+                    queryset=EventOrganizer.objects.select_related('organization'),
+                )
+            )
             .annotate(
                 confirmed_count=Count(
                     'registrations',
@@ -93,12 +100,16 @@ class PublicEventRegistrationView(APIView):
     )
     def post(self, request, makerspace_slug, public_token):
         makerspace = get_public_makerspace(makerspace_slug)
-        require_module(makerspace, 'events')
+        require_module_for_servable(makerspace, 'events')
         event = get_object_or_404(
             _public_events(makerspace),
             public_token=public_token,
         )
-        require_active_member_presence(request.user, makerspace)
+        # Membership and waiver, but deliberately NOT an open presence session: signing
+        # up is planning to attend, and a member registering in advance from home cannot
+        # be checked in. Physical attendance is established by the staff-scanned QR
+        # check-in instead, which is stronger evidence than a self-declared session.
+        require_active_member(request.user, makerspace)
 
         website = request.data.get('website')
         if website and str(website).strip():

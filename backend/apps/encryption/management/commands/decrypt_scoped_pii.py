@@ -1,4 +1,4 @@
-﻿"""Fenced, authenticated rollback from scoped envelopes to legacy plaintext."""
+"""Fenced, authenticated rollback from scoped envelopes to legacy plaintext."""
 
 from uuid import UUID
 
@@ -15,7 +15,7 @@ from apps.encryption.maintenance import decrypted_values, validate_legacy_values
 from apps.encryption.blind_index import canonical_email
 from apps.encryption.models import PiiBlindIndex, PiiGlobalWriteFence, PiiMakerspaceWriteFence
 from apps.encryption.readiness import assert_ready
-from apps.encryption.registry import ALL_FIELDS, BY_MODEL
+from apps.encryption.registry import all_fields, fields_for_label, registered_labels
 from apps.encryption.write_fence import fence_operation
 
 _FILTERS = {
@@ -34,7 +34,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--makerspace", type=int)
         parser.add_argument("--global", dest="global_verify", action="store_true")
-        parser.add_argument("--model", choices=sorted(BY_MODEL))
+        parser.add_argument("--model", choices=sorted(registered_labels()))
         parser.add_argument("--batch-size", type=int, default=500)
         parser.add_argument("--resume-after-pk", type=int, default=0)
         mode = parser.add_mutually_exclusive_group()
@@ -73,7 +73,7 @@ class Command(BaseCommand):
                 assert_ready()
             except PiiUnavailable as exc:
                 raise CommandError("Scoped PII readiness preflight failed.") from exc
-        labels = [options["model"]] if options["model"] else sorted(BY_MODEL)
+        labels = [options["model"]] if options["model"] else sorted(registered_labels())
         total = {"decrypted": 0, "plaintext": 0, "empty": 0}
         for label in labels:
             counts = self._process_model(label, makerspace.pk, actor, operation, options, mutate)
@@ -102,7 +102,7 @@ class Command(BaseCommand):
             raise CommandError("Matching closed global and makerspace rollback fences are required.")
 
     def _process_model(self, label, makerspace_id, actor, operation, options, mutate):
-        model, fields = apps.get_model(label), BY_MODEL[label]
+        model, fields = apps.get_model(label), fields_for_label(label)
         filters = {_FILTERS[label]: makerspace_id}
         checkpoint, counts = options["resume_after_pk"], {"decrypted": 0, "plaintext": 0, "empty": 0}
         while True:
@@ -179,7 +179,7 @@ class Command(BaseCommand):
             raise CommandError("Rollback verification found blind-index rows.")
 
     def _verify_global(self):
-        for field in ALL_FIELDS:
+        for field in all_fields():
             model = apps.get_model(field.model_label)
             if any(is_envelope(row[0]) for row in model.objects.values_list(field.field_name).iterator(chunk_size=200)):
                 raise CommandError("Global rollback verification found an envelope.")

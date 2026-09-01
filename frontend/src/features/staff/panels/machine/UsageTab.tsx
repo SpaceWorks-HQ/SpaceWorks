@@ -31,7 +31,7 @@ export function UsageTab({ machineId, makerspaceId, canOperate }: {
 
   return (
     <section>
-      <h3 className="mb-3 text-sm font-semibold text-ink">Usage</h3>
+      <h3 className="title-section mb-3">Usage</h3>
       {usage.isLoading ? <p className="text-sm text-muted">Loading usage...</p> : null}
       {usage.error instanceof Error ? <p className="text-sm text-danger">{usage.error.message}</p> : null}
       {!usage.isLoading && !usage.error && !items.length ? (
@@ -41,8 +41,8 @@ export function UsageTab({ machineId, makerspaceId, canOperate }: {
         {items.map((entry) => (
           <div key={entry.id} className="rounded-md border border-line bg-bg p-2 text-sm">
             <div className="flex items-center justify-between gap-2">
-              <strong className="text-ink">{entry.hours} h</strong>
-              <span className="text-xs text-muted">{formatDate(entry.created_at)}</span>
+              <strong className="font-mono text-ink">{entry.hours} h</strong>
+              <span className="font-mono text-xs text-muted">{formatDate(entry.created_at)}</span>
             </div>
             {entry.note ? <p className="mt-1 break-words text-muted">{entry.note}</p> : null}
             <p className="mt-1 text-xs text-muted">
@@ -54,11 +54,11 @@ export function UsageTab({ machineId, makerspaceId, canOperate }: {
       {canOperate ? (
         <form className="mt-3 grid gap-2 sm:grid-cols-[8rem_minmax(0,1fr)_auto] sm:items-end"
           onSubmit={(event) => { event.preventDefault(); add.mutate(); }}>
-          <label className="grid gap-1 text-xs font-semibold text-muted">Hours
+          <label className="eyebrow grid gap-1">Hours
             <input className="desk-input" type="number" min="0.01" step="0.01" value={hours}
               onChange={(event) => setHours(event.target.value)} required />
           </label>
-          <label className="grid gap-1 text-xs font-semibold text-muted">Note
+          <label className="eyebrow grid gap-1">Note
             <input className="desk-input" maxLength={255} value={note}
               onChange={(event) => setNote(event.target.value)} />
           </label>

@@ -112,9 +112,9 @@ export function OperationsReports({
       <Panel title="Reports">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-ink">
+            <h3 className="title-section">
               {printingOnly ? "3D printing reporting" : "Operations reporting"} for {scopeLabel}
-            </p>
+            </h3>
             <p className="text-xs text-muted">
               {printingOnly
                 ? "Print jobs, printer hours, and filament usage."
@@ -122,15 +122,15 @@ export function OperationsReports({
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <label className="grid gap-1 text-xs text-muted">
+            <label className="eyebrow grid gap-1">
               <span>Start</span>
               <input className="desk-input" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
             </label>
-            <label className="grid gap-1 text-xs text-muted">
+            <label className="eyebrow grid gap-1">
               <span>End</span>
               <input className="desk-input" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
             </label>
-            <label className="grid gap-1 text-xs text-muted">
+            <label className="eyebrow grid gap-1">
               <span>Report</span>
               <select className="desk-input" value={selectedReport} onChange={(event) => setSelectedReport(event.target.value as ReportKey)}>
                 {reportDefinitions.filter((report) => report.key !== "payment-reconciliation" || canManageMakerspace).map((report) => (
@@ -155,7 +155,7 @@ export function OperationsReports({
         </div>
         <div className="mt-4 space-y-3 border-t border-line pt-3">
           <div className="flex flex-wrap items-end gap-2">
-            <label className="grid min-w-48 gap-1 text-xs text-muted">
+            <label className="eyebrow grid min-w-48 gap-1">
               <span>View name</span>
               <input
                 className="desk-input"
@@ -164,7 +164,7 @@ export function OperationsReports({
                 placeholder={`${reportTitle(selectedReport)} - ${scopeLabel}`}
               />
             </label>
-            <button className="desk-button" type="button" onClick={saveCurrentView}>
+            <button className="desk-button-primary" type="button" onClick={saveCurrentView}>
               Save view
             </button>
           </div>
@@ -172,13 +172,13 @@ export function OperationsReports({
             <div className="flex flex-wrap gap-2">
               {savedViews.map((view) => (
                 <div key={view.id} className="flex items-center gap-1 rounded-md border border-line bg-bg px-2 py-1">
-                  <button className="text-sm font-semibold text-ink" type="button" onClick={() => applySavedView(view)}>
+                  <button className="desk-button-ghost justify-start text-left" type="button" onClick={() => applySavedView(view)}>
                     {view.name}
                   </button>
                   <span className="text-xs text-muted">
                     {reportTitle(view.selectedReport)} / {view.scopeLabel}
                   </span>
-                  <button className="px-1 text-sm text-danger" type="button" onClick={() => removeSavedView(view.id)} aria-label={`Remove ${view.name}`}>
+                  <button className="desk-button-danger" type="button" onClick={() => removeSavedView(view.id)} aria-label={`Remove ${view.name}`}>
                     x
                   </button>
                 </div>
@@ -209,12 +209,12 @@ export function OperationsReports({
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {availableExports.map((report) => (
             <div key={report} className={`rounded-md border p-3 ${selectedReport === report ? "border-accent bg-accent/10" : "border-line bg-bg"}`}>
-              <p className="text-sm font-semibold text-ink">{reportTitle(report)}</p>
+              <h3 className="title-section">{reportTitle(report)}</h3>
               <div className="mt-3 flex gap-2">
-                <button className="desk-button" type="button" disabled={exportReport.isPending} onClick={() => { setSelectedReport(report); exportReport.mutate({ report, format: "csv" }); }}>
+                <button className="desk-button-ghost" type="button" disabled={exportReport.isPending} onClick={() => { setSelectedReport(report); exportReport.mutate({ report, format: "csv" }); }}>
                   CSV
                 </button>
-                <button className="desk-button" type="button" disabled={exportReport.isPending} onClick={() => { setSelectedReport(report); exportReport.mutate({ report, format: "xlsx" }); }}>
+                <button className="desk-button-ghost" type="button" disabled={exportReport.isPending} onClick={() => { setSelectedReport(report); exportReport.mutate({ report, format: "xlsx" }); }}>
                   XLSX
                 </button>
               </div>

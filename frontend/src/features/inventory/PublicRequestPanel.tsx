@@ -55,21 +55,21 @@ export function PublicRequestPanel({
   const tabTone: Record<ActiveTab, { active: string; idle: string }> = {
     borrow: {
       active:
-        "border-tone-blue bg-tone-blue text-tone-blue-ink dark:bg-[#0b2a38] dark:text-[#7dd3fc]",
-      idle: "hover:bg-tone-blue/40 hover:text-tone-blue-ink",
+        "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+      idle: "hover:border-secondary hover:bg-secondary/15 hover:text-secondary-ink",
     },
     scan: {
       active:
-        "border-tone-mint bg-tone-mint text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]",
-      idle: "hover:bg-tone-mint/40 hover:text-tone-mint-ink",
+        "border-secondary bg-secondary text-on-secondary dark:bg-secondary/15 dark:text-secondary-ink",
+      idle: "hover:border-secondary hover:bg-secondary/15 hover:text-secondary-ink",
     },
   };
 
   function tabClass(tab: ActiveTab) {
     const tone = tabTone[tab];
     return activeTab === tab
-      ? `status-box w-full py-2 shadow-soft ${tone.active}`
-      : `status-box w-full py-2 ${tone.idle}`;
+      ? `status-box min-h-11 w-full py-2 shadow-soft ${tone.active}`
+      : `status-box min-h-11 w-full py-2 ${tone.idle}`;
   }
 
   const canSubmit =
@@ -81,10 +81,10 @@ export function PublicRequestPanel({
     <aside className="space-y-4 lg:sticky lg:top-0 lg:max-h-[100dvh] lg:flex lg:flex-col lg:overflow-hidden">
       {disabled ? (
         <Card>
-          <p className="text-xs font-semibold tracking-wide text-accent-ink">
+          <p className="eyebrow text-secondary-ink">
             Requests
           </p>
-          <h2 className="mt-2 text-xl font-semibold text-ink">Unavailable</h2>
+          <h2 className="title-panel mt-2">Unavailable</h2>
           <p className="mt-2 text-sm text-muted">
             This makerspace is publishing inventory without public requests.
           </p>
@@ -92,9 +92,9 @@ export function PublicRequestPanel({
       ) : (
         <>
           <Card className="shrink-0" padding="sm">
-            <p className="text-xs font-semibold tracking-wide text-accent-ink">
+            <h2 className="title-panel text-secondary-ink">
               Member borrowing
-            </p>
+            </h2>
             <p className="mt-2 text-sm text-muted">
               Requests use your signed-in member account. An active membership, waiver acceptance, and current presence are required.
             </p>

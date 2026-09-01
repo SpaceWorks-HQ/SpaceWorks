@@ -50,7 +50,8 @@ def custom_role(makerspace, slug, actions):
 
 
 def test_action_registries_contain_the_frozen_action_vocabulary():
-    assert len(rbac.ALL_ACTIONS) == 18
+    # 19 since collect_service_request split job handover out of manage_machines.
+    assert len(rbac.ALL_ACTIONS) == 19
     assert rbac.ROLE_FORBIDDEN_ACTIONS == {
         rbac.Action.TRANSFER_STOCK,
         rbac.Action.MANAGE_STAFF,

@@ -12,12 +12,13 @@ from apps.accounts.models import User
 from apps.audit.models import AuditLog
 from apps.boxes.models import Box, BoxScan
 from apps.evidence.models import EvidencePhoto
-from apps.evidence.storage import StorageUnavailable
+from apps.evidence.storage import EvidenceValidationResult, StorageUnavailable
 from apps.hardware_requests.models import HardwareRequest, HardwareRequestItem
 from apps.inventory import availability
 from apps.inventory.availability import InsufficientStock
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -306,8 +307,14 @@ def test_issue_put_mode_rejects_invalid_evidence_size(monkeypatch, settings, siz
     box = make_box(makerspace)
     assign_scanned_box(hardware_request, box, admin)
     evidence = make_issue_evidence(makerspace, admin)
-    monkeypatch.setattr("apps.evidence.storage.object_exists", Mock(return_value=True))
-    monkeypatch.setattr("apps.evidence.storage.object_size", Mock(return_value=size))
+    def validate(key):
+        if key == evidence.object_key:
+            from apps.evidence.storage import EvidenceObjectValidationError
+
+            raise EvidenceObjectValidationError("missing", "missing")
+        return EvidenceValidationResult(size=size, content_type="image/png")
+
+    monkeypatch.setattr("apps.evidence.storage.validate_evidence_object", validate)
 
     response = authenticated_client(admin).post(
         issue_url(hardware_request),
@@ -351,7 +358,8 @@ def test_issue_with_cross_tenant_or_wrong_type_evidence_returns_400_without_stor
     object_exists.assert_not_called()
 
 
-def test_issue_happy_path(monkeypatch, django_capture_on_commit_callbacks):
+def test_issue_happy_path(monkeypatch, settings, django_capture_on_commit_callbacks):
+    settings.STORAGE_PRESIGN_METHOD = "post"
     makerspace = make_space("issue-happy")
     makerspace.default_loan_days = 7
     makerspace.save(update_fields=["default_loan_days"])
@@ -361,7 +369,8 @@ def test_issue_happy_path(monkeypatch, django_capture_on_commit_callbacks):
     box = make_box(makerspace)
     assign_scanned_box(hardware_request, box, admin)
     evidence = make_issue_evidence(makerspace, admin)
-    monkeypatch.setattr("apps.evidence.storage.object_exists", Mock(return_value=True))
+    finalize = Mock(return_value=EvidenceValidationResult(size=123, content_type="image/png"))
+    monkeypatch.setattr("apps.evidence.storage.finalize_upload", finalize)
     notify = Mock()
     monkeypatch.setattr(
         "apps.hardware_requests.notifications.notify_request_issued",
@@ -376,6 +385,7 @@ def test_issue_happy_path(monkeypatch, django_capture_on_commit_callbacks):
         )
 
     assert response.status_code == 200
+    finalize.assert_called_once_with(evidence, settings.EVIDENCE_MAX_BYTES)
     hardware_request.refresh_from_db()
     assert hardware_request.status == HardwareRequest.Status.ISSUED
     assert hardware_request.issued_by == admin
@@ -425,12 +435,7 @@ def test_issue_preserves_manager_set_due_time(monkeypatch):
 
 def test_guest_admin_can_issue_accepted(monkeypatch):
     makerspace = make_space("guest-issue")
-    guest_admin = make_member(
-        "guest-issue-admin",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("guest-issue-admin", makerspace)
     product = make_product(makerspace)
     hardware_request = make_accepted_request(makerspace, product, 1)
     box = make_box(makerspace)
@@ -451,12 +456,7 @@ def test_guest_admin_can_issue_accepted(monkeypatch):
 
 def test_suspended_guest_cannot_issue_returns_403(monkeypatch):
     makerspace = make_space("suspended-guest-issue")
-    guest_admin = make_member(
-        "suspended-guest-issue-admin",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest_admin = make_handout_member("suspended-guest-issue-admin", makerspace)
     guest_admin.access_status = User.AccessStatus.SUSPENDED
     guest_admin.save(update_fields=["access_status"])
     product = make_product(makerspace)

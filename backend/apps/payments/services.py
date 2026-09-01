@@ -3,7 +3,8 @@
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 from django.db import transaction
-from apps.makerspaces.platform import member_area_url
+from apps.audit import services as audit
+from apps.makerspaces.platform import member_payment_return_url
 from apps.payments import stripe_client
 from apps.payments.connect import refresh_connected_account, restrict_account_status
 from apps.payments.models import (
@@ -12,9 +13,11 @@ from apps.payments.models import (
     PlatformStripeConnectSettings,
 )
 from apps.payments.resolution import resolve_payment_source, source_for_payment
+from apps.payments.services_checkout_audit import record_checkout_created
 from apps.payments.subjects import resolve_subject_labels, subject_label
 from apps.payments.services_webhooks import (
     apply_connect_webhook_event,
+    apply_razorpay_webhook_event,
     apply_webhook_event,
 )
 
@@ -30,7 +33,10 @@ class PaymentRailConflict(Exception):
     pass
 
 
-def create_payment(*, makerspace, subject_type, subject_id, member, amount, currency, created_by):
+def create_payment(
+    *, makerspace, subject_type, subject_id, member, amount, currency, created_by,
+    via_makerspace=None, subject_label="",
+):
     source = resolve_payment_source(makerspace)
     if source is None:
         raise stripe_client.PaymentsUnavailable(
@@ -39,36 +45,62 @@ def create_payment(*, makerspace, subject_type, subject_id, member, amount, curr
     provider = source.provider
     connected_account_id = source.connected_account_id
     fee_amount = _application_fee_amount(amount, source.application_fee_bps)
-    return Payment.objects.create(
+    payment = Payment.objects.create(
         makerspace=makerspace,
         subject_type=subject_type,
         subject_id=subject_id,
         member=member,
+        via_makerspace=via_makerspace,
+        subject_label=(subject_label or "")[:255],
         amount=amount,
         currency=currency.lower(),
         created_by=created_by,
+        # Stamped at creation from whatever resolved NOW, and immutable thereafter: a
+        # space that switches vendor must still settle and expire the charges it raised
+        # under the old one, and moving a row between vendors would point it at a
+        # merchant account that never took the money.
+        provider=source.vendor,
         stripe_provider=provider,
         stripe_connected_account_id=connected_account_id,
         stripe_application_fee_amount=fee_amount,
     )
+    # Raising a charge is when a member incurs a debt; the log previously recorded
+    # only its settlement.
+    audit.record(
+        created_by,
+        "payment.created",
+        makerspace=makerspace,
+        target=payment,
+        meta={
+            "payment_id": payment.pk,
+            "subject_type": subject_type,
+            "subject_id": subject_id,
+            "amount": str(amount),
+            "currency": payment.currency,
+            "via_makerspace_id": via_makerspace.pk if via_makerspace else None,
+        },
+    )
+    return payment
 
 
 def create_checkout(payment):
     """Schedule checkout creation; Stripe failure is deliberately never caller-visible."""
-    transaction.on_commit(lambda: _create_checkout_safely(payment.pk))
+    transaction.on_commit(
+        lambda: _create_checkout_safely(payment.pk, actor=payment.created_by)
+    )
 
 
-def _create_checkout_safely(payment_id):
+def _create_checkout_safely(payment_id, *, actor=None):
     try:
-        create_checkout_url(payment_id)
+        create_checkout_url(payment_id, actor=actor)
     except Exception:
         logger.exception("payment_checkout_creation_failed", extra={"payment_id": payment_id})
 
 
-def create_checkout_url(payment_id):
+def create_checkout_url(payment_id, *, actor=None):
     """Create and persist a pending payment's Checkout URL exactly once."""
     try:
-        return _create_checkout_url_atomic(payment_id)
+        return _create_checkout_url_atomic(payment_id, actor=actor)
     except _ConnectAccountCannotCharge as exc:
         merchant = MakerspacePaymentSettings.objects.get(pk=exc.merchant_id)
         restrict_account_status(merchant)
@@ -77,7 +109,7 @@ def create_checkout_url(payment_id):
         ) from None
 
 
-def _create_checkout_url_atomic(payment_id):
+def _create_checkout_url_atomic(payment_id, *, actor=None):
     payment_snapshot = Payment.objects.only(
         "makerspace_id", "stripe_provider"
     ).get(pk=payment_id)
@@ -106,8 +138,11 @@ def _create_checkout_url_atomic(payment_id):
             return ""
         if payment.online_rail == Payment.OnlineRail.NATIVE_PAYMENT_INTENT:
             raise PaymentRailConflict('The payment already uses the native payment rail.')
-        if payment.stripe_checkout_url:
-            return payment.stripe_checkout_url
+        # Generic column first: a Razorpay row never fills the Stripe one, and without
+        # this the service would mint a fresh payment link on every call -- several live
+        # links for one charge, any of which a member could pay.
+        if payment.checkout_url or payment.stripe_checkout_url:
+            return payment.checkout_url or payment.stripe_checkout_url
         if payment.online_rail is None:
             payment.online_rail = Payment.OnlineRail.CHECKOUT
         source = source_for_payment(payment)
@@ -128,11 +163,29 @@ def _create_checkout_url_atomic(payment_id):
                 and refreshed.connect_charges_enabled
             ):
                 raise _ConnectAccountCannotCharge(refreshed.pk)
-        member_url = member_area_url(payment.makerspace)
+        # Return the payer to the space they reached the charge THROUGH, not the one that
+        # owns it. For a collaborative-event charge those differ: host A owns the payment,
+        # member space B routed it, and B is the only member area the visitor can actually
+        # sign into -- `via_makerspace` is exactly that routing record. Sending them to A
+        # lands them in a space where they hold no membership. Archived spaces then resolve
+        # to the central recovery route instead of a dead tenant domain. Both the Stripe
+        # branch below and the provider seam read this one value.
+        member_url = member_payment_return_url(
+            payment.via_makerspace or payment.makerspace
+        )
         if not member_url:
             logger.warning("payment_checkout_return_url_unavailable", extra={"payment_id": payment_id})
             raise stripe_client.PaymentsUnavailable("A payment return URL is not configured.")
         label = subject_label(payment, resolve_subject_labels([payment]))
+        if payment.provider != Payment.Provider.STRIPE:
+            # Non-Stripe rows go through the provider seam. The Stripe branch below is
+            # left untouched on purpose: it is the path taking real money today, and
+            # this phase must not change its behaviour to add a second vendor.
+            checkout_url = _create_checkout_via_provider(
+                payment, source, label, member_url
+            )
+            record_checkout_created(payment, actor=actor)
+            return checkout_url
         checkout_params = {
             "mode": "payment",
             "client_reference_id": str(payment.pk),
@@ -156,16 +209,56 @@ def _create_checkout_url_atomic(payment_id):
         payment.stripe_checkout_session_id = session_id
         payment.stripe_checkout_url = checkout_url
         payment.stripe_checkout_session_expired_at = None
+        # Written in step with the historic columns. Migration 0010 backfilled existing
+        # rows for the same reason: a checkout only the Stripe-shaped columns know about
+        # is invisible to every provider-agnostic path added from here on.
+        payment.external_order_id = session_id
+        payment.checkout_url = checkout_url
         payment.save(
             update_fields=[
                 "stripe_checkout_session_id",
                 "stripe_checkout_url",
                 "stripe_checkout_session_expired_at",
+                "external_order_id",
+                "checkout_url",
                 "online_rail",
                 "updated_at",
             ]
         )
+        record_checkout_created(payment, actor=actor)
         return checkout_url
+
+
+def _create_checkout_via_provider(payment, source, label, member_url):
+    """Raise a hosted page through the provider seam and record the generic ids.
+
+    Called with the Payment row already locked by `_create_checkout_url_atomic`, so the
+    lock ordering (platform settings -> makerspace settings -> Payment) is unchanged.
+    """
+    from apps.payments.providers import CheckoutRequest, get_provider
+
+    provider = get_provider(payment.provider)
+    result = provider.create_checkout(
+        source,
+        CheckoutRequest(
+            # Integer minor units. A float here is a rounding bug that reconciles as a
+            # real money difference.
+            amount_minor=int(payment.amount * 100),
+            currency=payment.currency,
+            description=label,
+            reference=str(payment.pk),
+            success_url=f"{member_url}?checkout=success",
+            cancel_url=f"{member_url}?checkout=cancelled",
+            metadata={"payment_id": payment.pk, "makerspace_id": payment.makerspace_id},
+            idempotency_key=_checkout_idempotency_key(payment),
+        ),
+    )
+    payment.external_order_id = result.order_id
+    payment.checkout_url = result.checkout_url
+    payment.save(
+        update_fields=["external_order_id", "checkout_url", "online_rail", "updated_at"]
+    )
+    return result.checkout_url
 
 
 def _value(value, key):

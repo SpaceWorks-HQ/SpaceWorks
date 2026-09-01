@@ -15,10 +15,18 @@ def set_refresh_cookies(response, refresh_token, request=None):
 
     Explicit max_age (review fix #7) - without it the cookie would be a session cookie
     and die on browser close, despite the 7-day token lifetime."""
+    max_age = _refresh_max_age()
+    try:
+        from apps.accounts.claim_tokens import ClaimRefreshToken
+
+        token = ClaimRefreshToken(refresh_token)
+        max_age = max(0, int(token["exp"]) - int(__import__("time").time()))
+    except Exception:
+        pass
     response.set_cookie(
         settings.AUTH_REFRESH_COOKIE,
         str(refresh_token),
-        max_age=_refresh_max_age(),
+        max_age=max_age,
         httponly=True,
         secure=settings.AUTH_COOKIE_SECURE,
         samesite=settings.AUTH_COOKIE_SAMESITE,

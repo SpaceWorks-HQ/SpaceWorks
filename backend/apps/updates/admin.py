@@ -1,11 +1,11 @@
 from django.contrib import admin
 
+from apps.separability.tombstones import app_is_tombstoned
 from config.admin_access import SuperuserOnlyModelAdmin
 
 from apps.updates.models import PlatformUpdateSettings
 
 
-@admin.register(PlatformUpdateSettings)
 class PlatformUpdateSettingsAdmin(SuperuserOnlyModelAdmin, admin.ModelAdmin):
     list_display = (
         "automatic_updates_enabled",
@@ -33,3 +33,9 @@ class PlatformUpdateSettingsAdmin(SuperuserOnlyModelAdmin, admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# See the note in apps/payments/admin.py: autodiscovery runs before ready(), so this must
+# read the setting rather than the runtime manifest.
+if not app_is_tombstoned("updates"):
+    admin.site.register(PlatformUpdateSettings, PlatformUpdateSettingsAdmin)

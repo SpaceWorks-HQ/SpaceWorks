@@ -41,10 +41,10 @@ class ScopedPiiAdminSearchMixin:
         # source's own persisted makerspace rather than queried globally.
         from rest_framework.exceptions import ValidationError
 
-        from apps.encryption.registry import BY_MODEL
+        from apps.encryption.registry import fields_for_label
         from apps.encryption.search import legacy_plaintext_candidates
         dual_read = settings.PII_ENCRYPTION_DUAL_READ
-        for field in BY_MODEL[self.pii_search_model]:
+        for field in fields_for_label(self.pii_search_model):
             if field.field_name not in self.pii_search_fields:
                 continue
             exact = field.index_kind == "bloom_exact"

@@ -7,7 +7,7 @@ from django.db import transaction
 
 from apps.encryption.blind_index import active_generation, sync_event_hash, upsert_index
 from apps.encryption.models import PiiBlindIndex
-from apps.encryption.registry import BY_MODEL
+from apps.encryption.registry import fields_for_label
 
 
 FILTERS = {
@@ -66,7 +66,7 @@ class Command(BaseCommand):
             with transaction.atomic():
                 rows = list(model.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
                 for row in rows:
-                    for field in BY_MODEL[options["model"]]:
+                    for field in fields_for_label(options["model"]):
                         if field.index_kind in {"bloom", "bloom_exact"}:
                             if mutate:
                                 upsert_index(row, field, getattr(row, field.field_name), generation)

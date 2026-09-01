@@ -58,7 +58,7 @@ export function BoxCodeField({ value, onChange, makerspaceId, pending }: { value
             {value ? <span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-xs text-muted">Selected</span> : null}
           </div>
         </div>
-        <button className="desk-button shrink-0" type="button" disabled={pending} onClick={() => setScanOpen(true)}>Scan</button>
+        <button className="desk-button-ghost shrink-0" type="button" disabled={pending} onClick={() => setScanOpen(true)}>Scan</button>
       </div>
       {containers.length ? (
         <select className="desk-input" value="" disabled={pending} onChange={(event) => event.target.value && onChange(event.target.value)}>
@@ -66,7 +66,7 @@ export function BoxCodeField({ value, onChange, makerspaceId, pending }: { value
           {containers.map((container) => <option key={container.id} value={container.code ?? ""}>{container.label}</option>)}
         </select>
       ) : null}
-      <button className="desk-button justify-self-start" type="button" disabled={pending} onClick={() => setManualOpen((open) => !open)}>
+      <button className="desk-button-ghost justify-self-start" type="button" disabled={pending} onClick={() => setManualOpen((open) => !open)}>
         {manualOpen ? "Hide manual code entry" : "Enter code manually"}
       </button>
       {manualOpen ? <input className="desk-input min-w-0" value={value} disabled={pending} onChange={(event) => onChange(event.target.value)} /> : null}
@@ -79,8 +79,8 @@ export function BoxCodeField({ value, onChange, makerspaceId, pending }: { value
 export function FormFooter({ formId, pending, submitLabel, tone = "default", onCancel }: { formId: string; pending: boolean; submitLabel: string; tone?: "danger" | "default"; onCancel: () => void }) {
   return (
     <div className="desk-actions flex flex-wrap justify-end gap-2">
-      <button className="desk-button" type="button" disabled={pending} onClick={onCancel}>Cancel</button>
-      <button className={tone === "danger" ? "desk-button bg-danger text-bg hover:bg-danger/90 hover:text-bg" : "desk-button"} type="submit" form={formId} disabled={pending}>{pending ? "Working..." : submitLabel}</button>
+      <button className="desk-button-ghost" type="button" disabled={pending} onClick={onCancel}>Cancel</button>
+      <button className={tone === "danger" ? "desk-button-danger" : "desk-button-success"} type="submit" form={formId} disabled={pending}>{pending ? "Working..." : submitLabel}</button>
     </div>
   );
 }
@@ -103,4 +103,3 @@ export function submitForm(event: React.FormEvent<HTMLFormElement>, submit: () =
 }
 
 type ContainerOption = { id: number; code?: string | null; label: string; is_active?: boolean };
-

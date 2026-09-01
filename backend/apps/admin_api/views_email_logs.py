@@ -9,7 +9,7 @@ from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.integrations.models import EmailLog
 from apps.integrations.services import EmailRetryError, retry_email_log
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 
 
 class EmailLogPagination(PageNumberPagination):
@@ -55,7 +55,7 @@ class EmailLogListView(APIView):
             rbac.scope_by_action(
                 request.user,
                 rbac.Action.MANAGE_MAKERSPACE,
-                Makerspace.objects.filter(archived_at__isnull=True),
+                servable_queryset(),
                 field="id",
             ),
             pk=makerspace_id,
@@ -95,7 +95,7 @@ class EmailLogRetryView(APIView):
         queryset = rbac.scope_by_action(
             request.user,
             rbac.Action.MANAGE_MAKERSPACE,
-            EmailLog.objects.filter(makerspace__archived_at__isnull=True),
+            servable_queryset(EmailLog.objects.all(), relation="makerspace"),
             field="makerspace_id",
         )
         # The makerspace_id path segment gives the origin-scope guard tenant context

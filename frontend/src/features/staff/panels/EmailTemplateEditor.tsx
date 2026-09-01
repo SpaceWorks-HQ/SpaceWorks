@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { Badge } from "../../../components/ui";
+import { Badge, ConfirmDialog } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
+import { EmailTemplateTypeSelector, type MachineTypeOption } from "./EmailTemplateTypeSelector";
 
 export type TemplateSummary = {
   stream: string;
@@ -11,9 +12,15 @@ export type TemplateSummary = {
   label: string;
   is_active: boolean;
   is_overridden: boolean;
+  can_edit_space_default: boolean;
+  overridable_types: MachineTypeOption[];
 };
 
-export type SelectedTemplate = Pick<TemplateSummary, "stream" | "audience" | "key">;
+export type SelectedTemplate = Pick<TemplateSummary, "stream" | "audience" | "key"> & {
+  machineType: MachineTypeOption | null;
+  canEditSpaceDefault: boolean;
+  overridableTypes: MachineTypeOption[];
+};
 
 type TemplateDetail = TemplateSummary & {
   description: string;
@@ -26,12 +33,7 @@ type TemplateDetail = TemplateSummary & {
   default_html: string;
 };
 
-type Draft = {
-  subject: string;
-  text_body: string;
-  html_body: string;
-  is_active: boolean;
-};
+type Draft = { subject: string; text_body: string; html_body: string; is_active: boolean };
 
 type FocusedField = "subject" | "text_body" | "html_body";
 type Preview = Pick<Draft, "subject" | "text_body" | "html_body">;
@@ -41,14 +43,17 @@ const emptyDraft: Draft = { subject: "", text_body: "", html_body: "", is_active
 export function EmailTemplateEditor({
   makerspaceId,
   selected,
+  onSelectMachineType,
 }: {
   makerspaceId: number;
   selected: SelectedTemplate;
+  onSelectMachineType: (machineType: MachineTypeOption | null) => void;
 }) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [debouncedDraft, setDebouncedDraft] = useState<Draft>(emptyDraft);
   const [showDefaults, setShowDefaults] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [lastFocused, setLastFocused] = useState<FocusedField>("text_body");
   const subjectRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -59,6 +64,7 @@ export function EmailTemplateEditor({
     selected.stream,
     selected.audience,
     selected.key,
+    selected.machineType?.id ?? "space",
   ];
   const path = templatePath(makerspaceId, selected);
 
@@ -88,6 +94,7 @@ export function EmailTemplateEditor({
       selected.stream,
       selected.audience,
       selected.key,
+      selected.machineType?.id ?? "space",
       debouncedDraft,
     ],
     queryFn: () =>
@@ -97,6 +104,7 @@ export function EmailTemplateEditor({
           stream: selected.stream,
           audience: selected.audience,
           key: selected.key,
+          ...(selected.machineType ? { machine_type_id: selected.machineType.id } : {}),
           subject: debouncedDraft.subject,
           text_body: debouncedDraft.text_body,
           html_body: debouncedDraft.html_body,
@@ -116,6 +124,7 @@ export function EmailTemplateEditor({
       const next = detailToDraft(updated);
       setDraft(next);
       setDebouncedDraft(next);
+      setResetDialogOpen(false);
       invalidate();
     },
   });
@@ -131,7 +140,7 @@ export function EmailTemplateEditor({
 
   const insertField = (name: string) => {
     const token = `{{ ${name} }}`;
-    const target = editorRef(lastFocused, subjectRef, textRef, htmlRef).current;
+    const target = { subject: subjectRef, text_body: textRef, html_body: htmlRef }[lastFocused].current;
     const start = target?.selectionStart ?? draft[lastFocused].length;
     const end = target?.selectionEnd ?? start;
     setDraft((current) => ({
@@ -150,46 +159,59 @@ export function EmailTemplateEditor({
 
   return (
     <div className="grid gap-4">
+      <EmailTemplateTypeSelector
+        canEditSpaceDefault={selected.canEditSpaceDefault}
+        types={selected.overridableTypes}
+        selectedTypeId={selected.machineType?.id ?? null}
+        onSelect={onSelectMachineType}
+      />
       <form className="grid gap-4 rounded-md border border-line bg-bg p-4" onSubmit={(event) => {
         event.preventDefault();
         save.mutate();
       }}>
-        <TemplateHeader detail={detail.data} active={draft.is_active} onActive={(is_active) => setDraft({ ...draft, is_active })} />
-        <label className="grid gap-2 text-sm font-semibold text-ink">
+        <TemplateHeader detail={detail.data} active={draft.is_active} typeOverride={Boolean(selected.machineType)} onActive={(is_active) => setDraft({ ...draft, is_active })} />
+        <label className="eyebrow grid gap-2">
           <span>Subject</span>
           <input ref={subjectRef} className="desk-input" value={draft.subject} onFocus={() => setLastFocused("subject")} onChange={(event) => setDraft({ ...draft, subject: event.target.value })} />
         </label>
         <MergeFields detail={detail.data} onInsert={insertField} />
-        <label className="grid gap-2 text-sm font-semibold text-ink">
+        <label className="eyebrow grid gap-2">
           <span>Plain text body</span>
           <textarea ref={textRef} className="desk-input min-h-48 font-mono text-xs" value={draft.text_body} onFocus={() => setLastFocused("text_body")} onChange={(event) => setDraft({ ...draft, text_body: event.target.value })} />
         </label>
-        <label className="grid gap-2 text-sm font-semibold text-ink">
+        <label className="eyebrow grid gap-2">
           <span>HTML body</span>
           <textarea ref={htmlRef} className="desk-input min-h-56 font-mono text-xs" value={draft.html_body} onFocus={() => setLastFocused("html_body")} onChange={(event) => setDraft({ ...draft, html_body: event.target.value })} />
         </label>
         <div className="desk-actions flex flex-wrap items-center gap-2">
           <button className="desk-button-primary" type="submit" disabled={save.isPending}>{save.isPending ? "Saving..." : "Save"}</button>
-          <button className="desk-button" type="button" disabled={reset.isPending} onClick={() => window.confirm("Reset this email template to the default?") && reset.mutate()}>
-            {reset.isPending ? "Resetting..." : "Reset to default"}
+          <button className="desk-button-danger" type="button" disabled={reset.isPending} onClick={() => setResetDialogOpen(true)}>
+            {reset.isPending ? "Resetting..." : selected.machineType ? "Fall back to space default" : "Reset to built-in default"}
           </button>
-          <button className="desk-button" type="button" onClick={() => setShowDefaults((open) => !open)}>{showDefaults ? "Hide default" : "View default"}</button>
+          <button className="desk-button-ghost" type="button" onClick={() => setShowDefaults((open) => !open)}>{showDefaults ? "Hide default" : "View default"}</button>
         </div>
         {save.error ? <p className="text-sm text-danger">{save.error.message}</p> : null}
         {reset.error ? <p className="text-sm text-danger">{reset.error.message}</p> : null}
       </form>
-      {showDefaults ? <DefaultReference detail={detail.data} /> : null}
+      <ConfirmDialog
+        open={resetDialogOpen} title="Reset email template?"
+        message={selected.machineType ? "Reset this override to the space default?" : "Reset this email template to the built-in default?"}
+        confirmLabel="Reset template" tone="danger" pending={reset.isPending}
+        onConfirm={() => reset.mutate()}
+        onCancel={() => setResetDialogOpen(false)}
+      />
+      {showDefaults ? <DefaultReference detail={detail.data} typeOverride={Boolean(selected.machineType)} /> : null}
       <PreviewPane preview={preview.data} loading={preview.isFetching} error={preview.error} />
     </div>
   );
 }
 
-function TemplateHeader({ detail, active, onActive }: { detail: TemplateDetail; active: boolean; onActive: (active: boolean) => void }) {
+function TemplateHeader({ detail, active, typeOverride, onActive }: { detail: TemplateDetail; active: boolean; typeOverride: boolean; onActive: (active: boolean) => void }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="grid gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-base font-semibold text-ink">{detail.label}</h3>
+          <h3 className="title-section">{detail.label}</h3>
           <Badge tone={active ? "success" : "neutral"}>{active ? "Custom" : "Default"}</Badge>
           {detail.is_overridden ? <Badge tone="warn">Edited</Badge> : null}
         </div>
@@ -199,7 +221,7 @@ function TemplateHeader({ detail, active, onActive }: { detail: TemplateDetail; 
         <input className="mt-1 h-4 w-4" type="checkbox" checked={active} onChange={(event) => onActive(event.target.checked)} />
         <span>
           <span className="font-semibold">Use custom template</span>
-          <span className="block text-xs text-muted">When off, the built-in default is sent (your text is kept). The email always sends.</span>
+          <span className="block text-xs text-muted">When off, the {typeOverride ? "space" : "built-in"} default is sent (your text is kept). The email always sends.</span>
         </span>
       </label>
     </div>
@@ -209,10 +231,10 @@ function TemplateHeader({ detail, active, onActive }: { detail: TemplateDetail; 
 function MergeFields({ detail, onInsert }: { detail: TemplateDetail; onInsert: (name: string) => void }) {
   return (
     <div className="grid gap-2">
-      <p className="text-sm font-semibold text-ink">Merge fields</p>
+      <h3 className="title-section">Merge fields</h3>
       <div className="flex flex-wrap gap-2">
         {detail.fields.map((field) => (
-          <button key={field.name} className="rounded-lg border border-line bg-surface px-2 py-1 font-mono text-xs text-ink hover:border-accent hover:text-accent-ink" title={field.description} type="button" onClick={() => onInsert(field.name)}>
+          <button key={field.name} className="desk-button-ghost font-mono text-xs" title={field.description} type="button" onClick={() => onInsert(field.name)}>
             {field.name}
           </button>
         ))}
@@ -221,10 +243,10 @@ function MergeFields({ detail, onInsert }: { detail: TemplateDetail; onInsert: (
   );
 }
 
-function DefaultReference({ detail }: { detail: TemplateDetail }) {
+function DefaultReference({ detail, typeOverride }: { detail: TemplateDetail; typeOverride: boolean }) {
   return (
     <div className="grid gap-3 rounded-md border border-line bg-bg p-4">
-      <h3 className="text-base font-semibold text-ink">Default reference</h3>
+      <h3 className="title-section">{typeOverride ? "Space default reference" : "Built-in default reference"}</h3>
       <ReferenceBlock title="Subject" value={detail.default_subject} />
       <ReferenceBlock title="Plain text" value={detail.default_text} tall />
     </div>
@@ -234,7 +256,7 @@ function DefaultReference({ detail }: { detail: TemplateDetail }) {
 function ReferenceBlock({ title, value, tall = false }: { title: string; value: string; tall?: boolean }) {
   return (
     <div className="grid gap-2">
-      <p className="text-sm font-semibold text-ink">{title}</p>
+      <h4 className="title-section">{title}</h4>
       <pre className={`${tall ? "max-h-64 whitespace-pre-wrap" : ""} overflow-auto rounded-md border border-line bg-surface p-3 text-xs text-muted`}>{value || "-"}</pre>
     </div>
   );
@@ -244,7 +266,7 @@ function PreviewPane({ preview, loading, error }: { preview?: Preview; loading: 
   return (
     <div className="grid gap-3 rounded-md border border-line bg-bg p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-semibold text-ink">Preview</h3>
+        <h3 className="title-section">Preview</h3>
         {loading ? <span className="text-xs text-muted">Rendering...</span> : null}
       </div>
       {error ? <p className="text-sm text-danger">{error.message}</p> : null}
@@ -252,7 +274,7 @@ function PreviewPane({ preview, loading, error }: { preview?: Preview; loading: 
       <ReferenceBlock title="Plain text" value={preview?.text_body ?? ""} tall />
       {preview?.html_body ? (
         <div className="grid gap-2">
-          <p className="text-sm font-semibold text-ink">HTML</p>
+          <h4 className="title-section">HTML</h4>
           <iframe className="h-96 w-full rounded-md border border-line bg-white" sandbox="" srcDoc={preview.html_body} title="Rendered email HTML preview" />
         </div>
       ) : null}
@@ -261,7 +283,8 @@ function PreviewPane({ preview, loading, error }: { preview?: Preview; loading: 
 }
 
 function templatePath(makerspaceId: number, selected: SelectedTemplate) {
-  return `/admin/makerspace/${makerspaceId}/email-templates/${[selected.stream, selected.audience, selected.key].map(encodeURIComponent).join("/")}`;
+  const base = `/admin/makerspace/${makerspaceId}/email-templates/${[selected.stream, selected.audience, selected.key].map(encodeURIComponent).join("/")}`;
+  return selected.machineType ? `${base}/types/${selected.machineType.id}` : base;
 }
 
 function detailToDraft(detail: TemplateDetail): Draft {
@@ -271,15 +294,4 @@ function detailToDraft(detail: TemplateDetail): Draft {
     html_body: detail.html_body,
     is_active: detail.is_active,
   };
-}
-
-function editorRef(
-  focused: FocusedField,
-  subjectRef: RefObject<HTMLInputElement | null>,
-  textRef: RefObject<HTMLTextAreaElement | null>,
-  htmlRef: RefObject<HTMLTextAreaElement | null>,
-) {
-  if (focused === "subject") return subjectRef;
-  if (focused === "html_body") return htmlRef;
-  return textRef;
 }

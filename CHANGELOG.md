@@ -1,5 +1,66 @@
 # Changelog
 
+Releases are published from `main` and titled **`SpaceWorks <version>`**. The root `VERSION`
+file selects the series; each build is tagged `v<series>-main.<run>.<sha>`, which is what a
+deployment pins to. Bumping `VERSION` also requires bumping
+`SPECTACULAR_SETTINGS["VERSION"]` (`backend/tests/test_version_consistency.py` enforces it) and
+regenerating `frontend/openapi-schema.json` and `frontend/src/generated/api.ts`.
+
+Entries up to 0.2.0 below were generated automatically from conventional commits. That
+generation stopped afterwards, so **0.3.0 through 0.5.1 were never recorded here** — for that
+window see `git log` and the condensed changelog in `CLAUDE.md`, which also carries the design
+rule each change introduced.
+
+## 0.7.5 (2026-08-11)
+
+### Features
+
+* **events:** cross-makerspace collaborative events — a host invites another makerspace, which
+  accepts or declines, and the partner's members then discover and register through their own
+  member area. Registration records durable provenance, so later edits to the collaborator list
+  cannot erase a member's history or void a QR already issued
+  ([799804d](https://github.com/SpaceWorks-HQ/SpaceWorks/commit/799804d101a1ef74a17a20ef0a4332715bd675ba))
+* **events:** a visiting member accepts the host's waiver on the registration itself, rather than
+  by manufacturing a membership at the host — which would corrupt the host's roster, quotas, dues
+  and member reporting. Audited by waiver id and version, never by body
+  ([dab0354](https://github.com/SpaceWorks-HQ/SpaceWorks/commit/dab035456decbfb3315533354a345fa255761311))
+* **events:** QR check-in for event registrations. Resolution is read-only and answers unknown,
+  malformed and wrong-event tokens identically, so it cannot be used to tell them apart
+  ([d59f38d](https://github.com/SpaceWorks-HQ/SpaceWorks/commit/d59f38d6ded06592f8041517d24cc5c3af39d8bd))
+* **members:** opt-in publication of recently attended events on a maker profile, consent-gated
+  separately from the rest of the profile because attendance is not something the member typed
+  ([9ed0fcb](https://github.com/SpaceWorks-HQ/SpaceWorks/commit/9ed0fcb5af38994f67180cd0746e26b34abe7873))
+* **events:** registering no longer requires an active presence session — signing up is planning
+  to attend, not attending. Presence is proven at the door by the staff-scanned QR, and the nine
+  other presence-guarded surfaces are unchanged
+  ([f16896f](https://github.com/SpaceWorks-HQ/SpaceWorks/commit/f16896f5062010f44e6b3eca1aeb6252a93ef632))
+
+### Bug Fixes
+
+* **payments:** a purged `events` module no longer strands collaborative-event money. Routing
+  moved off the registration's provenance — which a purge deliberately clears — onto a new
+  `Payment.via_makerspace` column no purge touches. Previously a collaborator purging `events`
+  made a host-raised charge invisible in the member's own area while the host still refused them,
+  so a receipt vanished and a pending charge became impossible to settle
+* **events:** closed a rate-limit bypass on collaborative registration without blocking waiver
+  repair. New registrations share one `event_register` budget per member across both the public
+  and collaborative routes; retries are bounded on their own scope, so an exhausted create budget
+  can never stop a member repairing a registration that holds no waiver acceptance
+* **events:** the check-in scanner no longer tells correctly-accepted members to get a waiver.
+  Evidence lives in two places — a visitor's on the registration, a host member's on their
+  membership — and the endpoint read only the first, making it structurally false for every host
+  member. It now reports `not_required` / `on_file` / `missing`
+* **events:** the scanner no longer offers a Confirm button that can only fail. The resolve
+  response carries `event_status` and `confirmable`, mirroring the precondition that marking
+  attendance actually enforces
+
+### Changed
+
+* **release:** GitHub Releases are now titled `SpaceWorks <version>` instead of `v<version>`
+* **api:** the OpenAPI document version tracks the release series. It had sat at `0.1.0` while
+  `VERSION` climbed to `0.5.1`, so every schema consumer was told a version that had never been
+  true of anything
+
 ## [0.2.0](https://github.com/OSMM-HQ/OSMM-Makerspace-Manager/compare/v0.1.0...v0.2.0) (2026-07-14)
 
 

@@ -13,8 +13,8 @@ from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveSuperAdmin
 from apps.admin_api.serializers_makerspaces import MakerspaceSerializer
 from apps.makerspaces import hosting
-from apps.makerspaces.models import Makerspace
 from apps.makerspaces.provisioning import provision_subdomain
+from apps.makerspaces.servability import servable_queryset
 
 
 class ProvisionSubdomainRequestSerializer(serializers.Serializer):
@@ -102,7 +102,7 @@ class MakerspaceProvisionSubdomainView(APIView):
             rbac.scope_by_action(
                 request.user,
                 rbac.Action.MANAGE_MAKERSPACE,
-                Makerspace.objects.filter(archived_at__isnull=True),
+                servable_queryset(),
                 field="id",
             ),
             pk=makerspace_id,

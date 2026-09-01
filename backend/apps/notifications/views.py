@@ -10,8 +10,9 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
+from apps.machines import role_scope
 from apps.makerspaces.guards import require_module
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 from apps.notifications.models import Notification
 from apps.notifications.serializers import NotificationSerializer
 
@@ -39,13 +40,21 @@ def _makerspace_for_manager(user, makerspace_id):
     makerspace = get_object_or_404(
         rbac.scope_by_makerspace(
             user,
-            Makerspace.objects.filter(archived_at__isnull=True),
+            servable_queryset(),
             makerspace_field="id",
         ),
         pk=makerspace_id,
     )
     require_module(makerspace, "notifications")
     if _is_guest_only(user, makerspace.id):
+        raise PermissionDenied()
+    # A `Notification` carries no machine provenance, and `read_at` is makerspace-wide, so
+    # one team's acknowledgement would silence the row for every other team. Rather than
+    # give a per-type maintainer a feed they cannot be scoped to, the inbox is withheld
+    # from them entirely -- an accepted cost: they rely on email/chat, where per-event
+    # recipient rules already narrow by machine. Adding provenance and a per-recipient
+    # read state is the alternative, and it is a larger change than this phase.
+    if role_scope.is_machine_only(user, makerspace.id):
         raise PermissionDenied()
     if not (
         rbac.can(user, rbac.Action.VIEW_INVENTORY, makerspace.id)

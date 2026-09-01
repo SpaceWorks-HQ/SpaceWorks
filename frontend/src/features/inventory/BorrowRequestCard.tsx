@@ -30,14 +30,14 @@ export function BorrowRequestCard({
     <Card>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold tracking-wide text-accent-ink">
+          <p className="eyebrow text-secondary-ink">
             Borrow Request
           </p>
-          <h2 className="mt-2 text-xl font-semibold text-ink">
+          <h2 className="title-panel mt-2">
             Selected equipment
           </h2>
         </div>
-        <span className="rounded-lg border border-line bg-surface px-3 py-1 text-sm font-semibold text-ink">
+        <span className="rounded-lg border border-secondary bg-secondary/15 px-3 py-1 font-mono text-sm font-semibold text-secondary-ink">
           {totalItems}
         </span>
       </div>
@@ -56,7 +56,7 @@ export function BorrowRequestCard({
                 key={item.productId}
               >
                 <span className="text-sm font-medium text-ink">{item.name}</span>
-                <span className="text-sm text-muted">x{item.quantity}</span>
+                <span className="font-mono text-sm text-muted">x{item.quantity}</span>
               </div>
             ))}
           </div>
@@ -68,7 +68,7 @@ export function BorrowRequestCard({
 
       <div className="mt-5 space-y-3">
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold tracking-wide text-muted">
+          <span className="eyebrow mb-1 block">
             Request purpose
           </span>
           <textarea
@@ -88,8 +88,8 @@ export function BorrowRequestCard({
         </button>
         {submitError ? <Notice tone="danger" text={submitError} /> : null}
         {submitted ? (
-          <div className="rounded-xl border border-tone-mint bg-tone-mint px-3 py-2 text-tone-mint-ink dark:bg-[#06281a] dark:text-[#74dd9c]">
-            <p className="text-sm font-semibold">Request submitted</p>
+          <div className="rounded-xl border border-success bg-success px-3 py-2 text-on-success dark:bg-success/15 dark:text-success-ink">
+            <h3 className="title-section text-on-success dark:text-success-ink">Request submitted</h3>
             <p className="mt-1 text-xs">
               Check this page with your email to follow the request.
             </p>

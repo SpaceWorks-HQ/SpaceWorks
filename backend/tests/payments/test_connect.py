@@ -712,7 +712,7 @@ def test_connect_expired_webhook_confirms_checkout_session_is_closed(
 
     created = []
     monkeypatch.setattr(
-        "apps.payments.services.member_area_url",
+        "apps.payments.services.member_payment_return_url",
         lambda _makerspace: "https://space.example/member",
     )
     monkeypatch.setattr(

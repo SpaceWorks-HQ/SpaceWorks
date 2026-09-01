@@ -98,7 +98,7 @@ export function BulkImport({ makerspace }: { makerspace: Makerspace }) {
     <Panel title="Bulk import">
       <div className="grid gap-4">
         <div className="grid gap-2">
-          <label className="text-xs font-semibold uppercase text-muted">Upload CSV or XLSX</label>
+          <label className="eyebrow">Upload CSV or XLSX</label>
           <input
             className="desk-input"
             type="file"
@@ -111,22 +111,22 @@ export function BulkImport({ makerspace }: { makerspace: Makerspace }) {
           />
         </div>
         <div className="grid gap-2">
-          <label className="text-xs font-semibold uppercase text-muted">Paste table</label>
+          <label className="eyebrow">Paste table</label>
           <textarea className="desk-input h-28 w-full text-sm" value={tableText} onChange={(e) => { setSelectedFile(null); setTableText(e.target.value); }} />
           <div className="desk-actions flex flex-wrap gap-2">
-            <button className="desk-button" type="button" disabled={pending || !tableText.trim()} onClick={() => loadRows(parseDelimited(tableText))}>Map pasted table</button>
-            <button className="desk-button" type="button" disabled={pending || !sourceRows.length} onClick={() => setMappingOpen(true)}>Edit mapping</button>
-            <button className="desk-button" type="button" disabled={pending || !sourceRows.length} onClick={() => submitRows(false, mappedRows())}>Preview</button>
-            <button className="desk-button" type="button" disabled={pending || !sourceRows.length} onClick={() => submitRows(true, mappedRows())}>Apply rows</button>
-            <button className="desk-button" type="button" disabled={pending || !selectedFile} onClick={() => startFileJob("apply")}>Apply file job</button>
+            <button className="desk-button-ghost" type="button" disabled={pending || !tableText.trim()} onClick={() => loadRows(parseDelimited(tableText))}>Map pasted table</button>
+            <button className="desk-button-ghost" type="button" disabled={pending || !sourceRows.length} onClick={() => setMappingOpen(true)}>Edit mapping</button>
+            <button className="desk-button-ghost" type="button" disabled={pending || !sourceRows.length} onClick={() => submitRows(false, mappedRows())}>Preview</button>
+            <button className="desk-button-primary" type="button" disabled={pending || !sourceRows.length} onClick={() => submitRows(true, mappedRows())}>Apply rows</button>
+            <button className="desk-button-primary" type="button" disabled={pending || !selectedFile} onClick={() => startFileJob("apply")}>Apply file job</button>
           </div>
         </div>
         <details open={advancedOpen} onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}>
           <summary className="cursor-pointer text-sm font-semibold text-ink">Advanced JSON</summary>
           <textarea className="desk-input mt-2 h-32 w-full font-mono text-sm" value={rawJson} onChange={(e) => setRawJson(e.target.value)} />
           <div className="desk-actions mt-2 flex flex-wrap gap-2">
-            <button className="desk-button" type="button" disabled={pending} onClick={() => submitJson(false)}>Preview JSON</button>
-            <button className="desk-button" type="button" disabled={pending} onClick={() => submitJson(true)}>Apply JSON</button>
+            <button className="desk-button-ghost" type="button" disabled={pending} onClick={() => submitJson(false)}>Preview JSON</button>
+            <button className="desk-button-primary" type="button" disabled={pending} onClick={() => submitJson(true)}>Apply JSON</button>
           </div>
         </details>
         {pending || activeJob ? <ProgressBar job={activeJob} loading={jobMutation.isPending || syncMutation.isPending} /> : null}
@@ -144,7 +144,7 @@ export function BulkImport({ makerspace }: { makerspace: Makerspace }) {
 
 function MappingModal({ open, headers, mapping, setMapping, onClose, onPreview }: { open: boolean; headers: string[]; mapping: Mapping; setMapping: React.Dispatch<React.SetStateAction<Mapping>>; onClose: () => void; onPreview: () => void }) {
   return (
-    <Modal open={open} onClose={onClose} title="Map columns" footer={<div className="desk-actions flex flex-wrap justify-end gap-2"><button className="desk-button" type="button" onClick={onClose}>Cancel</button><button className="desk-button" type="button" onClick={onPreview}>Preview</button></div>}>
+    <Modal open={open} onClose={onClose} title="Map columns" footer={<div className="desk-actions flex flex-wrap justify-end gap-2"><button className="desk-button-ghost" type="button" onClick={onClose}>Cancel</button><button className="desk-button-primary" type="button" onClick={onPreview}>Preview</button></div>}>
       <div className="grid gap-3 sm:grid-cols-2">
         {fields.map((field) => (
           <label key={field} className="grid gap-1 text-sm">
@@ -186,7 +186,7 @@ function ImportSummary({ result }: { result: ImportResult }) {
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="text-xs uppercase text-muted"><tr><th className="px-2 py-1">Row</th><th className="px-2 py-1">Status</th><th className="px-2 py-1">Name</th><th className="px-2 py-1">Message</th></tr></thead>
+          <thead className="eyebrow"><tr><th className="px-2 py-1">Row</th><th className="px-2 py-1">Status</th><th className="px-2 py-1">Name</th><th className="px-2 py-1">Message</th></tr></thead>
           <tbody>{(result.rows ?? []).map((row) => {
             const errors = errorRows.get(row.row) ?? row.errors;
             const warnings = warningRows.get(row.row) ?? row.warnings;
@@ -200,7 +200,7 @@ function ImportSummary({ result }: { result: ImportResult }) {
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
-  return <div><p className="text-xs uppercase text-muted">{label}</p><p className="font-semibold text-ink">{value}</p></div>;
+  return <div><p className="eyebrow">{label}</p><p className="font-semibold text-ink">{value}</p></div>;
 }
 
 function isRunning(job?: BulkImportJob) {

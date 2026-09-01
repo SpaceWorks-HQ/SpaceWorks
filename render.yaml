@@ -1,4 +1,8 @@
 # Render Blueprint for the lean-paid always-on path.
+# H1 NOTE: the image now fails closed without the root-owned host marker. Render does not
+# mount that marker through this Blueprint, so deployment is intentionally refused until
+# a provider adapter lands in H1b. The explicit roles below must not be removed or replaced
+# with an ENTRYPOINT override.
 # Migrations are a documented ONE-OFF run against the Supabase direct/session URL,
 # not part of deploy. See docs/deploy-production.md. The app runtime uses the
 # transaction pooler URL. VPS deployment via docker-compose.prod.yml is the alternative.
@@ -9,6 +13,13 @@ envVarGroups:
       - key: SECRET_KEY
         sync: false
       - key: API_CLIENT_ENC_KEY
+        sync: false
+      # Audit row-MAC attestation. Blank is a valid state and leaves rows honestly
+      # unattested; set it to enable. The anchoring settings (AUDIT_ATTESTATION_*) are
+      # added per deployment when an off-box anchor is actually configured, since an
+      # anchor stored with this deployment's own credentials proves nothing against
+      # someone who holds them.
+      - key: AUDIT_MAC_MASTER_KEY
         sync: false
       - key: DEBUG
         value: "False"
@@ -22,6 +33,13 @@ envVarGroups:
         value: "true"
       - key: TRUST_X_FORWARDED_PROTO
         value: "true"
+      # Render terminates TLS at its own edge proxy and appends the client to
+      # X-Forwarded-For, so exactly one proxy is trusted. Unset, DRF falls back to
+      # legacy behaviour and keys throttles on REMOTE_ADDR -- which here is Render's
+      # proxy, so every user in the world shares one rate-limit bucket. Raise this only
+      # if a CDN is put in front of Render.
+      - key: TRUSTED_PROXY_COUNT
+        value: "1"
       - key: SECURE_HSTS_SECONDS
         value: "0"
       - key: DATABASE_URL
@@ -62,6 +80,12 @@ envVarGroups:
         sync: false
       - key: CRON_SECRET
         sync: false
+      - key: BACKUP_AGE_RECIPIENT
+        sync: false
+      - key: BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY
+        sync: false
+      - key: BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY
+        sync: false
       # NOTE: CELERY_BROKER_URL is NOT defined here - Render `fromService` refs are only
       # honored inside a service's own envVars, not inside an envVarGroup. It is wired
       # directly onto the web + worker services below.
@@ -92,7 +116,7 @@ services:
     # here; migrations are NOT run at start (they are a one-off against the direct/session
     # pooler - see docs/deploy-production.md), because the runtime DATABASE_URL is the
     # transaction pooler which can't run migration prepared statements.
-    startCommand: python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    startCommand: --role backend sh -c "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
     envVars:
       - fromGroup: makerspace-prod
       - key: CELERY_BROKER_URL
@@ -107,7 +131,7 @@ services:
     plan: starter
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    dockerCommand: celery -A config worker -l info
+    dockerCommand: --role worker celery -A config worker -l info
     envVars:
       - fromGroup: makerspace-prod
       - key: CELERY_BROKER_URL
@@ -122,7 +146,7 @@ services:
     plan: starter
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    dockerCommand: celery -A config beat -l info
+    dockerCommand: --role beat celery -A config beat -l info
     envVars:
       - fromGroup: makerspace-prod
       - key: CELERY_BROKER_URL

@@ -116,7 +116,7 @@ function SerializedReturnItem({ item, outcomes, pending, onChange }: { item: Non
       <p className="text-sm font-medium text-ink">{item.product_name}</p>
       <ShelfLine location={item.storage_location} />
       <div className="mt-2 grid gap-2">
-        {(item.issued_assets ?? []).map((asset) => <label key={asset.asset_id} className="grid gap-1 text-xs text-muted sm:grid-cols-[1fr_auto] sm:items-center"><span className="font-medium text-ink">{asset.asset_tag}{asset.serial_number ? ` - ${asset.serial_number}` : ""}</span><select className="desk-input" value={outcomes[asset.asset_id] ?? "returned"} disabled={pending} onChange={(event) => onChange(item.id, asset.asset_id, event.target.value as PendingOutcome)}><option value="returned">Returned</option><option value="damaged">Damaged</option><option value="missing">Missing</option><option value="pending">Not returned now</option></select></label>)}
+        {(item.issued_assets ?? []).map((asset) => <label key={asset.asset_id} className="eyebrow grid gap-1 sm:grid-cols-[1fr_auto] sm:items-center"><span className="font-medium text-ink">{asset.asset_tag}{asset.serial_number ? ` - ${asset.serial_number}` : ""}</span><select className="desk-input" value={outcomes[asset.asset_id] ?? "returned"} disabled={pending} onChange={(event) => onChange(item.id, asset.asset_id, event.target.value as PendingOutcome)}><option value="returned">Returned</option><option value="damaged">Damaged</option><option value="missing">Missing</option><option value="pending">Not returned now</option></select></label>)}
       </div>
     </div>
   );
@@ -128,7 +128,7 @@ function QuantityReturnItem({ item, resolution, pending, onChange }: { item: Non
       <p className="text-sm font-medium text-ink">{item.product_name}</p>
       <ShelfLine location={item.storage_location} />
       <div className="mt-2 grid gap-2 sm:grid-cols-3">
-        {(["returned", "damaged", "missing"] as const).map((key) => <label key={key} className="grid gap-1 text-xs text-muted"><span className="capitalize">{key}</span><input className="desk-input min-w-0" type="number" min="0" max={remainingCount(item)} value={resolution?.[key] ?? 0} disabled={pending} onChange={(event) => onChange(item.id, key, event.target.value)} /></label>)}
+        {(["returned", "damaged", "missing"] as const).map((key) => <label key={key} className="eyebrow grid gap-1"><span className="capitalize">{key}</span><input className="desk-input min-w-0" type="number" min="0" max={remainingCount(item)} value={resolution?.[key] ?? 0} disabled={pending} onChange={(event) => onChange(item.id, key, event.target.value)} /></label>)}
       </div>
     </div>
   );

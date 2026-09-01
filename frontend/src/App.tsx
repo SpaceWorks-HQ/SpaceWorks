@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { MakerspaceBrand } from "./components/MakerspaceBrand";
 import { MakerspaceMapLink } from "./components/MakerspaceMapLink";
@@ -12,9 +12,11 @@ import { AboutPage } from "./features/AboutPage";
 import { PublicBookingsPage } from "./features/bookings/PublicBookingsPage";
 import { PublicInventoryPage } from "./features/inventory/PublicInventoryPage";
 import { PublicEventsPage } from "./features/inventory/PublicEventsPage";
+import { PublicMachinesPage } from "./features/inventory/PublicMachinesPage";
 import { PublicSelfCheckoutPage } from "./features/inventory/PublicSelfCheckoutPage";
 import { usePublicMakerspaces } from "./features/inventory/usePublicInventory";
 import { PublicPrintRequestPage } from "./features/printing/PublicPrintRequestPage";
+import { ArchivedPayments } from "./features/members/ArchivedPayments";
 import { MemberArea } from "./features/members/MemberArea";
 import { KioskPage, ScannerPage, SuperadminPage } from "./features/staff/PlatformApps";
 import { ResetPasswordPage } from "./features/staff/ResetPasswordPage";
@@ -84,7 +86,7 @@ function LandingPage() {
           </SpaceWorksHomeLink>
           <div className="flex flex-wrap items-center gap-2">
             <ThemeToggle />
-            <Link className="desk-button" to="/admin">
+            <Link className="desk-button-secondary" to="/admin">
               Staff login
             </Link>
           </div>
@@ -93,23 +95,23 @@ function LandingPage() {
 
       <section className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-5 py-8 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="desk-panel h-fit p-5">
-          <p className="text-xs font-semibold tracking-wide text-accent-ink">
+          <p className="eyebrow text-secondary-ink">
             Inventory Directory
           </p>
-          <h1 className="mt-3 text-3xl font-bold text-ink">Makerspaces</h1>
+          <h1 className="title-page mt-3">Makerspaces</h1>
           <p className="mt-3 text-sm leading-6 text-muted">
             Browse public catalogs across connected workshops, labs, and community spaces.
           </p>
           <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-md border border-line bg-surface p-3">
-              <p className="text-2xl font-bold text-ink">
+              <p className="font-mono text-2xl font-bold text-ink">
                 {makerspacesQuery.isLoading ? "-" : totalMakerspaces}
               </p>
-              <p className="text-xs text-muted">Public spaces</p>
+              <p className="eyebrow">Public spaces</p>
             </div>
             <div className="rounded-md border border-line bg-surface p-3">
-              <p className="text-2xl font-bold text-accent-ink">Live</p>
-              <p className="text-xs text-muted">Status access</p>
+              <p className="text-2xl font-bold text-success-ink">Live</p>
+              <p className="eyebrow">Status access</p>
             </div>
           </div>
         </aside>
@@ -118,10 +120,10 @@ function LandingPage() {
           <div className="desk-panel space-y-4 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-ink">Available public catalogs</h2>
+                <h2 className="title-panel">Available public catalogs</h2>
                 <p className="text-sm text-muted">Select a makerspace to view shared equipment.</p>
               </div>
-              <span className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-muted">
+              <span className="eyebrow rounded-full border border-line bg-surface px-3 py-1">
                 Standard public portal
               </span>
             </div>
@@ -169,7 +171,7 @@ function LandingPage() {
 
         {makerspacesQuery.isError ? (
           <Card>
-            <h2 className="text-xl font-semibold text-ink">
+            <h2 className="title-panel">
               Makerspaces are unavailable
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted">
@@ -180,7 +182,7 @@ function LandingPage() {
 
         {makerspacesQuery.data && makerspacesQuery.data.length === 0 ? (
           <Card>
-            <h2 className="text-xl font-semibold text-ink">
+            <h2 className="title-panel">
               No public makerspaces yet
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted">
@@ -192,7 +194,7 @@ function LandingPage() {
         makerspacesQuery.data.length > 0 &&
         filteredMakerspaces.length === 0 ? (
           <Card>
-            <h2 className="text-xl font-semibold text-ink">
+            <h2 className="title-panel">
               No matching makerspaces
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted">
@@ -239,7 +241,7 @@ function LandingPage() {
                       {makerspace.public_code}
                     </span>
                     <Link
-                      className="inline-flex items-center gap-2 font-mono text-xs font-semibold tracking-tight text-secondary-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 after:absolute after:inset-0 after:content-['']"
+                      className="inline-flex items-center gap-2 font-mono text-xs font-semibold tracking-tight text-secondary-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus after:absolute after:inset-0 after:content-['']"
                       to={`/m/${makerspace.slug}`}
                       aria-label={`Open ${makerspace.name} catalog`}
                     >
@@ -263,10 +265,10 @@ function NotFoundPage() {
   return (
     <main className="grid min-h-screen place-items-center bg-bg px-6">
       <div className="text-center">
-        <p className="text-sm font-semibold tracking-wide text-muted">
+        <p className="eyebrow font-mono">
           404
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-ink">Page not found</h1>
+        <h1 className="title-page mt-2">Page not found</h1>
       </div>
     </main>
   );
@@ -274,6 +276,13 @@ function NotFoundPage() {
 
 export default function App() {
   const tenant = useTenant();
+  // Do not gate this payment-only recovery route on archived tenant bootstrap: the tenant
+  // screens below ("Loading site", "Site unavailable") are exactly what an archived member
+  // must get past. Read the ROUTER's location, not `window.location` -- a client-side `Link`
+  // updates router context without touching `window.location`, so a non-reactive read left
+  // this branch stale and sent every click on the recovery CTA to the not-found page.
+  const location = useLocation();
+  if (location.pathname === "/member/archived") return <Routes><Route path="/member/archived" element={<ArchivedPayments />} /></Routes>;
 
   if (tenant.mode === "single" && tenant.loading) {
     return (
@@ -291,7 +300,7 @@ export default function App() {
       <main className="desk-shell grid place-items-center px-5">
         <div className="desk-panel w-full max-w-md p-6">
           <SpaceWorksBadge className="mb-5" />
-          <h1 className="text-xl font-bold text-ink">Site unavailable</h1>
+          <h1 className="title-page">Site unavailable</h1>
           <p className="mt-2 text-sm text-muted">
             The configured tenant could not be resolved.
           </p>
@@ -306,6 +315,7 @@ export default function App() {
         <Route path="/" element={<PublicInventoryPage />} />
         <Route path="/checkout" element={<PublicSelfCheckoutPage />} />
         <Route path="/events" element={<PublicEventsPage />} />
+        <Route path="/machines" element={<PublicMachinesPage />} />
         <Route path="/bookings" element={<PublicBookingsPage />} />
         <Route path="/print" element={<PublicPrintRequestPage />} />
         <Route path="/member" element={<MemberArea />} />
@@ -327,10 +337,16 @@ export default function App() {
       <Route path="/m/:slug" element={<PublicInventoryPage />} />
       <Route path="/m/:slug/checkout" element={<PublicSelfCheckoutPage />} />
       <Route path="/m/:slug/events" element={<PublicEventsPage />} />
+      <Route path="/m/:slug/machines" element={<PublicMachinesPage />} />
       <Route path="/m/:slug/bookings" element={<PublicBookingsPage />} />
       <Route path="/m/:slug/admin/*" element={<StaffApp />} />
       <Route path="/m/:slug/print" element={<PublicPrintRequestPage />} />
       <Route path="/m/:slug/member" element={<MemberArea />} />
+      {/* The central member entry point. Without it `/member` 404s on a central deployment,
+          so a member whose only makerspace is ARCHIVED has nowhere to land: their tenant URL
+          no longer resolves and `/m/:slug/member` needs a slug they can no longer discover.
+          Tenant bootstrap fails here by design; MemberArea renders its recovery link anyway. */}
+      <Route path="/member" element={<MemberArea />} />
       <Route path="/m/:slug/stats" element={<PublicStatsPage />} />
       <Route path="/kiosk/:slug" element={<KioskPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />

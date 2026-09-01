@@ -10,6 +10,7 @@ from tests.return_helpers import (
     make_space,
     make_user,
 )
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -45,12 +46,7 @@ def make_inventory_manager(username, makerspace):
 
 
 def make_guest_admin(username, makerspace):
-    return make_member(
-        username,
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    return make_handout_member(username, makerspace)
 
 
 def make_superadmin(username):

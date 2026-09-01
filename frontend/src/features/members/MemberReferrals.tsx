@@ -47,13 +47,13 @@ export function MemberReferrals({
 
   return <div className="space-y-5">
     {canSubmitReferral ? <section className="desk-panel p-5">
-      <h2 className="font-semibold text-ink">Refer someone</h2>
+      <h2 className="title-panel">Refer someone</h2>
       <p className="mt-1 text-sm text-muted">Invite someone by email to join as a member.</p>
       <form className="mt-4 flex flex-col gap-3 sm:flex-row" onSubmit={submit}>
         <label className="sr-only" htmlFor="member-referral-email">Invite email</label>
         <input id="member-referral-email" className="desk-input flex-1" type="email" required value={email}
           onChange={(event) => setEmail(event.target.value)} placeholder="friend@example.com" />
-        <button className="desk-button-primary" disabled={isReferring} type="submit">
+        <button className="desk-button-secondary" disabled={isReferring} type="submit">
           {isReferring ? "Sending…" : "Send referral"}
         </button>
       </form>
@@ -62,7 +62,7 @@ export function MemberReferrals({
     </section> : null}
 
     <section className="desk-panel p-5">
-      <h2 className="font-semibold text-ink">Pending invitations</h2>
+      <h2 className="title-panel">Pending invitations</h2>
       {emailVerified === false ? <p className="mt-2 text-sm text-muted">Verify your email to discover and claim invitations.</p> : null}
       {invitationsLoading ? <p className="mt-2 text-sm text-muted">Checking pending invitations…</p> : null}
       {invitationError ? <p className="mt-2 text-sm text-danger" role="alert">{invitationError.message}</p> : null}
@@ -71,7 +71,7 @@ export function MemberReferrals({
         {invitations.map((invitation) => <li className="rounded border border-line p-3" key={invitation.id}>
           <p className="text-sm font-medium text-ink">{invitation.makerspace.name}</p>
           <p className="mt-1 text-sm text-muted">{invitation.inviter ? `Invited by ${invitation.inviter}` : "You have been invited."}{invitation.auto_activates ? " Claiming activates your membership." : " Claiming sends this to a manager for approval."}</p>
-          <button className="desk-button-primary mt-3" disabled={claimingId === invitation.id} onClick={() => onClaim(invitation.id)}>
+          <button className="desk-button-secondary mt-3" disabled={claimingId === invitation.id} onClick={() => onClaim(invitation.id)}>
             {claimingId === invitation.id ? "Claiming…" : "Claim invitation"}
           </button>
         </li>)}

@@ -41,12 +41,24 @@ def _get_or_create(registration, created_by):
     ).default_currency
     try:
         with transaction.atomic():
+            # Routing is stamped now because a purge may later clear the registration's
+            # provenance. `payment_via_makerspace` is read FIRST and is the whole point of
+            # that column: a waitlisted registration reaches this line only at promotion,
+            # potentially after the collaborator purged `events` and nulled the provenance,
+            # and falling back to the host would route the charge to a space the visiting
+            # member cannot reach.
             return create_payment(
                 **lookup,
                 member=registration.member,
+                via_makerspace=(
+                    registration.payment_via_makerspace
+                    or registration.registered_via_makerspace
+                    or event.makerspace
+                ),
                 amount=event.payment_amount,
                 currency=currency,
                 created_by=created_by,
+                subject_label=event.title,
             )
     except IntegrityError:
         return Payment.objects.get(**lookup)

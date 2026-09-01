@@ -7,7 +7,7 @@ from rest_framework.exceptions import ValidationError
 from apps.encryption.blind_index import active_generation, bloom_bits, canonical_email, exact_hash, normalized_name
 from apps.encryption.crypto import is_envelope
 from apps.encryption.models import PiiBlindIndex
-from apps.encryption.registry import BY_MODEL
+from apps.encryption.registry import fields_for_label
 
 CANDIDATE_LIMIT = 250
 
@@ -21,7 +21,7 @@ def _limit(rows):
 
 def indexed_candidates(*, makerspace_id, model_label, field_name, term, exact=False, base_ids=None):
     """Return bounded source IDs. Caller has already performed RBAC scoping."""
-    field = next((item for item in BY_MODEL.get(model_label, ()) if item.field_name == field_name), None)
+    field = next((item for item in fields_for_label(model_label) if item.field_name == field_name), None)
     if field is None or field.index_kind not in {"bloom", "bloom_exact"}:
         return []
     generation = active_generation()

@@ -13,13 +13,14 @@ from apps.admin_api.serializers_notification_rules import (
 )
 from apps.audit import services as audit
 from apps.integrations import notification_catalog, notification_rules
+from apps.integrations.dispatch_channels import channel_module_blocks
 from apps.integrations.models import (
     EmailNotificationMute,
     NotificationChannel,
     NotificationFeature,
     NotificationPreference,
 )
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 
 
 @extend_schema(tags=["Makerspaces"], summary="List or update makerspace notification rules")
@@ -32,7 +33,7 @@ class NotificationRulesView(APIView):
             rbac.scope_by_action(
                 request.user,
                 rbac.Action.MANAGE_MAKERSPACE,
-                Makerspace.objects.filter(archived_at__isnull=True),
+                servable_queryset(),
                 field="id",
             ),
             pk=makerspace_id,
@@ -71,9 +72,19 @@ class NotificationRulesView(APIView):
                 makerspace=makerspace
             ).values_list("feature", "channel", "enabled")
         }
-        channels = [
-            {"key": channel.value, "label": channel.label}
+        # A channel whose module is uninstalled is OMITTED, not rendered-and-disabled.
+        # The matrix turns this list straight into columns, and a tickable Discord column
+        # on a space without the Discord module would accept the tick, store the
+        # preference, and then silently SKIP every send -- a misconfiguration the operator
+        # has no way to see. Omitting the column makes that state unreachable, the same
+        # reasoning as pruning a sidebar entry rather than permission-hiding it.
+        available = [
+            channel
             for channel in NotificationChannel
+            if not channel_module_blocks(makerspace, channel.value)
+        ]
+        channels = [
+            {"key": channel.value, "label": channel.label} for channel in available
         ]
         features = [
             {
@@ -98,7 +109,9 @@ class NotificationRulesView(APIView):
                 ),
             }
             for feature in NotificationFeature
-            for channel in NotificationChannel
+            # Same list as the columns, or the response would carry preference cells for
+            # a channel the matrix renders no column for.
+            for channel in available
         ]
         return {
             "catalog": self._catalog(),

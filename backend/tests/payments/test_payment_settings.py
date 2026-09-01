@@ -109,6 +109,8 @@ def test_effective_payment_source_resolution_matrix(settings):
     assert raw.publishable_key == "pk_raw"
     raw_payment = SimpleNamespace(
         StripeProvider=Payment.StripeProvider,
+        Provider=Payment.Provider,
+        provider=Payment.Provider.STRIPE,
         stripe_provider=Payment.StripeProvider.RAW,
         makerspace=makerspace,
     )
@@ -129,6 +131,8 @@ def test_effective_payment_source_resolution_matrix(settings):
     assert connected.connected_account_id == "acct_resolution"
     connect_payment = SimpleNamespace(
         StripeProvider=Payment.StripeProvider,
+        Provider=Payment.Provider,
+        provider=Payment.Provider.STRIPE,
         stripe_provider=Payment.StripeProvider.CONNECT,
         makerspace=makerspace,
         stripe_connected_account_id="acct_resolution",

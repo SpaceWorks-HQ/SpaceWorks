@@ -13,6 +13,11 @@ def emit_notification(makerspace, *, title, level="info", event="", body="", url
     ``transaction.on_commit`` (a rolled-back workflow leaves no notification; when
     no transaction is open the callback runs immediately). No-ops when the
     makerspace has not opted into the ``notifications`` module.
+
+    That one gate also covers a tombstoned deployment: ``module_enabled`` ANDs in
+    ``module_available``, so every caller across the codebase stops emitting without
+    any of them learning about tombstones. This is the payoff for putting the check
+    at the chokepoint rather than at each call site.
     """
     try:
         if makerspace is None:

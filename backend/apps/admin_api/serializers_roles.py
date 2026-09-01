@@ -40,6 +40,37 @@ class RoleCreateSerializer(RoleWriteSerializer):
     granted_actions = serializers.ListField(child=serializers.CharField())
 
 
+class MachineScopeOptionSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    label = serializers.CharField()
+    # Global built-in types are selectable by every makerspace, so the console has to be
+    # able to say which ones are shared rather than this lab's own.
+    is_builtin = serializers.BooleanField(required=False)
+    is_active = serializers.BooleanField(required=False)
+
+
+class RoleMachineScopeSerializer(serializers.Serializer):
+    """The role's links plus everything it could be linked to, in one round trip."""
+
+    machine_type_ids = serializers.ListField(child=serializers.IntegerField())
+    machine_ids = serializers.ListField(child=serializers.IntegerField())
+    available_machine_types = MachineScopeOptionSerializer(many=True, read_only=True)
+    available_machines = MachineScopeOptionSerializer(many=True, read_only=True)
+    # False when the role holds MANAGE_MAKERSPACE (or is otherwise exempt): the console
+    # must render the editor as inert rather than let an administrator tick boxes that
+    # `role_scope` will ignore.
+    scoping_applies = serializers.BooleanField(read_only=True)
+
+
+class RoleMachineScopeWriteSerializer(serializers.Serializer):
+    machine_type_ids = serializers.ListField(
+        child=serializers.IntegerField(), allow_empty=True
+    )
+    machine_ids = serializers.ListField(
+        child=serializers.IntegerField(), allow_empty=True
+    )
+
+
 class CapabilitySerializer(serializers.Serializer):
     value = serializers.CharField()
     label = serializers.CharField()

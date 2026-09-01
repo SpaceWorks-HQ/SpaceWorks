@@ -1,7 +1,11 @@
+from unittest.mock import Mock
+
 import pytest
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.evidence.models import EvidencePhoto
+from apps.evidence.storage import EvidenceValidationResult
 from apps.hardware_requests.models import (
     HardwareRequest,
     HardwareRequestItem,
@@ -12,6 +16,7 @@ from apps.hardware_requests.models import (
 from apps.inventory.models import InventoryAsset, TrackingMode
 from apps.makerspaces.models import MakerspaceMembership
 from tests.return_helpers import authenticated_client, make_member, make_product, make_space, make_user
+from tests.handout_roles import make_handout_member
 
 pytestmark = pytest.mark.django_db
 
@@ -121,6 +126,33 @@ def test_missing_triage_moves_quantity_stock_to_lost_and_creates_accountability(
     assert accountability.description == "Confirmed by staff."
 
 
+def test_problem_report_evidence_is_finalized_in_post_mode(monkeypatch, settings):
+    settings.STORAGE_PRESIGN_METHOD = "post"
+    makerspace = make_space("problem-evidence-finalize")
+    manager = make_member("problem-evidence-finalize-manager", makerspace)
+    product = make_product(makerspace, total_quantity=1, available_quantity=1)
+    report, item = _returned_report(makerspace, product)
+    evidence = EvidencePhoto.objects.create(
+        makerspace=makerspace,
+        evidence_type=EvidencePhoto.EvidenceType.RETURN,
+        object_key=f"evidence/{makerspace.id}/return/triage",
+        uploaded_by=manager,
+    )
+    finalize = Mock(
+        return_value=EvidenceValidationResult(size=123, content_type="image/png")
+    )
+    monkeypatch.setattr("apps.evidence.storage.finalize_upload", finalize)
+    payload = _payload("damaged", item)
+    payload["evidence_id"] = evidence.id
+
+    response = authenticated_client(manager).post(
+        _triage_url(makerspace, report), payload, format="json"
+    )
+
+    assert response.status_code == 200
+    finalize.assert_called_once_with(evidence, settings.EVIDENCE_MAX_BYTES)
+
+
 def test_no_issue_triage_moves_no_stock_and_creates_no_accountability():
     makerspace = make_space("problem-no-issue")
     manager = make_member("problem-no-issue-manager", makerspace)
@@ -181,12 +213,7 @@ def test_triage_over_issued_quantity_is_rejected_with_clean_400():
 def test_triage_rbac_wrong_role_403_and_cross_tenant_404():
     makerspace = make_space("problem-rbac")
     other = make_space("problem-rbac-other")
-    guest = make_member(
-        "problem-rbac-guest",
-        makerspace,
-        membership_role=MakerspaceMembership.Role.GUEST_ADMIN,
-        role=User.Role.GUEST_ADMIN,
-    )
+    guest = make_handout_member("problem-rbac-guest", makerspace)
     other_manager = make_member("problem-rbac-other-manager", other)
     product = make_product(makerspace, total_quantity=1, available_quantity=1)
     report, item = _returned_report(makerspace, product)

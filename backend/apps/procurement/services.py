@@ -93,10 +93,24 @@ def move_to_inventory(
 
 def move_to_printing(actor, item, *, target, data):
     with transaction.atomic():
-        locked = ToBuyItem.objects.select_for_update().select_related("makerspace").get(pk=item.pk)
+        # `machine_type` is deliberately NOT select_related here: it is nullable, so
+        # Django emits a LEFT OUTER JOIN and Postgres refuses outright --
+        # "FOR UPDATE cannot be applied to the nullable side of an outer join". The
+        # attribute is read a few lines down and lazy-loads in one extra query, which is
+        # free next to the writes this transaction already performs. `makerspace` is
+        # non-nullable, so its INNER JOIN is fine to lock against.
+        locked = ToBuyItem.objects.select_for_update().select_related(
+            "makerspace"
+        ).get(pk=item.pk)
         _assert_move_allowed(locked, ToBuyItem.Kind.PRINTING)
         from apps.machines.procurement import move_received_printing
-        result = move_received_printing(locked.makerspace, actor, target=target, data=data)
+        result = move_received_printing(
+            locked.makerspace,
+            actor,
+            target=target,
+            data=data,
+            machine_type=locked.machine_type,
+        )
         if target == PrintingTarget.SPOOL:
             locked.resulting_pool = result
             update_fields = ["moved_to_inventory_at", "resulting_pool", "updated_at"]

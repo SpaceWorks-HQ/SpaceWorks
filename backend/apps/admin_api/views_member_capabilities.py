@@ -12,7 +12,9 @@ from apps.admin_api.serializers_member_memberships import (
 )
 from apps.admin_api.views_roles import ERRORS
 from apps.makerspaces import membership_services
+from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import MakerspaceMembership
+from apps.makerspaces.servability import servable_queryset
 
 
 def _membership_for_manager(actor, pk):
@@ -32,8 +34,11 @@ def _membership_for_verifier(actor, pk):
         MakerspaceMembership.objects.all(),
         field="makerspace_id",
     ).values("makerspace_id")
-    delegate_scope = MakerspaceMembership.objects.filter(
-        user=actor, status="active", can_verify=True, makerspace__archived_at__isnull=True
+    delegate_scope = servable_queryset(
+        MakerspaceMembership.objects.filter(
+            user=actor, status="active", can_verify=True
+        ),
+        relation="makerspace",
     ).values("makerspace_id")
     return get_object_or_404(
         MakerspaceMembership.objects.select_related("makerspace", "user", "assigned_role").filter(
@@ -63,7 +68,9 @@ class AdminMembershipVerifyView(APIView):
 
     @extend_schema(request=None, tags=["Admin memberships"], responses={200: AdminMembershipSerializer, **ERRORS})
     def post(self, request, pk):
-        membership = membership_services.verify_member(request.user, _membership_for_verifier(request.user, pk))
+        membership = _membership_for_verifier(request.user, pk)
+        require_module(membership.makerspace, "membership")
+        membership = membership_services.verify_member(request.user, membership)
         return Response(AdminMembershipSerializer(membership).data)
 
 
@@ -72,5 +79,7 @@ class AdminMembershipUnverifyView(APIView):
 
     @extend_schema(request=None, tags=["Admin memberships"], responses={200: AdminMembershipSerializer, **ERRORS})
     def post(self, request, pk):
-        membership = membership_services.unverify_member(request.user, _membership_for_verifier(request.user, pk))
+        membership = _membership_for_verifier(request.user, pk)
+        require_module(membership.makerspace, "membership")
+        membership = membership_services.unverify_member(request.user, membership)
         return Response(AdminMembershipSerializer(membership).data)
