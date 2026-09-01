@@ -1,7 +1,12 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from django.utils import timezone
 
-from apps.events.capacity import availability_label
+from apps.events.capacity import (
+    availability_label,
+    effective_registration_cutoff,
+    registration_is_open,
+)
 from apps.events.models import Event, EventCollaborator
 from apps.events.serializers_public import (
     EventOrganizerSummarySerializer,
@@ -94,6 +99,9 @@ class CollaborativeEventSerializer(serializers.Serializer):
     custom_form = serializers.JSONField(allow_null=True, read_only=True)
     capacity = serializers.IntegerField(min_value=0, read_only=True)
     availability = serializers.SerializerMethodField()
+    registration_requires_approval = serializers.BooleanField(read_only=True)
+    effective_registration_cutoff_at = serializers.SerializerMethodField()
+    registration_open = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
     host_name = serializers.CharField(source="makerspace.name", read_only=True)
     host_slug = serializers.SlugField(source="makerspace.slug", read_only=True)
@@ -105,6 +113,14 @@ class CollaborativeEventSerializer(serializers.Serializer):
     )
     def get_availability(self, obj):
         return availability_label(obj)
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_effective_registration_cutoff_at(self, obj):
+        return effective_registration_cutoff(obj)
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_registration_open(self, obj):
+        return registration_is_open(obj, timezone.now())
 
     @extend_schema_field(serializers.URLField(allow_null=True))
     def get_image_url(self, obj):

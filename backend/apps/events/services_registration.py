@@ -5,8 +5,17 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.encryption.write_fence import assert_mapped_write_allowed
-from apps.events.capacity import fresh_registration_status
-from apps.events.exceptions import DuplicateRegistration, EventInvalidTransition
+from apps.events.capacity import (
+    effective_registration_cutoff,
+    fresh_registration_status,
+    registration_is_open,
+)
+from apps.events.exceptions import (
+    DuplicateRegistration,
+    EventInvalidTransition,
+    RegistrationClosed,
+    RegistrationRejected,
+)
 from apps.events.models import EventRegistration
 from apps.forms_schema.validation import validate_answers
 from apps.makerspaces.guards import require_module_locked
@@ -62,11 +71,18 @@ def register(
     # ordering: publish() takes the event lock first, so taking the makerspace first
     # here would create a deadlock pair with it.
     require_module_locked(locked.makerspace, "events")
-    if (
-        (not locked.is_public and not staff_registration and not collaborative)
-        or locked.status != locked.Status.PUBLISHED
-        or locked.ends_at < timezone.now()
-    ):
+    now = timezone.now()
+    if not locked.is_public and not staff_registration and not collaborative:
+        raise EventInvalidTransition("This event is not open for registration.")
+    if not registration_is_open(locked, now):
+        cutoff = effective_registration_cutoff(locked)
+        if (
+            locked.status == locked.Status.PUBLISHED
+            and now < locked.ends_at
+            and cutoff is not None
+            and now >= cutoff
+        ):
+            raise RegistrationClosed("Registration for this event is closed.")
         raise EventInvalidTransition("This event is not open for registration.")
     custom_answers = validate_answers(locked.custom_form, custom_answers)
     status = fresh_registration_status(locked)
@@ -88,7 +104,14 @@ def register(
         ])
         return _record_registration(locked, actor, existing, status)
     if existing:
-        raise DuplicateRegistration("A registration already exists for this email.", fresh_status=status)
+        if existing.status == EventRegistration.Status.REJECTED:
+            raise RegistrationRejected(
+                "This registration application was rejected."
+            )
+        raise DuplicateRegistration(
+            "A registration already exists for this email.",
+            fresh_status=existing.status,
+        )
     registration = EventRegistration(
         event=locked, member=member, name=name, email=normalized_email,
         phone=phone, custom_answers=custom_answers, status=status,
@@ -127,8 +150,26 @@ def _existing_registration(event, member, normalized_email, generation, event_ha
 def _record_registration(event, actor, registration, status):
     from apps.events import services
 
-    services._audit(event, actor, "event.registration_created", registration, {"registration_id": registration.pk, "status": status})
-    services.notify_event_lifecycle(event, "registration_created", registration.pk)
+    services._audit(
+        event,
+        actor,
+        "event.registration_created",
+        registration,
+        {"registration_id": registration.pk, "status": status},
+    )
+    lifecycle_event = "registration_created"
+    if status == EventRegistration.Status.PENDING_APPROVAL:
+        services._audit(
+            event,
+            actor,
+            "event.registration_approval_requested",
+            registration,
+            {"registration_id": registration.pk},
+        )
+        lifecycle_event = "registration_pending_approval"
+    elif status == EventRegistration.Status.WAITLISTED:
+        lifecycle_event = "registration_waitlisted"
+    services.notify_event_lifecycle(event, lifecycle_event, registration.pk)
     if status == EventRegistration.Status.REGISTERED:
         from apps.events.service_payments import create_for_registered_registration
 

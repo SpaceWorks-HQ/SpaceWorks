@@ -82,10 +82,12 @@ def test_row_union_reranks_distinct_products_after_per_space_limit():
 def test_weighted_rate_recomputes_and_is_not_mean_of_space_rates():
     rows = [
         (1, [{"status": "completed", "capacity": 10, "registrations": 1,
-             "confirmed": 1, "registered": 0, "waitlisted": 0,
+             "confirmed": 1, "pending_approval": 0, "registered": 0,
+             "waitlisted": 0, "rejected": 0,
              "cancelled": 0, "attended": 1, "attendance_rate_percent": 100.0}]),
         (2, [{"status": "completed", "capacity": 20, "registrations": 9,
-             "confirmed": 9, "registered": 9, "waitlisted": 0,
+             "confirmed": 9, "pending_approval": 2, "registered": 9,
+             "waitlisted": 0, "rejected": 1,
              "cancelled": 0, "attended": 0, "attendance_rate_percent": 0.0}]),
     ]
 
@@ -93,6 +95,8 @@ def test_weighted_rate_recomputes_and_is_not_mean_of_space_rates():
 
     assert total["attendance_rate_percent"] == 10.0
     assert total["attendance_rate_percent"] != 50.0
+    assert total["pending_approval"] == 2
+    assert total["rejected"] == 1
 
 
 def test_global_rank_regroups_same_requester_across_two_spaces():

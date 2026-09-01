@@ -30,6 +30,15 @@ from apps.makerspaces.models import MakerspaceMembership
 from apps.payments.models import Payment
 
 
+REGISTRATION_ACTION_ERRORS = {
+    400: OpenApiResponse(ErrorSerializer, description='Unexpected request body.'),
+    401: OpenApiResponse(ErrorSerializer, description='Authentication is required.'),
+    403: OpenApiResponse(ErrorSerializer, description='Event management is required.'),
+    404: OpenApiResponse(ErrorSerializer, description='Registration not found.'),
+    409: EVENT_ERROR_409,
+}
+
+
 class EventRegistrationListView(APIView):
     permission_classes = [IsActiveStaff]
 
@@ -143,6 +152,64 @@ class EventRegistrationMarkAttendedView(APIView):
                 context=context,
             ).data
         )
+
+
+class _RegistrationActionView(APIView):
+    permission_classes = [IsActiveStaff]
+    operation = None
+
+    def execute(self, request, pk):
+        registration = _manageable_registration(request.user, pk)
+        _validate_empty_action(request)
+        registration = self.operation(registration, actor=request.user)
+        context = scoped_payment_context(
+            request.user,
+            rbac.Action.MANAGE_EVENTS,
+            Payment.SubjectType.EVENT_REGISTRATION,
+            [registration.pk],
+        )
+        return Response(
+            EventRegistrationAdminSerializer(registration, context=context).data
+        )
+
+
+class EventRegistrationApproveView(_RegistrationActionView):
+    operation = staticmethod(services.approve_registration)
+
+    @extend_schema(
+        tags=['Admin events'],
+        summary='Approve a pending event registration',
+        request=EmptyActionSerializer,
+        responses={200: EventRegistrationAdminSerializer, **REGISTRATION_ACTION_ERRORS},
+    )
+    def post(self, request, pk, *args, **kwargs):
+        return self.execute(request, pk)
+
+
+class EventRegistrationRejectView(_RegistrationActionView):
+    operation = staticmethod(services.reject_registration)
+
+    @extend_schema(
+        tags=['Admin events'],
+        summary='Reject a pending or waitlisted event registration',
+        request=EmptyActionSerializer,
+        responses={200: EventRegistrationAdminSerializer, **REGISTRATION_ACTION_ERRORS},
+    )
+    def post(self, request, pk, *args, **kwargs):
+        return self.execute(request, pk)
+
+
+class EventRegistrationPromoteView(_RegistrationActionView):
+    operation = staticmethod(services.promote_registration)
+
+    @extend_schema(
+        tags=['Admin events'],
+        summary='Manually promote an approved waitlisted registration',
+        request=EmptyActionSerializer,
+        responses={200: EventRegistrationAdminSerializer, **REGISTRATION_ACTION_ERRORS},
+    )
+    def post(self, request, pk, *args, **kwargs):
+        return self.execute(request, pk)
 
 
 class EventEligibleMemberListView(APIView):

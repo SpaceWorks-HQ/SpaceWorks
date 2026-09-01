@@ -49,7 +49,18 @@ AUDIT_META_REFERENCES = {
         ("request.issued", "evidence_id"),
     ),
     **_reference(R, "hardware_requests.ReturnEvent", ("evidence.attached", "return_event_id")),
-    **_reference(R, "events.EventRegistration", ("event.host_waiver_accepted", "registration_id")),
+    **_reference(
+        R,
+        "events.EventRegistration",
+        ("event.host_waiver_accepted", "registration_id"),
+        ("event.registration_created", "registration_id"),
+        ("event.registration_approval_requested", "registration_id"),
+        ("event.registration_approved", "registration_id"),
+        ("event.registration_rejected", "registration_id"),
+        ("event.registration_promoted", "registration_id"),
+        ("event.registration_cancelled", "registration_id"),
+        ("event.registration_attended", "registration_id"),
+    ),
     # Removing an organizer names the event it was removed from. REMAP, matching the
     # sibling above: an Event is tenant-owned and travels with the export, so the id is
     # remappable. The created/updated siblings pick their action with a conditional, so

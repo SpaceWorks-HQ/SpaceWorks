@@ -89,6 +89,9 @@ MODEL_LOOKUPS = {
     'admin-event-registration-list': ('events.Event', 'makerspace_id'),
     'admin-event-check-in-resolve': ('events.Event', 'makerspace_id'),
     'admin-event-registration-mark-attended': ('events.EventRegistration', 'event__makerspace_id'),
+    'admin-event-registration-approve': ('events.EventRegistration', 'event__makerspace_id'),
+    'admin-event-registration-reject': ('events.EventRegistration', 'event__makerspace_id'),
+    'admin-event-registration-promote': ('events.EventRegistration', 'event__makerspace_id'),
     'admin-event-collaborators': ('events.Event', 'makerspace_id'),
     # Respond belongs to the collaborator's domain; removal belongs to the host's.
     # Resolving respond through the host would make the feature unreachable from the

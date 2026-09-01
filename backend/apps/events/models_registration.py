@@ -10,8 +10,10 @@ from apps.events.models_event import Event
 
 class EventRegistration(ScopedPiiModelMixin, models.Model):
     class Status(models.TextChoices):
+        PENDING_APPROVAL = "pending_approval", "Pending approval"
         REGISTERED = "registered", "Registered"
         WAITLISTED = "waitlisted", "Waitlisted"
+        REJECTED = "rejected", "Rejected"
         CANCELLED = "cancelled", "Cancelled"
         ATTENDED = "attended", "Attended"
 
@@ -78,7 +80,7 @@ class EventRegistration(ScopedPiiModelMixin, models.Model):
     )
     custom_answers = models.JSONField(null=True, blank=True, default=None)
     status = models.CharField(
-        max_length=16,
+        max_length=20,
         choices=Status.choices,
         default=Status.REGISTERED,
     )
@@ -100,7 +102,7 @@ class EventRegistration(ScopedPiiModelMixin, models.Model):
                 fields=["event", "member"],
                 condition=Q(
                     member__isnull=False,
-                    status__in=("registered", "waitlisted"),
+                    status__in=("pending_approval", "registered", "waitlisted"),
                 ),
                 name="uniq_active_event_registration_member",
             ),

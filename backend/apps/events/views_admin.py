@@ -19,6 +19,9 @@ from apps.events.views_admin_events import (
 )
 from apps.events.views_admin_registrations import (
     EventEligibleMemberListView,
+    EventRegistrationApproveView,
     EventRegistrationListView,
     EventRegistrationMarkAttendedView,
+    EventRegistrationPromoteView,
+    EventRegistrationRejectView,
 )

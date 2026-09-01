@@ -2238,6 +2238,92 @@
                 }
             }
         },
+        "/api/v1/admin/event-registrations/{id}/approve/": {
+            "post": {
+                "operationId": "api_v1_admin_event_registrations_approve_create",
+                "summary": "Approve a pending event registration",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EventRegistrationAdmin"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected request body."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event management is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Registration not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event state or capacity conflict."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/event-registrations/{id}/mark-attended/": {
             "post": {
                 "operationId": "api_v1_admin_event_registrations_mark_attended_create",
@@ -2270,6 +2356,178 @@
                             }
                         },
                         "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event state or capacity conflict."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/event-registrations/{id}/promote/": {
+            "post": {
+                "operationId": "api_v1_admin_event_registrations_promote_create",
+                "summary": "Manually promote an approved waitlisted registration",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EventRegistrationAdmin"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected request body."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event management is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Registration not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event state or capacity conflict."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/event-registrations/{id}/reject/": {
+            "post": {
+                "operationId": "api_v1_admin_event_registrations_reject_create",
+                "summary": "Reject a pending or waitlisted event registration",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EventRegistrationAdmin"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Unexpected request body."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event management is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Registration not found."
                     },
                     "409": {
                         "content": {
@@ -37205,6 +37463,20 @@
                         ],
                         "readOnly": true
                     },
+                    "registration_requires_approval": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "effective_registration_cutoff_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "registration_open": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "image_url": {
                         "type": "string",
                         "format": "uri",
@@ -37242,6 +37514,7 @@
                     "capacity",
                     "custom_form",
                     "description",
+                    "effective_registration_cutoff_at",
                     "ends_at",
                     "host_name",
                     "host_slug",
@@ -37251,6 +37524,8 @@
                     "location",
                     "location_kind",
                     "organizers",
+                    "registration_open",
+                    "registration_requires_approval",
                     "starts_at",
                     "title"
                 ]
@@ -38863,6 +39138,31 @@
                         "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$",
                         "readOnly": true
                     },
+                    "registration_requires_approval": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "registration_cutoff_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "registration_cutoff_lead_minutes": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "effective_registration_cutoff_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "registration_open": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "is_public": {
                         "type": "boolean",
                         "readOnly": true
@@ -38918,6 +39218,7 @@
                     "created_by_id",
                     "custom_form",
                     "description",
+                    "effective_registration_cutoff_at",
                     "ends_at",
                     "id",
                     "image_url",
@@ -38928,6 +39229,10 @@
                     "organizers",
                     "payment_amount",
                     "registration_counts",
+                    "registration_cutoff_at",
+                    "registration_cutoff_lead_minutes",
+                    "registration_open",
+                    "registration_requires_approval",
                     "starts_at",
                     "status",
                     "title",
@@ -38994,10 +39299,16 @@
                     "confirmed": {
                         "type": "integer"
                     },
+                    "pending_approval": {
+                        "type": "integer"
+                    },
                     "registered": {
                         "type": "integer"
                     },
                     "waitlisted": {
+                        "type": "integer"
+                    },
+                    "rejected": {
                         "type": "integer"
                     },
                     "cancelled": {
@@ -39023,8 +39334,10 @@
                     "confirmed",
                     "event_id",
                     "organizers",
+                    "pending_approval",
                     "registered",
                     "registrations",
+                    "rejected",
                     "starts_at",
                     "status",
                     "title",
@@ -39362,22 +39675,32 @@
             },
             "EventRegistrationAdminStatusEnum": {
                 "enum": [
+                    "pending_approval",
                     "registered",
                     "waitlisted",
+                    "rejected",
                     "cancelled",
                     "attended"
                 ],
                 "type": "string",
-                "description": "* `registered` - Registered\n* `waitlisted` - Waitlisted\n* `cancelled` - Cancelled\n* `attended` - Attended"
+                "description": "* `pending_approval` - Pending approval\n* `registered` - Registered\n* `waitlisted` - Waitlisted\n* `rejected` - Rejected\n* `cancelled` - Cancelled\n* `attended` - Attended"
             },
             "EventRegistrationCounts": {
                 "type": "object",
                 "properties": {
+                    "pending_approval": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "registered": {
                         "type": "integer",
                         "readOnly": true
                     },
                     "waitlisted": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "rejected": {
                         "type": "integer",
                         "readOnly": true
                     },
@@ -39393,7 +39716,9 @@
                 "required": [
                     "attended",
                     "cancelled",
+                    "pending_approval",
                     "registered",
+                    "rejected",
                     "waitlisted"
                 ]
             },
@@ -39505,6 +39830,20 @@
                     "is_public": {
                         "type": "boolean",
                         "default": false
+                    },
+                    "registration_requires_approval": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "registration_cutoff_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "registration_cutoff_lead_minutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -46849,6 +47188,20 @@
                     "is_public": {
                         "type": "boolean",
                         "default": false
+                    },
+                    "registration_requires_approval": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "registration_cutoff_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "registration_cutoff_lead_minutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "nullable": true
                     }
                 }
             },
@@ -49528,6 +49881,20 @@
                         ],
                         "readOnly": true
                     },
+                    "registration_requires_approval": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "effective_registration_cutoff_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "registration_open": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "image_url": {
                         "type": "string",
                         "format": "uri",
@@ -49555,12 +49922,15 @@
                     "capacity",
                     "custom_form",
                     "description",
+                    "effective_registration_cutoff_at",
                     "ends_at",
                     "image_url",
                     "location",
                     "location_kind",
                     "organizers",
                     "public_token",
+                    "registration_open",
+                    "registration_requires_approval",
                     "starts_at",
                     "status",
                     "title"
@@ -49593,11 +49963,12 @@
             },
             "PublicEventRegistrationResponseStatusEnum": {
                 "enum": [
+                    "pending_approval",
                     "registered",
                     "waitlisted"
                 ],
                 "type": "string",
-                "description": "* `registered` - registered\n* `waitlisted` - waitlisted"
+                "description": "* `pending_approval` - pending_approval\n* `registered` - registered\n* `waitlisted` - waitlisted"
             },
             "PublicEventStatusEnum": {
                 "enum": [

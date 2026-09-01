@@ -7,6 +7,11 @@ import type { CustomAnswers, CustomFormSchema } from "../forms/customFormTypes";
 import { staffRequest } from "../../lib/api";
 
 const EVENT_TONES = ["border-accent", "border-secondary", "border-success", "border-warn"] as const;
+type CollaborativeEventWithPolicy = CollaborativeEvent & {
+  registration_requires_approval: boolean;
+  effective_registration_cutoff_at: string | null;
+  registration_open: boolean;
+};
 
 /** Events hosted by makerspaces that have accepted a collaboration with this one.
  *
@@ -25,7 +30,7 @@ export function PartnerEvents({
   const queryClient = useQueryClient();
   const events = useQuery({
     queryKey: ["member", slug, "partner-events"],
-    queryFn: () => staffRequest<CollaborativeEvent[]>(
+    queryFn: () => staffRequest<CollaborativeEventWithPolicy[]>(
       `/member/makerspaces/${makerspaceId}/collaborative-events/`,
     ),
     enabled: makerspaceId >= 0,
@@ -116,7 +121,7 @@ export function PartnerEvents({
                 <button
                   type="button"
                   className="desk-button-secondary"
-                  disabled={register.isPending || (open && blocked)}
+                  disabled={!event.registration_open || register.isPending || (open && blocked)}
                   onClick={() => {
                     if (mustExpand && !open) {
                       setAnswers({});
@@ -133,9 +138,10 @@ export function PartnerEvents({
                     });
                   }}
                 >
-                  {mustExpand && !open ? "Register…" : "Register"}
+                  {!event.registration_open ? "Registration closed" : mustExpand && !open ? `${event.registration_requires_approval ? "Apply" : "Register"}…` : event.registration_requires_approval ? "Apply" : "Register"}
                 </button>
               </div>
+              {!event.registration_open && event.effective_registration_cutoff_at ? <p className="mt-2 text-xs text-muted">Closed at {new Date(event.effective_registration_cutoff_at).toLocaleString()}</p> : null}
               {/* Unmounted when closed rather than hidden, so keyboard users cannot tab
                   into fields for an event they are not registering for. */}
               {open && waiver ? (

@@ -17,7 +17,7 @@ EXPORTED_MODEL_FIELDS = {
     "boxes.BoxScan": "id makerspace box request actor context created_at",
     "boxes.QrCode": "id makerspace payload target_type target_id status created_by revoked_at created_at updated_at",
     "boxes.QrScanEvent": "id makerspace qr_code request actor context created_at",
-    "events.Event": "id public_token makerspace title description starts_at ends_at location location_kind custom_form capacity payment_amount is_public image_key status created_by created_at updated_at",
+    "events.Event": "id public_token makerspace title description starts_at ends_at location location_kind custom_form capacity payment_amount registration_requires_approval registration_cutoff_at registration_cutoff_lead_minutes is_public image_key status created_by created_at updated_at",
     "events.EventCollaborator": "id event makerspace status invited_by responded_by created_at responded_at",
     "events.EventRegistration": "id event checkin_token name email phone member registered_via_makerspace payment_via_makerspace host_waiver host_waiver_accepted_at host_waiver_version_accepted email_exact_hash email_hash_generation custom_answers status created_at",
     "evidence.EvidencePhoto": "id makerspace evidence_type object_key content_type size_bytes uploaded_by created_at",

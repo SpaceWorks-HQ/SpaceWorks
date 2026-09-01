@@ -49,6 +49,9 @@ def test_event_defaults_are_draft_private_and_unlimited():
     assert event.capacity == 0
     assert event.location_kind == Event.LocationKind.OTHER
     assert event.custom_form is None
+    assert event.registration_requires_approval is False
+    assert event.registration_cutoff_at is None
+    assert event.registration_cutoff_lead_minutes is None
 
 
 def test_registration_custom_answers_default_to_null():

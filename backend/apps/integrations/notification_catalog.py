@@ -30,6 +30,8 @@ FEATURE_EVENTS = {
     ),
     F.EVENTS: (
         "published", "cancelled", "completed", "registration_created",
+        "registration_pending_approval", "registration_waitlisted",
+        "registration_approved", "registration_rejected",
         "registration_cancelled", "registration_promoted", "registration_attended",
     ),
     F.BOOKINGS: (

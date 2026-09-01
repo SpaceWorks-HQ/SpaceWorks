@@ -1,8 +1,10 @@
 from django.db.models import Count, Q
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.events.models import Event, EventRegistration
+from apps.events.capacity import effective_registration_cutoff, registration_is_open
 from apps.forms_schema.serializers import CustomFormSchemaField
 from apps.inventory import public_image_storage
 from apps.admin_api.serializers_payment_summary import PaymentSummaryMixin
@@ -35,6 +37,15 @@ class EventWriteSerializer(serializers.Serializer):
         required=False,
     )
     is_public = serializers.BooleanField(default=False, required=False)
+    registration_requires_approval = serializers.BooleanField(
+        default=False, required=False,
+    )
+    registration_cutoff_at = serializers.DateTimeField(
+        allow_null=True, default=None, required=False,
+    )
+    registration_cutoff_lead_minutes = serializers.IntegerField(
+        allow_null=True, default=None, min_value=0, required=False,
+    )
 
     def validate(self, attrs):
         starts_at = attrs.get('starts_at', getattr(self.instance, 'starts_at', None))
@@ -43,12 +54,37 @@ class EventWriteSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {'ends_at': 'End time must be at or after start time.'}
             )
+        cutoff_at = attrs.get(
+            'registration_cutoff_at',
+            getattr(self.instance, 'registration_cutoff_at', None),
+        )
+        lead_minutes = attrs.get(
+            'registration_cutoff_lead_minutes',
+            getattr(self.instance, 'registration_cutoff_lead_minutes', None),
+        )
+        if cutoff_at is not None and lead_minutes is not None:
+            raise serializers.ValidationError({
+                'registration_cutoff_at': (
+                    'Clear lead minutes before setting an absolute cutoff.'
+                ),
+                'registration_cutoff_lead_minutes': (
+                    'Clear the absolute cutoff before setting lead minutes.'
+                ),
+            })
+        if cutoff_at is not None and starts_at is not None and cutoff_at > starts_at:
+            raise serializers.ValidationError({
+                'registration_cutoff_at': (
+                    'Registration cutoff cannot be after the event starts.'
+                )
+            })
         return attrs
 
 
 class EventRegistrationCountsSerializer(serializers.Serializer):
+    pending_approval = serializers.IntegerField(read_only=True)
     registered = serializers.IntegerField(read_only=True)
     waitlisted = serializers.IntegerField(read_only=True)
+    rejected = serializers.IntegerField(read_only=True)
     cancelled = serializers.IntegerField(read_only=True)
     attended = serializers.IntegerField(read_only=True)
 
@@ -59,6 +95,8 @@ class EventAdminSerializer(serializers.ModelSerializer):
     registration_counts = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
     organizers = EventOrganizerSummarySerializer(many=True, read_only=True)
+    effective_registration_cutoff_at = serializers.SerializerMethodField()
+    registration_open = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -74,6 +112,11 @@ class EventAdminSerializer(serializers.ModelSerializer):
             'custom_form',
             'capacity',
             'payment_amount',
+            'registration_requires_approval',
+            'registration_cutoff_at',
+            'registration_cutoff_lead_minutes',
+            'effective_registration_cutoff_at',
+            'registration_open',
             'is_public',
             'image_url',
             'status',
@@ -90,6 +133,14 @@ class EventAdminSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.URLField(allow_null=True))
     def get_image_url(self, obj):
         return public_image_storage.public_url(obj.image_key) or None
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_effective_registration_cutoff_at(self, obj):
+        return effective_registration_cutoff(obj)
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_registration_open(self, obj):
+        return registration_is_open(obj, timezone.now())
 
     @extend_schema_field(EventRegistrationCountsSerializer)
     def get_registration_counts(self, obj):

@@ -26,6 +26,9 @@ EXPECTED_FIELDS = {
     'custom_form',
     'capacity',
     'availability',
+    'registration_requires_approval',
+    'effective_registration_cutoff_at',
+    'registration_open',
     'image_url',
     'status',
     'organizers',
@@ -199,6 +202,9 @@ def test_openapi_has_exact_public_contracts_and_documented_errors():
         field['writeOnly'] for field in input_schema['properties'].values()
     )
     assert set(response_schema['properties']) == {'status'}
+    status_property = response_schema['properties']['status']
+    status_ref = status_property.get('$ref') or status_property['allOf'][0]['$ref']
+    assert 'pending_approval' in components[status_ref.rsplit('/', 1)[-1]]['enum']
 
     list_operation = schema['paths'][
         '/api/v1/public/{makerspace_slug}/events/'

@@ -10,6 +10,8 @@ from apps.events.exceptions import (
     CapacityConflict,
     DuplicateRegistration,
     EventInvalidTransition,
+    RegistrationClosed,
+    RegistrationRejected,
 )
 from apps.hardware_requests.workflow import (
     AnonymousRequestIdempotencyConflict,
@@ -141,6 +143,16 @@ _EXCEPTION_MAP = {
         status.HTTP_409_CONFLICT,
         "capacity_conflict",
         "Event capacity conflicts with confirmed registrations.",
+    ),
+    RegistrationClosed: (
+        status.HTTP_409_CONFLICT,
+        "registration_closed",
+        "Registration for this event is closed.",
+    ),
+    RegistrationRejected: (
+        status.HTTP_409_CONFLICT,
+        "registration_rejected",
+        "This registration application was rejected.",
     ),
     DuplicateRegistration: (
         status.HTTP_400_BAD_REQUEST,

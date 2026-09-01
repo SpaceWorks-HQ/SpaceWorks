@@ -7,7 +7,8 @@ from apps.operations.report_scope import scoped_ids
 
 FIELDS = (
     "event_id", "title", "starts_at", "status", "capacity", "registrations",
-    "confirmed", "registered", "waitlisted", "cancelled", "attended",
+    "confirmed", "pending_approval", "registered", "waitlisted", "rejected",
+    "cancelled", "attended",
     "attendance_rate_percent", "organizers",
 )
 
@@ -28,8 +29,10 @@ def build_event_attendance(makerspace_id, *, limit=None, date_range=None):
         "id", "makerspace_id", "title", "starts_at", "status", "capacity"
     ).annotate(
         total=Count("registrations"),
+        pending_approval_count=Count("registrations", filter=Q(registrations__status=statuses.PENDING_APPROVAL)),
         registered_count=Count("registrations", filter=Q(registrations__status=statuses.REGISTERED)),
         waitlisted_count=Count("registrations", filter=Q(registrations__status=statuses.WAITLISTED)),
+        rejected_count=Count("registrations", filter=Q(registrations__status=statuses.REJECTED)),
         cancelled_count=Count("registrations", filter=Q(registrations__status=statuses.CANCELLED)),
         attended_count=Count("registrations", filter=Q(registrations__status=statuses.ATTENDED)),
     )
@@ -57,8 +60,12 @@ def build_event_attendance(makerspace_id, *, limit=None, date_range=None):
             "event_id": row["id"], "title": row["title"],
             "starts_at": row["starts_at"], "status": row["status"],
             "capacity": row["capacity"], "registrations": row["total"],
-            "confirmed": denominator, "registered": row["registered_count"],
-            "waitlisted": row["waitlisted_count"], "cancelled": row["cancelled_count"],
+            "confirmed": denominator,
+            "pending_approval": row["pending_approval_count"],
+            "registered": row["registered_count"],
+            "waitlisted": row["waitlisted_count"],
+            "rejected": row["rejected_count"],
+            "cancelled": row["cancelled_count"],
             "attended": row["attended_count"], "attendance_rate_percent": rate,
             "organizers": "; ".join(organizers_by_event.get(row["id"], [])),
         }

@@ -36,6 +36,8 @@ def portable_import_case(space, source_user, *, rotate=None, prepare_source=None
         starts_at=timezone.now() + timedelta(days=1),
         ends_at=timezone.now() + timedelta(days=1, hours=2),
         created_by=source_user,
+        registration_requires_approval=True,
+        registration_cutoff_lead_minutes=45,
     )
     registration = EventRegistration.objects.create(
         event=event,

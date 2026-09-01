@@ -156,7 +156,7 @@ FIRST_PARTY_FIELD_NAMES = {
     'machines.MachineErrorLog': frozenset('created_at id logged_by machine message severity'.split()),
     'machines.MachineConsumable': frozenset('created_at created_by id label low_threshold machine measurement note product remaining'.split()),
     'events.EventOrganizer': frozenset('created_at created_by event id organization'.split()),
-    'events.Event': frozenset('capacity created_at created_by custom_form description ends_at id image_key is_public location location_kind makerspace payment_amount public_token starts_at status title updated_at'.split()),
+    'events.Event': frozenset('capacity created_at created_by custom_form description ends_at id image_key is_public location location_kind makerspace payment_amount public_token registration_cutoff_at registration_cutoff_lead_minutes registration_requires_approval starts_at status title updated_at'.split()),
     'events.EventCollaborator': frozenset('created_at event id invited_by makerspace responded_at responded_by status'.split()),
     'events.EventRegistration': frozenset('checkin_token created_at custom_answers email email_exact_hash email_hash_generation event host_waiver host_waiver_accepted_at host_waiver_version_accepted id member name payment_via_makerspace phone registered_via_makerspace status'.split()),
     'bookings.BookableSpace': frozenset('approval_mode booking_lead_time_minutes capacity created_at created_by custom_form description id image_key is_active is_public kind location makerspace max_booking_advance_days max_booking_duration_minutes min_booking_duration_minutes name payment_amount public_token requester_notifications_enabled show_public_availability show_public_booker_names updated_at'.split()),

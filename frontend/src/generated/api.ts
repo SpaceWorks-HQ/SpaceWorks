@@ -100,7 +100,10 @@ export const openApiPaths = [
   "/api/v1/admin/direct-loans/{id}/return",
   "/api/v1/admin/event-collaborations/{id}/remove/",
   "/api/v1/admin/event-collaborations/{id}/respond/",
+  "/api/v1/admin/event-registrations/{id}/approve/",
   "/api/v1/admin/event-registrations/{id}/mark-attended/",
+  "/api/v1/admin/event-registrations/{id}/promote/",
+  "/api/v1/admin/event-registrations/{id}/reject/",
   "/api/v1/admin/events/{id}/",
   "/api/v1/admin/events/{id}/cancel/",
   "/api/v1/admin/events/{id}/check-in/resolve/",
@@ -1125,6 +1128,9 @@ export type CollaborativeEvent = {
   "custom_form": unknown | null;
   "capacity": number;
   "availability": AvailabilityEnum;
+  "registration_requires_approval": boolean;
+  "effective_registration_cutoff_at": string | null;
+  "registration_open": boolean;
   "image_url": string | null;
   "host_name": string;
   "host_slug": string;
@@ -1551,6 +1557,11 @@ export type EventAdmin = {
   "custom_form": unknown | null;
   "capacity": number;
   "payment_amount": string;
+  "registration_requires_approval": boolean;
+  "registration_cutoff_at": string | null;
+  "registration_cutoff_lead_minutes": number | null;
+  "effective_registration_cutoff_at": string | null;
+  "registration_open": boolean;
   "is_public": boolean;
   "image_url": string | null;
   "status": EventAdminStatusEnum;
@@ -1577,8 +1588,10 @@ export type EventAttendanceRow = {
   "capacity": number;
   "registrations": number;
   "confirmed": number;
+  "pending_approval": number;
   "registered": number;
   "waitlisted": number;
+  "rejected": number;
   "cancelled": number;
   "attended": number;
   "attendance_rate_percent": number | null;
@@ -1662,11 +1675,13 @@ export type EventRegistrationAdmin = {
   "payment": StaffPaymentSummary | null;
 };
 
-export type EventRegistrationAdminStatusEnum = "registered" | "waitlisted" | "cancelled" | "attended";
+export type EventRegistrationAdminStatusEnum = "pending_approval" | "registered" | "waitlisted" | "rejected" | "cancelled" | "attended";
 
 export type EventRegistrationCounts = {
+  "pending_approval": number;
   "registered": number;
   "waitlisted": number;
+  "rejected": number;
   "cancelled": number;
   "attended": number;
 };
@@ -1696,6 +1711,9 @@ export type EventWrite = {
   "capacity"?: number;
   "payment_amount"?: string;
   "is_public"?: boolean;
+  "registration_requires_approval"?: boolean;
+  "registration_cutoff_at"?: string | null;
+  "registration_cutoff_lead_minutes"?: number | null;
 };
 
 export type EvidenceGetResponse = {
@@ -3492,6 +3510,9 @@ export type PatchedEventWrite = {
   "capacity"?: number;
   "payment_amount"?: string;
   "is_public"?: boolean;
+  "registration_requires_approval"?: boolean;
+  "registration_cutoff_at"?: string | null;
+  "registration_cutoff_lead_minutes"?: number | null;
 };
 
 export type PatchedInventoryAssetAdminUpdate = {
@@ -4177,6 +4198,9 @@ export type PublicEvent = {
   "custom_form": unknown | null;
   "capacity": number;
   "availability": AvailabilityEnum;
+  "registration_requires_approval": boolean;
+  "effective_registration_cutoff_at": string | null;
+  "registration_open": boolean;
   "image_url": string | null;
   "status": PublicEventStatusEnum;
   "organizers": Array<EventOrganizerSummary>;
@@ -4190,7 +4214,7 @@ export type PublicEventRegistrationResponse = {
   "status": PublicEventRegistrationResponseStatusEnum;
 };
 
-export type PublicEventRegistrationResponseStatusEnum = "registered" | "waitlisted";
+export type PublicEventRegistrationResponseStatusEnum = "pending_approval" | "registered" | "waitlisted";
 
 export type PublicEventStatusEnum = "published";
 

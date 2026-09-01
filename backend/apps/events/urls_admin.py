@@ -17,8 +17,11 @@ from apps.events.views_admin import (
     EventDetailView,
     EventListCreateView,
     EventPublishView,
+    EventRegistrationApproveView,
     EventRegistrationListView,
     EventRegistrationMarkAttendedView,
+    EventRegistrationPromoteView,
+    EventRegistrationRejectView,
 )
 from apps.events.views_admin_organized import OrganizedEventListView
 from apps.events.views_admin_image import EventImageView
@@ -102,6 +105,21 @@ urlpatterns = [
         'event-registrations/<int:pk>/mark-attended/',
         EventRegistrationMarkAttendedView.as_view(),
         name='admin-event-registration-mark-attended',
+    ),
+    path(
+        'event-registrations/<int:pk>/approve/',
+        EventRegistrationApproveView.as_view(),
+        name='admin-event-registration-approve',
+    ),
+    path(
+        'event-registrations/<int:pk>/reject/',
+        EventRegistrationRejectView.as_view(),
+        name='admin-event-registration-reject',
+    ),
+    path(
+        'event-registrations/<int:pk>/promote/',
+        EventRegistrationPromoteView.as_view(),
+        name='admin-event-registration-promote',
     ),
     path(
         'organized-events/',

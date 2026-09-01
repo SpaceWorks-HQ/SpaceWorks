@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import F, Q
@@ -53,6 +54,12 @@ class Event(models.Model):
         default=0,
         validators=[MinValueValidator(0)],
     )
+    registration_requires_approval = models.BooleanField(default=False)
+    registration_cutoff_at = models.DateTimeField(null=True, blank=True)
+    registration_cutoff_lead_minutes = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
     is_public = models.BooleanField(default=False)
     # Public-bucket object key for the event cover image. Managed only by the
     # dedicated image endpoints (never by the generic update path), so it is
@@ -88,6 +95,20 @@ class Event(models.Model):
                 condition=Q(payment_amount__gte=0),
                 name="event_payment_nonnegative",
             ),
+            models.CheckConstraint(
+                condition=(
+                    Q(registration_cutoff_at__isnull=True)
+                    | Q(registration_cutoff_lead_minutes__isnull=True)
+                ),
+                name="event_registration_cutoff_mode_exclusive",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(registration_cutoff_at__isnull=True)
+                    | Q(registration_cutoff_at__lte=F("starts_at"))
+                ),
+                name="event_registration_cutoff_not_after_start",
+            ),
         ]
         indexes = [
             models.Index(
@@ -104,6 +125,23 @@ class Event(models.Model):
             ),
         ]
 
+    def clean(self):
+        super().clean()
+        if (
+            self.registration_cutoff_at is not None
+            and self.registration_cutoff_lead_minutes is not None
+        ):
+            raise ValidationError(
+                "Choose either an absolute registration cutoff or lead minutes, not both."
+            )
+        if (
+            self.registration_cutoff_at is not None
+            and self.starts_at is not None
+            and self.registration_cutoff_at > self.starts_at
+        ):
+            raise ValidationError({
+                "registration_cutoff_at": "Registration cutoff cannot be after the event starts."
+            })
     def save(self, *args, **kwargs):
         self.title = (self.title or "").strip()
         if self.pk:

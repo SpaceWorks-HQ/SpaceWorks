@@ -20,7 +20,9 @@ from apps.makerspaces.models import Makerspace
 
 EVENT_FIELDS = frozenset(
     {'title', 'description', 'starts_at', 'ends_at', 'location',
-     'location_kind', 'custom_form', 'capacity', 'is_public', 'payment_amount'}
+     'location_kind', 'custom_form', 'capacity', 'is_public', 'payment_amount',
+     'registration_requires_approval', 'registration_cutoff_at',
+     'registration_cutoff_lead_minutes'}
 )
 
 
@@ -60,34 +62,12 @@ def _may_promote(event, now):
     return event.status == Event.Status.PUBLISHED and event.ends_at >= now
 
 
-def _lock_waiters(event):
-    return list(
-        EventRegistration.objects.select_for_update().filter(
-            event=event, status=EventRegistration.Status.WAITLISTED
-        ).order_by("created_at", "id")
-    )
-
-
-def _promote(event, actor, waiters, count=None):
-    selected = waiters if count is None else waiters[:count]
-    for registration in selected:
-        registration.event = event
-        registration.status = EventRegistration.Status.REGISTERED
-        registration.save(update_fields=["status"])
-        from apps.events.service_payments import create_for_registered_registration
-
-        create_for_registered_registration(registration, actor)
-        meta = {"registration_id": registration.pk}
-        _audit(event, actor, "event.registration_promoted", registration, meta)
-        notify_event_lifecycle(event, "registration_promoted", registration.pk)
-    return selected
-
-
 @transaction.atomic
 def create_event(
     *, makerspace, actor, title, description, starts_at, ends_at, location,
     capacity, is_public, location_kind=Event.LocationKind.OTHER, custom_form=None,
-    payment_amount=0,
+    payment_amount=0, registration_requires_approval=False,
+    registration_cutoff_at=None, registration_cutoff_lead_minutes=None,
 ):
     locked_space = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
     require_module_locked(locked_space, "events")
@@ -103,6 +83,9 @@ def create_event(
         custom_form=_canonical_form(custom_form),
         capacity=capacity,
         payment_amount=payment_amount,
+        registration_requires_approval=registration_requires_approval,
+        registration_cutoff_at=registration_cutoff_at,
+        registration_cutoff_lead_minutes=registration_cutoff_lead_minutes,
         is_public=is_public,
     )
     _validate(event)
@@ -124,6 +107,15 @@ def update_event(event, *, actor, **changes):
 
     if 'custom_form' in changes:
         changes['custom_form'] = _canonical_form(changes['custom_form'])
+    if (
+        "registration_requires_approval" in changes
+        and changes["registration_requires_approval"]
+        != locked.registration_requires_approval
+        and locked.status != Event.Status.DRAFT
+    ):
+        raise EventInvalidTransition(
+            "Approval policy can only be changed while the event is a draft."
+        )
 
     now = timezone.now()
     old_capacity, old_ends_at = locked.capacity, locked.ends_at
@@ -148,12 +140,11 @@ def update_event(event, *, actor, **changes):
         _may_promote(locked, now)
         and (locked.capacity == 0 or locked.capacity > confirmed)
     ):
-        waiters = _lock_waiters(locked)
-        if locked.capacity == 0:
-            promoted = _promote(locked, actor, waiters)
-        else:
-            promoted = _promote(
-                locked, actor, waiters, locked.capacity - confirmed
+        if not locked.registration_requires_approval:
+            promoted = promote_automatically(
+                locked,
+                actor,
+                None if locked.capacity == 0 else locked.capacity - confirmed,
             )
 
     if changes:
@@ -211,53 +202,12 @@ def complete(event, *, actor):
     return _transition(event, actor, Event.Status.PUBLISHED, Event.Status.COMPLETED, "event.completed")
 
 
-@transaction.atomic
-def cancel_registration(registration, *, actor=None):
-    event = _locked_event(registration.event_id)
-    locked = EventRegistration.objects.select_for_update().get(pk=registration.pk)
-    if locked.event_id != event.pk or locked.status not in (
-        EventRegistration.Status.REGISTERED,
-        EventRegistration.Status.WAITLISTED,
-    ):
-        raise EventInvalidTransition("This registration cannot be cancelled.")
-    old_status = locked.status
-    locked.status = EventRegistration.Status.CANCELLED
-    locked.save(update_fields=["status"])
-    meta = {"registration_id": locked.pk, "old_status": old_status}
-    _audit(event, actor, "event.registration_cancelled", locked, meta)
-    notify_event_lifecycle(event, "registration_cancelled", locked.pk)
-    from apps.events.service_payments import cancel_for_registration
-
-    cancel_for_registration(locked, actor)
-    if (
-        old_status == EventRegistration.Status.REGISTERED
-        and event.capacity > 0
-        and _may_promote(event, timezone.now())
-    ):
-        waiters = _lock_waiters(event)
-        if waiters:
-            _promote(event, actor, waiters, 1)
-    return _refresh(locked)
-
-
-@transaction.atomic
-def mark_attended(registration, *, actor):
-    event = _locked_event(registration.event_id)
-    locked = EventRegistration.objects.select_for_update().get(pk=registration.pk)
-    if (
-        locked.event_id != event.pk
-        or locked.status != EventRegistration.Status.REGISTERED
-        or event.status not in (Event.Status.PUBLISHED, Event.Status.COMPLETED)
-    ):
-        raise EventInvalidTransition("This registration cannot be marked attended.")
-    locked.status = EventRegistration.Status.ATTENDED
-    locked.save(update_fields=["status"])
-    _audit(
-        event, actor, "event.registration_attended", locked,
-        {"registration_id": locked.pk},
-    )
-    notify_event_lifecycle(event, "registration_attended", locked.pk)
-    return _refresh(locked)
-
-
 from apps.events.services_registration import register  # noqa: E402
+from apps.events.services_registration_state import (  # noqa: E402
+    approve_registration,
+    cancel_registration,
+    mark_attended,
+    promote_automatically,
+    promote_registration,
+    reject_registration,
+)

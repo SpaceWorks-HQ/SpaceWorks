@@ -18,7 +18,7 @@ export type MakerspaceReportGroup<T> = {
   data: ReportResponse<T>;
 };
 export type MachineUsageRow = ScopedRow & { machine_id: number; machine_name: string; machine_type: string; is_active: boolean; usage_entries: number; usage_hours: string };
-export type EventAttendanceRow = ScopedRow & { event_id: number; title: string; starts_at: string; status: string; capacity: number; registrations: number; confirmed: number; registered: number; waitlisted: number; cancelled: number; attended: number; attendance_rate_percent: number | null };
+export type EventAttendanceRow = ScopedRow & { event_id: number; title: string; starts_at: string; status: string; capacity: number; registrations: number; confirmed: number; pending_approval: number; registered: number; waitlisted: number; rejected: number; cancelled: number; attended: number; attendance_rate_percent: number | null };
 export type BookingUtilizationRow = ScopedRow & { space_id: number; space_name: string; kind: string; is_active: boolean; booked: number; completed: number; no_show: number; cancelled: number; upcoming: number; reserved_hours: string; completed_hours: string; window_hours: string | null; reservation_utilization_percent: number | null; no_show_rate_percent: number | null };
 export type MaintenanceActivityRow = ScopedRow & { machine_id: number; machine_name: string; machine_type: string; is_active: boolean; log_count: number; costed_log_count: number; total_cost: string; average_cost: string | null; last_performed_at: string | null; average_interval_days: number | null; active_schedules: number; overdue_schedules: number };
 export type FabLabHealthRow = ScopedRow & {

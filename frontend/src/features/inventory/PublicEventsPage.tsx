@@ -24,6 +24,9 @@ type PublicEvent = {
   location: string;
   capacity: number | null;
   availability: "Available" | "Limited" | "Full";
+  registration_requires_approval: boolean;
+  effective_registration_cutoff_at: string | null;
+  registration_open: boolean;
   image_url: string | null;
   status: "published";
 };
@@ -80,6 +83,7 @@ export function PublicEventsPage() {
         const unlimited = item.capacity === 0 || item.capacity === null;
         const waitlist = item.availability === "Full";
         const open = activeToken === item.public_token;
+        const actionLabel = item.registration_requires_approval ? "Apply" : waitlist ? "Join waitlist" : "Register";
         return <article key={item.public_token} className="desk-panel overflow-hidden p-0">
           {/* Decorative: the title beside it already names the event, so alt is empty
               rather than a duplicate announcement for screen-reader users. */}
@@ -88,8 +92,9 @@ export function PublicEventsPage() {
           <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h2 className="title-panel">{item.title}</h2><p className="eyebrow mt-1"><time dateTime={item.starts_at}>{eventTime(item)}</time></p>{item.location ? <p className="eyebrow mt-1">{item.location}</p> : null}</div><StatusBadge status={item.status} /></div>
           {item.description ? <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink">{item.description}</p> : null}
           <dl className="mt-4 flex flex-wrap gap-4 text-sm"><div><dt className="eyebrow">Capacity</dt><dd className="font-mono font-semibold text-ink">{unlimited ? "Unlimited" : item.capacity}</dd></div><div><dt className="eyebrow">Availability</dt><dd className="font-mono font-semibold text-ink">{item.availability}</dd></div></dl>
-          <button className="desk-button-primary mt-4" type="button" aria-expanded={open} onClick={() => setActiveToken(open ? null : item.public_token)}>{open ? "Close form" : waitlist ? "Join waitlist" : "Register"}</button>
-          {open ? <div className="mt-4"><EventRegistrationForm key={item.public_token} makerspaceSlug={makerspaceSlug} publicToken={item.public_token} waitlist={waitlist} /></div> : null}
+          {!item.registration_open ? <p className="mt-4 text-sm font-semibold text-muted">Registration closed{item.effective_registration_cutoff_at ? ` · ${new Date(item.effective_registration_cutoff_at).toLocaleString()}` : ""}</p> : null}
+          <button className="desk-button-primary mt-4" type="button" disabled={!item.registration_open} aria-expanded={open} onClick={() => setActiveToken(open ? null : item.public_token)}>{open ? "Close form" : actionLabel}</button>
+          {open && item.registration_open ? <div className="mt-4"><EventRegistrationForm key={item.public_token} makerspaceSlug={makerspaceSlug} publicToken={item.public_token} waitlist={waitlist} approvalRequired={item.registration_requires_approval} /></div> : null}
           </div>
         </article>;
       })}</div> : null}

@@ -31,6 +31,10 @@ EVENTS_REQUESTER_SUBJECTS = {
     "cancelled": "{{ event.title }} has been cancelled",
     "completed": "Thank you for attending {{ event.title }}",
     "registration_created": "You are registered for {{ event.title }}",
+    "registration_pending_approval": "Your application for {{ event.title }} is awaiting approval",
+    "registration_waitlisted": "You are on the waitlist for {{ event.title }}",
+    "registration_approved": "Your application for {{ event.title }} was approved",
+    "registration_rejected": "Your application for {{ event.title }} was not approved",
     "registration_cancelled": "Your registration for {{ event.title }} was cancelled",
     "registration_promoted": "A place has opened up for {{ event.title }}",
     "registration_attended": "Your attendance at {{ event.title }} is recorded",
@@ -44,6 +48,21 @@ EVENTS_REQUESTER_BODIES = {
     ),
     "completed": "This event has finished. Thank you for taking part.",
     "registration_created": "Your place is booked. We look forward to seeing you.",
+    "registration_pending_approval": (
+        "Your application was received. No payment is due unless it is approved into "
+        "a confirmed place."
+    ),
+    "registration_waitlisted": (
+        "Your registration is on the waiting list. No payment is due unless a place "
+        "is confirmed."
+    ),
+    "registration_approved": (
+        "Your application was approved. The registration status above shows whether "
+        "your place is confirmed or waitlisted."
+    ),
+    "registration_rejected": (
+        "Your application was not approved. You were not charged."
+    ),
     "registration_cancelled": (
         "Your registration has been cancelled. You can register again while places "
         "remain."
