@@ -68,6 +68,21 @@ def delete_object(object_key):
         logger.exception("Failed to delete storage object %s.", object_key)
 
 
+def delete_object_strict(object_key):
+    """Delete every version and report whether a current object was visible."""
+    existed = object_exists(object_key)
+    try:
+        delete_all_versions(
+            _client(),
+            bucket=settings.AWS_STORAGE_BUCKET_NAME,
+            key=object_key,
+            require_version_listing=True,
+        )
+    except (BotoCoreError, ClientError) as exc:
+        raise StorageUnavailable from exc
+    return "deleted" if existed else "absent_or_version_only"
+
+
 def copy_object(source_key, dest_key):
     try:
         _client().copy_object(

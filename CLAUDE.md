@@ -32,7 +32,8 @@ Guidance for Claude Code (claude.ai/code) when working with code in this reposit
 
 A multi-tenant system for managing community hardware loans across makerspaces. The central concern is
 **traceability of physical handovers**: every issue and return must produce evidence (QR scans + photos +
-remarks + audit log) so that accountability for lost/damaged hardware is never ambiguous. Public users
+remarks + audit log). Photo bytes may expire under the configured retention policy, while immutable photo
+metadata, remarks, scans and audit history preserve the durable accountability trail. Public users
 browse and request; when self-checkout is enabled they may also issue/return eligible QR tools after
 authentication and evidence upload. Staff physically issue reviewed requests and direct handouts according
 to action scope.
@@ -70,8 +71,8 @@ channel only. Two architectural rules are load-bearing and easy to violate if yo
   inventory reservation/issue/return.
 - **Inventory Availability** — quantity math + asset status for QR-tracked tools.
 - **QR Code & Box** — generates/resolves/revokes QR codes, assigns boxes to requests, tracks scan history.
-- **Evidence Photo** — immutable issue/return photo storage linked to actor + request + QR scans; object
-  storage, never public.
+- **Evidence Photo** — immutable issue/return photo metadata linked to actor + request + QR scans; private
+  object bytes may expire under the evidence-retention policy and are never public.
 - **Check-In API Client** — **RETIRED** (`73a480c`, Part M7). `apps/checkin/` no longer exists and there is
   no `CHECKIN_MODE` setting. Requester identity now comes from authenticated member accounts, so there is no
   external verify dependency left to fail safe on.
@@ -120,8 +121,8 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   makerspace settings.
 - Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks
   active status.
-- **Every presigned upload lands on the staging key; the final object key is never client-writable.** A workflow promotes it exactly once, so an accepted evidence photo cannot be replaced through a still-valid presign. Read paths — the evidence endpoint, the admin preview, and backup/tenant-migration object capture — therefore fall back to the staging key, or an uploaded-but-unconsumed photo reads as missing.
-- Evidence photos and QR scan records are **immutable**; audit logs are **append-only**.
+- **Every presigned upload lands on the staging key; the final object key is never client-writable.** A workflow promotes it exactly once, so an accepted evidence photo cannot be replaced through a still-valid presign. Before retention expiry, read paths — the evidence endpoint, the admin preview, and backup/tenant-migration object capture — therefore fall back to the staging key, or an uploaded-but-unconsumed photo reads as missing. A terminal expired state returns 410 and never consults storage.
+- Evidence photo **rows** and QR scan records are **immutable**; audit logs are **append-only**. Evidence retention may delete every final and staging object version only after the configured window, but it does not update or delete the retained `EvidencePhoto` row.
 - Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos,
   requester history, or hidden counts. Public visibility is governed per-item by `is_public`,
   `show_public_count`, and `public_availability_mode` (`exact_count | status_only | hidden`).

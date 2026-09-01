@@ -196,6 +196,7 @@ _SOURCE_LOCAL_EDGES = {
     ("tenant_migration.export_read", "export_id"),
     ("data_export.download_url_issued", "export_id"),
     ("data_export.downloaded", "export_id"),
+    ("evidence.object_expired", "sweep_run_id"),
     ("tenant_migration.import_created", "import_id"),
     ("tenant_migration.import_read", "import_id"),
     ("tenant_migration.import_run_requested", "import_id"),

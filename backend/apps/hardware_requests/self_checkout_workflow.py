@@ -8,7 +8,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.boxes.models import Box, QrCode, QrScanEvent
 from apps.evidence.models import EvidencePhoto
-from apps.evidence.finalization import charge_storage_once
+from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.hardware_requests.models import (
     HardwareRequest,
     HardwareRequestItem,
@@ -223,7 +223,9 @@ def _public_evidence(makerspace, requester, evidence_id, evidence_type):
 
 
 def _lock_unused_evidence(evidence, *, issue):
-    EvidencePhoto.objects.select_for_update().get(pk=evidence.pk)
+    if not lock_evidence_for_attachment(evidence.pk):
+        error = RequestValidationError if issue else ReturnValidationError
+        raise error("Evidence has expired under the retention policy.")
     if issue:
         if HardwareRequest.objects.filter(issue_evidence=evidence).exists():
             raise RequestValidationError("Evidence already used.")

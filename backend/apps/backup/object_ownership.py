@@ -26,12 +26,18 @@ class ObjectReference:
     module_key: str
     coordination_policy: str
     coordination_makerspace_id: int | None
+    retention_state: str = "live"
+    object_expired_at: str = ""
+    expired_size_bytes: int | None = None
 
 
 @dataclass(frozen=True)
 class CapturedObject:
     size: int
     sha256: str
+    retention_state: str = "live"
+    object_expired_at: str = ""
+    expired_size_bytes: int | None = None
 
 
 class ObjectOwnershipPlan:
@@ -51,6 +57,11 @@ class ObjectOwnershipPlan:
 
     def _validate_candidates(self):
         for identity, references in self.multimap.items():
+            states = {item.retention_state for item in references}
+            if states - {"live", "expired"} or len(states) != 1:
+                raise BackupBuildError(
+                    "One object reference has inconsistent retention state."
+                )
             candidates = {
                 item.candidate_owner for item in references if item.candidate_owner
             }
@@ -84,6 +95,12 @@ class ObjectOwnershipPlan:
                 "makerspace_id": makerspaces[0] if len(makerspaces) == 1 else None,
                 "module_key": modules[0] if len(modules) == 1 else "",
             }
+            if references[0].retention_state == "expired":
+                result[bucket_kind][key].update(
+                    retention_state="expired",
+                    object_expired_at=references[0].object_expired_at,
+                    expired_size_bytes=references[0].expired_size_bytes,
+                )
         return result
 
     @staticmethod
@@ -126,18 +143,42 @@ class ObjectOwnershipPlan:
             previous = self._packaged_owner.get(identity)
             if previous is not None and previous != component:
                 raise BackupBuildError("A physical object byte was packaged by two components.")
+            references = self.multimap[identity]
+            retention_state = references[0].retention_state
             path = root / identity[0] / identity[1]
-            try:
-                size = path.stat().st_size
-                digest = sha256_file(path)
-            except OSError as exc:
-                raise BackupBuildError("A captured object byte is missing.") from exc
-            if size != item.get("size") or digest != item.get("sha256"):
-                raise BackupBuildError(
-                    "A packaged object differs from its immutable capture ledger."
-                )
+            if retention_state == "expired":
+                if (
+                    item.get("retention_state") != "expired"
+                    or item.get("object_expired_at")
+                    != references[0].object_expired_at
+                    or item.get("expired_size_bytes")
+                    != references[0].expired_size_bytes
+                    or path.exists()
+                ):
+                    raise BackupBuildError(
+                        "An expired object tombstone is inconsistent with its source state."
+                    )
+                size, digest = 0, ""
+            else:
+                if item.get("retention_state") is not None:
+                    raise BackupBuildError("A live object was replaced by a tombstone.")
+                try:
+                    size = path.stat().st_size
+                    digest = sha256_file(path)
+                except OSError as exc:
+                    raise BackupBuildError("A captured object byte is missing.") from exc
+                if size != item.get("size") or digest != item.get("sha256"):
+                    raise BackupBuildError(
+                        "A packaged object differs from its immutable capture ledger."
+                    )
             self._packaged_owner[identity] = component
-            captured[identity] = CapturedObject(size=size, sha256=digest)
+            captured[identity] = CapturedObject(
+                size=size,
+                sha256=digest,
+                retention_state=retention_state,
+                object_expired_at=references[0].object_expired_at,
+                expired_size_bytes=references[0].expired_size_bytes,
+            )
         if component in self._captured:
             raise BackupBuildError("An object component was bound more than once.")
         self._captured[component] = captured
@@ -158,16 +199,22 @@ class ObjectOwnershipPlan:
         for identity, fact in captured.items():
             item = actual[identity]
             path = self._roots[component] / identity[0] / identity[1]
-            try:
-                byte_mismatch = (
-                    path.stat().st_size != fact.size
-                    or sha256_file(path) != fact.sha256
-                )
-            except OSError:
-                byte_mismatch = True
+            if fact.retention_state == "expired":
+                byte_mismatch = path.exists()
+            else:
+                try:
+                    byte_mismatch = (
+                        path.stat().st_size != fact.size
+                        or sha256_file(path) != fact.sha256
+                    )
+                except OSError:
+                    byte_mismatch = True
             if (
                 item.get("size") != fact.size
                 or item.get("sha256") != fact.sha256
+                or item.get("retention_state", "live") != fact.retention_state
+                or item.get("object_expired_at", "") != fact.object_expired_at
+                or item.get("expired_size_bytes") != fact.expired_size_bytes
                 or byte_mismatch
             ):
                 raise BackupBuildError(
@@ -183,7 +230,7 @@ class ObjectOwnershipPlan:
         for component in expected_components:
             immutable_manifest = [
                 {"bucket_kind": kind, "key": key, "size": fact.size,
-                 "sha256": fact.sha256}
+                 "sha256": fact.sha256, "retention_state": fact.retention_state}
                 for (kind, key), fact in self._captured[component].items()
             ]
             # Re-read bytes against facts even though the caller no longer holds a
@@ -191,13 +238,16 @@ class ObjectOwnershipPlan:
             for item in immutable_manifest:
                 fact = self._captured[component][(item["bucket_kind"], item["key"])]
                 path = self._roots[component] / item["bucket_kind"] / item["key"]
-                try:
-                    mismatch = (
-                        path.stat().st_size != fact.size
-                        or sha256_file(path) != fact.sha256
-                    )
-                except OSError:
-                    mismatch = True
+                if fact.retention_state == "expired":
+                    mismatch = path.exists()
+                else:
+                    try:
+                        mismatch = (
+                            path.stat().st_size != fact.size
+                            or sha256_file(path) != fact.sha256
+                        )
+                    except OSError:
+                        mismatch = True
                 if mismatch:
                     raise BackupBuildError(
                         "A packaged object changed after immutable capture."

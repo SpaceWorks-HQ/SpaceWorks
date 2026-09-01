@@ -37,6 +37,7 @@ export const openApiTags = [
   "Email logs",
   "Email templates",
   "Events",
+  "Evidence retention",
   "Health",
   "Integration health",
   "Internal",
@@ -273,6 +274,8 @@ export const openApiPaths = [
   "/api/v1/admin/makerspaces/{id}",
   "/api/v1/admin/makerspaces/{makerspace_id}/event-collaborations/",
   "/api/v1/admin/makerspaces/{makerspace_id}/events/",
+  "/api/v1/admin/makerspaces/{makerspace_id}/evidence-retention",
+  "/api/v1/admin/makerspaces/{makerspace_id}/evidence-retention/preview",
   "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/consumable-pools",
   "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/requests",
   "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/typed-manual-usage",
@@ -1701,6 +1704,27 @@ export type EventWrite = {
 export type EvidenceGetResponse = {
   "url": string;
   "expires_in": number;
+};
+
+export type EvidenceRetentionPolicy = {
+  "makerspace_id": number;
+  "platform_default_days": number;
+  "override_days": number | null;
+  "effective_days": number;
+  "object_expiry_enabled": boolean;
+};
+
+export type EvidenceRetentionPreviewRequest = {
+  "limit"?: number;
+};
+
+export type EvidenceRetentionPreviewResponse = {
+  "as_of": string;
+  "policy_days": number;
+  "cutoff": string;
+  "object_candidates": number;
+  "candidate_bytes": number;
+  "has_more": boolean;
 };
 
 export type EvidenceUrlRequest = {
@@ -3492,6 +3516,10 @@ export type PatchedEventWrite = {
   "capacity"?: number;
   "payment_amount"?: string;
   "is_public"?: boolean;
+};
+
+export type PatchedEvidenceRetentionPatch = {
+  "object_retention_days"?: number | null;
 };
 
 export type PatchedInventoryAssetAdminUpdate = {

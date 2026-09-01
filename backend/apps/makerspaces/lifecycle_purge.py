@@ -66,7 +66,7 @@ def _delete_object_graph(makerspace):
         AuditSigningKeyRotationEvent,
     )
     from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
-    from apps.evidence.models import EvidencePhoto
+    from apps.evidence.models import EvidencePhoto, EvidenceRetentionPolicy
     from apps.events.models import EventOrganizer, EventRegistration
     from apps.hardware_requests.models import HardwareRequest
     from apps.hardware_requests.models import PublicToolLoan, RequesterAccountability
@@ -128,6 +128,7 @@ def _delete_object_graph(makerspace):
         ReturnEvent.objects.filter(makerspace=makerspace).delete()
         HardwareRequest.objects.filter(makerspace=makerspace).delete()
         EvidencePhoto.objects.filter(makerspace=makerspace).delete()
+        EvidenceRetentionPolicy.objects.filter(makerspace=makerspace).delete()
         QrCode.objects.filter(makerspace=makerspace).delete()
 
         # Machines + their maintenance/children/consumables cascade from the Machine

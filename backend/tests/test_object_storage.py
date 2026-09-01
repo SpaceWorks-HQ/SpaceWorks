@@ -79,6 +79,30 @@ def test_delete_all_versions_falls_back_when_listing_is_unsupported():
     assert deleted == [{"Bucket": "private", "Key": "exports/job.zip"}]
 
 
+def test_delete_all_versions_can_require_provable_version_deletion():
+    deleted = []
+
+    class Client:
+        def list_object_versions(self, **_kwargs):
+            raise ClientError(
+                {"Error": {"Code": "NotImplemented", "Message": "unsupported"}},
+                "ListObjectVersions",
+            )
+
+        def delete_object(self, **kwargs):
+            deleted.append(kwargs)
+
+    with pytest.raises(ClientError):
+        delete_all_versions(
+            Client(),
+            bucket="private",
+            key="evidence/photo.jpg",
+            require_version_listing=True,
+        )
+
+    assert deleted == []
+
+
 def test_delete_all_versions_propagates_access_denied_without_bare_delete():
     deleted = []
 

@@ -16,8 +16,6 @@ from apps.backup.object_restore_versions import ObjectRestoreError
 from apps.makerspaces import limits
 from apps.makerspaces.models import Makerspace
 from apps.object_storage import delete_all_versions
-
-
 def restore_objects(restore, bundle_root, manifest, journal_path):
     root = Path(bundle_root).resolve()
     journal = Path(journal_path)
@@ -25,6 +23,10 @@ def restore_objects(restore, bundle_root, manifest, journal_path):
     for item in manifest.get("storage", {}).get("objects", []):
         key = _safe_key(item["key"])
         kind = item["bucket_kind"]
+        if item.get("retention_state") == "expired":
+            storage.assert_object_absent(_bucket(kind), key)
+            storage.assert_object_absent(_bucket(kind), f"staging/{key}")
+            continue
         source = (root / "objects" / kind / key).resolve()
         if root not in source.parents or not source.is_file():
             raise ObjectRestoreError(f"Archive object is missing or unsafe: {key}")
@@ -39,7 +41,6 @@ def restore_objects(restore, bundle_root, manifest, journal_path):
         _journal(journal, {"effect": "replacement_written", "row_id": rollback.pk, "version_id": replacement_version})
         restored.append(rollback)
     return restored
-
 
 def _prepare_rollback(restore, item, journal):
     key = _safe_key(item["key"])

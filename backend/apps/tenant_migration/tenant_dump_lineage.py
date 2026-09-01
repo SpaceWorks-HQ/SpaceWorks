@@ -9,7 +9,7 @@ from .tenant_dump_manifest import verify_envelope_custody_manifest
 
 
 FORMAT = "spaceworks-tenant-dump-v1"
-DERIVATION_POLICY_VERSION = 4
+DERIVATION_POLICY_VERSION = 5
 
 
 def canonical_digest(value):
@@ -25,8 +25,7 @@ def canonical_digest(value):
 def object_ledger(entries):
     normalized = []
     for entry in entries:
-        normalized.append(
-            {
+        item = {
                 "bucket_kind": entry["bucket_kind"],
                 "key": entry.get("original_key", entry.get("source_key")),
                 "version_id": entry.get("version_id") or None,
@@ -34,7 +33,13 @@ def object_ledger(entries):
                 "sha256": entry["sha256"],
                 "content_type": entry.get("content_type") or "",
             }
-        )
+        if entry.get("retention_state") == "expired":
+            item.update(
+                retention_state="expired",
+                object_expired_at=entry.get("object_expired_at"),
+                expired_size_bytes=entry.get("expired_size_bytes"),
+            )
+        normalized.append(item)
     return tuple(sorted(normalized, key=lambda item: (item["bucket_kind"], item["key"])))
 
 
