@@ -113,6 +113,7 @@ def capture_objects(root, object_keys, modes):
 def module_for_model(label):
     return {
         "events.Event": "events",
+        "events.EventAttendanceCertificate": "events",
         "bookings.BookableSpace": "bookings",
         "maintenance.MaintenanceLogDocument": "maintenance",
         "procurement.ToBuyReceipt": "procurement",

@@ -87,8 +87,16 @@ MODEL_LOOKUPS = {
     'admin-event-cancel': ('events.Event', 'makerspace_id'),
     'admin-event-complete': ('events.Event', 'makerspace_id'),
     'admin-event-registration-list': ('events.Event', 'makerspace_id'),
+    'admin-event-feedback-survey': ('events.Event', 'makerspace_id'),
+    'admin-event-feedback-survey-open': ('events.Event', 'makerspace_id'),
+    'admin-event-feedback-survey-close': ('events.Event', 'makerspace_id'),
+    'admin-event-feedback-responses': ('events.Event', 'makerspace_id'),
     'admin-event-check-in-resolve': ('events.Event', 'makerspace_id'),
     'admin-event-registration-mark-attended': ('events.EventRegistration', 'event__makerspace_id'),
+    'admin-event-registration-correct-attendance': ('events.EventRegistration', 'event__makerspace_id'),
+    'admin-event-certificate-download': ('events.EventAttendanceCertificate', 'registration__event__makerspace_id'),
+    'admin-event-certificate-revoke': ('events.EventAttendanceCertificate', 'registration__event__makerspace_id'),
+    'admin-event-certificate-reissue': ('events.EventAttendanceCertificate', 'registration__event__makerspace_id'),
     'admin-event-registration-approve': ('events.EventRegistration', 'event__makerspace_id'),
     'admin-event-registration-reject': ('events.EventRegistration', 'event__makerspace_id'),
     'admin-event-registration-promote': ('events.EventRegistration', 'event__makerspace_id'),
@@ -177,14 +185,11 @@ TARGET_SET_LOOKUPS = {
     'admin-user-reset-password': (
         'makerspaces.MakerspaceMembership', 'user_id', 'makerspace_id'),
 }
-
-
 def request_route_targets(request, view=None):
     url_name, targets, invalid, route_recognized = _authoritative_route_targets(
         request, view
     )
     hints = []
-
     query = getattr(request, 'query_params', None)
     if query is None:
         query = getattr(request, 'GET', {})
@@ -196,7 +201,6 @@ def request_route_targets(request, view=None):
         invalid = invalid or parsed is None
         if parsed is not None:
             hints.append(parsed)
-
     if getattr(request, "method", "GET") not in {"GET", "HEAD", "OPTIONS", "TRACE"}:
         body = getattr(request, "data", {})
         if hasattr(body, "get"):

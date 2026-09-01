@@ -10,6 +10,8 @@ from apps.events.exceptions import (
     CapacityConflict,
     DuplicateRegistration,
     EventInvalidTransition,
+    FeedbackConflict,
+    FeedbackIneligible,
     RegistrationClosed,
     RegistrationRejected,
 )
@@ -128,6 +130,16 @@ _EXCEPTION_MAP = {
         status.HTTP_409_CONFLICT,
         "invalid_transition",
         "Invalid event transition.",
+    ),
+    FeedbackConflict: (
+        status.HTTP_409_CONFLICT,
+        "feedback_conflict",
+        "Feedback was already submitted with different answers.",
+    ),
+    FeedbackIneligible: (
+        status.HTTP_404_NOT_FOUND,
+        "feedback_not_found",
+        "Feedback eligibility could not be verified.",
     ),
     BookingInvalidTransition: (
         status.HTTP_409_CONFLICT,

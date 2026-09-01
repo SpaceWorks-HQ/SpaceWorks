@@ -26,6 +26,16 @@ from apps.events.views_admin import (
 from apps.events.views_admin_organized import OrganizedEventListView
 from apps.events.views_admin_image import EventImageView
 from apps.events.views_checkin import EventCheckInResolveView
+from apps.events.views_feedback_admin import (
+    EventCertificateDownloadView,
+    EventCertificateReissueView,
+    EventCertificateRevokeView,
+    EventFeedbackResponseListView,
+    EventFeedbackSurveyCloseView,
+    EventFeedbackSurveyOpenView,
+    EventFeedbackSurveyView,
+    EventRegistrationCorrectAttendanceView,
+)
 from apps.events.views_collaborators import (
     EventCollaborationInboxView,
     EventCollaborationRemoveView,
@@ -70,6 +80,26 @@ urlpatterns = [
         name='admin-event-registration-list',
     ),
     path(
+        'events/<int:pk>/feedback-survey/',
+        EventFeedbackSurveyView.as_view(),
+        name='admin-event-feedback-survey',
+    ),
+    path(
+        'events/<int:pk>/feedback-survey/open/',
+        EventFeedbackSurveyOpenView.as_view(),
+        name='admin-event-feedback-survey-open',
+    ),
+    path(
+        'events/<int:pk>/feedback-survey/close/',
+        EventFeedbackSurveyCloseView.as_view(),
+        name='admin-event-feedback-survey-close',
+    ),
+    path(
+        'events/<int:pk>/feedback-responses/',
+        EventFeedbackResponseListView.as_view(),
+        name='admin-event-feedback-responses',
+    ),
+    path(
         'events/<int:pk>/collaborators/',
         EventCollaboratorListView.as_view(),
         name='admin-event-collaborators',
@@ -105,6 +135,26 @@ urlpatterns = [
         'event-registrations/<int:pk>/mark-attended/',
         EventRegistrationMarkAttendedView.as_view(),
         name='admin-event-registration-mark-attended',
+    ),
+    path(
+        'event-registrations/<int:pk>/correct-attendance/',
+        EventRegistrationCorrectAttendanceView.as_view(),
+        name='admin-event-registration-correct-attendance',
+    ),
+    path(
+        'event-certificates/<int:pk>/download/',
+        EventCertificateDownloadView.as_view(),
+        name='admin-event-certificate-download',
+    ),
+    path(
+        'event-certificates/<int:pk>/revoke/',
+        EventCertificateRevokeView.as_view(),
+        name='admin-event-certificate-revoke',
+    ),
+    path(
+        'event-certificates/<int:pk>/reissue/',
+        EventCertificateReissueView.as_view(),
+        name='admin-event-certificate-reissue',
     ),
     path(
         'event-registrations/<int:pk>/approve/',

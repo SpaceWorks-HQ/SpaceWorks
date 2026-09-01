@@ -37,6 +37,10 @@ PUBLIC_CLAIM_ROUTES = {
         tenant=PUBLIC_TOKEN, audited=True
     ),
     ("public-event-register", "OPTIONS"): AnonymousRead(),
+    **_anonymous("public-event-feedback"),
+    ("public-event-feedback", "POST"): Allowed(
+        tenant=PUBLIC_TOKEN, audited=True
+    ),
     **_anonymous("public-bookable-space-list"),
     **_anonymous("public-space-availability"),
     ("public-booking-submit", "POST"): Allowed(

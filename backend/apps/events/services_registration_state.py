@@ -5,7 +5,12 @@ from django.utils import timezone
 
 from apps.events.capacity import spots_left
 from apps.events.exceptions import CapacityConflict, EventInvalidTransition
-from apps.events.models import Event, EventRegistration
+from apps.events.models import (
+    Event,
+    EventAttendanceCertificate,
+    EventCheckInEvent,
+    EventRegistration,
+)
 from apps.events.service_payments import (
     cancel_for_registration,
     create_for_registered_registration,
@@ -186,7 +191,12 @@ def cancel_registration(registration, *, actor=None):
 
 
 @transaction.atomic
-def mark_attended(registration, *, actor):
+def mark_attended(
+    registration,
+    *,
+    actor,
+    source=EventCheckInEvent.Source.STAFF,
+):
     services = _boundary()
     event = services._locked_event(registration.event_id)
     locked = _lock_registration(event, registration.pk)
@@ -197,12 +207,67 @@ def mark_attended(registration, *, actor):
         raise EventInvalidTransition("This registration cannot be marked attended.")
     locked.status = EventRegistration.Status.ATTENDED
     locked.save(update_fields=["status"])
+    check_in = EventCheckInEvent.objects.create(
+        registration=locked,
+        source=source,
+        attended_at=timezone.now(),
+        recorded_by=actor,
+    )
     services._audit(
         event,
         actor,
         "event.registration_attended",
         locked,
-        {"registration_id": locked.pk},
+        {
+            "registration_id": locked.pk,
+            "check_in_event_id": check_in.pk,
+            "source": source,
+        },
     )
     services.notify_event_lifecycle(event, "registration_attended", locked.pk)
     return services._refresh(locked)
+
+
+@transaction.atomic
+def correct_attendance(registration, *, actor):
+    services = _boundary()
+    event = services._locked_event(registration.event_id)
+    locked = _lock_registration(event, registration.pk)
+    if locked.status != EventRegistration.Status.ATTENDED:
+        raise EventInvalidTransition("Only attended registrations can be corrected.")
+    certificates = list(
+        EventAttendanceCertificate.objects.select_for_update().filter(
+            registration=locked,
+            status=EventAttendanceCertificate.Status.ACTIVE,
+        )
+    )
+    locked.status = EventRegistration.Status.REGISTERED
+    locked.save(update_fields=["status"])
+    now = timezone.now()
+    for certificate in certificates:
+        certificate.status = EventAttendanceCertificate.Status.REVOKED
+        certificate.revoked_at = now
+        certificate.revoked_by = actor
+        certificate.revocation_reason = (
+            EventAttendanceCertificate.RevocationReason.ATTENDANCE_CORRECTED
+        )
+        certificate.save(
+            update_fields=[
+                "status", "revoked_at", "revoked_by", "revocation_reason",
+            ]
+        )
+        services._audit(
+            event,
+            actor,
+            "event.certificate_revoked",
+            certificate,
+            {"reason": certificate.revocation_reason, "revision": certificate.revision},
+        )
+    services._audit(
+        event,
+        actor,
+        "event.registration_attendance_corrected",
+        locked,
+        {"registration_id": locked.pk, "revoked_certificates": len(certificates)},
+    )
+    return services._refresh(locked), certificates

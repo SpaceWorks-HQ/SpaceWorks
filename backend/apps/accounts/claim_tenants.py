@@ -20,6 +20,7 @@ PUBLIC_TOKEN_TARGETS = {
     # Present for completeness even though the matrix refuses registration: changing
     # that disposition later must still resolve the exact event row, never trust slug.
     "public-event-register": ("events.Event", "public_token"),
+    "public-event-feedback": ("events.Event", "public_token"),
 }
 BODY_OBJECT_TARGETS = {
     "public-machine-service-request-submit": ("machines.Machine", "machine_id"),

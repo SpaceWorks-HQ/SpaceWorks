@@ -4,6 +4,7 @@ import { Skeleton, StatusBadge } from "../../components/ui";
 import EventCheckInScanner from "./EventCheckInScanner";
 import { EventRegisterMember } from "./EventRegisterMember";
 import { PaymentReconcileActions } from "./PaymentReconcileActions";
+import { useCorrectAttendance } from "./eventFeedbackApi";
 import {
   useApproveEventRegistration,
   useEventRegistrations,
@@ -25,15 +26,16 @@ export function EventRegistrationRoster({ event, makerspaceId }: {
   const reject = useRejectEventRegistration(makerspaceId, event.id);
   const promote = usePromoteEventRegistration(makerspaceId, event.id);
   const attended = useMarkEventAttended(makerspaceId, event.id);
+  const correct = useCorrectAttendance(makerspaceId, event.id);
 
   function pendingFor(registrationId: number) {
-    return [approve, reject, promote, attended].some(
+    return [approve, reject, promote, attended, correct].some(
       (mutation) => mutation.isPending && mutation.variables === registrationId,
     );
   }
 
   function errorFor(registrationId: number) {
-    return [approve, reject, promote, attended].find(
+    return [approve, reject, promote, attended, correct].find(
       (mutation) => mutation.error && mutation.variables === registrationId,
     )?.error;
   }
@@ -57,7 +59,8 @@ export function EventRegistrationRoster({ event, makerspaceId }: {
         const rowError = errorFor(row.id);
         const hasAction = row.status === "pending_approval"
           || (row.status === "waitlisted" && event.registration_requires_approval)
-          || (row.status === "registered" && checkable);
+          || (row.status === "registered" && checkable)
+          || row.status === "attended";
         return <tr key={row.id} className="border-t border-line">
           <td className="p-2">{row.name}<PaymentReconcileActions makerspaceId={makerspaceId} payment={row.payment} invalidateKeys={[["event", event.id, "registrations"], ["event", event.id], ["events", makerspaceId]]} /></td>
           <td className="p-2"><a className="block hover:underline" href={`mailto:${row.email}`}>{row.email}</a><a className="block text-muted hover:underline" href={`tel:${row.phone}`}>{row.phone}</a></td>
@@ -66,6 +69,7 @@ export function EventRegistrationRoster({ event, makerspaceId }: {
             {row.status === "pending_approval" ? <><button className="desk-button-success" type="button" disabled={pending} onClick={() => approve.mutate(row.id)}>Approve</button><button className="desk-button-danger" type="button" disabled={pending} onClick={() => reject.mutate(row.id)}>Reject</button></> : null}
             {row.status === "waitlisted" && event.registration_requires_approval ? <><button className="desk-button-success" type="button" disabled={pending} onClick={() => promote.mutate(row.id)}>Promote</button><button className="desk-button-danger" type="button" disabled={pending} onClick={() => reject.mutate(row.id)}>Reject</button></> : null}
             {row.status === "registered" && checkable ? <button className="desk-button-success" type="button" disabled={pending} onClick={() => attended.mutate(row.id)}>Mark attended</button> : null}
+            {row.status === "attended" ? <button className="desk-button-danger" type="button" disabled={pending} onClick={() => correct.mutate(row.id)}>Correct attendance</button> : null}
             {!hasAction ? "—" : null}
           </div>{rowError ? <p className="mt-1 text-xs text-danger" role="alert">{eventErrorText(rowError)}</p> : null}</td>
         </tr>;

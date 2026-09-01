@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ConfirmDialog, DetailDrawer, EmptyState, Skeleton, StatusBadge } from "../../components/ui";
 import { EventCollaborators } from "./EventCollaborators";
 import { EventFields, emptyEventForm, payloadFor, valuesFor } from "./EventFormFields";
+import { EventFeedbackPanel } from "./EventFeedbackPanel";
 import { EventRegistrationRoster } from "./EventRegistrationRoster";
 import { ImageUploader } from "./ImageUploader";
 import {
@@ -55,6 +56,7 @@ export function EventDrawer({ eventId, makerspaceId, onClose }: {
         </div>
         {actionError ? <p className="text-sm text-danger" role="alert">{eventErrorText(actionError)}</p> : null}
         <EventRegistrationRoster event={event} makerspaceId={makerspaceId} />
+        <EventFeedbackPanel eventId={eventId} makerspaceId={makerspaceId} />
         <EventCollaborators makerspaceId={makerspaceId} eventId={eventId} />
       </div> : null}
     </DetailDrawer>

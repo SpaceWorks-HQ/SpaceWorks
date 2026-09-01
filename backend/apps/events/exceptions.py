@@ -14,6 +14,14 @@ class RegistrationRejected(Exception):
     pass
 
 
+class FeedbackIneligible(Exception):
+    """Uniform public failure for every certificate eligibility mismatch."""
+
+
+class FeedbackConflict(Exception):
+    pass
+
+
 class DuplicateRegistration(Exception):
     def __init__(self, *args, fresh_status=None):
         super().__init__(*args)

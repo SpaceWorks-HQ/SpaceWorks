@@ -1,10 +1,8 @@
 """Declared handling for deployment-global uniqueness during materialization."""
-
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import Callable
-
 
 class UniqueValueDisposition(StrEnum):
     DROP_ROW = "drop_row"
@@ -40,6 +38,17 @@ def _evidence_key(row, target, _source_value):
     from apps.evidence.storage import evidence_object_key
 
     return evidence_object_key(target.pk, row["evidence_type"])
+
+
+def _certificate_key(row, target, _source_value):
+    return f"event-certificates/{target.pk}/{row['serial']}.pdf"
+
+
+def _refuse_certificate_serial_collision(row, target, source_value):
+    raise RuntimeError(
+        "An attendance-certificate serial collision cannot be regenerated because "
+        "the serial is printed inside the immutable PDF."
+    )
 
 
 def _machine_document_key(row, target, source_value):
@@ -120,6 +129,18 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
     ),
     ("events.EventRegistration", "field:checkin_token"): _policy(
         FRESH, "Source check-in credentials are replaced."
+    ),
+    ("events.EventAttendanceCertificate", "field:serial"): _policy(
+        PRESERVE,
+        "Preserve the serial printed inside the immutable PDF; refuse a collision.",
+        field="serial",
+        generator=_refuse_certificate_serial_collision,
+    ),
+    ("events.EventAttendanceCertificate", "field:object_key"): _policy(
+        PRESERVE,
+        "Keep the archived private certificate key unless it collides on the target.",
+        field="object_key",
+        generator=_certificate_key,
     ),
     ("evidence.EvidencePhoto", "field:object_key"): _policy(
         PRESERVE,

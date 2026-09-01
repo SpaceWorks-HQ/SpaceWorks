@@ -1,5 +1,4 @@
 """Relational and semantic reference registries for the global User closure."""
-
 from .fields import FIELDS
 from .models import EXPORTED_MODELS
 from .types import (
@@ -9,8 +8,6 @@ from .types import (
     SourceLocalProvenance,
     UserEdge,
 )
-
-
 class DanglingUserReferenceError(RuntimeError):
     """A raw user ID cannot be bound safely in a portable archive."""
 
@@ -22,7 +19,6 @@ def require_raw_user(fidelity, *, model, row_pk, field, user_id, existing_user_i
             f"{model} row {row_pk} has dangling {field}={user_id}"
         )
     return user_id
-
 RAW_USER_REFERENCE_FIELDS = frozenset(  # Raw integers are not discoverable as FKs.
     {
         ("encryption.PiiGlobalWriteFence", "actor_id"),
@@ -30,7 +26,6 @@ RAW_USER_REFERENCE_FIELDS = frozenset(  # Raw integers are not discoverable as F
         ("machines.ServiceRequestFile", "owner_user_id"),
     }
 )
-
 # Every forward relation to accounts.User in the internal model graph, including M2M.
 RELATIONAL_USER_FIELDS = frozenset(
     {
@@ -66,6 +61,8 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("events.EventCollaborator", "responded_by"),
         ("events.EventOrganizer", "created_by"),
         ("events.EventRegistration", "member"),
+        ("events.EventCheckInEvent", "recorded_by"),
+        ("events.EventAttendanceCertificate", "revoked_by"),
         ("evidence.EvidencePhoto", "uploaded_by"),
         ("hardware_requests.HardwareRequest", "requester"),
         ("hardware_requests.HardwareRequest", "accepted_by"),
@@ -217,6 +214,8 @@ JSON_FIELDS = frozenset(
         ("bookings.Booking", "custom_answers"),
         ("events.Event", "custom_form"),
         ("events.EventRegistration", "custom_answers"),
+        ("events.EventFeedbackSurvey", "questions"),
+        ("events.EventFeedbackSurvey", "answered_question_ids"),
         ("hardware_requests.PublicToolLoan", "asset_ids"),
         ("hardware_requests.PublicToolLoan", "qr_ids"),
         ("machines.Machine", "service_file_policy"),

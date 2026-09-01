@@ -11,6 +11,10 @@ urlconf in place instead, exactly as it does for the other two.
 from django.urls import path
 
 from apps.events.views_checkin import EventCheckInQrView
+from apps.events.views_feedback_member import (
+    MemberEventCertificateDownloadView,
+    MemberEventFeedbackView,
+)
 from apps.events.views_member_events import (
     MemberCollaborativeEventListView,
     MemberCollaborativeEventRegistrationView,
@@ -31,5 +35,15 @@ urlpatterns = [
         'makerspaces/<int:makerspace_id>/event-registrations/<int:pk>/qr',
         EventCheckInQrView.as_view(),
         name='member-event-checkin-qr',
+    ),
+    path(
+        'makerspaces/<int:makerspace_id>/event-registrations/<int:pk>/feedback/',
+        MemberEventFeedbackView.as_view(),
+        name='member-event-feedback',
+    ),
+    path(
+        'makerspaces/<int:makerspace_id>/event-certificates/<int:pk>/download/',
+        MemberEventCertificateDownloadView.as_view(),
+        name='member-event-certificate-download',
     ),
 ]

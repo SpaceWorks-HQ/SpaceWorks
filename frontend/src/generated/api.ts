@@ -98,9 +98,13 @@ export const openApiPaths = [
   "/api/v1/admin/containers/{id}/history",
   "/api/v1/admin/containers/{id}/move",
   "/api/v1/admin/direct-loans/{id}/return",
+  "/api/v1/admin/event-certificates/{id}/download/",
+  "/api/v1/admin/event-certificates/{id}/reissue/",
+  "/api/v1/admin/event-certificates/{id}/revoke/",
   "/api/v1/admin/event-collaborations/{id}/remove/",
   "/api/v1/admin/event-collaborations/{id}/respond/",
   "/api/v1/admin/event-registrations/{id}/approve/",
+  "/api/v1/admin/event-registrations/{id}/correct-attendance/",
   "/api/v1/admin/event-registrations/{id}/mark-attended/",
   "/api/v1/admin/event-registrations/{id}/promote/",
   "/api/v1/admin/event-registrations/{id}/reject/",
@@ -110,6 +114,10 @@ export const openApiPaths = [
   "/api/v1/admin/events/{id}/collaborators/",
   "/api/v1/admin/events/{id}/complete/",
   "/api/v1/admin/events/{id}/eligible-members/",
+  "/api/v1/admin/events/{id}/feedback-responses/",
+  "/api/v1/admin/events/{id}/feedback-survey/",
+  "/api/v1/admin/events/{id}/feedback-survey/close/",
+  "/api/v1/admin/events/{id}/feedback-survey/open/",
   "/api/v1/admin/events/{id}/image",
   "/api/v1/admin/events/{id}/publish/",
   "/api/v1/admin/events/{id}/registrations/",
@@ -419,6 +427,8 @@ export const openApiPaths = [
   "/api/v1/member/makerspaces/{makerspace_id}/collaborative-events/{id}/register/",
   "/api/v1/member/makerspaces/{makerspace_id}/directory",
   "/api/v1/member/makerspaces/{makerspace_id}/directory/{membership_id}",
+  "/api/v1/member/makerspaces/{makerspace_id}/event-certificates/{id}/download/",
+  "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/{id}/feedback/",
   "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/{id}/qr",
   "/api/v1/member/makerspaces/{makerspace_id}/payments",
   "/api/v1/member/makerspaces/{makerspace_id}/payments/{payment_id}/checkout",
@@ -451,6 +461,7 @@ export const openApiPaths = [
   "/api/v1/public/makerspaces/",
   "/api/v1/public/requests/{public_token}/status",
   "/api/v1/public/{makerspace_slug}/events/",
+  "/api/v1/public/{makerspace_slug}/events/{public_token}/feedback/",
   "/api/v1/public/{makerspace_slug}/events/{public_token}/register/",
   "/api/v1/public/{makerspace_slug}/inventory/",
   "/api/v1/public/{makerspace_slug}/inventory/categories/",
@@ -798,6 +809,12 @@ export type AssignOperator = {
   "access_level": string;
 };
 
+export type AttendanceCorrectionResponse = {
+  "registration_id": number;
+  "status": string;
+  "revoked_certificates": number;
+};
+
 export type AttendedEvent = {
   "id": number;
   "title": string;
@@ -1050,6 +1067,26 @@ export type CategoryAdmin = {
   "created_at": string;
   "updated_at": string;
 };
+
+export type CertificateDownload = {
+  "url": string;
+  "expires_at": string;
+};
+
+export type CertificateRevoke = {
+  "reason": ReasonEnum;
+};
+
+export type CertificateSummary = {
+  "id": number;
+  "status": CertificateSummaryStatusEnum;
+  "revision": number;
+  "issued_at": string;
+  "rendered_at": string | null;
+  "revoked_at": string | null;
+};
+
+export type CertificateSummaryStatusEnum = "pending" | "rendering" | "active" | "failed" | "revoked";
 
 export type ChangePassword = {
   "current_password": string;
@@ -1574,6 +1611,12 @@ export type EventAdmin = {
 
 export type EventAdminStatusEnum = "draft" | "published" | "cancelled" | "completed";
 
+export type EventAttendanceMark = {
+  "source"?: EventAttendanceMarkSourceEnum;
+};
+
+export type EventAttendanceMarkSourceEnum = "staff" | "qr";
+
 export type EventAttendanceReport = {
   "rows": Array<Array<unknown>>;
   "typed_rows": Array<EventAttendanceRow>;
@@ -1777,6 +1820,71 @@ export type FabLabHealthRow = {
 export type FailureCodeEnum = "deadline_exceeded" | "integrity_error" | "storage_error" | "quota_exceeded" | "internal_error";
 
 export type FeatureEnum = "hardware_requests" | "printing" | "events" | "bookings" | "maintenance" | "members";
+
+export type FeedbackForm = {
+  "event": {
+  [key: string]: unknown;
+};
+  "survey": FeedbackSurvey;
+  "mode": FeedbackFormModeEnum;
+  "requires_auth": boolean;
+  "certificate": CertificateSummary | null;
+};
+
+export type FeedbackFormModeEnum = "anonymous" | "certificate";
+
+export type FeedbackResponse = {
+  "id": number;
+  "answers": unknown;
+  "created_at": string;
+  "identity": {
+  [key: string]: unknown;
+} | null;
+  "certificate": CertificateSummary | null;
+};
+
+export type FeedbackResponseList = {
+  "count": number;
+  "next": string | null;
+  "previous": string | null;
+  "results": Array<FeedbackResponse>;
+};
+
+export type FeedbackSubmission = {
+  "answers"?: {
+  [key: string]: unknown;
+};
+  "email"?: string;
+};
+
+export type FeedbackSubmissionResponse = {
+  "thank_you_text": string;
+  "certificate": CertificateSummary | null;
+};
+
+export type FeedbackSurvey = {
+  "id": number;
+  "title": string;
+  "thank_you_text": string;
+  "questions": unknown;
+  "is_open": boolean;
+  "certificate_enabled": boolean;
+  "answered_question_ids": Array<string>;
+  "opened_at": string | null;
+  "closed_at": string | null;
+  "response_count": number;
+};
+
+export type FeedbackSurveyAdminEnvelope = {
+  "survey": FeedbackSurvey | null;
+};
+
+export type FeedbackSurveyWrite = {
+  "title": string;
+  "thank_you_text"?: string;
+  "questions": unknown;
+  "certificate_enabled"?: boolean;
+};
 
 export type FidelityEnum = "REDACTED";
 
@@ -2771,6 +2879,11 @@ export type MemberEventRegistrationActivity = {
   "ends_at": string;
   "status": string;
   "waitlist_position": number | null;
+  "feedback_available": boolean;
+  "feedback_path": string | null;
+  "certificate": {
+  [key: string]: unknown;
+} | null;
 };
 
 export type MemberLoanActivity = {
@@ -4661,6 +4774,8 @@ export type Readiness = {
   "database": string;
   "archive_custody": ArchiveCustodyReadiness;
 };
+
+export type ReasonEnum = "staff_revoked";
 
 export type ReceiptEnvelope = {
   "payload": {

@@ -27,6 +27,8 @@ PROJECTED_MODEL_LABELS = frozenset(
     """accounts.User apiclients.ApiKeyRequest audit.AuditLog
     backup.MakerspaceArchiveRecipient bookings.BookableSpace bookings.Booking boxes.Box
     boxes.BoxScan boxes.QrCode boxes.QrScanEvent events.Event events.EventRegistration
+    events.EventCheckInEvent events.EventFeedbackSurvey events.EventFeedbackResponse
+    events.EventAttendanceCertificate
     evidence.EvidencePhoto hardware_requests.HardwareRequest
     hardware_requests.HardwareRequestItem hardware_requests.HardwareRequestItemAsset
     hardware_requests.PublicProblemReport hardware_requests.PublicToolLoan

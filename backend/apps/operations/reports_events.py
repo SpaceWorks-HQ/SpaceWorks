@@ -9,7 +9,8 @@ FIELDS = (
     "event_id", "title", "starts_at", "status", "capacity", "registrations",
     "confirmed", "pending_approval", "registered", "waitlisted", "rejected",
     "cancelled", "attended",
-    "attendance_rate_percent", "organizers",
+    "attendance_rate_percent", "feedback_responses", "active_certificates",
+    "revoked_certificates", "organizers",
 )
 
 
@@ -28,13 +29,24 @@ def build_event_attendance(makerspace_id, *, limit=None, date_range=None):
     queryset = queryset.values(
         "id", "makerspace_id", "title", "starts_at", "status", "capacity"
     ).annotate(
-        total=Count("registrations"),
-        pending_approval_count=Count("registrations", filter=Q(registrations__status=statuses.PENDING_APPROVAL)),
-        registered_count=Count("registrations", filter=Q(registrations__status=statuses.REGISTERED)),
-        waitlisted_count=Count("registrations", filter=Q(registrations__status=statuses.WAITLISTED)),
-        rejected_count=Count("registrations", filter=Q(registrations__status=statuses.REJECTED)),
-        cancelled_count=Count("registrations", filter=Q(registrations__status=statuses.CANCELLED)),
-        attended_count=Count("registrations", filter=Q(registrations__status=statuses.ATTENDED)),
+        total=Count("registrations", distinct=True),
+        pending_approval_count=Count("registrations", filter=Q(registrations__status=statuses.PENDING_APPROVAL), distinct=True),
+        registered_count=Count("registrations", filter=Q(registrations__status=statuses.REGISTERED), distinct=True),
+        waitlisted_count=Count("registrations", filter=Q(registrations__status=statuses.WAITLISTED), distinct=True),
+        rejected_count=Count("registrations", filter=Q(registrations__status=statuses.REJECTED), distinct=True),
+        cancelled_count=Count("registrations", filter=Q(registrations__status=statuses.CANCELLED), distinct=True),
+        attended_count=Count("registrations", filter=Q(registrations__status=statuses.ATTENDED), distinct=True),
+        feedback_response_count=Count("feedback_survey__responses", distinct=True),
+        active_certificate_count=Count(
+            "registrations__attendance_certificates",
+            filter=Q(registrations__attendance_certificates__status="active"),
+            distinct=True,
+        ),
+        revoked_certificate_count=Count(
+            "registrations__attendance_certificates",
+            filter=Q(registrations__attendance_certificates__status="revoked"),
+            distinct=True,
+        ),
     )
     ordering = ("makerspace_id", "-starts_at", "id") if aggregate else ("-starts_at", "id")
     rows = list(queryset.order_by(*ordering)[:limit] if limit is not None else queryset.order_by(*ordering))
@@ -67,6 +79,9 @@ def build_event_attendance(makerspace_id, *, limit=None, date_range=None):
             "rejected": row["rejected_count"],
             "cancelled": row["cancelled_count"],
             "attended": row["attended_count"], "attendance_rate_percent": rate,
+            "feedback_responses": row["feedback_response_count"],
+            "active_certificates": row["active_certificate_count"],
+            "revoked_certificates": row["revoked_certificate_count"],
             "organizers": "; ".join(organizers_by_event.get(row["id"], [])),
         }
         if aggregate:

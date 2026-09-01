@@ -67,7 +67,14 @@ def _delete_object_graph(makerspace):
     )
     from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
     from apps.evidence.models import EvidencePhoto
-    from apps.events.models import EventOrganizer, EventRegistration
+    from apps.events.models import (
+        EventAttendanceCertificate,
+        EventCheckInEvent,
+        EventFeedbackResponse,
+        EventFeedbackSurvey,
+        EventOrganizer,
+        EventRegistration,
+    )
     from apps.hardware_requests.models import HardwareRequest
     from apps.hardware_requests.models import PublicToolLoan, RequesterAccountability
     from apps.hardware_requests.models import ReturnEvent
@@ -192,6 +199,16 @@ def _delete_object_graph(makerspace):
         # Organizer attribution is owned by the hosted event, never by whichever
         # makerspaces happen to be linked to its deployment-global organization.
         EventOrganizer.objects.filter(event__makerspace=makerspace).delete()
+        EventAttendanceCertificate.objects.filter(
+            registration__event__makerspace=makerspace
+        ).delete()
+        EventFeedbackResponse.objects.filter(
+            survey__event__makerspace=makerspace
+        ).delete()
+        EventFeedbackSurvey.objects.filter(event__makerspace=makerspace).delete()
+        EventCheckInEvent.objects.filter(
+            registration__event__makerspace=makerspace
+        ).delete()
         # Registrations otherwise survive until the final makerspace cascade. Delete
         # hosted rows explicitly so any PROTECT FK they gain cannot fail that cascade;
         # collaborator provenance must not remove another host's registration.

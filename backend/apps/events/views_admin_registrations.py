@@ -11,6 +11,7 @@ from apps.admin_api.serializers_payment_summary import scoped_payment_context
 from apps.events import services
 from apps.events.models import EventRegistration
 from apps.events.serializers_admin import (
+    EventAttendanceMarkSerializer,
     EmptyActionSerializer,
     EventEligibleMemberSerializer,
     EventRegistrationAdminSerializer,
@@ -133,13 +134,18 @@ class EventRegistrationMarkAttendedView(APIView):
     @extend_schema(
         tags=['Admin events'],
         summary='Mark an event registration attended',
-        request=EmptyActionSerializer,
+        request=EventAttendanceMarkSerializer,
         responses={200: EventRegistrationAdminSerializer, 409: EVENT_ERROR_409},
     )
     def post(self, request, pk, *args, **kwargs):
         registration = _manageable_registration(request.user, pk)
-        _validate_empty_action(request)
-        registration = services.mark_attended(registration, actor=request.user)
+        serializer = EventAttendanceMarkSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        registration = services.mark_attended(
+            registration,
+            actor=request.user,
+            source=serializer.validated_data["source"],
+        )
         context = scoped_payment_context(
             request.user,
             rbac.Action.MANAGE_EVENTS,

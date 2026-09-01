@@ -3,6 +3,7 @@
 
 def collect_private_object_keys(makerspace, *, include_coordination=True):
     from apps.evidence.models import EvidencePhoto
+    from apps.events.models import EventAttendanceCertificate
     from apps.maintenance.models import MaintenanceLogDocument
     from apps.machines.models import MachineDocument
     from apps.machines.service_lifecycle import collect_private_object_keys as collect_service
@@ -18,6 +19,7 @@ def collect_private_object_keys(makerspace, *, include_coordination=True):
 
     for model, lookup in (
         (EvidencePhoto, {"makerspace": makerspace}),
+        (EventAttendanceCertificate, {"registration__event__makerspace": makerspace}),
         (WarrantyDocument, {"warranty__makerspace": makerspace}),
         (ToBuyReceipt, {"to_buy_item__makerspace": makerspace}),
         (MaintenanceLogDocument, {"log__machine__makerspace": makerspace}),

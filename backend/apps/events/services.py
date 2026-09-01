@@ -11,7 +11,12 @@ from apps.events.exceptions import (
     CapacityConflict,
     EventInvalidTransition,
 )
-from apps.events.models import Event, EventRegistration
+from apps.events.models import (
+    Event,
+    EventAttendanceCertificate,
+    EventFeedbackSurvey,
+    EventRegistration,
+)
 from apps.events.notifications import notify_event_lifecycle
 from apps.forms_schema.validation import validate_form_schema
 from apps.makerspaces import limits
@@ -194,7 +199,52 @@ def publish(event, *, actor):
 
 @transaction.atomic
 def cancel(event, *, actor):
-    return _transition(event, actor, Event.Status.PUBLISHED, Event.Status.CANCELLED, "event.cancelled")
+    locked = _locked_event(event.pk)
+    if locked.status != Event.Status.PUBLISHED:
+        raise EventInvalidTransition(
+            f"Cannot transition event from {locked.status} to {Event.Status.CANCELLED}."
+        )
+    survey = EventFeedbackSurvey.objects.select_for_update().filter(event=locked).first()
+    certificates = list(
+        EventAttendanceCertificate.objects.select_for_update().filter(
+            registration__event=locked,
+            status=EventAttendanceCertificate.Status.ACTIVE,
+        )
+    )
+    now = timezone.now()
+    if survey is not None and survey.is_open:
+        survey.is_open = False
+        survey.closed_at = now
+        survey.save(update_fields=["is_open", "closed_at", "updated_at"])
+        _audit(locked, actor, "event.feedback_survey_closed", survey, {"reason": "event_cancelled"})
+    for certificate in certificates:
+        certificate.status = EventAttendanceCertificate.Status.REVOKED
+        certificate.revoked_at = now
+        certificate.revoked_by = actor
+        certificate.revocation_reason = (
+            EventAttendanceCertificate.RevocationReason.EVENT_CANCELLED
+        )
+        certificate.save(
+            update_fields=["status", "revoked_at", "revoked_by", "revocation_reason"]
+        )
+        _audit(
+            locked,
+            actor,
+            "event.certificate_revoked",
+            certificate,
+            {"reason": certificate.revocation_reason, "revision": certificate.revision},
+        )
+    locked.status = Event.Status.CANCELLED
+    locked.save(update_fields=["status", "updated_at"])
+    _audit(
+        locked,
+        actor,
+        "event.cancelled",
+        locked,
+        {"old_status": Event.Status.PUBLISHED, "new_status": Event.Status.CANCELLED},
+    )
+    notify_event_lifecycle(locked, "cancelled")
+    return _refresh(locked)
 
 
 @transaction.atomic
@@ -206,6 +256,7 @@ from apps.events.services_registration import register  # noqa: E402
 from apps.events.services_registration_state import (  # noqa: E402
     approve_registration,
     cancel_registration,
+    correct_attendance,
     mark_attended,
     promote_automatically,
     promote_registration,

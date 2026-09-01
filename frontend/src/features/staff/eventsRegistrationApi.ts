@@ -48,8 +48,26 @@ function useRegistrationAction(
   });
 }
 
-export function useMarkEventAttended(makerspaceId: number, eventId: number) {
-  return useRegistrationAction(makerspaceId, eventId, MARK_ATTENDED_PATH);
+export function useMarkEventAttended(
+  makerspaceId: number,
+  eventId: number,
+  source: "staff" | "qr" = "staff",
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (registrationId: number) => staffRequest<EventRegistration>(
+      staffPath(MARK_ATTENDED_PATH, { id: registrationId }),
+      { method: "POST", body: JSON.stringify({ source }) },
+    ),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: eventKeys.registrations(eventId) }),
+        queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
+        queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
+        queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
+      ]);
+    },
+  });
 }
 
 export function useApproveEventRegistration(makerspaceId: number, eventId: number) {

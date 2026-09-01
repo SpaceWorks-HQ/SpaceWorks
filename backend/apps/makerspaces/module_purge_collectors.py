@@ -31,7 +31,15 @@ from apps.makerspaces.module_purge_collectors_single_model import (
 
 
 def events_delete(makerspace, cursor):
-    from apps.events.models import Event, EventCollaborator, EventRegistration
+    from apps.events.models import (
+        Event,
+        EventAttendanceCertificate,
+        EventCheckInEvent,
+        EventCollaborator,
+        EventFeedbackResponse,
+        EventFeedbackSurvey,
+        EventRegistration,
+    )
 
     collaborations, collaboration_labels = _delete(
         EventCollaborator.objects.filter(makerspace=makerspace)
@@ -42,13 +50,34 @@ def events_delete(makerspace, cursor):
     provenance_cleared = EventRegistration.objects.filter(
         registered_via_makerspace=makerspace,
     ).exclude(event__makerspace=makerspace).update(registered_via_makerspace=None)
+    certificates, certificate_labels = _delete(
+        EventAttendanceCertificate.objects.filter(
+            registration__event__makerspace=makerspace
+        )
+    )
+    responses, response_labels = _delete(
+        EventFeedbackResponse.objects.filter(survey__event__makerspace=makerspace)
+    )
+    surveys, survey_labels = _delete(
+        EventFeedbackSurvey.objects.filter(event__makerspace=makerspace)
+    )
+    checkins, checkin_labels = _delete(
+        EventCheckInEvent.objects.filter(registration__event__makerspace=makerspace)
+    )
     registrations, registration_labels = _delete(
         EventRegistration.objects.filter(event__makerspace=makerspace)
     )
     events, event_labels = _delete(Event.objects.filter(makerspace=makerspace))
     return _counts(
-        model_labels=collaboration_labels | registration_labels | event_labels,
+        model_labels=(
+            collaboration_labels | certificate_labels | response_labels
+            | survey_labels | checkin_labels | registration_labels | event_labels
+        ),
         event_collaborations=collaborations,
+        event_certificates=certificates,
+        event_feedback_responses=responses,
+        event_feedback_surveys=surveys,
+        event_check_in_events=checkins,
         event_registration_provenance_cleared=provenance_cleared,
         event_registrations=registrations,
         events=events,
@@ -61,6 +90,27 @@ def events_public_images(makerspace):
     return list(
         Event.objects.filter(makerspace=makerspace).values_list("image_key", flat=True)
     )
+
+
+def events_private_keys(makerspace, add):
+    from apps.events.models import EventAttendanceCertificate
+
+    for key in EventAttendanceCertificate.objects.filter(
+        registration__event__makerspace=makerspace
+    ).values_list("object_key", flat=True):
+        add(key)
+
+
+def events_private_key_sizes(makerspace):
+    from apps.events.models import EventAttendanceCertificate
+
+    return {
+        key: size
+        for key, size in EventAttendanceCertificate.objects.filter(
+            registration__event__makerspace=makerspace
+        ).values_list("object_key", "size_bytes")
+        if key
+    }
 
 
 def maintenance_delete(makerspace, cursor):

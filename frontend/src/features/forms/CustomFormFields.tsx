@@ -2,12 +2,13 @@ import { useId } from "react";
 
 import type { CustomAnswers, CustomFormQuestion, CustomFormSchema } from "./customFormTypes";
 
-export function CustomFormFields({ schema, answers, onChange, errors = {}, disabled = false }: {
+export function CustomFormFields({ schema, answers, onChange, errors = {}, disabled = false, yesNoAsCheckbox = false }: {
   schema: CustomFormSchema;
   answers: CustomAnswers;
   onChange: (answers: CustomAnswers) => void;
   errors?: Record<string, string>;
   disabled?: boolean;
+  yesNoAsCheckbox?: boolean;
 }) {
   const prefix = useId();
   if (!schema?.length) return null;
@@ -23,6 +24,7 @@ export function CustomFormFields({ schema, answers, onChange, errors = {}, disab
           inputId={prefix + "-" + question.id}
           value={answers[question.id]}
           error={errors[question.id]}
+          yesNoAsCheckbox={yesNoAsCheckbox}
           onChange={(value) => setAnswer(question.id, value)}
         />
       ))}
@@ -30,11 +32,12 @@ export function CustomFormFields({ schema, answers, onChange, errors = {}, disab
   );
 }
 
-function QuestionField({ question, inputId, value, error, onChange }: {
+function QuestionField({ question, inputId, value, error, yesNoAsCheckbox, onChange }: {
   question: CustomFormQuestion;
   inputId: string;
   value: CustomAnswers[string];
   error?: string;
+  yesNoAsCheckbox: boolean;
   onChange: (value: CustomAnswers[string]) => void;
 }) {
   const errorId = inputId + "-error";
@@ -46,6 +49,10 @@ function QuestionField({ question, inputId, value, error, onChange }: {
   };
   const label = <span className="eyebrow">{question.label}{question.required ? <span className="text-danger"> *</span> : null}</span>;
   const message = error ? <span id={errorId} className="text-xs font-normal text-danger">{error}</span> : null;
+
+  if (question.type === "yes_no" && yesNoAsCheckbox) {
+    return <label className="grid gap-1 text-ink"><span className="flex items-center gap-2 text-sm"><input id={inputId} type="checkbox" checked={value === true} required={question.required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.checked)} />{label}</span>{message}</label>;
+  }
 
   if (question.type === "paragraph") {
     return <label className="grid gap-1 text-ink">{label}<textarea {...inputProps} className="desk-input min-h-24" maxLength={5000} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} />{message}</label>;

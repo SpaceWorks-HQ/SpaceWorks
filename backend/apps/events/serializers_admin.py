@@ -89,6 +89,14 @@ class EventRegistrationCountsSerializer(serializers.Serializer):
     attended = serializers.IntegerField(read_only=True)
 
 
+class EventAttendanceMarkSerializer(serializers.Serializer):
+    source = serializers.ChoiceField(
+        choices=("staff", "qr"),
+        default="staff",
+        required=False,
+    )
+
+
 class EventAdminSerializer(serializers.ModelSerializer):
     makerspace_id = serializers.IntegerField(read_only=True)
     created_by_id = serializers.IntegerField(allow_null=True, read_only=True)

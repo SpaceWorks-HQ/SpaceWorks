@@ -31,10 +31,22 @@ function newQuestion(): CustomFormQuestion {
   return { id: questionId(), label: "", type: "short_text", options: [], required: false };
 }
 
-export function CustomFormBuilder({ value, onChange, disabled = false }: {
+export function CustomFormBuilder({
+  value,
+  onChange,
+  disabled = false,
+  allowedTypes = CUSTOM_QUESTION_TYPES,
+  lockedQuestionIds = [],
+  legend = "Custom questions",
+  emptyMessage = "No custom questions. The standard contact fields will still be collected.",
+}: {
   value: CustomFormSchema;
   onChange: (schema: CustomFormSchema) => void;
   disabled?: boolean;
+  allowedTypes?: readonly CustomQuestionType[];
+  lockedQuestionIds?: readonly string[];
+  legend?: string;
+  emptyMessage?: string;
 }) {
   const questions = value ?? [];
   const replace = (index: number, question: CustomFormQuestion) => {
@@ -51,7 +63,7 @@ export function CustomFormBuilder({ value, onChange, disabled = false }: {
   return (
     <fieldset className="grid gap-3" disabled={disabled}>
       <div>
-        <legend className="title-panel">Custom questions</legend>
+        <legend className="title-panel">{legend}</legend>
         <p className="eyebrow mt-1">Answers are visible only to authorized staff.</p>
       </div>
       {questions.map((question, index) => (
@@ -60,6 +72,8 @@ export function CustomFormBuilder({ value, onChange, disabled = false }: {
           question={question}
           index={index}
           count={questions.length}
+          allowedTypes={allowedTypes}
+          locked={lockedQuestionIds.includes(question.id)}
           onChange={(next) => replace(index, next)}
           onMove={(direction) => move(index, direction)}
           onRemove={() => onChange(questions.filter((item) => item.id !== question.id))}
@@ -67,7 +81,7 @@ export function CustomFormBuilder({ value, onChange, disabled = false }: {
       ))}
       {!questions.length ? (
         <p className="rounded-lg border border-dashed border-outline bg-surface p-3 text-sm text-muted">
-          No custom questions. The standard contact fields will still be collected.
+          {emptyMessage}
         </p>
       ) : null}
       <button className="desk-button-ghost w-fit" type="button" disabled={questions.length >= 50} onClick={() => onChange([...questions, newQuestion()])}>
@@ -77,10 +91,12 @@ export function CustomFormBuilder({ value, onChange, disabled = false }: {
   );
 }
 
-function QuestionEditor({ question, index, count, onChange, onMove, onRemove }: {
+function QuestionEditor({ question, index, count, allowedTypes, locked, onChange, onMove, onRemove }: {
   question: CustomFormQuestion;
   index: number;
   count: number;
+  allowedTypes: readonly CustomQuestionType[];
+  locked: boolean;
   onChange: (question: CustomFormQuestion) => void;
   onMove: (direction: -1 | 1) => void;
   onRemove: () => void;
@@ -110,24 +126,24 @@ function QuestionEditor({ question, index, count, onChange, onMove, onRemove }: 
         <div className="ml-auto flex gap-2">
           <button className="desk-button-ghost" type="button" disabled={index === 0} onClick={() => onMove(-1)} aria-label={"Move question " + (index + 1) + " up"}>Up</button>
           <button className="desk-button-ghost" type="button" disabled={index === count - 1} onClick={() => onMove(1)} aria-label={"Move question " + (index + 1) + " down"}>Down</button>
-          <button className="desk-button-danger" type="button" onClick={onRemove}>Remove</button>
+          <button className="desk-button-danger" type="button" disabled={locked} onClick={onRemove}>Remove</button>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
         <label className="grid gap-1 text-ink"><span className="eyebrow">Label</span>
-          <input className="desk-input" required maxLength={200} value={question.label} onChange={(event) => onChange({ ...question, label: event.target.value })} />
+          <input className="desk-input" required disabled={locked} maxLength={200} value={question.label} onChange={(event) => onChange({ ...question, label: event.target.value })} />
         </label>
         <label className="grid gap-1 text-ink"><span className="eyebrow">Answer type</span>
-          <select className="desk-input" value={question.type} onChange={changeType}>
-            {CUSTOM_QUESTION_TYPES.map((type) => <option key={type} value={type}>{QUESTION_TYPE_LABELS[type]}</option>)}
+          <select className="desk-input" disabled={locked} value={question.type} onChange={changeType}>
+            {allowedTypes.map((type) => <option key={type} value={type}>{QUESTION_TYPE_LABELS[type]}</option>)}
           </select>
         </label>
       </div>
       <label className="mt-3 flex items-center gap-2 text-sm text-ink">
-        <input type="checkbox" checked={question.required} onChange={(event) => onChange({ ...question, required: event.target.checked })} />
+        <input type="checkbox" disabled={locked} checked={question.required} onChange={(event) => onChange({ ...question, required: event.target.checked })} />
         Required question
       </label>
-      {choice ? <OptionsEditor question={question} onChange={onChange} /> : null}
+      {choice ? <OptionsEditor question={question} disabled={locked} onChange={onChange} /> : null}
       <ConfirmDialog
         open={pendingType !== null}
         title="Change answer type?"
@@ -144,8 +160,9 @@ function QuestionEditor({ question, index, count, onChange, onMove, onRemove }: 
   );
 }
 
-function OptionsEditor({ question, onChange }: {
+function OptionsEditor({ question, disabled, onChange }: {
   question: CustomFormQuestion;
+  disabled: boolean;
   onChange: (question: CustomFormQuestion) => void;
 }) {
   return (
@@ -153,11 +170,11 @@ function OptionsEditor({ question, onChange }: {
       <h3 className="title-section">Choices</h3>
       {question.options.map((option, index) => (
         <div className="flex gap-2" key={question.id + "-option-" + index}>
-          <input className="desk-input min-w-0 flex-1" aria-label={"Choice " + (index + 1)} required maxLength={200} value={option} onChange={(event) => onChange({ ...question, options: question.options.map((item, itemIndex) => itemIndex === index ? event.target.value : item) })} />
-          <button className="desk-button-danger" type="button" disabled={question.options.length === 1} onClick={() => onChange({ ...question, options: question.options.filter((_, itemIndex) => itemIndex !== index) })}>Remove</button>
+          <input className="desk-input min-w-0 flex-1" aria-label={"Choice " + (index + 1)} required disabled={disabled} maxLength={200} value={option} onChange={(event) => onChange({ ...question, options: question.options.map((item, itemIndex) => itemIndex === index ? event.target.value : item) })} />
+          <button className="desk-button-danger" type="button" disabled={disabled || question.options.length === 1} onClick={() => onChange({ ...question, options: question.options.filter((_, itemIndex) => itemIndex !== index) })}>Remove</button>
         </div>
       ))}
-      <button className="desk-button-ghost w-fit" type="button" disabled={question.options.length >= 50} onClick={() => onChange({ ...question, options: [...question.options, ""] })}>Add choice</button>
+      <button className="desk-button-ghost w-fit" type="button" disabled={disabled || question.options.length >= 50} onClick={() => onChange({ ...question, options: [...question.options, ""] })}>Add choice</button>
     </div>
   );
 }

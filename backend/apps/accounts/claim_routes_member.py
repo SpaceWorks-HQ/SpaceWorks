@@ -107,4 +107,26 @@ MEMBER_CLAIM_ROUTES = {
         ownership=RowOwnership.MIXED_REFUSED,
     ),
     **_options("member-event-checkin-qr"),
+    ("member-event-feedback", "GET"): Refused(
+        "event feedback can return foreign-hosted registration rows",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    ("member-event-feedback", "HEAD"): Refused(
+        "event feedback can return foreign-hosted registration rows",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    ("member-event-feedback", "POST"): Refused(
+        "event feedback can write a foreign-hosted response",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    **_options("member-event-feedback"),
+    ("member-event-certificate-download", "GET"): Refused(
+        "event certificates can belong to foreign-hosted registrations",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    ("member-event-certificate-download", "HEAD"): Refused(
+        "event certificates can belong to foreign-hosted registrations",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    **_options("member-event-certificate-download"),
 }

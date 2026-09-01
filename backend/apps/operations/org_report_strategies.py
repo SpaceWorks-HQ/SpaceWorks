@@ -114,7 +114,8 @@ STRATEGIES = {
     ),
     "event-attendance": _strategy(
         AggregationKind.WEIGHTED_RATE, (),
-        ("capacity", "registrations", "confirmed", "pending_approval", "registered", "waitlisted", "rejected", "cancelled", "attended", "attendance_rate_percent"),
+        ("capacity", "registrations", "confirmed", "pending_approval", "registered", "waitlisted", "rejected", "cancelled", "attended",
+         "feedback_responses", "active_certificates", "revoked_certificates", "attendance_rate_percent"),
         breakdown=("event_id", "title", "starts_at", "status", "organizers"),
         ordering=(), text=(
             ("title", "breakdown-only"), ("starts_at", "breakdown-only"),
