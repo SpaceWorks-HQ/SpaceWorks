@@ -46,6 +46,7 @@ class MakerspaceMachineServiceReportView(APIView):
         # uniform 403 and never leaks its module state via a 400-vs-403 difference.
         if not rbac.can(request.user, rbac.Action.MANAGE_MACHINES, makerspace_id):
             raise PermissionDenied()
+        require_module(makerspace_id, "reports")
         require_module(makerspace_id, "machine_service")
         # The report carries per-machine hours, consumption and payment snapshots, so it
         # is narrowed to the machines this role actually runs. An exempt actor (space

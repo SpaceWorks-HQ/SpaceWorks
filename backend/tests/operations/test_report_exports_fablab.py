@@ -10,12 +10,43 @@ from apps.accounts.models import User
 from apps.bookings.models import BookableSpace
 from apps.events.models import Event
 from apps.machines.models import Machine, MachineType, MachineUsageEntry
-from apps.operations.report_registry import REPORT_REGISTRY
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user
 
 
 pytestmark = pytest.mark.django_db
 KEYS = ("machine-usage", "event-attendance", "booking-utilization", "maintenance-activity", "fablab-health")
+EXPECTED_FIELDS = {
+    "machine-usage": (
+        "machine_id", "machine_name", "machine_type", "is_active",
+        "usage_entries", "usage_hours",
+    ),
+    "event-attendance": (
+        "event_id", "title", "starts_at", "status", "capacity",
+        "registrations", "confirmed", "registered", "waitlisted", "cancelled",
+        "attended", "attendance_rate_percent", "organizers",
+    ),
+    "booking-utilization": (
+        "space_id", "space_name", "kind", "is_active", "booked", "completed",
+        "no_show", "cancelled", "upcoming", "reserved_hours", "completed_hours",
+        "window_hours", "reservation_utilization_percent", "no_show_rate_percent",
+    ),
+    "maintenance-activity": (
+        "machine_id", "machine_name", "machine_type", "is_active", "log_count",
+        "costed_log_count", "total_cost", "average_cost", "last_performed_at",
+        "average_interval_days", "active_schedules", "overdue_schedules",
+    ),
+    "fablab-health": (
+        "events_enabled", "events_available", "events_in_period",
+        "events_registrations", "events_attended",
+        "events_completed_attendance_rate_percent", "bookings_enabled",
+        "bookings_available", "bookings_active_spaces", "bookings_non_cancelled",
+        "bookings_reserved_hours", "bookings_upcoming", "bookings_no_shows",
+        "bookings_reservation_utilization_percent", "machines_enabled",
+        "machines_available", "machines_active", "machines_usage_hours",
+        "maintenance_enabled", "maintenance_available", "maintenance_logs",
+        "maintenance_total_cost", "maintenance_overdue_schedules",
+    ),
+}
 
 
 def _seed(slug):
@@ -37,7 +68,7 @@ def test_each_new_key_exports_exact_headers_per_space_and_aggregate(key, fmt):
         f"/api/v1/admin/makerspace/{space.id}/reports/{key}/export?format={fmt}&limit=1"
     )
     assert per.status_code == 200
-    assert _header(per, fmt) == list(REPORT_REGISTRY[key].fields)
+    assert _header(per, fmt) == list(EXPECTED_FIELDS[key])
 
     disabled, _ = _seed(f"export-disabled-{key}-{fmt}")
     disabled.enabled_modules = [module for module in disabled.enabled_modules if module != "reports"]
@@ -51,7 +82,7 @@ def test_each_new_key_exports_exact_headers_per_space_and_aggregate(key, fmt):
         f"/api/v1/admin/reports/{key}/export?format={fmt}"
     )
     assert aggregate.status_code == 200
-    assert _header(aggregate, fmt) == ["makerspace_id", *REPORT_REGISTRY[key].fields]
+    assert _header(aggregate, fmt) == ["makerspace_id", *EXPECTED_FIELDS[key]]
     ids = _makerspace_ids(aggregate, fmt)
     assert space.id in ids
     assert disabled.id not in ids

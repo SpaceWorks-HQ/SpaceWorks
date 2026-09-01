@@ -56,6 +56,8 @@ export function ModulesPanel({ makerspaceId }: { makerspaceId: number }) {
     onSuccess: () => {
       client.invalidateQueries({ queryKey });
       client.invalidateQueries({ queryKey: ["staff", "makerspaces"] });
+      client.invalidateQueries({ queryKey: ["report-catalog"] });
+      client.invalidateQueries({ queryKey: ["operations-report"] });
     },
   });
 

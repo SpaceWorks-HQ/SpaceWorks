@@ -107,6 +107,7 @@ export function useEventInvalidation(makerspaceId: number, eventId?: number) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
       queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
+      queryClient.invalidateQueries({ queryKey: ["operations-report"] }),
       ...(eventId === undefined ? [] : [
         queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
       ]),
@@ -124,6 +125,7 @@ export function useCreateEvent(makerspaceId: number) {
       queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.detail(created.id) }),
       queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
+      queryClient.invalidateQueries({ queryKey: ["operations-report"] }),
     ]); },
   });
 }
@@ -139,6 +141,7 @@ export function useUpdateEvent(makerspaceId: number, eventId: number) {
       queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
       queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
       queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
+      queryClient.invalidateQueries({ queryKey: ["operations-report"] }),
     ]); },
   });
 }

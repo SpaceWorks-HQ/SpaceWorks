@@ -8,15 +8,16 @@ type Consumption = Scoped & { machine_id: number; machine_name: string; measurem
 type Failure = Scoped & { machine_id: number; machine_name: string; outcome: string; failed_count: number; failed_partial_hours: number; failed_count_amount: string; failed_grams_amount: string };
 type Report = { status_totals: Status[]; machines: Machine[]; consumption: Consumption[]; failure_summary: Failure[] };
 
-export function OperationsReportsMachineService({ makerspace, aggregate, canManageMachines, startDate, endDate, makerspaceName }: {
+export function OperationsReportsMachineService({ makerspace, aggregate, canManageMachines, reportsEnabled, startDate, endDate, makerspaceName }: {
   makerspace: Makerspace;
   aggregate: boolean;
   canManageMachines: boolean;
+  reportsEnabled: boolean;
   startDate: string;
   endDate: string;
   makerspaceName: (id: number) => string;
 }) {
-  const enabled = canManageMachines && (aggregate || (makerspace.enabled_modules ?? []).includes("machine_service"));
+  const enabled = canManageMachines && reportsEnabled && (aggregate || (makerspace.enabled_modules ?? []).includes("machine_service"));
   const base = aggregate ? "/admin/machine-service-report" : `/admin/makerspace/${makerspace.id}/machine-service-report`;
   const query = new URLSearchParams();
   if (startDate) query.set("start", startDate);

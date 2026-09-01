@@ -335,6 +335,17 @@
                     },
                     {
                         "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "limit",
                         "schema": {
                             "type": "integer"
@@ -348,17 +359,25 @@
                             "enum": [
                                 "active-loans",
                                 "booking-utilization",
+                                "communications-health",
+                                "community-engagement",
                                 "damaged-lost",
                                 "damaged-missing",
                                 "event-attendance",
+                                "evidence-compliance",
                                 "fablab-health",
+                                "import-quality",
+                                "inventory-control",
+                                "loan-throughput",
                                 "machine-service",
                                 "machine-usage",
                                 "maintenance-activity",
                                 "member-activity",
+                                "module-operational-health",
                                 "most-lent",
                                 "payment-reconciliation",
                                 "printer-service",
+                                "procurement-performance",
                                 "qr-scans",
                                 "recently-added",
                                 "returns",
@@ -7545,6 +7564,151 @@
                 }
             }
         },
+        "/api/v1/admin/makerspace/{makerspace_id}/analytics/{report_key}": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_analytics_retrieve",
+                "summary": "Get analytics report",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "end",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "report_key",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "start",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "status",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "canceled",
+                                "paid_offline",
+                                "paid_online",
+                                "pending",
+                                "waived"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "subject_type",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "booking",
+                                "event_registration",
+                                "machine_service_request",
+                                "makerspace_membership"
+                            ]
+                        }
+                    }
+                ],
+                "tags": [
+                    "Analytics"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AnalyticsReportResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Invalid report request."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace or report not found."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspace/{makerspace_id}/analytics/active-loans": {
             "get": {
                 "operationId": "api_v1_admin_makerspace_analytics_active_loans_retrieve",
@@ -7556,6 +7720,17 @@
                         "schema": {
                             "type": "string",
                             "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
                         }
                     },
                     {
@@ -7686,6 +7861,17 @@
                     },
                     {
                         "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "limit",
                         "schema": {
                             "type": "integer"
@@ -7808,6 +7994,17 @@
                         "schema": {
                             "type": "string",
                             "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
                         }
                     },
                     {
@@ -7938,6 +8135,17 @@
                     },
                     {
                         "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "limit",
                         "schema": {
                             "type": "integer"
@@ -8060,6 +8268,17 @@
                         "schema": {
                             "type": "string",
                             "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
                         }
                     },
                     {
@@ -8190,6 +8409,17 @@
                     },
                     {
                         "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "limit",
                         "schema": {
                             "type": "integer"
@@ -8312,6 +8542,17 @@
                         "schema": {
                             "type": "string",
                             "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
                         }
                     },
                     {
@@ -8442,6 +8683,17 @@
                     },
                     {
                         "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "limit",
                         "schema": {
                             "type": "integer"
@@ -8564,6 +8816,17 @@
                         "schema": {
                             "type": "string",
                             "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
                         }
                     },
                     {
@@ -8694,6 +8957,17 @@
                     },
                     {
                         "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "limit",
                         "schema": {
                             "type": "integer"
@@ -8816,6 +9090,17 @@
                         "schema": {
                             "type": "string",
                             "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
                         }
                     },
                     {
@@ -8946,6 +9231,17 @@
                     },
                     {
                         "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "limit",
                         "schema": {
                             "type": "integer"
@@ -9068,6 +9364,17 @@
                         "schema": {
                             "type": "string",
                             "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
                         }
                     },
                     {
@@ -9198,6 +9505,17 @@
                     },
                     {
                         "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "limit",
                         "schema": {
                             "type": "integer"
@@ -9320,6 +9638,17 @@
                         "schema": {
                             "type": "string",
                             "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
                         }
                     },
                     {
@@ -9450,6 +9779,17 @@
                     },
                     {
                         "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "limit",
                         "schema": {
                             "type": "integer"
@@ -9572,6 +9912,17 @@
                         "schema": {
                             "type": "string",
                             "format": "date"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
                         }
                     },
                     {
@@ -15568,6 +15919,17 @@
                         }
                     },
                     {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
                         "in": "path",
                         "name": "makerspace_id",
                         "schema": {
@@ -15583,17 +15945,25 @@
                             "enum": [
                                 "active-loans",
                                 "booking-utilization",
+                                "communications-health",
+                                "community-engagement",
                                 "damaged-lost",
                                 "damaged-missing",
                                 "event-attendance",
+                                "evidence-compliance",
                                 "fablab-health",
+                                "import-quality",
+                                "inventory-control",
+                                "loan-throughput",
                                 "machine-service",
                                 "machine-usage",
                                 "maintenance-activity",
                                 "member-activity",
+                                "module-operational-health",
                                 "most-lent",
                                 "payment-reconciliation",
                                 "printer-service",
+                                "procurement-performance",
                                 "qr-scans",
                                 "recently-added",
                                 "returns",
@@ -15660,6 +16030,82 @@
                                 "schema": {
                                     "type": "string",
                                     "format": "binary"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Invalid report request."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace or report not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/reports/catalog": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_reports_catalog_retrieve",
+                "summary": "List makerspace report catalog",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportCatalog"
                                 }
                             }
                         },
@@ -21433,6 +21879,7 @@
                                 "damaged-lost",
                                 "damaged-missing",
                                 "event-attendance",
+                                "evidence-compliance",
                                 "fablab-health",
                                 "machine-usage",
                                 "maintenance-activity",
@@ -24090,6 +24537,17 @@
                         }
                     },
                     {
+                        "in": "query",
+                        "name": "grain",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "month"
+                            ]
+                        }
+                    },
+                    {
                         "in": "path",
                         "name": "report_key",
                         "schema": {
@@ -24097,17 +24555,25 @@
                             "enum": [
                                 "active-loans",
                                 "booking-utilization",
+                                "communications-health",
+                                "community-engagement",
                                 "damaged-lost",
                                 "damaged-missing",
                                 "event-attendance",
+                                "evidence-compliance",
                                 "fablab-health",
+                                "import-quality",
+                                "inventory-control",
+                                "loan-throughput",
                                 "machine-service",
                                 "machine-usage",
                                 "maintenance-activity",
                                 "member-activity",
+                                "module-operational-health",
                                 "most-lent",
                                 "payment-reconciliation",
                                 "printer-service",
+                                "procurement-performance",
                                 "qr-scans",
                                 "recently-added",
                                 "returns",
@@ -24174,6 +24640,72 @@
                                 "schema": {
                                     "type": "string",
                                     "format": "binary"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Invalid report request."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace or report not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/reports/catalog": {
+            "get": {
+                "operationId": "api_v1_admin_reports_catalog_retrieve",
+                "summary": "List deployment report catalog",
+                "tags": [
+                    "Reports"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportCatalog"
                                 }
                             }
                         },
@@ -34959,6 +35491,9 @@
                     },
                     {
                         "$ref": "#/components/schemas/PaymentReconciliationReport"
+                    },
+                    {
+                        "$ref": "#/components/schemas/GenericAnalyticsReport"
                     }
                 ]
             },
@@ -39846,6 +40381,35 @@
                 ],
                 "type": "string",
                 "description": "* `pending` - Pending\n* `verified` - Verified\n* `failed` - Failed"
+            },
+            "GenericAnalyticsReport": {
+                "type": "object",
+                "properties": {
+                    "report_key": {
+                        "type": "string"
+                    },
+                    "rows": {
+                        "type": "array",
+                        "items": {
+                            "type": "array",
+                            "items": {}
+                        }
+                    },
+                    "typed_rows": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        }
+                    },
+                    "meta": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    }
+                },
+                "required": [
+                    "rows"
+                ]
             },
             "GenericObject": {
                 "type": "object",
@@ -51843,6 +52407,82 @@
                 },
                 "required": [
                     "reason"
+                ]
+            },
+            "ReportCatalog": {
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ReportCatalogItem"
+                        }
+                    }
+                },
+                "required": [
+                    "results"
+                ]
+            },
+            "ReportCatalogItem": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "fields": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "exportable": {
+                        "type": "boolean"
+                    },
+                    "summary": {
+                        "type": "boolean"
+                    },
+                    "required_modules": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "available": {
+                        "type": "boolean",
+                        "nullable": true
+                    },
+                    "unavailable_reason": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "grains": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "chart_hint": {
+                        "type": "string"
+                    },
+                    "aggregate_supported": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "aggregate_supported",
+                    "available",
+                    "chart_hint",
+                    "exportable",
+                    "fields",
+                    "grains",
+                    "key",
+                    "required_modules",
+                    "summary",
+                    "title",
+                    "unavailable_reason"
                 ]
             },
             "ReportError": {

@@ -1,4 +1,4 @@
-import { BarChart, DataState, PieChart, ReportTable, StatCards } from "./OperationsReportsParts";
+import { BarChart, DataState, LineChart, PieChart, ReportTable, StatCards } from "./OperationsReportsParts";
 import { Panel } from "./shared";
 import { groupReportByMakerspace, sum, useFablabReport, type EventAttendanceRow, type FablabPanelProps, type ReportResponse } from "./operationsReportsFablabApi";
 
@@ -28,6 +28,7 @@ function EventsReport({ rows, data }: { rows: EventAttendanceRow[]; data?: Repor
     <div className="mt-4 grid gap-4 lg:grid-cols-2">
       <PieChart rows={statusRows} valueLabel="registrations" />
       <BarChart rows={rows.filter((row) => row.attendance_rate_percent !== null).map((row) => ({ label: row.title, value: row.attendance_rate_percent ?? 0 }))} valueLabel="% attended" />
+      <LineChart rows={[...rows].sort((a, b) => a.starts_at.localeCompare(b.starts_at)).map((row) => ({ label: row.starts_at, value: row.registrations }))} valueLabel="registrations" />
     </div>
     <ReportTable data={data} />
   </>;

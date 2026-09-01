@@ -47,6 +47,7 @@ export function MachineServiceConsole({ makerspaceId, canManage, machineType, ma
   const invalidate = () => void Promise.all([
     queryClient.invalidateQueries({ queryKey: ["machine-service-requests", makerspaceId, machineType.id] }),
     queryClient.invalidateQueries({ queryKey: ["machine-service-manual", makerspaceId, machineType.id] }),
+    queryClient.invalidateQueries({ queryKey: ["operations-report"] }),
     queryClient.invalidateQueries({ queryKey: poolQueryKey(makerspaceId) }),
     // Service transitions change the assigned machine's status, and manual usage its
     // usage hours; without this the integrated machine row and the status filter

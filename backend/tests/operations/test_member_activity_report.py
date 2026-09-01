@@ -10,11 +10,15 @@ from openpyxl import load_workbook
 from apps.accounts.models import User
 from apps.makerspaces.models import MakerspaceMembership, MembershipRequest
 from apps.operations import reports
-from apps.operations.report_registry import REPORT_REGISTRY
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user
 
 
 pytestmark = pytest.mark.django_db
+MEMBER_ACTIVITY_FIELDS = (
+    "makerspace_name", "membership_policy", "referrals_enabled", "new_members",
+    "active_members", "revoked_members", "pending_requests", "open_invites",
+    "referred_joins", "verified_members",
+)
 
 
 def test_member_activity_has_one_scoped_row_with_current_snapshot_metrics():
@@ -148,7 +152,7 @@ def test_member_activity_api_is_scoped_and_generic_exports_keep_the_registered_s
     aggregate = authenticated_client(superadmin).get("/api/v1/admin/analytics/member-activity")
 
     assert response.status_code == 200
-    assert response.data["rows"][0] == list(REPORT_REGISTRY["member-activity"].fields)
+    assert response.data["rows"][0] == list(MEMBER_ACTIVITY_FIELDS)
     assert forbidden.status_code == 404
     assert {row["makerspace_id"] for row in aggregate.data["typed_rows"]} == {space.id, other.id}
     assert all("makerspace_id" not in row for row in response.data["typed_rows"])
@@ -161,8 +165,8 @@ def test_member_activity_api_is_scoped_and_generic_exports_keep_the_registered_s
             f"/api/v1/admin/reports/member-activity/export?format={fmt}"
         )
         assert per_space.status_code == aggregate_export.status_code == 200
-        assert _header(per_space, fmt) == list(REPORT_REGISTRY["member-activity"].fields)
-        assert _header(aggregate_export, fmt) == ["makerspace_id", *REPORT_REGISTRY["member-activity"].fields]
+        assert _header(per_space, fmt) == list(MEMBER_ACTIVITY_FIELDS)
+        assert _header(aggregate_export, fmt) == ["makerspace_id", *MEMBER_ACTIVITY_FIELDS]
 
 
 def _header(response, fmt):

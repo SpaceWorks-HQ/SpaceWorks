@@ -75,6 +75,7 @@ EXPORTED_MODEL_FIELDS = {
     "operations.InventoryAdjustment": "id makerspace stocktake transfer product asset delta_available delta_damaged delta_lost reason created_by created_at",
     "operations.QrPrintBatch": "id makerspace title status created_by created_at printed_at",
     "operations.QrPrintBatchItem": "id batch qr_code label_text target_type target_id sort_order",
+    "operations.ReportMetricRollup": "id makerspace source_module report_key metric_key bucket_start grain dimension_key dimensions value sample_count revision source_cutoff computed_at checksum",
     "operations.StocktakeLedgerEntry": "id makerspace stocktake line product asset bucket delta old_asset_status new_asset_status reason created_by created_at",
     "operations.StocktakeLine": "id stocktake product asset container expected_quantity counted_quantity variance_quantity condition notes",
     "operations.StocktakeSession": "id makerspace container status started_by approved_by started_at completed_at approved_at notes",
@@ -169,6 +170,7 @@ OMITTED_MODELS = {
     "makerspaces.ImportedUserReconciliation": "Target-side operator reconciliation input.",
     "makerspaces.SubdomainRequest": "Source-deployment routing request.",
     "operations.PeriodicTaskRun": "Deployment scheduler state.",
+    "operations.ReportRollupCursor": "Rebuildable report rollup coordination and retention-fence state.",
     "events.EventOrganizer": (
         "It references a deployment-global organization that does not travel with "
         "a tenant export."

@@ -414,13 +414,17 @@ stored credential**, so re-enabling needs no re-entry.
 ### reports
 
 - **What it is** — analytics, the report registry and CSV/XLSX exports.
-- **What it adds** — the `analytics` and `report_export` workflows: dashboards, the ledger, problem
-  reports and every registered report.
+- **What it adds** — the `analytics` and `report_export` workflows: a server-provided report catalog,
+  dashboards, accessible charts with table fallbacks, the ledger, problem reports and every registered
+  report. The catalog covers every module either with a substantive report or an explicitly gated row in
+  a composite operational-health report.
 - **Without it** — no analytics screens and no exports from the console. It is a **standalone area
   rather than part of Inventory** on purpose: switching Inventory off would otherwise take the machine
   and event reports with it.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately; reports read
-  other modules' rows.
+- **Data** — closed historical buckets are stored as append-only, non-PII metric rollups; corrections add
+  a revision rather than rewriting history. Automatic evidence retention must finalize its rollup fence
+  first, so it cannot change historical figures. Whole-tenant purge removes the rollups through tenant
+  ownership, and an explicit source-module purge removes that module's derived rollups too.
 
 ---
 

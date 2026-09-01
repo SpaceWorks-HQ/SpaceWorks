@@ -2,21 +2,21 @@ import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
 import { downloadStaffFile } from "../../../lib/api";
-import { DataState, StatCards } from "./OperationsReportsParts";
+import { BarChart, DataState, ReportTable, StatCards } from "./OperationsReportsParts";
 import { OperationsReportsFablab } from "./OperationsReportsFablab";
 import { OperationsReportsHardware } from "./OperationsReportsHardware";
 import { OperationsReportsMachineService } from "./OperationsReportsMachineService";
 import { OperationsReportsMembers } from "./OperationsReportsMembers";
 import { OperationsReportsPayments } from "./OperationsReportsPayments";
+import { OperationsReportsPrinterService } from "./OperationsReportsPrinterService";
+import { OperationsReportsCoverage } from "./OperationsReportsCoverage";
 import { Panel, type Makerspace, useStaffGet } from "./shared";
 import {
-  exportReports,
   loadSavedReportViews,
   newSavedViewId,
-  reportDefinitions,
   reportTitle,
   savedViewsStorageKey,
-  sourceModule,
+  type ReportCatalog,
   type ReportKey,
   type SavedReportView,
 } from "./operationsReportsConfig";
@@ -47,6 +47,7 @@ export function OperationsReports({
   const [allMakerspaces, setAllMakerspaces] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [grain, setGrain] = useState("day");
   const [selectedReport, setSelectedReport] = useState<ReportKey>("most-lent");
   const [presetName, setPresetName] = useState("");
   const [savedViews, setSavedViews] = useState<SavedReportView[]>(loadSavedReportViews);
@@ -60,21 +61,28 @@ export function OperationsReports({
   const dateQuery = [startDate ? `start=${encodeURIComponent(startDate)}` : "", endDate ? `end=${encodeURIComponent(endDate)}` : ""].filter(Boolean).join("&");
   const dateSuffix = dateQuery ? `&${dateQuery}` : "";
   const reportsEnabled = aggregate || (makerspace.enabled_modules ?? []).includes("reports");
+  const catalog = useStaffGet<ReportCatalog>(
+    ["report-catalog", scopeKey],
+    aggregate ? "/admin/reports/catalog" : `/admin/makerspace/${makerspace.id}/reports/catalog`,
+    reportsEnabled,
+  );
+  const catalogEntries = catalog.data?.results ?? [];
+  useEffect(() => {
+    if (!catalog.data || catalogEntries.some((item) => item.key === selectedReport && item.available !== false)) return;
+    const firstAvailable = catalogEntries.find((item) => item.available !== false);
+    if (firstAvailable) setSelectedReport(firstAvailable.key);
+  }, [catalog.data, catalogEntries, selectedReport]);
   const hardwareEnabled = canViewAudit && reportsEnabled;
   const summary = useStaffGet<Summary>(["operations-report", "summary", scopeKey, startDate, endDate], `${analyticsBase}/summary?${dateQuery}`, hardwareEnabled);
 
   const scopeLabel = aggregate ? "all makerspaces" : makerspace.name;
   const currentScope: SavedReportView["scope"] = aggregate ? "all" : `makerspace:${makerspace.id}`;
   const makerspaceName = (id: number) => makerspaces.find((space) => space.id === id)?.name ?? `#${id}`;
-  const availableExports = exportReports.filter((key) => {
-    if (key === "payment-reconciliation" && !canManageMakerspace) return false;
-    if (!reportsEnabled) return false;
-    const module = sourceModule(key);
-    if (key === "maintenance-activity" && !aggregate && !(makerspace.enabled_modules ?? []).includes("maintenance")) return false;
-    return aggregate || module === null || (makerspace.enabled_modules ?? []).includes(module);
-  });
+  const availableExports = reportsEnabled
+    ? catalogEntries.filter((report) => report.exportable && report.available !== false)
+    : [];
   const saveCurrentView = () => {
-    const name = presetName.trim() || `${reportTitle(selectedReport)} - ${scopeLabel}`;
+    const name = presetName.trim() || `${reportTitle(selectedReport, catalogEntries)} - ${scopeLabel}`;
     const view: SavedReportView = {
       id: newSavedViewId(),
       name,
@@ -102,7 +110,7 @@ export function OperationsReports({
   const exportReport = useMutation({
     mutationFn: ({ report, format }: { report: string; format: "csv" | "xlsx" }) =>
       downloadStaffFile(
-        `${reportsBase}/${report}/export?format=${format}${dateSuffix}`,
+        `${reportsBase}/${report}/export?format=${format}${dateSuffix}&grain=${encodeURIComponent(grain)}`,
         `${aggregate ? "all-makerspaces-" : ""}${report}.${format}`,
       ),
   });
@@ -133,11 +141,18 @@ export function OperationsReports({
             <label className="eyebrow grid gap-1">
               <span>Report</span>
               <select className="desk-input" value={selectedReport} onChange={(event) => setSelectedReport(event.target.value as ReportKey)}>
-                {reportDefinitions.filter((report) => report.key !== "payment-reconciliation" || canManageMakerspace).map((report) => (
-                  <option key={report.key} value={report.key}>
+                {!catalogEntries.length ? <option value={selectedReport}>{catalog.isLoading ? "Loading reports..." : "No reports available"}</option> : null}
+                {catalogEntries.map((report) => (
+                  <option key={report.key} value={report.key} disabled={report.available === false}>
                     {report.title}
                   </option>
                 ))}
+              </select>
+            </label>
+            <label className="eyebrow grid gap-1">
+              <span>Grain</span>
+              <select className="desk-input" value={grain} onChange={(event) => setGrain(event.target.value)}>
+                <option value="day">Day</option><option value="month">Month</option>
               </select>
             </label>
             {isSuperadmin ? (
@@ -153,6 +168,7 @@ export function OperationsReports({
             ) : null}
           </div>
         </div>
+        {catalog.error ? <p className="mt-3 text-sm text-danger">{catalog.error instanceof Error ? catalog.error.message : "Could not load report catalog."}</p> : null}
         <div className="mt-4 space-y-3 border-t border-line pt-3">
           <div className="flex flex-wrap items-end gap-2">
             <label className="eyebrow grid min-w-48 gap-1">
@@ -176,7 +192,7 @@ export function OperationsReports({
                     {view.name}
                   </button>
                   <span className="text-xs text-muted">
-                    {reportTitle(view.selectedReport)} / {view.scopeLabel}
+                    {reportTitle(view.selectedReport, catalogEntries)} / {view.scopeLabel}
                   </span>
                   <button className="desk-button-danger" type="button" onClick={() => removeSavedView(view.id)} aria-label={`Remove ${view.name}`}>
                     x
@@ -199,6 +215,24 @@ export function OperationsReports({
                 ["Missing", summary.data?.missing_quantity],
               ]}
             />
+            <div className="mt-4">
+              <BarChart rows={[
+                { label: "Available", value: summary.data?.available_quantity ?? 0 },
+                { label: "Issued", value: summary.data?.issued_quantity ?? 0 },
+                { label: "Damaged", value: summary.data?.damaged_quantity ?? 0 },
+                { label: "Missing", value: summary.data?.missing_quantity ?? 0 },
+              ]} valueLabel="units" />
+            </div>
+            <ReportTable data={{ rows: [
+              ["metric", "value"],
+              ["products", summary.data?.products ?? 0],
+              ["assets", summary.data?.assets ?? 0],
+              ["active_loans", summary.data?.active_loans ?? 0],
+              ["available_quantity", summary.data?.available_quantity ?? 0],
+              ["issued_quantity", summary.data?.issued_quantity ?? 0],
+              ["damaged_quantity", summary.data?.damaged_quantity ?? 0],
+              ["missing_quantity", summary.data?.missing_quantity ?? 0],
+            ] }} />
           </DataState>
         ) : !printingOnly ? <p className="mt-3 text-sm text-muted">Module disabled</p> : null}
       </Panel>
@@ -207,14 +241,14 @@ export function OperationsReports({
       <>
       <Panel title="Exports">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {availableExports.map((report) => (
-            <div key={report} className={`rounded-md border p-3 ${selectedReport === report ? "border-accent bg-accent/10" : "border-line bg-bg"}`}>
-              <h3 className="title-section">{reportTitle(report)}</h3>
+          {availableExports.map((definition) => (
+            <div key={definition.key} className={`rounded-md border p-3 ${selectedReport === definition.key ? "border-accent bg-accent/10" : "border-line bg-bg"}`}>
+              <h3 className="title-section">{definition.title}</h3>
               <div className="mt-3 flex gap-2">
-                <button className="desk-button-ghost" type="button" disabled={exportReport.isPending} onClick={() => { setSelectedReport(report); exportReport.mutate({ report, format: "csv" }); }}>
+                <button className="desk-button-ghost" type="button" disabled={exportReport.isPending} onClick={() => { setSelectedReport(definition.key); exportReport.mutate({ report: definition.key, format: "csv" }); }}>
                   CSV
                 </button>
-                <button className="desk-button-ghost" type="button" disabled={exportReport.isPending} onClick={() => { setSelectedReport(report); exportReport.mutate({ report, format: "xlsx" }); }}>
+                <button className="desk-button-ghost" type="button" disabled={exportReport.isPending} onClick={() => { setSelectedReport(definition.key); exportReport.mutate({ report: definition.key, format: "xlsx" }); }}>
                   XLSX
                 </button>
               </div>
@@ -229,14 +263,16 @@ export function OperationsReports({
       </Panel>
 
       <OperationsReportsHardware analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} enabled={hardwareEnabled} aggregate={aggregate} makerspaceName={makerspaceName} />
+      <OperationsReportsCoverage catalog={catalogEntries} analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} grain={grain} aggregate={aggregate} makerspaceName={makerspaceName} />
       <OperationsReportsMembers makerspaceId={makerspace.id} aggregate={aggregate} startDate={startDate} endDate={endDate} enabled={hardwareEnabled} />
-      {canManageMakerspace ? <OperationsReportsPayments analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} enabled={reportsEnabled} /> : null}
+      {canManageMakerspace ? <OperationsReportsPayments analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} enabled={reportsEnabled} makerspaceName={makerspaceName} /> : null}
       </>
       ) : null}
 
       {!printingOnly ? <OperationsReportsFablab makerspace={makerspace} aggregate={aggregate} canViewAudit={canViewAudit} startDate={startDate} endDate={endDate} makerspaceName={makerspaceName} /> : null}
 
-      <OperationsReportsMachineService makerspace={makerspace} aggregate={aggregate} canManageMachines={canManageMachines} startDate={startDate} endDate={endDate} makerspaceName={makerspaceName} />
+      <OperationsReportsPrinterService makerspace={makerspace} aggregate={aggregate} canManageMachines={canManageMachines} reportsEnabled={reportsEnabled} startDate={startDate} endDate={endDate} makerspaceName={makerspaceName} />
+      <OperationsReportsMachineService makerspace={makerspace} aggregate={aggregate} canManageMachines={canManageMachines} reportsEnabled={reportsEnabled} startDate={startDate} endDate={endDate} makerspaceName={makerspaceName} />
     </div>
   );
 }

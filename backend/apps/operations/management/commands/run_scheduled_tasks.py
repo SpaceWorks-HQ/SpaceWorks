@@ -65,6 +65,11 @@ SCHEDULED_TASKS = (
         24 * 60,
     ),
     (
+        "finalize-report-rollups",
+        "apps.operations.tasks.finalize_report_rollups_task",
+        24 * 60,
+    ),
+    (
         "scheduled-deployment-backup",
         "apps.backup.tasks.scheduled_deployment_backup_task",
         24 * 60,

@@ -9,6 +9,10 @@ from apps.makerspaces.models import Makerspace
 # Re-exported so `apps.operations.models.PeriodicTaskRun` resolves and Django registers
 # the model, matching the barrel pattern the rest of this app uses.
 from apps.operations.models_scheduling import PeriodicTaskRun  # noqa: F401,E402
+from apps.operations.models_rollups import (  # noqa: F401,E402
+    ReportMetricRollup,
+    ReportRollupCursor,
+)
 
 
 class StockTransfer(models.Model):

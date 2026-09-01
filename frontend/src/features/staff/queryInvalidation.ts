@@ -24,7 +24,8 @@ export function invalidatePrintingViews(queryClient: QueryClient, makerspaceId: 
     queryClient.invalidateQueries({ queryKey: ["print-spools", makerspaceId] });
     queryClient.invalidateQueries({ queryKey: ["print-requests", makerspaceId] });
   }
-  queryClient.invalidateQueries({ queryKey: ["operations-report", "printing"] });
+  queryClient.invalidateQueries({ queryKey: ["printer-service-report"] });
+  queryClient.invalidateQueries({ queryKey: ["operations-report"] });
 }
 
 export function invalidateContainerViews(queryClient: QueryClient, makerspaceId: number, containerId?: number) {

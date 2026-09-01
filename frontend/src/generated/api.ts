@@ -185,6 +185,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/analytics/summary",
   "/api/v1/admin/makerspace/{makerspace_id}/analytics/taken-items",
   "/api/v1/admin/makerspace/{makerspace_id}/analytics/top-borrowers",
+  "/api/v1/admin/makerspace/{makerspace_id}/analytics/{report_key}",
   "/api/v1/admin/makerspace/{makerspace_id}/api-client-scopes",
   "/api/v1/admin/makerspace/{makerspace_id}/api-clients",
   "/api/v1/admin/makerspace/{makerspace_id}/api-settings",
@@ -252,6 +253,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/problem-reports/{id}/triage",
   "/api/v1/admin/makerspace/{makerspace_id}/provision-subdomain",
   "/api/v1/admin/makerspace/{makerspace_id}/qr-print-batches",
+  "/api/v1/admin/makerspace/{makerspace_id}/reports/catalog",
   "/api/v1/admin/makerspace/{makerspace_id}/reports/{report_key}/export",
   "/api/v1/admin/makerspace/{makerspace_id}/request-history",
   "/api/v1/admin/makerspace/{makerspace_id}/return-policy",
@@ -334,6 +336,7 @@ export const openApiPaths = [
   "/api/v1/admin/qr/{id}/print",
   "/api/v1/admin/qr/{id}/rebind-target",
   "/api/v1/admin/qr/{id}/revoke",
+  "/api/v1/admin/reports/catalog",
   "/api/v1/admin/reports/{report_key}/export",
   "/api/v1/admin/requests/{id}/accept",
   "/api/v1/admin/requests/{id}/assign-box",
@@ -586,7 +589,7 @@ export type AdminRequestItem = {
   "issued_assets": Array<unknown>;
 };
 
-export type AnalyticsReportResponse = AnalyticsSummary | TakenItemsReport | ActiveLoansReport | ReturnsReport | DamagedMissingReport | DamagedLostReport | QrScansReport | MostLentReport | TopBorrowersReport | RecentlyAddedReport | MachineUsageReport | EventAttendanceReport | BookingUtilizationReport | MaintenanceActivityReport | MemberActivityReport | FabLabHealthReport | PaymentReconciliationReport;
+export type AnalyticsReportResponse = AnalyticsSummary | TakenItemsReport | ActiveLoansReport | ReturnsReport | DamagedMissingReport | DamagedLostReport | QrScansReport | MostLentReport | TopBorrowersReport | RecentlyAddedReport | MachineUsageReport | EventAttendanceReport | BookingUtilizationReport | MaintenanceActivityReport | MemberActivityReport | FabLabHealthReport | PaymentReconciliationReport | GenericAnalyticsReport;
 
 export type AnalyticsSummary = {
   "products": number;
@@ -1779,6 +1782,17 @@ export type ForgotPasswordRequest = {
 };
 
 export type FrontendDomainStatusEnum = "pending" | "verified" | "failed";
+
+export type GenericAnalyticsReport = {
+  "report_key"?: string;
+  "rows": Array<Array<unknown>>;
+  "typed_rows"?: Array<{
+  [key: string]: unknown;
+}>;
+  "meta"?: {
+  [key: string]: unknown;
+};
+};
 
 export type GenericObject = {
   "detail"?: string;
@@ -4764,6 +4778,24 @@ export type RefreshResponse = {
 
 export type RejectRequest = {
   "reason": string;
+};
+
+export type ReportCatalog = {
+  "results": Array<ReportCatalogItem>;
+};
+
+export type ReportCatalogItem = {
+  "key": string;
+  "title": string;
+  "fields": Array<string>;
+  "exportable": boolean;
+  "summary": boolean;
+  "required_modules": Array<string>;
+  "available": boolean | null;
+  "unavailable_reason": string | null;
+  "grains": Array<string>;
+  "chart_hint": string;
+  "aggregate_supported": boolean;
 };
 
 export type ReportError = {

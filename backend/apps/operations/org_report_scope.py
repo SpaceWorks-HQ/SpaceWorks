@@ -30,6 +30,27 @@ ORGANIZATION_REPORT_ACTIONS = frozenset({
     rbac.Action.MANAGE_MAKERSPACE,
 })
 EXCLUDED_ORGANIZATION_REPORT_KEYS = frozenset({
+    # Unique borrowers can span makerspaces, while the duration averages do not
+    # expose the sample counts needed to combine them without bias.
+    "loan-throughput",
+    # Its rate_percent rows use heterogeneous, unexposed denominators (for example
+    # public products versus active containers), so one weighted total is undefined.
+    "inventory-control",
+    # Import diagnostics intentionally retain their tenant/job context; flattening
+    # failures and warning rates would hide which makerspace needs remediation.
+    "import-quality",
+    # The average order/receipt durations do not expose their qualifying sample
+    # counts, so an organization average cannot be reconstructed correctly.
+    "procurement-performance",
+    # Delivery configuration and health are tenant-local, and repeated destination
+    # counts plus per-status rates do not form one truthful organization total.
+    "communications-health",
+    # Active accounts are distinct-person metrics that may refer to the same person
+    # in several owned makerspaces and therefore cannot be summed safely.
+    "community-engagement",
+    # Enabled/available/rollup state is per makerspace; combining it would mask the
+    # specific unhealthy or stale tenant that an operator must repair.
+    "module-operational-health",
     "machine-service",
     "printer-service",
 })

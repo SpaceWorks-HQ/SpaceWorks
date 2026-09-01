@@ -139,6 +139,7 @@ export function StaffTabContent({
           maintenanceEnabled={activeMakerspace.enabled_modules?.includes("maintenance") ?? false}
           machineServiceEnabled={activeMakerspace.enabled_modules?.includes("machine_service") ?? false}
           printingEnabled={activeMakerspace.enabled_modules?.includes("printing") ?? false}
+          reportsEnabled={activeMakerspace.enabled_modules?.includes("reports") ?? false}
           guestOnly={guestOnly}
           makerspaceSlug={activeMakerspace.slug}
           singleTenantLocked={singleTenantLocked}
