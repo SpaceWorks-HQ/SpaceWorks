@@ -6,6 +6,11 @@ from apps.events.models_attendance import EventCheckInEvent
 from apps.events.models_feedback import EventFeedbackResponse, EventFeedbackSurvey
 from apps.events.models_certificates import EventAttendanceCertificate
 from apps.events.organizer_models import EventOrganizer
+from apps.events.models_series import (
+    EventSeries,
+    EventSeriesCollaborator,
+    EventSeriesOrganizer,
+)
 
 __all__ = [
     "Event",
@@ -16,4 +21,7 @@ __all__ = [
     "EventFeedbackSurvey",
     "EventOrganizer",
     "EventRegistration",
+    "EventSeries",
+    "EventSeriesCollaborator",
+    "EventSeriesOrganizer",
 ]

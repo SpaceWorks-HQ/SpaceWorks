@@ -44,6 +44,13 @@ class EventCollaborator(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     responded_at = models.DateTimeField(null=True, blank=True)
+    source_series_collaboration = models.ForeignKey(
+        "events.EventSeriesCollaborator",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="occurrence_collaborators",
+    )
 
     class Meta:
         unique_together = (("event", "makerspace"),)

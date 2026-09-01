@@ -6,6 +6,10 @@ class CapacityConflict(Exception):
     pass
 
 
+class UseSeriesCollaborators(Exception):
+    pass
+
+
 class RegistrationClosed(Exception):
     pass
 

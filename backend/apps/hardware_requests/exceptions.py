@@ -10,6 +10,7 @@ from apps.events.exceptions import (
     CapacityConflict,
     DuplicateRegistration,
     EventInvalidTransition,
+    UseSeriesCollaborators,
     FeedbackConflict,
     FeedbackIneligible,
     RegistrationClosed,
@@ -130,6 +131,11 @@ _EXCEPTION_MAP = {
         status.HTTP_409_CONFLICT,
         "invalid_transition",
         "Invalid event transition.",
+    ),
+    UseSeriesCollaborators: (
+        status.HTTP_409_CONFLICT,
+        "use_series_collaborators",
+        "Manage projected collaborators on the event series.",
     ),
     FeedbackConflict: (
         status.HTTP_409_CONFLICT,

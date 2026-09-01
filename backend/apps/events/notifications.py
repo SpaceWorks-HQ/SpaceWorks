@@ -117,3 +117,20 @@ def notify_event_lifecycle(
                 extra={"event_id": event_id, "makerspace_id": link.makerspace_id},
             )
     return venue_result
+
+
+def notify_series_lifecycle(series_obj, event_name, *, sync=False):
+    """Send one bounded lifecycle message for a series, never one per occurrence."""
+    occurrence = series_obj.occurrences.order_by("starts_at", "pk").first()
+    if occurrence is None:
+        return None
+    try:
+        return _notify_makerspace(
+            occurrence.pk, series_obj.makerspace, event_name, None, sync=sync
+        )
+    except Exception:
+        logger.warning(
+            "event_series_notification_failed",
+            extra={"series_id": series_obj.pk, "makerspace_id": series_obj.makerspace_id},
+        )
+        return None

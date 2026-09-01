@@ -50,6 +50,7 @@ FIELD_OBJECT_RULES = (
                     coordination_path="makerspace_id",
                     coordination_reason="data_export_coordination"),
     FieldObjectRule("events.Event", "image_key", BucketRule.PUBLIC_IMAGE),
+    FieldObjectRule("events.EventSeries", "image_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("events.EventAttendanceCertificate", "object_key", BucketRule.PRIVATE),
     FieldObjectRule("evidence.EvidencePhoto", "object_key", BucketRule.PRIVATE),
     FieldObjectRule("inventory.InventoryProduct", "image_key", BucketRule.PUBLIC_IMAGE),

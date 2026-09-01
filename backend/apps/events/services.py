@@ -29,6 +29,7 @@ EVENT_FIELDS = frozenset(
      'registration_requires_approval', 'registration_cutoff_at',
      'registration_cutoff_lead_minutes'}
 )
+INHERITABLE_FIELDS = EVENT_FIELDS | {"image_key"}
 
 
 def _locked_event(event_id):
@@ -100,7 +101,7 @@ def create_event(
 
 
 @transaction.atomic
-def update_event(event, *, actor, **changes):
+def update_event(event, *, actor, inherit_fields=(), **changes):
     locked = _locked_event(event.pk)
     if locked.status not in (Event.Status.DRAFT, Event.Status.PUBLISHED):
         raise EventInvalidTransition("Terminal events cannot be updated.")
@@ -109,6 +110,23 @@ def update_event(event, *, actor, **changes):
         raise serializers.ValidationError(
             {field: "This field cannot be updated." for field in sorted(unknown)}
         )
+    inherit_fields = set(inherit_fields or ())
+    invalid_inherit = inherit_fields - INHERITABLE_FIELDS
+    if invalid_inherit:
+        raise serializers.ValidationError(
+            {field: "This field cannot inherit from a series." for field in invalid_inherit}
+        )
+    if inherit_fields & set(changes):
+        raise serializers.ValidationError(
+            {field: "A field cannot be changed and inherited together." for field in inherit_fields & set(changes)}
+        )
+    if inherit_fields and locked.series_id is None:
+        raise serializers.ValidationError({"inherit_fields": "This event is not in a series."})
+    if inherit_fields:
+        from apps.events.services_series import occurrence_inherited_value
+
+        for field in inherit_fields:
+            changes[field] = occurrence_inherited_value(locked, field)
 
     if 'custom_form' in changes:
         changes['custom_form'] = _canonical_form(changes['custom_form'])
@@ -123,7 +141,7 @@ def update_event(event, *, actor, **changes):
         )
 
     now = timezone.now()
-    old_capacity, old_ends_at = locked.capacity, locked.ends_at
+    old_capacity, old_ends_at, old_image_key = locked.capacity, locked.ends_at, locked.image_key
     for field, value in changes.items():
         setattr(locked, field, value)
     _validate(locked)
@@ -153,8 +171,23 @@ def update_event(event, *, actor, **changes):
             )
 
     if changes:
-        locked.save(update_fields=[*sorted(changes), "updated_at"])
+        update_fields = set(changes)
+        if locked.series_id:
+            overrides = set(locked.series_override_fields or [])
+            overrides.update(set(changes) - inherit_fields)
+            overrides.difference_update(inherit_fields)
+            locked.series_override_fields = sorted(overrides)
+            update_fields.add("series_override_fields")
+        locked.save(update_fields=[*sorted(update_fields), "updated_at"])
+        if "image_key" in inherit_fields and old_image_key:
+            from apps.inventory import public_image_storage
+
+            public_image_storage.release_public_image_on_commit(
+                locked.makerspace, old_image_key
+            )
     meta = {"changed_fields": sorted(changes)}
+    if inherit_fields:
+        meta["inherited_fields"] = sorted(inherit_fields)
     if capacity_changed:
         meta.update(
             old_capacity=old_capacity,
@@ -198,7 +231,7 @@ def publish(event, *, actor):
 
 
 @transaction.atomic
-def cancel(event, *, actor):
+def cancel(event, *, actor, notify=True):
     locked = _locked_event(event.pk)
     if locked.status != Event.Status.PUBLISHED:
         raise EventInvalidTransition(
@@ -243,7 +276,8 @@ def cancel(event, *, actor):
         locked,
         {"old_status": Event.Status.PUBLISHED, "new_status": Event.Status.CANCELLED},
     )
-    notify_event_lifecycle(locked, "cancelled")
+    if notify:
+        notify_event_lifecycle(locked, "cancelled")
     return _refresh(locked)
 
 

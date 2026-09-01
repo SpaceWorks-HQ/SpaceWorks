@@ -107,6 +107,7 @@ class CollaborativeEventSerializer(serializers.Serializer):
     host_slug = serializers.SlugField(source="makerspace.slug", read_only=True)
     host_waiver = serializers.SerializerMethodField()
     organizers = EventOrganizerSummarySerializer(many=True, read_only=True)
+    series = serializers.SerializerMethodField()
 
     @extend_schema_field(
         {"type": "string", "enum": ["Available", "Limited", "Full"]}
@@ -124,7 +125,16 @@ class CollaborativeEventSerializer(serializers.Serializer):
 
     @extend_schema_field(serializers.URLField(allow_null=True))
     def get_image_url(self, obj):
-        return public_image_storage.public_url(obj.image_key) or None
+        key = obj.image_key
+        if obj.series_id and "image_key" not in (obj.series_override_fields or []):
+            key = obj.series.image_key
+        return public_image_storage.public_url(key) or None
+
+    @extend_schema_field({'type': 'object', 'nullable': True})
+    def get_series(self, obj):
+        if not obj.series_id:
+            return None
+        return {'public_token': obj.series.public_token, 'title': obj.series.title}
 
     @extend_schema_field(HostWaiverSerializer(allow_null=True))
     def get_host_waiver(self, obj):

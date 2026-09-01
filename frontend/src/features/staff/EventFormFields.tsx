@@ -1,4 +1,5 @@
 import type { EventPayload, StaffEvent } from "./eventsApi";
+import { CustomFormBuilder } from "../forms/CustomFormBuilder";
 
 export type EventFormValues = Omit<EventPayload, "starts_at" | "ends_at" | "registration_cutoff_at"> & {
   starts_at: string;
@@ -11,6 +12,7 @@ export const emptyEventForm: EventFormValues = {
   capacity: 0, payment_amount: "0.00", registration_requires_approval: false,
   registration_cutoff_at: null, registration_cutoff_lead_minutes: null,
   is_public: false,
+  custom_form: null,
 };
 
 function localDate(value: string) {
@@ -28,6 +30,7 @@ export function valuesFor(event: StaffEvent): EventFormValues {
     registration_cutoff_at: event.registration_cutoff_at ? localDate(event.registration_cutoff_at) : null,
     registration_cutoff_lead_minutes: event.registration_cutoff_lead_minutes,
     is_public: event.is_public,
+    custom_form: event.custom_form,
   };
 }
 
@@ -59,5 +62,6 @@ export function EventFields({ values, setValues, disabled = false, approvalLocke
     <label className="grid gap-1 text-sm font-semibold text-ink sm:col-span-2">Description<textarea className="desk-input min-h-24" value={values.description} onChange={(e) => set("description", e.target.value)} disabled={disabled} /></label>
     <label className="flex items-center gap-2 text-sm text-ink sm:col-span-2"><input type="checkbox" checked={values.registration_requires_approval} onChange={(e) => set("registration_requires_approval", e.target.checked)} disabled={disabled || approvalLocked} />Require staff approval for registrations</label>
     <label className="flex items-center gap-2 text-sm text-ink sm:col-span-2"><input type="checkbox" checked={values.is_public} onChange={(e) => set("is_public", e.target.checked)} disabled={disabled} />Show this event on the public Events page</label>
+    <div className="sm:col-span-2"><CustomFormBuilder value={values.custom_form} onChange={(value) => set("custom_form", value)} disabled={disabled} /></div>
   </div>;
 }

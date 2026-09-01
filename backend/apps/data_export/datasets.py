@@ -25,6 +25,8 @@ DATASET_SPECS = {
     "boxes.QrCode": ("inventory/qr_mappings.csv", P(("makerspace",))),
     "boxes.QrScanEvent": ("lending/qr_scan_events.csv", P(("makerspace",), ("qr_code__makerspace",))),
     "events.Event": ("events/events.csv", P(("makerspace",))),
+    "events.EventSeries": ("events/series.csv", P(("makerspace",))),
+    "events.EventSeriesCollaborator": ("events/series_collaborators.csv", P(("series__makerspace", "makerspace"))),
     "events.EventCollaborator": ("events/collaborators.csv", P(("event__makerspace", "makerspace"))),
     "events.EventRegistration": ("events/registrations.csv", P(("event__makerspace",))),
     "events.EventCheckInEvent": ("events/check_in_history.csv", P(("registration__event__makerspace",))),

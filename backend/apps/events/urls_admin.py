@@ -42,8 +42,84 @@ from apps.events.views_collaborators import (
     EventCollaborationRespondView,
     EventCollaboratorListView,
 )
+from apps.events.views_series import (
+    EventSeriesCancelView,
+    EventSeriesCompleteView,
+    EventSeriesDetailView,
+    EventSeriesExtendView,
+    EventSeriesListCreateView,
+    EventSeriesOccurrenceListView,
+    EventSeriesPublishView,
+)
+from apps.events.views_series_collaboration import (
+    EventSeriesCollaborationInboxView,
+    EventSeriesCollaborationRemoveView,
+    EventSeriesCollaborationRespondView,
+    EventSeriesCollaboratorListView,
+)
+from apps.events.views_series_image import EventSeriesImageView
 
 urlpatterns = [
+    path(
+        'makerspaces/<int:makerspace_id>/event-series/',
+        EventSeriesListCreateView.as_view(),
+        name='admin-event-series-list-create',
+    ),
+    path(
+        'event-series/<int:pk>/',
+        EventSeriesDetailView.as_view(),
+        name='admin-event-series-detail',
+    ),
+    path(
+        'event-series/<int:pk>/occurrences/',
+        EventSeriesOccurrenceListView.as_view(),
+        name='admin-event-series-occurrences',
+    ),
+    path(
+        'event-series/<int:pk>/publish/',
+        EventSeriesPublishView.as_view(),
+        name='admin-event-series-publish',
+    ),
+    path(
+        'event-series/<int:pk>/cancel/',
+        EventSeriesCancelView.as_view(),
+        name='admin-event-series-cancel',
+    ),
+    path(
+        'event-series/<int:pk>/complete/',
+        EventSeriesCompleteView.as_view(),
+        name='admin-event-series-complete',
+    ),
+    path(
+        'event-series/<int:pk>/extend/',
+        EventSeriesExtendView.as_view(),
+        name='admin-event-series-extend',
+    ),
+    path(
+        'event-series/<int:pk>/image',
+        EventSeriesImageView.as_view(),
+        name='admin-event-series-image',
+    ),
+    path(
+        'event-series/<int:pk>/collaborators/',
+        EventSeriesCollaboratorListView.as_view(),
+        name='admin-event-series-collaborators',
+    ),
+    path(
+        'event-series-collaborations/<int:pk>/remove/',
+        EventSeriesCollaborationRemoveView.as_view(),
+        name='admin-event-series-collaboration-remove',
+    ),
+    path(
+        'makerspaces/<int:makerspace_id>/event-series-collaborations/',
+        EventSeriesCollaborationInboxView.as_view(),
+        name='admin-event-series-collaboration-inbox',
+    ),
+    path(
+        'event-series-collaborations/<int:pk>/respond/',
+        EventSeriesCollaborationRespondView.as_view(),
+        name='admin-event-series-collaboration-respond',
+    ),
     path(
         'makerspaces/<int:makerspace_id>/events/',
         EventListCreateView.as_view(),

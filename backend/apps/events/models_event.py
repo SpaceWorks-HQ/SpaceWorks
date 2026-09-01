@@ -31,6 +31,16 @@ class Event(models.Model):
         on_delete=models.CASCADE,
         related_name="events",
     )
+    series = models.ForeignKey(
+        "events.EventSeries",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="occurrences",
+    )
+    series_occurrence_key = models.CharField(max_length=48, null=True, blank=True)
+    series_revision = models.PositiveIntegerField(null=True, blank=True)
+    series_override_fields = models.JSONField(default=list, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     starts_at = models.DateTimeField()
@@ -109,6 +119,25 @@ class Event(models.Model):
                 ),
                 name="event_registration_cutoff_not_after_start",
             ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        series__isnull=True,
+                        series_occurrence_key__isnull=True,
+                        series_revision__isnull=True,
+                    )
+                    | Q(
+                        series__isnull=False,
+                        series_occurrence_key__isnull=False,
+                        series_revision__isnull=False,
+                    )
+                ),
+                name="event_series_identity_all_or_none",
+            ),
+            models.UniqueConstraint(
+                fields=("series", "series_occurrence_key"),
+                name="uniq_event_series_occurrence_key",
+            ),
         ]
         indexes = [
             models.Index(
@@ -122,6 +151,9 @@ class Event(models.Model):
             models.Index(
                 fields=["makerspace", "is_public", "status", "ends_at"],
                 name="event_public_lookup_idx",
+            ),
+            models.Index(
+                fields=["series", "starts_at"], name="event_series_start_idx"
             ),
         ]
 
@@ -142,6 +174,19 @@ class Event(models.Model):
             raise ValidationError({
                 "registration_cutoff_at": "Registration cutoff cannot be after the event starts."
             })
+        identity = (
+            self.series_id,
+            self.series_occurrence_key,
+            self.series_revision,
+        )
+        if any(value is None for value in identity) and any(value is not None for value in identity):
+            raise ValidationError("Series occurrence identity must be entirely set or entirely empty.")
+        if self.series_id and self.makerspace_id != self.series.makerspace_id:
+            raise ValidationError({"series": "Series and occurrence must share a makerspace."})
+        if not isinstance(self.series_override_fields, list) or any(
+            not isinstance(value, str) for value in self.series_override_fields
+        ):
+            raise ValidationError({"series_override_fields": "Expected a list of field names."})
     def save(self, *args, **kwargs):
         self.title = (self.title or "").strip()
         if self.pk:

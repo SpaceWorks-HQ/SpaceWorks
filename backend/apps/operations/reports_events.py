@@ -6,7 +6,8 @@ from apps.operations.report_scope import scoped_ids
 
 
 FIELDS = (
-    "event_id", "title", "starts_at", "status", "capacity", "registrations",
+    "event_id", "series_id", "series_title", "series_occurrence_key", "title",
+    "starts_at", "status", "capacity", "registrations",
     "confirmed", "pending_approval", "registered", "waitlisted", "rejected",
     "cancelled", "attended",
     "attendance_rate_percent", "feedback_responses", "active_certificates",
@@ -27,7 +28,8 @@ def build_event_attendance(makerspace_id, *, limit=None, date_range=None):
             queryset = queryset.filter(starts_at__lt=end)
     statuses = EventRegistration.Status
     queryset = queryset.values(
-        "id", "makerspace_id", "title", "starts_at", "status", "capacity"
+        "id", "makerspace_id", "series_id", "series__title",
+        "series_occurrence_key", "title", "starts_at", "status", "capacity"
     ).annotate(
         total=Count("registrations", distinct=True),
         pending_approval_count=Count("registrations", filter=Q(registrations__status=statuses.PENDING_APPROVAL), distinct=True),
@@ -69,7 +71,10 @@ def build_event_attendance(makerspace_id, *, limit=None, date_range=None):
         if row["status"] == Event.Status.COMPLETED and denominator:
             rate = round(row["attended_count"] / denominator * 100, 2)
         record = {
-            "event_id": row["id"], "title": row["title"],
+            "event_id": row["id"], "series_id": row["series_id"],
+            "series_title": row["series__title"] or "",
+            "series_occurrence_key": row["series_occurrence_key"] or "",
+            "title": row["title"],
             "starts_at": row["starts_at"], "status": row["status"],
             "capacity": row["capacity"], "registrations": row["total"],
             "confirmed": denominator,

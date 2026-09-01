@@ -39,8 +39,18 @@ def events_delete(makerspace, cursor):
         EventFeedbackResponse,
         EventFeedbackSurvey,
         EventRegistration,
+        EventSeries,
+        EventSeriesCollaborator,
     )
 
+    projected_collaborations, projected_collaboration_labels = _delete(
+        EventCollaborator.objects.filter(
+            source_series_collaboration__makerspace=makerspace
+        ).exclude(event__makerspace=makerspace)
+    )
+    series_collaborations, series_collaboration_labels = _delete(
+        EventSeriesCollaborator.objects.filter(makerspace=makerspace)
+    )
     collaborations, collaboration_labels = _delete(
         EventCollaborator.objects.filter(makerspace=makerspace)
     )
@@ -68,11 +78,15 @@ def events_delete(makerspace, cursor):
         EventRegistration.objects.filter(event__makerspace=makerspace)
     )
     events, event_labels = _delete(Event.objects.filter(makerspace=makerspace))
+    series, series_labels = _delete(EventSeries.objects.filter(makerspace=makerspace))
     return _counts(
         model_labels=(
             collaboration_labels | certificate_labels | response_labels
             | survey_labels | checkin_labels | registration_labels | event_labels
+            | projected_collaboration_labels | series_collaboration_labels | series_labels
         ),
+        event_series_collaboration_projections=projected_collaborations,
+        event_series_collaborations=series_collaborations,
         event_collaborations=collaborations,
         event_certificates=certificates,
         event_feedback_responses=responses,
@@ -81,15 +95,17 @@ def events_delete(makerspace, cursor):
         event_registration_provenance_cleared=provenance_cleared,
         event_registrations=registrations,
         events=events,
+        event_series=series,
     )
 
 
 def events_public_images(makerspace):
-    from apps.events.models import Event
+    from apps.events.models import Event, EventSeries
 
-    return list(
-        Event.objects.filter(makerspace=makerspace).values_list("image_key", flat=True)
-    )
+    return [
+        *Event.objects.filter(makerspace=makerspace).values_list("image_key", flat=True),
+        *EventSeries.objects.filter(makerspace=makerspace).values_list("image_key", flat=True),
+    ]
 
 
 def events_private_keys(makerspace, add):

@@ -173,6 +173,18 @@ _ENTRIES = (
         "The event publication controls are tenant-owned content.",
     ),
     *_same(
+        "events.EventSeries",
+        "is_public status",
+        D.PRESERVE,
+        "The series publication controls are tenant-owned content.",
+    ),
+    *_same(
+        "events.EventSeries",
+        "public_token",
+        D.RESET,
+        "Source series bearer tokens are regenerated.",
+    ),
+    *_same(
         "events.Event",
         "public_token",
         D.RESET,

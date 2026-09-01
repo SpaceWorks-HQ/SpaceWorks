@@ -46,6 +46,17 @@ class EventWriteSerializer(serializers.Serializer):
     registration_cutoff_lead_minutes = serializers.IntegerField(
         allow_null=True, default=None, min_value=0, required=False,
     )
+    inherit_fields = serializers.ListField(
+        child=serializers.ChoiceField(choices=sorted((
+            'title', 'description', 'starts_at', 'ends_at', 'location',
+            'location_kind', 'custom_form', 'capacity', 'is_public', 'payment_amount',
+            'registration_requires_approval', 'registration_cutoff_at',
+            'registration_cutoff_lead_minutes',
+            'image_key',
+        ))),
+        required=False,
+        write_only=True,
+    )
 
     def validate(self, attrs):
         starts_at = attrs.get('starts_at', getattr(self.instance, 'starts_at', None))
@@ -105,12 +116,16 @@ class EventAdminSerializer(serializers.ModelSerializer):
     organizers = EventOrganizerSummarySerializer(many=True, read_only=True)
     effective_registration_cutoff_at = serializers.SerializerMethodField()
     registration_open = serializers.SerializerMethodField()
+    series_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
         fields = (
             'id',
             'makerspace_id',
+            'series_summary',
+            'series_revision',
+            'series_override_fields',
             'title',
             'description',
             'starts_at',
@@ -140,7 +155,27 @@ class EventAdminSerializer(serializers.ModelSerializer):
     # URL, matching PublicMachineSerializer.
     @extend_schema_field(serializers.URLField(allow_null=True))
     def get_image_url(self, obj):
-        return public_image_storage.public_url(obj.image_key) or None
+        key = obj.image_key
+        if obj.series_id and "image_key" not in (obj.series_override_fields or []):
+            key = obj.series.image_key
+        return public_image_storage.public_url(key) or None
+
+    @extend_schema_field({
+        'type': 'object', 'nullable': True,
+        'properties': {
+            'id': {'type': 'integer'}, 'public_token': {'type': 'string', 'format': 'uuid'},
+            'title': {'type': 'string'}, 'timezone': {'type': 'string'},
+        },
+    })
+    def get_series_summary(self, obj):
+        if not obj.series_id:
+            return None
+        return {
+            'id': obj.series_id,
+            'public_token': obj.series.public_token,
+            'title': obj.series.title,
+            'timezone': obj.series.recurrence_timezone,
+        }
 
     @extend_schema_field(serializers.DateTimeField(allow_null=True))
     def get_effective_registration_cutoff_at(self, obj):

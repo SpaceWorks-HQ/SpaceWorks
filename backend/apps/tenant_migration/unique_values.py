@@ -127,6 +127,12 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
     ("events.Event", "field:public_token"): _policy(
         FRESH, "Source bearer tokens are replaced."
     ),
+    ("events.EventSeries", "field:public_token"): _policy(
+        FRESH, "Source series bearer tokens are replaced."
+    ),
+    ("events.Event", "uniq_event_series_occurrence_key"): _policy(
+        REMAP, "The series reference is remapped with its occurrence identity."
+    ),
     ("events.EventRegistration", "field:checkin_token"): _policy(
         FRESH, "Source check-in credentials are replaced."
     ),

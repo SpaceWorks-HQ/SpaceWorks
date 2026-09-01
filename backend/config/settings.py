@@ -569,6 +569,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.hardware_requests.tasks.send_return_reminders_task",
         "schedule": crontab(minute=0),
     },
+    "extend-event-series": {
+        "task": "apps.events.tasks.extend_event_series_task",
+        "schedule": crontab(minute=10),
+    },
     # Spent email/phone verification challenges hold an address or a number and nothing
     # deleted them. Off-peak because it is a pure delete nobody is waiting on.
     "purge-auth-challenges": {
@@ -632,6 +636,12 @@ if "tenant_migration" in TOMBSTONED_APPS:
         name: entry
         for name, entry in CELERY_BEAT_SCHEDULE.items()
         if ".tenant_migration." not in entry["task"]
+    }
+if "events" in TOMBSTONED_APPS:
+    CELERY_BEAT_SCHEDULE = {
+        name: entry
+        for name, entry in CELERY_BEAT_SCHEDULE.items()
+        if ".events." not in entry["task"]
     }
 
 CORS_ALLOWED_ORIGINS = env.list(

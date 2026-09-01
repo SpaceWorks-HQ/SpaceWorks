@@ -14,6 +14,9 @@ class MachineUsageRowSerializer(TypedReportBaseSerializer):
 
 class EventAttendanceRowSerializer(TypedReportBaseSerializer):
     event_id = serializers.IntegerField()
+    series_id = serializers.IntegerField(allow_null=True)
+    series_title = serializers.CharField(allow_blank=True)
+    series_occurrence_key = serializers.CharField(allow_blank=True)
     title = serializers.CharField()
     starts_at = serializers.DateTimeField()
     status = serializers.CharField()

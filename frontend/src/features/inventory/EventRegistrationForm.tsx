@@ -3,6 +3,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { ApiPath } from "../../generated/api";
 import { StructuredApiError, tenantPublicRequest } from "../../lib/api";
+import { CustomFormFields } from "../forms/CustomFormFields";
+import {
+  customAnswerErrors,
+  validateCustomAnswers,
+  type CustomAnswers,
+  type CustomFormSchema,
+} from "../forms/customFormTypes";
 
 type RegistrationResult = { status: "pending_approval" | "registered" | "waitlisted" };
 
@@ -26,15 +33,18 @@ function failureMessage(error: StructuredApiError | null) {
   return error.detail ?? error.message;
 }
 
-export function EventRegistrationForm({ makerspaceSlug, publicToken, waitlist, approvalRequired }: {
+export function EventRegistrationForm({ makerspaceSlug, publicToken, waitlist, approvalRequired, customForm }: {
   makerspaceSlug: string; publicToken: string; waitlist: boolean; approvalRequired: boolean;
+  customForm: CustomFormSchema;
 }) {
   const queryClient = useQueryClient();
   const [website, setWebsite] = useState("");
+  const [answers, setAnswers] = useState<CustomAnswers>({});
+  const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const successRef = useRef<HTMLDivElement>(null);
   const registration = useMutation({
     mutationFn: async () => {
-      const rawTransportBody = { website };
+      const rawTransportBody = { website, custom_answers: answers };
       return tenantPublicRequest<RegistrationResult>(makerspaceSlug, registerPath(makerspaceSlug, publicToken), {
         method: "POST", body: JSON.stringify(rawTransportBody),
       });
@@ -55,15 +65,20 @@ export function EventRegistrationForm({ makerspaceSlug, publicToken, waitlist, a
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    const errors = validateCustomAnswers(customForm, answers);
+    setClientErrors(errors);
+    if (Object.keys(errors).length) return;
     if (!registration.isPending) registration.mutate();
   };
   const apiError = registration.error instanceof StructuredApiError ? registration.error : null;
+  const serverErrors = customAnswerErrors(apiError?.body.custom_answers);
 
   return <form className="grid gap-3 rounded-lg border border-line bg-bg p-4" onSubmit={submit} noValidate>
     <h3 className="title-section">{approvalRequired ? "Apply" : waitlist ? "Join the waitlist" : "Register"}</h3>
     <label className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">Website
       <input name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
     </label>
+    <CustomFormFields schema={customForm} answers={answers} onChange={setAnswers} errors={{ ...serverErrors, ...clientErrors }} />
     {registration.error ? <p className="text-sm text-danger" role="alert">{failureMessage(apiError)}</p> : null}
     <button className="desk-button-primary" type="submit" disabled={registration.isPending}>
       {registration.isPending ? "Submitting..." : approvalRequired ? "Apply" : waitlist ? "Join waitlist" : "Register"}

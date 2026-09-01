@@ -38,10 +38,9 @@ class TenantDumpCatalogError(AssertionError):
 
 # SHA-256 of the ordered model/table/field graph produced by ``catalog_schema``.
 # Updating it is an explicit review act; runtime introspection never blesses drift.
-# Re-blessed for the four post-event models (EventCheckInEvent, EventFeedbackSurvey,
-# EventFeedbackResponse, EventAttendanceCertificate). Verified the model-universe
-# checks above pass first, so the drift is those models' fields and nothing else.
-CATALOG_SCHEMA_SHA256 = "25fa0a0b54bc81f1d03612d8a45ac4987453239f29b3ca5ce1c6cbdbe226163a"
+# Re-blessed for recurring event series after the explicit model/field dispositions,
+# authority policies, and cross-tenant collaboration rules were added above.
+CATALOG_SCHEMA_SHA256 = "eda37deff0b105d3fa5cff58a906a50d2ed0ef056a60ba541aff51284b5218d4"
 
 
 def catalog_models(apps_registry=apps):

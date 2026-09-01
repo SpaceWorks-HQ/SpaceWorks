@@ -32,6 +32,11 @@ EXPECTED_FIELDS = {
     'image_url',
     'status',
     'organizers',
+    # Recurrence grouping only: {public_token, title}. The series public_token is an
+    # opaque public identifier -- deliberately NOT the sequential internal series id --
+    # and no public route consumes it, so it grants nothing. The title is already public
+    # via the occurrence itself.
+    'series',
 }
 FORBIDDEN_KEYS = {
     'id',

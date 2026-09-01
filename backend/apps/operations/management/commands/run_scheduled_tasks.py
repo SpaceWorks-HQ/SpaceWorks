@@ -48,6 +48,7 @@ SCHEDULED_TASKS = (
         1,
     ),
     ("return-reminders", "apps.hardware_requests.tasks.send_return_reminders_task", 60),
+    ("extend-event-series", "apps.events.tasks.extend_event_series_task", 60),
     ("purge-auth-challenges", "apps.accounts.tasks.purge_auth_challenges_task", 24 * 60),
     # Beat runs this at a fixed hour; the beat-less runner has no wall-clock schedule, so
     # the cadence is expressed as the interval instead. Daily either way.
@@ -119,6 +120,8 @@ if "tenant_migration" in settings.TOMBSTONED_APPS:
     SCHEDULED_TASKS = tuple(
         task for task in SCHEDULED_TASKS if ".tenant_migration." not in task[1]
     )
+if "events" in settings.TOMBSTONED_APPS:
+    SCHEDULED_TASKS = tuple(task for task in SCHEDULED_TASKS if ".events." not in task[1])
 
 
 def _import_task(dotted_path):

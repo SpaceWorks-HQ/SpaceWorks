@@ -7,9 +7,10 @@ from rest_framework.exceptions import ValidationError
 
 def public_image_key_in_use(
     makerspace_id, object_key, *, product_id=None, machine_id=None, event_id=None,
+    series_id=None,
     profile_id=None, project_id=None, makerspace_field="",
 ):
-    from apps.events.models import Event
+    from apps.events.models import Event, EventSeries
     from apps.inventory.models import InventoryProduct
     from apps.machines.models import Machine
     from apps.makerspaces.models import Makerspace, MemberProfile, MemberProject
@@ -32,6 +33,11 @@ def public_image_key_in_use(
     if event_id is not None:
         events = events.exclude(pk=event_id)
     if events.exists():
+        return True
+    series = EventSeries.objects.filter(makerspace_id=makerspace_id, image_key=object_key)
+    if series_id is not None:
+        series = series.exclude(pk=series_id)
+    if series.exists():
         return True
     profiles = MemberProfile.objects.filter(
         membership__makerspace_id=makerspace_id, avatar_key=object_key

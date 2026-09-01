@@ -38,6 +38,10 @@ EVENTS_REQUESTER_SUBJECTS = {
     "registration_cancelled": "Your registration for {{ event.title }} was cancelled",
     "registration_promoted": "A place has opened up for {{ event.title }}",
     "registration_attended": "Your attendance at {{ event.title }} is recorded",
+    "series_published": "{{ event.title }} recurring schedule published",
+    "series_cancelled": "{{ event.title }} recurring schedule cancelled",
+    "series_completed": "{{ event.title }} recurring schedule completed",
+    "series_generation_failed": "{{ event.title }} needs schedule attention",
 }
 
 EVENTS_REQUESTER_BODIES = {
@@ -72,6 +76,10 @@ EVENTS_REQUESTER_BODIES = {
         "now confirmed."
     ),
     "registration_attended": "Your attendance has been recorded.",
+    "series_published": "The recurring schedule is now published.",
+    "series_cancelled": "The recurring schedule has been cancelled.",
+    "series_completed": "The recurring schedule is complete.",
+    "series_generation_failed": "Automatic occurrence generation needs staff attention.",
 }
 
 EVENTS_REQUESTER_TEXT = """Hello {{ registration.name|default:"there" }},

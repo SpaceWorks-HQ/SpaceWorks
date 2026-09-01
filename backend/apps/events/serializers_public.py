@@ -29,6 +29,7 @@ PUBLIC_EVENT_FIELDS = (
     'image_url',
     'status',
     'organizers',
+    'series',
 )
 
 
@@ -60,6 +61,7 @@ class PublicEventSerializer(serializers.Serializer):
         read_only=True,
     )
     organizers = EventOrganizerSummarySerializer(many=True, read_only=True)
+    series = serializers.SerializerMethodField()
 
     @extend_schema_field(
         {
@@ -82,7 +84,22 @@ class PublicEventSerializer(serializers.Serializer):
     # resolved URL, exactly as PublicMachineSerializer does.
     @extend_schema_field(serializers.URLField(allow_null=True))
     def get_image_url(self, obj):
-        return public_image_storage.public_url(obj.image_key) or None
+        key = obj.image_key
+        if obj.series_id and "image_key" not in (obj.series_override_fields or []):
+            key = obj.series.image_key
+        return public_image_storage.public_url(key) or None
+
+    @extend_schema_field({
+        'type': 'object', 'nullable': True,
+        'properties': {
+            'public_token': {'type': 'string', 'format': 'uuid'},
+            'title': {'type': 'string'},
+        },
+    })
+    def get_series(self, obj):
+        if not obj.series_id:
+            return None
+        return {'public_token': obj.series.public_token, 'title': obj.series.title}
 
 
 class PublicEventRegistrationInputSerializer(

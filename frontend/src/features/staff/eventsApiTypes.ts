@@ -35,6 +35,11 @@ export type StaffEvent = {
   created_at: string;
   updated_at: string;
   registration_counts: EventRegistrationCounts;
+  series_summary: {
+    id: number; public_token: string; title: string; timezone: string;
+  } | null;
+  series_revision: number | null;
+  series_override_fields: string[];
 };
 
 export type EventRegistration = {
@@ -60,9 +65,10 @@ export type EventPayload = {
   registration_cutoff_at: string | null;
   registration_cutoff_lead_minutes: number | null;
   is_public: boolean;
+  custom_form: CustomFormSchema;
 };
 
-export type EventPatch = Partial<EventPayload>;
+export type EventPatch = Partial<EventPayload> & { inherit_fields?: string[] };
 export type Paginated<T> = {
   count: number;
   next: string | null;

@@ -5,6 +5,8 @@ MAKERSPACE_KWARG_ROUTES = {
     'admin-maintenance-log-list-create': 'makerspace_id',
     'admin-bookable-space-list-create': 'makerspace_id',
     'admin-event-list-create': 'makerspace_id',
+    'admin-event-series-list-create': 'makerspace_id',
+    'admin-event-series-collaboration-inbox': 'makerspace_id',
     'admin-role-capabilities': 'makerspace_id',
     'admin-role-list-create': 'makerspace_id',
     'admin-role-detail': 'makerspace_id',
@@ -83,6 +85,20 @@ MODEL_LOOKUPS = {
     'admin-booking-complete': ('bookings.Booking', 'space__makerspace_id'),
     'admin-booking-no-show': ('bookings.Booking', 'space__makerspace_id'),
     'admin-event-detail': ('events.Event', 'makerspace_id'),
+    'admin-event-series-detail': ('events.EventSeries', 'makerspace_id'),
+    'admin-event-series-occurrences': ('events.EventSeries', 'makerspace_id'),
+    'admin-event-series-publish': ('events.EventSeries', 'makerspace_id'),
+    'admin-event-series-cancel': ('events.EventSeries', 'makerspace_id'),
+    'admin-event-series-complete': ('events.EventSeries', 'makerspace_id'),
+    'admin-event-series-extend': ('events.EventSeries', 'makerspace_id'),
+    'admin-event-series-image': ('events.EventSeries', 'makerspace_id'),
+    'admin-event-series-collaborators': ('events.EventSeries', 'makerspace_id'),
+    'admin-event-series-collaboration-remove': (
+        'events.EventSeriesCollaborator', 'series__makerspace_id'
+    ),
+    'admin-event-series-collaboration-respond': (
+        'events.EventSeriesCollaborator', 'makerspace_id'
+    ),
     'admin-event-publish': ('events.Event', 'makerspace_id'),
     'admin-event-cancel': ('events.Event', 'makerspace_id'),
     'admin-event-complete': ('events.Event', 'makerspace_id'),

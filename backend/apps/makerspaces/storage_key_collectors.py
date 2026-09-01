@@ -35,13 +35,13 @@ def collect_private_object_keys(makerspace, *, include_coordination=True):
 
 def collect_public_image_keys(makerspace, *, include_coordination=True):
     from apps.bookings.models import BookableSpace
-    from apps.events.models import Event
+    from apps.events.models import Event, EventSeries
     from apps.inventory.models import InventoryProduct
     from apps.machines.models import Machine
     from apps.makerspaces.models import MemberProfile, MemberProject
 
     keys = [makerspace.logo_key, makerspace.cover_image_key]
-    for model in (BookableSpace, Event, InventoryProduct, Machine):
+    for model in (BookableSpace, Event, EventSeries, InventoryProduct, Machine):
         keys.extend(
             model.objects.filter(makerspace=makerspace).values_list("image_key", flat=True)
         )

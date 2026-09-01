@@ -17,8 +17,10 @@ EXPORTED_MODEL_FIELDS = {
     "boxes.BoxScan": "id makerspace box request actor context created_at",
     "boxes.QrCode": "id makerspace payload target_type target_id status created_by revoked_at created_at updated_at",
     "boxes.QrScanEvent": "id makerspace qr_code request actor context created_at",
-    "events.Event": "id public_token makerspace title description starts_at ends_at location location_kind custom_form capacity payment_amount registration_requires_approval registration_cutoff_at registration_cutoff_lead_minutes is_public image_key status created_by created_at updated_at",
-    "events.EventCollaborator": "id event makerspace status invited_by responded_by created_at responded_at",
+    "events.EventSeries": "id public_token makerspace title description location location_kind custom_form capacity payment_amount registration_requires_approval registration_cutoff_lead_minutes is_public image_key recurrence_timezone dtstart_local_date dtstart_local_time recurrence_rule duration_minutes revision status last_materialized_at last_generation_error_code created_by created_at updated_at",
+    "events.EventSeriesCollaborator": "id series makerspace status invited_by responded_by created_at responded_at",
+    "events.Event": "id public_token makerspace series series_occurrence_key series_revision series_override_fields title description starts_at ends_at location location_kind custom_form capacity payment_amount registration_requires_approval registration_cutoff_at registration_cutoff_lead_minutes is_public image_key status created_by created_at updated_at",
+    "events.EventCollaborator": "id event makerspace status invited_by responded_by created_at responded_at source_series_collaboration",
     "events.EventRegistration": "id event checkin_token name email phone member registered_via_makerspace payment_via_makerspace host_waiver host_waiver_accepted_at host_waiver_version_accepted email_exact_hash email_hash_generation custom_answers status created_at",
     "events.EventCheckInEvent": "id registration source attended_at recorded_by created_at",
     "events.EventFeedbackSurvey": "id event title thank_you_text questions is_open certificate_enabled answered_question_ids opened_at closed_at created_at updated_at",
@@ -174,6 +176,10 @@ OMITTED_MODELS = {
     "makerspaces.SubdomainRequest": "Source-deployment routing request.",
     "operations.PeriodicTaskRun": "Deployment scheduler state.",
     "events.EventOrganizer": (
+        "It references a deployment-global organization that does not travel with "
+        "a tenant export."
+    ),
+    "events.EventSeriesOrganizer": (
         "It references a deployment-global organization that does not travel with "
         "a tenant export."
     ),
