@@ -33,6 +33,13 @@ TenantBootstrapSerializer = inline_serializer(
                 "membership_policy": serializers.ChoiceField(
                     choices=Makerspace.MembershipPolicy.choices
                 ),
+                # `required=False` for the same reason as `geofence_enabled`: the key is
+                # emitted ONLY when the makerspace opted into account-less requests, so
+                # every other deployment keeps a byte-for-byte identical payload. Absent
+                # means an account is required.
+                "request_access": serializers.ChoiceField(
+                    choices=[("anyone", "anyone")], required=False
+                ),
             },
         ),
         "frontend": inline_serializer(

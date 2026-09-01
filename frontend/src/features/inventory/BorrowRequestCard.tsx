@@ -12,6 +12,22 @@ type BorrowRequestCardProps = {
   onClear: () => void;
   onRequestedForChange: (value: string) => void;
   onSubmit: () => void;
+  // Account-less mode: the makerspace opted into requests without an account, so the
+  // borrower has no profile to read a name and email from and must supply them here.
+  accountLess?: boolean;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  onContactNameChange?: (value: string) => void;
+  onContactEmailChange?: (value: string) => void;
+  onContactPhoneChange?: (value: string) => void;
+  // Honeypot, carried by every other public form (booking, printing, events). A bot that
+  // autofills it gets the server's decoy response instead of a real request.
+  website?: string;
+  onWebsiteChange?: (value: string) => void;
+  // The ONLY handle an account-less requester has on their request: their contact details
+  // are unverified so no lifecycle email is sent, and status lookup is by token.
+  publicToken?: string;
 };
 
 export function BorrowRequestCard({
@@ -25,6 +41,16 @@ export function BorrowRequestCard({
   onClear,
   onRequestedForChange,
   onSubmit,
+  accountLess = false,
+  contactName = "",
+  contactEmail = "",
+  contactPhone = "",
+  onContactNameChange,
+  onContactEmailChange,
+  onContactPhoneChange,
+  website = "",
+  onWebsiteChange,
+  publicToken,
 }: BorrowRequestCardProps) {
   return (
     <Card>
@@ -44,8 +70,9 @@ export function BorrowRequestCard({
 
       {items.length === 0 ? (
         <p className="mt-4 text-sm leading-6 text-muted">
-          Add public items from the inventory list, then submit the request with
-          your signed-in member account.
+          {accountLess
+            ? "Add public items from the inventory list, then leave your name and email to submit the request."
+            : "Add public items from the inventory list, then submit the request with your signed-in member account."}
         </p>
       ) : (
         <div className="mt-4 space-y-2">
@@ -67,6 +94,59 @@ export function BorrowRequestCard({
       )}
 
       <div className="mt-5 space-y-3">
+        {accountLess ? (
+          <div className="space-y-3">
+            <label className="block">
+              <span className="eyebrow mb-1 block">Your name</span>
+              <input
+                autoComplete="name"
+                className="desk-input w-full"
+                maxLength={200}
+                placeholder="Ada Lovelace"
+                type="text"
+                value={contactName}
+                onChange={(event) => onContactNameChange?.(event.target.value)}
+              />
+            </label>
+            <label className="block">
+              <span className="eyebrow mb-1 block">Email</span>
+              <input
+                autoComplete="email"
+                className="desk-input w-full"
+                maxLength={254}
+                placeholder="you@example.com"
+                type="email"
+                value={contactEmail}
+                onChange={(event) => onContactEmailChange?.(event.target.value)}
+              />
+            </label>
+            <label className="block">
+              <span className="eyebrow mb-1 block">Phone (optional)</span>
+              <input
+                autoComplete="tel"
+                className="desk-input w-full"
+                maxLength={32}
+                placeholder="+44 20 1234 5678"
+                type="tel"
+                value={contactPhone}
+                onChange={(event) => onContactPhoneChange?.(event.target.value)}
+              />
+            </label>
+          </div>
+        ) : null}
+        <label
+          aria-hidden="true"
+          className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden"
+        >
+          Website
+          <input
+            autoComplete="off"
+            name="website"
+            tabIndex={-1}
+            value={website}
+            onChange={(event) => onWebsiteChange?.(event.target.value)}
+          />
+        </label>
         <label className="block">
           <span className="eyebrow mb-1 block">
             Request purpose
@@ -90,9 +170,23 @@ export function BorrowRequestCard({
         {submitted ? (
           <div className="rounded-xl border border-success bg-success px-3 py-2 text-on-success dark:bg-success/15 dark:text-success-ink">
             <h3 className="title-section text-on-success dark:text-success-ink">Request submitted</h3>
-            <p className="mt-1 text-xs">
-              Check this page with your email to follow the request.
-            </p>
+            {accountLess ? (
+              <>
+                <p className="mt-1 text-xs">
+                  Save this reference — an account-less request has no sign-in to come back
+                  to, and staff will ask for it.
+                </p>
+                {publicToken ? (
+                  <p className="mt-2 break-all rounded-lg bg-surface px-2 py-1 font-mono text-xs text-ink">
+                    {publicToken}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="mt-1 text-xs">
+                Check this page with your email to follow the request.
+              </p>
+            )}
           </div>
         ) : null}
       </div>

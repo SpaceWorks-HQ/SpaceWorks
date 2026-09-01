@@ -27,8 +27,14 @@ type Overdue = {
 type Restriction = { requester_id: number; username: string; access_status: string; restriction_reason: string };
 type ProblemReportItem = { id: number; product_name: string; issued_quantity: number; tracking_mode: string };
 type ProblemReport = { id: number; requester_username: string; label: string; note: string; created_at: string; items: ProblemReportItem[] };
+type AnonymousAccountability = { damaged: number; missing: number; total_issues: number; total_quantity: number };
 type AccountabilityResponse = {
   repeat_offenders: Offender[];
+  // Account-less loans all share one requester principal, so they are excluded from the
+  // per-person ranking above and reported as a total instead. Rendering it is not
+  // optional: without it the panel reads "No damage or loss on record" while account-less
+  // incidents exist.
+  anonymous_accountability?: AnonymousAccountability;
   overdue: Overdue[];
   restrictions: Restriction[];
   problem_reports: ProblemReport[];
@@ -50,6 +56,7 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
   const [restrictionReason, setRestrictionReason] = useState("");
   const report = useStaffGet<AccountabilityResponse>(["accountability", makerspace.id], `/admin/makerspace/${makerspace.id}/accountability`);
   const data = report.data;
+  const anonymous = data?.anonymous_accountability;
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["accountability", makerspace.id] });
@@ -121,8 +128,25 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
       </Panel>
 
       <Panel title="Repeat offenders">
+        {anonymous && anonymous.total_issues > 0 ? (
+          <div className="mb-4 rounded-xl border border-warn bg-warn/10 px-3 py-2">
+            <p className="text-sm font-medium text-ink">
+              Account-less loans: {anonymous.total_issues}{" "}
+              {anonymous.total_issues === 1 ? "incident" : "incidents"} ({anonymous.total_quantity}{" "}
+              {anonymous.total_quantity === 1 ? "item" : "items"})
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              {anonymous.damaged} damaged, {anonymous.missing} missing. These have no person to
+              rank or restrict, so they are reported as a total rather than as a row above.
+            </p>
+          </div>
+        ) : null}
         {!data?.repeat_offenders.length ? (
-          <p className="text-sm text-muted">No damage or loss on record.</p>
+          <p className="text-sm text-muted">
+            {anonymous && anonymous.total_issues > 0
+              ? "No damage or loss recorded against a named person."
+              : "No damage or loss on record."}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[36rem] text-sm">

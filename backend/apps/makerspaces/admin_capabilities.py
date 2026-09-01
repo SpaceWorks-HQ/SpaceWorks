@@ -6,6 +6,7 @@ from apps.audit import services as audit
 from apps.makerspaces.capabilities import FEATURE_DEFINITIONS, validate_capabilities
 from apps.makerspaces.admin_images import MakerspaceAdminForm as ImageMakerspaceAdminForm
 from apps.makerspaces.module_registry import MODULES
+from apps.makerspaces.request_access import effective_policy
 
 
 class CapabilityMatrixWidget(forms.CheckboxSelectMultiple):
@@ -80,6 +81,12 @@ class MakerspaceAdminForm(ImageMakerspaceAdminForm):
             "modules": sorted(set(self.instance.enabled_modules or [])),
             "features": sorted(set(self.instance.enabled_features or [])),
         }
+        # Captured here, from the UNMODIFIED instance: `clean_capabilities` rewrites
+        # `enabled_modules` in place, so by `save_model` the old policy is gone. Ticking
+        # `membership` in this matrix forces account-less requests off inside
+        # `Makerspace.save()`, and the module/feature lists alone cannot tell an
+        # `anyone -> members` change from an `accounts -> members` one.
+        self.request_access_before = effective_policy(self.instance)
 
     def clean_capabilities(self):
         values = self.cleaned_data["capabilities"]
@@ -102,11 +109,23 @@ class MakerspaceCapabilityAdminMixin:
             "modules": sorted(set(obj.enabled_modules or [])),
             "features": sorted(set(obj.enabled_features or [])),
         }
-        if change and before != after:
+        request_access_before = getattr(form, "request_access_before", None)
+        request_access_after = effective_policy(obj)
+        request_access_changed = (
+            request_access_before is not None
+            and request_access_before != request_access_after
+        )
+        if change and (before != after or request_access_changed):
+            meta = {"before": before, "after": after}
+            if request_access_changed:
+                meta["request_access"] = {
+                    "before": request_access_before,
+                    "after": request_access_after,
+                }
             audit.record(
                 request.user,
                 "makerspace.capabilities_changed",
                 makerspace=obj,
                 target=obj,
-                meta={"before": before, "after": after},
+                meta=meta,
             )

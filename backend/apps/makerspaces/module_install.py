@@ -16,6 +16,7 @@ from apps.audit import services as audit
 from apps.makerspaces.capabilities import prune_features, validate_capabilities
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.module_profiles import MINIMAL, profile_modules
+from apps.makerspaces.request_access import effective_policy
 from apps.makerspaces.module_registry import (
     BY_KEY,
     MODULES,
@@ -124,6 +125,12 @@ def apply_profile(makerspace, profile, actor=None):
 def _apply(locked, modules, actor):
     before = sorted(set(locked.enabled_modules or []))
     before_features = sorted(set(locked.enabled_features or []))
+    # Installing `membership` FORCES account-less requests off inside `Makerspace.save()`
+    # below, because the pair is impossible. That flip is a change of who may submit a
+    # borrow request, so it has to be audited -- and it can only be audited here: `save()`
+    # has no actor, and the capability meta records module and feature lists only, which
+    # cannot distinguish a previous `anyone` policy from `accounts`.
+    before_request_access = effective_policy(locked)
     # Drop features whose modules are going away BEFORE validating, or the validation
     # refuses the change outright -- see `prune_features` for why this is a removal
     # rather than an error or a silent keep.
@@ -134,18 +141,30 @@ def _apply(locked, modules, actor):
     locked.enabled_modules = canonical_modules
     locked.enabled_features = canonical_features
     locked.save(update_fields=["enabled_modules", "enabled_features"])
-    if before != canonical_modules or before_features != sorted(canonical_features):
+    after_request_access = effective_policy(locked)
+    request_access_changed = before_request_access != after_request_access
+    if (
+        before != canonical_modules
+        or before_features != sorted(canonical_features)
+        or request_access_changed
+    ):
+        meta = {
+            "before": {"modules": before, "features": before_features},
+            "after": {"modules": canonical_modules, "features": sorted(canonical_features)},
+            # Named explicitly: a feature removed as a consequence of a module going
+            # away is the kind of change an operator will otherwise discover only
+            # when something stops charging.
+            "features_dropped_with_modules": dropped_features,
+        }
+        if request_access_changed:
+            meta["request_access"] = {
+                "before": before_request_access,
+                "after": after_request_access,
+            }
         audit.record(
             actor,
             "makerspace.capabilities_changed",
             makerspace=locked,
             target=locked,
-            meta={
-                "before": {"modules": before, "features": before_features},
-                "after": {"modules": canonical_modules, "features": sorted(canonical_features)},
-                # Named explicitly: a feature removed as a consequence of a module going
-                # away is the kind of change an operator will otherwise discover only
-                # when something stops charging.
-                "features_dropped_with_modules": dropped_features,
-            },
+            meta=meta,
         )

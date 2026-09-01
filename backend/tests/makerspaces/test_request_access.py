@@ -94,6 +94,43 @@ def test_installing_membership_closes_account_less_requests():
     assert space.anonymous_requests_enabled is False
 
 
+def test_the_forced_close_is_audited_with_the_before_and_after_policy():
+    """The flip happens inside `Makerspace.save()`, which has no actor, so it is audited on
+    the module-change path instead. Without this the capability meta carries module and
+    feature lists only -- which cannot distinguish a previous `anyone` policy from
+    `accounts` -- and the operator loses the record that installing membership closed an
+    unauthenticated write surface."""
+    space = _space("ra-forced-audit", modules=CORE_PLUS, anonymous=True)
+
+    install_module(space, "membership")
+
+    entry = AuditLog.objects.filter(action="makerspace.capabilities_changed").latest("id")
+    assert entry.meta["request_access"] == {"before": ANYONE, "after": MEMBERS}
+
+
+def test_installing_membership_records_the_accounts_to_members_move_too():
+    """Not only the forced-off case: installing membership moves `accounts` -> `members`
+    even when account-less requests were already off, and that is still a change in who
+    may submit."""
+    space = _space("ra-accounts-to-members", modules=CORE_PLUS)
+
+    install_module(space, "membership")
+
+    entry = AuditLog.objects.filter(action="makerspace.capabilities_changed").latest("id")
+    assert entry.meta["request_access"] == {"before": ACCOUNTS, "after": MEMBERS}
+
+
+def test_an_unrelated_module_change_records_no_policy_meta():
+    """The key is omitted rather than emitted-as-unchanged, so an auditor reading the log
+    sees a request-access entry only where the policy actually moved."""
+    space = _space("ra-unrelated-audit", modules=CORE_PLUS)
+
+    install_module(space, "telegram")
+
+    entry = AuditLog.objects.filter(action="makerspace.capabilities_changed").latest("id")
+    assert "request_access" not in entry.meta
+
+
 def test_uninstalling_membership_does_not_reopen_account_less_requests():
     """Forcing off is one-way. Re-opening an unauthenticated write surface is an
     explicit operator act, never a side effect of removing an unrelated module."""
@@ -202,3 +239,44 @@ def test_an_anonymous_submission_is_refused_when_membership_is_installed():
     )
 
     assert response.status_code == 401
+
+
+# --------------------------------------------------------------- /control/ matrix
+
+
+def test_the_control_capability_matrix_audits_the_forced_policy_change():
+    """The `/control/` matrix does NOT go through `module_install._apply` -- the admin
+    mixin saves the model directly -- so it needs its own before/after capture. The model
+    still forces account-less requests off, but module and feature lists alone cannot tell
+    an `anyone -> members` change from an `accounts -> members` one.
+    """
+    from types import SimpleNamespace
+
+    from django.contrib.admin import ModelAdmin
+    from django.contrib.admin.sites import AdminSite
+
+    from apps.accounts.models import User
+    from apps.makerspaces.admin_capabilities import (
+        MakerspaceAdminForm,
+        MakerspaceCapabilityAdminMixin,
+    )
+
+    class _CapabilityAdmin(MakerspaceCapabilityAdminMixin, ModelAdmin):
+        """The mixin relies on `super().save_model`, so it needs a real ModelAdmin."""
+
+    space = _space("ra-control-matrix", modules=CORE_PLUS, anonymous=True)
+    assert effective_policy(space) == ANYONE
+
+    form = MakerspaceAdminForm(instance=space)
+    # Captured from the unmodified instance, before `clean_capabilities` rewrites it.
+    assert form.request_access_before == ANYONE
+
+    actor = User.objects.create_user(username="ra-control-actor", is_superuser=True)
+    space.enabled_modules = [*CORE_PLUS, "membership", "member_accounts"]
+    admin = _CapabilityAdmin(Makerspace, AdminSite())
+    admin.save_model(SimpleNamespace(user=actor), space, form, change=True)
+
+    space.refresh_from_db()
+    assert space.anonymous_requests_enabled is False
+    entry = AuditLog.objects.filter(action="makerspace.capabilities_changed").latest("id")
+    assert entry.meta["request_access"] == {"before": ANYONE, "after": MEMBERS}

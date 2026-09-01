@@ -244,3 +244,47 @@ def test_staff_origin_scope_filters_makerspace_list_and_blocks_cross_tenant_targ
     assert cross_list.status_code == 403
     assert own_detail.status_code == 200
     assert cross_detail.status_code == 403
+
+
+def test_bootstrap_omits_request_access_unless_the_space_opted_in():
+    """Absent means "an account is required", which is what every client assumed before
+    the policy existed. Emitting it unconditionally would change the payload for every
+    deployment, and the byte-for-byte dormant-payload invariant forbids that -- the same
+    reason `/api/v1/config` emits `member_accounts` only when off."""
+    makerspace = make_space("platform-request-access-default")
+    makerspace.enabled_modules = ["public_inventory", "request_workflow"]
+    makerspace.save()
+
+    response = APIClient().get(f"/api/v1/bootstrap?slug={makerspace.slug}")
+
+    assert response.status_code == 200
+    assert "request_access" not in response.data["makerspace"]
+
+
+def test_bootstrap_publishes_request_access_when_account_less_requests_are_on():
+    """The public borrow form reads this to decide whether to collect contact details and
+    send an Idempotency-Key. Without it the client posts a member-shaped body and takes a
+    400 on a space that advertises "no account needed"."""
+    makerspace = make_space("platform-request-access-anyone")
+    makerspace.enabled_modules = ["public_inventory", "request_workflow"]
+    makerspace.anonymous_requests_enabled = True
+    makerspace.save()
+
+    response = APIClient().get(f"/api/v1/bootstrap?slug={makerspace.slug}")
+
+    assert response.status_code == 200
+    assert response.data["makerspace"]["request_access"] == "anyone"
+
+
+def test_bootstrap_withholds_request_access_when_membership_makes_it_impossible():
+    """Fails closed on the read path too: a row carrying both settings (raw SQL, an old
+    backup) must not advertise account-less submission the view would refuse."""
+    makerspace = make_space("platform-request-access-impossible")
+    makerspace.enabled_modules = ["public_inventory", "request_workflow", "membership"]
+    makerspace.anonymous_requests_enabled = True
+    makerspace.save()
+
+    response = APIClient().get(f"/api/v1/bootstrap?slug={makerspace.slug}")
+
+    assert response.status_code == 200
+    assert "request_access" not in response.data["makerspace"]

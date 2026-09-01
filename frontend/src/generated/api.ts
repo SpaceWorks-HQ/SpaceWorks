@@ -3,7 +3,7 @@
 
 export const openApiInfo = {
   "title": "Space Works API",
-  "version": "0.7.5"
+  "version": "0.8.0"
 } as const;
 
 export const openApiTags = [
@@ -4771,6 +4771,8 @@ export type ReportError = {
   "code"?: string;
 };
 
+export type RequestAccessEnum = "anyone";
+
 export type RequestItemInput = {
   "product_id": number;
   "quantity": number;
@@ -5353,6 +5355,7 @@ export type TenantBootstrapMakerspace = {
   "cover_image_url": string | null;
   "public_stats_enabled": boolean;
   "membership_policy": MembershipPolicyEnum;
+  "request_access"?: RequestAccessEnum;
 };
 
 export type TenantBootstrapPublicApi = {

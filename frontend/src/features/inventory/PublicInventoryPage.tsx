@@ -289,6 +289,7 @@ export function PublicInventoryPage() {
             makerspaceSlug={makerspaceSlug}
             onClear={() => setCart({})}
             disabled={!requestEnabled}
+            requestAccess={bootstrap?.makerspace.request_access}
           />
         </div>
       </section>
