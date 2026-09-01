@@ -5,6 +5,7 @@ from django.db.models import Count, Sum
 
 from apps.hardware_requests.display import label_from_candidates
 from apps.hardware_requests.models import HardwareRequest, HardwareRequestItem
+from apps.makerspaces.anonymous_requesters import anonymous_requester_ids
 from apps.makerspaces.models import MakerspaceMembership, MembershipRequest
 from apps.operations.report_scope import ReportScope, scope_queryset
 
@@ -19,6 +20,10 @@ def globally_ranked_borrowers(scope: ReportScope, *, date_range, limit):
         makerspace_field="request__makerspace_id",
     )
     items = _range(items, "request__issued_at", date_range)
+    # Same reason as the per-space ranking: the shared account-less principal is not a
+    # person and must not occupy a rank. Excluded before the slice so it cannot displace
+    # a real borrower from the top `limit`.
+    items = items.exclude(request__requester_id__in=anonymous_requester_ids())
     ranked = list(
         items.values("request__requester_id")
         .annotate(

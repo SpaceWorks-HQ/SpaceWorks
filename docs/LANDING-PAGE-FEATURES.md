@@ -293,7 +293,7 @@ supported installation without them.
 | Membership | Join requests, waivers, referrals, profiles, directory and activity | People can still borrow, but enrolment and community features disappear |
 | Notifications | In-app inbox and unread state | No in-app alerts; separately installed outbound channels can still send |
 | Email | Makerspace email through its SMTP account | No tenant email; platform recovery and verification mail still sends |
-| Telegram | Group alerts, test delivery and accept/reject buttons | No Telegram alerts or chat-based request decisions |
+| Telegram | Group alerts and test delivery | No Telegram alerts |
 | Slack | Slack incoming-webhook destination | No Slack notification surface |
 | Mattermost | Mattermost incoming-webhook destination | No Mattermost notification surface |
 | Discord | Discord incoming-webhook destination | No Discord notification surface |

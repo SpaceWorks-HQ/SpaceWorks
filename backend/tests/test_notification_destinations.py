@@ -333,19 +333,22 @@ def test_a_telegram_room_shares_the_makerspace_bot():
     assert telegram.resolve_bot_token(space) == "space-token"
 
 
-def test_inbound_callbacks_do_not_depend_on_which_room_sent_the_message():
-    """G6: the reason one bot per makerspace is enough.
+def test_no_room_can_turn_a_telegram_alert_into_an_action_surface():
+    """G6, restated for a one-way channel.
 
-    An accept/reject button posts back to a single registered webhook authenticated by
-    one deployment-wide secret. Routing resolves the ACTOR from `from.id` and the request
-    from the callback data — the chat the button was pressed in is never consulted — so
-    adding rooms cannot strand a callback. If this ever starts reading a chat id, per-room
-    Telegram destinations need per-bot webhook secrets and inbound routing first.
+    This used to pin inbound callback routing: an accept/reject button posted back to a
+    single registered webhook, and routing never consulted the chat it came from, so
+    adding rooms could not strand a callback. **The buttons are gone.** What has to hold
+    now is simpler and stricter — no room, however configured, gets an inline keyboard,
+    because an inline keyboard IS the action surface that was removed. If a button is
+    ever reintroduced, per-room destinations need per-bot webhook secrets and inbound
+    routing before it ships.
     """
-    from apps.integrations.views import _parse_callback
+    import inspect
 
-    assert _parse_callback("accept:42") == ("accept", 42, "")
-    assert _parse_callback("reject:42:out of stock") == ("reject", 42, "out of stock")
+    from apps.integrations import telegram
+
+    assert "reply_markup" not in inspect.signature(telegram.send_message).parameters
 
 
 @override_settings(TELEGRAM_BOT_TOKEN="deployment-token")

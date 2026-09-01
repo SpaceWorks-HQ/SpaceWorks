@@ -1,6 +1,14 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { focusFirstDialogElement, trapDialogFocus } from "./dialogFocus";
+import {
+  consumePendingRestore,
+  focusFirstDialogElement,
+  getSnapshot,
+  popDialog,
+  pushDialog,
+  subscribe,
+  trapDialogFocus,
+} from "./dialogFocus";
 // Bundle the wasm binary with our own build (Vite emits it under /assets) instead
 // of letting zxing-wasm fetch it from the jsdelivr CDN - the strict app CSP only
 // allows connect-src 'self', so the CDN fetch would be blocked and detection would
@@ -23,7 +31,13 @@ const loadZxingReader = () => {
 
 export default function QrScanner({ onScan, onClose }: QrScannerProps) {
   const titleId = useId();
+  const layerRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const tokenRef = useRef<symbol | null>(null);
+  const top = useSyncExternalStore(subscribe, getSnapshot);
+  const amTop = top === tokenRef.current;
+  const amTopRef = useRef(amTop);
+  amTopRef.current = amTop;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<number | null>(null);
@@ -59,10 +73,16 @@ export default function QrScanner({ onScan, onClose }: QrScannerProps) {
   }, [onScan]);
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const token = pushDialog({
+      previousFocus,
+      getPanel: () => panelRef.current,
+      getLayer: () => layerRef.current,
+    });
+    tokenRef.current = token;
     const panel = panelRef.current;
-    if (panel) focusFirstDialogElement(panel);
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!amTopRef.current) return;
       if (event.key === "Escape") close();
       if (panel) trapDialogFocus(event, panel);
     };
@@ -70,9 +90,22 @@ export default function QrScanner({ onScan, onClose }: QrScannerProps) {
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      previousFocus?.focus();
+      popDialog(token);
+      if (tokenRef.current === token) tokenRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!amTop) return;
+    consumePendingRestore(panelRef.current);
+    // Initial focus lives HERE, not in the push effect. A dialog that opens while another sits
+    // above it renders with `inert` on its layer, and `inert` is only cleared by the re-render
+    // that follows becoming topmost -- so focusing from the push effect silently fails, and
+    // consumePendingRestore no-ops because nothing was popped. This effect runs post-commit,
+    // once `inert` is gone. jsdom implements no `inert` at all, so no unit test can catch this.
+    const panel = panelRef.current;
+    if (panel && !panel.contains(document.activeElement)) focusFirstDialogElement(panel);
+  }, [amTop]);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,8 +212,8 @@ export default function QrScanner({ onScan, onClose }: QrScannerProps) {
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-3 sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="flex max-h-[90vh] w-full max-w-lg flex-col gap-3 overflow-y-auto rounded-lg border border-line bg-panel p-4 shadow-xl outline-none">
+    <div ref={layerRef} inert={!amTop} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-3 sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
+      <div ref={panelRef} role="dialog" aria-modal={amTop ? "true" : undefined} aria-labelledby={titleId} tabIndex={-1} className="flex max-h-[90vh] w-full max-w-lg flex-col gap-3 overflow-y-auto rounded-lg border border-line bg-panel p-4 shadow-xl outline-none">
         <h2 id={titleId} className="sr-only">QR scanner</h2>
         {error ? (
           <div className="grid gap-3">

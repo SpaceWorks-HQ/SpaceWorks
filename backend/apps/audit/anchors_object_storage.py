@@ -31,8 +31,14 @@ class ObjectStorageAnchorSink(ObjectStorageRotationMixin):
         self.retention_days = int(
             getattr(settings, "AUDIT_ATTESTATION_RETENTION_DAYS", 0)
         )
+        # `or "COMPLIANCE"` because BLANK is not the same as absent here. Compose passes
+        # `AUDIT_ATTESTATION_S3_OBJECT_LOCK_MODE: ${...:-}`, which makes the variable
+        # present-but-empty, and django-environ only applies its default when a variable
+        # is ABSENT -- so the setting arrives as "" and the getattr default never fires.
+        # Every deployment that left the mode unset in .env therefore refused to anchor.
+        # COMPLIANCE is the stricter of the two modes, so defaulting to it fails safe.
         self.lock_mode = str(
-            getattr(settings, "AUDIT_ATTESTATION_S3_OBJECT_LOCK_MODE", "COMPLIANCE")
+            getattr(settings, "AUDIT_ATTESTATION_S3_OBJECT_LOCK_MODE", "") or "COMPLIANCE"
         ).upper()
         if not self.bucket or self.retention_days < 1:
             raise AnchorError(

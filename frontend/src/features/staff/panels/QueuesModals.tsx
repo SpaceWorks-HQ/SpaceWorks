@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 
-import { Modal } from "../../../components/ui/Modal";
-import { ErrorText, FormFooter, submitForm } from "./QueuesModalShared";
+import { ErrorText, Modal } from "../../../components/ui";
+import { FormFooter, submitForm } from "./QueuesModalShared";
 import type { FormModalProps, RejectRequestValues, ReturnDueValues } from "./QueuesModalTypes";
 
 export type {

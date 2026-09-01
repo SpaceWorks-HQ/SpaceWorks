@@ -18,6 +18,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
+from apps.accounts.principal_guards import is_anonymous_requester
 from apps.accounts.password_reset_crypto import normalize_email
 from apps.accounts.serializers_password_reset import (
     ChangePasswordResponseSerializer,
@@ -94,7 +95,11 @@ class ChangePasswordView(APIView):
         new_password = serializer.validated_data["new_password"]
         user = request.user
 
-        if user.is_walk_in or not user.check_password(current_password):
+        if (
+            user.is_walk_in
+            or is_anonymous_requester(user)
+            or not user.check_password(current_password)
+        ):
             raise serializers.ValidationError(
                 {"current_password": "Current password is incorrect."}
             )
@@ -111,7 +116,11 @@ class ChangePasswordView(APIView):
 
         with transaction.atomic():
             locked = User.objects.select_for_update().get(pk=user.pk)
-            if locked.is_walk_in or not locked.check_password(current_password):
+            if (
+                locked.is_walk_in
+                or is_anonymous_requester(locked)
+                or not locked.check_password(current_password)
+            ):
                 raise serializers.ValidationError(
                     {"current_password": "Current password is incorrect."}
                 )
@@ -238,6 +247,7 @@ def _verified_legacy_email(user, token, *, expected_email=None):
         and user.is_active
         and user.access_status == User.AccessStatus.ACTIVE
         and not user.is_walk_in
+        and not is_anonymous_requester(user)
     ):
         return None
     try:

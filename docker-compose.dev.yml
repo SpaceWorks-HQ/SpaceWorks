@@ -47,17 +47,30 @@ services:
 
   # Migrations run from the mounted tree, so a migration you just wrote applies
   # without rebuilding the image.
+  # These three inherit `DEBUG: ${DEBUG:-False}` from the base &backend-env anchor -- only
+  # `backend` above overrides DEBUG to True. Since the trusted-proxy guard landed in settings.py
+  # ("TRUSTED_PROXY_COUNT must be explicitly set when DEBUG is False"), that made every one of
+  # them crash on boot and took `dev-docker.sh up --build` with them. Declared here rather than
+  # defaulted in the base anchor on purpose: the guard exists so a PRODUCTION topology has to be
+  # stated explicitly, and a base-level default would silently satisfy it. None of these three
+  # serves HTTP, and dev is direct access, so 0 is the honest value.
   migrate:
+    environment:
+      TRUSTED_PROXY_COUNT: "0"
     volumes:
       - ./backend:/app
 
   # Celery has no autoreload: restart these two after changing task code
   # (`./scripts/dev-docker.sh restart worker beat`).
   worker:
+    environment:
+      TRUSTED_PROXY_COUNT: "0"
     volumes:
       - ./backend:/app
 
   beat:
+    environment:
+      TRUSTED_PROXY_COUNT: "0"
     volumes:
       - ./backend:/app
 

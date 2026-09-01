@@ -2,7 +2,7 @@
     "openapi": "3.0.3",
     "info": {
         "title": "Space Works API",
-        "version": "0.7.5",
+        "version": "0.8.0",
         "description": "Multi-tenant makerspace hardware loan system.\n\nPublic flow: browse inventory, search with `q`, page with `page`, sign in as a member, submit a borrow request, then track it by public token.\n\nAdmin flow: authenticate with JWT, manage makerspaces, inventory, staff, QR labels, bulk imports, request review, issue, and return.\n\nAuthentication: staff/admin endpoints use `Authorization: Bearer <access>`. Public browser endpoints can use `X-Publishable-Key` when public key hardening is enabled. Server API clients send `X-Client-Id`, `X-Timestamp`, `X-Nonce`, and `X-Signature`. Generate a unique, unpredictable `X-Nonce` for every request and sign the byte sequence `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY` with HMAC-SHA256. The nonce uses 1-128 characters from `A-Z`, `a-z`, `0-9`, `.`, `_`, `~`, and `-`. A deployment may temporarily accept the legacy nonce-less signed format while `APICLIENT_REQUIRE_NONCE` is disabled."
     },
     "paths": {
@@ -29203,7 +29203,8 @@
         "/api/v1/integrations/telegram/webhook": {
             "post": {
                 "operationId": "api_v1_integrations_telegram_webhook_create",
-                "summary": "Receive Telegram callback webhook",
+                "description": "Retained so an already-registered webhook does not retry forever. Callback queries are acknowledged and discarded: accepting and rejecting borrow requests happens in the staff console, never from chat.",
+                "summary": "Acknowledge a Telegram webhook (no action is taken)",
                 "tags": [
                     "Telegram"
                 ],
@@ -29228,7 +29229,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Webhook processed."
+                        "description": "Acknowledged; no action taken."
                     }
                 }
             }
@@ -33159,6 +33160,14 @@
                 "parameters": [
                     {
                         "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Required for account-less submissions. Reusing a key with the same payload returns the original request; a different payload is rejected."
+                    },
+                    {
+                        "in": "header",
                         "name": "X-Nonce",
                         "schema": {
                             "type": "string"
@@ -33194,7 +33203,7 @@
                             "examples": {
                                 "SubmitPublicEquipmentRequest": {
                                     "value": {
-                                        "requester_name": "Shaan Shoukath",
+                                        "contact_name": "Shaan Shoukath",
                                         "contact_email": "shaans@example.com",
                                         "contact_phone": "+919876543210",
                                         "requested_for": "Electronics workshop diagnostics",
@@ -33225,7 +33234,8 @@
                 "security": [
                     {
                         "jwtAuth": []
-                    }
+                    },
+                    {}
                 ],
                 "responses": {
                     "201": {
@@ -34683,6 +34693,10 @@
                         "type": "string",
                         "readOnly": true
                     },
+                    "requester_contact_verified": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "status": {
                         "type": "string",
                         "readOnly": true
@@ -34787,6 +34801,7 @@
                     "requested_for",
                     "requester_contact_email",
                     "requester_contact_phone",
+                    "requester_contact_verified",
                     "requester_display",
                     "requester_name",
                     "requester_username",
@@ -51844,6 +51859,13 @@
                     "detail"
                 ]
             },
+            "RequestAccessEnum": {
+                "enum": [
+                    "anyone"
+                ],
+                "type": "string",
+                "description": "* `anyone` - anyone"
+            },
             "RequestItemInput": {
                 "type": "object",
                 "properties": {
@@ -51852,6 +51874,7 @@
                     },
                     "quantity": {
                         "type": "integer",
+                        "maximum": 99,
                         "minimum": 1
                     }
                 },
@@ -51867,15 +51890,40 @@
                         "type": "string",
                         "writeOnly": true
                     },
+                    "contact_name": {
+                        "type": "string",
+                        "description": "Required for an account-less submission.",
+                        "maxLength": 200
+                    },
+                    "contact_email": {
+                        "description": "Required for an account-less submission; normalized to lowercase.",
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "email",
+                                "maxLength": 254
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
+                    },
+                    "contact_phone": {
+                        "type": "string",
+                        "maxLength": 32
+                    },
                     "requested_for": {
                         "type": "string",
-                        "default": ""
+                        "default": "",
+                        "maxLength": 500
                     },
                     "items": {
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/RequestItemInput"
-                        }
+                        },
+                        "maxItems": 20
                     }
                 },
                 "required": [
@@ -54029,6 +54077,9 @@
                     },
                     "membership_policy": {
                         "$ref": "#/components/schemas/MembershipPolicyEnum"
+                    },
+                    "request_access": {
+                        "$ref": "#/components/schemas/RequestAccessEnum"
                     }
                 },
                 "required": [

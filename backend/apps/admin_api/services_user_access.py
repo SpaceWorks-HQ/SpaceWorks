@@ -9,6 +9,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.accounts import rbac
 from apps.accounts.models import User
+from apps.accounts.principal_guards import refuse_anonymous_requester_credential
 from apps.admin_api.permissions import hidden_space_manager_reset_break_glass
 from apps.audit import services as audit
 from apps.makerspaces.models import MakerspaceMembership
@@ -25,6 +26,7 @@ def reset_user_password(actor, target_pk, password=None, data=None):
     target = _target_for_reset(actor, target_pk, is_superadmin)
     if target.is_superuser or target.role == User.Role.SUPERADMIN:
         raise PermissionDenied("Cannot reset a superadmin's password here.")
+    refuse_anonymous_requester_credential(target)
     # A walk-in is a person record staff typed at the counter, not an account, and this
     # service HANDS BACK a usable temporary password -- so without this it is a one-click
     # way to turn one into a login, available to any space manager in the makerspace and
@@ -55,6 +57,7 @@ def reset_user_password(actor, target_pk, password=None, data=None):
         # Close the stale-read interleaving where the walk-in migration marks this
         # user after the check above but before this password write.
         target = User.objects.select_for_update().get(pk=target.pk)
+        refuse_anonymous_requester_credential(target)
         if target.is_walk_in:
             raise PermissionDenied(
                 "This is a walk-in record, not an account. It has no password to reset."

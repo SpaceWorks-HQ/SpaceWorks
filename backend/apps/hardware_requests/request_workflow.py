@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -5,13 +8,27 @@ from apps.audit import services as audit
 from apps.hardware_requests import notifications
 from apps.hardware_requests.models import HardwareRequest, HardwareRequestItem
 from apps.hardware_requests.workflow_errors import (
+    AnonymousRequestIdempotencyConflict,
+    AnonymousRequestOutstandingLimit,
     InvalidTransition,
     RequestValidationError,
     RequesterBlocked,
 )
 from apps.hardware_requests.workflow_utils import locked_request
 from apps.inventory import availability
+from apps.makerspaces.models import Makerspace
 from apps.notifications.emit import emit_notification
+
+
+@dataclass(frozen=True)
+class RequesterSnapshot:
+    """Identity captured on a request independently from its durable principal."""
+
+    username: str
+    name: str
+    email: str
+    phone: str
+    contact_verified: bool
 
 
 def submit_request(
@@ -19,19 +36,39 @@ def submit_request(
     items,
     requested_for="",
     *,
-    requester,
+    requester_principal,
+    contact_snapshot,
+    audit_actor,
+    idempotency_key_fingerprint="",
+    payload_fingerprint="",
 ):
     with transaction.atomic():
         from apps.encryption.write_fence import assert_mapped_write_allowed
 
         assert_mapped_write_allowed(makerspace.id)
+        if not contact_snapshot.contact_verified:
+            # Serialize the tenant ceiling with creation. A count followed by INSERT
+            # without this lock lets concurrent requests all observe spare capacity.
+            makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+            existing = anonymous_idempotency_replay(
+                makerspace,
+                idempotency_key_fingerprint,
+                payload_fingerprint,
+            )
+            if existing is not None:
+                return existing
+            _enforce_anonymous_outstanding_limit(makerspace)
+
         request = HardwareRequest.objects.create(
             makerspace=makerspace,
-            requester=requester,
-            requester_username=requester.username,
-            requester_name=requester.display_name,
-            requester_contact_email=requester.email,
-            requester_contact_phone=requester.phone,
+            requester=requester_principal,
+            requester_username=contact_snapshot.username,
+            requester_name=contact_snapshot.name,
+            requester_contact_email=contact_snapshot.email,
+            requester_contact_phone=contact_snapshot.phone,
+            requester_contact_verified=contact_snapshot.contact_verified,
+            anonymous_idempotency_key_fingerprint=idempotency_key_fingerprint,
+            anonymous_payload_fingerprint=payload_fingerprint,
             status=HardwareRequest.Status.PENDING_APPROVAL,
             requested_for=requested_for,
         )
@@ -46,7 +83,7 @@ def submit_request(
             ]
         )
         audit.record(
-            requester,
+            audit_actor,
             "request.submitted",
             makerspace=makerspace,
             target=request,
@@ -60,6 +97,35 @@ def submit_request(
             body=f"Hardware request #{request.pk} submitted.",
         )
         return request
+
+
+def anonymous_idempotency_replay(makerspace, key_fingerprint, payload_fingerprint):
+    if not key_fingerprint:
+        raise RequestValidationError("An Idempotency-Key header is required.")
+    existing = HardwareRequest.objects.filter(
+        makerspace=makerspace,
+        anonymous_idempotency_key_fingerprint=key_fingerprint,
+    ).first()
+    if existing is None:
+        return None
+    if existing.anonymous_payload_fingerprint != payload_fingerprint:
+        raise AnonymousRequestIdempotencyConflict(
+            "This idempotency key was already used for a different request."
+        )
+    return existing
+
+
+def _enforce_anonymous_outstanding_limit(makerspace):
+    limit = settings.ANONYMOUS_REQUEST_OUTSTANDING_LIMIT
+    outstanding = HardwareRequest.objects.filter(
+        makerspace=makerspace,
+        status=HardwareRequest.Status.PENDING_APPROVAL,
+    ).exclude(anonymous_idempotency_key_fingerprint="").count()
+    if outstanding >= limit:
+        raise AnonymousRequestOutstandingLimit(
+            "This makerspace is not accepting more anonymous requests until "
+            "pending requests are reviewed."
+        )
 
 
 def accept_request(actor, request, accepted=None):

@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
+from apps.accounts.principal_guards import refuse_anonymous_requester_access_mutation
 from apps.admin_api.permissions import (
     IsActiveStaff,
     IsActiveSuperAdmin,
@@ -35,6 +36,7 @@ class RestrictUserView(APIView):
     def post(self, request, pk, *args, **kwargs):
         user = get_object_or_404(User, pk=pk)
         require_user_access_mutation(request.user, user)
+        refuse_anonymous_requester_access_mutation(user)
         serializer = RestrictUserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user.access_status = serializer.validated_data["status"]
@@ -82,6 +84,7 @@ class RestoreUserAccessView(APIView):
         with transaction.atomic():
             user = get_object_or_404(User.objects.select_for_update(), pk=pk)
             require_user_access_mutation(request.user, user)
+            refuse_anonymous_requester_access_mutation(user)
             if user.access_status != User.AccessStatus.ACTIVE and user.is_active:
                 memberships = user.makerspace_memberships.select_related(
                     "makerspace"

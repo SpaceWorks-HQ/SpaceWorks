@@ -72,7 +72,19 @@ export async function submitPublicRequest(
   payload: {
     requested_for: string;
     items: { product_id: number; quantity: number }[];
+    // Account-less submissions only. The backend requires name and email (phone is
+    // optional) and rejects the request without them.
+    contact_name?: string;
+    contact_email?: string;
+    contact_phone?: string;
+    // Honeypot. The serializer pops it and a filled value gets the decoy response, so it
+    // is sent on every submission, authenticated or not -- the backend checks both.
+    website?: string;
   },
+  // Required by the backend for account-less submissions, and the reason a retry cannot
+  // create a second request: the same key with the same payload returns the original,
+  // a different payload is refused.
+  idempotencyKey?: string,
 ): Promise<RequestSubmitResponse> {
   return tenantPublicRequest<RequestSubmitResponse>(
     slug,
@@ -80,6 +92,7 @@ export async function submitPublicRequest(
     {
       method: "POST",
       body: JSON.stringify(payload),
+      ...(idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : {}),
     },
   );
 }

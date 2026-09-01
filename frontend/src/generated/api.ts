@@ -3,7 +3,7 @@
 
 export const openApiInfo = {
   "title": "Space Works API",
-  "version": "0.7.5"
+  "version": "0.8.0"
 } as const;
 
 export const openApiTags = [
@@ -545,6 +545,7 @@ export type AdminRequest = {
   "requester_display": string;
   "requester_contact_email": string;
   "requester_contact_phone": string;
+  "requester_contact_verified": boolean;
   "status": string;
   "requested_for": string;
   "rejection_reason": string;
@@ -4770,6 +4771,8 @@ export type ReportError = {
   "code"?: string;
 };
 
+export type RequestAccessEnum = "anyone";
+
 export type RequestItemInput = {
   "product_id": number;
   "quantity": number;
@@ -4777,6 +4780,9 @@ export type RequestItemInput = {
 
 export type RequestSubmit = {
   "website"?: string;
+  "contact_name"?: string;
+  "contact_email"?: string;
+  "contact_phone"?: string;
   "requested_for"?: string;
   "items": Array<RequestItemInput>;
 };
@@ -5349,6 +5355,7 @@ export type TenantBootstrapMakerspace = {
   "cover_image_url": string | null;
   "public_stats_enabled": boolean;
   "membership_policy": MembershipPolicyEnum;
+  "request_access"?: RequestAccessEnum;
 };
 
 export type TenantBootstrapPublicApi = {

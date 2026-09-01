@@ -250,7 +250,6 @@ def _deliver_notification(log) -> NotificationDeliveryLog:
             ok = send_message(
                 log.makerspace,
                 log.text_body,
-                reply_markup=(log.payload or {}).get("reply_markup"),
                 destination=log.destination,
             )
         else:

@@ -1,8 +1,11 @@
+import json
+
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.module_install import module_status
 from apps.makerspaces.module_profiles import PROFILES
+from apps.makerspaces.request_access import effective_policy
 
 
 class Command(BaseCommand):
@@ -10,9 +13,31 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--makerspace", default=None, help="Makerspace slug (default: the only one).")
+        parser.add_argument(
+            "--json",
+            action="store_true",
+            help="Emit machine-readable state instead of the operator listing.",
+        )
 
     def handle(self, *args, **options):
         makerspace = resolve_makerspace(options["makerspace"])
+        if options["json"]:
+            # `setup.sh` reads its module state back from here rather than parsing the
+            # `*`/`+`/`-` marks below. That listing is formatted for a human and has
+            # already been re-laid-out once; a shell script keying on its punctuation
+            # would break silently the next time it is.
+            self.stdout.write(
+                json.dumps(
+                    {
+                        "makerspace": makerspace.slug,
+                        "installed": sorted(
+                            row["key"] for row in module_status(makerspace) if row["installed"]
+                        ),
+                        "request_access": effective_policy(makerspace),
+                    }
+                )
+            )
+            return
         self.stdout.write(f"Modules for {makerspace.slug}:")
         for row in module_status(makerspace):
             if row["core"]:

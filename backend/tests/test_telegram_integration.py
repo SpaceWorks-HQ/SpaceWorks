@@ -61,12 +61,21 @@ def test_telegram_webhook_throttles_rapid_requests(settings, monkeypatch):
         HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN=WEBHOOK_SECRET,
     )
 
-    assert first.status_code == 403
+    # 200 now, not 403: the callback is acknowledged and discarded rather than
+    # rejected during actor resolution, which no longer happens.
+    assert first.status_code == 200
     assert second.status_code == 429
 
 
 @override_settings(TELEGRAM_WEBHOOK_SECRET=WEBHOOK_SECRET)
-def test_telegram_accept_callback_routes_through_workflow(monkeypatch):
+def test_an_accept_callback_no_longer_changes_request_state(monkeypatch):
+    """Chat is a notification channel, not a decision surface.
+
+    This replaces `test_telegram_accept_callback_routes_through_workflow`. The actor
+    resolution and RBAC checks it used to assert went with the route: there is nothing
+    left to authorize, so the property worth pinning is that a well-formed, correctly
+    secreted accept callback from a genuinely authorized admin still moves nothing.
+    """
     makerspace = make_space("telegram")
     admin = make_member("telegram-admin", makerspace)
     admin.telegram_user_id = "42"
@@ -89,13 +98,18 @@ def test_telegram_accept_callback_routes_through_workflow(monkeypatch):
         HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN=WEBHOOK_SECRET,
     )
 
+    # 200, not 403: an already-registered webhook must be acknowledged rather than
+    # retried for hours by Telegram.
     assert response.status_code == 200
+    assert response.data["detail"] == "Ignored."
     hardware_request.refresh_from_db()
-    assert hardware_request.status == HardwareRequest.Status.ACCEPTED
+    assert hardware_request.status == HardwareRequest.Status.PENDING_APPROVAL
 
 
 @override_settings(TELEGRAM_WEBHOOK_SECRET=WEBHOOK_SECRET)
-def test_unlinked_telegram_actor_is_denied():
+def test_an_unlinked_telegram_actor_is_acknowledged_and_ignored():
+    """Previously 403 via actor resolution. There is no actor to resolve now, and an
+    unauthenticated stranger who guessed the secret still cannot make anything happen."""
     response = authenticated_client(
         User.objects.create_user(
             username="placeholder",
@@ -109,7 +123,8 @@ def test_unlinked_telegram_actor_is_denied():
         HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN=WEBHOOK_SECRET,
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert response.data["detail"] == "Ignored."
 
 
 @override_settings(TELEGRAM_WEBHOOK_SECRET=WEBHOOK_SECRET)
@@ -129,30 +144,6 @@ def test_telegram_webhook_rejects_missing_or_wrong_secret():
     )
 
     assert response.status_code == 403
-
-
-@override_settings(TELEGRAM_WEBHOOK_SECRET=WEBHOOK_SECRET)
-def test_suspended_telegram_actor_cannot_act():
-    makerspace = make_space("telegram-suspended")
-    admin = make_member("telegram-suspended-admin", makerspace)
-    admin.telegram_user_id = "77"
-    admin.access_status = User.AccessStatus.SUSPENDED
-    admin.save(update_fields=["telegram_user_id", "access_status"])
-    product = make_product(makerspace)
-    hardware_request = make_accepted_request(makerspace, product, 1)
-    hardware_request.status = HardwareRequest.Status.PENDING_APPROVAL
-    hardware_request.save(update_fields=["status"])
-
-    response = authenticated_client(admin).post(
-        WEBHOOK_URL,
-        {"callback_query": {"from": {"id": 77}, "data": f"accept:{hardware_request.id}"}},
-        format="json",
-        HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN=WEBHOOK_SECRET,
-    )
-
-    assert response.status_code == 403
-    hardware_request.refresh_from_db()
-    assert hardware_request.status == HardwareRequest.Status.PENDING_APPROVAL
 
 
 def test_suspended_user_cannot_send_telegram_test_alert():
@@ -276,7 +267,10 @@ def test_submitted_request_telegram_alert_includes_contact_and_items(
     assert "Bench Meter: 2" in text
     assert "Logic Analyzer: 3" in text
     assert "parse_mode" not in sent.call_args.kwargs
-    assert sent.call_args.kwargs["reply_markup"]["inline_keyboard"]
+    # No inline keyboard: an accept/reject button IS an action surface, and chat is
+    # not one any more. The alert now points staff at the console instead.
+    assert "reply_markup" not in sent.call_args.kwargs
+    assert "Review and decide in the staff console." in text
 
 
 def test_submitted_request_telegram_delivery_error_is_swallowed(
@@ -343,7 +337,10 @@ def test_submitted_request_telegram_message_stays_within_limit(
 
     text = sent.call_args.args[1]
     assert len(text) <= 4096
-    assert sent.call_args.kwargs["reply_markup"]["inline_keyboard"]
+    # No inline keyboard: an accept/reject button IS an action surface, and chat is
+    # not one any more. The alert now points staff at the console instead.
+    assert "reply_markup" not in sent.call_args.kwargs
+    assert "Review and decide in the staff console." in text
 
 
 @override_settings(TELEGRAM_WEBHOOK_SECRET="")

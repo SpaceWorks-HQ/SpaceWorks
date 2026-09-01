@@ -1,7 +1,7 @@
 import { useId, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { Modal } from "../../../components/ui";
+import { Field, Modal } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import { invalidateInventoryViews } from "../queryInvalidation";
 import { Panel, type Makerspace, useStaffGet } from "./shared";
@@ -27,8 +27,14 @@ type Overdue = {
 type Restriction = { requester_id: number; username: string; access_status: string; restriction_reason: string };
 type ProblemReportItem = { id: number; product_name: string; issued_quantity: number; tracking_mode: string };
 type ProblemReport = { id: number; requester_username: string; label: string; note: string; created_at: string; items: ProblemReportItem[] };
+type AnonymousAccountability = { damaged: number; missing: number; total_issues: number; total_quantity: number };
 type AccountabilityResponse = {
   repeat_offenders: Offender[];
+  // Account-less loans all share one requester principal, so they are excluded from the
+  // per-person ranking above and reported as a total instead. Rendering it is not
+  // optional: without it the panel reads "No damage or loss on record" while account-less
+  // incidents exist.
+  anonymous_accountability?: AnonymousAccountability;
   overdue: Overdue[];
   restrictions: Restriction[];
   problem_reports: ProblemReport[];
@@ -50,6 +56,7 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
   const [restrictionReason, setRestrictionReason] = useState("");
   const report = useStaffGet<AccountabilityResponse>(["accountability", makerspace.id], `/admin/makerspace/${makerspace.id}/accountability`);
   const data = report.data;
+  const anonymous = data?.anonymous_accountability;
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["accountability", makerspace.id] });
@@ -121,19 +128,36 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
       </Panel>
 
       <Panel title="Repeat offenders">
+        {anonymous && anonymous.total_issues > 0 ? (
+          <div className="mb-4 rounded-xl border border-warn bg-warn/10 px-3 py-2">
+            <p className="text-sm font-medium text-ink">
+              Account-less loans: {anonymous.total_issues}{" "}
+              {anonymous.total_issues === 1 ? "incident" : "incidents"} ({anonymous.total_quantity}{" "}
+              {anonymous.total_quantity === 1 ? "item" : "items"})
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              {anonymous.damaged} damaged, {anonymous.missing} missing. These have no person to
+              rank or restrict, so they are reported as a total rather than as a row above.
+            </p>
+          </div>
+        ) : null}
         {!data?.repeat_offenders.length ? (
-          <p className="text-sm text-muted">No damage or loss on record.</p>
+          <p className="text-sm text-muted">
+            {anonymous && anonymous.total_issues > 0
+              ? "No damage or loss recorded against a named person."
+              : "No damage or loss on record."}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[36rem] text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase text-muted">
-                  <th className="p-2">Requester</th>
-                  <th className="p-2">Damaged</th>
-                  <th className="p-2">Missing</th>
-                  <th className="p-2">Total issues</th>
-                  <th className="p-2">Status</th>
-                  {isSuperadmin ? <th className="p-2">Action</th> : null}
+                  <th scope="col" className="p-2">Requester</th>
+                  <th scope="col" className="p-2">Damaged</th>
+                  <th scope="col" className="p-2">Missing</th>
+                  <th scope="col" className="p-2">Total issues</th>
+                  <th scope="col" className="p-2">Status</th>
+                  {isSuperadmin ? <th scope="col" className="p-2">Action</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -279,7 +303,7 @@ function ProblemReportCard({ row, makerspace, onTriaged }: { row: ProblemReport;
           ))}
         </div>
       ) : null}
-      <textarea className="desk-input min-h-20" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Triage note" />
+      <Field label="Triage note"><textarea className="desk-input min-h-20" value={note} onChange={(event) => setNote(event.target.value)} /></Field>
       <div className="flex flex-wrap items-center justify-between gap-3">
         {triage.error ? <p className="text-sm text-danger">{(triage.error as Error).message}</p> : <span />}
         <button className="desk-button-primary" type="button" disabled={triage.isPending || (actionable && resolutions.length === 0)} onClick={() => triage.mutate()}>

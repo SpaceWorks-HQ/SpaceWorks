@@ -102,6 +102,20 @@ MANAGED_RESOURCE_LIMITS = {
 # by the operator's SMS vendor, so this is a cost ceiling rather than a fair-use quota.
 # Blank disables the cap entirely.
 OTP_SMS_DAILY_CAP = env.int("OTP_SMS_DAILY_CAP", default=200)
+ANONYMOUS_REQUEST_OUTSTANDING_LIMIT = env.int(
+    "ANONYMOUS_REQUEST_OUTSTANDING_LIMIT",
+    default=50,
+)
+ANONYMOUS_REQUEST_IDEMPOTENCY_KEY_MAX_LENGTH = env.int(
+    "ANONYMOUS_REQUEST_IDEMPOTENCY_KEY_MAX_LENGTH",
+    default=128,
+)
+if ANONYMOUS_REQUEST_OUTSTANDING_LIMIT < 1:
+    raise ImproperlyConfigured("ANONYMOUS_REQUEST_OUTSTANDING_LIMIT must be positive.")
+if ANONYMOUS_REQUEST_IDEMPOTENCY_KEY_MAX_LENGTH < 1:
+    raise ImproperlyConfigured(
+        "ANONYMOUS_REQUEST_IDEMPOTENCY_KEY_MAX_LENGTH must be positive."
+    )
 STORAGE_PRESIGN_METHOD = env("STORAGE_PRESIGN_METHOD", default="post")
 CRON_SECRET = env("CRON_SECRET", default="")
 ADMIN_SITE_NAME = env("ADMIN_SITE_NAME", default="Space Works")
@@ -764,6 +778,18 @@ REST_FRAMEWORK = {
             "THROTTLE_PUBLIC_REQUEST_SUBMIT",
             default="10/min",
         ),
+        "anonymous_request_ip_burst": env(
+            "THROTTLE_ANONYMOUS_REQUEST_IP_BURST",
+            default="2/min",
+        ),
+        "anonymous_request_ip_hour": env(
+            "THROTTLE_ANONYMOUS_REQUEST_IP_HOUR",
+            default="10/hour",
+        ),
+        "anonymous_request_email": env(
+            "THROTTLE_ANONYMOUS_REQUEST_EMAIL",
+            default="3/day",
+        ),
         "print_request_submit": env("THROTTLE_PRINT_REQUEST_SUBMIT", default="10/min"),
         "public_tool_checkout": env("THROTTLE_PUBLIC_TOOL_CHECKOUT", default="10/min"),
         "public_tool_return": env("THROTTLE_PUBLIC_TOOL_RETURN", default="10/min"),
@@ -933,7 +959,7 @@ SPECTACULAR_SETTINGS = {
     # `tests/test_version_consistency.py`. It cannot simply READ that file: the backend
     # image is built with `context: ./backend`, so the repo root is outside the build
     # context and the file does not exist inside the container.
-    "VERSION": "0.7.5",
+    "VERSION": "0.8.0",
     "ENUM_NAME_OVERRIDES": {
         "QrPrintBatchStatusEnum": [
             ("draft", "Draft"),

@@ -39,13 +39,15 @@ to action scope.
 
 ## Architecture: Concepts That Span Multiple Modules
 
-UIs and the Telegram bot are thin clients over an API server composed of deep modules. Two architectural
-rules are load-bearing and easy to violate if you only read one module:
+UIs are thin clients over an API server composed of deep modules; Telegram is an outbound notification
+channel only. Two architectural rules are load-bearing and easy to violate if you only read one module:
 
-1. **The Request Workflow Module is the single source of truth for state transitions.** Telegram callbacks,
-   the web admin panel, and the guest-admin app must all route through the *same* workflow service — never
-   mutate `HardwareRequest.status` directly. The Telegram module in particular must call the workflow
-   module, not the database. This is what keeps web and bot behavior consistent and audited.
+1. **The Request Workflow Module is the single source of truth for state transitions.** The web admin
+   panel, the guest-admin app and the `/control/` review page must all route through the *same* workflow
+   service — never mutate `HardwareRequest.status` directly. **Chat is not a decision surface**: the
+   Telegram accept/reject buttons and their callback route were removed, so there is no bot path into the
+   state machine to keep consistent any more. Re-introducing one means going through the workflow module,
+   never the database.
 
 2. **The Inventory Availability Module owns all quantity math.** Reserve / issue / return / mark-lost all
    flow through it. No other module computes available/reserved/issued counts. The invariant "availability
@@ -60,9 +62,10 @@ rules are load-bearing and easy to violate if you only read one module:
   Manager are both retired** — handover is a custom role, and `print_manager` survives only as the frozen
   legacy fallback in `_MEMBERSHIP_ROLE_ACTIONS` (migrations and enum archaeology under **Handover roles**
   in `docs/INVARIANTS.md`). Inventory Manager is membership-only and covers the full hardware lifecycle but
-  not printing, staff, or makerspace settings. Also verifies Telegram actors and blocks
-  restricted/suspended users. Interface: `can(actor, action, resource)`,
-  `scope_by_makerspace(actor, query)`, `assertTelegramActorCan(...)`.
+  not printing, staff, or makerspace settings. Also blocks restricted/suspended users. Interface:
+  `can(actor, action, resource)`, `scope_by_makerspace(actor, query)`. (It no longer verifies Telegram
+  actors — that went with the callback route. `assertTelegramActorCan` never existed in the code at all;
+  this line asserted it for months.)
 - **Request Workflow** — owns the state machine, emits audit logs, triggers Telegram alerts, coordinates
   inventory reservation/issue/return.
 - **Inventory Availability** — quantity math + asset status for QR-tracked tools.
@@ -72,8 +75,9 @@ rules are load-bearing and easy to violate if you only read one module:
 - **Check-In API Client** — **RETIRED** (`73a480c`, Part M7). `apps/checkin/` no longer exists and there is
   no `CHECKIN_MODE` setting. Requester identity now comes from authenticated member accounts, so there is no
   external verify dependency left to fail safe on.
-- **Telegram Integration** — sends per-makerspace group alerts and processes accept/reject callbacks
-  (delegating to Request Workflow).
+- **Telegram Integration** — sends per-makerspace group alerts. **Outbound only.** The webhook route is
+  retained but accept-and-ignores every callback, because a deployment that already ran `setWebhook` would
+  otherwise have Telegram retry a 404 for hours; no chat message may carry an inline keyboard.
 
 ## Request State Machine
 
@@ -198,6 +202,19 @@ starting a build.** These are the rules you must not violate without having read
   `./scripts/dev-local.sh test` with `spaceworks-db` (:5433), `spaceworks-redis` (:6379) and
   `spaceworks-minio` (:9200) up. **Never run two `pytest` procs against one DB**, and never run the full
   suite concurrently with `codex review` (it runs its own).
+- **`tests/backup` and `tests/tenant_migration` need a pg client whose MAJOR equals the server's (16),
+  and the host may not have one.** `postgres_client.client_binary` resolves
+  `/usr/lib/postgresql/{major}/bin` (Debian/PGDG) or `/usr/pgsql-{major}/bin` (RHEL) and otherwise
+  fails closed — so on Arch, where neither path exists and `/usr/bin/pg_dump` is whatever `pacman`
+  ships, every one of those tests refuses with `PostgresClientUnavailable`. That is the environment,
+  **not a regression**. Run them in Docker instead, and note the DATABASE_URL override: the backend
+  container runs as the least-privilege `spaceworks_app` role, which has no CREATEDB, so pytest cannot
+  build a test database as itself.
+
+  ```bash
+  ./scripts/dev-docker.sh exec -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
+    -T backend pytest tests/backup tests/tenant_migration -q
+  ```
 - **Chain every new migration off the ACTUAL leaf** — `ls backend/apps/<app>/migrations/`, never the number
   a spec quotes.
 - **Commits sit local and unpushed on `dev`; pushing is the owner's call alone.** Ask
@@ -212,8 +229,11 @@ starting a build.** These are the rules you must not violate without having read
 
 ```bash
 ./scripts/dev-docker.sh up -d --build                          # default: all in Docker, live reload
-./scripts/dev-docker.sh exec backend pytest
-./scripts/dev-local.sh infra && ./scripts/dev-local.sh test    # host fallback: faster pytest
+./scripts/dev-local.sh infra && ./scripts/dev-local.sh test    # host: faster pytest, most of the suite
+
+# In Docker, pytest needs the DB OWNER: the backend runs as `spaceworks_app`, which has no CREATEDB.
+./scripts/dev-docker.sh exec -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
+  -T backend pytest
 ```
 
 Public inventory page: `http://localhost:5000/m/makerspace`. API: `http://localhost:8000/api` — Swagger UI
@@ -243,7 +263,8 @@ Stack (in use):
 - **API documentation:** drf-spectacular / OpenAPI (snapshot `frontend/openapi-schema.json` + generated
   `frontend/src/generated/api.ts`; regenerate both when routes/models change — spectacular needs
   `--format openapi-json`).
-- **Telegram:** request alerts, test alerts, authenticated webhook accept/reject callbacks.
+- **Telegram:** request alerts and test alerts. Outbound only — the webhook acknowledges and discards
+  callbacks; decisions are made in the staff console or `/control/`.
 
 ## Current source map — in `docs/SOURCE-MAP.md`
 

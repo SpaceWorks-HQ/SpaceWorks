@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { Field } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
 import { Panel, useStaffGet } from "./StaffPanels";
 
@@ -74,40 +75,10 @@ export function PlatformStripeConnectPanel() {
       </p>
       <div className="mt-4 rounded-md border border-line bg-surface p-3">
         <div className="grid gap-2 sm:grid-cols-2">
-          <input
-            className="desk-input"
-            type="password"
-            autoComplete="new-password"
-            placeholder={
-              settings.data?.stripe_publishable_key_set
-                ? "Platform publishable key set"
-                : "Platform publishable key"
-            }
-            value={publishableKey}
-            onChange={(event) => setPublishableKey(event.target.value)}
-          />
-          <input
-            className="desk-input"
-            type="password"
-            autoComplete="new-password"
-            placeholder={settings.data?.stripe_secret_key_set ? "Platform secret key set" : "Platform secret key"}
-            value={secretKey}
-            onChange={(event) => setSecretKey(event.target.value)}
-          />
-          <input
-            className="desk-input"
-            type="password"
-            autoComplete="new-password"
-            placeholder={settings.data?.stripe_webhook_secret_set ? "Platform webhook secret set" : "Platform webhook secret"}
-            value={webhookSecret}
-            onChange={(event) => setWebhookSecret(event.target.value)}
-          />
-          <input
-            className="desk-input"
-            placeholder="Stripe Connect client ID"
-            value={clientId}
-            onChange={(event) => setClientId(event.target.value)}
-          />
+          <Field label="Platform publishable key"><input className="desk-input" type="password" autoComplete="new-password" placeholder={settings.data?.stripe_publishable_key_set ? "Platform publishable key set" : undefined} value={publishableKey} onChange={(event) => setPublishableKey(event.target.value)} /></Field>
+          <Field label="Platform secret key"><input className="desk-input" type="password" autoComplete="new-password" placeholder={settings.data?.stripe_secret_key_set ? "Platform secret key set" : undefined} value={secretKey} onChange={(event) => setSecretKey(event.target.value)} /></Field>
+          <Field label="Platform webhook secret"><input className="desk-input" type="password" autoComplete="new-password" placeholder={settings.data?.stripe_webhook_secret_set ? "Platform webhook secret set" : undefined} value={webhookSecret} onChange={(event) => setWebhookSecret(event.target.value)} /></Field>
+          <Field label="Stripe Connect client ID"><input className="desk-input" value={clientId} onChange={(event) => setClientId(event.target.value)} /></Field>
           <input
             aria-label="Application fee basis points"
             className="desk-input"

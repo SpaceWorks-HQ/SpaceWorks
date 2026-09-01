@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { Badge } from "../../components/ui";
+import { Badge, Field } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
 import { MakerspaceBrandingSettings } from "./MakerspaceBrandingSettings";
 import { MakerspaceBookingRulesSettings } from "./MakerspaceBookingRulesSettings";
@@ -198,15 +198,17 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMak
                 <p className="text-sm text-danger">{updatePrintStatusLookupPolicy.error.message}</p>
               ) : null}
             </div>
-            <select
-              className="desk-input w-full"
-              value={publicPrintStatusLookupPolicy}
-              disabled={settings.isLoading || updatePrintStatusLookupPolicy.isPending}
-              onChange={(event) => updatePrintStatusLookupPolicy.mutate(event.target.value as Makerspace["public_print_status_lookup_policy"])}
-            >
-              <option value="token_only">Token only</option>
-              <option value="email_unverified">Email lookup</option>
-            </select>
+            <Field label="Public print status lookup policy">
+              <select
+                className="desk-input w-full"
+                value={publicPrintStatusLookupPolicy}
+                disabled={settings.isLoading || updatePrintStatusLookupPolicy.isPending}
+                onChange={(event) => updatePrintStatusLookupPolicy.mutate(event.target.value as Makerspace["public_print_status_lookup_policy"])}
+              >
+                <option value="token_only">Token only</option>
+                <option value="email_unverified">Email lookup</option>
+              </select>
+            </Field>
           </div>
         </div>
         <MakerspaceBookingSettings makerspace={makerspace} settings={settings.data} loading={settings.isLoading} />

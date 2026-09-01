@@ -125,6 +125,27 @@ module_change_one() {
     done
   fi
 
+  # A preceding question may already have implied a module. `setup.sh` asks who may
+  # submit borrow requests, and the answer IS the `membership` module -- so the tick list
+  # opens with it already ticked (or unticked) rather than making the operator work out
+  # the connection themselves. Applied BEFORE the interactive loop on purpose: they can
+  # still see it and change their mind, and whatever they leave ticked is what gets
+  # applied. Nothing here decides the final state; the DB read-back after apply does.
+  module_apply_forced_state() {
+    local list="$1" want="$2" key j
+    [[ -n "$list" ]] || return 0
+    local forced=()
+    IFS=, read -r -a forced <<< "$list"
+    for key in "${forced[@]}"; do
+      [[ -n "$key" ]] || continue
+      for ((j=0; j<${#keys[@]}; j++)); do
+        if [[ "${keys[j]}" == "$key" ]]; then state[j]="$want"; break; fi
+      done
+    done
+  }
+  module_apply_forced_state "${MODULE_FORCE_ON:-}" x
+  module_apply_forced_state "${MODULE_FORCE_OFF:-}" " "
+
   if [[ "${MODULE_MODE:-interactive}" == interactive ]]; then
     say "Choose modules for $slug"
     echo "Ticked modules are enabled. Core modules are always on."

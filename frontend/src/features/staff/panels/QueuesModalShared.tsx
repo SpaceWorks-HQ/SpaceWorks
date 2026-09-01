@@ -2,6 +2,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 
 import QrScanner from "../../../components/ui/QrScanner";
+import { Field } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 
 export function BoxCodeField({ value, onChange, makerspaceId, pending }: { value: string; onChange: (code: string) => void; makerspaceId: number; pending: boolean }) {
@@ -61,15 +62,17 @@ export function BoxCodeField({ value, onChange, makerspaceId, pending }: { value
         <button className="desk-button-ghost shrink-0" type="button" disabled={pending} onClick={() => setScanOpen(true)}>Scan</button>
       </div>
       {containers.length ? (
-        <select className="desk-input" value="" disabled={pending} onChange={(event) => event.target.value && onChange(event.target.value)}>
-          <option value="">Choose an available container...</option>
-          {containers.map((container) => <option key={container.id} value={container.code ?? ""}>{container.label}</option>)}
-        </select>
+        <Field label="Available container">
+          <select className="desk-input" value="" disabled={pending} onChange={(event) => event.target.value && onChange(event.target.value)}>
+            <option value="">Choose an available container...</option>
+            {containers.map((container) => <option key={container.id} value={container.code ?? ""}>{container.label}</option>)}
+          </select>
+        </Field>
       ) : null}
       <button className="desk-button-ghost justify-self-start" type="button" disabled={pending} onClick={() => setManualOpen((open) => !open)}>
         {manualOpen ? "Hide manual code entry" : "Enter code manually"}
       </button>
-      {manualOpen ? <input className="desk-input min-w-0" value={value} disabled={pending} onChange={(event) => onChange(event.target.value)} /> : null}
+      {manualOpen ? <Field label="Container code"><input className="desk-input min-w-0" value={value} disabled={pending} onChange={(event) => onChange(event.target.value)} /></Field> : null}
       {scanError ? <p className="text-xs text-danger">{scanError}</p> : null}
       {scanOpen ? <QrScanner onScan={handleScan} onClose={() => setScanOpen(false)} /> : null}
     </div>
@@ -83,10 +86,6 @@ export function FormFooter({ formId, pending, submitLabel, tone = "default", onC
       <button className={tone === "danger" ? "desk-button-danger" : "desk-button-success"} type="submit" form={formId} disabled={pending}>{pending ? "Working..." : submitLabel}</button>
     </div>
   );
-}
-
-export function ErrorText({ message }: { message: string }) {
-  return message ? <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{message}</p> : null;
 }
 
 // The product's free-text storage location ("shelf") so staff know where to physically

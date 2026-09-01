@@ -182,7 +182,7 @@ def test_raising_build_and_dispatch_never_escape(monkeypatch):
     }
 
 
-def test_hardware_submitted_adapter_calls_one_fanout_with_original_buttons(monkeypatch):
+def test_hardware_submitted_adapter_calls_one_fanout_and_carries_no_buttons(monkeypatch):
     space = make_space("fanout-hardware-adapter")
     requester = User.objects.create_user(username="fanout-hardware-requester")
     request = HardwareRequest.objects.create(
@@ -206,13 +206,9 @@ def test_hardware_submitted_adapter_calls_one_fanout_with_original_buttons(monke
     hardware_notifications.notify_request_submitted(request)
     assert len(calls) == 1
     assert calls[0][1]["event"] == "submitted"
-    assert calls[0][2].telegram_reply_markup == {
-        "inline_keyboard": [[
-            {"text": "Accept", "callback_data": f"accept:{request.pk}"},
-            {
-                "text": "Reject",
-                "callback_data": f"reject:{request.pk}:Rejected from Telegram.",
-            },
-        ]]
-    }
+    # No inline keyboard any more: chat is a notification channel, not a decision
+    # surface, so the adapter's whole telegram_reply_markup path was removed with the
+    # callback route it fed.
+    assert not hasattr(calls[0][2], "telegram_reply_markup")
+    assert "Review and decide in the staff console." in calls[0][2].text
 

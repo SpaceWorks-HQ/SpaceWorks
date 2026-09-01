@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import type { ApiPath } from "../../generated/api";
-import { Badge } from "../../components/ui";
+import { Badge, Metric } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
 import type { Makerspace } from "./StaffPanels";
 import { staffTabPath } from "./staffTabs";
@@ -156,15 +156,6 @@ function HealthBlock({
       {detail ? <p className="mb-3 break-words text-sm text-danger">{detail}</p> : null}
       {children}
     </section>
-  );
-}
-
-function Metric({ label, value, danger = false }: { label: string; value?: number; danger?: boolean }) {
-  return (
-    <div className="rounded-md border border-line bg-surface p-3">
-      <p className="text-xs font-semibold uppercase text-muted">{label}</p>
-      <p className={`mt-1 text-lg font-semibold ${danger ? "text-danger" : "text-ink"}`}>{value ?? 0}</p>
-    </div>
   );
 }
 

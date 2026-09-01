@@ -42,10 +42,10 @@ export function OperationsReportsPayments({
         <div className="overflow-x-auto rounded-md border border-line">
           <table className="w-full text-left text-sm">
             <thead className="eyebrow bg-surface"><tr>
-              {scopeKey === "all" ? <th className="px-3 py-2">Makerspace</th> : null}
-              <th className="px-3 py-2">Currency</th><th className="px-3 py-2">Subject</th>
-              <th className="px-3 py-2">Status</th><th className="px-3 py-2">Payments</th>
-              <th className="px-3 py-2">Total</th><th className="px-3 py-2">Outstanding</th>
+              {scopeKey === "all" ? <th scope="col" className="px-3 py-2">Makerspace</th> : null}
+              <th scope="col" className="px-3 py-2">Currency</th><th scope="col" className="px-3 py-2">Subject</th>
+              <th scope="col" className="px-3 py-2">Status</th><th scope="col" className="px-3 py-2">Payments</th>
+              <th scope="col" className="px-3 py-2">Total</th><th scope="col" className="px-3 py-2">Outstanding</th>
             </tr></thead>
             <tbody>{report.data?.typed_rows.map((row, index) => (
               <tr className="border-t border-line" key={`${row.makerspace_id ?? scopeKey}-${row.currency}-${row.subject_type}-${row.status}-${index}`}>

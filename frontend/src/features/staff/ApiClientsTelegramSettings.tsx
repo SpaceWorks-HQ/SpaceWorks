@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { Field } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
 import { type Makerspace, useStaffGet } from "./StaffPanels";
 
@@ -75,27 +76,26 @@ export function ApiClientsTelegramSettings({ makerspace }: { makerspace: Makersp
     <div className="rounded-md border border-line bg-surface p-3">
       <h3 className="font-semibold text-ink">Integration settings</h3>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <input
-          className="desk-input"
-          placeholder="Telegram group chat ID"
-          value={settingsForm.telegram_group_chat_id}
-          onChange={(event) =>
-            setSettingsForm({ ...settingsForm, telegram_group_chat_id: event.target.value })
-          }
-        />
-        <input
-          className="desk-input"
-          placeholder={
-            settings.data?.telegram_bot_token_set
-              ? "Telegram bot token set"
-              : "Telegram bot token"
-          }
-          type="password"
-          value={settingsForm.telegram_bot_token}
-          onChange={(event) =>
-            setSettingsForm({ ...settingsForm, telegram_bot_token: event.target.value })
-          }
-        />
+        <Field label="Telegram group chat ID">
+          <input
+            className="desk-input"
+            value={settingsForm.telegram_group_chat_id}
+            onChange={(event) =>
+              setSettingsForm({ ...settingsForm, telegram_group_chat_id: event.target.value })
+            }
+          />
+        </Field>
+        <Field label="Telegram bot token">
+          <input
+            className="desk-input"
+            placeholder={settings.data?.telegram_bot_token_set ? "Telegram bot token set" : undefined}
+            type="password"
+            value={settingsForm.telegram_bot_token}
+            onChange={(event) =>
+              setSettingsForm({ ...settingsForm, telegram_bot_token: event.target.value })
+            }
+          />
+        </Field>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <button

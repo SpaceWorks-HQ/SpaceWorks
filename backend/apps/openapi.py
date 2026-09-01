@@ -38,7 +38,7 @@ PUBLIC_API_AUTH_PARAMETERS = [
 PUBLIC_REQUEST_SUBMIT_EXAMPLE = OpenApiExample(
     "Submit public equipment request",
     value={
-        "requester_name": "Shaan Shoukath",
+        "contact_name": "Shaan Shoukath",
         "contact_email": "shaans@example.com",
         "contact_phone": "+919876543210",
         "requested_for": "Electronics workshop diagnostics",

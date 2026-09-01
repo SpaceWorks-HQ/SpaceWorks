@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { ConfirmDialog, DataTable, FilterBar, Modal, StatusBadge } from "../../../components/ui";
+import { ConfirmDialog, DataTable, Field, FilterBar, Modal, StatusBadge } from "../../../components/ui";
 import type { DataTableColumn } from "../../../components/ui";
 import { downloadStaffFile, staffRequest } from "../../../lib/api";
 import { useDebouncedValue } from "../../../lib/useDebouncedValue";
@@ -257,7 +257,7 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
         <Modal open={Boolean(toBuyTarget)} onClose={() => setToBuyTarget(null)} title="Add to To Buy" footer={<div className="desk-actions flex flex-wrap justify-end gap-2"><button className="desk-button-ghost" type="button" disabled={toBuy.isPending} onClick={() => setToBuyTarget(null)}>Cancel</button><button className="desk-button-primary" type="button" disabled={toBuy.isPending} onClick={() => toBuy.mutate()}>Add</button></div>}>
           <div className="grid gap-3 text-sm">
             <p className="font-semibold text-ink">{toBuyTarget?.name}</p>
-            <input className="desk-input" type="number" min="1" value={toBuyQty} onChange={(e) => setToBuyQty(e.target.value)} />
+            <Field label="Quantity"><input className="desk-input" type="number" min="1" value={toBuyQty} onChange={(e) => setToBuyQty(e.target.value)} /></Field>
             {toBuy.error ? <p className="text-sm text-danger">{toBuy.error.message}</p> : null}
           </div>
         </Modal>
@@ -310,7 +310,7 @@ function QuantityAdjust({ product, form, setForm, pending, error, onSubmit }: { 
       <h3 className="title-section">Adjust quantities</h3>
       <div className="grid gap-2 sm:grid-cols-3"><InventoryMetric label="Available" value={product.available_quantity} /><InventoryMetric label="Damaged" value={product.damaged_quantity} /><InventoryMetric label="Lost" value={product.lost_quantity} /></div>
       <div className="grid gap-2 sm:grid-cols-3"><Field label="Â± Available"><input className="desk-input" type="number" value={form.delta_available} onChange={(e) => setForm((c) => ({ ...c, delta_available: e.target.value }))} /></Field><Field label="Â± Damaged"><input className="desk-input" type="number" value={form.delta_damaged} onChange={(e) => setForm((c) => ({ ...c, delta_damaged: e.target.value }))} /></Field><Field label="Â± Lost"><input className="desk-input" type="number" value={form.delta_lost} onChange={(e) => setForm((c) => ({ ...c, delta_lost: e.target.value }))} /></Field></div>
-      <input className="desk-input" placeholder="Adjustment reason" value={form.reason} onChange={(e) => setForm((c) => ({ ...c, reason: e.target.value }))} />
+      <Field label="Adjustment reason"><input className="desk-input" value={form.reason} onChange={(e) => setForm((c) => ({ ...c, reason: e.target.value }))} /></Field>
       <div className="desk-actions flex justify-end"><button className="desk-button-primary" type="button" disabled={pending || !form.reason.trim()} onClick={onSubmit}>Apply adjustment</button></div>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
     </div>
@@ -466,10 +466,6 @@ function InventoryAvailability({ product }: { product: AdminProduct }) {
 function defaultToBuyQuantity(product: AdminProduct) {
   const target = Math.ceil(product.total_quantity * 0.2) + 1;
   return String(Math.max(1, target - product.available_quantity));
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="grid gap-1"><span className="eyebrow">{label}</span>{children}</label>;
 }
 
 function InventoryMetric({ label, value }: { label: string; value: number }) {

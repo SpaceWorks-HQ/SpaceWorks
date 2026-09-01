@@ -1,12 +1,12 @@
-import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { ErrorText, Field } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import { Pagination } from "../../../components/ui/Pagination";
 import { usePaginatedQuery } from "../../../lib/usePaginatedQuery";
 import { Panel, type Makerspace, type Product, useStaffGet } from "./shared";
-import { ErrorText, TransferTable } from "./StockTransferTable";
+import { TransferTable } from "./StockTransferTable";
 import { invalidateContainerViews, invalidateInventoryViews } from "../queryInvalidation";
 
 type ListResponse<T> = { count?: number; results: T[] };
@@ -225,13 +225,13 @@ export function StockTransferPanel({
                 <button className="desk-button-ghost" type="button" onClick={addLine}>Add line</button>
               </div>
               <div className="grid gap-2">
-                {lineRows.map((line) => (
+                {lineRows.map((line, index) => (
                   <div key={line.key} className="grid gap-2 md:grid-cols-[1fr_120px_auto]">
-                    <select className="desk-input" value={line.productId} disabled={products.isLoading} onChange={(event) => updateLine(line.key, { productId: event.target.value })}>
+                    <Field label={`Product for transfer line ${index + 1}`}><select className="desk-input" value={line.productId} disabled={products.isLoading} onChange={(event) => updateLine(line.key, { productId: event.target.value })}>
                       <option value="">Product</option>
                       {products.data?.results?.map((product) => <option key={product.id} value={product.id}>{product.name} ({product.available_quantity} available)</option>)}
-                    </select>
-                    <input className="desk-input" min={1} inputMode="numeric" type="number" value={line.quantity} onChange={(event) => updateLine(line.key, { quantity: event.target.value })} />
+                    </select></Field>
+                    <Field label={`Quantity for transfer line ${index + 1}`}><input className="desk-input" min={1} inputMode="numeric" type="number" value={line.quantity} onChange={(event) => updateLine(line.key, { quantity: event.target.value })} /></Field>
                     <button className="desk-button-danger" type="button" onClick={() => removeLine(line.key)}>Remove</button>
                   </div>
                 ))}
@@ -249,11 +249,11 @@ export function StockTransferPanel({
                 asset-tracked products are not supported.
               </p>
             ) : null}
-            {validationError ? <ErrorText text={validationError} /> : null}
-            {create.isError ? <ErrorText text={create.error.message} /> : null}
-            {products.isError ? <ErrorText text={products.error.message} /> : null}
-            {sourceContainers.isError ? <ErrorText text={sourceContainers.error.message} /> : null}
-            {destinationContainers.isError ? <ErrorText text={destinationContainers.error.message} /> : null}
+            {validationError ? <ErrorText message={validationError} /> : null}
+            {create.isError ? <ErrorText message={create.error.message} /> : null}
+            {products.isError ? <ErrorText message={products.error.message} /> : null}
+            {sourceContainers.isError ? <ErrorText message={sourceContainers.error.message} /> : null}
+            {destinationContainers.isError ? <ErrorText message={destinationContainers.error.message} /> : null}
             <button className="desk-button-primary mt-4" type="submit" disabled={create.isPending}>
               {create.isPending ? "Creating..." : "Create transfer"}
             </button>
@@ -272,10 +272,6 @@ export function StockTransferPanel({
       </div>
     </Panel>
   );
-}
-
-function Field({ children, className = "", label }: { children: React.ReactNode; className?: string; label: string }) {
-  return <label className={`block ${className}`}><span className="eyebrow mb-1 block">{label}</span>{children}</label>;
 }
 
 function labelForContainer(container: Container) {

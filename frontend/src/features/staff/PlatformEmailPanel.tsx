@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { Field } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
 import { Panel, useStaffGet } from "./StaffPanels";
 
@@ -77,43 +78,11 @@ export function PlatformEmailPanel() {
 
       <div className="mt-4 rounded-md border border-line bg-surface p-3">
         <div className="grid gap-2 sm:grid-cols-2">
-          <input
-            className="desk-input"
-            disabled={formDisabled}
-            placeholder="SMTP host"
-            value={form.smtp_host}
-            onChange={(event) => setForm({ ...form, smtp_host: event.target.value })}
-          />
-          <input
-            className="desk-input"
-            disabled={formDisabled}
-            inputMode="numeric"
-            placeholder="SMTP port"
-            value={form.smtp_port}
-            onChange={(event) => setForm({ ...form, smtp_port: event.target.value })}
-          />
-          <input
-            className="desk-input"
-            disabled={formDisabled}
-            placeholder="SMTP username"
-            value={form.smtp_username}
-            onChange={(event) => setForm({ ...form, smtp_username: event.target.value })}
-          />
-          <input
-            className="desk-input"
-            disabled={formDisabled}
-            placeholder={settings.data?.smtp_password_set ? "SMTP password set" : "SMTP password"}
-            type="password"
-            value={form.smtp_password}
-            onChange={(event) => setForm({ ...form, smtp_password: event.target.value })}
-          />
-          <input
-            className="desk-input sm:col-span-2"
-            disabled={formDisabled}
-            placeholder="From email"
-            value={form.from_email}
-            onChange={(event) => setForm({ ...form, from_email: event.target.value })}
-          />
+          <Field label="SMTP host"><input className="desk-input" disabled={formDisabled} value={form.smtp_host} onChange={(event) => setForm({ ...form, smtp_host: event.target.value })} /></Field>
+          <Field label="SMTP port"><input className="desk-input" disabled={formDisabled} inputMode="numeric" value={form.smtp_port} onChange={(event) => setForm({ ...form, smtp_port: event.target.value })} /></Field>
+          <Field label="SMTP username"><input className="desk-input" disabled={formDisabled} value={form.smtp_username} onChange={(event) => setForm({ ...form, smtp_username: event.target.value })} /></Field>
+          <Field label="SMTP password"><input className="desk-input" disabled={formDisabled} placeholder={settings.data?.smtp_password_set ? "SMTP password set" : undefined} type="password" value={form.smtp_password} onChange={(event) => setForm({ ...form, smtp_password: event.target.value })} /></Field>
+          <Field className="sm:col-span-2" label="From email"><input className="desk-input sm:col-span-2" disabled={formDisabled} value={form.from_email} onChange={(event) => setForm({ ...form, from_email: event.target.value })} /></Field>
         </div>
         <div className="mt-3 flex flex-wrap gap-4">
           <label className="flex items-center gap-2 text-sm text-muted">
@@ -161,5 +130,4 @@ function platformEmailPayload(form: PlatformEmailForm) {
   if (form.smtp_password) payload.smtp_password = form.smtp_password;
   return payload;
 }
-
 

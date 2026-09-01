@@ -264,7 +264,7 @@ function CountSection({ makerspace, stocktakeId }: { makerspace: Makerspace; sto
           <div className="overflow-x-auto">
             <table className="min-w-[720px] text-left text-xs">
               <thead className="text-muted">
-                <tr><th className="py-1">Item</th><th>Container</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Condition</th><th>Notes</th></tr>
+                <tr><th scope="col" className="py-1">Item</th><th scope="col">Container</th><th scope="col">Expected</th><th scope="col">Counted</th><th scope="col">Variance</th><th scope="col">Condition</th><th scope="col">Notes</th></tr>
               </thead>
               <tbody>
                 {lines.map((line) => (

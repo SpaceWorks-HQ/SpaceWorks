@@ -30,6 +30,17 @@ class HardwareRequest(ScopedPiiModelMixin, models.Model):
     requester_name = models.TextField(blank=True, default="")
     requester_contact_email = models.TextField(blank=True)
     requester_contact_phone = models.TextField(blank=True)
+    requester_contact_verified = models.BooleanField(default=True)
+    anonymous_idempotency_key_fingerprint = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+    )
+    anonymous_payload_fingerprint = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+    )
     status = models.CharField(
         max_length=32,
         choices=Status.choices,
@@ -105,6 +116,14 @@ class HardwareRequest(ScopedPiiModelMixin, models.Model):
                     status__in=["issued", "partially_returned"],
                 ),
             ),
+            models.Index(
+                fields=["makerspace", "status"],
+                name="hwreq_anon_pending_idx",
+                condition=(
+                    models.Q(status="pending_approval")
+                    & ~models.Q(anonymous_idempotency_key_fingerprint="")
+                ),
+            ),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -116,6 +135,11 @@ class HardwareRequest(ScopedPiiModelMixin, models.Model):
                     ]
                 ),
                 name="uniq_active_loan_per_box",
+            ),
+            models.UniqueConstraint(
+                fields=["makerspace", "anonymous_idempotency_key_fingerprint"],
+                condition=~models.Q(anonymous_idempotency_key_fingerprint=""),
+                name="uniq_hwreq_anon_idempotency",
             ),
         ]
 

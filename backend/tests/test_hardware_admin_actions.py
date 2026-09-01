@@ -83,32 +83,99 @@ def action_payload(action, hardware_request, **extra):
     }
 
 
-def test_accept_action_moves_pending_request_to_accepted():
+def review_url(hardware_request):
+    return reverse(
+        "admin:hardware_requests_hardwarerequest_review", args=[hardware_request.pk]
+    )
+
+
+def test_the_bulk_accept_and_reject_actions_no_longer_exist():
+    """Accepting reserves stock and rejecting closes a person's ask. Neither is a
+    checkbox-column decision any more -- both moved to the one-by-one review page."""
+    superadmin = make_superadmin("hardware-no-bulk-superadmin")
+    hardware_request = make_hardware_request()
+
+    for action in ("accept_selected", "reject_selected"):
+        response = admin_client(superadmin).post(
+            changelist_url(), action_payload(action, hardware_request), follow=True
+        )
+        hardware_request.refresh_from_db()
+        assert hardware_request.status == HardwareRequest.Status.PENDING_APPROVAL, action
+        messages = [str(message) for message in get_messages(response.wsgi_request)]
+        assert "No action selected." in messages, action
+
+
+def test_the_review_page_accepts_one_request():
     superadmin = make_superadmin()
     hardware_request = make_hardware_request()
 
-    response = admin_client(superadmin).post(
-        changelist_url(),
-        action_payload("accept_selected", hardware_request),
-    )
+    response = admin_client(superadmin).post(review_url(hardware_request), {"accept": "1"})
 
     assert response.status_code == 302
     hardware_request.refresh_from_db()
     assert hardware_request.status == HardwareRequest.Status.ACCEPTED
 
 
-def test_reject_action_with_reason_moves_pending_request_to_rejected():
+def test_the_review_page_honours_a_lowered_accepted_quantity():
+    superadmin = make_superadmin("hardware-partial-superadmin")
+    hardware_request = make_hardware_request()
+    item = hardware_request.items.get()
+    item.requested_quantity = 3
+    item.save(update_fields=["requested_quantity"])
+
+    response = admin_client(superadmin).post(
+        review_url(hardware_request),
+        {"accept": "1", f"accepted_quantity_{item.pk}": "2"},
+    )
+
+    assert response.status_code == 302
+    item.refresh_from_db()
+    assert item.accepted_quantity == 2
+
+
+def test_the_review_page_refuses_a_quantity_above_what_was_requested():
+    superadmin = make_superadmin("hardware-overrequest-superadmin")
+    hardware_request = make_hardware_request()
+    item = hardware_request.items.get()
+
+    response = admin_client(superadmin).post(
+        review_url(hardware_request),
+        {"accept": "1", f"accepted_quantity_{item.pk}": "99"},
+        follow=True,
+    )
+
+    hardware_request.refresh_from_db()
+    assert hardware_request.status == HardwareRequest.Status.PENDING_APPROVAL
+    messages = [str(message) for message in get_messages(response.wsgi_request)]
+    assert any("must be between 0 and" in message for message in messages)
+
+
+def test_the_review_page_refuses_a_non_numeric_quantity():
+    """Parsed here rather than handed to the workflow, so a malformed field is an error
+    on the page instead of a 500 inside the service."""
+    superadmin = make_superadmin("hardware-nan-superadmin")
+    hardware_request = make_hardware_request()
+    item = hardware_request.items.get()
+
+    response = admin_client(superadmin).post(
+        review_url(hardware_request),
+        {"accept": "1", f"accepted_quantity_{item.pk}": "two"},
+        follow=True,
+    )
+
+    hardware_request.refresh_from_db()
+    assert hardware_request.status == HardwareRequest.Status.PENDING_APPROVAL
+    messages = [str(message) for message in get_messages(response.wsgi_request)]
+    assert any("whole number" in message for message in messages)
+
+
+def test_the_review_page_rejects_with_a_reason():
     superadmin = make_superadmin("hardware-reject-superadmin")
     hardware_request = make_hardware_request()
 
     response = admin_client(superadmin).post(
-        changelist_url(),
-        action_payload(
-            "reject_selected",
-            hardware_request,
-            apply="1",
-            reason="Unavailable this week.",
-        ),
+        review_url(hardware_request),
+        {"reject": "1", "reason": "Unavailable this week."},
     )
 
     assert response.status_code == 302
@@ -117,19 +184,13 @@ def test_reject_action_with_reason_moves_pending_request_to_rejected():
     assert hardware_request.rejection_reason == "Unavailable this week."
 
 
-def test_reject_action_with_empty_reason_does_not_change_status_and_reports_error():
+def test_the_review_page_refuses_to_reject_without_a_reason():
     superadmin = make_superadmin("hardware-empty-reject-superadmin")
     hardware_request = make_hardware_request()
-    client = admin_client(superadmin)
 
-    response = client.post(
-        changelist_url(),
-        action_payload(
-            "reject_selected",
-            hardware_request,
-            apply="1",
-            reason="   ",
-        ),
+    response = admin_client(superadmin).post(
+        review_url(hardware_request),
+        {"reject": "1", "reason": "   "},
         follow=True,
     )
 
@@ -139,23 +200,14 @@ def test_reject_action_with_empty_reason_does_not_change_status_and_reports_erro
     assert "Rejection reason is required." in messages
 
 
-def test_hardware_request_admin_blocks_direct_add_and_delete():
-    """Regression: requests are workflow-driven; the admin must not expose
-    direct add (broken readonly form) or delete (bypasses reservation/audit)."""
-    superadmin = make_superadmin("hardware-add-delete-superadmin")
-    # has_*_permission=False raises PermissionDenied (rendered as 403); the test
-    # client must not re-raise it.
-    client = Client(raise_request_exception=False)
-    client.force_login(superadmin)
-
-    add_url = reverse("admin:hardware_requests_hardwarerequest_add")
-    add_response = client.get(add_url)
-    assert add_response.status_code == 403
-
+def test_the_review_page_is_closed_to_a_non_superadmin():
+    """`admin_site.admin_view` plus the model's superuser gate. Without both, this URL
+    would be the one state-changing surface that skipped them."""
+    staffer = make_user("hardware-review-staffer", is_staff=True)
     hardware_request = make_hardware_request()
-    delete_url = reverse(
-        "admin:hardware_requests_hardwarerequest_delete",
-        args=[hardware_request.pk],
-    )
-    delete_response = client.get(delete_url)
-    assert delete_response.status_code == 403
+
+    response = admin_client(staffer).get(review_url(hardware_request))
+
+    assert response.status_code in (302, 403, 404)
+    hardware_request.refresh_from_db()
+    assert hardware_request.status == HardwareRequest.Status.PENDING_APPROVAL

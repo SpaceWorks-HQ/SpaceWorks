@@ -6,20 +6,65 @@ from apps.inventory.models import TrackingMode
 
 class RequestItemInputSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
-    quantity = serializers.IntegerField(min_value=1)
+    quantity = serializers.IntegerField(min_value=1, max_value=99)
 
 
 class RequestSubmitSerializer(serializers.Serializer):
+    CONTACT_FIELDS = ("contact_name", "contact_email", "contact_phone")
+
     website = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    contact_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=200,
+        help_text="Required for an account-less submission.",
+    )
+    contact_email = serializers.EmailField(
+        required=False,
+        allow_blank=True,
+        max_length=254,
+        help_text="Required for an account-less submission; normalized to lowercase.",
+    )
+    contact_phone = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=32,
+    )
     requested_for = serializers.CharField(
         required=False,
         allow_blank=True,
         default="",
+        max_length=500,
     )
-    items = RequestItemInputSerializer(many=True, allow_empty=False)
+    items = serializers.ListField(
+        child=RequestItemInputSerializer(),
+        allow_empty=False,
+        max_length=20,
+    )
+
+    def to_internal_value(self, data):
+        if not self.context.get("anonymous_submission", False):
+            # Authenticated identity remains account-derived. Removing these fields
+            # before child validation makes them genuinely ignored, including an
+            # oversized spoof value that must not turn into a validation side channel.
+            data = data.copy()
+            for field_name in self.CONTACT_FIELDS:
+                data.pop(field_name, None)
+        return super().to_internal_value(data)
+
+    def validate_contact_email(self, value):
+        return value.strip().lower()
 
     def validate(self, attrs):
         attrs["website"] = attrs.get("website", "")
+        if self.context.get("anonymous_submission", False):
+            errors = {}
+            if not attrs.get("contact_name", "").strip():
+                errors["contact_name"] = "This field is required."
+            if not attrs.get("contact_email", "").strip():
+                errors["contact_email"] = "This field is required."
+            if errors:
+                raise serializers.ValidationError(errors)
         product_ids = [item["product_id"] for item in attrs["items"]]
         if len(product_ids) != len(set(product_ids)):
             raise serializers.ValidationError(
@@ -101,6 +146,7 @@ class AdminRequestSerializer(serializers.Serializer):
     requester_display = serializers.SerializerMethodField()
     requester_contact_email = serializers.EmailField(read_only=True)
     requester_contact_phone = serializers.CharField(read_only=True)
+    requester_contact_verified = serializers.BooleanField(read_only=True)
     status = serializers.CharField(read_only=True)
     requested_for = serializers.CharField(read_only=True)
     rejection_reason = serializers.CharField(read_only=True)

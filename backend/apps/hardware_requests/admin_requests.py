@@ -3,6 +3,8 @@ from django.contrib import admin
 from django.contrib import messages
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.template.response import TemplateResponse
+from django.urls import reverse
+from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 
 from apps.hardware_requests.admin_workflow import WORKFLOW_EXCEPTIONS
@@ -10,8 +12,8 @@ from apps.hardware_requests.handover_workflow import (
     assign_box,
     set_return_due as workflow_set_return_due,
 )
+from apps.hardware_requests.admin_request_review import RequestReviewAdminMixin
 from apps.hardware_requests.models import HardwareRequest, HardwareRequestItem
-from apps.hardware_requests.request_workflow import accept_request, reject_request
 from config.admin_access import SuperuserOnlyModelAdmin
 from apps.encryption.admin_search import ScopedPiiAdminSearchMixin
 
@@ -48,10 +50,14 @@ class HardwareRequestItemInline(TabularInline):
 
 
 @admin.register(HardwareRequest)
-class HardwareRequestAdmin(ScopedPiiAdminSearchMixin, SuperuserOnlyModelAdmin, ModelAdmin):
+class HardwareRequestAdmin(
+    RequestReviewAdminMixin, ScopedPiiAdminSearchMixin, SuperuserOnlyModelAdmin, ModelAdmin
+):
+    # Accepting reserves stock and rejecting closes a person's ask, so neither is a
+    # checkbox-column decision any more: both moved to the one-by-one review page
+    # (`admin_request_review`). What survives here is genuinely bulk-shaped work on
+    # requests whose decision has ALREADY been made.
     actions = [
-        "accept_selected",
-        "reject_selected",
         "assign_box_selected",
         "set_return_due",
     ]
@@ -62,8 +68,11 @@ class HardwareRequestAdmin(ScopedPiiAdminSearchMixin, SuperuserOnlyModelAdmin, M
         "requester_identity",
         "return_due_at",
         "created_at",
+        "review_link",
     )
-    list_filter = ("status", "makerspace")
+    # `requester_contact_verified` is filterable so the unverified submissions -- which
+    # are exactly the account-less ones -- can be pulled up as a group before handover.
+    list_filter = ("status", "makerspace", "requester_contact_verified")
     search_fields = (
         "requested_for",
         "rejection_reason",
@@ -73,6 +82,7 @@ class HardwareRequestAdmin(ScopedPiiAdminSearchMixin, SuperuserOnlyModelAdmin, M
         "makerspace",
         "requester",
         "requester_username",
+        "requester_contact_verified",
         "status",
         "requested_for",
         "rejection_reason",
@@ -96,79 +106,31 @@ class HardwareRequestAdmin(ScopedPiiAdminSearchMixin, SuperuserOnlyModelAdmin, M
 
     @admin.display(description="Requester")
     def requester_identity(self, obj):
-        return obj.requester_name or obj.requester_contact_email or "-"
+        label = obj.requester_name or obj.requester_contact_email or "-"
+        if obj.requester_contact_verified:
+            return label
+        # An account-less submitter typed this address themselves and nothing has ever
+        # proved it is theirs -- staff acceptance does not prove it either. Marking it
+        # here is what stops the queue from reading like a list of known people.
+        return f"{label} (unverified contact)"
+
+    @admin.display(description="Review")
+    def review_link(self, obj):
+        if obj.status != HardwareRequest.Status.PENDING_APPROVAL:
+            return "-"
+        url = reverse(
+            "admin:hardware_requests_hardwarerequest_review", args=[obj.pk]
+        )
+        return format_html('<a href="{}">Review</a>', url)
 
     # Requests are created by the public submit flow and mutated only through the
-    # workflow services (the actions below). Direct add hits required readonly fields
-    # and direct delete bypasses reservation/audit/notification cleanup.
+    # workflow services. Direct add hits required readonly fields and direct delete
+    # bypasses reservation/audit/notification cleanup.
     def has_add_permission(self, request):
         return False
 
     def has_delete_permission(self, request, obj=None):
         return False
-
-    @admin.action(description="Accept selected requests")
-    def accept_selected(self, request, queryset):
-        success_count = 0
-        for hardware_request in queryset:
-            try:
-                accept_request(request.user, hardware_request)
-            except WORKFLOW_EXCEPTIONS as exc:
-                self.message_user(
-                    request,
-                    f"{hardware_request.pk}: {exc}",
-                    level=messages.ERROR,
-                )
-            else:
-                success_count += 1
-
-        if success_count:
-            self.message_user(
-                request,
-                f"Accepted {success_count} hardware request(s).",
-                level=messages.SUCCESS,
-            )
-
-    @admin.action(description="Reject selected requests (with reason)")
-    def reject_selected(self, request, queryset):
-        if "apply" not in request.POST:
-            return self._intermediate_action_response(
-                request,
-                queryset,
-                "admin/hardware_requests/reject_action.html",
-                "Reject selected hardware requests",
-                "reject_selected",
-            )
-
-        reason = request.POST.get("reason", "").strip()
-        if not reason:
-            self.message_user(
-                request,
-                "Rejection reason is required.",
-                level=messages.ERROR,
-            )
-            return None
-
-        success_count = 0
-        for hardware_request in queryset:
-            try:
-                reject_request(request.user, hardware_request, reason)
-            except WORKFLOW_EXCEPTIONS as exc:
-                self.message_user(
-                    request,
-                    f"{hardware_request.pk}: {exc}",
-                    level=messages.ERROR,
-                )
-            else:
-                success_count += 1
-
-        if success_count:
-            self.message_user(
-                request,
-                f"Rejected {success_count} hardware request(s).",
-                level=messages.SUCCESS,
-            )
-        return None
 
     @admin.action(description="Assign box to selected requests")
     def assign_box_selected(self, request, queryset):

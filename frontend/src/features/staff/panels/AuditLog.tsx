@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { Skeleton } from "../../../components/ui";
+import { Field, Skeleton } from "../../../components/ui";
 import { Panel, useStaffGet } from "./shared";
 
 type AuditLogEntry = {
@@ -44,8 +44,8 @@ export function AuditLog() {
   return (
     <Panel title="Audit logs">
       <div className="mb-3 grid gap-2 sm:grid-cols-2">
-        <input className="desk-input" placeholder="target type, e.g. inventory.inventoryproduct" value={targetType} onChange={(e) => updateTargetType(e.target.value)} />
-        <input className="desk-input" placeholder="target id" value={targetId} onChange={(e) => updateTargetId(e.target.value)} />
+        <Field label="Target type"><input className="desk-input" placeholder="e.g. inventory.inventoryproduct" value={targetType} onChange={(e) => updateTargetType(e.target.value)} /></Field>
+        <Field label="Target ID"><input className="desk-input" value={targetId} onChange={(e) => updateTargetId(e.target.value)} /></Field>
       </div>
       <div className="grid gap-2 text-sm">
         {logs.error ? <p className="text-sm text-danger">{logs.error.message}</p> : null}

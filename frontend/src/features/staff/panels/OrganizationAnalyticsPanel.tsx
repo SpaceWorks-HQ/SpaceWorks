@@ -133,7 +133,7 @@ function AnalyticsRowsTable({
         <thead className="eyebrow sticky top-0 bg-surface">
           <tr>
             {headers.map((header) => (
-              <th className="whitespace-nowrap px-3 py-2" key={header}>{header.replace(/_/g, " ")}</th>
+              <th scope="col" className="whitespace-nowrap px-3 py-2" key={header}>{header.replace(/_/g, " ")}</th>
             ))}
           </tr>
         </thead>

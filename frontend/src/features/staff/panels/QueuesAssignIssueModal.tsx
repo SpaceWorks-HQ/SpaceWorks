@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-import { Modal } from "../../../components/ui/Modal";
+import { ErrorText, Modal } from "../../../components/ui";
 import QrScanner from "../../../components/ui/QrScanner";
 import { staffRequest } from "../../../lib/api";
 import { EvidenceUpload } from "./EvidenceUpload";
-import { BoxCodeField, ErrorText, FormFooter, ShelfLine, submitForm } from "./QueuesModalShared";
+import { BoxCodeField, FormFooter, ShelfLine, submitForm } from "./QueuesModalShared";
 import type { AssignIssueValues, FormModalProps } from "./QueuesModalTypes";
 
 type ScannedAsset = { payload: string; label: string };

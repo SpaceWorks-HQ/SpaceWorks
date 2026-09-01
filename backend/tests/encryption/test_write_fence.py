@@ -213,7 +213,17 @@ def test_mapped_service_paths_fail_with_the_typed_503_exception(monkeypatch):
         )
     with pytest.raises(PiiWriteFenced):
         request_workflow.submit_request(
-            space, [], requester=actor
+            space,
+            [],
+            requester_principal=actor,
+            contact_snapshot=request_workflow.RequesterSnapshot(
+                username=actor.username,
+                name=actor.display_name,
+                email=actor.email,
+                phone=actor.phone,
+                contact_verified=True,
+            ),
+            audit_actor=actor,
         )
     with pytest.raises(PiiWriteFenced):
         service_workflow.submit(

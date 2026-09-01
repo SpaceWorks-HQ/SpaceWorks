@@ -243,7 +243,7 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | | [`member_accounts`](docs/MODULES.md#member_accounts) | | | Member sign-up and member sign-in |
 | **Notifications** | [`notifications`](docs/MODULES.md#notifications) | | | The in-app inbox |
 | | [`email`](docs/MODULES.md#email) | | | Outbound email |
-| | [`telegram`](docs/MODULES.md#telegram) | | | Telegram alerts and accept/reject buttons |
+| | [`telegram`](docs/MODULES.md#telegram) | | | Telegram group alerts (outbound only) |
 | | [`slack`](docs/MODULES.md#slack) | | | Slack alerts |
 | | [`mattermost`](docs/MODULES.md#mattermost) | | | Mattermost alerts |
 | | [`discord`](docs/MODULES.md#discord) | | | Discord alerts |
@@ -321,6 +321,26 @@ People still get named, two ways:
   It is enough to issue them a tool, register them for an event or run a machine job for them, and it
   keeps every handover attributable to a real person, which the hardware rules require.
 
+#### Who may ask to borrow something
+
+Borrow requests are only ever a *proposal* — staff still accept them, and staff acceptance is what
+reserves stock — so who may submit one is a separate switch from who may sign in. There are three
+states, and you never set them both:
+
+| Member accounts | Account-less requests | Who may submit |
+| --- | --- | --- |
+| on | off | **Members** — an active member of that makerspace |
+| off | off | **Account holders** — anyone signed in (the default without the module) |
+| off | **on** | **Anyone** — no account at all |
+
+The last row is opt-in per makerspace, and turning **Member accounts** on turns it back off: enabling
+membership means asking for membership, so a stranger must not still walk past it. Account-less
+submissions ask for a name, email and phone, require an `Idempotency-Key`, and are rate-limited per IP
+and per email address; every one of them is recorded against a single shared requester principal, which
+is deliberately excluded from every per-person ranking so a hundred strangers never add up to one
+fictional "top borrower". `setup.sh` asks this question during first-run setup, and it can be changed
+later with `manage.py set_request_access`.
+
 ### Choosing which ways in you offer
 
 **`/control/` → Platform login methods** switches the four credential kinds independently: password,
@@ -354,8 +374,8 @@ Two things worth knowing before you set this up:
 - **Webhook URLs are write-only.** They are stored encrypted and never shown again, so an edit that
   only renames a room can leave the field blank.
 - **Telegram rooms share the makerspace's bot** — add the same bot to each group and paste each
-  group's chat ID. That is what keeps the accept/reject buttons working, since Telegram sends every
-  button press back to one address.
+  group's chat ID. Delivery is outbound only: chat is not a decision surface, so no alert carries
+  accept/reject buttons and decisions are made in the staff console or `/control/`.
 
 A makerspace that has added no rooms keeps using the single webhook under **Chat webhooks**, exactly
 as before. Nothing changes until you add your first room.

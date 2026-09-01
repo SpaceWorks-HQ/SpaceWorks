@@ -1,6 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 
-import { Modal } from "../../../components/ui";
+import { Field, Modal } from "../../../components/ui";
 
 export type StaffForm = {
   username: string;
@@ -273,17 +273,6 @@ export function ResetPasswordModal({
         </form>
       )}
     </Modal>
-  );
-}
-
-function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: ReactNode }) {
-  return (
-    <label className="grid gap-1">
-      <span className="eyebrow">{label}</span>
-      {children}
-      {hint ? <span className="text-xs font-normal text-muted">{hint}</span> : null}
-      {error ? <span className="text-xs font-normal text-danger">{error}</span> : null}
-    </label>
   );
 }
 

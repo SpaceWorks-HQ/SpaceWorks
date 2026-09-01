@@ -9,6 +9,7 @@ from apps.presence.guard import (
     MemberPresenceRequired,
     PresenceRequired,
     WaiverAcceptanceRequired,
+    require_active_account,
     require_active_member_presence,
 )
 
@@ -18,6 +19,23 @@ def setup_member(space):
     role = MakerspaceRole.objects.get(makerspace=space, slug="member")
     membership = MakerspaceMembership.objects.create(makerspace=space, user=user, assigned_role=role, role="custom")
     return user, membership
+
+
+@pytest.mark.django_db
+def test_active_account_guard_keeps_identity_checks_without_requiring_membership():
+    space = Makerspace.objects.create(name="Account Guard", slug="account-guard")
+    user = User.objects.create_user(username="account-only", password="password")
+
+    result = require_active_account(user, space)
+
+    assert result.membership is None
+    assert result.accepted_waiver is None
+    assert result.session is None
+
+    user.access_status = User.AccessStatus.RESTRICTED
+    user.save(update_fields=["access_status"])
+    with pytest.raises(MemberPresenceRequired):
+        require_active_account(user, space)
 
 
 @pytest.mark.django_db

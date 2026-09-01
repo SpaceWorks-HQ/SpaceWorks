@@ -38,7 +38,7 @@ export function UsersTable({ rows, makerspaceNames, loading, assignableRoles, on
     <>
       <div className="overflow-x-auto rounded-md border border-line bg-bg">
         <table className="w-full min-w-[860px] text-left text-sm">
-          <thead className="eyebrow bg-surface"><tr className="border-b border-line">{["Username", "Email", "Role", "Makerspace", "Access", ""].map((header) => <th key={header} className="px-3 py-2">{header}</th>)}</tr></thead>
+          <thead className="eyebrow bg-surface"><tr className="border-b border-line">{["Username", "Email", "Role", "Makerspace", "Access", ""].map((header) => <th scope={header ? "col" : undefined} key={header} className="px-3 py-2">{header}</th>)}</tr></thead>
           <tbody>{rows.map((membership) => <tr key={membership.id} className="border-b border-line last:border-b-0">
             <td className="px-3 py-2 font-semibold text-ink"><span className="block max-w-40 break-words">{membership.user.username}</span></td>
             <td className="px-3 py-2 text-muted"><span className="block max-w-56 break-all">{membership.user.email || "-"}</span></td>

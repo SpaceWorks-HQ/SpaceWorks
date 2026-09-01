@@ -16,6 +16,10 @@ from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationFo
 from rest_framework.exceptions import APIException
 
 from apps.accounts.models import NativeAppRegistration, User
+from apps.accounts.principal_guards import (
+    refuse_anonymous_requester_access_mutation,
+    refuse_anonymous_requester_credential,
+)
 from apps.accounts.transition_services import (
     WalkInTransitionError,
     transition_walk_in_to_account,
@@ -78,6 +82,17 @@ class UserAdmin(SuperuserOnlyModelAdmin, DjangoUserAdmin, ModelAdmin):
     def user_change_password(self, request, id, form_url=""):
         """Make the inherited password form an explicit account transition."""
         user = self.get_object(request, id)
+        if request.method == "POST" and user is not None:
+            try:
+                refuse_anonymous_requester_credential(user)
+            except APIException as exc:
+                self.message_user(request, _api_exception_message(exc), level=messages.ERROR)
+                return HttpResponseRedirect(
+                    reverse(
+                        f"{self.admin_site.name}:{user._meta.app_label}_{user._meta.model_name}_change",
+                        args=(user.pk,),
+                    )
+                )
         if (
             request.method != "POST"
             or user is None
@@ -171,16 +186,28 @@ class UserAdmin(SuperuserOnlyModelAdmin, DjangoUserAdmin, ModelAdmin):
         status = form.cleaned_data["status"]
         reason = form.cleaned_data["reason"]
         for user in queryset:
-            user.access_status = status
-            user.restriction_reason = reason
-            user.save(update_fields=["access_status", "restriction_reason"])
-            audit.record(
-                request.user,
-                "user.access_restricted",
-                target=user,
-                meta={"status": user.access_status, "reason": user.restriction_reason},
-            )
-            success_count += 1
+            try:
+                refuse_anonymous_requester_access_mutation(user)
+            except APIException as exc:
+                self.message_user(
+                    request,
+                    f"{user.username}: {_api_exception_message(exc)}",
+                    level=messages.ERROR,
+                )
+            else:
+                user.access_status = status
+                user.restriction_reason = reason
+                user.save(update_fields=["access_status", "restriction_reason"])
+                audit.record(
+                    request.user,
+                    "user.access_restricted",
+                    target=user,
+                    meta={
+                        "status": user.access_status,
+                        "reason": user.restriction_reason,
+                    },
+                )
+                success_count += 1
 
         self.message_user(
             request,
@@ -196,6 +223,7 @@ class UserAdmin(SuperuserOnlyModelAdmin, DjangoUserAdmin, ModelAdmin):
             try:
                 with transaction.atomic():
                     locked = User.objects.select_for_update().get(pk=user.pk)
+                    refuse_anonymous_requester_access_mutation(locked)
                     if locked.access_status != User.AccessStatus.ACTIVE and locked.is_active:
                         memberships = MakerspaceMembership.objects.select_related(
                             "makerspace"

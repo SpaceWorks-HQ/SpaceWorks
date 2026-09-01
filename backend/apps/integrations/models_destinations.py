@@ -13,13 +13,15 @@ Discord each need an incoming-webhook URL; Telegram needs a chat id. A single
 webhook URL being saved as a chat id. Two nullable columns and a per-channel check
 constraint make the wrong row unrepresentable.
 
-**Telegram destinations carry NO bot token.** Telegram is bidirectional: the accept/reject
-buttons post back to a single registered webhook authenticated by one
-`TELEGRAM_WEBHOOK_SECRET`, so a second bot's callbacks cannot be authenticated or routed.
-A per-destination token would create rooms that can send but whose buttons are dead, which
-in a staff room reads as a broken accept rather than a configuration limit. One bot added
-to many groups gives per-machine rooms and keeps callbacks working. Per-bot destinations
-would need per-bot webhook secrets and inbound routing — its own phase.
+**Telegram destinations carry NO bot token.** The original reason was inbound: accept/reject
+buttons posted back to a single registered webhook authenticated by one
+`TELEGRAM_WEBHOOK_SECRET`, so a second bot's callbacks could not be authenticated or routed.
+**Those buttons are gone** — chat is a notification channel now, not a decision surface — so
+that argument has expired, and the rule stands on the outbound half instead: one bot identity
+per makerspace across all of its rooms is what makes per-machine rooms read as a single
+sender rather than a handful of unrelated bots, and it keeps the token surface to one secret
+per tenant. If a button is ever reintroduced, per-bot destinations need per-bot webhook
+secrets and inbound routing first — its own phase, exactly as before.
 
 **No scope links means space-wide**, which is deliberately the OPPOSITE default to role
 machine-scope. An unscoped *role* must see nothing (access fails closed); an unscoped

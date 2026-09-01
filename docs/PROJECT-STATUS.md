@@ -80,4 +80,5 @@ Stack (in use):
   `frontend/src/generated/api.ts`; regenerate both when routes/models change — spectacular needs
   `--format openapi-json`).
 - **Admin theme:** django-unfold; site name via `ADMIN_SITE_NAME` (default "Space Works").
-- **Telegram:** request alerts, test alerts, authenticated webhook accept/reject callbacks.
+- **Telegram:** request alerts and test alerts. Outbound only — the webhook acknowledges and discards
+  callbacks; decisions are made in the staff console or `/control/`.

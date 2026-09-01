@@ -239,7 +239,17 @@ def test_non_compound_backup_succeeds_without_capability_marker(
         (root / "database.dump").write_bytes(b"ordinary backup")
         return {"format": "spaceworks-phase5a-v3", "storage": {"objects": []}}
 
+    real_run = archive_builder.subprocess.run
+
     def encrypt(command, **_kwargs):
+        if "-o" not in command:
+        # Not an age invocation. This fake replaces the SHARED subprocess module, so
+        # every other binary the code runs lands here too -- including
+        # `postgres_client._binary_major`'s `<client> --version` probe. Delegate
+        # instead of stubbing: a bare SimpleNamespace has no `.stdout`, which turned a
+        # clean PostgresClientUnavailable into an AttributeError on every host without
+        # a versioned client directory (any non-Debian/RHEL host).
+            return real_run(command, **_kwargs)
         shutil.copyfile(command[-1], command[command.index("-o") + 1])
         return SimpleNamespace(returncode=0)
 

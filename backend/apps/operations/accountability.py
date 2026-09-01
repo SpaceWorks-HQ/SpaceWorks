@@ -3,20 +3,44 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.hardware_requests.display import requester_label
 from apps.hardware_requests.models import (
     HardwareRequest,
     PublicProblemReport,
     PublicToolLoan,
     RequesterAccountability,
 )
+from apps.makerspaces.anonymous_requesters import anonymous_requester_ids
+
+
+def _anonymous_accountability(makerspace_id, principals):
+    """Damage and loss recorded against account-less requests, as one total.
+
+    Not a ranking row and deliberately not shaped like one: there is no person to name,
+    contact or restrict here, only a count of what strangers did not bring back.
+    """
+    totals = RequesterAccountability.objects.filter(
+        makerspace_id=makerspace_id, requester_id__in=principals
+    ).aggregate(
+        damaged=Count("id", filter=Q(issue_type=RequesterAccountability.IssueType.DAMAGED)),
+        missing=Count("id", filter=Q(issue_type=RequesterAccountability.IssueType.MISSING)),
+        total_issues=Count("id"),
+        total_quantity=Coalesce(Sum("quantity"), 0),
+    )
+    return {key: value or 0 for key, value in totals.items()}
 
 
 def accountability_data(makerspace_id, *, limit=200):
-    repeat_offenders, repeat_truncated = _repeat_offenders(makerspace_id, limit)
+    principals = anonymous_requester_ids([makerspace_id])
+    repeat_offenders, repeat_truncated = _repeat_offenders(makerspace_id, limit, principals)
     overdue, overdue_truncated = _overdue_loans(makerspace_id, limit)
     problem_reports, problems_truncated = _problem_reports(makerspace_id, limit)
     return {
         "repeat_offenders": repeat_offenders,
+        # The damage and loss that the excluded principal was carrying, kept as a total
+        # rather than dropped: an accountability panel that silently lost every
+        # account-less incident would be worse than one that named a fictional person.
+        "anonymous_accountability": _anonymous_accountability(makerspace_id, principals),
         "overdue": overdue,
         "restrictions": _restricted_requesters(makerspace_id),
         "problem_reports": problem_reports,
@@ -57,9 +81,12 @@ def _problem_reports(makerspace_id, limit):
     ], len(rows) > limit
 
 
-def _repeat_offenders(makerspace_id, limit):
+def _repeat_offenders(makerspace_id, limit, principals):
     rows = list(
+        # Excluded BEFORE the limit, not after: filtering a materialized page would let
+        # the principal push a real repeat offender off the end of the list.
         RequesterAccountability.objects.filter(makerspace_id=makerspace_id)
+        .exclude(requester_id__in=principals)
         .values(
             "requester_id",
             "requester__username",
@@ -125,7 +152,10 @@ def _overdue_requests(makerspace_id, now, limit):
         {
             "type": "request",
             "reference_id": request.id,
-            "requester_username": request.requester.username,
+            # `requester_label` prefers the request's own contact snapshot, so an
+            # account-less overdue loan shows the email the borrower actually gave
+            # instead of the principal's internal `member_<uuid>` username.
+            "requester_username": requester_label(request),
             "label": _request_label(request),
             "due_at": request.return_due_at,
         }
@@ -160,6 +190,10 @@ def _request_label(request):
 
 
 def _restricted_requesters(makerspace_id):
+    # The principal can never legitimately appear here -- restrict/restore both refuse it
+    # via `refuse_anonymous_requester_access_mutation` -- but it is excluded anyway, so a
+    # row created before that guard, or by a direct DB edit, cannot render as a person.
+    principals = anonymous_requester_ids([makerspace_id])
     return [
         {
             "requester_id": user.id,
@@ -167,7 +201,7 @@ def _restricted_requesters(makerspace_id):
             "access_status": user.access_status,
             "restriction_reason": user.restriction_reason,
         }
-        for user in User.objects.filter(
+        for user in User.objects.exclude(pk__in=principals).filter(
             accountability_records__makerspace_id=makerspace_id,
             access_status__in=[
                 User.AccessStatus.RESTRICTED,

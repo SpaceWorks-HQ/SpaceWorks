@@ -72,7 +72,7 @@ export function DataTable<T>({
         <thead className="bg-surface text-xs text-muted">
           <tr className="border-b border-line">
             {selectionEnabled ? (
-              <th className="w-10 px-3 py-2">
+              <th className="w-10 px-3 py-2" scope="col">
                 <input ref={selectAllRef} type="checkbox" aria-label="Select all rows" checked={allSelected} onChange={(event) => changeAll(event.target.checked)} />
               </th>
             ) : null}
@@ -81,6 +81,7 @@ export function DataTable<T>({
                 key={column.key}
                 className={`px-3 py-2 font-semibold ${column.className ?? ""}`}
                 aria-sort={sort?.key === column.key ? ariaSort(sort.direction) : undefined}
+                scope="col"
               >
                 {column.sortable ? (
                   <button type="button" className="inline-flex items-center gap-1 font-semibold" onClick={() => toggleSort(column)}>

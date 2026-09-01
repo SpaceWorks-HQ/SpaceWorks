@@ -37,7 +37,6 @@ class EmailDelivery:
 class LifecyclePayload:
     text: str
     emails: tuple[EmailDelivery, ...] = ()
-    telegram_reply_markup: dict | None = None
     # What this alert is about, for destination scoping. It rides on the payload rather
     # than being a `notify_lifecycle` parameter because only `build()` has resolved the
     # domain object — the caller often has just a primary key. `None` means the alert
@@ -135,12 +134,6 @@ def _run_guarded(makerspace, feature, event, build, sync):
             if not enabled[channel]:
                 continue
             try:
-                payload_data = (
-                    {"reply_markup": payload.telegram_reply_markup}
-                    if channel == NotificationChannel.TELEGRAM
-                    and payload.telegram_reply_markup
-                    else None
-                )
                 logs = dispatch_channel(
                     makerspace=makerspace,
                     channel=channel,
@@ -153,7 +146,6 @@ def _run_guarded(makerspace, feature, event, build, sync):
                         if channel == NotificationChannel.NATIVE_PUSH
                         else chat_text
                     ),
-                    payload=payload_data,
                     sync=sync,
                     scope=payload.scope,
                 )

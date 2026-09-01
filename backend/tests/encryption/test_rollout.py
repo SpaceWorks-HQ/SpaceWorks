@@ -132,7 +132,12 @@ def test_closed_global_fence_rejects_orm_bulk_and_raw_bypass_paths():
 def test_rollback_rejects_an_overflow_without_touching_source_or_index():
     actor = _actor()
     with enabled_encryption():
-        space, user, row = _request("x" * 121)
+        # Must exceed the REGISTRY limit for this field (`registry.SOURCE_FIELDS` declares
+        # requester_name at 200), not the column: the model field is a TextField, so the
+        # database would accept any length and `validate_legacy_values` is the only thing
+        # standing between a rollback and a silently truncated legacy row. This read 121
+        # while the registered limit was 120, and went quiet when the limit moved to 200.
+        space, user, row = _request("x" * 201)
         operation = close_global("decrypt_rollback", actor.pk, all_makerspaces=True)
         with pytest.raises(ValidationError):
             call_command("decrypt_scoped_pii", makerspace=space.pk, model=row._meta.label,

@@ -1,7 +1,8 @@
 @import "tailwindcss";
+@import "./styles/chrome.css";
 @config "../tailwind.config.ts";
 
-/* Self-hosted fonts: Clash Display headings, Instrument Sans body, JetBrains Mono labels. */
+/* Self-hosted fonts: Clash Display headings and JetBrains Mono labels. */
 @font-face {
   font-family: "Clash Display";
   src: url("/fonts/ClashDisplay-Semibold.woff2") format("woff2");
@@ -13,13 +14,6 @@
   font-family: "Clash Display";
   src: url("/fonts/ClashDisplay-Bold.woff2") format("woff2");
   font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Instrument Sans";
-  src: url("/fonts/InstrumentSans-Variable.woff2") format("woff2");
-  font-weight: 400 700;
   font-style: normal;
   font-display: swap;
 }
@@ -110,8 +104,8 @@
   body {
     @apply bg-bg text-ink antialiased;
     font-family:
-      "Instrument Sans", ui-sans-serif, system-ui, -apple-system,
-      BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+      sans-serif;
     background-image:
       linear-gradient(to right, rgb(var(--color-ink) / 0.045) 1px, transparent 1px),
       linear-gradient(to bottom, rgb(var(--color-ink) / 0.045) 1px, transparent 1px);
@@ -205,7 +199,7 @@
     @apply text-base font-semibold text-ink;
   }
   .eyebrow {
-    @apply font-mono text-[11px] font-semibold uppercase tracking-wide text-muted;
+    @apply font-mono text-[0.6875rem] font-semibold uppercase tracking-wide text-muted;
   }
 
   .chip {
@@ -305,11 +299,19 @@
   }
 
   .desk-tab {
-    @apply flex-1 rounded-lg border border-transparent px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50;
+    @apply min-h-11 flex-1 rounded-lg border border-transparent px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .desk-tab-active {
     @apply rounded-lg border-line bg-accent text-on-accent shadow-soft hover:bg-accent hover:text-on-accent;
+  }
+
+  /* Raises BARE buttons in an actions row off the old ~30px target. Scoped with :not() because
+     `.desk-actions button` (0,1,1) outranks `.desk-button-*` (0,1,0) in the same layer, so an
+     unscoped min-height here would DROP the button family from its 44px floor to 36px at the
+     9 call sites that put a `desk-button-*` inside `.desk-actions` (modal footers, mostly). */
+  .desk-actions button:not([class*="desk-button"]) {
+    @apply min-h-9 px-3 py-1.5;
   }
 
   .desk-actions button {

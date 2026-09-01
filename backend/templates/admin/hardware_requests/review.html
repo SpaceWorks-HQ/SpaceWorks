@@ -1,0 +1,76 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div class="module aligned">
+  <h2>Requester</h2>
+  <table>
+    <tr><th>Name</th><td>{{ hardware_request.requester_name|default:"—" }}</td></tr>
+    <tr><th>Email</th><td>{{ hardware_request.requester_contact_email|default:"—" }}</td></tr>
+    <tr><th>Phone</th><td>{{ hardware_request.requester_contact_phone|default:"—" }}</td></tr>
+    <tr>
+      <th>Contact</th>
+      <td>
+        {% if hardware_request.requester_contact_verified %}
+          Verified
+        {% else %}
+          <strong>NOT VERIFIED</strong> — this contact is only a claim made by whoever
+          submitted the request. Nothing proves the address or number belongs to them, and
+          accepting does not verify it. Confirm identity before handing anything over.
+        {% endif %}
+      </td>
+    </tr>
+    <tr><th>Makerspace</th><td>{{ hardware_request.makerspace }}</td></tr>
+    <tr><th>Status</th><td>{{ hardware_request.status }}</td></tr>
+    <tr><th>Requested for</th><td>{{ hardware_request.requested_for|default:"—" }}</td></tr>
+    <tr><th>Submitted</th><td>{{ hardware_request.created_at }}</td></tr>
+  </table>
+</div>
+
+{% if is_pending %}
+<form method="post" action="{{ request.path }}">
+  {% csrf_token %}
+
+  <fieldset class="module aligned">
+    <h2>Items</h2>
+    <table>
+      <thead>
+        <tr><th>Product</th><th>Requested</th><th>Accept</th></tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ item.product.name }}</td>
+          <td>{{ item.requested_quantity }}</td>
+          <td>
+            <input type="number" name="accepted_quantity_{{ item.pk }}"
+                   value="{{ item.requested_quantity }}"
+                   min="0" max="{{ item.requested_quantity }}" step="1">
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3">This request has no items.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </fieldset>
+
+  <fieldset class="module aligned">
+    <h2>Reject instead</h2>
+    <div class="form-row">
+      <label for="id_reason">Reason (required to reject):</label>
+      <textarea id="id_reason" name="reason" rows="4"></textarea>
+    </div>
+  </fieldset>
+
+  <div class="submit-row">
+    <input type="submit" name="accept" value="Accept this request">
+    <input type="submit" name="reject" value="Reject this request" class="deletelink">
+  </div>
+</form>
+{% else %}
+<p class="module aligned">
+  This request is <strong>{{ hardware_request.status }}</strong>, so there is nothing left
+  to review. Accept and reject apply to pending requests only.
+</p>
+{% endif %}
+{% endblock %}
