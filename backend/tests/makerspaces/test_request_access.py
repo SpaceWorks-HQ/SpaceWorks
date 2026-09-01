@@ -21,6 +21,7 @@ from apps.audit.models import AuditLog
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.module_install import install_module, uninstall_module
+from tests.module_helpers import disable_module
 from apps.makerspaces.request_access import (
     ACCOUNTS,
     ANYONE,
@@ -136,7 +137,7 @@ def test_uninstalling_membership_does_not_reopen_account_less_requests():
     explicit operator act, never a side effect of removing an unrelated module."""
     space = _space("ra-uninstall", modules=[*CORE_PLUS, "membership", "member_accounts"])
 
-    uninstall_module(space, "membership")
+    disable_module(space, "membership")
 
     space.refresh_from_db()
     assert space.anonymous_requests_enabled is False

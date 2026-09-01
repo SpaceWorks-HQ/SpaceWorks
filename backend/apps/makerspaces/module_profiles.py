@@ -18,6 +18,11 @@ EVERYTHING = "everything"
 
 # Core plus what a makerspace lending hardware realistically needs on day one:
 # the inventory lifecycle, reporting, and machines.
+#
+# It ships `machine_service` WITHOUT `membership`, which is only coherent because that
+# module's public submit falls back to an account-only guard exactly as the public borrow
+# request does. If you ever make it hard-require a membership row again, this profile
+# breaks silently -- the surface stays enabled and refuses every ordinary account.
 _RECOMMENDED_EXTRAS = frozenset({
     "guest_handover", "bulk_import", "containers", "stock_transfers", "stocktake",
     "reports", "qr_print_batches", "asset_units", "machines", "machine_service",

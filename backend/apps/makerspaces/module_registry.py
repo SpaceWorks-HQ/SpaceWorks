@@ -110,15 +110,28 @@ MODULES = (
         "machines", "Machines", "Machine registry, operators, usage and documents.",
         "machines", GUARD, group=GROUP_MACHINES,
     ),
+    # NOT dependent on `membership`, deliberately. Its public submit is a PROPOSAL that
+    # staff act on -- "please make this for me", not the requester operating the machine --
+    # so it takes the same shape as the public borrow request: membership when that module
+    # is installed, an active account otherwise. Declaring the dependency instead would
+    # have dragged `membership` into the default profile and silently made ordinary
+    # borrowing require a membership, waiver and presence session.
     ModuleDefinition(
         "machine_service", "Machine service", "Machine service requests and consoles.",
         "machines", GUARD, group=GROUP_MACHINES, frontend_workflows=("machine_service_requests",),
     ),
+    # Requires `membership`: registration resolves through `require_active_member`, and the
+    # host waiver it records lives on MakerspaceMembership. Without that module the public
+    # listing renders and every registration refuses.
     ModuleDefinition(
         "events", "Events", "Event scheduling and registrations.", "events", GUARD, group=GROUP_EVENTS,
+        requires_modules=("membership",),
     ),
+    # Requires `membership`: public self-booking calls `require_active_member_presence`, so
+    # without a MakerspaceMembership row the catalogue lists and the booking mutation dies.
     ModuleDefinition(
         "bookings", "Bookings", "Resource booking and public self-booking.", "bookings", GUARD, group=GROUP_BOOKINGS,
+        requires_modules=("membership",),
     ),
     ModuleDefinition(
         "maintenance", "Maintenance", "Maintenance schedules and work orders.",

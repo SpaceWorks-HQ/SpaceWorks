@@ -312,11 +312,12 @@ def test_the_switch_row_is_never_written_by_an_anonymous_request():
 
 def test_uninstalling_membership_closes_the_profile_surfaces_but_keeps_the_data():
     from apps.makerspaces.module_install import uninstall_module
+    from tests.module_helpers import disable_module
 
     space = make_space("profile-uninstall")
     membership = member_of(space, "author")
     profile_services.save_profile(membership, {"is_visible": True, "bio": "Kept"})
-    uninstall_module(space, "membership")
+    disable_module(space, "membership")
 
     client = authed(membership.user)
     assert client.get(f"/api/v1/member/makerspaces/{space.pk}/profile").status_code == 400

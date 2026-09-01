@@ -41,3 +41,28 @@ def request_queryset():
         "issued_by",
         "issue_evidence",
     ).prefetch_related("items__product", "items__asset_links__asset", "returnevent_set")
+
+
+# The `guest-admin/` routes REUSE the admin view classes (`ActiveLoansView`,
+# `ReturnRequestView`), so the module a request must satisfy depends on the URL SURFACE it
+# arrived through, not on the view class. Gating the shared view on `guest_handover`
+# instead let an OPTIONAL module block the CORE reviewed-request transitions for every
+# actor -- a core-only install reached `accepted` and could never issue or return the
+# hardware, which is the `9e496997` bug class one module over. `guest_handover` is the
+# narrow guest-admin SURFACE, never the underlying authority: that is `rbac.Action`.
+#
+# Declared as a table for the same reason as `CHANNEL_MODULE_KEYS` -- one gate shared by
+# several call sites, where the table IS the enforcement declaration the registry drift
+# guard reads.
+HANDOVER_SURFACE_MODULE_KEYS = {
+    "guest-admin": "guest_handover",
+    "admin": "request_workflow",
+}
+
+
+def handover_surface_module(request):
+    """Which module key gates this reviewed-request call, by the URL it came through."""
+    match = getattr(request, "resolver_match", None)
+    url_name = getattr(match, "url_name", None) or ""
+    surface = "guest-admin" if url_name.startswith("guest-admin-") else "admin"
+    return HANDOVER_SURFACE_MODULE_KEYS[surface]

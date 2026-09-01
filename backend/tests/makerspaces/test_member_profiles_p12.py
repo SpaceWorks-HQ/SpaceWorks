@@ -222,10 +222,11 @@ def test_a_non_member_reaches_nothing():
 
 def test_the_directory_needs_the_membership_module():
     from apps.makerspaces.module_install import uninstall_module
+    from tests.module_helpers import disable_module
 
     space = make_space()
     viewer = member(space, username="viewer")
-    uninstall_module(space, "membership")
+    disable_module(space, "membership")
 
     # The typed `module` 400 every other module gate raises, not a permission error:
     # the caller is allowed here, the space just does not run the module.

@@ -22,6 +22,7 @@ from apps.makerspaces.models import (
     MembershipRequest,
 )
 from apps.makerspaces.module_install import install_module, uninstall_module
+from tests.module_helpers import disable_module
 from apps.makerspaces.module_purge import purge_module, purgeable_modules
 from apps.payments.models import Payment
 
@@ -200,7 +201,7 @@ def test_purging_membership_keeps_waiver_evidence_but_removes_community_data():
         kind=MembershipRequest.Kind.REQUEST,
         state=MembershipRequest.State.REVOKED,
     )
-    uninstall_module(makerspace, "membership")
+    disable_module(makerspace, "membership")
 
     purge_module(makerspace, "membership", superadmin("membership-admin"))
 

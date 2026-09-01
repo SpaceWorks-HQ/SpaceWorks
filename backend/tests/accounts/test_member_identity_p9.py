@@ -13,6 +13,7 @@ from apps.accounts.models import User
 from apps.accounts import member_identity
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
 from apps.makerspaces.module_install import uninstall_module
+from tests.module_helpers import disable_module
 from apps.makerspaces.walk_in_services import create_walk_in_member
 
 pytestmark = pytest.mark.django_db
@@ -31,7 +32,7 @@ def make_space(slug="identity-space"):
 def accounts_off(makerspace, actor=None):
     """Uninstall through the real service, so dependency and feature pruning run."""
     uninstall_module(makerspace, "mobile", actor=actor)
-    uninstall_module(makerspace, "membership", actor=actor)
+    disable_module(makerspace, "membership", actor=actor)
     uninstall_module(makerspace, "member_accounts", actor=actor)
 
 

@@ -21,6 +21,7 @@ from apps.hardware_requests.serializers import (
 from apps.hardware_requests.view_helpers import (
     ACTION_ERROR_RESPONSES,
     ERROR_503,
+    handover_surface_module,
     request_queryset,
 )
 from apps.makerspaces.guards import require_module
@@ -37,7 +38,7 @@ class AssignBoxView(APIView):
     )
     def post(self, request, pk, *args, **kwargs):
         hardware_request = _scoped_action_request(
-            request.user,
+            request,
             pk,
             rbac.Action.ASSIGN_BOX,
         )
@@ -62,7 +63,7 @@ class IssueRequestView(APIView):
     )
     def post(self, request, pk, *args, **kwargs):
         hardware_request = _scoped_action_request(
-            request.user,
+            request,
             pk,
             rbac.Action.ISSUE_REQUEST,
         )
@@ -90,7 +91,7 @@ class ReturnRequestView(APIView):
     )
     def post(self, request, pk, *args, **kwargs):
         hardware_request = _scoped_action_request(
-            request.user,
+            request,
             pk,
             rbac.Action.RETURN_REQUEST,
         )
@@ -118,7 +119,7 @@ class SetReturnDueView(APIView):
     )
     def post(self, request, pk, *args, **kwargs):
         hardware_request = _scoped_action_request(
-            request.user,
+            request,
             pk,
             rbac.Action.ACCEPT_REQUEST,
         )
@@ -132,13 +133,15 @@ class SetReturnDueView(APIView):
         return Response(AdminRequestSerializer(updated).data)
 
 
-def _scoped_action_request(user, pk, action):
-    scoped = rbac.scope_by_action(user, action, request_queryset())
+def _scoped_action_request(request, pk, action):
+    """Scope by RBAC action, then gate on the module that owns THIS URL surface.
+
+    The action is the authority; the module is only the surface. Keying the module on the
+    action instead made `guest_handover` -- an optional module -- refuse `assign_box`,
+    `issue` and `return` for every actor including a full Space Manager, so a core-only
+    install could accept a request and then never fulfil it.
+    """
+    scoped = rbac.scope_by_action(request.user, action, request_queryset())
     hardware_request = get_object_or_404(scoped, pk=pk)
-    module = "guest_handover" if action in {
-        rbac.Action.ASSIGN_BOX,
-        rbac.Action.ISSUE_REQUEST,
-        rbac.Action.RETURN_REQUEST,
-    } else "request_workflow"
-    require_module(hardware_request.makerspace, module)
+    require_module(hardware_request.makerspace, handover_surface_module(request))
     return hardware_request

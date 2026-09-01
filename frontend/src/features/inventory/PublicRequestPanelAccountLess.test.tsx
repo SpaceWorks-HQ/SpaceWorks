@@ -179,3 +179,68 @@ describe("account-less borrow requests", () => {
     expect(idempotencyKey).toBeUndefined();
   });
 });
+
+describe("account-less races", () => {
+  beforeEach(() => {
+    submitPublicRequest.mockReset();
+    submitPublicRequest.mockResolvedValue({ public_token: "tok-abc-123" });
+    getAccessToken.mockReset();
+    getAccessToken.mockReturnValue("");
+  });
+
+  it("keeps submit disabled while the session probe is still pending", async () => {
+    // A slow refresh must not let a visitor submit a member-shaped body and take a 400.
+    let release: (value: boolean) => void = () => {};
+    refreshAccessToken.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        release = resolve;
+      }),
+    );
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({
+            defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+          })
+        }
+      >
+        <PublicRequestPanel
+          requestAccess="anyone"
+          items={ITEMS}
+          makerspaceSlug="makerspace"
+          onClear={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+
+    fill(/request purpose/i, "Bench diagnostics");
+    // Contact fields do not exist yet, so nothing else can be filled in.
+    expect(screen.queryByLabelText(/your name/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /submit request/i })).toBeDisabled();
+
+    release(false);
+    await waitFor(() => expect(screen.getByLabelText(/your name/i)).toBeTruthy());
+  });
+
+  it("drops the previous token as soon as another attempt starts", async () => {
+    refreshAccessToken.mockResolvedValue(false);
+    renderPanel(true);
+    await waitFor(() => expect(screen.getByLabelText(/your name/i)).toBeTruthy());
+
+    fill(/your name/i, "Ada Lovelace");
+    fill(/^email$/i, "ada@example.test");
+    fill(/request purpose/i, "Bench diagnostics");
+    fireEvent.click(screen.getByRole("button", { name: /submit request/i }));
+    await waitFor(() => expect(screen.getByText("tok-abc-123")).toBeTruthy());
+
+    // A second attempt that FAILS must not leave the old reference on screen beside the
+    // error -- saving the wrong token is unrecoverable for an account-less requester.
+    submitPublicRequest.mockRejectedValueOnce(new Error("nope"));
+    fill(/your name/i, "Ada Lovelace");
+    fill(/^email$/i, "ada@example.test");
+    fill(/request purpose/i, "Bench diagnostics");
+    fireEvent.click(screen.getByRole("button", { name: /submit request/i }));
+
+    await waitFor(() => expect(screen.queryByText("tok-abc-123")).toBeNull());
+  });
+});

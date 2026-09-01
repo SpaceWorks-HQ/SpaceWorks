@@ -2,8 +2,10 @@
 
 **What this proves, precisely.** For every optional module `M`, a makerspace built from
 `core + (every other optional module)` can still run the loan spine end to end: browse the
-public catalogue, submit a borrow request, see it in the staff queue, accept it, and read
-its public status. Plus the strongest single case — `core` and nothing else.
+public catalogue, submit a borrow request, see it in the staff queue, accept it, read its
+public status, scan and assign a box, attach issue evidence, issue it, then attach return
+evidence and a remark and complete the return. Plus the strongest single case — `core`
+and nothing else.
 
 **What it does NOT prove.** It is not a general proof that "no core module hard-depends on
 an optional module's data". A true static proof is not available in this codebase: an app
@@ -34,10 +36,18 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
+from apps.evidence.storage import EvidenceValidationResult
+from apps.hardware_requests.models import HardwareRequest
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.makerspaces.module_registry import BY_KEY, MODULES, core_module_keys
 from apps.presence.models import PresenceSession
+from tests.return_helpers import (
+    make_box,
+    make_issue_evidence,
+    make_return_evidence,
+    return_payload,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -124,9 +134,13 @@ def _client(user=None):
     return client
 
 
-def run_loan_spine(slug, modules):
-    """Browse -> submit -> staff queue -> accept -> public status. Returns nothing;
-    every step asserts, so the failing step names itself."""
+def run_loan_spine(slug, modules, monkeypatch):
+    """Browse -> submit -> queue -> accept -> public status -> box -> issue -> return.
+
+    Returns nothing; every step asserts, so the failing endpoint names itself. The
+    post-acceptance steps satisfy the production handover rules with a real box scan,
+    distinct issue/return evidence, and a complete return remark + resolution.
+    """
     space = _space(slug, modules)
     product = InventoryProduct.objects.create(
         makerspace=space,
@@ -147,7 +161,8 @@ def run_loan_spine(slug, modules):
     assert submit.status_code == 201, f"submit: {submit.status_code} {submit.data}"
     public_token = submit.data["public_token"]
 
-    staff = _client(_staff(slug))
+    staff_user = _staff(slug)
+    staff = _client(staff_user)
     pending = staff.get(reverse("hardware_requests:pending-requests", args=[space.id]))
     assert pending.status_code == 200, f"queue: {pending.status_code} {pending.data}"
     assert pending.data["count"] == 1, pending.data
@@ -162,15 +177,58 @@ def run_loan_spine(slug, modules):
     )
     assert status_response.status_code == 200, f"status: {status_response.status_code}"
 
+    monkeypatch.setattr(
+        "apps.evidence.storage.finalize_upload",
+        lambda *_args: EvidenceValidationResult(size=123, content_type="image/jpeg"),
+    )
+    box = make_box(space, label=f"{slug} loan box")
+    assigned = staff.post(
+        reverse("hardware_requests:request-assign-box", args=[request_id]),
+        {"box_code": box.code},
+        format="json",
+    )
+    assert assigned.status_code == 200, f"assign-box: {assigned.status_code} {assigned.data}"
 
-def test_the_loan_spine_runs_on_a_core_only_makerspace():
+    issued = staff.post(
+        reverse("hardware_requests:request-issue", args=[request_id]),
+        {
+            "evidence_id": make_issue_evidence(space, staff_user).pk,
+            "remark": "Issued after box and evidence verification.",
+        },
+        format="json",
+    )
+    assert issued.status_code == 200, f"issue: {issued.status_code} {issued.data}"
+    assert issued.data["status"] == HardwareRequest.Status.ISSUED
+
+    hardware_request = HardwareRequest.objects.get(pk=request_id)
+    returned = staff.post(
+        reverse("hardware_requests:request-return", args=[request_id]),
+        return_payload(
+            hardware_request,
+            make_return_evidence(space, staff_user),
+            remark="Returned complete and inspected.",
+        ),
+        format="json",
+    )
+    assert returned.status_code == 200, f"return: {returned.status_code} {returned.data}"
+    hardware_request.refresh_from_db()
+    assert hardware_request.status in {
+        HardwareRequest.Status.RETURNED,
+        HardwareRequest.Status.CLOSED_WITH_ISSUE,
+    }
+    assert returned.data["status"] == hardware_request.status
+
+
+def test_the_loan_spine_runs_on_a_core_only_makerspace(monkeypatch):
     """The strongest single case: every optional module uninstalled at once."""
-    run_loan_spine("core-only", sorted(CORE))
+    run_loan_spine("core-only", sorted(CORE), monkeypatch)
 
 
 @pytest.mark.parametrize("missing", OPTIONAL)
-def test_the_loan_spine_survives_each_optional_module_being_uninstalled(missing):
-    run_loan_spine(f"no-{missing.replace('_', '-')}", configuration_without(missing))
+def test_the_loan_spine_survives_each_optional_module_being_uninstalled(missing, monkeypatch):
+    run_loan_spine(
+        f"no-{missing.replace('_', '-')}", configuration_without(missing), monkeypatch
+    )
 
 
 def test_every_optional_module_is_actually_covered_by_the_matrix():
