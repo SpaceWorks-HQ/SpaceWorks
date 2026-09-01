@@ -16,7 +16,6 @@ def notify_request_submitted(request):
         requester_key="request_received",
         staff_event="submitted",
         text_builder=_build_submitted_request_message,
-        reply_markup_builder=_submitted_reply_markup,
     )
 
 
@@ -84,7 +83,6 @@ def _notify(
     requester_key,
     staff_event,
     text_builder,
-    reply_markup_builder=None,
     sync=False,
 ):
     logger.info(
@@ -107,12 +105,7 @@ def _notify(
             .get(pk=request_id)
         )
         emails = _email_deliveries(row, requester_key, staff_event)
-        markup = reply_markup_builder(row) if reply_markup_builder else None
-        return LifecyclePayload(
-            text=text_builder(row),
-            emails=emails,
-            telegram_reply_markup=markup,
-        )
+        return LifecyclePayload(text=text_builder(row), emails=emails)
 
     return notify_lifecycle(
         request.makerspace,
@@ -180,20 +173,6 @@ def render_email(request, key):
     )
 
 
-def _submitted_reply_markup(request):
-    return {
-        "inline_keyboard": [
-            [
-                {"text": "Accept", "callback_data": f"accept:{request.pk}"},
-                {
-                    "text": "Reject",
-                    "callback_data": f"reject:{request.pk}:Rejected from Telegram.",
-                },
-            ]
-        ]
-    }
-
-
 def _build_submitted_request_message(request):
     lines = [
         f"New hardware request #{request.pk}",
@@ -203,6 +182,11 @@ def _build_submitted_request_message(request):
         lines.append(f"Email: {request.requester_contact_email}")
     if request.requester_contact_phone:
         lines.append(f"Phone: {request.requester_contact_phone}")
+    if not request.requester_contact_verified:
+        # The same warning the staff console and /control/ carry. Telegram is where a
+        # request is FIRST seen, so omitting it here would mean the one surface that
+        # reaches staff instantly is the one that implies the contact is trustworthy.
+        lines.append("Contact NOT verified - confirm identity before handing over.")
     if request.requested_for:
         lines.append(f"Requested for: {_clamp(request.requested_for, 300)}")
     items = list(request.items.all())
@@ -215,6 +199,10 @@ def _build_submitted_request_message(request):
             lines.append(f"- ...and {len(items) - len(shown)} more")
     else:
         lines.append("Items: None")
+    # Telegram is a NOTIFICATION channel, not a decision surface: the accept/reject
+    # buttons that used to ride on this message are gone, so the alert has to say where
+    # the decision is actually made or it becomes a dead end.
+    lines.append("Review and decide in the staff console.")
     return _clamp("\n".join(lines), 4000)
 
 

@@ -83,8 +83,18 @@ def _successful_build_stubs(monkeypatch):
     monkeypatch.setattr(archive_builder, "_snapshot_payload", snapshot)
     calls = []
 
+    real_run = archive_builder.subprocess.run
+
     def encrypt(args, **_kwargs):
         calls.append(args)
+        if "-o" not in args:
+        # Not an age invocation. This fake replaces the SHARED subprocess module, so
+        # every other binary the code runs lands here too -- including
+        # `postgres_client._binary_major`'s `<client> --version` probe. Delegate
+        # instead of stubbing: a bare SimpleNamespace has no `.stdout`, which turned a
+        # clean PostgresClientUnavailable into an AttributeError on every host without
+        # a versioned client directory (any non-Debian/RHEL host).
+            return real_run(args, **_kwargs)
         shutil.copyfile(args[-1], args[args.index("-o") + 1])
         return SimpleNamespace(returncode=0)
 

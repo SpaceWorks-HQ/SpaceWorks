@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { Field } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import { Pagination } from "../../../components/ui/Pagination";
 import { useDebouncedValue } from "../../../lib/useDebouncedValue";
@@ -158,12 +159,7 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
 
   return (
     <div className="grid gap-4">
-      <input
-        className="desk-input"
-        placeholder="Search requester name, email, phone, or purpose"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
+      <Field label="Search requests"><input className="desk-input" placeholder="Search requester name, email, phone, or purpose" value={search} onChange={(event) => setSearch(event.target.value)} /></Field>
       {!guestOnly ? (
         <Panel title="Pending review">
           {pending.isLoading ? <RequestListSkeleton /> : <RequestList rows={pending.results} canViewAudit={canViewAudit} actions={(row) => <PendingActions row={row} disabled={action.isPending} openModal={openModal} setAcceptRow={setAcceptRow} setRejectRow={setRejectRow} setDueRow={setDueRow} />} />}
@@ -256,6 +252,5 @@ function localDateTimeValue(value: string) {
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
-
 
 

@@ -14,13 +14,15 @@ class TelegramDeliveryError(Exception):
 
 
 def resolve_bot_token(makerspace):
-    """The bot a makerspace posts as.
+    """The bot a makerspace posts as: its own token, else the deployment's.
 
-    Destinations deliberately do NOT override this (D16). Telegram is bidirectional: the
-    accept/reject buttons post back to one registered webhook authenticated by a single
-    `TELEGRAM_WEBHOOK_SECRET`, so a second bot's callbacks could not be authenticated or
-    routed — a room on its own bot could send, but its buttons would be dead. One bot in
-    many groups gives per-machine rooms and keeps callbacks working.
+    Destinations deliberately do NOT override this (D16). The original reason was
+    inbound: accept/reject buttons posted back to one registered webhook authenticated by
+    a single `TELEGRAM_WEBHOOK_SECRET`, so a second bot's callbacks could not be
+    authenticated or routed. **Those buttons are gone** — chat is no longer an action
+    surface — but the rule stands on its outbound half: one bot identity per makerspace
+    across all of its rooms is what makes per-machine rooms read as one sender rather
+    than as a handful of unrelated bots, and it keeps the token surface to one secret.
     """
     token = (
         makerspace.get_telegram_bot_token()
@@ -36,7 +38,7 @@ def resolve_chat_id(makerspace, destination=None):
     return getattr(makerspace, "telegram_group_chat_id", "")
 
 
-def send_message(makerspace, text, reply_markup=None, destination=None):
+def send_message(makerspace, text, destination=None):
     token = resolve_bot_token(makerspace)
     chat_id = resolve_chat_id(makerspace, destination)
     if not token or not chat_id:
@@ -51,9 +53,10 @@ def send_message(makerspace, text, reply_markup=None, destination=None):
         return False
 
     base_url = getattr(settings, "TELEGRAM_API_URL", "https://api.telegram.org").rstrip("/")
+    # No `reply_markup`: Telegram is a notification channel here, and an inline keyboard
+    # is by definition an action surface. The accept/reject buttons were removed with the
+    # callback route that served them.
     payload = {"chat_id": chat_id, "text": trim_for_channel("telegram", text)}
-    if reply_markup:
-        payload["reply_markup"] = reply_markup
     try:
         body = json.dumps(payload).encode()
         req = urllib_request.Request(

@@ -152,9 +152,19 @@ The default path needs nothing installed on the host but Docker. Migrations run 
 # After changing package.json, recreate the node_modules volume:
 ./scripts/dev-docker.sh up -d --build -V frontend
 
-# Tests
-./scripts/dev-docker.sh exec backend pytest
+# Tests. The DATABASE_URL override is REQUIRED: the backend container runs as the
+# least-privilege `spaceworks_app` role, which has no CREATEDB, so pytest cannot build
+# its test database as itself (every django_db test errors in setup without this).
+./scripts/dev-docker.sh exec -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
+  -T backend pytest
 ```
+
+`tests/backup` and `tests/tenant_migration` are **Docker-only in practice**: they need a PostgreSQL
+client whose major equals the server's (16), which `postgres_client.client_binary` looks for under
+`/usr/lib/postgresql/{major}/bin` or `/usr/pgsql-{major}/bin`. Neither path exists on Arch, so on the
+host they all refuse with `PostgresClientUnavailable` — the environment, not a regression. The backend
+image installs client 16 *and* 17 on purpose (`pg_dump` must be >= every supported source server;
+`pg_restore` must be <= the target, because 17+ emits a `transaction_timeout` GUC that 16 rejects).
 
 Host fallback (faster `pytest` / one-off `manage.py`; needs `backend/.venv` + `npm install`):
 

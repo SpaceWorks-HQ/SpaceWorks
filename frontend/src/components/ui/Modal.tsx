@@ -1,6 +1,14 @@
 import type React from "react";
-import { useEffect, useId, useRef } from "react";
-import { focusFirstDialogElement, trapDialogFocus } from "./dialogFocus";
+import { useEffect, useId, useRef, useSyncExternalStore } from "react";
+import {
+  consumePendingRestore,
+  focusFirstDialogElement,
+  getSnapshot,
+  popDialog,
+  pushDialog,
+  subscribe,
+  trapDialogFocus,
+} from "./dialogFocus";
 
 type ModalProps = {
   open: boolean;
@@ -22,7 +30,13 @@ export function Modal({
   backdrop = "plain",
 }: ModalProps) {
   const titleId = useId();
+  const layerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const tokenRef = useRef<symbol | null>(null);
+  const top = useSyncExternalStore(subscribe, getSnapshot);
+  const amTop = top === tokenRef.current;
+  const amTopRef = useRef(amTop);
+  amTopRef.current = amTop;
   const maxWidthClass = size === "xl" ? "max-w-4xl" : "max-w-lg";
   const backdropClass =
     backdrop === "blur" ? "bg-ink/35 backdrop-blur-sm" : "bg-ink/40";
@@ -36,10 +50,16 @@ export function Modal({
   useEffect(() => {
     if (!open) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const token = pushDialog({
+      previousFocus,
+      getPanel: () => panelRef.current,
+      getLayer: () => layerRef.current,
+    });
+    tokenRef.current = token;
     const panel = panelRef.current;
-    if (panel) focusFirstDialogElement(panel);
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!amTopRef.current) return;
       if (event.key === "Escape") onCloseRef.current();
       if (panel) trapDialogFocus(event, panel);
     };
@@ -47,14 +67,29 @@ export function Modal({
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      previousFocus?.focus();
+      popDialog(token);
+      if (tokenRef.current === token) tokenRef.current = null;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!amTop) return;
+    consumePendingRestore(panelRef.current);
+    // Initial focus lives HERE, not in the push effect. A dialog that opens while another sits
+    // above it renders with `inert` on its layer, and `inert` is only cleared by the re-render
+    // that follows becoming topmost -- so focusing from the push effect silently fails, and
+    // consumePendingRestore no-ops because nothing was popped. This effect runs post-commit,
+    // once `inert` is gone. jsdom implements no `inert` at all, so no unit test can catch this.
+    const panel = panelRef.current;
+    if (panel && !panel.contains(document.activeElement)) focusFirstDialogElement(panel);
+  }, [amTop]);
 
   if (!open) return null;
 
   return (
     <div
+      ref={layerRef}
+      inert={!amTop}
       className={`fixed inset-0 z-50 grid place-items-center ${backdropClass} p-3 sm:p-4`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
@@ -65,7 +100,7 @@ export function Modal({
       <div
         ref={panelRef}
         role="dialog"
-        aria-modal="true"
+        aria-modal={amTop ? "true" : undefined}
         aria-labelledby={titleId}
         tabIndex={-1}
         className={`desk-panel flex max-h-[calc(100dvh-1.5rem)] w-full ${maxWidthClass} flex-col overflow-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:max-h-[calc(100dvh-2rem)]`}

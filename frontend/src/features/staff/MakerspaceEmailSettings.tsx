@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { Field } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
 import { type Makerspace, useStaffGet } from "./StaffPanels";
 
@@ -157,40 +158,11 @@ export function MakerspaceEmailSettings({ makerspace }: { makerspace: Makerspace
           </div>
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <input
-            className="desk-input"
-            placeholder="SMTP host"
-            value={smtpForm.smtp_host}
-            onChange={(event) => setSmtpForm({ ...smtpForm, smtp_host: event.target.value })}
-          />
-          <input
-            className="desk-input"
-            inputMode="numeric"
-            placeholder="SMTP port"
-            value={smtpForm.smtp_port}
-            onChange={(event) => setSmtpForm({ ...smtpForm, smtp_port: event.target.value })}
-          />
-          <input
-            className="desk-input"
-            placeholder="SMTP username"
-            value={smtpForm.smtp_username}
-            onChange={(event) => setSmtpForm({ ...smtpForm, smtp_username: event.target.value })}
-          />
-          <input
-            className="desk-input"
-            placeholder={settings.data?.smtp_password_set ? "SMTP password set" : "SMTP password"}
-            type="password"
-            value={smtpForm.smtp_password}
-            onChange={(event) => setSmtpForm({ ...smtpForm, smtp_password: event.target.value })}
-          />
-          <input
-            className="desk-input sm:col-span-2"
-            placeholder="SMTP from email"
-            value={smtpForm.smtp_from_email}
-            onChange={(event) =>
-              setSmtpForm({ ...smtpForm, smtp_from_email: event.target.value })
-            }
-          />
+          <Field label="SMTP host"><input className="desk-input" value={smtpForm.smtp_host} onChange={(event) => setSmtpForm({ ...smtpForm, smtp_host: event.target.value })} /></Field>
+          <Field label="SMTP port"><input className="desk-input" inputMode="numeric" value={smtpForm.smtp_port} onChange={(event) => setSmtpForm({ ...smtpForm, smtp_port: event.target.value })} /></Field>
+          <Field label="SMTP username"><input className="desk-input" value={smtpForm.smtp_username} onChange={(event) => setSmtpForm({ ...smtpForm, smtp_username: event.target.value })} /></Field>
+          <Field label="SMTP password"><input className="desk-input" placeholder={settings.data?.smtp_password_set ? "SMTP password set" : undefined} type="password" value={smtpForm.smtp_password} onChange={(event) => setSmtpForm({ ...smtpForm, smtp_password: event.target.value })} /></Field>
+          <Field className="sm:col-span-2" label="SMTP from email"><input className="desk-input sm:col-span-2" value={smtpForm.smtp_from_email} onChange={(event) => setSmtpForm({ ...smtpForm, smtp_from_email: event.target.value })} /></Field>
         </div>
         <div className="mt-3 flex flex-wrap gap-4">
           <label className="flex items-center gap-2 text-sm text-muted">

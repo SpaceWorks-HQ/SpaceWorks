@@ -47,6 +47,12 @@ POLICY_OVERRIDE_ALLOWLIST = {
     "apps.events.throttles.CollaborativeRegistrationThrottle": {
         "_tier", "allow_request", "get_cache_key"
     },
+    # The account-less borrow-request budgets. Both override `get_cache_key` only, to
+    # return None for an authenticated caller: they sit in `throttle_classes` beside the
+    # member throttle, and DRF applies every class on every request, so without the skip a
+    # makerspace behind one NAT would rate-limit its own signed-in members by egress IP.
+    "apps.hardware_requests.throttles.AnonymousRequestIpBurstThrottle": {"get_cache_key"},
+    "apps.hardware_requests.throttles.AnonymousRequestIpHourThrottle": {"get_cache_key"},
     "apps.machines.permissions.IsActiveRequester": {"has_permission"},
     "apps.accounts.views_device.IsDeviceAccessToken": {"has_permission"},
     "apps.makerspaces.throttles.MemberImagePresignThrottle": {"get_cache_key"},

@@ -1,0 +1,35 @@
+/* Chrome + motion rules, split out of index.css.
+   index.css was already over the repo's ~300-line ceiling (349) before the Apple-design pass, and
+   the rule is to split an over-ceiling file before adding to it. The COLOUR TOKENS deliberately
+   stay in index.css: backend/tests/test_frontend_theme_contrast.py hand-parses that exact path for
+   `:root {` / `:root.dark {`, and moving them here would make that guard silently blind. */
+
+@layer components {
+  /* The one genuinely "Apple" primitive: a translucent, blurred material for nav and header
+     chrome. `@supports` falls back to the solid panel where backdrop-filter is unavailable. */
+  .material-chrome {
+    background-color: rgb(var(--color-panel) / 0.8);
+    backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  @supports not (backdrop-filter: blur(1px)) {
+    .material-chrome {
+      background-color: rgb(var(--color-panel));
+    }
+  }
+}
+
+/* Deliberately UNLAYERED: unlayered rules outrank every @layer, so these neutralise the hover
+   transforms declared on .brutal-hover and the .desk-button-* family without needing to restate
+   their selectors' specificity. WCAG 2.3.3 / HIG Motion "Make motion optional". */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .brutal-hover:hover { transform: none; }
+  .desk-button-primary:hover, .desk-button-secondary:hover, .desk-button-success:hover,
+  .desk-button-warn:hover, .desk-button-danger:hover { transform: none; }
+}

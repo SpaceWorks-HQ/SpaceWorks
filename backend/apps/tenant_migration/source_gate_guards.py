@@ -113,6 +113,8 @@ def validate_webhook_coverage(apps_dir=APPS_DIR):
     exemptions = {
         "apps.payments.views_connect.StripeConnectWebhookView.post":
             HTTP_EXEMPTIONS["stripe-connect-webhook"],
+        "apps.integrations.views.TelegramWebhookView.post":
+            HTTP_EXEMPTIONS["telegram-webhook"],
     }
     stale = set(exemptions) - actual
     if stale:

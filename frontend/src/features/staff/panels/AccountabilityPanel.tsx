@@ -1,7 +1,7 @@
 import { useId, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { Modal } from "../../../components/ui";
+import { Field, Modal } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import { invalidateInventoryViews } from "../queryInvalidation";
 import { Panel, type Makerspace, useStaffGet } from "./shared";
@@ -128,12 +128,12 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
             <table className="w-full min-w-[36rem] text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase text-muted">
-                  <th className="p-2">Requester</th>
-                  <th className="p-2">Damaged</th>
-                  <th className="p-2">Missing</th>
-                  <th className="p-2">Total issues</th>
-                  <th className="p-2">Status</th>
-                  {isSuperadmin ? <th className="p-2">Action</th> : null}
+                  <th scope="col" className="p-2">Requester</th>
+                  <th scope="col" className="p-2">Damaged</th>
+                  <th scope="col" className="p-2">Missing</th>
+                  <th scope="col" className="p-2">Total issues</th>
+                  <th scope="col" className="p-2">Status</th>
+                  {isSuperadmin ? <th scope="col" className="p-2">Action</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -279,7 +279,7 @@ function ProblemReportCard({ row, makerspace, onTriaged }: { row: ProblemReport;
           ))}
         </div>
       ) : null}
-      <textarea className="desk-input min-h-20" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Triage note" />
+      <Field label="Triage note"><textarea className="desk-input min-h-20" value={note} onChange={(event) => setNote(event.target.value)} /></Field>
       <div className="flex flex-wrap items-center justify-between gap-3">
         {triage.error ? <p className="text-sm text-danger">{(triage.error as Error).message}</p> : <span />}
         <button className="desk-button-primary" type="button" disabled={triage.isPending || (actionable && resolutions.length === 0)} onClick={() => triage.mutate()}>

@@ -1,7 +1,7 @@
-import type React from "react";
+import { Field } from "../../../components/ui";
+import type { Product } from "./shared";
 
 type PrinterOption = { id: number; name: string };
-import type { Product } from "./shared";
 
 export type ContainerOption = { id: number; label: string };
 export type HardwareMode = "create" | "topup";
@@ -102,10 +102,6 @@ export function PrintingMoveForm({ form, setForm, printers }: { form: PrintingFo
 
 function Segmented<T extends string>({ values, value, label, onChange }: { values: T[]; value: T; label: (value: T) => string; onChange: (value: T) => void }) {
   return <div className="inline-flex w-max rounded-md border border-line bg-surface p-1">{values.map((item) => <button key={item} type="button" className={value === item ? "desk-button-primary" : "desk-button-ghost"} onClick={() => onChange(item)}>{label(item)}</button>)}</div>;
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="grid gap-1"><span className="eyebrow">{label}</span>{children}</label>;
 }
 
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {

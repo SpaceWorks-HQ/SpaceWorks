@@ -62,7 +62,7 @@ MODULES = (
         frontend_workflows=("printing_requests",),
     ),
     ModuleDefinition(
-        "telegram", "Telegram", "Per-makerspace Telegram group alerts and callbacks.",
+        "telegram", "Telegram", "Per-makerspace Telegram group alerts (outbound only).",
         "integrations", GUARD, group=GROUP_NOTIFICATIONS, frontend_workflows=("telegram_alerts",),
     ),
     ModuleDefinition(
@@ -246,6 +246,27 @@ def _validate_registry():
             raise ImproperlyConfiguredRegistry(
                 f"{definition.key} is core, which already implies default_enabled."
             )
+        # A core module is present in EVERY makerspace and cannot be switched off. If it
+        # declared a dependency on an optional key, either that key is really core (and
+        # is mislabelled), or the core module stops working the moment an operator
+        # uninstalls something they were told was optional. `9e496997` was that bug
+        # without the declaration: core `request_workflow` hard-required a
+        # MakerspaceMembership row, and the default `recommended` profile ships no
+        # `membership` module -- so a fresh self-host install could not accept a public
+        # borrow request at all. This catches the declared form of it at import time;
+        # `tests/makerspaces/test_core_module_independence.py` covers the undeclared form.
+        if definition.is_core:
+            optional_requirements = [
+                key
+                for key in definition.requires_modules
+                if key in BY_KEY and not BY_KEY[key].is_core
+            ]
+            if optional_requirements:
+                raise ImproperlyConfiguredRegistry(
+                    f"{definition.key} is core but requires optional module(s): "
+                    f"{', '.join(sorted(optional_requirements))}. A core module must "
+                    "work with every optional module uninstalled."
+                )
         if definition.enforcement not in {GUARD, FEATURE_PARENT, NONE}:
             raise ImproperlyConfiguredRegistry(
                 f"{definition.key} has unknown enforcement {definition.enforcement!r}."

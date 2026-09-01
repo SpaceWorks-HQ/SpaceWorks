@@ -116,12 +116,12 @@ export function PrintingSection({ printing }: { printing: PublicStatsPrinting })
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-muted">
-                  <th className="eyebrow py-2 pr-3">Printer</th>
-                  <th className="eyebrow px-3 py-2 text-right">
+                  <th scope="col" className="eyebrow py-2 pr-3">Printer</th>
+                  <th scope="col" className="eyebrow px-3 py-2 text-right">
                     Completed jobs
                   </th>
-                  <th className="eyebrow px-3 py-2 text-right">Hours</th>
-                  <th className="eyebrow py-2 pl-3 text-right">
+                  <th scope="col" className="eyebrow px-3 py-2 text-right">Hours</th>
+                  <th scope="col" className="eyebrow py-2 pl-3 text-right">
                     Filament (g)
                   </th>
                 </tr>

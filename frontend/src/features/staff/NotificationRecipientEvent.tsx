@@ -156,6 +156,7 @@ function RecipientTarget({ data, index, rule, rules, update }: {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <select
+        aria-label={`Recipient ${index + 1} type`}
         className="desk-input"
         onChange={(changed) => replace({
           kind: changed.target.value as RecipientKind,
@@ -171,6 +172,7 @@ function RecipientTarget({ data, index, rule, rules, update }: {
       </select>
       {rule.kind === "role" ? (
         <select
+          aria-label={`Recipient ${index + 1} role`}
           className="desk-input"
           onChange={(changed) => replace({ role_id: Number(changed.target.value) })}
           value={rule.role_id ?? ""}
@@ -181,6 +183,7 @@ function RecipientTarget({ data, index, rule, rules, update }: {
       ) : null}
       {rule.kind === "user" ? (
         <select
+          aria-label={`Recipient ${index + 1} member`}
           className="desk-input"
           onChange={(changed) => replace({ user_id: Number(changed.target.value) })}
           value={rule.user_id ?? ""}

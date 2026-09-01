@@ -81,14 +81,14 @@ export function ProcurementRow({ item, makerspaceSlug, updatePending, deletePend
       <td className="px-3 py-2 font-mono">{item.quantity}</td>
       <td className="px-3 py-2"><ItemLink link={item.link} /></td>
       <td className="px-3 py-2 font-mono">{item.estimated_unit_cost ?? "-"}</td>
-      <td className="px-3 py-2"><input className="desk-input w-36" value={draft.vendor_name} onChange={(event) => setDraft({ ...draft, vendor_name: event.target.value })} /></td>
-      <td className="px-3 py-2"><input className="desk-input w-28" type="number" min={0} step="0.01" value={draft.actual_unit_cost} onChange={(event) => setDraft({ ...draft, actual_unit_cost: event.target.value })} /></td>
+      <td className="px-3 py-2"><input className="desk-input w-36" aria-label={`Vendor for ${item.name}`} value={draft.vendor_name} onChange={(event) => setDraft({ ...draft, vendor_name: event.target.value })} /></td>
+      <td className="px-3 py-2"><input className="desk-input w-28" aria-label={`Actual unit cost for ${item.name}`} type="number" min={0} step="0.01" value={draft.actual_unit_cost} onChange={(event) => setDraft({ ...draft, actual_unit_cost: event.target.value })} /></td>
       <td className="px-3 py-2 text-muted"><span className="block max-w-36 break-words">{item.purchaser_username ?? "-"}</span></td>
       <td className="px-3 py-2 font-mono text-xs text-muted">{formatDateTime(item.ordered_at)}</td>
       <td className="px-3 py-2 font-mono text-xs text-muted">{formatDateTime(item.received_at)}</td>
       <td className="px-3 py-2"><ProcurementReceipts itemId={item.id} receipts={item.receipts ?? []} onChanged={onReceiptsChanged} /></td>
       <td className="px-3 py-2">
-        <select className="desk-input w-32" value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as ToBuyStatus })}>
+        <select className="desk-input w-32" aria-label={`Status for ${item.name}`} value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as ToBuyStatus })}>
           {statusOptions.map((status) => <option key={status} value={status}>{labelStatus(status)}</option>)}
         </select>
       </td>

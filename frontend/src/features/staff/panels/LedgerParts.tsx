@@ -41,7 +41,7 @@ export function LedgerSkeleton({ aggregate }: { aggregate: boolean }) {
             {["Item", "Holder", "Qty", "Out since", "Due", "Source", aggregate ? "Makerspace" : ""]
               .filter(Boolean)
               .map((label) => (
-                <th key={label} className="whitespace-nowrap px-3 py-2">
+                <th scope="col" key={label} className="whitespace-nowrap px-3 py-2">
                   <Skeleton className="h-3 w-20" />
                 </th>
               ))}
@@ -87,7 +87,7 @@ export function SortableHeader({
 }) {
   const active = sort.key === sortKey;
   return (
-    <th className={`whitespace-nowrap px-3 py-2 ${align === "right" ? "text-right" : "text-left"}`}>
+    <th scope="col" className={`whitespace-nowrap px-3 py-2 ${align === "right" ? "text-right" : "text-left"}`}>
       <button
         type="button"
         className={`desk-button-ghost ${align === "right" ? "justify-end" : ""}`}

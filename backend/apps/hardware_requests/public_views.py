@@ -37,6 +37,7 @@ from apps.inventory.models import InventoryProduct
 from apps.makerspaces.anonymous_requesters import get_or_create_anonymous_requester
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.request_access import anonymous_requests_allowed
 from apps.makerspaces.servability import servable_queryset
 from apps.presence.guard import require_active_account, require_active_member_presence
 from apps.openapi import (
@@ -48,14 +49,25 @@ from apps.openapi import (
 
 class RequestSubmitView(APIView):
     permission_classes = [AllowAny]
-    # Anonymous throttles are selected inside post(). The authenticated throttle stays
-    # in APIView.initial() through check_throttles(), preserving the original ordering.
-    throttle_classes = []
+    # Every IP/principal budget is declared here so DRF applies it in APIView.initial(),
+    # BEFORE the handler runs. `check_throttles` is deliberately NOT overridden: it is a
+    # pre-auth lifecycle hook, `apps.accounts.claim_route_guard` refuses any route that
+    # replaces one, and overriding it here had already cost the endpoint its floor --
+    # anonymous throttles were selected inside post(), which is *after* the
+    # `anonymous_requests_allowed` refusal, so every makerspace that had not opted in
+    # served an UNTHROTTLED 401 that still paid for a makerspace lookup.
+    #
+    # Each class self-selects by auth state (see `_AnonymousIpThrottle`), so listing them
+    # together does not double-charge anyone. Consequence worth knowing: the honeypot no
+    # longer precedes the IP budget, so a bot loud enough to exhaust it sees 429 instead
+    # of the honeypot's fake success. Being rate-limited before being fingerprinted is
+    # the safer of the two, and the honeypot still absorbs every bot under the limit.
+    throttle_classes = [
+        MemberPrincipalRateThrottle,
+        AnonymousRequestIpBurstThrottle,
+        AnonymousRequestIpHourThrottle,
+    ]
     throttle_scope = "public_request_submit"
-
-    def check_throttles(self, request):
-        if request.user.is_authenticated:
-            _enforce_throttles(request, self, (MemberPrincipalRateThrottle,))
 
     @extend_schema(
         tags=["Public requests"],
@@ -82,21 +94,23 @@ class RequestSubmitView(APIView):
         makerspace = get_public_makerspace(makerspace_slug)
         anonymous_submission = not request.user.is_authenticated
         if anonymous_submission:
-            if not makerspace.anonymous_requests_enabled:
+            if not anonymous_requests_allowed(makerspace):
                 # Raising DRF's own exception preserves the previous IsAuthenticated
                 # response body as well as its 401 status for every non-opted-in space.
+                #
+                # `anonymous_requests_allowed` re-derives the answer rather than reading
+                # the column, so a row that somehow carries BOTH the flag and the
+                # `membership` module -- raw SQL, an old backup, a restore that predates
+                # the model rule -- still fails closed here instead of admitting a
+                # stranger past the membership requirement.
                 raise NotAuthenticated()
             # Resolving the opt-in flag is unavoidable because disabled spaces must
-            # retain their 401. From here the raw honeypot precedes module checks,
-            # throttling, serializer work, product queries and principal creation.
+            # retain their 401. The IP budgets were already charged in initial(); from
+            # here the raw honeypot precedes module checks, serializer work, product
+            # queries and principal creation.
             if _honeypot_filled(request.data):
                 return _honeypot_response()
             _require_module(makerspace, "request_workflow")
-            _enforce_throttles(
-                request,
-                self,
-                (AnonymousRequestIpBurstThrottle, AnonymousRequestIpHourThrottle),
-            )
         else:
             _require_module(makerspace, "request_workflow")
             if module_enabled(makerspace, "membership"):

@@ -1,7 +1,7 @@
 import { Link, Navigate, useLocation } from "react-router-dom";
 
+import { StaffDock } from "./StaffDock";
 import { StaffHeader } from "./StaffHeader";
-import { StaffSidebar } from "./StaffSidebar";
 import { StaffTabContent } from "./StaffTabContent";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { SkipLink } from "../../components/SkipLink";
@@ -22,7 +22,6 @@ export function StaffWorkspace({
   actions,
   isMachineOnly,
   canConfigureMachineTypes,
-  collapsedGroups,
   guestOnly,
   isSuperadmin,
   makerspaces,
@@ -32,14 +31,12 @@ export function StaffWorkspace({
   setTab,
   signOut,
   singleTenantLocked,
-  toggleGroup,
   user,
 }: {
   activeMakerspace?: Makerspace;
   actions: readonly string[];
   isMachineOnly: boolean;
   canConfigureMachineTypes: boolean;
-  collapsedGroups: Set<string>;
   guestOnly: boolean;
   isSuperadmin: boolean;
   makerspaces: Makerspace[];
@@ -49,7 +46,6 @@ export function StaffWorkspace({
   setTab: (tab: string) => void;
   signOut: () => Promise<void>;
   singleTenantLocked: boolean;
-  toggleGroup: (label: string) => void;
   user: StaffAuthUser;
 }) {
   const location = useLocation();
@@ -99,6 +95,12 @@ export function StaffWorkspace({
   const activeTabPath = activeTab
     ? staffTabPath(activeTab, guestOnly, activeMakerspace?.slug, singleTenantLocked, keptSubPath)
     : staffTabPath(defaultTab, guestOnly, activeMakerspace?.slug, singleTenantLocked);
+  // Super Admin is GLOBAL authority and must win over any local membership row: a superuser who
+  // also holds a membership would otherwise be announced as "Member". The deleted sidebar
+  // prioritised it the same way.
+  const activeRoleName = isSuperadmin
+    ? "Super Admin"
+    : user.makerspaces.find((item) => item.id === selected)?.role_name;
 
   // Tabs OMITTED by design rather than genuinely forbidden: `requests` holds hardware rows
   // a machine-only actor never has, and `notifications` is withheld from that same actor
@@ -113,35 +115,23 @@ export function StaffWorkspace({
   }
 
   return (
-    <main className="desk-shell grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)]">
+    <main className="desk-shell grid grid-cols-1">
       <SkipLink />
-      <StaffSidebar
-        activeMakerspace={activeMakerspace}
-        activeTab={routeTabDenied ? "" : activeTab}
-        allowedTabs={moduleAllowedTabs}
-        collapsedGroups={collapsedGroups}
-        guestOnly={guestOnly}
-        isSuperadmin={isSuperadmin}
-        makerspaces={makerspaces}
-        printingOnly={printingOnly}
-        selected={selected}
-        setSelected={setSelected}
-        setTab={setTab}
-        singleTenantLocked={singleTenantLocked}
-        toggleGroup={toggleGroup}
-      />
-
       <section className="min-w-0">
         <StaffHeader
           activeMakerspace={activeMakerspace}
           isSuperadmin={isSuperadmin}
+          makerspaces={makerspaces}
           onSignOut={signOut}
           onSwitchMakerspace={() => setSelected(null)}
+          roleName={activeRoleName}
+          selected={selected}
+          setSelected={setSelected}
           singleTenantLocked={singleTenantLocked}
           user={user}
         />
 
-        <div className="min-w-0 p-5" id="main-content" tabIndex={-1}>
+        <div className="min-w-0 p-5 pb-28" id="main-content" tabIndex={-1}>
           {routeTabDenied ? (
             <EmptyState
               title="Access denied"
@@ -182,6 +172,15 @@ export function StaffWorkspace({
           )}
         </div>
       </section>
+
+      <StaffDock
+        activeMakerspace={activeMakerspace}
+        activeTab={routeTabDenied ? "" : activeTab}
+        allowedTabs={moduleAllowedTabs}
+        guestOnly={guestOnly}
+        setTab={setTab}
+        singleTenantLocked={singleTenantLocked}
+      />
     </main>
   );
 }

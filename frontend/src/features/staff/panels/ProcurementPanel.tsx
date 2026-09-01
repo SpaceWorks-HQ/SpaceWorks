@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 
+import { Field, Metric } from "../../../components/ui";
 import { downloadStaffFile, staffRequest } from "../../../lib/api";
 import {
   groupProcurementRows,
@@ -129,12 +130,12 @@ export function ProcurementPanel({
       </p>
 
       <form className="grid gap-2 sm:grid-cols-2 xl:grid-cols-8" onSubmit={(event) => { event.preventDefault(); if (form.name.trim() && (!requiresMachineType || form.machine_type)) create.mutate(); }}>
-        <input className="desk-input xl:col-span-2" placeholder="Item name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <input className="desk-input" type="number" min={1} placeholder="Qty" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
-        <input className="desk-input" placeholder="Link (optional)" value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} />
-        <input className="desk-input" type="number" min={0} step="0.01" placeholder="Est. unit cost" value={form.estimated_unit_cost} onChange={(e) => setForm({ ...form, estimated_unit_cost: e.target.value })} />
-        <input className="desk-input" placeholder="Vendor" value={form.vendor_name} onChange={(e) => setForm({ ...form, vendor_name: e.target.value })} />
-        <input className="desk-input" type="number" min={0} step="0.01" placeholder="Actual unit cost" value={form.actual_unit_cost} onChange={(e) => setForm({ ...form, actual_unit_cost: e.target.value })} />
+        <Field label="Item name" className="xl:col-span-2"><input className="desk-input xl:col-span-2" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+        <Field label="Quantity"><input className="desk-input" type="number" min={1} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /></Field>
+        <Field label="Link (optional)"><input className="desk-input" value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} /></Field>
+        <Field label="Estimated unit cost"><input className="desk-input" type="number" min={0} step="0.01" value={form.estimated_unit_cost} onChange={(e) => setForm({ ...form, estimated_unit_cost: e.target.value })} /></Field>
+        <Field label="Vendor"><input className="desk-input" value={form.vendor_name} onChange={(e) => setForm({ ...form, vendor_name: e.target.value })} /></Field>
+        <Field label="Actual unit cost"><input className="desk-input" type="number" min={0} step="0.01" value={form.actual_unit_cost} onChange={(e) => setForm({ ...form, actual_unit_cost: e.target.value })} /></Field>
         <label className="eyebrow grid gap-1">
           Machine type
           <select
@@ -190,7 +191,7 @@ function ProcurementTable({ rows, items, update, remove, invalidate, makerspaceS
     <div className="mt-3 max-h-[32rem] overflow-x-auto overflow-y-auto rounded-md border border-line">
       <table className="min-w-[1180px] divide-y divide-line text-left text-sm">
         <thead className="eyebrow sticky top-0 bg-surface">
-          <tr>{["kind", "item", "qty", "link", "est.", "vendor", "actual", "purchaser", "ordered", "received", "receipts", "status", "moved", ""].map((header) => <th key={header} className="whitespace-nowrap px-3 py-2">{header}</th>)}</tr>
+          <tr>{["kind", "item", "qty", "link", "est.", "vendor", "actual", "purchaser", "ordered", "received", "receipts", "status", "moved", ""].map((header) => <th scope={header ? "col" : undefined} key={header} className="whitespace-nowrap px-3 py-2">{header}</th>)}</tr>
         </thead>
         <tbody className="divide-y divide-line bg-bg text-ink">
           {groupProcurementRows(rows).map((group) => (
@@ -213,13 +214,13 @@ function ProcurementTable({ rows, items, update, remove, invalidate, makerspaceS
 
 function GroupedRows({ label, rows, makerspaceSlug, update, remove, invalidate, onMove }: { label: string; rows: ToBuyItem[]; makerspaceSlug: string; update: UseMutationResult<unknown, Error, UpdateVariables>; remove: UseMutationResult<unknown, Error, number>; invalidate: () => void; onMove: (item: ToBuyItem) => void }) {
   return <>
-    <tr className="bg-surface"><th className="eyebrow px-3 py-2" colSpan={14}>{label}</th></tr>
+    <tr className="bg-surface"><th scope="row" className="eyebrow px-3 py-2" colSpan={14}>{label}</th></tr>
     {rows.map((item) => <ProcurementRow key={item.id} item={item} makerspaceSlug={makerspaceSlug} updatePending={update.isPending} deletePending={remove.isPending} onSave={(draft) => update.mutate({ id: item.id, payload: { status: draft.status, vendor_name: draft.vendor_name, actual_unit_cost: draft.actual_unit_cost ? Number(draft.actual_unit_cost) : null } })} onDelete={() => remove.mutate(item.id)} onMove={() => onMove(item)} onReceiptsChanged={invalidate} />)}
   </>;
 }
 
 function KindSelect({ value, onChange }: { value: Kind; onChange: (kind: Kind) => void }) {
-  return <select className="desk-input" value={value} onChange={(e) => onChange(e.target.value as Kind)}><option value="hardware">Hardware</option><option value="printing">Printing</option></select>;
+  return <Field label="Kind"><select className="desk-input" value={value} onChange={(e) => onChange(e.target.value as Kind)}><option value="hardware">Hardware</option><option value="printing">Printing</option></select></Field>;
 }
 
 function AddButton({ disabled, label, className = "" }: { disabled: boolean; label: string; className?: string }) {
@@ -233,13 +234,4 @@ function MutationErrors({ create, update, remove, exportError }: { create: unkno
 
 function formatAmount(value: number) {
   return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  const tones: Record<string, string> = {
-    "Visible estimated total": "border-accent bg-accent/15",
-    "Open budget": "border-warn bg-warn/15",
-    "Received actual total": "border-success bg-success/15",
-  };
-  return <div className={`rounded-md border px-3 py-2 ${tones[label] ?? "border-secondary bg-secondary/15"}`}><p className="eyebrow">{label}</p><p className="mt-1 font-mono text-lg font-semibold text-ink">{value}</p></div>;
 }

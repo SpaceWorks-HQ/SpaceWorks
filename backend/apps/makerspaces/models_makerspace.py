@@ -16,6 +16,7 @@ from apps.makerspaces.capabilities import (
 )
 from apps.makerspaces.module_registry import default_enabled_module_keys
 from apps.makerspaces.provenance import validate_actor_snapshot
+from apps.makerspaces.request_access import reconcile_enabled_modules
 from apps.makerspaces.models_makerspace_secrets import MakerspaceSecretsMixin
 from apps.makerspaces.validators import (
     DEFAULT_PRESENCE_PRESETS,
@@ -77,6 +78,11 @@ class Makerspace(MakerspaceSecretsMixin, models.Model):
     # Account-less requests are an unauthenticated write surface, so this is an
     # independent opt-in. In particular, it must not follow the membership module:
     # recommended installs omit that module and must stay closed after an upgrade.
+    #
+    # The reverse direction IS coupled, and `save()` enforces it: installing
+    # `membership` forces this off, because the anonymous branch of RequestSubmitView
+    # runs before any membership guard and would otherwise walk straight past the
+    # requirement the operator just switched on. See `request_access`.
     anonymous_requests_enabled = models.BooleanField(default=False)
     public_stats_enabled = models.BooleanField(default=False)
     public_stats_show_holder_names = models.BooleanField(default=False)
@@ -232,6 +238,22 @@ class Makerspace(MakerspaceSecretsMixin, models.Model):
     def save(self, *args, **kwargs):
         self.public_code = (self.public_code or "").upper()
         self.frontend_domain = normalize_frontend_domain(self.frontend_domain)
+        # Membership and account-less requests are mutually exclusive, and this is the
+        # ONE chokepoint every writer passes through: module install/uninstall, profile
+        # application, the /control/ capability matrix, setup_instance, seed_demo and a
+        # plain obj.save(). Enforcing it here rather than in each of them is what makes
+        # the state unreachable instead of merely discouraged -- see
+        # `request_access` for why the pair is impossible.
+        reconciled = reconcile_enabled_modules(
+            self.enabled_modules, self.anonymous_requests_enabled
+        )
+        if reconciled != self.anonymous_requests_enabled:
+            self.anonymous_requests_enabled = reconciled
+            # A partial save that did not name this field would otherwise change the
+            # attribute in memory and leave the row in the impossible state.
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = [*update_fields, "anonymous_requests_enabled"]
         super().save(*args, **kwargs)
 
     def clean(self):

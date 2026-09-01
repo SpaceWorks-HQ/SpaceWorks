@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { ConfirmDialog, DataTable, EmptyState } from "../../../components/ui";
+import { ConfirmDialog, DataTable, EmptyState, Field } from "../../../components/ui";
 import type { DataTableColumn } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import { categoryResults, Panel, type Category, type CategoryListResponse, type Makerspace, useStaffGet } from "./shared";
@@ -99,6 +99,7 @@ export function Categories({ makerspace }: { makerspace: Makerspace }) {
         editingId === category.id ? (
           <input
             className="desk-input w-full"
+            aria-label={`Name for ${category.name}`}
             value={editForm.name}
             onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
           />
@@ -115,6 +116,7 @@ export function Categories({ makerspace }: { makerspace: Makerspace }) {
         editingId === category.id ? (
           <input
             className="desk-input w-24"
+            aria-label={`Order for ${category.name}`}
             type="number"
             value={editForm.display_order}
             onChange={(event) => setEditForm((current) => ({ ...current, display_order: event.target.value }))}
@@ -130,6 +132,7 @@ export function Categories({ makerspace }: { makerspace: Makerspace }) {
         editingId === category.id ? (
           <input
             className="desk-input w-28"
+            aria-label={`Icon for ${category.name}`}
             value={editForm.icon}
             onChange={(event) => setEditForm((current) => ({ ...current, icon: event.target.value }))}
           />
@@ -177,31 +180,10 @@ export function Categories({ makerspace }: { makerspace: Makerspace }) {
     <Panel title="Categories">
       <div className="grid gap-3">
         <div className="grid gap-2 rounded-md border border-line bg-panel p-3 md:grid-cols-[1fr_1fr_120px_1fr_auto]">
-          <input
-            className="desk-input"
-            placeholder="Name"
-            value={form.name}
-            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-          />
-          <input
-            className="desk-input"
-            placeholder="auto from name"
-            value={form.slug}
-            onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))}
-          />
-          <input
-            className="desk-input"
-            type="number"
-            placeholder="Order"
-            value={form.display_order}
-            onChange={(event) => setForm((current) => ({ ...current, display_order: event.target.value }))}
-          />
-          <input
-            className="desk-input"
-            placeholder="Icon"
-            value={form.icon}
-            onChange={(event) => setForm((current) => ({ ...current, icon: event.target.value }))}
-          />
+          <Field label="Name"><input className="desk-input" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></Field>
+          <Field label="Slug"><input className="desk-input" placeholder="auto from name" value={form.slug} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} /></Field>
+          <Field label="Order"><input className="desk-input" type="number" value={form.display_order} onChange={(event) => setForm((current) => ({ ...current, display_order: event.target.value }))} /></Field>
+          <Field label="Icon"><input className="desk-input" value={form.icon} onChange={(event) => setForm((current) => ({ ...current, icon: event.target.value }))} /></Field>
           <button className="desk-button-primary" type="button" disabled={!form.name.trim() || create.isPending} onClick={() => create.mutate()}>
             Add category
           </button>

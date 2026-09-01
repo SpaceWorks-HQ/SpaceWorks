@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { Badge, CollapsibleSection } from "../../../../components/ui";
+import { Badge, CollapsibleSection, ErrorBlock } from "../../../../components/ui";
 import type { PrinterPool } from "../../../../generated/api";
 import { staffRequest } from "../../../../lib/api";
 import { ConsumablePoolCreateForm } from "./ConsumablePoolCreateForm";
@@ -45,7 +45,7 @@ export function SharedConsumablesSection({ makerspaceId, pools, existingPools, p
           <h4 className="title-section mb-2">Space-wide stock</h4>
           <ConsumablePoolList makerspaceId={makerspaceId} pools={pools} />
         </section>
-        <ErrorBlock error={poolError} />
+        <ErrorBlock className="mt-2" error={poolError} />
       </div>
     </CollapsibleSection>
   );
@@ -175,11 +175,7 @@ export function ConsumablePoolList({ makerspaceId, pools }: { makerspaceId: numb
         })}
         {!pools.length ? <p className="text-sm text-muted">No consumable pools.</p> : null}
       </div>
-      <ErrorBlock error={adjustPool.error ?? visibility.error} />
+      <ErrorBlock className="mt-2" error={adjustPool.error ?? visibility.error} />
     </>
   );
-}
-
-function ErrorBlock({ error }: { error: unknown }) {
-  return error instanceof Error ? <p className="mt-2 text-sm text-danger">{error.message}</p> : null;
 }

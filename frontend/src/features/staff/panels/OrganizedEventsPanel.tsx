@@ -47,11 +47,11 @@ export function OrganizedEventsPanel() {
             <caption className="sr-only">Organization-managed events in chronological order</caption>
             <thead className="eyebrow bg-bg">
               <tr>
-                <th className="px-3 py-2">Title</th>
-                <th className="px-3 py-2">Date / location</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Registration totals</th>
-                <th className="px-3 py-2">Organizers</th>
+                <th scope="col" className="px-3 py-2">Title</th>
+                <th scope="col" className="px-3 py-2">Date / location</th>
+                <th scope="col" className="px-3 py-2">Status</th>
+                <th scope="col" className="px-3 py-2">Registration totals</th>
+                <th scope="col" className="px-3 py-2">Organizers</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line bg-surface">
@@ -138,7 +138,7 @@ function OrganizedEventsTableSkeleton() {
         <thead className="eyebrow bg-bg">
           <tr>
             {["Title", "Date / location", "Status", "Registration totals", "Organizers"].map((label) => (
-              <th key={label} className="px-3 py-2">{label}</th>
+              <th scope="col" key={label} className="px-3 py-2">{label}</th>
             ))}
           </tr>
         </thead>

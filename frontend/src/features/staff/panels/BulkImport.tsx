@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { Modal } from "../../../components/ui";
+import { Field, Metric, Modal } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import {
   fields,
@@ -97,8 +97,7 @@ export function BulkImport({ makerspace }: { makerspace: Makerspace }) {
   return (
     <Panel title="Bulk import">
       <div className="grid gap-4">
-        <div className="grid gap-2">
-          <label className="eyebrow">Upload CSV or XLSX</label>
+        <Field label="Upload CSV or XLSX" className="gap-2">
           <input
             className="desk-input"
             type="file"
@@ -109,10 +108,9 @@ export function BulkImport({ makerspace }: { makerspace: Makerspace }) {
               if (file) { setSelectedFile(file); parseFileSample(file).then(loadRows).catch((exc: Error) => setError(exc.message)); }
             }}
           />
-        </div>
+        </Field>
         <div className="grid gap-2">
-          <label className="eyebrow">Paste table</label>
-          <textarea className="desk-input h-28 w-full text-sm" value={tableText} onChange={(e) => { setSelectedFile(null); setTableText(e.target.value); }} />
+          <Field label="Paste table"><textarea className="desk-input h-28 w-full text-sm" value={tableText} onChange={(e) => { setSelectedFile(null); setTableText(e.target.value); }} /></Field>
           <div className="desk-actions flex flex-wrap gap-2">
             <button className="desk-button-ghost" type="button" disabled={pending || !tableText.trim()} onClick={() => loadRows(parseDelimited(tableText))}>Map pasted table</button>
             <button className="desk-button-ghost" type="button" disabled={pending || !sourceRows.length} onClick={() => setMappingOpen(true)}>Edit mapping</button>
@@ -123,7 +121,7 @@ export function BulkImport({ makerspace }: { makerspace: Makerspace }) {
         </div>
         <details open={advancedOpen} onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}>
           <summary className="cursor-pointer text-sm font-semibold text-ink">Advanced JSON</summary>
-          <textarea className="desk-input mt-2 h-32 w-full font-mono text-sm" value={rawJson} onChange={(e) => setRawJson(e.target.value)} />
+          <Field label="JSON rows"><textarea className="desk-input mt-2 h-32 w-full font-mono text-sm" value={rawJson} onChange={(e) => setRawJson(e.target.value)} /></Field>
           <div className="desk-actions mt-2 flex flex-wrap gap-2">
             <button className="desk-button-ghost" type="button" disabled={pending} onClick={() => submitJson(false)}>Preview JSON</button>
             <button className="desk-button-primary" type="button" disabled={pending} onClick={() => submitJson(true)}>Apply JSON</button>
@@ -186,21 +184,17 @@ function ImportSummary({ result }: { result: ImportResult }) {
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="eyebrow"><tr><th className="px-2 py-1">Row</th><th className="px-2 py-1">Status</th><th className="px-2 py-1">Name</th><th className="px-2 py-1">Message</th></tr></thead>
+          <thead className="eyebrow"><tr><th scope="col" className="px-2 py-1">Row</th><th scope="col" className="px-2 py-1">Status</th><th scope="col" className="px-2 py-1">Name</th><th scope="col" className="px-2 py-1">Message</th></tr></thead>
           <tbody>{(result.rows ?? []).map((row) => {
             const errors = errorRows.get(row.row) ?? row.errors;
             const warnings = warningRows.get(row.row) ?? row.warnings;
             const message = errors ? messageFor(errors) : warnings ? messageFor(warnings) : "";
-            return <tr key={row.row} className="border-t border-line"><td className="px-2 py-1">{row.row}</td><td className="px-2 py-1">{errors ? "error" : row.action ?? "ready"}</td><td className="px-2 py-1">{String(row.data?.name ?? "")}</td><td className={errors ? "px-2 py-1 text-danger" : "px-2 py-1 text-amber-700"}>{message}</td></tr>;
+            return <tr key={row.row} className="border-t border-line"><td className="px-2 py-1">{row.row}</td><td className="px-2 py-1">{errors ? "error" : row.action ?? "ready"}</td><td className="px-2 py-1">{String(row.data?.name ?? "")}</td><td className={errors ? "px-2 py-1 text-danger" : "px-2 py-1 text-warn-ink"}>{message}</td></tr>;
           })}</tbody>
         </table>
       </div>
     </div>
   );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return <div><p className="eyebrow">{label}</p><p className="font-semibold text-ink">{value}</p></div>;
 }
 
 function isRunning(job?: BulkImportJob) {

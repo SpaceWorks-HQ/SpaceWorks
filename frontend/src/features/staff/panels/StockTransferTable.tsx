@@ -1,8 +1,5 @@
+import { ErrorText } from "../../../components/ui";
 import type { Transfer } from "./StockTransferPanel";
-
-export function ErrorText({ text }: { text: string }) {
-  return <p className="mt-2 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{text}</p>;
-}
 
 export function TransferTable({
   transfers,
@@ -20,19 +17,19 @@ export function TransferTable({
   destinationContainerNames: Map<number, string>;
 }) {
   if (loading) return <p className="text-sm text-muted">Loading transfers...</p>;
-  if (error) return <ErrorText text={error} />;
+  if (error) return <ErrorText message={error} />;
   if (!transfers.length) return <p className="text-sm text-muted">No stock transfers recorded.</p>;
   return (
     <div className="overflow-x-auto rounded-md border border-line">
       <table className="min-w-[760px] divide-y divide-line text-left text-sm">
         <thead className="eyebrow bg-surface">
           <tr>
-            <th className="px-3 py-2">ID</th>
-            <th className="px-3 py-2">Source</th>
-            <th className="px-3 py-2">Destination</th>
-            <th className="px-3 py-2">Reason</th>
-            <th className="px-3 py-2">Created</th>
-            <th className="px-3 py-2">Lines</th>
+            <th scope="col" className="px-3 py-2">ID</th>
+            <th scope="col" className="px-3 py-2">Source</th>
+            <th scope="col" className="px-3 py-2">Destination</th>
+            <th scope="col" className="px-3 py-2">Reason</th>
+            <th scope="col" className="px-3 py-2">Created</th>
+            <th scope="col" className="px-3 py-2">Lines</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line bg-bg text-ink">

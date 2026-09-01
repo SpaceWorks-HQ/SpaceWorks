@@ -1,3 +1,4 @@
+import { Field } from "../../components/ui";
 import { ApiClientScopePicker } from "./ApiClientScopePicker";
 import type { ApiClientCreateResponse, ApiClientScopeOption } from "./apiClientsApi";
 import { splitOrigins } from "./apiClientsApi";
@@ -48,18 +49,21 @@ export function ApiClientCreateCard({
       <article className="rounded-md border border-line bg-surface p-3">
         <h3 className="font-semibold text-ink">API clients</h3>
         <div className="mt-3 grid gap-2">
-          <input
-            className="desk-input w-full"
-            placeholder="Client label"
-            value={label}
-            onChange={(event) => onLabelChange(event.target.value)}
-          />
-          <textarea
-            className="desk-input min-h-24 w-full"
-            placeholder="Allowed browser origins, one per line. Example: https://lab.example.com"
-            value={origins}
-            onChange={(event) => onOriginsChange(event.target.value)}
-          />
+          <Field label="Client label">
+            <input
+              className="desk-input w-full"
+              value={label}
+              onChange={(event) => onLabelChange(event.target.value)}
+            />
+          </Field>
+          <Field label="Allowed browser origins">
+            <textarea
+              className="desk-input min-h-24 w-full"
+              placeholder="Allowed browser origins, one per line. Example: https://lab.example.com"
+              value={origins}
+              onChange={(event) => onOriginsChange(event.target.value)}
+            />
+          </Field>
           <div className="grid gap-2">
             <span className="eyebrow">Scopes</span>
             <p className="text-xs text-muted">Choose the exact public API access this client needs.</p>
@@ -111,24 +115,28 @@ export function ApiClientCreateCard({
     <article className="rounded-md border border-line bg-surface p-3">
       <h3 className="font-semibold text-ink">Request API access</h3>
       <div className="mt-3 grid gap-2">
-        <input
-          className="desk-input w-full"
-          placeholder="Request label"
-          value={label}
-          onChange={(event) => onLabelChange(event.target.value)}
-        />
-        <textarea
-          className="desk-input min-h-24 w-full"
-          placeholder="Reason for API access"
-          value={reason}
-          onChange={(event) => onReasonChange(event.target.value)}
-        />
-        <textarea
-          className="desk-input min-h-24 w-full"
-          placeholder="Allowed browser origins, one per line. Example: https://lab.example.com"
-          value={origins}
-          onChange={(event) => onOriginsChange(event.target.value)}
-        />
+        <Field label="Request label">
+          <input
+            className="desk-input w-full"
+            value={label}
+            onChange={(event) => onLabelChange(event.target.value)}
+          />
+        </Field>
+        <Field label="Reason for API access">
+          <textarea
+            className="desk-input min-h-24 w-full"
+            value={reason}
+            onChange={(event) => onReasonChange(event.target.value)}
+          />
+        </Field>
+        <Field label="Allowed browser origins">
+          <textarea
+            className="desk-input min-h-24 w-full"
+            placeholder="Allowed browser origins, one per line. Example: https://lab.example.com"
+            value={origins}
+            onChange={(event) => onOriginsChange(event.target.value)}
+          />
+        </Field>
       </div>
       <button
         className="desk-button-primary mt-3 w-full"

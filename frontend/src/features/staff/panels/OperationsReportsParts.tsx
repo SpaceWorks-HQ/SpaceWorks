@@ -288,7 +288,7 @@ export function ReportTable({ data }: { data?: ReportRows }) {
         <thead className="eyebrow sticky top-0 bg-surface">
           <tr>
             {tableHeaders.map((header) => (
-              <th key={header} className="whitespace-nowrap px-3 py-2">
+              <th scope="col" key={header} className="whitespace-nowrap px-3 py-2">
                 {header.replace(/_/g, " ")}
               </th>
             ))}

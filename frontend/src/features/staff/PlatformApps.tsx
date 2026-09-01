@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
 import { ThemeToggle } from "../../components/ThemeToggle";
-import { Card } from "../../components/ui/Card";
+import { Card, Field } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
 import { PublicInventoryPage } from "../inventory/PublicInventoryPage";
 import { StaffApp } from "./StaffApp";
@@ -64,12 +64,14 @@ export function ScannerPage() {
         </div>
         <Card>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <input
-              className="desk-input flex-1"
-              placeholder="Scan or paste QR payload"
-              value={payload}
-              onChange={(event) => setPayload(event.target.value)}
-            />
+            <Field className="flex-1" label="QR payload">
+              <input
+                className="desk-input flex-1"
+                placeholder="Scan or paste QR payload"
+                value={payload}
+                onChange={(event) => setPayload(event.target.value)}
+              />
+            </Field>
             <button
               className="desk-button-primary"
               disabled={!payload.trim() || resolve.isPending}

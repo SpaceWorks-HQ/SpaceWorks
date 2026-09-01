@@ -116,12 +116,18 @@ def _prepare_build(monkeypatch, settings, markers):
 
     monkeypatch.setattr(archive_payload, "_tenant_payload", tenant_payload)
     commands = []
+    real_run = archive_builder.subprocess.run
 
     def fake_age(command, **_kwargs):
         commands.append(command)
         if "-o" not in command:
-            # Not an age invocation (E7 added other subprocess calls); nothing to seal.
-            return SimpleNamespace(returncode=0)
+        # Not an age invocation. This fake replaces the SHARED subprocess module, so
+        # every other binary the code runs lands here too -- including
+        # `postgres_client._binary_major`'s `<client> --version` probe. Delegate
+        # instead of stubbing: a bare SimpleNamespace has no `.stdout`, which turned a
+        # clean PostgresClientUnavailable into an AttributeError on every host without
+        # a versioned client directory (any non-Debian/RHEL host).
+            return real_run(command, **_kwargs)
         output = Path(command[command.index("-o") + 1])
         payload = _kwargs.get("input")
         if payload is None:

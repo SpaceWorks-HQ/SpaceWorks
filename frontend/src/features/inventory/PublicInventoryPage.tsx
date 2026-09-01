@@ -6,12 +6,10 @@ import { MakerspaceBrand } from "../../components/MakerspaceBrand";
 import { MakerspaceMapLink } from "../../components/MakerspaceMapLink";
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
 import { ThemeToggle } from "../../components/ThemeToggle";
-import { Card } from "../../components/ui/Card";
+import { ChartIcon, UserIcon } from "../../components/icons";
+import { Card, Field, IconLink } from "../../components/ui";
 import { useTenant, useTenantPath } from "../../lib/tenant";
-import type {
-  Product,
-  RequestCartItem,
-} from "../../types/inventory";
+import type { Product, RequestCartItem } from "../../types/inventory";
 import { ProductCard } from "./ProductCard";
 import { ProductQuickViewModal } from "./ProductQuickViewModal";
 import {
@@ -24,11 +22,7 @@ import {
 } from "./PublicInventoryParts";
 import { PublicRequestPanel } from "./PublicRequestPanel";
 import { SkipLink } from "../../components/SkipLink";
-import {
-  usePublicCategories,
-  usePublicInventory,
-  useTenantBootstrap,
-} from "./usePublicInventory";
+import { usePublicCategories, usePublicInventory, useTenantBootstrap } from "./usePublicInventory";
 
 const PAGE_SIZE = 24;
 
@@ -133,7 +127,7 @@ export function PublicInventoryPage() {
   return (
     <main className="desk-shell">
       <SkipLink />
-      <header className="border-b border-line bg-panel">
+      <header className="material-chrome border-b border-line">
         <div className="mx-auto flex max-w-screen-2xl flex-col gap-2 px-5 py-4 sm:px-8">
           <p className="eyebrow text-secondary-ink">
             Public Inventory
@@ -155,40 +149,44 @@ export function PublicInventoryPage() {
                 className="mt-1"
               />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <SpaceWorksBadge />
-              <div className="rounded-lg border border-secondary bg-secondary/15 px-3 py-2 font-mono text-sm text-secondary-ink">
-                {inventoryQuery.data?.count ?? "-"} listed items
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center justify-end gap-2">
+                {bootstrap?.makerspace.public_stats_enabled ? (
+                  <IconLink label="Stats" to={tenantPath("stats")}>
+                    <ChartIcon />
+                  </IconLink>
+                ) : null}
+                <ThemeToggle variant="icon" />
+                <IconLink label="Staff login" to="/admin">
+                  <UserIcon />
+                </IconLink>
               </div>
-              {bootstrap?.makerspace.public_stats_enabled ? (
-                <Link className="desk-button" to={tenantPath("stats")}>
-                  Stats
-                </Link>
-              ) : null}
-              {modules.has("printing") ? (
-                <Link className="desk-button" to={tenantPath("print")}>
-                  Request a 3D print
-                </Link>
-              ) : null}
-              {modules.has("events") ? (
-                <Link className="desk-button" to={tenantPath("events")}>
-                  Events
-                </Link>
-              ) : null}
-              {modules.has("machines") ? (
-                <Link className="desk-button" to={tenantPath("machines")}>
-                  Machines
-                </Link>
-              ) : null}
-              {modules.has("bookings") ? (
-                <Link className="desk-button" to={tenantPath("bookings")}>
-                  Book a space
-                </Link>
-              ) : null}
-              <ThemeToggle />
-              <Link className="desk-button" to="/admin">
-                Staff login
-              </Link>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <SpaceWorksBadge />
+                <div className="rounded-lg border border-secondary bg-secondary/15 px-3 py-2 font-mono text-sm text-secondary-ink">
+                  {inventoryQuery.data?.count ?? "-"} listed items
+                </div>
+                {modules.has("printing") ? (
+                  <Link className="desk-button" to={tenantPath("print")}>
+                    Request a 3D print
+                  </Link>
+                ) : null}
+                {modules.has("events") ? (
+                  <Link className="desk-button" to={tenantPath("events")}>
+                    Events
+                  </Link>
+                ) : null}
+                {modules.has("machines") ? (
+                  <Link className="desk-button" to={tenantPath("machines")}>
+                    Machines
+                  </Link>
+                ) : null}
+                {modules.has("bookings") ? (
+                  <Link className="desk-button" to={tenantPath("bookings")}>
+                    Book a space
+                  </Link>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
@@ -203,16 +201,15 @@ export function PublicInventoryPage() {
 
         <div className="min-w-0 space-y-4">
           <Card>
-            <form
-              className="flex flex-col gap-3 sm:flex-row"
-              onSubmit={submitSearch}
-            >
-              <input
-                className="desk-input min-w-0 flex-1"
-                placeholder="Search tools, machines, kits, or materials"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-              />
+            <form className="flex flex-col gap-3 sm:flex-row" onSubmit={submitSearch}>
+              <Field className="min-w-0 flex-1" label="Search inventory">
+                <input
+                  className="desk-input min-w-0 flex-1"
+                  placeholder="Search tools, machines, kits, or materials"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                />
+              </Field>
               <button className="desk-button-primary" type="submit">
                 Search
               </button>

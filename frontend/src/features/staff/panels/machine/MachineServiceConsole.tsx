@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { MachineServiceRequest, PrinterPool, TypedManualUsageResponse } from "../../../../generated/api";
+import { ErrorBlock } from "../../../../components/ui";
 import { staffRequest } from "../../../../lib/api";
 import { machineKeys } from "../../machinesApi";
 import type { Machine, MachineType, MeteringUnit } from "../../machinesApi";
@@ -157,8 +158,4 @@ function ManualUsageForm({ draft, setDraft, machines, pools, unitLabel, hasPool,
 
 function Subsection({ title, children }: { title: string; children: React.ReactNode }) {
   return <section><h4 className="title-section mb-2">{title}</h4>{children}</section>;
-}
-
-function ErrorBlock({ error }: { error: unknown }) {
-  return error instanceof Error ? <p className="text-sm text-danger">{error.message}</p> : null;
 }

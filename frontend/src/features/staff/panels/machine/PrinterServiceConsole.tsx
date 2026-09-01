@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { MachineServiceRequest, PrinterPool, PrinterServiceReport, TypedManualUsageResponse } from "../../../../generated/api";
+import { ErrorBlock } from "../../../../components/ui";
 import { staffRequest } from "../../../../lib/api";
 import { machineKeys } from "../../machinesApi";
 import type { Machine, MachineType } from "../../machinesApi";
@@ -165,8 +166,4 @@ function ManualUsageForm({ draft, setDraft, printers, pools, pending, onSubmit }
 
 function Subsection({ title, children }: { title: string; children: React.ReactNode }) {
   return <section><h4 className="title-section mb-2">{title}</h4>{children}</section>;
-}
-
-function ErrorBlock({ error }: { error: unknown }) {
-  return error instanceof Error ? <p className="text-sm text-danger">{error.message}</p> : null;
 }

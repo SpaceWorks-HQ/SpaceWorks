@@ -118,7 +118,7 @@ export function OverviewTab({ machine, makerspaceId, canManageMachines, canEdit,
       <section className="border-t border-line pt-4">
         <h3 className="title-section mb-3">Status</h3>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <select className="desk-input flex-1" value={status} disabled={!canOperate}
+          <select className="desk-input flex-1" aria-label="Machine status" value={status} disabled={!canOperate}
             onChange={(event) => setStatus(event.target.value as MachineStatus)}>
             {MACHINE_STATUSES.map((value) => (
               <option key={value} value={value}>{value.replace("_", " ")}</option>

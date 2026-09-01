@@ -6,7 +6,19 @@ from apps.accounts.audit_events import fingerprint
 
 
 class _AnonymousIpThrottle(SimpleRateThrottle):
+    """Per-IP budget for ACCOUNT-LESS submissions only.
+
+    Returning None for an authenticated caller is what lets these sit in the view's
+    `throttle_classes` beside the member throttle: DRF applies every class on every
+    request, and an authenticated member already has a per-principal budget. Without the
+    skip, a makerspace behind one NAT would rate-limit its own signed-in members by the
+    shared egress IP.
+    """
+
     def get_cache_key(self, request, view):
+        user = getattr(request, "user", None)
+        if getattr(user, "is_authenticated", False):
+            return None
         ident = self.get_ident(request)
         return None if not ident else self.cache_format % {
             "scope": self.scope,

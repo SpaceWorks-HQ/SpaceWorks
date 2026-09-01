@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
-import { useEffect, useId, useRef } from "react";
-import { focusFirstDialogElement, trapDialogFocus } from "./dialogFocus";
+import { useEffect, useId, useRef, useSyncExternalStore } from "react";
+import {
+  consumePendingRestore,
+  focusFirstDialogElement,
+  getSnapshot,
+  popDialog,
+  pushDialog,
+  subscribe,
+  trapDialogFocus,
+} from "./dialogFocus";
 
 type DetailDrawerProps = {
   open: boolean;
@@ -11,7 +19,13 @@ type DetailDrawerProps = {
 
 export function DetailDrawer({ open, title, onClose, children }: DetailDrawerProps) {
   const titleId = useId();
+  const layerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
+  const tokenRef = useRef<symbol | null>(null);
+  const top = useSyncExternalStore(subscribe, getSnapshot);
+  const amTop = top === tokenRef.current;
+  const amTopRef = useRef(amTop);
+  amTopRef.current = amTop;
   // See Modal.tsx: onClose lives in a ref so this focus effect depends only on `open`.
   // Otherwise a fresh inline onClose each render re-runs the effect and steals focus.
   const onCloseRef = useRef(onClose);
@@ -20,10 +34,16 @@ export function DetailDrawer({ open, title, onClose, children }: DetailDrawerPro
   useEffect(() => {
     if (!open) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const token = pushDialog({
+      previousFocus,
+      getPanel: () => panelRef.current,
+      getLayer: () => layerRef.current,
+    });
+    tokenRef.current = token;
     const panel = panelRef.current;
-    if (panel) focusFirstDialogElement(panel);
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!amTopRef.current) return;
       if (event.key === "Escape") onCloseRef.current();
       if (panel) trapDialogFocus(event, panel);
     };
@@ -31,14 +51,27 @@ export function DetailDrawer({ open, title, onClose, children }: DetailDrawerPro
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      previousFocus?.focus();
+      popDialog(token);
+      if (tokenRef.current === token) tokenRef.current = null;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!amTop) return;
+    consumePendingRestore(panelRef.current);
+    // Initial focus lives HERE, not in the push effect. A dialog that opens while another sits
+    // above it renders with `inert` on its layer, and `inert` is only cleared by the re-render
+    // that follows becoming topmost -- so focusing from the push effect silently fails, and
+    // consumePendingRestore no-ops because nothing was popped. This effect runs post-commit,
+    // once `inert` is gone. jsdom implements no `inert` at all, so no unit test can catch this.
+    const panel = panelRef.current;
+    if (panel && !panel.contains(document.activeElement)) focusFirstDialogElement(panel);
+  }, [amTop]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div ref={layerRef} inert={!amTop} className="fixed inset-0 z-50">
       <button
         type="button"
         aria-label="Close detail drawer"
@@ -46,7 +79,7 @@ export function DetailDrawer({ open, title, onClose, children }: DetailDrawerPro
         onClick={onClose}
       />
       <aside
-        aria-modal="true"
+        aria-modal={amTop ? "true" : undefined}
         role="dialog"
         aria-labelledby={titleId}
         ref={panelRef}

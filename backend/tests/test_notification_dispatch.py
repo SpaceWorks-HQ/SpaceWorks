@@ -160,18 +160,20 @@ def test_telegram_payload_is_durable_and_passed_to_sender(monkeypatch):
     monkeypatch.setattr(limits, "is_self_host", lambda: True)
     sender = Mock(return_value=True)
     monkeypatch.setattr("apps.integrations.telegram.send_message", sender)
-    markup = {"inline_keyboard": [[{"text": "Open", "url": "https://safe.test"}]]}
+    # An arbitrary payload: the `payload` column carries delivery-time context (today,
+    # the alert's `scope`, which push resolves its recipients from), and the property
+    # under test is that it survives to the log row intact.
+    payload = {"scope": {"kind": "machine", "id": 7}}
 
-    log = dispatch(space, "telegram", payload={"reply_markup": markup}, sync=True)
+    log = dispatch(space, "telegram", payload=payload, sync=True)
 
     log.refresh_from_db()
-    assert log.payload == {"reply_markup": markup}
+    assert log.payload == payload
     assert log.status == NotificationDeliveryStatus.SENT
     # destination=None is the legacy makerspace-column path: this space has no rooms, so
-    # the chat id still comes off the makerspace exactly as it did.
-    sender.assert_called_once_with(
-        space, "Booking confirmed.", reply_markup=markup, destination=None
-    )
+    # the chat id still comes off the makerspace exactly as it did. No `reply_markup`:
+    # the Telegram sender has no such parameter any more.
+    sender.assert_called_once_with(space, "Booking confirmed.", destination=None)
 
 
 def test_async_dispatch_enqueues_after_commit(

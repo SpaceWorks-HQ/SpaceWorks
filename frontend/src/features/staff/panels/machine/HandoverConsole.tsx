@@ -26,7 +26,7 @@ const money = (payment: MachineServiceRequest["payment"]) => {
   return {
     paid: paid || payment.status === "waived",
     label: payment.status === "waived" ? "Waived" : `${payment.currency.toUpperCase()} ${payment.amount}`.trim(),
-    tone: paid || payment.status === "waived" ? "text-muted" : "text-amber-600 dark:text-amber-400",
+    tone: paid || payment.status === "waived" ? "text-muted" : "text-warn-ink",
   };
 };
 
@@ -55,7 +55,7 @@ export function HandoverConsole({ makerspaceId, enabled }: Props) {
     <Panel title="Awaiting collection">
       {waiting.isLoading ? <p className="text-sm text-muted">Loading…</p> : null}
       {waiting.isError ? (
-        <p className="text-sm text-red-600 dark:text-red-400">Could not load finished jobs.</p>
+        <p className="text-sm text-danger">Could not load finished jobs.</p>
       ) : null}
       {!waiting.isLoading && !waiting.isError && rows.length === 0 ? (
         <p className="text-sm text-muted">Nothing is waiting to be handed over.</p>
@@ -95,7 +95,7 @@ export function HandoverConsole({ makerspaceId, enabled }: Props) {
       ) : null}
 
       {collect.isError ? (
-        <p className="mt-3 text-sm text-red-600 dark:text-red-400">
+        <p className="mt-3 text-sm text-danger">
           Could not mark that job collected. It may have been handed over already.
         </p>
       ) : null}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { Badge } from "../../components/ui";
+import { Badge, Field } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
 import { type Makerspace, useStaffGet } from "./StaffPanels";
 
@@ -85,34 +85,36 @@ export function MakerspacePaymentSettings({ makerspace }: { makerspace: Makerspa
         </Badge>
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <input
-          className="desk-input"
-          type="password"
-          autoComplete="new-password"
-          placeholder={
-            settings.data?.stripe_publishable_key_set
-              ? "Stripe publishable key set"
-              : "Stripe publishable key"
-          }
-          value={publishableKey}
-          onChange={(event) => setPublishableKey(event.target.value)}
-        />
-        <input
-          className="desk-input"
-          type="password"
-          autoComplete="new-password"
-          placeholder={settings.data?.stripe_secret_key_set ? "Stripe secret key set" : "Stripe secret key"}
-          value={secretKey}
-          onChange={(event) => setSecretKey(event.target.value)}
-        />
-        <input
-          className="desk-input"
-          type="password"
-          autoComplete="new-password"
-          placeholder={settings.data?.stripe_webhook_secret_set ? "Stripe webhook secret set" : "Stripe webhook secret"}
-          value={webhookSecret}
-          onChange={(event) => setWebhookSecret(event.target.value)}
-        />
+        <Field label="Stripe publishable key">
+          <input
+            className="desk-input"
+            type="password"
+            autoComplete="new-password"
+            placeholder={settings.data?.stripe_publishable_key_set ? "Stripe publishable key set" : undefined}
+            value={publishableKey}
+            onChange={(event) => setPublishableKey(event.target.value)}
+          />
+        </Field>
+        <Field label="Stripe secret key">
+          <input
+            className="desk-input"
+            type="password"
+            autoComplete="new-password"
+            placeholder={settings.data?.stripe_secret_key_set ? "Stripe secret key set" : undefined}
+            value={secretKey}
+            onChange={(event) => setSecretKey(event.target.value)}
+          />
+        </Field>
+        <Field label="Stripe webhook secret">
+          <input
+            className="desk-input"
+            type="password"
+            autoComplete="new-password"
+            placeholder={settings.data?.stripe_webhook_secret_set ? "Stripe webhook secret set" : undefined}
+            value={webhookSecret}
+            onChange={(event) => setWebhookSecret(event.target.value)}
+          />
+        </Field>
         <input
           aria-label="Default payment currency"
           className="desk-input"

@@ -1,6 +1,7 @@
 from django.db.models import Count, Sum
 
 from apps.boxes.models import QrScanEvent
+from apps.makerspaces.anonymous_requesters import anonymous_requester_ids
 from apps.hardware_requests.display import label_from_candidates, requester_label
 from apps.hardware_requests.models import HardwareRequest, HardwareRequestItem
 from apps.inventory.models import InventoryAsset, InventoryProduct
@@ -179,6 +180,10 @@ def _top_borrowers(makerspace_id, aggregate, limit=None, date_range=None):
     qs = (
         _apply_date_range(_items(makerspace_id), "request__issued_at", date_range)
         .filter(issued_quantity__gt=0)
+        # Every account-less request in a space shares ONE requester principal, so
+        # without this they rank as a single fictional "top borrower". Excluded before
+        # the grouping so the ranking and any limit are computed over real people only.
+        .exclude(request__requester_id__in=anonymous_requester_ids())
         .values(*values)
         .annotate(
             requests=Count("request_id", distinct=True),

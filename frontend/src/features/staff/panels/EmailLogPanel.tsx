@@ -77,12 +77,12 @@ export function EmailLogPanel({ makerspace }: { makerspace: Makerspace }) {
         <table className="min-w-full text-left text-sm">
           <thead className="eyebrow border-b border-line">
             <tr>
-              <th className="px-2 py-2">Created</th>
-              <th className="px-2 py-2">To</th>
-              <th className="px-2 py-2">Event</th>
-              <th className="px-2 py-2">Status</th>
-              <th className="px-2 py-2">Error</th>
-              <th className="px-2 py-2">Action</th>
+              <th scope="col" className="px-2 py-2">Created</th>
+              <th scope="col" className="px-2 py-2">To</th>
+              <th scope="col" className="px-2 py-2">Event</th>
+              <th scope="col" className="px-2 py-2">Status</th>
+              <th scope="col" className="px-2 py-2">Error</th>
+              <th scope="col" className="px-2 py-2">Action</th>
             </tr>
           </thead>
           <tbody>

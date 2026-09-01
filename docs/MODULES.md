@@ -86,6 +86,13 @@ thirteen modules under it are optional.
 - **Without it** — not an option. Every handover in the system — staff issue, front-desk handout, member
   self-checkout — records itself through this workflow, and it is the only place a request's status is
   allowed to change.
+- **Who may submit is set by `membership`, not by this module.** Being core, this module is present in every
+  makerspace and therefore must work with `membership` uninstalled: members only when `membership` is on,
+  any signed-in account when it is off, and account-less strangers only when an operator has explicitly
+  opted in (`manage.py set_request_access --mode anyone`, which is refused while `membership` is installed).
+  See the `membership` module below, and **Who may submit a borrow request** in `docs/INVARIANTS.md`.
+- **Accept and reject are one request at a time.** There is no bulk accept or bulk reject anywhere —
+  `/control/` serves a per-request review page, and Telegram alerts carry no buttons.
 - **Data** — core; not separately purgeable.
 
 ### staff_admin
@@ -310,6 +317,14 @@ Required by `printing`.
   no directory. `payments.membership` becomes inert.
 - **Deliberately does not require `member_accounts`.** Identity can come from external OIDC or a staff-created
   person record, so the two are independent switches.
+- **It decides who may submit a borrow request, and installing it closes account-less requests.** With this
+  module on, submitting requires an active member of the makerspace. With it off, any signed-in account may
+  submit — a request is only a proposal that staff must accept, and waiver acceptance cannot be recorded
+  without a membership row anyway. Turning it ON therefore forces `anonymous_requests_enabled` OFF (audited,
+  never silent): the account-less path bypasses the membership check entirely, so leaving both on would let
+  a stranger walk past the requirement you just switched on. Turning it back off does **not** re-open
+  account-less requests — that is an explicit choice, made with
+  `manage.py set_request_access --mode anyone`.
 - **Data** — purgeable: join requests and member profiles with their projects and imagery. Memberships,
   waivers and acceptance evidence **stay** — they are core RBAC and liability state.
 
@@ -361,11 +376,13 @@ stored credential**, so re-enabling needs no re-entry.
 
 ### telegram
 
-- **What it is** — per-makerspace Telegram group alerts, and the accept/reject buttons on them.
-- **What it adds** — the `telegram_alerts` workflow, the webhook that processes callbacks, and test
-  alerts. Callbacks route through the request workflow like every other actor.
-- **Without it** — no Telegram alerts and no accept/reject from chat; the same decisions are made in the
-  console.
+- **What it is** — per-makerspace Telegram group alerts. Outbound only.
+- **What it adds** — the `telegram_alerts` workflow and test alerts. **No accept/reject buttons**: chat is
+  a notification channel, not a decision surface, so an alert names the request and points staff at the
+  console. The webhook route survives but acknowledges and discards every callback, which stops Telegram
+  retrying against a deployment that already ran `setWebhook`.
+- **Without it** — no Telegram alerts. Request decisions are unaffected; they are made in the staff console
+  or `/control/` either way.
 - **Data** — purgeable: Telegram destinations and their chat ids. Delivery logs survive — the record that
   a message was attempted is history; the credential is the secret.
 

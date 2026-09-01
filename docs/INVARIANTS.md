@@ -1053,6 +1053,77 @@ from `index.css` and `tailwind.config.ts`.
 **Console parity principle.** Every backend lifecycle capability reachable in the Django `/control/` admin
 must have a React staff-console surface — a capability with no console surface is a latent dead/broken
 feature for normal staff. New workflow actions ship their staff UI in the same batch.
+
+**Who may submit a borrow request is DERIVED, and `membership` + account-less requests is an impossible
+pair.** `apps/makerspaces/request_access.py` is the only answer to the question. Three states fall out of
+one column and one module: `membership` on → **members**; both off → **accounts** (any active signed-in
+account); `anonymous_requests_enabled` on with `membership` off → **anyone**. The fourth combination must
+not exist, because `RequestSubmitView` takes its anonymous branch *before* any membership guard runs, so a
+row carrying both would walk a stranger straight past the membership requirement the operator had just
+switched on. It is enforced at three depths and all three are load-bearing: `Makerspace.save()` reconciles
+the pair so **no writer** can persist it (module install/uninstall, `apply_profile`, the `/control/`
+capability matrix, `setup_instance`, `seed_demo`, a bare `obj.save()`) — and it appends the field to
+`update_fields` so a partial save cannot leave the row inconsistent; `set_anonymous_requests` takes the row
+lock and **refuses** an explicit request to open account-less submission while `membership` is installed
+(the module path *forces*, the operator path *refuses* — the operator was asking about this flag, so
+silently ignoring them would be the wrong answer); and `anonymous_requests_allowed` re-derives at request
+time so a row from raw SQL or an old restore still fails closed. Migration
+`makerspaces/0067` closed the pair on existing rows and is deliberately **not reversible**. Turning
+`membership` off never re-opens account-less requests — opening an unauthenticated write surface is an
+explicit act, never a side effect.
+
+**A core module must work with every optional module uninstalled.** Two halves. The *declared* half is
+checked at import time: `module_registry._validate_registry` refuses a registry where an `is_core` module
+names a non-core key in `requires_modules`. The *undeclared* half — core code reaching for a row an optional
+module owns — has no sound static check in this codebase, because an app label is not the unit of module
+ownership (`hardware_requests` owns core `request_workflow` **and** optional `guest_handover`; `admin_api`
+owns core `staff_admin` and many optional surfaces), so no per-file rule can tell a legitimate
+optional-module gate from a genuine violation. It is covered behaviourally instead, by
+`tests/makerspaces/test_core_module_independence.py`: the core loan spine (catalogue → submit → staff queue
+→ accept → public status) is driven over HTTP on a core-only makerspace and on `core + every optional
+module except M`, for every optional `M`, with the **test identity built to match each configuration** —
+with `membership` installed the spine legitimately needs an active member and an open presence session, and
+a test that always used a plain account would be refused before reaching the code under test and would
+prove nothing. This is the regression `9e496997` shipped: core `request_workflow` called
+`require_active_member_presence` unconditionally and the default `recommended` profile ships no
+`membership`, so a fresh self-host install 403'd every public borrow request. Do not weaken the claim in
+that file's docstring; it says what it proves and what it does not.
+
+**Telegram is an OUTBOUND channel. Chat is not a decision surface.** The inline accept/reject keyboard and
+the callback route that served it are gone: `LifecyclePayload` has no `telegram_reply_markup`,
+`telegram.send_message` has no `reply_markup` parameter, and `TelegramWebhookView` acknowledges and
+discards every callback. The webhook **route is kept on purpose** — a deployment that already ran
+`setWebhook` has the URL registered, we cannot call `deleteWebhook` for them, and Telegram retries a
+non-2xx for hours, so a 200 is the graceful retirement and a 404 would be a permanent error loop in
+someone else's infrastructure. The secret check stays even though nothing acts behind it, because an
+endpoint that had quietly stopped authenticating is exactly what would turn a reintroduced callback into a
+vulnerability. The one-bot-per-makerspace rule (D16) survives on its **outbound** half only — one sender
+identity across a tenant's rooms, one token secret — since its original inbound justification expired with
+the buttons. Reintroducing a button means per-bot webhook secrets and inbound routing first.
+
+**Accepting and rejecting a borrow request are one-at-a-time acts.** The `/control/` bulk `accept_selected`
+and `reject_selected` actions were removed; `admin_request_review.RequestReviewAdminMixin` serves a
+per-request review page instead, showing requester identity, contact-verification state and per-item
+accepted quantities. Accepting reserves stock and rejecting closes a person's ask, and neither is a
+judgement made about twenty rows from a checkbox column. The mutations still go through
+`request_workflow`, so the state machine, audit entry and notification fan-out are unchanged — only the
+entry point moved. The review URL must keep `admin_site.admin_view`, must load through
+`self.get_queryset(request)` (the superadmin queryset excludes hard-hidden makerspaces), must re-check
+`has_change_permission`, and must parse quantities as ints before calling the workflow.
+
+**The shared account-less requester principal is not a person, and no per-PERSON aggregate may rank it.**
+Every anonymous submission in a makerspace points at one `Makerspace.anonymous_requester`, so grouping by
+`requester_id` folds every unrelated stranger into a single fictional human. `_repeat_offenders`,
+`_top_borrowers`, `globally_ranked_borrowers` and `_restricted_requesters` exclude
+`anonymous_requesters.anonymous_requester_ids(...)` **before** any limit or slice, so the principal cannot
+displace a real borrower from the top N. The excluded damage and loss is not dropped: `accountability_data`
+reports it as an additive `anonymous_accountability` total, because an accountability panel that silently
+lost every account-less incident would be worse than one naming a fake person. Per-request rows keep
+showing, but route their `requester_username` through `display.requester_label` so an overdue account-less
+loan shows the contact the borrower gave rather than the principal's internal `member_<uuid>`. Restricting
+the principal is refused at the write side by
+`accounts.principal_guards.refuse_anonymous_requester_access_mutation` — it would restrict every future
+account-less requester at once — and the read-side exclusion is the backstop for rows predating that guard.
 ## Handover roles and the retired Guest Admin
 
 **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`); handover staff get a **custom

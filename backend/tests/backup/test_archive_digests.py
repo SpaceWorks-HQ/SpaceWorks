@@ -100,7 +100,17 @@ def test_built_archive_manifest_contains_streamed_content_ledger(
             "storage": {"objects": objects},
         }
 
+    real_run = archive_builder.subprocess.run
+
     def encrypt(command, **_kwargs):
+        if "-o" not in command:
+        # Not an age invocation. This fake replaces the SHARED subprocess module, so
+        # every other binary the code runs lands here too -- including
+        # `postgres_client._binary_major`'s `<client> --version` probe. Delegate
+        # instead of stubbing: a bare SimpleNamespace has no `.stdout`, which turned a
+        # clean PostgresClientUnavailable into an AttributeError on every host without
+        # a versioned client directory (any non-Debian/RHEL host).
+            return real_run(command, **_kwargs)
         output = Path(command[command.index("-o") + 1])
         shutil.copyfile(command[-1], output)
         return SimpleNamespace(returncode=0)

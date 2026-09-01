@@ -1,4 +1,5 @@
 import hmac
+import logging
 
 from django.conf import settings
 from django.shortcuts import get_object_or_404
@@ -10,8 +11,6 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.accounts.models import User
-from apps.hardware_requests import workflow
-from apps.hardware_requests.models import HardwareRequest
 from apps.integrations.serializers import (
     TelegramTestAlertSerializer,
     TelegramWebhookSerializer,
@@ -19,46 +18,53 @@ from apps.integrations.serializers import (
 from apps.integrations.telegram import TelegramDeliveryError, send_message
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.guards import require_module
-from apps.tenant_migration.gate_runtime import tenant_write
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramWebhookView(APIView):
+    """Accept-and-ignore. Telegram is a notification channel, not an action surface.
+
+    The accept/reject buttons are gone and this endpoint no longer touches the request
+    workflow. **The route is kept anyway**, deliberately: a deployment that has already
+    called `setWebhook` has this URL registered with Telegram, we cannot call
+    `deleteWebhook` on its behalf, and Telegram retries a non-2xx response for hours. A
+    200 acknowledgement is the graceful retirement; a 404 would be a permanent error loop
+    in someone else's infrastructure.
+
+    The secret check stays for the same reason it was added -- `from.id` in the payload is
+    attacker-controllable and the endpoint must stay closed to strangers -- and because
+    the moment a callback DID something again, an endpoint that had quietly stopped
+    checking would be the vulnerability.
+    """
+
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "telegram_webhook"
 
     @extend_schema(
         tags=["Telegram"],
-        summary="Receive Telegram callback webhook",
+        summary="Acknowledge a Telegram webhook (no action is taken)",
+        description=(
+            "Retained so an already-registered webhook does not retry forever. Callback "
+            "queries are acknowledged and discarded: accepting and rejecting borrow "
+            "requests happens in the staff console, never from chat."
+        ),
         auth=[],
         request=TelegramWebhookSerializer,
-        responses={200: OpenApiResponse(description="Webhook processed.")},
+        responses={200: OpenApiResponse(description="Acknowledged; no action taken.")},
     )
     def post(self, request, *args, **kwargs):
         if not _webhook_secret_ok(request):
             return Response({"detail": "Invalid webhook secret."}, status=403)
         serializer = TelegramWebhookSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        callback = serializer.validated_data.get("callback_query")
-        if not callback:
-            return Response({"detail": "Ignored."})
-
-        actor = _telegram_actor(callback)
-        action, request_id, reason = _parse_callback(callback.get("data", ""))
-        hardware_request = get_object_or_404(HardwareRequest, pk=request_id)
-        with tenant_write(hardware_request.makerspace_id):
-            require_module(hardware_request.makerspace, "telegram")
-            if action == "accept":
-                if not rbac.can(actor, rbac.Action.ACCEPT_REQUEST, hardware_request.makerspace_id):
-                    return Response({"detail": "Permission denied."}, status=403)
-                workflow.accept_request(actor, hardware_request)
-            elif action == "reject":
-                if not rbac.can(actor, rbac.Action.REJECT_REQUEST, hardware_request.makerspace_id):
-                    return Response({"detail": "Permission denied."}, status=403)
-                workflow.reject_request(actor, hardware_request, reason or "Rejected from Telegram.")
-            else:
-                return Response({"detail": "Unsupported action."}, status=400)
-        return Response({"detail": "Processed."})
+        if serializer.validated_data.get("callback_query"):
+            logger.info(
+                "Telegram callback ignored; chat is not an action surface.",
+                extra={"has_callback": True},
+            )
+        return Response({"detail": "Ignored."})
 
 
 class TelegramTestAlertView(APIView):
@@ -114,42 +120,11 @@ class TelegramTestAlertView(APIView):
 
 def _webhook_secret_ok(request):
     # Telegram echoes the secret_token configured at setWebhook time in this header.
-    # Fail closed when unset: `from.id` in the payload is attacker-controllable, so
-    # without this the accept/reject workflow could be driven by anyone.
+    # Fail closed when unset. Nothing behind this endpoint acts any more, but `from.id`
+    # in the payload is attacker-controllable, and an endpoint that quietly stopped
+    # authenticating is exactly what would turn a future callback into a vulnerability.
     secret = settings.TELEGRAM_WEBHOOK_SECRET
     if not secret:
         return False
     provided = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
     return hmac.compare_digest(provided, secret)
-
-
-def _telegram_actor(callback):
-    from rest_framework.exceptions import PermissionDenied
-
-    telegram_id = str((callback.get("from") or {}).get("id") or "")
-    # Guard the empty id: filtering on "" would match every user with a blank
-    # telegram_user_id. Also require active standing so a suspended/restricted or
-    # deactivated staffer can't drive accept/reject from an old inline button.
-    if not telegram_id:
-        raise PermissionDenied("Telegram actor is not linked to a staff user.")
-    actor = User.objects.filter(
-        telegram_user_id=telegram_id,
-        is_active=True,
-        access_status=User.AccessStatus.ACTIVE,
-    ).first()
-    if not actor:
-        raise PermissionDenied("Telegram actor is not linked to an active staff user.")
-    return actor
-
-
-def _parse_callback(data):
-    parts = str(data).split(":", 2)
-    if len(parts) < 2:
-        return None, None, ""
-    action = parts[0]
-    try:
-        request_id = int(parts[1])
-    except ValueError:
-        request_id = None
-    reason = parts[2] if len(parts) > 2 else ""
-    return action, request_id, reason

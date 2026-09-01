@@ -108,13 +108,13 @@ export function WarrantyPanel({
           <table className="min-w-[820px] divide-y divide-line text-left text-sm">
             <thead className="eyebrow bg-bg">
               <tr>
-                <th className="px-3 py-2">Host</th>
-                <th className="px-3 py-2">Vendor</th>
-                <th className="px-3 py-2">Purchased</th>
-                <th className="px-3 py-2">Expires</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2 text-right">Docs</th>
-                <th className="px-3 py-2 text-right">Manage</th>
+                <th scope="col" className="px-3 py-2">Host</th>
+                <th scope="col" className="px-3 py-2">Vendor</th>
+                <th scope="col" className="px-3 py-2">Purchased</th>
+                <th scope="col" className="px-3 py-2">Expires</th>
+                <th scope="col" className="px-3 py-2">Status</th>
+                <th scope="col" className="px-3 py-2 text-right">Docs</th>
+                <th scope="col" className="px-3 py-2 text-right">Manage</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line bg-surface">
@@ -182,7 +182,7 @@ function WarrantyTableSkeleton() {
         <thead className="eyebrow bg-bg">
           <tr>
             {["Host", "Vendor", "Purchased", "Expires", "Status", "Docs", "Manage"].map((label) => (
-              <th key={label} className="px-3 py-2">{label}</th>
+              <th scope="col" key={label} className="px-3 py-2">{label}</th>
             ))}
           </tr>
         </thead>

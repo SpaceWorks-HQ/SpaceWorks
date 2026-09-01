@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { Field } from "../../../components/ui";
 import { downloadStaffFile } from "../../../lib/api";
 import { useDebouncedValue } from "../../../lib/useDebouncedValue";
 import {
@@ -109,18 +110,13 @@ export function Ledger({ makerspace, isSuperadmin }: { makerspace: Makerspace; i
         </div>
 
         <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_140px_auto_auto] md:items-center">
-          <input
-            className="desk-input"
-            placeholder="Search holder, email, item, or box"
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-          />
-          <select className="desk-input" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as LedgerSourceFilter)}>
+          <Field label="Search ledger"><input className="desk-input" placeholder="Search holder, email, item, or box" value={filter} onChange={(event) => setFilter(event.target.value)} /></Field>
+          <Field label="Source"><select className="desk-input" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as LedgerSourceFilter)}>
             <option value="">All sources</option>
             <option value="reviewed">Reviewed</option>
             <option value="self_checkout">Self-checkout</option>
             <option value="direct">Direct</option>
-          </select>
+          </select></Field>
           <label className="inline-flex items-center gap-2 text-sm font-medium text-ink">
             <input type="checkbox" checked={overdueOnly} onChange={(event) => setOverdueOnly(event.target.checked)} />
             Overdue

@@ -38,6 +38,7 @@ export function ChangePasswordGate({ username, onChanged, onSignOut }: ChangePas
         }}
       >
         <input
+          aria-label="Username"
           className="sr-only"
           type="text"
           autoComplete="username"

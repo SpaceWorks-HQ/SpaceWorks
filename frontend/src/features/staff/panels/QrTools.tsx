@@ -2,7 +2,7 @@ import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { Modal } from "../../../components/ui/Modal";
+import { ErrorText, Field, Modal } from "../../../components/ui";
 import { downloadStaffFile, staffRequest } from "../../../lib/api";
 import { Panel, type Makerspace, type Product, useStaffGet } from "./shared";
 import { QrImage } from "./QrImage";
@@ -157,22 +157,22 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
               New batch
             </button>
           </div>
-          <select className="desk-input mt-3 w-full" value={batchId} disabled={batches.isLoading} onChange={(event) => setBatchId(event.target.value)}>
+          <Field label="Print batch"><select className="desk-input mt-3 w-full" value={batchId} disabled={batches.isLoading} onChange={(event) => setBatchId(event.target.value)}>
             <option value="">Select a print batch</option>
             {batches.data?.results?.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-          </select>
-          {batches.isError ? <ErrorText text={batches.error.message} /> : null}
+          </select></Field>
+          {batches.isError ? <ErrorText message={batches.error.message} /> : null}
         </div>
 
         <ActionBox title="Inventory QR">
-          <select className="desk-input w-full" value={productId} disabled={!hasBatch || products.isLoading} onChange={(event) => selectProduct(event.target.value)}>
+          <Field label="Inventory item"><select className="desk-input w-full" value={productId} disabled={!hasBatch || products.isLoading} onChange={(event) => selectProduct(event.target.value)}>
             <option value="">Inventory item</option>
             {productOptions.map((product) => (
               <option key={product.id} value={product.id}>
                 {product.name} | {product.tracking_mode} | {product.available_quantity} available
               </option>
             ))}
-          </select>
+          </select></Field>
           {selectedProduct ? <p className="mt-2 font-mono text-xs uppercase text-muted">{selectedProduct.tracking_mode}</p> : null}
           {selectedIsIndividual && !assetUnitsEnabled ? (
             <p className="mt-2 text-sm text-muted">
@@ -182,27 +182,27 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
           {selectedIsIndividual && assetUnitsEnabled ? (
             <div className="mt-2 grid gap-3">
               <div className="grid gap-2 sm:grid-cols-[110px_1fr_auto]">
-                <input className="desk-input" inputMode="numeric" value={assetCount} onChange={(event) => setAssetCount(event.target.value)} />
-                <input className="desk-input" value={assetPrefix} placeholder="Label prefix" onChange={(event) => setAssetPrefix(event.target.value)} />
+                <Field label="Unit count"><input className="desk-input" inputMode="numeric" value={assetCount} onChange={(event) => setAssetCount(event.target.value)} /></Field>
+                <Field label="Label prefix"><input className="desk-input" value={assetPrefix} onChange={(event) => setAssetPrefix(event.target.value)} /></Field>
                 <button className="desk-button-primary" type="button" disabled={!canGenerateAssets || generateAssets.isPending} onClick={() => generateAssets.mutate()}>
                   {generateAssets.isPending ? "Generating..." : "Generate missing/new unit QRs"}
                 </button>
               </div>
               <div className="grid gap-2 border-t border-line pt-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <select className="desk-input w-full" value={assetId} disabled={!hasBatch || assets.isLoading} onChange={(event) => setAssetId(event.target.value)}>
+                <Field label="Existing unit to reprint"><select className="desk-input w-full" value={assetId} disabled={!hasBatch || assets.isLoading} onChange={(event) => setAssetId(event.target.value)}>
                   <option value="">Existing unit to reprint</option>
                   {assetOptions.map((asset) => (
                     <option key={asset.id} value={asset.id}>
                       {asset.asset_tag} | {asset.status} | {asset.qr_code_id ? `QR #${asset.qr_code_id}` : "no QR linked"}
                     </option>
                   ))}
-                </select>
+                </select></Field>
                 <button className="desk-button-primary" type="button" disabled={!canReprintAsset || reprintAsset.isPending} onClick={() => reprintAsset.mutate()}>
                   {reprintAsset.isPending ? "Adding..." : "Reprint unit QR"}
                 </button>
               </div>
               {assets.isLoading ? <p className="text-sm text-muted">Loading units...</p> : null}
-              {assets.isError ? <ErrorText text={assets.error.message} /> : null}
+              {assets.isError ? <ErrorText message={assets.error.message} /> : null}
               {!assets.isLoading && selectedProduct && !assetOptions.length ? <p className="text-sm text-muted">No individual units yet.</p> : null}
             </div>
           ) : null}
@@ -211,9 +211,9 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
               {addProduct.isPending ? "Adding..." : "Add/reprint item QR"}
             </button>
           ) : null}
-          {addProduct.isError ? <ErrorText text={addProduct.error.message} /> : null}
-          {reprintAsset.isError ? <ErrorText text={reprintAsset.error.message} /> : null}
-          {generateAssets.isError ? <ErrorText text={generateAssets.error.message} /> : null}
+          {addProduct.isError ? <ErrorText message={addProduct.error.message} /> : null}
+          {reprintAsset.isError ? <ErrorText message={reprintAsset.error.message} /> : null}
+          {generateAssets.isError ? <ErrorText message={generateAssets.error.message} /> : null}
         </ActionBox>
 
         <div className="rounded-md border border-line bg-surface p-3">
@@ -227,7 +227,7 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
             </button>
           </div>
           {batch.isLoading ? <p className="mt-3 text-sm text-muted">Loading batch...</p> : null}
-          {batch.isError ? <ErrorText text={batch.error.message} /> : null}
+          {batch.isError ? <ErrorText message={batch.error.message} /> : null}
           {!batch.isLoading && !batchItems.length ? <p className="mt-3 text-sm text-muted">No QR labels in this batch.</p> : null}
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {batchItems.map((item) => (
@@ -238,13 +238,13 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
               </article>
             ))}
           </div>
-          {downloadZip.isError ? <ErrorText text={(downloadZip.error as Error).message} /> : null}
+          {downloadZip.isError ? <ErrorText message={(downloadZip.error as Error).message} /> : null}
         </div>
       </div>
 
       <Modal open={batchModalOpen} onClose={() => setBatchModalOpen(false)} title="Create QR print batch" footer={<ModalActions pending={createBatch.isPending} onCancel={() => setBatchModalOpen(false)} onSubmit={() => createBatch.mutate()} submitLabel="Create batch" disabled={!batchTitle.trim()} />}>
-        <input className="desk-input w-full" value={batchTitle} onChange={(event) => setBatchTitle(event.target.value)} />
-        {createBatch.isError ? <ErrorText text={createBatch.error.message} /> : null}
+        <Field label="Batch title"><input className="desk-input w-full" value={batchTitle} onChange={(event) => setBatchTitle(event.target.value)} /></Field>
+        {createBatch.isError ? <ErrorText message={createBatch.error.message} /> : null}
       </Modal>
     </Panel>
   );
@@ -252,10 +252,6 @@ export function QrTools({ makerspace }: { makerspace: Makerspace }) {
 
 function ActionBox({ children, title }: { children: React.ReactNode; title: string }) {
   return <section className="rounded-md border border-line bg-surface p-3"><h3 className="title-section mb-2">{title}</h3>{children}</section>;
-}
-
-function ErrorText({ text }: { text: string }) {
-  return <p className="mt-2 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{text}</p>;
 }
 
 function ModalActions(props: { pending: boolean; disabled: boolean; submitLabel: string; onCancel: () => void; onSubmit: () => void }) {

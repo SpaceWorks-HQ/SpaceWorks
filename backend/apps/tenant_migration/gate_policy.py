@@ -19,6 +19,12 @@ HTTP_EXEMPTIONS = {
     ),
     "backup-recovery-state": "Deployment recovery must be able to quarantine/recover the deployment.",
     "stripe-connect-webhook": "Connect account events are platform routing state, not one source tenant.",
+    "telegram-webhook": (
+        "Acknowledge-and-discard: the callback route was removed when chat stopped being an "
+        "action surface, so this writes nothing and cannot break quiescence. It must keep "
+        "answering 200 even mid-migration, or Telegram retries an already-registered webhook "
+        "for hours against a tenant that is being moved."
+    ),
     "auth-login": "Global user session state is excluded from tenant quiescence.",
     "auth-refresh": "Global user session state is excluded from tenant quiescence.",
     "auth-logout": "Global user session state is excluded from tenant quiescence.",
@@ -64,6 +70,11 @@ HTTP_ANONYMOUS_EXEMPTIONS = {
     "apps.accounts.views_social.SocialNonceView.post": "Global social-login nonce state.",
     "apps.accounts.views_social.SocialLoginView.post": "Global social identity and session state.",
     "apps.payments.views_connect.StripeConnectWebhookView.post": "Platform Connect routing state.",
+    "apps.integrations.views.TelegramWebhookView.post": (
+        "Writes nothing at all: the callback route was removed when chat stopped being an "
+        "action surface, and the view only acknowledges so an already-registered webhook "
+        "stops retrying. No tenant state is reachable from it to quiesce."
+    ),
 }
 
 

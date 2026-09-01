@@ -1,5 +1,6 @@
-import { cloneElement, useEffect, useRef, useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { Field } from "../../components/ui";
 import { StructuredApiError } from "../../lib/api";
 import { CustomFormFields } from "../forms/CustomFormFields";
 import {
@@ -108,15 +109,5 @@ export function PublicBookingForm({ makerspaceSlug, space }: {
         </button>
       </form>
     </div>
-  );
-}
-
-function Field({ label, error, children }: { label: string; error: string; children: ReactElement<{ "aria-invalid"?: boolean }> }) {
-  return (
-    <label className="grid gap-1 text-ink">
-      <span className="eyebrow">{label}</span>
-      {error ? <span className="text-xs font-normal text-danger">{error}</span> : null}
-      {cloneElement(children, { "aria-invalid": Boolean(error) })}
-    </label>
   );
 }

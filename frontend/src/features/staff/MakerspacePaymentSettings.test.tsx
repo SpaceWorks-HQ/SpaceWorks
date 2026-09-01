@@ -62,7 +62,7 @@ describe("MakerspacePaymentSettings", () => {
   it("keeps self-host raw-only and shows managed Connect onboarding", () => {
     const view = renderSettings(false);
     expect(screen.getByText("Stripe payments")).toBeTruthy();
-    expect(screen.getByPlaceholderText("Stripe secret key")).toBeTruthy();
+    expect(screen.getByLabelText("Stripe secret key")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /connect stripe/i })).toBeNull();
 
     view.unmount();

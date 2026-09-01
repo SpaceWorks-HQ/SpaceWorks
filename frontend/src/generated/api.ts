@@ -545,6 +545,7 @@ export type AdminRequest = {
   "requester_display": string;
   "requester_contact_email": string;
   "requester_contact_phone": string;
+  "requester_contact_verified": boolean;
   "status": string;
   "requested_for": string;
   "rejection_reason": string;
@@ -4777,6 +4778,9 @@ export type RequestItemInput = {
 
 export type RequestSubmit = {
   "website"?: string;
+  "contact_name"?: string;
+  "contact_email"?: string;
+  "contact_phone"?: string;
   "requested_for"?: string;
   "items": Array<RequestItemInput>;
 };

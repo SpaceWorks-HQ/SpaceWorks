@@ -260,3 +260,26 @@ def test_outstanding_anonymous_ceiling_returns_typed_error(settings):
     assert second.status_code == 429
     assert second.data["code"] == "anonymous_request_outstanding_limit"
     assert HardwareRequest.objects.filter(makerspace=space).count() == 1
+
+
+def test_the_refusal_path_is_throttled_not_just_the_accepted_one():
+    """An unopted-in space must not serve an UNBOUNDED 401.
+
+    The throttles used to be selected inside `post()`, which runs *after* the
+    `anonymous_requests_allowed` refusal -- so every makerspace that had not opted in
+    (the default) answered unauthenticated POSTs forever, each one still paying for a
+    makerspace lookup. They are declared in `throttle_classes` now, so DRF charges the
+    IP budget in `initial()`, before the handler and before that refusal.
+    """
+    disabled = _space("anonymous-refusal-throttled", anonymous=False)
+    payload = _payload(_product(disabled))
+
+    statuses = [
+        _submit(disabled, payload, f"refusal-{index}", ip="203.0.113.77").status_code
+        for index in range(3)
+    ]
+
+    # 2/min burst: the first two are refused for being account-less, the third for
+    # exhausting the budget. Before the fix this was [401, 401, 401].
+    assert statuses[:2] == [401, 401]
+    assert statuses[2] == 429

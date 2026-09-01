@@ -91,7 +91,7 @@ describe("ApiClientsPanel scope picker", () => {
     const createCard = screen.getByText("API clients").closest("article")!;
     const create = within(createCard);
 
-    fireEvent.change(create.getByPlaceholderText("Client label"), { target: { value: "Public app" } });
+    fireEvent.change(create.getByLabelText("Client label"), { target: { value: "Public app" } });
     fireEvent.change(create.getByPlaceholderText(/allowed browser origins/i), { target: { value: "https://app.example" } });
     expect(create.getByRole("button", { name: /create api client/i })).toBeDisabled();
     expect(create.getByRole("checkbox", { name: /legacy v1/i })).toBeDisabled();
@@ -161,7 +161,7 @@ describe("ApiClientsPanel scope picker", () => {
     staffRequest.mockRejectedValue(new Error("Create failed"));
     const invalidate = renderPanel();
     const create = within(screen.getByText("API clients").closest("article")!);
-    fireEvent.change(create.getByPlaceholderText("Client label"), { target: { value: "Bad app" } });
+    fireEvent.change(create.getByLabelText("Client label"), { target: { value: "Bad app" } });
     fireEvent.change(create.getByPlaceholderText(/allowed browser origins/i), { target: { value: "https://bad.example" } });
     fireEvent.click(create.getByRole("checkbox", { name: /public read/i }));
     fireEvent.click(create.getByRole("button", { name: /create api client/i }));

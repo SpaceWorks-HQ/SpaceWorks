@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 
-import { Modal } from "../../../components/ui/Modal";
+import { ErrorText, Modal } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import { EvidenceUpload } from "./EvidenceUpload";
-import { BoxCodeField, ErrorText, FormFooter, ShelfLine, submitForm } from "./QueuesModalShared";
+import { BoxCodeField, FormFooter, ShelfLine, submitForm } from "./QueuesModalShared";
 import type { AssetReturnOutcome, FormModalProps, ReturnRequestValues } from "./QueuesModalTypes";
 
 type PendingOutcome = AssetReturnOutcome | "pending";
@@ -157,4 +157,3 @@ function countAssetOutcomes(assets: Array<{ outcome: AssetReturnOutcome }>) {
 function remainingCount(item: NonNullable<FormModalProps<ReturnRequestValues>["row"]>["items"][number]) {
   return item.issued_quantity - item.returned_quantity - item.damaged_quantity - item.missing_quantity;
 }
-
