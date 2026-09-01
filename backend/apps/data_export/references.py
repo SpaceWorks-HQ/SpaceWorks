@@ -13,8 +13,6 @@ from .types import (
 
 class DanglingUserReferenceError(RuntimeError):
     """A raw user ID cannot be bound safely in a portable archive."""
-
-
 def require_raw_user(fidelity, *, model, row_pk, field, user_id, existing_user_ids):
     """Enforce the declared no-dangling contract before a raw ID is remapped."""
     if fidelity is Fidelity.PORTABLE and user_id not in existing_user_ids:
@@ -22,7 +20,6 @@ def require_raw_user(fidelity, *, model, row_pk, field, user_id, existing_user_i
             f"{model} row {row_pk} has dangling {field}={user_id}"
         )
     return user_id
-
 RAW_USER_REFERENCE_FIELDS = frozenset(  # Raw integers are not discoverable as FKs.
     {
         ("encryption.PiiGlobalWriteFence", "actor_id"),
@@ -151,6 +148,8 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("organizations.OrganizationMakerspace", "created_by"),
         ("organizations.OrganizationMembership", "user"),
         ("organizations.OrganizationMembership", "created_by"),
+        ("organizations.OrganizationInvitation", "created_by"),
+        ("organizations.OrganizationInvitation", "redeemed_by"),
         ("payments.Payment", "member"),
         ("payments.Payment", "created_by"),
         ("payments.StripeConnectOAuthState", "initiated_by"),

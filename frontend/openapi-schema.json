@@ -2942,6 +2942,98 @@
                 }
             }
         },
+        "/api/v1/admin/events/{id}/organizers/": {
+            "put": {
+                "operationId": "api_v1_admin_events_organizers_update",
+                "summary": "Replace an event's organization organizers",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventOrganizerReplace"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventOrganizerReplace"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventOrganizerReplace"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EventOrganizerList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid or unavailable organization."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "description": "Concurrent event state conflict."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/events/{id}/publish/": {
             "post": {
                 "operationId": "api_v1_admin_events_publish_create",
@@ -21393,6 +21485,134 @@
                 }
             }
         },
+        "/api/v1/admin/organization-invitations/{id}/": {
+            "delete": {
+                "operationId": "api_v1_admin_organization_invitations_destroy",
+                "summary": "Revoke an unused organization invitation",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin organizations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization authority is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization not found."
+                    },
+                    "400": {
+                        "description": "Invalid organization data."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization state conflict."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/organizations/": {
+            "get": {
+                "operationId": "admin_organizations_list",
+                "summary": "List organizations visible to the actor",
+                "tags": [
+                    "Admin organizations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrganizationList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization authority is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization not found."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/organizations/{organization_id}/analytics/{report_key}": {
             "get": {
                 "operationId": "api_v1_admin_organizations_analytics_retrieve",
@@ -21543,6 +21763,396 @@
                             }
                         },
                         "description": "Organization or report not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/organizations/{id}/": {
+            "get": {
+                "operationId": "admin_organizations_retrieve",
+                "summary": "Retrieve organization governance details",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin organizations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrganizationDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization authority is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization not found."
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "api_v1_admin_organizations_partial_update",
+                "summary": "Update an organization public profile",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin organizations"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedOrganizationProfileUpdate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedOrganizationProfileUpdate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedOrganizationProfileUpdate"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrganizationDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization authority is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization not found."
+                    },
+                    "400": {
+                        "description": "Invalid organization data."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization state conflict."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/organizations/{id}/invitations/": {
+            "get": {
+                "operationId": "api_v1_admin_organizations_invitations_retrieve",
+                "summary": "List organization invitations without bearer tokens",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin organizations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrganizationInvitationList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization authority is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization not found."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_organizations_invitations_create",
+                "summary": "Create a single-use organization invitation",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin organizations"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OrganizationInvitationCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OrganizationInvitationCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OrganizationInvitationCreate"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrganizationInvitationCreated"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization authority is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization not found."
+                    },
+                    "400": {
+                        "description": "Invalid organization data."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization state conflict."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/organizations/{id}/memberships/": {
+            "get": {
+                "operationId": "api_v1_admin_organizations_memberships_retrieve",
+                "summary": "List organization memberships",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin organizations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrganizationMembershipList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization authority is required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Organization not found."
                     }
                 }
             }
@@ -27629,6 +28239,88 @@
                     },
                     "429": {
                         "description": "Request throttled."
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/organization-invitations/redeem/": {
+            "post": {
+                "operationId": "api_v1_auth_organization_invitations_redeem_create",
+                "summary": "Redeem a single-use organization invitation",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OrganizationInvitationRedeem"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OrganizationInvitationRedeem"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OrganizationInvitationRedeem"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrganizationInvitationRedeemed"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Malformed token."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "Invitation not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -34189,6 +34881,80 @@
                 }
             }
         },
+        "/api/v1/public/organizations/{slug}/": {
+            "get": {
+                "operationId": "api_v1_public_organizations_retrieve",
+                "summary": "Retrieve a public organization profile",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Public organizations"
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicOrganization"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "Organization not found."
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded."
+                    }
+                }
+            }
+        },
+        "/api/v1/public/organizations/{slug}/events/": {
+            "get": {
+                "operationId": "api_v1_public_organizations_events_retrieve",
+                "summary": "List public events organized across makerspaces",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Public organizations"
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicOrganizationEventList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "Organization not found."
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded."
+                    }
+                }
+            }
+        },
         "/api/v1/public/requests/{public_token}/status": {
             "get": {
                 "operationId": "api_v1_public_requests_status_retrieve",
@@ -39280,9 +40046,44 @@
                     "results"
                 ]
             },
+            "EventOrganizerList": {
+                "type": "object",
+                "properties": {
+                    "organizers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/EventOrganizerSummary"
+                        },
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "organizers"
+                ]
+            },
+            "EventOrganizerReplace": {
+                "type": "object",
+                "properties": {
+                    "organization_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "maxItems": 50
+                    }
+                },
+                "required": [
+                    "organization_ids"
+                ]
+            },
             "EventOrganizerSummary": {
                 "type": "object",
                 "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "slug": {
                         "type": "string",
                         "readOnly": true,
@@ -39294,6 +40095,7 @@
                     }
                 },
                 "required": [
+                    "id",
                     "name",
                     "slug"
                 ]
@@ -44337,7 +45139,7 @@
                         "$ref": "#/components/schemas/MembershipRequestKindEnum"
                     },
                     "state": {
-                        "$ref": "#/components/schemas/StateEnum"
+                        "$ref": "#/components/schemas/MembershipRequestStateEnum"
                     },
                     "invite_email": {
                         "type": "string",
@@ -44415,6 +45217,16 @@
                     "id",
                     "name"
                 ]
+            },
+            "MembershipRequestStateEnum": {
+                "enum": [
+                    "requested",
+                    "invited",
+                    "active",
+                    "revoked"
+                ],
+                "type": "string",
+                "description": "* `requested` - Requested\n* `invited` - Invited\n* `active` - Active\n* `revoked` - Revoked"
             },
             "MembershipRequestUser": {
                 "type": "object",
@@ -45506,6 +46318,479 @@
                     "username"
                 ]
             },
+            "OrganizationDetail": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "governance_actions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "readOnly": true
+                    },
+                    "granted_actions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "readOnly": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "website": {
+                        "type": "string",
+                        "format": "uri",
+                        "readOnly": true
+                    },
+                    "logo_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "public_profile_enabled": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "legal_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "registration_number": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "contact_email": {
+                        "type": "string",
+                        "format": "email",
+                        "readOnly": true
+                    },
+                    "billing_email": {
+                        "type": "string",
+                        "format": "email",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "billing_email",
+                    "contact_email",
+                    "description",
+                    "governance_actions",
+                    "granted_actions",
+                    "id",
+                    "is_active",
+                    "legal_name",
+                    "logo_url",
+                    "name",
+                    "public_profile_enabled",
+                    "registration_number",
+                    "slug",
+                    "website"
+                ]
+            },
+            "OrganizationEventHost": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "logo_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true,
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "logo_url",
+                    "name",
+                    "slug"
+                ]
+            },
+            "OrganizationInvitation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "organization_id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "governance_actions": {
+                        "readOnly": true
+                    },
+                    "granted_actions": {
+                        "readOnly": true
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "redeemed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "revoked_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_by_id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "redeemed_by_id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "state": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/State31eEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "created_by_id",
+                    "expires_at",
+                    "governance_actions",
+                    "granted_actions",
+                    "id",
+                    "organization_id",
+                    "redeemed_at",
+                    "redeemed_by_id",
+                    "revoked_at",
+                    "state"
+                ]
+            },
+            "OrganizationInvitationCreate": {
+                "type": "object",
+                "properties": {
+                    "governance_actions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "granted_actions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "expires_in_days": {
+                        "type": "integer",
+                        "maximum": 30,
+                        "minimum": 1,
+                        "default": 7
+                    }
+                }
+            },
+            "OrganizationInvitationCreated": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "organization_id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "governance_actions": {
+                        "readOnly": true
+                    },
+                    "granted_actions": {
+                        "readOnly": true
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "redeemed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "revoked_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_by_id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "redeemed_by_id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "state": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/State31eEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "token": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "redeem_path": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "created_by_id",
+                    "expires_at",
+                    "governance_actions",
+                    "granted_actions",
+                    "id",
+                    "organization_id",
+                    "redeem_path",
+                    "redeemed_at",
+                    "redeemed_by_id",
+                    "revoked_at",
+                    "state",
+                    "token"
+                ]
+            },
+            "OrganizationInvitationList": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OrganizationInvitation"
+                        }
+                    }
+                },
+                "required": [
+                    "count",
+                    "next",
+                    "previous",
+                    "results"
+                ]
+            },
+            "OrganizationInvitationRedeem": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "minLength": 20
+                    }
+                },
+                "required": [
+                    "token"
+                ]
+            },
+            "OrganizationInvitationRedeemed": {
+                "type": "object",
+                "properties": {
+                    "user": {
+                        "$ref": "#/components/schemas/AuthUserPayload"
+                    },
+                    "membership": {
+                        "$ref": "#/components/schemas/OrganizationMembership"
+                    }
+                },
+                "required": [
+                    "membership",
+                    "user"
+                ]
+            },
+            "OrganizationList": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OrganizationSummary"
+                        }
+                    }
+                },
+                "required": [
+                    "count",
+                    "next",
+                    "previous",
+                    "results"
+                ]
+            },
+            "OrganizationMembership": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "user_id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "username": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/OrganizationMembershipStatusEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "governance_actions": {
+                        "readOnly": true
+                    },
+                    "granted_actions": {
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "display_name",
+                    "email",
+                    "governance_actions",
+                    "granted_actions",
+                    "id",
+                    "status",
+                    "updated_at",
+                    "user_id",
+                    "username"
+                ]
+            },
+            "OrganizationMembershipList": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OrganizationMembership"
+                        }
+                    }
+                },
+                "required": [
+                    "count",
+                    "next",
+                    "previous",
+                    "results"
+                ]
+            },
+            "OrganizationMembershipStatusEnum": {
+                "enum": [
+                    "active",
+                    "suspended"
+                ],
+                "type": "string",
+                "description": "* `active` - Active\n* `suspended` - Suspended"
+            },
             "OrganizationReportBreakdown": {
                 "type": "object",
                 "properties": {
@@ -45564,6 +46849,45 @@
                 },
                 "required": [
                     "rows"
+                ]
+            },
+            "OrganizationSummary": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "governance_actions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "readOnly": true
+                    },
+                    "granted_actions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "governance_actions",
+                    "granted_actions",
+                    "id",
+                    "name",
+                    "slug"
                 ]
             },
             "OtpResetPasswordConfirm": {
@@ -47538,6 +48862,39 @@
                         "items": {
                             "$ref": "#/components/schemas/NotificationPreferenceChange"
                         }
+                    }
+                }
+            },
+            "PatchedOrganizationProfileUpdate": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "slug": {
+                        "type": "string",
+                        "maxLength": 50,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "website": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uri",
+                                "maxLength": 200
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
+                    },
+                    "public_profile_enabled": {
+                        "type": "boolean"
                     }
                 }
             },
@@ -49537,7 +50894,7 @@
                     "status": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/PublicEventStatusEnum"
+                                "$ref": "#/components/schemas/StatusE90Enum"
                             }
                         ],
                         "readOnly": true
@@ -49598,13 +50955,6 @@
                 ],
                 "type": "string",
                 "description": "* `registered` - registered\n* `waitlisted` - waitlisted"
-            },
-            "PublicEventStatusEnum": {
-                "enum": [
-                    "published"
-                ],
-                "type": "string",
-                "description": "* `published` - published"
             },
             "PublicImageAttachRequest": {
                 "type": "object",
@@ -49817,6 +51167,180 @@
                     "name",
                     "public_code",
                     "slug"
+                ]
+            },
+            "PublicOrganization": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "website": {
+                        "type": "string",
+                        "format": "uri",
+                        "readOnly": true
+                    },
+                    "logo_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "catalogue_links": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "catalogue_links",
+                    "description",
+                    "logo_url",
+                    "name",
+                    "slug",
+                    "website"
+                ]
+            },
+            "PublicOrganizationEvent": {
+                "type": "object",
+                "properties": {
+                    "public_token": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "ends_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "location": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "location_kind": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/LocationKindEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "custom_form": {
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "capacity": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "readOnly": true
+                    },
+                    "availability": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AvailabilityEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/StatusE90Enum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "organizers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/EventOrganizerSummary"
+                        },
+                        "readOnly": true
+                    },
+                    "host": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/OrganizationEventHost"
+                            }
+                        ],
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "availability",
+                    "capacity",
+                    "custom_form",
+                    "description",
+                    "ends_at",
+                    "host",
+                    "image_url",
+                    "location",
+                    "location_kind",
+                    "organizers",
+                    "public_token",
+                    "starts_at",
+                    "status",
+                    "title"
+                ]
+            },
+            "PublicOrganizationEventList": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PublicOrganizationEvent"
+                        }
+                    }
+                },
+                "required": [
+                    "count",
+                    "next",
+                    "previous",
+                    "results"
                 ]
             },
             "PublicPrintStatusLookupPolicyEnum": {
@@ -53328,15 +54852,15 @@
                 "type": "string",
                 "description": "* `requested` - Requested\n* `claimed` - Claimed\n* `preflight` - Preflight\n* `quiesced` - Quiesced\n* `db_restoring` - Database restoring\n* `objects_restoring` - Objects restoring\n* `validating` - Validating\n* `completed` - Completed\n* `restored_quarantined` - Restored quarantined\n* `rolling_back` - Rolling back\n* `failed` - Failed\n* `aborted` - Aborted"
             },
-            "StateEnum": {
+            "State31eEnum": {
                 "enum": [
-                    "requested",
-                    "invited",
                     "active",
-                    "revoked"
+                    "expired",
+                    "revoked",
+                    "redeemed"
                 ],
                 "type": "string",
-                "description": "* `requested` - Requested\n* `invited` - Invited\n* `active` - Active\n* `revoked` - Revoked"
+                "description": "* `active` - active\n* `expired` - expired\n* `revoked` - revoked\n* `redeemed` - redeemed"
             },
             "Status37fEnum": {
                 "enum": [
@@ -53394,6 +54918,13 @@
                 ],
                 "type": "string",
                 "description": "* `pending` - Pending\n* `running` - Running\n* `available` - Available\n* `failed` - Failed"
+            },
+            "StatusE90Enum": {
+                "enum": [
+                    "published"
+                ],
+                "type": "string",
+                "description": "* `published` - published"
             },
             "StatusE94Enum": {
                 "enum": [

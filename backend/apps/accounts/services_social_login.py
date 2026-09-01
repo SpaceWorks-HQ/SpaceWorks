@@ -53,6 +53,10 @@ def assert_staff_authority(user, request):
     if scope is NO_STAFF_ORIGIN_SCOPE:
         if rbac.has_any_org_authority(user):
             return
+        from apps.organizations.governance import has_any_governance
+
+        if has_any_governance(user):
+            return
     elif rbac.effective_actions(user, scope):
         return
     raise SocialResolutionError("staff_access_required", 403)

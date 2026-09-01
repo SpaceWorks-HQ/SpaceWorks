@@ -60,6 +60,11 @@ AUTH_CLAIM_ROUTES = {
     **_refused("auth-forgot-password", ("POST",), "walk-ins have no password credential"),
     **_refused("auth-reset-password", ("POST",), "walk-ins have no password credential"),
     **_refused("auth-member-sign-up", ("POST",), "claim sessions cannot create another account"),
+    **_refused(
+        "auth-organization-invitation-redeem",
+        ("POST",),
+        "claim sessions cannot take on organization authority",
+    ),
     **_refused("auth-email-verification-resend", ("POST",), "walk-ins cannot verify email"),
     **_refused("auth-email-verification-confirm", ("POST",), "walk-ins cannot verify email"),
 }

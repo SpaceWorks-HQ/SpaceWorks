@@ -42,6 +42,7 @@ from apps.accounts.views_oidc_browser import (
     OidcBrowserStartView,
 )
 from apps.accounts.views_claim import ClaimRedemptionView
+from apps.organizations.views_redeem import OrganizationInvitationRedeemView
 
 urlpatterns = [
     path("social/nonce", SocialNonceView.as_view(), name="social-nonce"),
@@ -75,6 +76,11 @@ urlpatterns = [
     path("phone", PhoneUnlinkView.as_view(), name="auth-phone-unlink"),
     path("login", LoginView.as_view(), name="auth-login"),
     path("claim/redeem", ClaimRedemptionView.as_view(), name="auth-claim-redeem"),
+    path(
+        "organization-invitations/redeem/",
+        OrganizationInvitationRedeemView.as_view(),
+        name="auth-organization-invitation-redeem",
+    ),
     path("refresh", RefreshView.as_view(), name="auth-refresh"),
     path("logout", LogoutView.as_view(), name="auth-logout"),
     path("me", MeView.as_view(), name="auth-me"),

@@ -22,6 +22,7 @@ from apps.events.views_admin import (
 )
 from apps.events.views_admin_organized import OrganizedEventListView
 from apps.events.views_admin_image import EventImageView
+from apps.events.views_admin_organizers import EventOrganizerView
 from apps.events.views_checkin import EventCheckInResolveView
 from apps.events.views_collaborators import (
     EventCollaborationInboxView,
@@ -65,6 +66,11 @@ urlpatterns = [
         'events/<int:pk>/registrations/',
         EventRegistrationListView.as_view(),
         name='admin-event-registration-list',
+    ),
+    path(
+        'events/<int:pk>/organizers/',
+        EventOrganizerView.as_view(),
+        name='admin-event-organizers',
     ),
     path(
         'events/<int:pk>/collaborators/',

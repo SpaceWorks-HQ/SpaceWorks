@@ -6,6 +6,8 @@ import { StaffAccessDenied } from "./StaffAccessDenied";
 import { StaffWorkspace } from "./StaffWorkspace";
 import { RecoveryQuarantinePanel } from "./RecoveryQuarantinePanel";
 import { useStaffSession } from "./useStaffSession";
+import { tabFromStaffPath } from "./staffTabs";
+import { useLocation } from "react-router-dom";
 
 function StaffLoading({ message, restoring = false }: { message: string; restoring?: boolean }) {
   const panelClass = restoring
@@ -22,6 +24,7 @@ function StaffLoading({ message, restoring = false }: { message: string; restori
 }
 
 export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
+  const location = useLocation();
   const {
     activeMakerspace,
     chooseMakerspace,
@@ -74,6 +77,7 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
   }
 
   const isSuperadmin = user.is_superuser || user.role === "superadmin";
+  const globalOrganizationRoute = tabFromStaffPath(location.pathname, guestOnly) === "organizations";
 
   if (isSuperadmin && recovery.data?.mode === "quarantined") {
     return (
@@ -115,7 +119,7 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
     return <StaffLoading message="Restoring makerspace..." />;
   }
 
-  if (!singleTenantLocked && isSuperadmin && selected !== null && !activeMakerspace) {
+  if (!singleTenantLocked && isSuperadmin && selected !== null && !activeMakerspace && !globalOrganizationRoute) {
     return (
       <MakerspacePicker
         makerspaces={makerspaces.data ?? []}
@@ -127,7 +131,7 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
     );
   }
 
-  if (!singleTenantLocked && isSuperadmin && selected === null) {
+  if (!singleTenantLocked && isSuperadmin && selected === null && !globalOrganizationRoute) {
     return (
       <MakerspacePicker
         makerspaces={makerspaces.data ?? []}

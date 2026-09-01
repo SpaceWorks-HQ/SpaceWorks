@@ -15,6 +15,7 @@ class Organization(models.Model):
     website = models.URLField(blank=True)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    public_profile_enabled = models.BooleanField(default=False)
     makerspaces = models.ManyToManyField(
         "makerspaces.Makerspace",
         through="OrganizationMakerspace",
@@ -104,6 +105,7 @@ class OrganizationMembership(models.Model):
         related_name="organization_memberships",
     )
     granted_actions = models.JSONField(default=list, blank=True)
+    governance_actions = models.JSONField(default=list, blank=True)
     status = models.CharField(
         max_length=16,
         choices=Status.choices,
@@ -135,3 +137,59 @@ class OrganizationMembership(models.Model):
 
     def __str__(self):
         return f"{self.user} in {self.organization}"
+
+
+class OrganizationInvitation(models.Model):
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="invitations",
+    )
+    token_digest = models.CharField(max_length=64, unique=True, editable=False)
+    granted_actions = models.JSONField(default=list, blank=True)
+    governance_actions = models.JSONField(default=list, blank=True)
+    expires_at = models.DateTimeField()
+    redeemed_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_organization_invitations",
+    )
+    redeemed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="redeemed_organization_invitations",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(redeemed_at__isnull=True, redeemed_by__isnull=True)
+                    | Q(redeemed_at__isnull=False, redeemed_by__isnull=False)
+                ),
+                name="org_invitation_redemption_complete",
+            ),
+            models.CheckConstraint(
+                condition=Q(redeemed_at__isnull=True) | Q(revoked_at__isnull=True),
+                name="org_invitation_not_redeemed_revoked",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("organization", "expires_at"),
+                condition=Q(redeemed_at__isnull=True, revoked_at__isnull=True),
+                name="org_invitation_active_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Invitation to {self.organization}"

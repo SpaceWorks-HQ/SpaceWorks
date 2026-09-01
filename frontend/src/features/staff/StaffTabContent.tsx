@@ -15,6 +15,7 @@ const MachinesPanel = lazy(() => import("./panels/MachinesPanel").then((m) => ({
 const EventsPanel = lazy(() => import("./EventsPanel").then((m) => ({ default: m.EventsPanel })));
 const OrganizedEventsPanel = lazy(() => import("./panels/OrganizedEventsPanel").then((m) => ({ default: m.OrganizedEventsPanel })));
 const OrganizationAnalyticsPanel = lazy(() => import("./panels/OrganizationAnalyticsPanel").then((m) => ({ default: m.OrganizationAnalyticsPanel })));
+const OrganizationsPanel = lazy(() => import("./panels/OrganizationsPanel").then((m) => ({ default: m.OrganizationsPanel })));
 const BookingsPanel = lazy(() => import("./BookingsPanel").then((m) => ({ default: m.BookingsPanel })));
 const MembersPanel = lazy(() => import("./MembersPanel").then((m) => ({ default: m.MembersPanel })));
 const QrTools = lazy(() => import("./panels/QrTools").then((m) => ({ default: m.QrTools })));
@@ -99,6 +100,9 @@ export function StaffTabContent({
   // Machines needs this for links; targetless organization panels need it as a mount gate.
   singleTenantLocked?: boolean;
 }) {
+  if (activeTab === "organizations") {
+    return <StaffPanelErrorBoundary resetKey="organizations"><Suspense fallback={<Skeleton className="h-40 w-full" />}><OrganizationsPanel /></Suspense></StaffPanelErrorBoundary>;
+  }
   if (!activeMakerspace) {
     return <Panel title="No makerspace">Assign a makerspace to this account.</Panel>;
   }

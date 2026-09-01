@@ -1,7 +1,7 @@
 const ALL_TABS = [
   "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "organized", "bookings", "members", "tobuy", "transfers",
   "stocktake", "containers", "ledger", "reports", "accountability", "warranty", "bulk", "qr", "scanner", "api", "settings", "emailtemplates", "users", "platform", "audit",
-  "email-logs", "payments", "organization-analytics", "modules", "exports", "backups", "migration",
+  "email-logs", "payments", "organizations", "organization-analytics", "modules", "exports", "backups", "migration",
 ] as const;
 
 export const STAFF_TAB_KEYS: readonly string[] = ALL_TABS;
@@ -30,6 +30,7 @@ export const TAB_LABELS: Record<string, string> = {
   tobuy: "To Buy",
   reports: "Reports",
   "organization-analytics": "Organization analytics",
+  organizations: "Organizations",
   accountability: "Accountability",
   warranty: "Warranties",
   audit: "Audit log",
@@ -54,6 +55,7 @@ export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
   { label: "Bookings", tabs: ["bookings"] },
   { label: "Members", tabs: ["members"] },
   { label: "Insights", tabs: ["reports", "organization-analytics", "accountability", "warranty", "audit"] },
+  { label: "Organizations", tabs: ["organizations"] },
   { label: "Admin", tabs: ["users", "settings", "emailtemplates", "email-logs", "api", "exports", "backups", "migration", "modules", "platform"] },
 ];
 
@@ -88,6 +90,7 @@ export function getStaffAccess(
   const canUseToBuy = has("edit_inventory") || has("manage_printing") || has("manage_machines") || has("manage_makerspace");
   const canChooseToBuyKind = has("manage_makerspace");
   const canSeeDashboard = has("view_inventory") || has("manage_printing") || has("manage_machines") || has("manage_makerspace");
+  const governanceOnly = !isSuperadmin && actions.length === 0 && !singleTenantLocked;
   // Mirrors rbac.HANDOUT_ACTIONS / _HANDOUT_MUTATIONS. `collect_service_request` belongs
   // here so a front-desk role that also hands over finished machine jobs still reads as
   // handover-only and keeps the narrow tab set, rather than being shown the whole console.
@@ -99,7 +102,7 @@ export function getStaffAccess(
   const canCollectServiceRequests = has("collect_service_request") || canManageMachines;
   const printingOnly = canSeePrinting && !canEditInventory && !canManageMakerspace;
   const baseTabs = handoutOnly ? (["requests", "direct", "handover"] as const) : ALL_TABS;
-  const allowedTabs: readonly string[] = baseTabs.filter((tabName) => {
+  const allowedTabs: readonly string[] = governanceOnly ? ["organizations"] : baseTabs.filter((tabName) => {
     if (tabName === "dashboard") return !handoutOnly && (isSuperadmin || canSeeDashboard);
     // The inbox has no machine provenance and its read state is makerspace-wide, so the
     // backend withholds it from a per-type maintainer entirely. Omit the tab rather than
@@ -143,6 +146,7 @@ export function getStaffAccess(
     // Like organized events, organization analytics is targetless and cross-makerspace.
     // A hard-scoped tenant origin rejects it before application authorization runs.
     if (tabName === "organization-analytics") return !isSuperadmin && !singleTenantLocked;
+    if (tabName === "organizations") return !singleTenantLocked;
     if (tabName === "bookings") return canManageBookings;
     if (tabName === "members") return canManageMakerspace;
     if (tabName === "payments") return canManageMakerspace;

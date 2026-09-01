@@ -57,6 +57,8 @@ _ROUTE_DEFINITIONS = (
         TARGET_TENANT_SLUG, False, True,
     ),
     ("public-event-list", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-organization-detail", _READ, PUBLIC_READ_SCOPES, TARGET_GLOBAL, True, False),
+    ("public-organization-events", _READ, PUBLIC_READ_SCOPES, TARGET_GLOBAL, True, False),
     ("public-event-register", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
     ("public-bookable-space-list", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
     ("public-space-availability", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),

@@ -18,6 +18,7 @@ export const openApiTags = [
   "Admin maintenance",
   "Admin makerspaces",
   "Admin memberships",
+  "Admin organizations",
   "Admin payment settings",
   "Admin requests",
   "Admin roles",
@@ -57,6 +58,7 @@ export const openApiTags = [
   "Public inventory",
   "Public machine service",
   "Public machines",
+  "Public organizations",
   "Public requests",
   "QR assets",
   "QR print batches",
@@ -108,6 +110,7 @@ export const openApiPaths = [
   "/api/v1/admin/events/{id}/complete/",
   "/api/v1/admin/events/{id}/eligible-members/",
   "/api/v1/admin/events/{id}/image",
+  "/api/v1/admin/events/{id}/organizers/",
   "/api/v1/admin/events/{id}/publish/",
   "/api/v1/admin/events/{id}/registrations/",
   "/api/v1/admin/evidence/{id}",
@@ -301,6 +304,11 @@ export const openApiPaths = [
   "/api/v1/admin/memberships/{id}/unverify",
   "/api/v1/admin/memberships/{id}/verify",
   "/api/v1/admin/memberships/{id}/waiver/witness",
+  "/api/v1/admin/organization-invitations/{id}/",
+  "/api/v1/admin/organizations/",
+  "/api/v1/admin/organizations/{id}/",
+  "/api/v1/admin/organizations/{id}/invitations/",
+  "/api/v1/admin/organizations/{id}/memberships/",
   "/api/v1/admin/organizations/{organization_id}/analytics/{report_key}",
   "/api/v1/admin/organized-events/",
   "/api/v1/admin/platform/backup-settings",
@@ -381,6 +389,7 @@ export const openApiPaths = [
   "/api/v1/auth/logout",
   "/api/v1/auth/me",
   "/api/v1/auth/member-sign-up",
+  "/api/v1/auth/organization-invitations/redeem/",
   "/api/v1/auth/phone",
   "/api/v1/auth/phone/link/confirm",
   "/api/v1/auth/phone/link/start",
@@ -446,6 +455,8 @@ export const openApiPaths = [
   "/api/v1/procurement/to-buy/{id}/receipts/presign",
   "/api/v1/public/machine-service/3d-printer/requests/{public_token}/status",
   "/api/v1/public/makerspaces/",
+  "/api/v1/public/organizations/{slug}/",
+  "/api/v1/public/organizations/{slug}/events/",
   "/api/v1/public/requests/{public_token}/status",
   "/api/v1/public/{makerspace_slug}/events/",
   "/api/v1/public/{makerspace_slug}/events/{public_token}/register/",
@@ -1645,7 +1656,16 @@ export type EventListResponse = {
   "results": Array<EventAdmin>;
 };
 
+export type EventOrganizerList = {
+  "organizers": Array<EventOrganizerSummary>;
+};
+
+export type EventOrganizerReplace = {
+  "organization_ids": Array<number>;
+};
+
 export type EventOrganizerSummary = {
+  "id": number;
   "slug": string;
   "name": string;
 };
@@ -2837,7 +2857,7 @@ export type MembershipPolicyEnum = "request" | "open" | "invite_only";
 export type MembershipRequest = {
   "id": number;
   "kind": MembershipRequestKindEnum;
-  "state": StateEnum;
+  "state": MembershipRequestStateEnum;
   "invite_email"?: string;
   "user": MembershipRequestUser | null;
   "assigned_role": MembershipRequestRole | null;
@@ -2856,6 +2876,8 @@ export type MembershipRequestRole = {
   "id": number;
   "name": string;
 };
+
+export type MembershipRequestStateEnum = "requested" | "invited" | "active" | "revoked";
 
 export type MembershipRequestUser = {
   "id": number;
@@ -3158,6 +3180,110 @@ export type OperatorCandidate = {
   "display_name": string;
 };
 
+export type OrganizationDetail = {
+  "id": number;
+  "slug": string;
+  "name": string;
+  "governance_actions": Array<string>;
+  "granted_actions": Array<string>;
+  "description": string;
+  "website": string;
+  "logo_url": string | null;
+  "public_profile_enabled": boolean;
+  "is_active": boolean;
+  "legal_name": string;
+  "registration_number": string;
+  "contact_email": string;
+  "billing_email": string;
+};
+
+export type OrganizationEventHost = {
+  "slug": string;
+  "name": string;
+  "logo_url": string | null;
+};
+
+export type OrganizationInvitation = {
+  "id": number;
+  "organization_id": number;
+  "governance_actions": unknown;
+  "granted_actions": unknown;
+  "expires_at": string;
+  "redeemed_at": string | null;
+  "revoked_at": string | null;
+  "created_by_id": number | null;
+  "redeemed_by_id": number | null;
+  "created_at": string;
+  "state": State31eEnum;
+};
+
+export type OrganizationInvitationCreate = {
+  "governance_actions"?: Array<string>;
+  "granted_actions"?: Array<string>;
+  "expires_in_days"?: number;
+};
+
+export type OrganizationInvitationCreated = {
+  "id": number;
+  "organization_id": number;
+  "governance_actions": unknown;
+  "granted_actions": unknown;
+  "expires_at": string;
+  "redeemed_at": string | null;
+  "revoked_at": string | null;
+  "created_by_id": number | null;
+  "redeemed_by_id": number | null;
+  "created_at": string;
+  "state": State31eEnum;
+  "token": string;
+  "redeem_path": string;
+};
+
+export type OrganizationInvitationList = {
+  "count": number;
+  "next": string | null;
+  "previous": string | null;
+  "results": Array<OrganizationInvitation>;
+};
+
+export type OrganizationInvitationRedeem = {
+  "token": string;
+};
+
+export type OrganizationInvitationRedeemed = {
+  "user": AuthUserPayload;
+  "membership": OrganizationMembership;
+};
+
+export type OrganizationList = {
+  "count": number;
+  "next": string | null;
+  "previous": string | null;
+  "results": Array<OrganizationSummary>;
+};
+
+export type OrganizationMembership = {
+  "id": number;
+  "user_id": number;
+  "username": string;
+  "display_name": string;
+  "email": string;
+  "status": OrganizationMembershipStatusEnum;
+  "governance_actions": unknown;
+  "granted_actions": unknown;
+  "created_at": string;
+  "updated_at": string;
+};
+
+export type OrganizationMembershipList = {
+  "count": number;
+  "next": string | null;
+  "previous": string | null;
+  "results": Array<OrganizationMembership>;
+};
+
+export type OrganizationMembershipStatusEnum = "active" | "suspended";
+
 export type OrganizationReportBreakdown = {
   "rows": Array<{
   [key: string]: unknown;
@@ -3176,6 +3302,14 @@ export type OrganizationReportRows = {
   "rows": Array<{
   [key: string]: unknown;
 }>;
+};
+
+export type OrganizationSummary = {
+  "id": number;
+  "slug": string;
+  "name": string;
+  "governance_actions": Array<string>;
+  "granted_actions": Array<string>;
 };
 
 export type OtpResetPasswordConfirm = {
@@ -3675,6 +3809,14 @@ export type PatchedNotificationRecipientsPatch = {
 export type PatchedNotificationRulesPatch = {
   "changes"?: Array<NotificationRuleChange>;
   "preferences"?: Array<NotificationPreferenceChange>;
+};
+
+export type PatchedOrganizationProfileUpdate = {
+  "name"?: string;
+  "slug"?: string;
+  "description"?: string;
+  "website"?: string;
+  "public_profile_enabled"?: boolean;
 };
 
 export type PatchedPlatformBackupSettings = {
@@ -4178,7 +4320,7 @@ export type PublicEvent = {
   "capacity": number;
   "availability": AvailabilityEnum;
   "image_url": string | null;
-  "status": PublicEventStatusEnum;
+  "status": StatusE90Enum;
   "organizers": Array<EventOrganizerSummary>;
 };
 
@@ -4191,8 +4333,6 @@ export type PublicEventRegistrationResponse = {
 };
 
 export type PublicEventRegistrationResponseStatusEnum = "registered" | "waitlisted";
-
-export type PublicEventStatusEnum = "published";
 
 export type PublicImageAttachRequest = {
   "object_key": string;
@@ -4250,6 +4390,41 @@ export type PublicMakerspace = {
   "map_url": string;
   "logo_url": string | null;
   "cover_image_url": string | null;
+};
+
+export type PublicOrganization = {
+  "slug": string;
+  "name": string;
+  "description": string;
+  "website": string;
+  "logo_url": string | null;
+  "catalogue_links": {
+  [key: string]: string;
+};
+};
+
+export type PublicOrganizationEvent = {
+  "public_token": string;
+  "title": string;
+  "description": string;
+  "starts_at": string;
+  "ends_at": string;
+  "location": string;
+  "location_kind": LocationKindEnum;
+  "custom_form": unknown | null;
+  "capacity": number;
+  "availability": AvailabilityEnum;
+  "image_url": string | null;
+  "status": StatusE90Enum;
+  "organizers": Array<EventOrganizerSummary>;
+  "host": OrganizationEventHost;
+};
+
+export type PublicOrganizationEventList = {
+  "count": number;
+  "next": string | null;
+  "previous": string | null;
+  "results": Array<PublicOrganizationEvent>;
 };
 
 export type PublicPrinterPool = {
@@ -5158,7 +5333,7 @@ export type StaffPaymentSummary = {
 
 export type StageEnum = "requested" | "claimed" | "preflight" | "quiesced" | "db_restoring" | "objects_restoring" | "validating" | "completed" | "restored_quarantined" | "rolling_back" | "failed" | "aborted";
 
-export type StateEnum = "requested" | "invited" | "active" | "revoked";
+export type State31eEnum = "active" | "expired" | "revoked" | "redeemed";
 
 export type Status37fEnum = "active" | "revoked";
 
@@ -5171,6 +5346,8 @@ export type StatusA39Enum = "pending" | "verified" | "failed";
 export type StatusB9dEnum = "invited" | "accepted" | "declined";
 
 export type StatusE1dEnum = "pending" | "running" | "available" | "failed";
+
+export type StatusE90Enum = "published";
 
 export type StatusE94Enum = "pending" | "approved" | "rejected";
 

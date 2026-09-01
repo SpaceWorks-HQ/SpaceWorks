@@ -238,6 +238,22 @@ AUDIT_META_REFERENCES.update(
 )
 AUDIT_META_REFERENCES.update(
     _reference(
+        S, "organizations.Organization",
+        ("event.organizers_updated", "old_organization_ids"),
+        ("event.organizers_updated", "organization_ids"),
+        ("organization.invitation_created", "organization_id"),
+        ("organization.invitation_redeemed", "organization_id"),
+        ("organization.invitation_revoked", "organization_id"),
+    )
+)
+AUDIT_META_REFERENCES.update(
+    _reference(
+        S, "organizations.OrganizationMembership",
+        ("organization.invitation_redeemed", "membership_id"),
+    )
+)
+AUDIT_META_REFERENCES.update(
+    _reference(
         S, "makerspaces.Makerspace",
         ("event.host_waiver_accepted", "via_makerspace_id"),
         ("inventory.asset_moved_makerspace", "new_makerspace_id"),
