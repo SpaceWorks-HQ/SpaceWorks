@@ -48,6 +48,11 @@ SCHEDULED_TASKS = (
         1,
     ),
     ("return-reminders", "apps.hardware_requests.tasks.send_return_reminders_task", 60),
+    (
+        "evidence-object-expiry",
+        "apps.evidence.tasks.sweep_evidence_retention_task",
+        360,
+    ),
     ("purge-auth-challenges", "apps.accounts.tasks.purge_auth_challenges_task", 24 * 60),
     # Beat runs this at a fixed hour; the beat-less runner has no wall-clock schedule, so
     # the cadence is expressed as the interval instead. Daily either way.

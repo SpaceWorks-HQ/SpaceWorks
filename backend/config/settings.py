@@ -328,6 +328,13 @@ STORAGES = {
 EVIDENCE_URL_TTL_SECONDS = env.int("EVIDENCE_URL_TTL_SECONDS", default=300)
 EVIDENCE_MAX_BYTES = env.int("EVIDENCE_MAX_BYTES", default=10485760)
 EVIDENCE_ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"]
+EVIDENCE_OBJECT_RETENTION_DAYS = env.int(
+    "EVIDENCE_OBJECT_RETENTION_DAYS", default=365
+)
+EVIDENCE_OBJECT_EXPIRY_ENABLED = env.bool(
+    "EVIDENCE_OBJECT_EXPIRY_ENABLED", default=False
+)
+EVIDENCE_RETENTION_BATCH_SIZE = env.int("EVIDENCE_RETENTION_BATCH_SIZE", default=100)
 WARRANTY_DOC_MAX_BYTES = env.int("WARRANTY_DOC_MAX_BYTES", default=10485760)
 WARRANTY_DOC_ALLOWED_MIME = env.list(
     "WARRANTY_DOC_ALLOWED_MIME",
@@ -568,6 +575,10 @@ CELERY_BEAT_SCHEDULE = {
     "return-reminders": {
         "task": "apps.hardware_requests.tasks.send_return_reminders_task",
         "schedule": crontab(minute=0),
+    },
+    "evidence-object-expiry": {
+        "task": "apps.evidence.tasks.sweep_evidence_retention_task",
+        "schedule": crontab(minute=10, hour="*/6"),
     },
     # Spent email/phone verification challenges hold an address or a number and nothing
     # deleted them. Off-peak because it is a pure delete nobody is waiting on.

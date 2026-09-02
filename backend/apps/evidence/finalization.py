@@ -83,6 +83,13 @@ def _claim(evidence_id):
         state, _ = EvidenceUploadFinalization.objects.select_for_update().get_or_create(
             evidence_id=evidence_id
         )
+        if not lock_evidence_for_attachment(evidence_id, photo_already_locked=True):
+            from apps.evidence.storage import EvidenceObjectValidationError
+
+            raise EvidenceObjectValidationError(
+                "expired",
+                "Evidence is expiring or has expired under the retention policy.",
+            )
         if state.status == EvidenceUploadFinalization.Status.FINALIZED:
             return None, _result(state)
         if state.status == EvidenceUploadFinalization.Status.PROMOTING:
@@ -94,6 +101,21 @@ def _claim(evidence_id):
         state.claim_token = token
         state.save(update_fields=["status", "claim_token", "updated_at"])
         return token, None
+
+
+def lock_evidence_for_attachment(evidence_id, *, photo_already_locked=False):
+    """Use the retention lock order and reject evidence already claimed for expiry."""
+    from apps.evidence.models import EvidenceObjectRetentionState
+
+    if not photo_already_locked:
+        EvidencePhoto.objects.select_for_update().get(pk=evidence_id)
+        EvidenceUploadFinalization.objects.select_for_update().filter(
+            evidence_id=evidence_id
+        ).first()
+    state = EvidenceObjectRetentionState.objects.select_for_update().filter(
+        evidence_id=evidence_id
+    ).first()
+    return state is None
 
 
 def _recover_or_wait(evidence, max_bytes):

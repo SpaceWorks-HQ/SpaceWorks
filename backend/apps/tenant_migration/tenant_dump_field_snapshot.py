@@ -74,6 +74,8 @@ FIRST_PARTY_FIELD_NAMES = {
     'audit.AuditBatch': frozenset('batch_seq created_at id leaf_count makerspace merkle_root prev_batch_root signature signer_fingerprint'.split()),
     'audit.AuditBatchLeaf': frozenset('audit_log batch id leaf_position'.split()),
     'evidence.EvidencePhoto': frozenset('content_type created_at evidence_type id makerspace object_key size_bytes uploaded_by'.split()),
+    'evidence.EvidenceObjectRetentionState': frozenset('claim_token claimed_at evidence expired_size_bytes last_error object_expired_at status updated_at'.split()),
+    'evidence.EvidenceRetentionPolicy': frozenset('makerspace object_retention_days updated_at'.split()),
     'evidence.EvidenceUploadFinalization': frozenset('claim_token content_type evidence quota_charged size_bytes status updated_at'.split()),
     'warranty.Warranty': frozenset('asset created_at id machine makerspace purchased_on updated_at vendor_contact vendor_name warranty_expires_on'.split()),
     'warranty.WarrantyDocument': frozenset('content_type created_at id object_key original_filename size_bytes uploaded_by warranty'.split()),

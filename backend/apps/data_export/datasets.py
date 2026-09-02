@@ -28,6 +28,14 @@ DATASET_SPECS = {
     "events.EventCollaborator": ("events/collaborators.csv", P(("event__makerspace", "makerspace"))),
     "events.EventRegistration": ("events/registrations.csv", P(("event__makerspace",))),
     "evidence.EvidencePhoto": ("evidence/photos.csv", P(("makerspace",))),
+    "evidence.EvidenceObjectRetentionState": (
+        "evidence/object_retention.csv",
+        P(("evidence__makerspace",)),
+    ),
+    "evidence.EvidenceRetentionPolicy": (
+        "evidence/retention_policy.csv",
+        P(("makerspace",)),
+    ),
     "hardware_requests.HardwareRequest": ("lending/requests.csv", P(("makerspace",))),
     "hardware_requests.HardwareRequestItem": ("lending/request_items.csv", P(("request__makerspace",))),
     "hardware_requests.HardwareRequestItemAsset": ("lending/request_item_assets.csv", P(("request_item__request__makerspace",))),
@@ -123,6 +131,10 @@ def _columns(fidelity, label):
 
 
 DATASETS = {}
+_MODEL_KEYSETS = {
+    "evidence.EvidenceObjectRetentionState": ("evidence_id",),
+    "evidence.EvidenceRetentionPolicy": ("makerspace_id",),
+}
 for _fidelity in Fidelity:
     for _label, (_path, _predicate) in DATASET_SPECS.items():
         _columns_for_dataset, _omissions = _columns(_fidelity, _label)
@@ -131,7 +143,7 @@ for _fidelity in Fidelity:
             path=_path,
             model=_label,
             predicate=_predicate,
-            keyset=("id",),
+            keyset=_MODEL_KEYSETS.get(_label, ("id",)),
             columns=_columns_for_dataset,
             explicit_omissions=_omissions,
         )

@@ -55,6 +55,18 @@ def test_password_reset_drain_is_registered_in_both_schedulers():
     ) in SCHEDULED_TASKS
 
 
+def test_evidence_expiry_uses_the_same_six_hour_task_in_both_schedulers():
+    from django.conf import settings
+
+    task = "apps.evidence.tasks.sweep_evidence_retention_task"
+    entry = settings.CELERY_BEAT_SCHEDULE["evidence-object-expiry"]
+
+    assert entry["task"] == task
+    assert entry["schedule"]._orig_minute == 10
+    assert entry["schedule"]._orig_hour == "*/6"
+    assert ("evidence-object-expiry", task, 360) in SCHEDULED_TASKS
+
+
 def test_running_records_a_row_per_task():
     call_command("run_scheduled_tasks", stdout=StringIO())
 

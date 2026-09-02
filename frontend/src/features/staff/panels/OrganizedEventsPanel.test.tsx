@@ -32,8 +32,8 @@ const event: EventAdmin = {
   updated_at: "2026-08-20T10:00:00Z",
   registration_counts: { registered: 4, attended: 2, waitlisted: 1, cancelled: 3 },
   organizers: [
-    { name: "Repair Collective", slug: "repair-collective" },
-    { name: "Open Tools", slug: "open-tools" },
+    { id: 1, name: "Repair Collective", slug: "repair-collective" },
+    { id: 2, name: "Open Tools", slug: "open-tools" },
   ],
 };
 

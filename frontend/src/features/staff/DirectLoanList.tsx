@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { staffRequest } from "../../lib/api";
+import { evidenceErrorText } from "./evidenceUi";
 import { Panel } from "./StaffPanels";
 
 export type DirectLoan = {
@@ -43,7 +44,7 @@ export function DirectLoanList({
     } catch (error) {
       setEvidenceError({
         loanId,
-        message: error instanceof Error ? error.message : "Could not load evidence photo.",
+        message: evidenceErrorText(error),
       });
     }
   };

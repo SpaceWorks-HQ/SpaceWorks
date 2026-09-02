@@ -43,6 +43,13 @@ def verify_import_object_ownership(job, *, rows=None):
         (TenantImportObject.BucketKind.PUBLIC_IMAGE, key)
         for key in collect_public_image_keys(target, include_coordination=False)
     }
+    expired_private = {
+        (TenantImportObject.BucketKind.PRIVATE, key)
+        for key in target.evidence_photos.filter(
+            object_retention_state__status="expired"
+        ).values_list("object_key", flat=True)
+    }
+    owned -= expired_private
     journal = {(row.bucket_kind, row.target_key) for row in rows}
     unowned = journal - owned
     missing = owned - journal

@@ -50,6 +50,9 @@ ALWAYS_OMITTED = {
     ("events.EventRegistration", "checkin_token"): "Source check-in bearer token.",
     ("events.EventRegistration", "email_exact_hash"): "Deployment-local blind index.",
     ("events.EventRegistration", "email_hash_generation"): "Deployment-local key generation.",
+    ("evidence.EvidenceObjectRetentionState", "claim_token"): (
+        "Transient object-expiry claim credential."
+    ),
     ("hardware_requests.HardwareRequest", "public_token"): "Source bearer/status token.",
     ("integrations.NotificationDestination", "webhook_url"): "Encrypted webhook credential.",
     ("machines.Machine", "camera_feed_url"): "May embed camera credentials.",

@@ -12,6 +12,7 @@ import EventCheckInScanner from "./EventCheckInScanner";
 import { EventCollaborators } from "./EventCollaborators";
 import { EventRegisterMember } from "./EventRegisterMember";
 import { EventOrganizers } from "./EventOrganizers";
+import { EvidenceRetentionPanel } from "./EvidenceRetentionPanel";
 import { ImageUploader } from "./ImageUploader";
 import { Panel } from "./panels/shared";
 import { PaymentReconcileActions } from "./PaymentReconcileActions";
@@ -114,6 +115,7 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
   return (
     <Panel title="Events">
       <p className="mb-4 text-sm text-muted">Create events, publish registrations, and record attendance.</p>
+      <EvidenceRetentionPanel makerspaceId={makerspaceId} />
       <CollaborationInbox makerspaceId={makerspaceId} />
       <form className="mb-5 rounded-xl border border-line bg-bg p-4" onSubmit={submit}>
         <h3 className="title-section mb-3">Create draft event</h3>

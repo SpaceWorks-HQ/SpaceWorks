@@ -11,7 +11,6 @@ from django.conf import settings
 from apps.object_storage import delete_all_versions
 
 logger = logging.getLogger(__name__)
-
 # Shared by every uploader: apps.*.storage.staging_key() is f"staging/{final_key}".
 STAGING_PREFIX = "staging/"
 
@@ -27,7 +26,6 @@ class BackupStorageError(RuntimeError):
 
 class BackupVerificationError(BackupStorageError):
     pass
-
 
 def client(*, public_endpoint=False):
     endpoint = settings.AWS_S3_PUBLIC_ENDPOINT_URL if public_endpoint else settings.AWS_S3_ENDPOINT_URL
@@ -188,6 +186,52 @@ def download_object(bucket, key, destination, *, versioned):
         )
         return {**staged, "key": key}
 
+
+def assert_object_absent(bucket, key):
+    """Fail closed if a terminal retention tombstone still has any stored bytes."""
+    s3 = client()
+    try:
+        page = s3.list_object_versions(Bucket=bucket, Prefix=key)
+        while True:
+            for group in (page.get("Versions", ()), page.get("DeleteMarkers", ())):
+                if any(item.get("Key") == key for item in group):
+                    raise BackupStorageError(
+                        f"Expired storage object {key} still has retained versions."
+                    )
+            if not page.get("IsTruncated"):
+                break
+            params = {
+                "Bucket": bucket,
+                "Prefix": key,
+                "KeyMarker": page.get("NextKeyMarker"),
+                "VersionIdMarker": page.get("NextVersionIdMarker"),
+            }
+            page = s3.list_object_versions(
+                **{name: value for name, value in params.items() if value is not None}
+            )
+    except ClientError as exc:
+        raise BackupStorageError(
+            f"Expired storage object {key} could not be inspected."
+        ) from exc
+    except BotoCoreError as exc:
+        raise BackupStorageError(
+            f"Expired storage object {key} could not be inspected."
+        ) from exc
+    try:
+        s3.head_object(Bucket=bucket, Key=key)
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code")
+        status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+        if code in {"404", "NoSuchKey", "NotFound"} or status == 404:
+            return
+        raise BackupStorageError(
+            f"Expired storage object {key} could not be inspected."
+        ) from exc
+    except BotoCoreError as exc:
+        raise BackupStorageError(
+            f"Expired storage object {key} could not be inspected."
+        ) from exc
+    raise BackupStorageError(f"Expired storage object {key} is still present.")
 
 def _download_object(bucket, key, destination, *, versioned):
     s3 = client()

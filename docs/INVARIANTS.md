@@ -300,6 +300,31 @@ URLs. Upload validation: strict magic-sniff for PDF/image; the private maker/CAD
 (`apps/maker_file_formats.py`) accepts STL/OBJ/3MF/STEP/etc. on ext+MIME (+signature for 3MF/STEP);
 public-image + evidence buckets stay strictly image-only.
 
+**Evidence object retention bounds live bytes without weakening evidence-row immutability.** Evidence is
+the deliberate exception to the generic POST wording above: both POST and PUT presigns target
+`staging/<final-key>`, and an attaching workflow promotes to the never-client-writable final key. The
+deployment default is 365 days; a makerspace override must be between 30 and 3650 days. The global
+`EVIDENCE_OBJECT_EXPIRY_ENABLED` switch ships false, and policy GET/PATCH plus preview remain available
+while it is false. The six-hour sweep is bounded per tenant, enters one source-gate fan-out boundary per
+makerspace, and refuses to run outside deployment recovery state `NORMAL`.
+
+Expiry locks only long enough to claim in the order `EvidencePhoto`, `EvidenceUploadFinalization`, then
+`EvidenceObjectRetentionState`; all object-store HEAD/delete work happens outside that transaction. A
+claim makes the photo unavailable to finalization and every issue/return attachment path. Success means
+that **all versions and delete markers** of both the final key and its staging key are confirmed deleted;
+an unsupported version-listing API or any transport/auth failure is retryable failure, not best-effort
+success. Only a confirmed two-key deletion may write terminal `expired`, release managed quota once and
+append `evidence.object_expired`. `recompute_storage` excludes only terminal expired rows. The immutable
+`EvidencePhoto` row, its inbound request/return/accountability relationships and the PostgreSQL
+immutability triggers remain unchanged; object expiry does not authorize row pruning.
+
+An expired evidence read returns 410 from the terminal state without contacting object storage. Backup,
+restore and tenant migration treat `expiring` as a refusal and `expired` as a signed, state-backed
+intentional-absence tombstone: both final and staging keys must be absent, while the row and retention
+state remain in the database image. Live missing evidence is still an error. An archive captured before
+expiry can contain and later resurrect the old photo bytes, so this mechanism bounds the live store; it
+is not legal erasure from historical archives.
+
 **Reports/analytics extend one registry** (never a parallel system). `apps/operations/report_registry.py`
 holds canonical `ReportDefinition`s (module-gated, `report_scope.eligible_makerspaces` excludes archived
 + reports-disabled + superadmin-hidden). FabLab domain builders (`reports_events`/`_bookings`/
@@ -1907,7 +1932,10 @@ may have only one canonical component candidate: a main/slice or slice/slice con
 archive; first ship never duplicates bytes and has no shared envelope. Historical audit object strings and
 recursive archive pointers are explicit coordination references, not generic JSON discoveries. Each
 component then proves reference/manifest equality, binds immutable captured size and SHA-256 facts, and
-re-reads every packaged byte against them before the readable main can be projected.
+re-reads every packaged byte against them before the readable main can be projected. The only no-byte
+member is an evidence-retention tombstone backed by a terminal `EvidenceObjectRetentionState`: it remains
+part of exact reference/manifest equality, records the expiry timestamp and prior size, and is rejected if
+either final or staging bytes (including historical versions) still exist.
 
 `MakerspaceEncryptionKey` is tenant-owned for Lane E projection even though manager data export omits it.
 Its source-broker row must not survive in the readable main. Inside the same immutable snapshot, W8 freezes
@@ -2231,6 +2259,9 @@ client from `backup/postgres_client.py` creates the custom `--no-owner --no-acl`
 restores it and repeats catalog, FK-closure, open-fence, cache and raw mapped-value digest checks before the
 candidate is atomically exposed. Object members are copied only from immutable capture staging and carry an
 opaque member path plus original key, version ID, size, content type and SHA-256; ETag is never a digest.
+Terminal evidence expiry instead carries a typed tombstone with no member path or bytes, an empty digest,
+the terminal timestamp and the recorded expired size; import allocates/remaps a collision-safe final key
+but creates no staged or promoted object journal row.
 
 **Lane D D3 freezes custody and source bytes as one immutable capture lineage.** The request transaction
 reuses `backup/custody.py::with_makerspace_custody_lock`: makerspace first, every archive-recipient row in

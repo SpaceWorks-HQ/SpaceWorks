@@ -4,7 +4,7 @@ from django.db import IntegrityError, transaction
 from apps.audit import services as audit
 from apps.boxes.models import Box, BoxScan
 from apps.evidence import storage
-from apps.evidence.finalization import charge_storage_once
+from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.evidence.models import EvidencePhoto
 from apps.hardware_requests import notifications
 from apps.hardware_requests.models import (
@@ -52,7 +52,8 @@ def return_items(actor, request, evidence_id, remark, box_code, resolutions):
         # return. ReturnEvent.evidence (OneToOne) already blocks reviewed-request
         # reuse; this shared row lock serializes against the direct-loan return
         # path, which has no DB constraint spanning the two tables.
-        EvidencePhoto.objects.select_for_update().get(pk=evidence.pk)
+        if not lock_evidence_for_attachment(evidence.pk):
+            raise ReturnValidationError("Evidence has expired under the retention policy.")
         if PublicToolLoan.objects.filter(return_evidence=evidence).exists():
             raise ReturnValidationError("Return evidence has already been used.")
         charge_storage_once(evidence, finalized.size)

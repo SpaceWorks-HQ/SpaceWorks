@@ -81,7 +81,8 @@ def derive_tenant_dump(capture_id, *, database=None):
         object_entries = tuple(
             item
             for item in capture.object_ledger
-            if item.get("source_key") not in projection.excluded_object_keys
+            if item.get("source_key", item.get("key"))
+            not in projection.excluded_object_keys
         )
         objects = package_staged_objects(root, bundle, object_entries)
         key_envelope = None

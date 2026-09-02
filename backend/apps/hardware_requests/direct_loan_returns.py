@@ -5,7 +5,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.boxes.models import QrCode, QrScanEvent
 from apps.evidence import storage
-from apps.evidence.finalization import charge_storage_once
+from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.evidence.models import EvidencePhoto
 from apps.hardware_requests.direct_loan_audit import record_item_logs
 from apps.hardware_requests.models import PublicToolLoan, ReturnEvent
@@ -58,7 +58,8 @@ def return_direct_loan(
         )
         if locked.status != PublicToolLoan.Status.CHECKED_OUT:
             raise InvalidTransition("Direct loan is not currently checked out.")
-        EvidencePhoto.objects.select_for_update().get(pk=evidence.pk)
+        if not lock_evidence_for_attachment(evidence.pk):
+            raise ReturnValidationError("Evidence has expired under the retention policy.")
         if (
             PublicToolLoan.objects.filter(return_evidence=evidence).exists()
             or ReturnEvent.objects.filter(evidence=evidence).exists()

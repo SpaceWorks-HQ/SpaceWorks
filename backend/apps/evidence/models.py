@@ -61,3 +61,9 @@ class EvidenceUploadFinalization(models.Model):
     content_type = models.CharField(max_length=128, blank=True)
     quota_charged = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+from apps.evidence.retention_models import (  # noqa: E402,F401
+    EvidenceObjectRetentionState,
+    EvidenceRetentionPolicy,
+)

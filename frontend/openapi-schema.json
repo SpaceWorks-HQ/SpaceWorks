@@ -18336,6 +18336,192 @@
                 }
             }
         },
+        "/api/v1/admin/makerspaces/{makerspace_id}/evidence-retention": {
+            "get": {
+                "operationId": "api_v1_admin_makerspaces_evidence_retention_retrieve",
+                "summary": "Get a makerspace evidence object-retention policy",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Evidence retention"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EvidenceRetentionPolicy"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "Active manage-events permission is required."
+                    },
+                    "404": {
+                        "description": "Makerspace was not found in the actor's scope."
+                    },
+                    "503": {
+                        "description": "Deployment recovery is active."
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "api_v1_admin_makerspaces_evidence_retention_partial_update",
+                "summary": "Set or clear a makerspace evidence object-retention override",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Evidence retention"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedEvidenceRetentionPatch"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedEvidenceRetentionPatch"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedEvidenceRetentionPatch"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EvidenceRetentionPolicy"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Retention days are invalid."
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "Active manage-events permission is required."
+                    },
+                    "404": {
+                        "description": "Makerspace was not found in the actor's scope."
+                    },
+                    "503": {
+                        "description": "Deployment recovery is active."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspaces/{makerspace_id}/evidence-retention/preview": {
+            "post": {
+                "operationId": "api_v1_admin_makerspaces_evidence_retention_preview_create",
+                "summary": "Preview evidence objects eligible for expiry",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Evidence retention"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EvidenceRetentionPreviewRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EvidenceRetentionPreviewRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EvidenceRetentionPreviewRequest"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EvidenceRetentionPreviewResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Preview limit is invalid."
+                    },
+                    "401": {
+                        "description": "Authentication is required."
+                    },
+                    "403": {
+                        "description": "Active manage-events permission is required."
+                    },
+                    "404": {
+                        "description": "Makerspace was not found in the actor's scope."
+                    },
+                    "503": {
+                        "description": "Deployment recovery is active."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/consumable-pools": {
             "get": {
                 "operationId": "api_v1_admin_makerspaces_machine_service_consumable_pools_list",
@@ -40866,6 +41052,78 @@
                     "url"
                 ]
             },
+            "EvidenceRetentionPolicy": {
+                "type": "object",
+                "properties": {
+                    "makerspace_id": {
+                        "type": "integer"
+                    },
+                    "platform_default_days": {
+                        "type": "integer"
+                    },
+                    "override_days": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "effective_days": {
+                        "type": "integer"
+                    },
+                    "object_expiry_enabled": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "effective_days",
+                    "makerspace_id",
+                    "object_expiry_enabled",
+                    "override_days",
+                    "platform_default_days"
+                ]
+            },
+            "EvidenceRetentionPreviewRequest": {
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "maximum": 1000,
+                        "minimum": 1,
+                        "default": 100
+                    }
+                }
+            },
+            "EvidenceRetentionPreviewResponse": {
+                "type": "object",
+                "properties": {
+                    "as_of": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "policy_days": {
+                        "type": "integer"
+                    },
+                    "cutoff": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "object_candidates": {
+                        "type": "integer"
+                    },
+                    "candidate_bytes": {
+                        "type": "integer"
+                    },
+                    "has_more": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "as_of",
+                    "candidate_bytes",
+                    "cutoff",
+                    "has_more",
+                    "object_candidates",
+                    "policy_days"
+                ]
+            },
             "EvidenceUrlRequest": {
                 "type": "object",
                 "properties": {
@@ -48737,6 +48995,17 @@
                     "is_public": {
                         "type": "boolean",
                         "default": false
+                    }
+                }
+            },
+            "PatchedEvidenceRetentionPatch": {
+                "type": "object",
+                "properties": {
+                    "object_retention_days": {
+                        "type": "integer",
+                        "maximum": 3650,
+                        "minimum": 30,
+                        "nullable": true
                     }
                 }
             },
