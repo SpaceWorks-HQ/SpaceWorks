@@ -28,6 +28,7 @@ export type StaffEvent = {
   registration_cutoff_lead_minutes: number | null;
   effective_registration_cutoff_at: string | null;
   registration_open: boolean;
+  offline_checkin_enabled: boolean;
   is_public: boolean;
   image_url: string | null;
   status: EventStatus;
@@ -101,6 +102,8 @@ export const eventKeys = {
   detail: (eventId: number) => ["event", eventId] as const,
   registrations: (eventId: number) => ["event", eventId, "registrations"] as const,
   badgeTemplate: (eventId: number) => ["event", eventId, "badge-template"] as const,
+  checkinStation: (eventId: number) => ["event", eventId, "check-in", "station"] as const,
+  checkinHistory: (eventId: number) => ["event", eventId, "check-in", "history"] as const,
 };
 
 export function eligibleMemberKey(eventId: number) {

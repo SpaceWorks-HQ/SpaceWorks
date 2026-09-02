@@ -47,12 +47,23 @@ POLICY_OVERRIDE_ALLOWLIST = {
     "apps.events.throttles.CollaborativeRegistrationThrottle": {
         "_tier", "allow_request", "get_cache_key"
     },
+    # Public feedback reads and submissions take separate budgets. The scope is chosen in
+    # `allow_request` rather than a view-level `get_throttles()` override precisely BECAUSE
+    # this guard forbids a lifecycle-hook override on a pre-auth route; the override set is
+    # therefore identical to its ClientTierRateThrottle base.
+    "apps.events.throttles.PublicFeedbackRateThrottle": {
+        "_tier", "allow_request", "get_cache_key"
+    },
     # The account-less borrow-request budgets. Both override `get_cache_key` only, to
     # return None for an authenticated caller: they sit in `throttle_classes` beside the
     # member throttle, and DRF applies every class on every request, so without the skip a
     # makerspace behind one NAT would rate-limit its own signed-in members by egress IP.
     "apps.hardware_requests.throttles.AnonymousRequestIpBurstThrottle": {"get_cache_key"},
     "apps.hardware_requests.throttles.AnonymousRequestIpHourThrottle": {"get_cache_key"},
+    # The subscribable calendar feed is fetched by a calendar client with only its
+    # bearer token, so the budget keys on that token rather than the caller.
+    "apps.events.throttles.EventCalendarFeedTokenThrottle": {"get_cache_key"},
+    "apps.events.throttles.EventCalendarFeedIpThrottle": {"get_cache_key"},
     "apps.machines.permissions.IsActiveRequester": {"has_permission"},
     "apps.accounts.views_device.IsDeviceAccessToken": {"has_permission"},
     "apps.makerspaces.throttles.MemberImagePresignThrottle": {"get_cache_key"},

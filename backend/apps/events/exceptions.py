@@ -1,3 +1,6 @@
+from rest_framework.exceptions import APIException
+
+
 class EventInvalidTransition(Exception):
     pass
 
@@ -30,3 +33,13 @@ class DuplicateRegistration(Exception):
     def __init__(self, *args, fresh_status=None):
         super().__init__(*args)
         self.fresh_status = fresh_status
+
+
+class DuplicateCheckInOperation(Exception):
+    pass
+
+
+class CheckInLeaseExpired(APIException):
+    status_code = 410
+    default_detail = "The check-in lease synchronization deadline passed."
+    default_code = "checkin_lease_expired"

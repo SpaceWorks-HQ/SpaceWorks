@@ -4,6 +4,9 @@ from .audit_references_targets import (
     AuditReference,
     AuditReferenceDisposition,
 )
+from .audit_references_meta_source_local import SOURCE_LOCAL_AUDIT_EDGES
+
+_SOURCE_LOCAL_EDGES = SOURCE_LOCAL_AUDIT_EDGES
 
 
 def _reference(disposition, model, *edges):
@@ -61,6 +64,11 @@ AUDIT_META_REFERENCES = {
         ("event.registration_cancelled", "registration_id"),
         ("event.registration_attended", "registration_id"),
     ),
+    **_reference(
+        R,
+        "events.EventCheckInEvent",
+        ("event.registration_attended", "check_in_event_id"),
+    ),
     # Removing an organizer names the event it was removed from. REMAP, matching the
     # sibling above: an Event is tenant-owned and travels with the export, so the id is
     # remappable. The created/updated siblings pick their action with a conditional, so
@@ -80,6 +88,11 @@ AUDIT_META_REFERENCES = {
         ("event.series_occurrence_removed", "event_id"),
         ("event.series_updated", "created_ids"),
         ("event.series_updated", "removed_ids"),
+        ("event.station_pin_rotated", "event_id"),
+        ("event.station_pin_revealed", "event_id"),
+        ("event.station_disabled", "event_id"),
+        ("event.station_pin_failed", "event_id"),
+        ("event.station_session_started", "event_id"),
     ),
     **_reference(
         R, "events.EventSeries",
@@ -169,73 +182,7 @@ AUDIT_META_REFERENCES = {
     **_reference(R, "operations.StocktakeLine", ("stocktake.line_counted", "line_id")),
 }
 
-_SOURCE_LOCAL_EDGES = {
-    ("audit.signing_key_rotation_aborted", "rotation_id"),
-    ("audit.signing_key_rotation_started", "rotation_id"),
-    ("audit.signing_key_rotation_completed", "rotation_id"),
-    ("audit.signing_key_rotation_failed", "rotation_id"),
-    ("encryption.write_fence_closed", "operation_id"),
-    ("encryption.write_fence_opened", "operation_id"),
-    ("payment.checkout_created", "subject_id"),
-    ("payment.created", "subject_id"),
-    ("payment.double_paid_refund_required", "event_id"),
-    ("payment.paid_after_terminal", "event_id"),
-    ("payment.paid_online", "event_id"),
-    ("payments.connect_authorization_revoked", "connect_account_id"),
-    ("payments.connect_previous_authorization_revoked", "connect_account_id"),
-    ("procurement.moved_to_printing", "result_id"),
-    ("qr.rebound", "new_target_id"),
-    ("tenant_migration.pairing_approved", "migration_id"),
-    ("tenant_migration.pairing_approved", "source_deployment_id"),
-    ("tenant_migration.pairing_approved", "target_deployment_id"),
-    ("tenant_migration.source_migrated_out", "migration_id"),
-    ("tenant_migration.source_migrated_out", "receipt_id"),
-    ("tenant_migration.source_migrated_out", "source_deployment_id"),
-    ("tenant_migration.source_migrated_out", "target_deployment_id"),
-    ("tenant_migration.target_activated", "migration_id"),
-    ("tenant_migration.target_activated", "receipt_id"),
-    ("tenant_migration.target_activated", "source_deployment_id"),
-    ("tenant_migration.target_activated", "target_deployment_id"),
-    ("tenant_migration.target_aborted", "migration_id"),
-    ("tenant_migration.target_aborted", "receipt_id"),
-    ("tenant_migration.target_aborted", "source_deployment_id"),
-    ("tenant_migration.target_aborted", "target_deployment_id"),
-    ("tenant_migration.source_reopened", "migration_id"),
-    ("tenant_migration.source_reopened", "receipt_id"),
-    ("tenant_migration.source_reopened", "source_deployment_id"),
-    ("tenant_migration.source_reopened", "target_deployment_id"),
-    ("tenant_migration.source_gate_closed", "owner_id"),
-    ("tenant_migration.source_gate_capture_released", "owner_id"),
-    ("tenant_migration.source_gate_recovered", "owner_id"),
-    ("tenant_migration.source_gate_reopened", "owner_id"),
-    ("tenant_migration.source_gate_recovery_command", "makerspace_id"),
-    ("tenant_migration.source_gate_recovery_command", "owner_id"),
-    ("tenant_migration.source_gate_migrated_out", "owner_id"),
-    ("tenant_migration.source_quiesced", "owner_id"),
-    ("tenant_migration.tenant_dump_captured", "gate_owner_id"),
-    ("tenant_migration.tenant_dump_derived", "artifact_id"),
-    ("tenant_migration.tenant_dump_derived", "capture_id"),
-    ("tenant_migration.objects_staged", "job_id"),
-    ("tenant_migration.objects_promoted", "job_id"),
-    ("tenant_migration.objects_rolled_back", "job_id"),
-    ("tenant_migration.export_requested", "export_id"),
-    ("tenant_migration.export_read", "export_id"),
-    ("data_export.download_url_issued", "export_id"),
-    ("data_export.downloaded", "export_id"),
-    ("tenant_migration.import_created", "import_id"),
-    ("tenant_migration.import_read", "import_id"),
-    ("tenant_migration.import_run_requested", "import_id"),
-    ("tenant_migration.identity_decisions_submitted", "import_id"),
-    ("tenant_migration.identity_decisions_read", "import_id"),
-    ("tenant_migration.import_completed", "import_id"),
-    ("tenant_migration.verification_read", "import_id"),
-    # Lane E compound-artifact identifiers. Deployment-operational: the artifact
-    # and component ledger rows never travel, so there is no PK to remap and the
-    # live binding must not be asserted on a target.
-    ("backup.archive_exclusion_activated", "artifact_id"),
-    ("backup.archive_exclusion_activated", "capture_id"),
-}
-AUDIT_META_REFERENCES.update(_reference(S, None, *_SOURCE_LOCAL_EDGES))
+AUDIT_META_REFERENCES.update(_reference(S, None, *SOURCE_LOCAL_AUDIT_EDGES))
 AUDIT_META_REFERENCES.update(
     _reference(
         S, "backup.RestoreOperation",

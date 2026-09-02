@@ -15,7 +15,6 @@ Two rules every collector here obeys:
   which the management command imports at load time; importing app models at module
   scope would drag half the app graph into every `manage.py` invocation.
 """
-
 from apps.makerspaces.module_purge_collectors_machine_service import machine_service_delete
 from apps.makerspaces.module_purge_collectors_single_model import (
     _counts,
@@ -35,6 +34,7 @@ def events_delete(makerspace, cursor):
         Event,
         EventAttendanceCertificate,
         EventCheckInEvent,
+        EventCheckInStationCredential,
         EventCollaborator,
         EventFeedbackResponse,
         EventFeedbackSurvey,
@@ -64,6 +64,9 @@ def events_delete(makerspace, cursor):
     provenance_cleared = EventRegistration.objects.filter(
         registered_via_makerspace=makerspace,
     ).exclude(event__makerspace=makerspace).update(registered_via_makerspace=None)
+    station_credentials, station_credential_labels = _delete(
+        EventCheckInStationCredential.objects.filter(event__makerspace=makerspace)
+    )
     certificates, certificate_labels = _delete(
         EventAttendanceCertificate.objects.filter(
             registration__event__makerspace=makerspace
@@ -76,7 +79,7 @@ def events_delete(makerspace, cursor):
         EventFeedbackSurvey.objects.filter(event__makerspace=makerspace)
     )
     checkins, checkin_labels = _delete(
-        EventCheckInEvent.objects.filter(registration__event__makerspace=makerspace)
+        EventCheckInEvent.objects.filter(makerspace=makerspace)
     )
     registrations, registration_labels = _delete(
         EventRegistration.objects.filter(event__makerspace=makerspace)
@@ -88,7 +91,7 @@ def events_delete(makerspace, cursor):
             collaboration_labels | certificate_labels | response_labels
             | survey_labels | checkin_labels | registration_labels | event_labels
             | projected_collaboration_labels | series_collaboration_labels | series_labels
-            | feed_labels
+            | feed_labels | station_credential_labels
         ),
         event_series_collaboration_projections=projected_collaborations,
         event_series_collaborations=series_collaborations,
@@ -97,6 +100,7 @@ def events_delete(makerspace, cursor):
         event_feedback_responses=responses,
         event_feedback_surveys=surveys,
         event_check_in_events=checkins,
+        event_check_in_station_credentials=station_credentials,
         event_registration_provenance_cleared=provenance_cleared,
         event_registrations=registrations,
         events=events,

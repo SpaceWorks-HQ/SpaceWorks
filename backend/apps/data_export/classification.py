@@ -22,7 +22,7 @@ EXPORTED_MODEL_FIELDS = {
     "events.Event": "id public_token calendar_uid calendar_sequence calendar_updated_at timezone_name badge_template makerspace series series_occurrence_key series_revision series_override_fields title description starts_at ends_at location location_kind custom_form capacity payment_amount registration_requires_approval registration_cutoff_at registration_cutoff_lead_minutes is_public image_key status created_by created_at updated_at",
     "events.EventCollaborator": "id event makerspace status invited_by responded_by created_at responded_at source_series_collaboration",
     "events.EventRegistration": "id event checkin_token name email phone member registered_via_makerspace payment_via_makerspace host_waiver host_waiver_accepted_at host_waiver_version_accepted email_exact_hash email_hash_generation custom_answers status calendar_sequence calendar_updated_at created_at",
-    "events.EventCheckInEvent": "id registration source attended_at recorded_by created_at",
+    "events.EventCheckInEvent": "id makerspace event registration operation_id source attended_at recorded_at actor session_id station_version",
     "events.EventFeedbackSurvey": "id event title thank_you_text questions is_open certificate_enabled answered_question_ids opened_at closed_at created_at updated_at",
     "events.EventFeedbackResponse": "id survey registration answers_snapshot certificate_requested created_at",
     "events.EventAttendanceCertificate": "id response registration serial revision recipient_name event_title event_starts_at event_ends_at issuer_name object_key content_type size_bytes sha256 status issued_at rendered_at revoked_at revoked_by revocation_reason",
@@ -108,6 +108,9 @@ GLOBAL_MODELS = {
 }
 
 OMITTED_MODELS = {
+    "events.EventCheckInStationCredential": (
+        "Live event-station authentication authority; a restored tenant must rotate a new PIN."
+    ),
     "events.MemberCalendarFeed": (
         "Deployment-local bearer credential over member registration history; restored tenants must reissue it."
     ),

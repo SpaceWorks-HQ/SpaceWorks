@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { Skeleton, StatusBadge } from "../../components/ui";
-import EventCheckInScanner from "./EventCheckInScanner";
+import { EventCheckInOperator } from "./EventCheckInOperator";
 import { EventBadgeActions } from "./EventBadgeActions";
 import { EventRegisterMember } from "./EventRegisterMember";
 import { PaymentReconcileActions } from "./PaymentReconcileActions";
@@ -16,12 +16,12 @@ import {
 } from "./eventsApi";
 import { eventErrorText } from "./eventUi";
 
-export function EventRegistrationRoster({ event, makerspaceId }: {
+export function EventRegistrationRoster({ event, makerspaceId, offlineCheckInEnabled }: {
   event: StaffEvent;
   makerspaceId: number;
+  offlineCheckInEnabled: boolean;
 }) {
   const [page, setPage] = useState(1);
-  const [scanning, setScanning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [includeAttended, setIncludeAttended] = useState(false);
   const rows = useEventRegistrations(event.id, page);
@@ -52,10 +52,7 @@ export function EventRegistrationRoster({ event, makerspaceId }: {
     {rows.error ? <p className="text-sm text-danger">{eventErrorText(rows.error)}</p> : null}
     {rows.data && !rows.data.results.length ? <p className="text-sm text-muted">No registrations yet.</p> : null}
     <EventRegisterMember makerspaceId={makerspaceId} eventId={event.id} customForm={event.custom_form} disabled={event.status !== "published" || !event.registration_open} />
-    {checkable ? (scanning
-      ? <EventCheckInScanner makerspaceId={makerspaceId} eventId={event.id} onClose={() => setScanning(false)} />
-      : <button className="desk-button mt-3" type="button" onClick={() => setScanning(true)}>Scan check-in</button>
-    ) : null}
+    {checkable ? <EventCheckInOperator makerspaceId={makerspaceId} eventId={event.id} offlineEnabled={offlineCheckInEnabled} /> : null}
     {rows.data?.results.length ? <EventBadgeActions event={event} makerspaceId={makerspaceId} selectedIds={selectedIds} includeAttended={includeAttended} onIncludeAttended={(value) => { setIncludeAttended(value); if (!value) setSelectedIds([]); }} /> : null}
     {rows.data?.results.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Event registration contact details and badge selection</caption><thead><tr><th className="eyebrow p-2">Badge</th><th className="eyebrow p-2">Name</th><th className="eyebrow p-2">Contact</th><th className="eyebrow p-2">Status</th><th className="eyebrow p-2">Action</th></tr></thead><tbody>
       {rows.data.results.map((row) => {

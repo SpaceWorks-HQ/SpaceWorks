@@ -71,6 +71,7 @@ def _delete_object_graph(makerspace):
         Event,
         EventAttendanceCertificate,
         EventCheckInEvent,
+        EventCheckInStationCredential,
         EventCollaborator,
         EventFeedbackResponse,
         EventFeedbackSurvey,
@@ -210,9 +211,10 @@ def _delete_object_graph(makerspace):
             survey__event__makerspace=makerspace
         ).delete()
         EventFeedbackSurvey.objects.filter(event__makerspace=makerspace).delete()
-        EventCheckInEvent.objects.filter(
-            registration__event__makerspace=makerspace
+        EventCheckInStationCredential.objects.filter(
+            event__makerspace=makerspace
         ).delete()
+        EventCheckInEvent.objects.filter(makerspace=makerspace).delete()
         # Registrations otherwise survive until the final makerspace cascade. Delete
         # hosted rows explicitly so any PROTECT FK they gain cannot fail that cascade;
         # collaborator provenance must not remove another host's registration.

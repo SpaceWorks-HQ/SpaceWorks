@@ -14,6 +14,7 @@ import { PublicPrintRequestPage } from "./features/printing/PublicPrintRequestPa
 import { KioskPage, ScannerPage, SuperadminPage } from "./features/staff/PlatformApps";
 import { ResetPasswordPage } from "./features/staff/ResetPasswordPage";
 import { StaffApp } from "./features/staff/StaffApp";
+import { EventCheckInStationPage } from "./features/events/EventCheckInStationPage";
 import { PublicStatsPage } from "./features/stats/PublicStatsPage";
 
 function NotFoundPage() {
@@ -30,6 +31,7 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
     <Route path="/checkout" element={<PublicSelfCheckoutPage />} />
     <Route path="/events" element={<PublicEventsPage />} />
     <Route path="/events/:publicToken/feedback" element={<PublicEventFeedbackPage />} />
+    <Route path="/event-check-in/:stationToken" element={<EventCheckInStationPage />} />
     <Route path="/machines" element={<PublicMachinesPage />} />
     <Route path="/bookings" element={<PublicBookingsPage />} />
     <Route path="/print" element={<PublicPrintRequestPage />} />
@@ -49,6 +51,7 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
     <Route path="/m/:slug/checkout" element={<PublicSelfCheckoutPage />} />
     <Route path="/m/:slug/events" element={<PublicEventsPage />} />
     <Route path="/m/:slug/events/:publicToken/feedback" element={<PublicEventFeedbackPage />} />
+    <Route path="/m/:slug/event-check-in/:stationToken" element={<EventCheckInStationPage />} />
     <Route path="/m/:slug/machines" element={<PublicMachinesPage />} />
     <Route path="/m/:slug/bookings" element={<PublicBookingsPage />} />
     <Route path="/m/:slug/admin/*" element={<StaffApp />} />

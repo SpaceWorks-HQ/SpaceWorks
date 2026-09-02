@@ -1,6 +1,7 @@
 """Relational and semantic reference registries for the global User closure."""
 from .fields import FIELDS
 from .models import EXPORTED_MODELS
+from .references_json_fields import JSON_REFERENCE_FIELDS
 from .types import (
     Fidelity,
     Omitted,
@@ -65,7 +66,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("events.EventCollaborator", "responded_by"),
         ("events.EventOrganizer", "created_by"),
         ("events.EventRegistration", "member"),
-        ("events.EventCheckInEvent", "recorded_by"),
+        ("events.EventCheckInEvent", "actor"),
         ("events.EventAttendanceCertificate", "revoked_by"),
         ("evidence.EvidencePhoto", "uploaded_by"),
         ("hardware_requests.HardwareRequest", "requester"),
@@ -202,48 +203,7 @@ POLYMORPHIC_PAIRS = frozenset(
     }
 )
 
-JSON_FIELDS = frozenset(
-    {
-        ("apiclients.ApiClient", "scopes"),
-        ("apiclients.ApiClient", "allowed_origins"),
-        ("apiclients.ApiKeyRequest", "allowed_origins"),
-        ("audit.AuditLog", "meta"),
-        # Phase 7 imported-actor provenance. Each holds actor_username,
-        # actor_display, source_user_id and recorded_at.
-        ("makerspaces.MakerspaceMembership", "witnessed_actor_snapshot"),
-        ("makerspaces.MakerspaceMembership", "verified_actor_snapshot"),
-        ("makerspaces.MakerspaceMembership", "activated_actor_snapshot"),
-        ("makerspaces.MakerspaceMembership", "revoked_actor_snapshot"),
-        ("bookings.BookableSpace", "custom_form"),
-        ("bookings.Booking", "custom_answers"),
-        ("events.Event", "custom_form"),
-        ("events.Event", "badge_template"),
-        ("events.Event", "series_override_fields"),
-        ("events.EventSeries", "custom_form"),
-        ("events.EventRegistration", "custom_answers"),
-        ("events.EventFeedbackSurvey", "questions"),
-        ("events.EventFeedbackSurvey", "answered_question_ids"),
-        ("hardware_requests.PublicToolLoan", "asset_ids"),
-        ("hardware_requests.PublicToolLoan", "qr_ids"),
-        ("machines.Machine", "service_file_policy"),
-        ("machines.Machine", "type_payload"),
-        ("machines.MachineServiceRequest", "capability_payload"),
-        ("machines.MachineType", "capability_config"),
-        ("makerspaces.Makerspace", "cors_allowed_origins"),
-        ("makerspaces.Makerspace", "enabled_modules"),
-        ("makerspaces.Makerspace", "enabled_features"),
-        ("makerspaces.Makerspace", "resource_limit_overrides"),
-        ("makerspaces.Makerspace", "theme_config"),
-        ("makerspaces.Makerspace", "branding_config"),
-        ("makerspaces.Makerspace", "presence_preset_minutes"),
-        ("makerspaces.MakerspaceRole", "granted_actions"),
-        ("makerspaces.MemberProfile", "interests"),
-        ("makerspaces.MemberProfile", "languages"),
-        ("makerspaces.MemberProfile", "education"),
-        ("makerspaces.MemberProject", "links"),
-        ("tenant_migration.ExternalTenantReference", "snapshot"),
-    }
-)
+JSON_FIELDS = JSON_REFERENCE_FIELDS
 
 SEMANTIC_REFERENCES = {}
 for _fidelity in Fidelity:

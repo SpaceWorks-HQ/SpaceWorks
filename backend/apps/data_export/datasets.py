@@ -29,7 +29,7 @@ DATASET_SPECS = {
     "events.EventSeriesCollaborator": ("events/series_collaborators.csv", P(("series__makerspace", "makerspace"))),
     "events.EventCollaborator": ("events/collaborators.csv", P(("event__makerspace", "makerspace"))),
     "events.EventRegistration": ("events/registrations.csv", P(("event__makerspace",))),
-    "events.EventCheckInEvent": ("events/check_in_history.csv", P(("registration__event__makerspace",))),
+    "events.EventCheckInEvent": ("events/check_in_history.csv", P(("makerspace",))),
     "events.EventFeedbackSurvey": ("events/feedback_surveys.csv", P(("event__makerspace",))),
     "events.EventFeedbackResponse": ("events/feedback_responses.csv", P(("survey__event__makerspace",))),
     "events.EventAttendanceCertificate": ("events/attendance_certificates.csv", P(("registration__event__makerspace",))),

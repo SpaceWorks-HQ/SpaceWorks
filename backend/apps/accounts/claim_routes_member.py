@@ -119,6 +119,11 @@ MEMBER_CLAIM_ROUTES = {
     ("member-event-calendar-feed", "GET"): Refused(
         "claim sessions cannot manage durable bearer credentials"
     ),
+    # DRF derives HEAD from GET, so the pair must be declared together or the route is
+    # half-classified and the matrix guard fails.
+    ("member-event-calendar-feed", "HEAD"): Refused(
+        "claim sessions cannot manage durable bearer credentials"
+    ),
     ("member-event-calendar-feed", "POST"): Refused(
         "claim sessions cannot manage durable bearer credentials"
     ),

@@ -5,12 +5,7 @@ from django.utils import timezone
 
 from apps.events.capacity import spots_left
 from apps.events.exceptions import CapacityConflict, EventInvalidTransition
-from apps.events.models import (
-    Event,
-    EventAttendanceCertificate,
-    EventCheckInEvent,
-    EventRegistration,
-)
+from apps.events.models import Event, EventAttendanceCertificate, EventRegistration
 from apps.events.service_payments import (
     cancel_for_registration,
     create_for_registered_registration,
@@ -192,44 +187,6 @@ def cancel_registration(registration, *, actor=None):
         and services._may_promote(event, timezone.now())
     ):
         promote_automatically(event, actor, 1)
-    return services._refresh(locked)
-
-
-@transaction.atomic
-def mark_attended(
-    registration,
-    *,
-    actor,
-    source=EventCheckInEvent.Source.STAFF,
-):
-    services = _boundary()
-    event = services._locked_event(registration.event_id)
-    locked = _lock_registration(event, registration.pk)
-    if (
-        locked.status != EventRegistration.Status.REGISTERED
-        or event.status not in (Event.Status.PUBLISHED, Event.Status.COMPLETED)
-    ):
-        raise EventInvalidTransition("This registration cannot be marked attended.")
-    locked.status = EventRegistration.Status.ATTENDED
-    locked.save(update_fields=["status"])
-    check_in = EventCheckInEvent.objects.create(
-        registration=locked,
-        source=source,
-        attended_at=timezone.now(),
-        recorded_by=actor,
-    )
-    services._audit(
-        event,
-        actor,
-        "event.registration_attended",
-        locked,
-        {
-            "registration_id": locked.pk,
-            "check_in_event_id": check_in.pk,
-            "source": source,
-        },
-    )
-    services.notify_event_lifecycle(event, "registration_attended", locked.pk)
     return services._refresh(locked)
 
 

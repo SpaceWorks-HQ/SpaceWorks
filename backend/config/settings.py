@@ -656,6 +656,7 @@ CORS_ALLOW_HEADERS = (
     "x-signature",
     "x-timestamp",
     "x-refresh-csrf",
+    "x-station-csrf",
     "x-publishable-key",
 )
 CORS_ALLOW_CREDENTIALS = True
@@ -674,6 +675,26 @@ HMAC_PROTECTED_PATH_PREFIXES = env.list(
 # _fernet() raises ImproperlyConfigured only when a key is actually needed. Tests/CI get a
 # real key from .env / docker-compose (added below).
 API_CLIENT_ENC_KEY = env("API_CLIENT_ENC_KEY", default="")
+# Dedicated domain-separation secret for event-station PIN verification. The raw PIN
+# is encrypted with API_CLIENT_ENC_KEY only because staff reveal is an explicit product
+# requirement; the slow hash plus this independent pepper remains the verifier.
+EVENT_STATION_PIN_PEPPER = env("EVENT_STATION_PIN_PEPPER", default="")
+EVENT_CHECKIN_WINDOW_BEFORE_HOURS = env.int(
+    "EVENT_CHECKIN_WINDOW_BEFORE_HOURS", default=24
+)
+EVENT_CHECKIN_WINDOW_AFTER_HOURS = env.int(
+    "EVENT_CHECKIN_WINDOW_AFTER_HOURS", default=2
+)
+EVENT_CHECKIN_SYNC_GRACE_HOURS = env.int(
+    "EVENT_CHECKIN_SYNC_GRACE_HOURS", default=24
+)
+EVENT_CHECKIN_ROSTER_LIFETIME_HOURS = env.int(
+    "EVENT_CHECKIN_ROSTER_LIFETIME_HOURS", default=24
+)
+EVENT_CHECKIN_CLOCK_SKEW_SECONDS = env.int(
+    "EVENT_CHECKIN_CLOCK_SKEW_SECONDS", default=300
+)
+EVENT_CHECKIN_ROSTER_MAX = env.int("EVENT_CHECKIN_ROSTER_MAX", default=1000)
 # Wraps the per-scope audit row-MAC keys. Independent of PII_MASTER_KEY on purpose: the
 # audit domain gets its own key so a PII key rotation cannot invalidate integrity
 # evidence. Empty means row-MAC attestation is OFF and new audit rows are stored
@@ -813,6 +834,24 @@ REST_FRAMEWORK = {
         ),
         "event_checkin_resolve": env(
             "THROTTLE_EVENT_CHECKIN_RESOLVE", default="60/min"
+        ),
+        "event_offline_roster": env(
+            "THROTTLE_EVENT_OFFLINE_ROSTER", default="10/hour"
+        ),
+        "event_offline_sync": env(
+            "THROTTLE_EVENT_OFFLINE_SYNC", default="60/hour"
+        ),
+        "event_station_pin_token": env(
+            "THROTTLE_EVENT_STATION_PIN_TOKEN", default="10/hour"
+        ),
+        "event_station_pin_ip": env(
+            "THROTTLE_EVENT_STATION_PIN_IP", default="30/hour"
+        ),
+        "event_station_session": env(
+            "THROTTLE_EVENT_STATION_SESSION", default="120/hour"
+        ),
+        "event_station_reveal": env(
+            "THROTTLE_EVENT_STATION_REVEAL", default="5/hour"
         ),
         "event_calendar_feed_token": env(
             "THROTTLE_EVENT_CALENDAR_FEED_TOKEN", default="120/hour"

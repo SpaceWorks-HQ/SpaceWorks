@@ -22,6 +22,7 @@ const event: EventAdmin = {
   description: "Repair together.",
   starts_at: "2026-09-04T12:00:00Z",
   ends_at: "2026-09-04T14:00:00Z",
+  timezone_name: "UTC",
   location: "North workshop",
   location_kind: "indoor",
   custom_form: null,

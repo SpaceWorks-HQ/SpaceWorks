@@ -37,6 +37,7 @@ export const openApiTags = [
   "Device auth",
   "Email logs",
   "Email templates",
+  "Event check-in stations",
   "Events",
   "Health",
   "Integration health",
@@ -123,7 +124,12 @@ export const openApiPaths = [
   "/api/v1/admin/events/{id}/badge-template/",
   "/api/v1/admin/events/{id}/badges.pdf",
   "/api/v1/admin/events/{id}/cancel/",
+  "/api/v1/admin/events/{id}/check-in/offline-roster/",
+  "/api/v1/admin/events/{id}/check-in/offline-sync/",
   "/api/v1/admin/events/{id}/check-in/resolve/",
+  "/api/v1/admin/events/{id}/check-in/station/",
+  "/api/v1/admin/events/{id}/check-in/station/reveal/",
+  "/api/v1/admin/events/{id}/check-in/station/rotate/",
   "/api/v1/admin/events/{id}/collaborators/",
   "/api/v1/admin/events/{id}/complete/",
   "/api/v1/admin/events/{id}/eligible-members/",
@@ -426,6 +432,9 @@ export const openApiPaths = [
   "/api/v1/bootstrap",
   "/api/v1/config",
   "/api/v1/data-exports/download/{job_id}/{token}",
+  "/api/v1/event-checkin-stations/{public_token}/roster/",
+  "/api/v1/event-checkin-stations/{public_token}/session/",
+  "/api/v1/event-checkin-stations/{public_token}/sync/",
   "/api/v1/guest-admin/makerspace/{makerspace_id}/active-loans",
   "/api/v1/guest-admin/requests/{id}/return",
   "/api/v1/health/",
@@ -1652,6 +1661,7 @@ export type EventAdmin = {
   "registration_cutoff_lead_minutes": number | null;
   "effective_registration_cutoff_at": string | null;
   "registration_open": boolean;
+  "offline_checkin_enabled": boolean;
   "is_public": boolean;
   "image_url": string | null;
   "status": StatusFbbEnum;
@@ -1666,7 +1676,7 @@ export type EventAttendanceMark = {
   "source"?: EventAttendanceMarkSourceEnum;
 };
 
-export type EventAttendanceMarkSourceEnum = "staff" | "qr";
+export type EventAttendanceMarkSourceEnum = "online" | "qr";
 
 export type EventAttendanceReport = {
   "rows": Array<Array<unknown>>;
@@ -3413,6 +3423,58 @@ export type NotificationUnreadCount = {
 };
 
 export type NullEnum = null;
+
+export type OfflineCheckInOperation = {
+  "operation_id": string;
+  "checkin_token": string;
+  "reported_occurred_at": string;
+};
+
+export type OfflineCheckInResult = {
+  "operation_id": string;
+  "outcome": OfflineCheckInResultOutcomeEnum;
+  "registration_id"?: number;
+  "attended_at"?: string;
+};
+
+export type OfflineCheckInResultOutcomeEnum = "applied" | "duplicate_operation" | "already_attended" | "registration_changed" | "event_unavailable" | "invalid_token" | "outside_window";
+
+export type OfflineCheckInSyncRequest = {
+  "lease_token": string;
+  "operations": Array<OfflineCheckInOperation>;
+};
+
+export type OfflineCheckInSyncResponse = {
+  "recorded_at": string;
+  "results": Array<OfflineCheckInResult>;
+};
+
+export type OfflineRosterEvent = {
+  "id": number;
+  "title": string;
+  "starts_at": string;
+  "ends_at": string;
+};
+
+export type OfflineRosterRegistration = {
+  "registration_id": number;
+  "checkin_token": string;
+  "name": string;
+  "host_waiver_state": HostWaiverStateEnum;
+};
+
+export type OfflineRosterResponse = {
+  "lease_token": string;
+  "lease_id": string;
+  "server_time": string;
+  "issued_at": string;
+  "expires_at": string;
+  "scan_opens_at": string;
+  "scan_closes_at": string;
+  "sync_deadline": string;
+  "event": OfflineRosterEvent;
+  "registrations": Array<OfflineRosterRegistration>;
+};
 
 export type OidcBrowserCallback = {
   "code": string;
@@ -5518,6 +5580,35 @@ export type StaffPaymentSummary = {
 export type StageEnum = "requested" | "claimed" | "preflight" | "quiesced" | "db_restoring" | "objects_restoring" | "validating" | "completed" | "restored_quarantined" | "rolling_back" | "failed" | "aborted";
 
 export type StateEnum = "requested" | "invited" | "active" | "revoked";
+
+export type StationPin = {
+  "pin": string;
+};
+
+export type StationReveal = {
+  "current_password": string;
+};
+
+export type StationRevealResponse = {
+  "pin": string;
+  "version": number;
+};
+
+export type StationRotation = {
+  "pin": string;
+  "public_token": string;
+  "version": number;
+  "station_url": string;
+};
+
+export type StationStatus = {
+  "configured": boolean;
+  "enabled"?: boolean;
+  "public_token"?: string;
+  "version"?: number;
+  "station_url"?: string;
+  "rotated_at"?: string;
+};
 
 export type Status37fEnum = "active" | "revoked";
 

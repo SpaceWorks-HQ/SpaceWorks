@@ -38,9 +38,9 @@ class TenantDumpCatalogError(AssertionError):
 
 # SHA-256 of the ordered model/table/field graph produced by ``catalog_schema``.
 # Updating it is an explicit review act; runtime introspection never blesses drift.
-# Re-blessed for calendar identities/templates and the explicitly omitted, deployment-
-# local MemberCalendarFeed bearer credential after their field dispositions were added.
-CATALOG_SCHEMA_SHA256 = "5351f2c1de0931b3e887dc03a77fc4793b856ffafa8884605f9bcd80126e1f55"
+# Re-blessed for the source-aware check-in ledger fields and the explicitly dropped,
+# deployment-local station credential after both field dispositions were reviewed.
+CATALOG_SCHEMA_SHA256 = "5dcb99fbe7207dc8e832ddc5d74457c8096c5c2fdf485509ab67ba6c7d9cc6f3"
 
 
 def catalog_models(apps_registry=apps):

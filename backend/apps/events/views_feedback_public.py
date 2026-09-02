@@ -6,7 +6,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.apiclients.throttling import ClientTierRateThrottle
+from apps.events.throttles import PublicFeedbackRateThrottle
 from apps.events.models import Event, EventFeedbackSurvey
 from apps.events.serializers_feedback import (
     FeedbackFormSerializer,
@@ -64,11 +64,7 @@ def feedback_form_payload(event, survey, *, certificate=None):
 
 class PublicEventFeedbackView(APIView):
     permission_classes = [AllowAny]
-    throttle_classes = [ClientTierRateThrottle]
-
-    def get_throttles(self):
-        self.throttle_scope = "public_read" if self.request.method == "GET" else "event_register"
-        return super().get_throttles()
+    throttle_classes = [PublicFeedbackRateThrottle]
 
     @extend_schema(tags=["Public events"], auth=[], responses={200: FeedbackFormSerializer, **ERRORS})
     def get(self, request, makerspace_slug, public_token):

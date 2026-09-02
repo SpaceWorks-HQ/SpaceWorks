@@ -221,7 +221,7 @@ def test_mark_attended_writes_history_and_correction_revokes_certificate():
     corrected, revoked = services.correct_attendance(attended, actor=actor)
 
     history = EventCheckInEvent.objects.get(registration=row)
-    assert history.source == EventCheckInEvent.Source.STAFF
+    assert history.source == EventCheckInEvent.Source.ONLINE
     assert history.attended_at <= timezone.now()
     assert corrected.status == EventRegistration.Status.REGISTERED
     assert [item.pk for item in revoked] == [certificate.pk]

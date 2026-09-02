@@ -4599,6 +4599,258 @@
                 }
             }
         },
+        "/api/v1/admin/events/{id}/check-in/offline-roster/": {
+            "get": {
+                "operationId": "api_v1_admin_events_check_in_offline_roster_retrieve",
+                "summary": "Download a minimal expiring offline check-in roster",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OfflineRosterResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid batch."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication or lease failed."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event authority changed."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Roster window closed."
+                    },
+                    "410": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Synchronization deadline passed."
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Roster exceeds the offline limit."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/events/{id}/check-in/offline-sync/": {
+            "post": {
+                "operationId": "api_v1_admin_events_check_in_offline_sync_create",
+                "summary": "Synchronize queued offline event check-ins",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OfflineCheckInSyncRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OfflineCheckInSyncRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OfflineCheckInSyncRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OfflineCheckInSyncResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid batch."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication or lease failed."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event authority changed."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Roster window closed."
+                    },
+                    "410": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Synchronization deadline passed."
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Roster exceeds the offline limit."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/events/{id}/check-in/resolve/": {
             "post": {
                 "operationId": "api_v1_admin_events_check_in_resolve_create",
@@ -4681,6 +4933,408 @@
                             }
                         },
                         "description": "Request rate limit exceeded."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/events/{id}/check-in/station/": {
+            "get": {
+                "operationId": "api_v1_admin_events_check_in_station_retrieve",
+                "summary": "Read venue-station configuration without revealing its PIN",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StationStatus"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event access or step-up denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rotate the PIN instead of revealing."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Credential secrets are unavailable."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "api_v1_admin_events_check_in_station_destroy",
+                "summary": "Disable a venue check-in station",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StationStatus"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event access or step-up denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rotate the PIN instead of revealing."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Credential secrets are unavailable."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/events/{id}/check-in/station/reveal/": {
+            "post": {
+                "operationId": "api_v1_admin_events_check_in_station_reveal_create",
+                "summary": "Reveal the current station PIN after password step-up",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StationReveal"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StationReveal"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StationReveal"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StationRevealResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event access or step-up denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rotate the PIN instead of revealing."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Credential secrets are unavailable."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/events/{id}/check-in/station/rotate/": {
+            "post": {
+                "operationId": "api_v1_admin_events_check_in_station_rotate_create",
+                "summary": "Create or rotate an event-scoped eight-digit station PIN",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StationRotation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event access or step-up denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rotate the PIN instead of revealing."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Credential secrets are unavailable."
                     }
                 }
             }
@@ -31634,6 +32288,305 @@
                 }
             }
         },
+        "/api/v1/event-checkin-stations/{public_token}/roster/": {
+            "get": {
+                "operationId": "api_v1_event_checkin_stations_roster_retrieve",
+                "summary": "Download the station's minimal expiring attendee roster",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Event check-in stations"
+                ],
+                "security": [
+                    {
+                        "EventStationCookie": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OfflineRosterResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    }
+                }
+            }
+        },
+        "/api/v1/event-checkin-stations/{public_token}/session/": {
+            "post": {
+                "operationId": "api_v1_event_checkin_stations_session_create",
+                "summary": "Exchange an event-scoped PIN for a station session",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Event check-in stations"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StationPin"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StationPin"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StationPin"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "api_v1_event_checkin_stations_session_destroy",
+                "summary": "Clear the local station session cookie",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Event check-in stations"
+                ],
+                "security": [
+                    {
+                        "EventStationCookie": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    }
+                }
+            }
+        },
+        "/api/v1/event-checkin-stations/{public_token}/sync/": {
+            "post": {
+                "operationId": "api_v1_event_checkin_stations_sync_create",
+                "summary": "Synchronize queued PIN-station check-ins",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Event check-in stations"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OfflineCheckInSyncRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OfflineCheckInSyncRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OfflineCheckInSyncRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "EventStationCookie": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OfflineCheckInSyncResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    },
+                    "410": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid station credential, session, origin, feature, or time window."
+                    }
+                }
+            }
+        },
         "/api/v1/guest-admin/makerspace/{makerspace_id}/active-loans": {
             "get": {
                 "operationId": "api_v1_guest_admin_makerspace_active_loans_list",
@@ -42965,6 +43918,10 @@
                         "type": "boolean",
                         "readOnly": true
                     },
+                    "offline_checkin_enabled": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "is_public": {
                         "type": "boolean",
                         "readOnly": true
@@ -43028,6 +43985,7 @@
                     "location",
                     "location_kind",
                     "makerspace_id",
+                    "offline_checkin_enabled",
                     "organizers",
                     "payment_amount",
                     "registration_counts",
@@ -43054,17 +44012,17 @@
                                 "$ref": "#/components/schemas/EventAttendanceMarkSourceEnum"
                             }
                         ],
-                        "default": "staff"
+                        "default": "online"
                     }
                 }
             },
             "EventAttendanceMarkSourceEnum": {
                 "enum": [
-                    "staff",
+                    "online",
                     "qr"
                 ],
                 "type": "string",
-                "description": "* `staff` - staff\n* `qr` - qr"
+                "description": "* `online` - online\n* `qr` - qr"
             },
             "EventAttendanceReport": {
                 "type": "object",
@@ -50319,6 +51277,208 @@
             "NullEnum": {
                 "enum": [
                     null
+                ]
+            },
+            "OfflineCheckInOperation": {
+                "type": "object",
+                "properties": {
+                    "operation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "checkin_token": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "reported_occurred_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "checkin_token",
+                    "operation_id",
+                    "reported_occurred_at"
+                ]
+            },
+            "OfflineCheckInResult": {
+                "type": "object",
+                "properties": {
+                    "operation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "outcome": {
+                        "$ref": "#/components/schemas/OfflineCheckInResultOutcomeEnum"
+                    },
+                    "registration_id": {
+                        "type": "integer"
+                    },
+                    "attended_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "operation_id",
+                    "outcome"
+                ]
+            },
+            "OfflineCheckInResultOutcomeEnum": {
+                "enum": [
+                    "applied",
+                    "duplicate_operation",
+                    "already_attended",
+                    "registration_changed",
+                    "event_unavailable",
+                    "invalid_token",
+                    "outside_window"
+                ],
+                "type": "string",
+                "description": "* `applied` - applied\n* `duplicate_operation` - duplicate_operation\n* `already_attended` - already_attended\n* `registration_changed` - registration_changed\n* `event_unavailable` - event_unavailable\n* `invalid_token` - invalid_token\n* `outside_window` - outside_window"
+            },
+            "OfflineCheckInSyncRequest": {
+                "type": "object",
+                "properties": {
+                    "lease_token": {
+                        "type": "string",
+                        "maxLength": 8192
+                    },
+                    "operations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OfflineCheckInOperation"
+                        }
+                    }
+                },
+                "required": [
+                    "lease_token",
+                    "operations"
+                ]
+            },
+            "OfflineCheckInSyncResponse": {
+                "type": "object",
+                "properties": {
+                    "recorded_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OfflineCheckInResult"
+                        }
+                    }
+                },
+                "required": [
+                    "recorded_at",
+                    "results"
+                ]
+            },
+            "OfflineRosterEvent": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "ends_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "ends_at",
+                    "id",
+                    "starts_at",
+                    "title"
+                ]
+            },
+            "OfflineRosterRegistration": {
+                "type": "object",
+                "properties": {
+                    "registration_id": {
+                        "type": "integer"
+                    },
+                    "checkin_token": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "host_waiver_state": {
+                        "$ref": "#/components/schemas/HostWaiverStateEnum"
+                    }
+                },
+                "required": [
+                    "checkin_token",
+                    "host_waiver_state",
+                    "name",
+                    "registration_id"
+                ]
+            },
+            "OfflineRosterResponse": {
+                "type": "object",
+                "properties": {
+                    "lease_token": {
+                        "type": "string"
+                    },
+                    "lease_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "server_time": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "issued_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "scan_opens_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "scan_closes_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "sync_deadline": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "event": {
+                        "$ref": "#/components/schemas/OfflineRosterEvent"
+                    },
+                    "registrations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OfflineRosterRegistration"
+                        }
+                    }
+                },
+                "required": [
+                    "event",
+                    "expires_at",
+                    "issued_at",
+                    "lease_id",
+                    "lease_token",
+                    "registrations",
+                    "scan_closes_at",
+                    "scan_opens_at",
+                    "server_time",
+                    "sync_deadline"
                 ]
             },
             "OidcBrowserCallback": {
@@ -58592,6 +59752,100 @@
                 "type": "string",
                 "description": "* `requested` - Requested\n* `invited` - Invited\n* `active` - Active\n* `revoked` - Revoked"
             },
+            "StationPin": {
+                "type": "object",
+                "properties": {
+                    "pin": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "pattern": "^\\d{8}$"
+                    }
+                },
+                "required": [
+                    "pin"
+                ]
+            },
+            "StationReveal": {
+                "type": "object",
+                "properties": {
+                    "current_password": {
+                        "type": "string",
+                        "writeOnly": true
+                    }
+                },
+                "required": [
+                    "current_password"
+                ]
+            },
+            "StationRevealResponse": {
+                "type": "object",
+                "properties": {
+                    "pin": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "pin",
+                    "version"
+                ]
+            },
+            "StationRotation": {
+                "type": "object",
+                "properties": {
+                    "pin": {
+                        "type": "string"
+                    },
+                    "public_token": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "version": {
+                        "type": "integer"
+                    },
+                    "station_url": {
+                        "type": "string",
+                        "format": "uri"
+                    }
+                },
+                "required": [
+                    "pin",
+                    "public_token",
+                    "station_url",
+                    "version"
+                ]
+            },
+            "StationStatus": {
+                "type": "object",
+                "properties": {
+                    "configured": {
+                        "type": "boolean"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "public_token": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "version": {
+                        "type": "integer"
+                    },
+                    "station_url": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "rotated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "configured"
+                ]
+            },
             "Status37fEnum": {
                 "enum": [
                     "active",
@@ -60458,6 +61712,12 @@
             }
         },
         "securitySchemes": {
+            "EventStationCookie": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "sw_event_station",
+                "description": "Signed, event/version-bound venue-station session cookie."
+            },
             "jwtAuth": {
                 "type": "http",
                 "scheme": "bearer",

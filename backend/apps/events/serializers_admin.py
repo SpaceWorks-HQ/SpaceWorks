@@ -7,6 +7,7 @@ from apps.events.models import Event, EventRegistration
 from apps.events.capacity import effective_registration_cutoff, registration_is_open
 from apps.forms_schema.serializers import CustomFormSchemaField
 from apps.inventory import public_image_storage
+from apps.makerspaces.platform import feature_enabled
 from apps.admin_api.serializers_payment_summary import PaymentSummaryMixin
 from apps.events.serializers_public import EventOrganizerSummarySerializer
 
@@ -103,8 +104,8 @@ class EventRegistrationCountsSerializer(serializers.Serializer):
 
 class EventAttendanceMarkSerializer(serializers.Serializer):
     source = serializers.ChoiceField(
-        choices=("staff", "qr"),
-        default="staff",
+        choices=("online", "qr"),
+        default="online",
         required=False,
     )
 
@@ -118,6 +119,7 @@ class EventAdminSerializer(serializers.ModelSerializer):
     effective_registration_cutoff_at = serializers.SerializerMethodField()
     registration_open = serializers.SerializerMethodField()
     series_summary = serializers.SerializerMethodField()
+    offline_checkin_enabled = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -142,6 +144,7 @@ class EventAdminSerializer(serializers.ModelSerializer):
             'registration_cutoff_lead_minutes',
             'effective_registration_cutoff_at',
             'registration_open',
+            'offline_checkin_enabled',
             'is_public',
             'image_url',
             'status',
@@ -186,6 +189,10 @@ class EventAdminSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.BooleanField())
     def get_registration_open(self, obj):
         return registration_is_open(obj, timezone.now())
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_offline_checkin_enabled(self, obj):
+        return feature_enabled(obj.makerspace, "events.offline_checkin")
 
     @extend_schema_field(EventRegistrationCountsSerializer)
     def get_registration_counts(self, obj):

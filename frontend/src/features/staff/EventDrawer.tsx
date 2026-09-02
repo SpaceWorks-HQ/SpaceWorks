@@ -67,7 +67,7 @@ export function EventDrawer({ eventId, makerspaceId, onClose }: {
           {event.status === "published" ? <><button className="desk-button-success" type="button" onClick={() => setConfirm("complete")}>Complete</button><button className="desk-button-danger" type="button" onClick={() => setConfirm("cancel")}>Cancel event</button></> : null}
         </div>
         {actionError ? <p className="text-sm text-danger" role="alert">{eventErrorText(actionError)}</p> : null}
-        <EventRegistrationRoster event={event} makerspaceId={makerspaceId} />
+        <EventRegistrationRoster event={event} makerspaceId={makerspaceId} offlineCheckInEnabled={event.offline_checkin_enabled} />
         <EventFeedbackPanel eventId={eventId} makerspaceId={makerspaceId} />
         <EventCollaborators makerspaceId={makerspaceId} eventId={eventId} />
       </div> : null}

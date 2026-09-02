@@ -8,7 +8,7 @@ names, so `origin_scope_routes` (keyed by bare `url_name`), the OpenAPI snapshot
 every `reverse()` are unaffected. No `app_name`, matching `admin_api`.
 """
 
-from django.urls import path
+from django.urls import include, path
 
 from apps.events.views_admin import (
     EventCancelView,
@@ -25,7 +25,6 @@ from apps.events.views_admin import (
 )
 from apps.events.views_admin_organized import OrganizedEventListView
 from apps.events.views_admin_image import EventImageView
-from apps.events.views_checkin import EventCheckInResolveView
 from apps.events.views_feedback_admin import (
     EventCertificateDownloadView,
     EventCertificateReissueView,
@@ -61,6 +60,7 @@ from apps.events.views_series_image import EventSeriesImageView
 from apps.events.views_badges import EventBadgePdfView, EventBadgeTemplateView
 
 urlpatterns = [
+    path("", include("apps.events.urls_checkin_admin")),
     path(
         'makerspaces/<int:makerspace_id>/event-series/',
         EventSeriesListCreateView.as_view(),
@@ -205,13 +205,6 @@ urlpatterns = [
         'event-collaborations/<int:pk>/respond/',
         EventCollaborationRespondView.as_view(),
         name='admin-event-collaboration-respond',
-    ),
-    # Keep the kwarg named `pk`: origin scope resolves MODEL_LOOKUPS from
-    # kwargs.get('pk'), so another name would deny every custom-domain request.
-    path(
-        'events/<int:pk>/check-in/resolve/',
-        EventCheckInResolveView.as_view(),
-        name='admin-event-check-in-resolve',
     ),
     path(
         'events/<int:pk>/eligible-members/',

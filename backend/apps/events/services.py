@@ -208,9 +208,9 @@ from apps.events.services_registration_state import (  # noqa: E402
     approve_registration,
     cancel_registration,
     correct_attendance,
-    mark_attended,
     promote_automatically,
     promote_registration,
     reject_registration,
 )
+from apps.events.services_checkin import mark_attended  # noqa: E402
 from apps.events.services_lifecycle import cancel, complete, publish  # noqa: E402

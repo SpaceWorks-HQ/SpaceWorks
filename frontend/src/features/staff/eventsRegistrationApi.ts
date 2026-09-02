@@ -51,7 +51,7 @@ function useRegistrationAction(
 export function useMarkEventAttended(
   makerspaceId: number,
   eventId: number,
-  source: "staff" | "qr" = "staff",
+  source: "online" | "qr" = "online",
 ) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -64,6 +64,7 @@ export function useMarkEventAttended(
         queryClient.invalidateQueries({ queryKey: eventKeys.registrations(eventId) }),
         queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
         queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
+        queryClient.invalidateQueries({ queryKey: eventKeys.checkinHistory(eventId) }),
         queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
       ]);
     },
