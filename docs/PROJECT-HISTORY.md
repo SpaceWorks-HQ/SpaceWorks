@@ -6,6 +6,75 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-09-02 — Events-programme round-trip hardening after integration.** The phase-10 graph exposed
+  defects that declaration-only guards could not: `EventSeriesCollaborator.series` and `.makerspace` were
+  unclassified cross-tenant edges, so tenant projection refused them until the rules explicitly matched
+  occurrence collaboration and dropped a half-owned grant; the encryption plaintext-leak sweep had no
+  builders for the new PII in `EventFeedbackResponse.answers_snapshot` or
+  `EventAttendanceCertificate.recipient_name`, so both immutable models gained real sentinel builders.
+  Evidence retention then proved a more general migration trap: a `OneToOneField(primary_key=True)` leaves
+  no `id` column and is outside the importer’s supported auto-integer/UUID primary-key shapes. Both retention
+  models now have normal `BigAutoField` primary keys plus unique one-to-ones, and materialization reads the
+  model’s actual PK attname through `source_pk()` rather than assuming `row["id"]`; the multi-tenant fixture
+  also stopped reusing a globally unique calendar-feed digest. The final round-trip fixes made an empty
+  sovereign-row projection produce a correctly typed empty marker instead of raising Django’s
+  `EmptyResultSet`, skipped nullable object keys instead of capturing an object literally named `"None"`,
+  withdrew the organization-events URL when the separable events app is tombstoned, limited organization
+  analytics choices to reports with a server aggregation strategy, and made the migration harness release
+  source-only immutable operation UUIDs/certificate serials before modelling a clean target
+  (`abccb738`, `622aac8c`, `a674197f`).
+- **2026-09-02 — Twelve-phase events, modules, organizations, reporting and evidence programme.** **Phase
+  0** repaired six module-cascade defects: core staff request issue/return now gate by their own URL surface
+  instead of the optional `guest_handover` module, events/bookings declare their membership dependency, and
+  `backend/tests/modules/` now exercises module-OFF behaviour through the complete box→issue→return loan
+  spine. **Phase 0a** corrected five report gates/builders so disabled printing, machine-service, membership
+  and asset-unit data cannot leak through the wrong module key. **Phase 1** split the events schema into
+  focused `models_*` modules behind the stable `models.py` re-export barrel. **Phase 2** added an exclusive
+  absolute-or-lead-time registration cutoff, optional approval/rejection, approval-aware uniqueness and
+  FIFO waitlist promotion; paid applicants are charged only when they become registered. **Phase 3** added
+  immutable, source-aware check-in history, immutable feedback answer snapshots, and PDF attendance
+  certificates that require `attended` status and revoke on attendance correction. **Phase 4** materialised
+  recurring `Event` rows from an `EventSeries` so registrations, payments and audit targets stay concrete;
+  recurrence anchors to local wall-clock date/time plus an IANA zone across DST and can be extended by both
+  staff and the no-beat cloud scheduler. **Phase 5** shipped public/member ICS, rotatable digest-only bearer
+  feeds, RRULE/VTIMEZONE series export and printable badges whose QR reuses the registration check-in token.
+  **Phase 6** added minimal expiring offline rosters and idempotent late sync, plus an event/window-scoped,
+  rotated, hashed-and-peppered PIN station with uniform public failures. Its merge kept
+  `DeploymentRecoveryGateMiddleware` at `MIDDLEWARE[0]`, ahead of calendar-token log redaction; classified
+  `EVENT_STATION_PIN_PEPPER` under the **EXACT fingerprint** restore policy; and put the anonymous station
+  write points through `assert_write_allowed` so they cannot create tenant state after a tenant-migration
+  source gate closes. **Phase 7** kept makerspace as the tenancy anchor while adding organization public
+  profiles/catalogues, separate governance actions, single-use invitations and managed event organizers.
+  **Phase 8** added module-complete composite reports, charts, and append-only cursor/fence rollups, with an
+  explicit aggregation strategy or exclusion reason for every report key. **Phase 9** implemented evidence
+  retention mechanism A: delete final and staging object bytes after the effective window, retain immutable
+  `EvidencePhoto` metadata, record a truthful terminal expired state, return 410 on reads, and preserve the
+  tombstone through backup/migration. **Phase 10** built the real recurring-series→occurrence→registration→
+  attendance→feedback→certificate object graph and proved field-by-field deployment-backup and tenant-
+  migration round trips across module-on/off, retained-disabled and archived tenants, expired evidence and
+  report rollups; it also made the retention sweep bounded, dry-runnable and observable through a structured
+  completion summary (`007e508a`, `2bb7a3d3`, `ef44d212`, `212eaeba`, `141f852f`, `cc02ad4b`).
+- **2026-09-01 — SpaceWorks 0.8.0 release (PRs #15 and #16).** PR #15 first published the cumulative 0.7.5
+  tree, then PR #16 advanced `VERSION` to `0.8.0`; `origin/main` landed at `b15c4e11`. The release completed
+  the post-Part-A backup/migration work: compound deployment archives gained tenant-recipient-only opaque
+  slices, a verified sovereign-row-free readable main, typed n-way object ownership, bounded DEK rewrap,
+  signed outer manifests, durable component/custody ledgers, create-only staged promotion, serialized
+  activation, pre-mutation import validation and an H1-supervised restore/cutover/rollback path. Tenant exit
+  gained a deny-by-default field/authority projection, constrained scratch-database materialization, frozen
+  capture and recipient revalidation, readable outer envelopes, target identity/readiness checks and broad
+  acceptance coverage; critically, the source gate moved its shared advisory lock to a dedicated connection
+  and verifies backend continuity so it remains effective behind a transaction pooler. Operations gained
+  coverage-proved scheduled backup runs and restore preflight, while the producer capability marker binds
+  installed privileged-script and entrypoint hashes. The same release added the curl-first pinned-image
+  installer, upgrade-time per-makerspace module selection and the native-Windows/WSL2 support boundary;
+  renamed the opt-in `accounts` module to `member_accounts`; added machine-type-scoped/public coloured
+  filament pools; and split over-ceiling modules behind compatibility barrels. The 0.8 increment then made
+  core public borrow proposals work when membership is off and added opt-in account-less requests using one
+  inert, credential-disabled makerspace principal, unverified contact snapshots, `actor=None` audits, required
+  idempotency and IP/email/outstanding limits. Telegram became outbound-only, the staff sidebar became a
+  tested dock, and release hardening preserved OCI child manifests, recorded executable bits in Git so
+  tarballs can restore, and fixed the compose-wrapper validator import (`5bf555b0`, `728fcbf6`, `32f4f306`,
+  `b15c4e11`).
 - **2026-08-22 — Archive-recipient custody, Part A (K1 landed + the two-recipient floor).** A tenant archive
   is encrypted to the makerspace's own verified `age` recipients, and the platform is added **only** when
   `superadmin_access_enabled` is true — so with the switch off the operator can *run* a tenant backup but
