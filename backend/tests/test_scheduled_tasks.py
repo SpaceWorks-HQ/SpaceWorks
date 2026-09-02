@@ -67,6 +67,40 @@ def test_evidence_expiry_uses_the_same_six_hour_task_in_both_schedulers():
     assert ("evidence-object-expiry", task, 360) in SCHEDULED_TASKS
 
 
+def test_evidence_expiry_controls_reach_the_beatless_task(monkeypatch):
+    import apps.operations.management.commands.run_scheduled_tasks as module
+
+    calls = []
+    monkeypatch.setattr(
+        module,
+        "_import_task",
+        lambda _path: lambda **kwargs: calls.append(kwargs),
+    )
+
+    old_run = timezone.now() - timedelta(days=1)
+    PeriodicTaskRun.objects.create(
+        name="evidence-object-expiry", last_run_at=old_run
+    )
+    call_command(
+        "run_scheduled_tasks",
+        "--task", "evidence-object-expiry",
+        "--dry-run", "--batch-size", "17",
+        stdout=StringIO(),
+    )
+
+    assert calls == [{"dry_run": True, "batch_size": 17}]
+    assert PeriodicTaskRun.objects.get(
+        name="evidence-object-expiry"
+    ).last_run_at == old_run
+
+
+def test_evidence_expiry_controls_cannot_leak_to_unrelated_tasks():
+    from django.core.management.base import CommandError
+
+    with pytest.raises(CommandError, match="require --task evidence-object-expiry"):
+        call_command("run_scheduled_tasks", "--dry-run", stdout=StringIO())
+
+
 def test_running_records_a_row_per_task():
     call_command("run_scheduled_tasks", stdout=StringIO())
 
