@@ -30,6 +30,7 @@ export type StaffEvent = {
   created_at: string;
   updated_at: string;
   registration_counts: EventRegistrationCounts;
+  organizers: { id: number; slug: string; name: string }[];
 };
 
 export type EventRegistration = {
@@ -65,6 +66,7 @@ const EVENT_COMPLETE_PATH: ApiPath = "/api/v1/admin/events/{id}/complete/";
 const EVENT_REGISTRATIONS_PATH: ApiPath = "/api/v1/admin/events/{id}/registrations/";
 const MARK_ATTENDED_PATH: ApiPath = "/api/v1/admin/event-registrations/{id}/mark-attended/";
 const CHECK_IN_RESOLVE_PATH: ApiPath = "/api/v1/admin/events/{id}/check-in/resolve/";
+const EVENT_ORGANIZERS_PATH = "/api/v1/admin/events/{id}/organizers/";
 
 function staffPath(path: ApiPath, replacements: Record<string, number>) {
   return Object.entries(replacements).reduce(
@@ -143,6 +145,22 @@ export function useUpdateEvent(makerspaceId: number, eventId: number) {
       queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
       queryClient.invalidateQueries({ queryKey: ["operations-report"] }),
     ]); },
+  });
+}
+
+export function useReplaceEventOrganizers(makerspaceId: number, eventId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (organizationIds: number[]) => staffRequest<{ organizers: StaffEvent["organizers"] }>(
+      staffPath(EVENT_ORGANIZERS_PATH as ApiPath, { id: eventId }),
+      { method: "PUT", body: JSON.stringify({ organization_ids: organizationIds }) },
+    ),
+    onSuccess: async () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
+      queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
+      queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
+      queryClient.invalidateQueries({ queryKey: ["public-organization"] }),
+    ]),
   });
 }
 

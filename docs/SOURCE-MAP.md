@@ -24,10 +24,13 @@
   over `lifecycle_archive.py`, `lifecycle_purge.py` and `lifecycle_storage.py`),
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
 - `backend/apps/organizations/` — `Organization` (platform entity, creatable before any makerspace, NOT a
-  module_registry key), `OrganizationMakerspace` (the many-to-many link, at most one `owner` per space) and
-  `OrganizationMembership` (org-level `granted_actions`). Authority is resolved through
-  `accounts/rbac.py` with its organization layer in `accounts/rbac_organizations.py`, never mirrored into
-  `MakerspaceMembership`; `accounts/org_payload.py` projects it into the auth payload.
+  module_registry key), its opt-in public profile and cross-makerspace event catalogue,
+  `OrganizationMakerspace` (the many-to-many link, at most one `owner` per space),
+  `OrganizationMembership` (org-level makerspace grants plus separate organization-governance actions),
+  and digest-only single-use `OrganizationInvitation` grants. Organization profile/member governance
+  lives in `governance.py` + `services_profiles.py`/`services_invitations.py`; makerspace authority is
+  resolved through `accounts/rbac.py` with its organization layer in `accounts/rbac_organizations.py`,
+  never mirrored into `MakerspaceMembership`; `accounts/org_payload.py` projects it into the auth payload.
 - `backend/apps/apiclients/` — `ApiClient` (client_id + Fernet-encrypted HMAC secret), `ApiKeyRequest`, and
   `scope_registry.py`/`scope_registry_routes.py` — the single source of truth for which protected route each
   scope authorizes, keyed on the versioned `view_name`. `checks.py` is the deployment-time guard that a

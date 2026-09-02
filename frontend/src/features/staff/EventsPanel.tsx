@@ -11,6 +11,7 @@ import { CollaborationInbox } from "./CollaborationInbox";
 import EventCheckInScanner from "./EventCheckInScanner";
 import { EventCollaborators } from "./EventCollaborators";
 import { EventRegisterMember } from "./EventRegisterMember";
+import { EventOrganizers } from "./EventOrganizers";
 import { ImageUploader } from "./ImageUploader";
 import { Panel } from "./panels/shared";
 import { PaymentReconcileActions } from "./PaymentReconcileActions";
@@ -178,6 +179,7 @@ export function EventDrawer({ eventId, makerspaceId, onClose }: { eventId: numbe
           <EventFields values={values} setValues={setValues} disabled={readOnly} />
           {!readOnly ? <button className="desk-button-primary mt-3" type="submit" disabled={update.isPending}>{update.isPending ? "Saving..." : "Save changes"}</button> : <p className="mt-3 text-sm text-muted">Terminal events are read-only.</p>}
         </form>
+        <EventOrganizers event={event} makerspaceId={makerspaceId} disabled={readOnly} />
         <div className="flex flex-wrap gap-2">
           {event.status === "draft" ? <button className="desk-button-primary" type="button" onClick={() => setConfirm("publish")}>Publish</button> : null}
           {event.status === "published" ? <><button className="desk-button-success" type="button" onClick={() => setConfirm("complete")}>Complete</button><button className="desk-button-danger" type="button" onClick={() => setConfirm("cancel")}>Cancel event</button></> : null}

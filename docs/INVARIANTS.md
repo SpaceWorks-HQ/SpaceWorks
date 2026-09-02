@@ -2531,6 +2531,24 @@ encoder always emits canonical output, so stored envelopes are unaffected.
   audit scope, storage quota and public venue routing all key on it. An organizer is attribution plus a
   narrow permission, never tenancy, and no organizer feature may move a number, a key, a quota or a
   route away from the venue.
+- **Organization presentation is a global projection, not another tenant surface.** A public organization
+  profile is opt-in (`public_profile_enabled`) and exposes only the explicit public serializer fields.
+  Its event catalogue projects already-public, published, not-ended events and keeps each event's host
+  makerspace visible; the host must remain servable, visible in the central directory and have the events
+  module enabled. Switching either public-profile or host-module gate off hides the projection without
+  deleting the organization, event or organizer bridge.
+- **Organization governance is separate from makerspace RBAC.** `governance_actions` may authorize profile
+  or membership administration, but never becomes a makerspace action and never changes a user's local
+  role identity. Invitations store only a SHA-256 digest of a high-entropy, single-use bearer token; the raw
+  token is returned once and must never enter list responses or audit metadata. Invitation creation and
+  redemption both enforce non-escalation against the creator's current active authority under row locks;
+  suspended memberships are never silently reactivated, and revoke/redeem races have one transactional
+  winner.
+- **Event organizer mutation has one service path.** `services_organizers.replace_organizers()` locks in
+  `event -> makerspace` order, rechecks the events module and action-scoped event authority, requires an
+  active membership in each newly assigned organization (superadmin excepted), replaces the bridge set
+  atomically and emits one makerspace-scoped audit entry. It changes attribution only: the event's
+  `makerspace_id`, routing, PII custody and quotas remain untouched.
 
 ## API client scopes and the protected-route registry
 

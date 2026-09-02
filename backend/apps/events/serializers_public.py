@@ -25,6 +25,7 @@ PUBLIC_EVENT_FIELDS = (
 
 
 class EventOrganizerSummarySerializer(serializers.Serializer):
+    id = serializers.IntegerField(source='organization.id', read_only=True)
     slug = serializers.SlugField(source='organization.slug', read_only=True)
     name = serializers.CharField(source='organization.name', read_only=True)
 

@@ -181,6 +181,9 @@ OMITTED_MODELS = {
     "organizations.OrganizationMembership": (
         "Live cross-tenant organization authorization."
     ),
+    "organizations.OrganizationInvitation": (
+        "Deployment-local bearer authorization state for a global organization."
+    ),
     "tenant_migration.TenantImportJob": "Target-side tenant import coordination state.",
     "tenant_migration.TenantImportObject": (
         "Deployment-scoped import promotion journal; it names a target makerspace "
