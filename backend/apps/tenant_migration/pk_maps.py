@@ -12,6 +12,34 @@ from .transaction_state import require_import_transaction
 TABLE_NAME = "tenant_import_pk_map"
 DEFAULT_BATCH_SIZE = 1_000
 
+# The only primary-key shapes an import can reserve target values for.
+AUTO_PK_FIELD_TYPES = (models.AutoField, models.BigAutoField, models.SmallAutoField)
+SUPPORTED_PK_FIELD_TYPES = (*AUTO_PK_FIELD_TYPES, models.UUIDField)
+
+# How many defaults to draw when checking that a UUID primary key can actually mint
+# distinct values. Two is enough to catch a missing or constant default.
+_UUID_DEFAULT_SAMPLE = 2
+
+
+def unsupported_primary_key_reason(model, sample=_UUID_DEFAULT_SAMPLE):
+    """Why an import cannot reserve target primary keys for ``model``, else ``None``.
+
+    Exported so the projected-catalog guard enforces what reservation actually
+    requires rather than a weaker approximation of it. Being a ``UUIDField`` is not
+    sufficient: the field also has to supply a default that mints distinct UUIDs, so
+    a ``UUIDField(primary_key=True)`` declared without ``default=uuid.uuid4`` is
+    still unreservable and must be reported as such.
+    """
+    pk_field = model._meta.pk
+    if isinstance(pk_field, AUTO_PK_FIELD_TYPES):
+        return None
+    if not isinstance(pk_field, models.UUIDField):
+        return f"{model._meta.label} does not use an auto-integer or UUID primary key."
+    values = [pk_field.get_default() for _index in range(sample)]
+    if any(not isinstance(value, UUID) for value in values) or len(set(values)) != sample:
+        return f"{model._meta.label} does not provide unique UUID primary keys."
+    return None
+
 
 def _batches(values: Iterable, size: int) -> Iterator[list]:
     iterator = iter(values)
@@ -125,9 +153,7 @@ class TransactionPkMap:
 
     def _reserve_target_pks(self, model, count):
         pk_field = model._meta.pk
-        if isinstance(
-            pk_field, (models.AutoField, models.BigAutoField, models.SmallAutoField)
-        ):
+        if isinstance(pk_field, AUTO_PK_FIELD_TYPES):
             with self.connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -139,9 +165,7 @@ class TransactionPkMap:
                 return [row[0] for row in cursor.fetchall()]
         if isinstance(pk_field, models.UUIDField):
             return self._unused_uuids(model, count)
-        raise UnsupportedPrimaryKey(
-            f"{model._meta.label} does not use an auto-integer or UUID primary key."
-        )
+        raise UnsupportedPrimaryKey(unsupported_primary_key_reason(model))
 
     def _unused_uuids(self, model, count):
         pk_field = model._meta.pk

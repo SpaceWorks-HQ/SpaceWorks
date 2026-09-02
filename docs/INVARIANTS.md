@@ -1877,6 +1877,36 @@ Load-bearing details that carried over unchanged:
 
 ## Backup, restore and tenant migration (Phase 5A/5B and Lane D D1-D4/D6 built)
 
+### The SHAPE a projected model must have (catalog-driven, 2026-09-03)
+
+Being classified is not the same as being importable. Two shapes break a tenant move
+silently, and each was found only by running a full round-trip *after* the model had
+already shipped, so both are now enumerated over the whole
+`PROJECTED_MODEL_LABELS` catalog by
+`tests/tenant_migration/test_projected_catalog_travel_guard.py` — a newly projected
+model inherits the checks instead of waiting for a bespoke round-trip test:
+
+- **The primary key must be an auto-integer or a UUID.** `pk_maps` can only reserve
+  target values for those shapes and raises `UnsupportedPrimaryKey` otherwise, and a
+  `OneToOneField(primary_key=True)` additionally exports no `id` column at all, so the
+  materializer's read of the pk fails mid-move. **A `OneToOneField(primary_key=True)`
+  on any model that travels is a latent break — prefer a normal auto pk plus a unique
+  `OneToOne`.** Both evidence retention models shipped this way and had to be amended.
+  `pk_maps.SUPPORTED_PK_FIELD_TYPES` is the single source of truth; the guard asserts
+  against it rather than keeping a second copy.
+- **Every deployment-global unique column needs a `DEPLOYMENT_GLOBAL_UNIQUE_RULES`
+  entry** deciding REGENERATE versus PRESERVE-and-refuse. An unruled unique column
+  violates its own constraint the first time a target already holds the value. The one
+  deliberate exemption is `accounts.User.username`, resolved before insertion by
+  `identity_resolution.allocate_username`; the guard holds that exemption as an exact
+  set, so adding a rule for it fails the test until the exemption is removed.
+
+Relational uniqueness is scoped by the row it points at, so a unique `OneToOne` is not
+a deployment-global collision and is deliberately out of scope. Object pointers are a
+separate, already-guarded axis: `tests/backup/test_object_field_coverage.py` requires
+every `*_key` field to be either captured by name in `OBJECT_FIELD_NAMES` or exempted
+with a reason in `NON_OBJECT_KEY_FIELDS`.
+
 ### Lane D tenant-exclusive identity and payment closure (D6, 2026-08-23)
 
 **Lane D does not use the older per-identity `DisclosureClosureApproval` policy.** That
