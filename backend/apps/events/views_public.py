@@ -63,6 +63,7 @@ class PublicEventListView(APIView):
         require_module_for_servable(makerspace, 'events')
         events = (
             _public_events(makerspace)
+            .select_related('series')
             .prefetch_related(
                 Prefetch(
                     'organizers',

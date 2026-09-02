@@ -1,10 +1,17 @@
 from django.apps import apps
 
+from apps.makerspaces.origin_scope_model_lookups import (
+    BASE_MODEL_LOOKUPS,
+    TARGET_SET_LOOKUPS,
+)
+
 MAKERSPACE_KWARG_ROUTES = {
     'admin-maintenance-schedule-list-create': 'makerspace_id',
     'admin-maintenance-log-list-create': 'makerspace_id',
     'admin-bookable-space-list-create': 'makerspace_id',
     'admin-event-list-create': 'makerspace_id',
+    'admin-event-series-list-create': 'makerspace_id',
+    'admin-event-series-collaboration-inbox': 'makerspace_id',
     'admin-role-capabilities': 'makerspace_id',
     'admin-role-list-create': 'makerspace_id',
     'admin-role-detail': 'makerspace_id',
@@ -57,132 +64,16 @@ MACHINE_SERVICE_ACTIONS = {
     'admin-machine-service-file-finalize',
 }
 MODEL_LOOKUPS = {
-    'admin-membership-request-approve': ('makerspaces.MembershipRequest', 'makerspace_id'),
-    'admin-membership-request-revoke': ('makerspaces.MembershipRequest', 'makerspace_id'),
-    'admin-membership-revoke-m2': ('makerspaces.MakerspaceMembership', 'makerspace_id'),
-    'admin-membership-role-m2': ('makerspaces.MakerspaceMembership', 'makerspace_id'),
-    'admin-membership-capabilities': ('makerspaces.MakerspaceMembership', 'makerspace_id'),
-    'admin-membership-revoke': ('makerspaces.MakerspaceMembership', 'makerspace_id'),
-    'admin-presence-sessions-current': ('makerspaces.Makerspace', 'id'),
-    'admin-maintenance-schedule-detail': ('maintenance.MaintenanceSchedule', 'machine__makerspace_id'),
-    'admin-maintenance-schedule-deactivate': ('maintenance.MaintenanceSchedule', 'machine__makerspace_id'),
-    'admin-maintenance-log-document-presign': ('maintenance.MaintenanceLog', 'machine__makerspace_id'),
-    'admin-maintenance-log-document-finalize': ('maintenance.MaintenanceLog', 'machine__makerspace_id'),
-    'admin-maintenance-log-document-url': ('maintenance.MaintenanceLogDocument', 'log__machine__makerspace_id'),
-    'admin-maintenance-log-document-detail': ('maintenance.MaintenanceLogDocument', 'log__machine__makerspace_id'),
-    'admin-bookable-space-detail': ('bookings.BookableSpace', 'makerspace_id'),
-    'admin-bookable-space-booking-rules': ('bookings.BookableSpace', 'makerspace_id'),
-    'admin-bookable-space-deactivate': ('bookings.BookableSpace', 'makerspace_id'),
-    'admin-bookable-space-image-presign': ('bookings.BookableSpace', 'makerspace_id'),
-    'admin-bookable-space-image-finalize': ('bookings.BookableSpace', 'makerspace_id'),
-    'admin-bookable-space-image-delete': ('bookings.BookableSpace', 'makerspace_id'),
-    'admin-space-booking-list': ('bookings.BookableSpace', 'makerspace_id'),
-    'admin-booking-approve': ('bookings.Booking', 'space__makerspace_id'),
-    'admin-booking-reject': ('bookings.Booking', 'space__makerspace_id'),
-    'admin-booking-cancel': ('bookings.Booking', 'space__makerspace_id'),
-    'admin-booking-complete': ('bookings.Booking', 'space__makerspace_id'),
-    'admin-booking-no-show': ('bookings.Booking', 'space__makerspace_id'),
-    'admin-event-detail': ('events.Event', 'makerspace_id'),
-    'admin-event-publish': ('events.Event', 'makerspace_id'),
-    'admin-event-cancel': ('events.Event', 'makerspace_id'),
-    'admin-event-complete': ('events.Event', 'makerspace_id'),
-    'admin-event-registration-list': ('events.Event', 'makerspace_id'),
-    'admin-event-organizers': ('events.Event', 'makerspace_id'),
-    'admin-event-check-in-resolve': ('events.Event', 'makerspace_id'),
-    'admin-event-registration-mark-attended': ('events.EventRegistration', 'event__makerspace_id'),
-    'admin-event-collaborators': ('events.Event', 'makerspace_id'),
-    # Respond belongs to the collaborator's domain; removal belongs to the host's.
-    # Resolving respond through the host would make the feature unreachable from the
-    # collaborator's custom domain, while resolving removal through the collaborator
-    # would give the host route the wrong origin scope.
-    'admin-event-collaboration-remove': (
-        'events.EventCollaborator', 'event__makerspace_id'
-    ),
-    'admin-event-collaboration-respond': (
-        'events.EventCollaborator', 'makerspace_id'
-    ),
-    'admin-machine-operator-candidates': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-publicity': ('machines.Machine', 'makerspace_id'),
-    'makerspace-verify-domain': ('makerspaces.Makerspace', 'id'),
-    'admin-inventory-detail': ('inventory.InventoryProduct', 'makerspace_id'),
-    'admin-inventory-image': ('inventory.InventoryProduct', 'makerspace_id'),
-    'admin-inventory-asset-detail': ('inventory.InventoryAsset', 'makerspace_id'),
-    'admin-machine-warranty': ('machines.Machine', 'makerspace_id'),
-    'admin-warranty-document-presign': ('warranty.Warranty', 'makerspace_id'),
-    'admin-warranty-documents': ('warranty.Warranty', 'makerspace_id'),
-    'admin-warranty-document-url': ('warranty.WarrantyDocument', 'warranty__makerspace_id'),
-    'admin-warranty-document-detail': ('warranty.WarrantyDocument', 'warranty__makerspace_id'),
-    'admin-inventory-adjust-quantity': ('inventory.InventoryProduct', 'makerspace_id'),
-    'admin-inventory-lending-history': ('inventory.InventoryProduct', 'makerspace_id'),
-    'admin-inventory-chain-of-custody': ('inventory.InventoryProduct', 'makerspace_id'),
-    'admin-needs-fix-action': ('inventory.InventoryProduct', 'makerspace_id'),
-    'admin-category-detail': ('inventory.Category', 'makerspace_id'),
-    'container-detail': ('boxes.Box', 'makerspace_id'),
-    'container-move': ('boxes.Box', 'makerspace_id'),
-    'container-contents': ('boxes.Box', 'makerspace_id'),
-    'container-history': ('boxes.Box', 'makerspace_id'),
-    'qr-print': ('boxes.QrCode', 'makerspace_id'),
-    'qr-revoke': ('boxes.QrCode', 'makerspace_id'),
-    'qr-rebind-target': ('boxes.QrCode', 'makerspace_id'),
-    'evidence-detail': ('evidence.EvidencePhoto', 'makerspace_id'),
-    'stock-transfer-detail': ('operations.StockTransfer', 'makerspace_id'),
-    'stocktake-detail': ('operations.StocktakeSession', 'makerspace_id'),
-    'stocktake-count-lines': ('operations.StocktakeSession', 'makerspace_id'),
-    'stocktake-resolve-scan': ('operations.StocktakeSession', 'makerspace_id'),
-    'stocktake-complete': ('operations.StocktakeSession', 'makerspace_id'),
-    'stocktake-approve': ('operations.StocktakeSession', 'makerspace_id'),
-    'stocktake-apply-adjustments': ('operations.StocktakeSession', 'makerspace_id'),
-    'qr-print-batch-detail': ('operations.QrPrintBatch', 'makerspace_id'),
-    'qr-print-batch-items': ('operations.QrPrintBatch', 'makerspace_id'),
-    'qr-print-batch-download': ('operations.QrPrintBatch', 'makerspace_id'),
-    'direct-loan-return': ('hardware_requests.PublicToolLoan', 'makerspace_id'),
-    'problem-report-triage': ('hardware_requests.PublicProblemReport', 'makerspace_id'),
-    'to-buy-detail': ('procurement.ToBuyItem', 'makerspace_id'),
-    'to-buy-move-to-inventory': ('procurement.ToBuyItem', 'makerspace_id'),
-    'to-buy-move-to-printing': ('procurement.ToBuyItem', 'makerspace_id'),
-    'to-buy-receipt-presign': ('procurement.ToBuyItem', 'makerspace_id'),
-    'to-buy-receipt-list': ('procurement.ToBuyItem', 'makerspace_id'),
-    'to-buy-receipt-url': ('procurement.ToBuyReceipt', 'to_buy_item__makerspace_id'),
-    'to-buy-receipt-detail': ('procurement.ToBuyReceipt', 'to_buy_item__makerspace_id'),
-    'admin-machine-detail': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-image': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-set-status': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-retire': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-unretire': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-usage': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-consumables': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-consumable-detail': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-consumption-log': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-consumable-candidates': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-operators': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-operator-detail': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-document-presign': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-documents': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-error-logs': ('machines.Machine', 'makerspace_id'),
-    'admin-machine-document-url': ('machines.MachineDocument', 'machine__makerspace_id'),
-    'admin-machine-document-detail': ('machines.MachineDocument', 'machine__makerspace_id'),
-    'admin-machine-service-file-url': ('machines.ServiceRequestFile', 'makerspace_id'),
-    'admin-machine-service-file-detail': ('machines.ServiceRequestFile', 'makerspace_id'),
-    'admin-machine-service-request-reprint': ('machines.MachineServiceRequest', 'makerspace_id'),
-    'admin-machine-service-payment-mark-offline': ('payments.Payment', 'makerspace_id'),
-    'admin-machine-service-payment-waive': ('payments.Payment', 'makerspace_id'),
+    **BASE_MODEL_LOOKUPS,
     **{name: ('hardware_requests.HardwareRequest', 'makerspace_id') for name in REQUEST_ACTIONS},
     **{name: ('machines.MachineServiceRequest', 'makerspace_id') for name in MACHINE_SERVICE_ACTIONS},
 }
-# A password belongs to a User, not one membership. Keep this set-valued lookup out of
-# MODEL_LOOKUPS so a multi-membership user can never be reduced to one arbitrary tenant.
-TARGET_SET_LOOKUPS = {
-    'admin-user-reset-password': (
-        'makerspaces.MakerspaceMembership', 'user_id', 'makerspace_id'),
-}
-
 
 def request_route_targets(request, view=None):
     url_name, targets, invalid, route_recognized = _authoritative_route_targets(
         request, view
     )
     hints = []
-
     query = getattr(request, 'query_params', None)
     if query is None:
         query = getattr(request, 'GET', {})
@@ -194,7 +85,6 @@ def request_route_targets(request, view=None):
         invalid = invalid or parsed is None
         if parsed is not None:
             hints.append(parsed)
-
     if getattr(request, "method", "GET") not in {"GET", "HEAD", "OPTIONS", "TRACE"}:
         body = getattr(request, "data", {})
         if hasattr(body, "get"):

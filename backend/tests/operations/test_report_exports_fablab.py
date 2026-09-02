@@ -20,10 +20,15 @@ EXPECTED_FIELDS = {
         "machine_id", "machine_name", "machine_type", "is_active",
         "usage_entries", "usage_hours",
     ),
+    # Order mirrors the report definition exactly: recurrence provenance, the approval
+    # lifecycle statuses, then the post-event feedback and certificate counts.
     "event-attendance": (
-        "event_id", "title", "starts_at", "status", "capacity",
-        "registrations", "confirmed", "registered", "waitlisted", "cancelled",
-        "attended", "attendance_rate_percent", "organizers",
+        "event_id", "series_id", "series_title", "series_occurrence_key",
+        "title", "starts_at", "status", "capacity",
+        "registrations", "confirmed", "pending_approval", "registered", "waitlisted",
+        "rejected", "cancelled", "attended", "attendance_rate_percent",
+        "feedback_responses", "active_certificates", "revoked_certificates",
+        "organizers",
     ),
     "booking-utilization": (
         "space_id", "space_name", "kind", "is_active", "booked", "completed",

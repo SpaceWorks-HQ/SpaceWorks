@@ -12,8 +12,11 @@ exactly the domain that needs it -- which is the whole feature -- so the origin 
 asserted here directly.
 """
 
+from datetime import timedelta
+
 import pytest
 from django.urls import resolve as resolve_url, reverse
+from django.utils import timezone
 from rest_framework.test import APIRequestFactory
 
 from apps.events.models import EventCollaborator, EventRegistration
@@ -136,6 +139,29 @@ def test_capacity_still_applies_to_a_collaborative_registration():
         EventRegistration.Status.REGISTERED,
         EventRegistration.Status.WAITLISTED,
     }
+
+
+def test_collaborative_registration_obeys_cutoff_and_approval_policy():
+    host, partner = make_space("policy-host"), make_space("policy-partner")
+    event = make_event(host, is_public=False)
+    event.registration_requires_approval = True
+    event.registration_cutoff_at = timezone.now() - timedelta(seconds=1)
+    event.save(update_fields=[
+        "registration_requires_approval", "registration_cutoff_at",
+    ])
+    collaborate(event, partner)
+    member = make_member(partner, "policy-visitor")
+    client = client_for(member)
+
+    closed = client.post(register_url(partner, event), {}, format="json")
+    assert closed.status_code == 409
+    assert closed.data["code"] == "registration_closed"
+
+    event.registration_cutoff_at = None
+    event.save(update_fields=["registration_cutoff_at"])
+    pending = client.post(register_url(partner, event), {}, format="json")
+    assert pending.status_code == 201
+    assert pending.data["status"] == EventRegistration.Status.PENDING_APPROVAL
 
 
 # --- discovery ----------------------------------------------------------------------

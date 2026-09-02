@@ -6,7 +6,7 @@ from apps.accounts.models import User
 from apps.boxes.models import QrCode, QrScanEvent
 from apps.encryption.crypto import parse_envelope
 from apps.encryption.services import rotate_dek
-from apps.events.models import EventRegistration
+from apps.events.models import Event, EventRegistration
 from apps.hardware_requests.models import (
     HardwareRequest,
     HardwareRequestItemAsset,
@@ -72,6 +72,10 @@ def test_portable_archive_round_trips_into_a_new_tenant_with_target_aad():
         assert imported.requester_name == "Archive Member"
         assert parse_envelope(target_envelope)[0] == parse_envelope(source_envelope)[0] == 1
         assert target.encryption_keys.get(status="active").version == 2
+        imported_event = Event.objects.get(makerspace=target)
+        assert imported_event.registration_requires_approval is True
+        assert imported_event.registration_cutoff_at is None
+        assert imported_event.registration_cutoff_lead_minutes == 45
         assert EventRegistration.objects.get(event__makerspace=target).email == "member@example.test"
         membership = MakerspaceMembership.objects.get(makerspace=target)
         assert membership.assigned_role == target.roles.get(slug="member")

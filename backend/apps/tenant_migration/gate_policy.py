@@ -169,6 +169,14 @@ TASK_INTERNAL_PARTICIPANTS = {
     "apps.evidence.tasks.sweep_evidence_retention_task": (
         "Each evidence expiry uses the skip-and-count tenant boundary."
     ),
+    "apps.events.tasks.extend_event_series_task": (
+        "Each series extension locks its own makerspace and uses the skip-and-count "
+        "tenant boundary; the queryset is servable-filtered before iteration."
+    ),
+    "apps.operations.tasks.finalize_report_rollups_task": (
+        "Each rollup finalisation uses the skip-and-count tenant boundary; the "
+        "makerspace queryset is servable-filtered before iteration."
+    ),
     "apps.makerspaces.tasks.refresh_github_contributions_task": (
         "Each profile refresh uses the skip-and-count tenant boundary."
     ),
@@ -218,6 +226,12 @@ OBJECT_MUTATION_PARTICIPANTS = {
     ),
     "apps.events.services_images.remove_image": "Called by the tenant-resolved event image route.",
     "apps.events.services_images.update_image": "Called by the tenant-resolved event image route.",
+    "apps.events.services_series_images.remove_image": "Called by the tenant-resolved event series image route.",
+    "apps.events.services_series_images.update_image": "Called by the tenant-resolved event series image route.",
+    "apps.events.services.update_event": (
+        "Runs inside the tenant-resolved admin event route's transaction; it can clear "
+        "image_key when an occurrence stops overriding its series template."
+    ),
     "apps.hardware_requests.direct_loan_returns.validate_evidence_upload": "Runs inside the guarded direct-loan return transaction.",
     "apps.hardware_requests.handover_workflow.issue_request": "Runs inside the request route's tenant transaction.",
     "apps.hardware_requests.return_workflow.return_items": "Runs inside the request route's tenant transaction.",

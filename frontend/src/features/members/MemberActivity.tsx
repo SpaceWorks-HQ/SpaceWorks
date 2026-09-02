@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { staffRequestBlob } from "../../lib/api";
+import { MemberEventFeedback } from "./MemberEventFeedback";
+import { MemberCalendarActions } from "./MemberCalendarActions";
 
 type Loan = { label: string; checked_out_at: string; due_at: string | null; overdue: boolean };
 type MachineServiceRequest = { machine_type?: string; title: string; status: string; queue_position: number | null };
@@ -14,6 +16,9 @@ type Registration = {
   // Non-null only for a REGISTERED row: a waitlisted registration has nothing confirmable
   // behind it, and a QR that scans and then fails is worse than no QR at all.
   checkin_token: string | null;
+  feedback_available: boolean;
+  feedback_path: string | null;
+  certificate: { id: number; status: string; revision: number } | null;
 };
 type Presence = { started_at: string; expires_at: string; active: boolean };
 
@@ -89,8 +94,16 @@ const SECTION_TONES: Record<string, string> = {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) { return <section className={`desk-panel ${SECTION_TONES[title] ?? "border-secondary"} p-5`}><h2 className="title-panel">{title}</h2>{children}</section>; }
 function Empty({ children = "Nothing to show yet." }: { children?: React.ReactNode }) { return <p className="mt-2 border-l-2 border-secondary pl-3 text-sm text-muted">{children}</p>; }
+const REGISTRATION_LABELS: Record<string, string> = {
+  pending_approval: "Awaiting approval",
+  registered: "Confirmed",
+  waitlisted: "Waitlisted",
+  rejected: "Not approved",
+  cancelled: "Cancelled",
+  attended: "Attended",
+};
 
-export function MemberActivityPanel({ activity, makerspaceId }: { activity: MemberActivity; makerspaceId: number }) {
+export function MemberActivityPanel({ activity, makerspaceId, makerspaceSlug }: { activity: MemberActivity; makerspaceId: number; makerspaceSlug: string }) {
   const printerRequests = (activity.machine_service_requests ?? []).filter((request) => request.machine_type === "3d_printer");
   const otherServiceRequests = (activity.machine_service_requests ?? []).filter((request) => request.machine_type !== "3d_printer");
   const requestRows = (rows: MachineServiceRequest[]) => rows.length ? <ul className="mt-3 space-y-2 text-sm text-muted">{rows.map((item) => <li key={`${item.title}-${item.status}`}><span className="font-medium text-ink">{item.title}</span> · {item.status}{item.queue_position ? <span className="font-mono">{` · Queue ${item.queue_position}`}</span> : ""}</li>)}</ul> : <Empty />;
@@ -99,7 +112,7 @@ export function MemberActivityPanel({ activity, makerspaceId }: { activity: Memb
     <Section title="Active hardware loans">{activity.active_hardware_loans.length ? <ul className="mt-3 space-y-2 text-sm text-muted">{activity.active_hardware_loans.map((loan) => <li key={`${loan.label}-${loan.checked_out_at}`}><span className="font-medium text-ink">{loan.label}</span><span className="font-mono">{loan.due_at ? ` · Due ${new Date(loan.due_at).toLocaleString()}` : " · No due date"}</span>{loan.overdue ? " · Overdue" : ""}</li>)}</ul> : <Empty />}</Section>
     {activity.machine_service_requests ? <><Section title="3D print requests">{requestRows(printerRequests)}</Section>{otherServiceRequests.length ? <Section title="Machine-service requests">{requestRows(otherServiceRequests)}</Section> : null}</> : null}
     {activity.bookings ? <Section title="Bookings"><div className="mt-3 grid gap-4 sm:grid-cols-2"><div><h3 className="title-section">Upcoming</h3>{activity.bookings.upcoming.length ? <ul className="mt-2 space-y-2 text-sm text-muted">{activity.bookings.upcoming.map((item) => <li key={`${item.space_name}-${item.starts_at}`}>{item.space_name} · <span className="font-mono">{new Date(item.starts_at).toLocaleString()}</span> · {item.status}</li>)}</ul> : <Empty />}</div><div><h3 className="title-section">Past</h3>{activity.bookings.past.length ? <ul className="mt-2 space-y-2 text-sm text-muted">{activity.bookings.past.map((item) => <li key={`${item.space_name}-${item.starts_at}`}>{item.space_name} · <span className="font-mono">{new Date(item.starts_at).toLocaleString()}</span> · {item.status}</li>)}</ul> : <Empty />}</div></div></Section> : null}
-    {activity.event_registrations ? <Section title="Event registrations">{activity.event_registrations.length ? <ul className="mt-3 space-y-2 text-sm text-muted">{activity.event_registrations.map((item) => <li key={item.registration_id}><span className="font-medium text-ink">{item.event_title}</span> · {item.status}{item.waitlist_position ? ` · Waitlist ${item.waitlist_position}` : ""}{item.checkin_token ? <CheckInQr makerspaceId={makerspaceId} registrationId={item.registration_id} /> : null}</li>)}</ul> : <Empty />}</Section> : null}
+    {activity.event_registrations ? <Section title="Event registrations"><MemberCalendarActions makerspaceId={makerspaceId} makerspaceSlug={makerspaceSlug} />{activity.event_registrations.length ? <ul className="mt-3 space-y-2 text-sm text-muted">{activity.event_registrations.map((item) => <li key={item.registration_id}><span className="font-medium text-ink">{item.event_title}</span> · {REGISTRATION_LABELS[item.status] ?? item.status}{item.status === "pending_approval" ? " · No payment until confirmed" : ""}{item.waitlist_position ? ` · Waitlist ${item.waitlist_position}` : ""}{item.checkin_token ? <CheckInQr makerspaceId={makerspaceId} registrationId={item.registration_id} /> : null}<MemberEventFeedback makerspaceId={makerspaceId} makerspaceSlug={makerspaceSlug} registrationId={item.registration_id} feedbackPath={item.feedback_path} certificate={item.certificate} /></li>)}</ul> : <Empty />}</Section> : null}
     <Section title="Recent presence">{activity.recent_presence_sessions.length ? <ul className="mt-3 space-y-2 font-mono text-sm text-muted">{activity.recent_presence_sessions.map((item) => <li key={item.started_at}>{new Date(item.started_at).toLocaleString()} to {new Date(item.expires_at).toLocaleString()}{item.active ? " · Active" : ""}</li>)}</ul> : <Empty />}</Section>
   </div>;
 }

@@ -53,6 +53,9 @@ def endpoint_calls(space, event, registration):
         ('post', reverse('admin-event-complete', kwargs={'pk': event.pk}), {}),
         ('get', reverse('admin-event-registration-list', kwargs={'pk': event.pk}), None),
         ('post', reverse('admin-event-registration-mark-attended', kwargs={'pk': registration.pk}), {}),
+        ('post', reverse('admin-event-registration-approve', kwargs={'pk': registration.pk}), {}),
+        ('post', reverse('admin-event-registration-reject', kwargs={'pk': registration.pk}), {}),
+        ('post', reverse('admin-event-registration-promote', kwargs={'pk': registration.pk}), {}),
     ]
 def call(client, method, url, data):
     return getattr(client, method)(url, data=data, format='json')
@@ -256,7 +259,7 @@ def test_staff_urls_reverse_and_origin_registry_resolves_owner():
     event = make_event(space)
     registration = make_registration(event)
     urls = [url for _method, url, _data in endpoint_calls(space, event, registration)]
-    assert len(set(urls)) == 7
+    assert len(set(urls)) == 10
     factory = APIRequestFactory()
     for url in urls:
         match = resolve(url)
@@ -278,8 +281,11 @@ def test_openapi_contains_nine_operations_and_typed_components():
         '/api/v1/admin/events/{id}/complete/': {'post'},
         '/api/v1/admin/events/{id}/registrations/': {'get'},
         '/api/v1/admin/event-registrations/{id}/mark-attended/': {'post'},
+        '/api/v1/admin/event-registrations/{id}/approve/': {'post'},
+        '/api/v1/admin/event-registrations/{id}/reject/': {'post'},
+        '/api/v1/admin/event-registrations/{id}/promote/': {'post'},
     }
-    assert sum(len(methods) for methods in paths.values()) == 9
+    assert sum(len(methods) for methods in paths.values()) == 12
     assert all(methods <= schema['paths'][path].keys() for path, methods in paths.items())
     components = schema['components']['schemas']
     assert {'EventWrite', 'EventAdmin', 'EventRegistrationAdmin'} <= components.keys()

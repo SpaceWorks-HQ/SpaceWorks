@@ -91,6 +91,7 @@ GENERATOR_PROOFS = {
             ("bookings_bookablespace", "public_token"),
             ("bookings_booking", "public_token"),
             ("events_event", "public_token"),
+            ("events_eventseries", "public_token"),
             ("events_eventregistration", "checkin_token"),
             ("hardware_requests_hardwarerequest", "public_token"),
             ("machines_machineservicerequest", "public_token"),

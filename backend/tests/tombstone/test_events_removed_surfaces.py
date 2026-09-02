@@ -14,6 +14,7 @@ routes and nothing else.
 """
 
 import pytest
+from django.conf import settings
 from django.urls import Resolver404, resolve
 from rest_framework.test import APIClient
 
@@ -21,6 +22,7 @@ from apps.events.models import Event, EventRegistration
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.module_registry import module_available
 from apps.makerspaces.platform import available_modules
+from apps.operations.management.commands.run_scheduled_tasks import SCHEDULED_TASKS
 from apps.separability.registry import pii_fields_for, purge_plan_for, runtime_active
 
 pytestmark = pytest.mark.django_db
@@ -39,7 +41,13 @@ def test_the_app_is_registered_as_inactive():
     "path",
     [
         "/api/v1/admin/makerspaces/1/events/",
+        "/api/v1/admin/makerspaces/1/event-series/",
         "/api/v1/admin/events/1/",
+        "/api/v1/admin/event-series/1/",
+        "/api/v1/admin/event-series/1/occurrences/",
+        "/api/v1/admin/event-series/1/extend/",
+        "/api/v1/admin/event-series/1/collaborators/",
+        "/api/v1/admin/makerspaces/1/event-series-collaborations/",
         "/api/v1/admin/events/1/publish/",
         "/api/v1/admin/events/1/cancel/",
         "/api/v1/admin/events/1/complete/",
@@ -82,7 +90,17 @@ def test_the_openapi_schema_does_not_advertise_events():
 
     assert response.status_code == 200
     assert b"/events/" not in response.content
+    assert b"/event-series/" not in response.content
     assert b"/event-registrations/" not in response.content
+
+
+def test_the_series_extension_task_is_not_scheduled():
+    task = "apps.events.tasks.extend_event_series_task"
+    beat_tasks = {entry["task"] for entry in settings.CELERY_BEAT_SCHEDULE.values()}
+    runner_tasks = {dotted for _name, dotted, _minutes in SCHEDULED_TASKS}
+
+    assert task not in beat_tasks
+    assert task not in runner_tasks
 
 
 def test_the_module_is_not_offered_to_the_console():

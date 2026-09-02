@@ -31,7 +31,7 @@ export default function EventCheckInScanner({
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<string | null>(null);
   const resolve = useResolveEventCheckIn(eventId);
-  const attend = useMarkEventAttended(makerspaceId, eventId);
+  const attend = useMarkEventAttended(makerspaceId, eventId, "qr");
 
   const handleScan = async (value: string) => {
     setScanning(false);

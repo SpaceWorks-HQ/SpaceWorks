@@ -19,5 +19,6 @@ NON_TRAVERSABLE = frozenset(
         ("operations.StockTransfer", "source_container"),
         ("operations.StockTransfer", "destination_container"),
         ("events.EventCollaborator", "event"),
+        ("events.EventSeriesCollaborator", "series"),
     }
 )

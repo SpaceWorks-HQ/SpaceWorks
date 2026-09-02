@@ -25,9 +25,10 @@ def test_registry_declares_all_send_path_keys():
         *{("hardware", "staff", key) for key in HARDWARE_STAFF_KEYS},
         *{("printing", "requester", key) for key in PRINTING_REQUESTER_KEYS},
         *{("printing", "staff", key) for key in PRINTING_STAFF_KEYS},
-        # The four FabLab streams cover both audiences for every event (20 x 2). Derived
-        # from the same table the registry builds from, so this stays a guard against a
-        # key existing with no send path rather than a number to bump.
+        # The four FabLab streams cover both audiences for every event (24 x 2 = 48;
+        # events 11, bookings 6, maintenance 5, membership 2). Derived from the same
+        # table the registry builds from, so this stays a guard against a key existing
+        # with no send path rather than a number to bump.
         *{
             (stream, audience, key)
             for stream, keys in FABLAB_STREAM_KEYS.items()
@@ -36,7 +37,7 @@ def test_registry_declares_all_send_path_keys():
         },
     }
 
-    assert len(REGISTRY) == 27 + 40
+    assert len(REGISTRY) == 27 + 48
     assert all_send_keys() == expected
 
 

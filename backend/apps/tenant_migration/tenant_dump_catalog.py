@@ -38,7 +38,11 @@ class TenantDumpCatalogError(AssertionError):
 
 # SHA-256 of the ordered model/table/field graph produced by ``catalog_schema``.
 # Updating it is an explicit review act; runtime introspection never blesses drift.
-CATALOG_SCHEMA_SHA256 = "e56b68cf7e2853e745f5bbf72040fa21229ac9b7727ad2e172cfc0f436e8a86c"
+# Re-blessed once for the WHOLE merged model graph: the events programme (series,
+# check-in ledger, feedback, certificates, station credential), the organization layer
+# and the evidence retention state. Neither branch's pinned value describes the merge,
+# so this was recomputed after the merge rather than taken from either side.
+CATALOG_SCHEMA_SHA256 = "eff14cebc1c741bc00072a0c3184f83f22d322ccccfe1755755fd125353943d2"
 
 
 def catalog_models(apps_registry=apps):

@@ -26,7 +26,9 @@ THIRD_PARTY_INSTALLED_APP_LABELS = frozenset(
 PROJECTED_MODEL_LABELS = frozenset(
     """accounts.User apiclients.ApiKeyRequest audit.AuditLog
     backup.MakerspaceArchiveRecipient bookings.BookableSpace bookings.Booking boxes.Box
-    boxes.BoxScan boxes.QrCode boxes.QrScanEvent events.Event events.EventRegistration
+    boxes.BoxScan boxes.QrCode boxes.QrScanEvent events.EventSeries events.Event events.EventRegistration
+    events.EventCheckInEvent events.EventFeedbackSurvey events.EventFeedbackResponse
+    events.EventAttendanceCertificate
     evidence.EvidencePhoto evidence.EvidenceObjectRetentionState
     evidence.EvidenceRetentionPolicy hardware_requests.HardwareRequest
     hardware_requests.HardwareRequestItem hardware_requests.HardwareRequestItemAsset
@@ -47,7 +49,8 @@ PROJECTED_MODEL_LABELS = frozenset(
     makerspaces.MakerspaceMembership makerspaces.MakerspaceWaiver
     makerspaces.MemberProfile makerspaces.MemberProject makerspaces.MembershipRequest
     notifications.Notification operations.InventoryAdjustment operations.QrPrintBatch
-    operations.QrPrintBatchItem operations.StockTransfer operations.StockTransferLine
+    operations.QrPrintBatchItem operations.ReportMetricRollup operations.StockTransfer
+    operations.StockTransferLine
     operations.StocktakeLedgerEntry operations.StocktakeLine operations.StocktakeSession
     payments.MakerspacePaymentSettings payments.Payment presence.PresenceSession
     procurement.ToBuyItem procurement.ToBuyReceipt
@@ -60,6 +63,7 @@ PRESERVE_LIVE_MODEL_LABELS = frozenset({"machines.MachineOperator"})
 EXPLICIT_DROP_MODEL_REASONS = {
     "apiclients.ApiClient": "Source clients and their bearer secrets never become target authority.",
     "events.EventCollaborator": "Cross-tenant collaboration grants have no target counterpart.",
+    "events.EventSeriesCollaborator": "Cross-tenant series collaboration grants have no target counterpart.",
     "integrations.EmailNotificationMute": "Source delivery suppression does not control target mail.",
     "integrations.NotificationPreference": "Target notification defaults are authoritative.",
     "integrations.NotificationRecipient": "Every explicit recipient is a live disclosure rule.",

@@ -14,6 +14,7 @@ from apps.admin_api.serializers_payment_summary import scoped_payment_context
 from apps.boxes.qr_render import render_qr_label_svg
 from apps.events.member_history import registrations_for_space
 from apps.events.models import Event, EventRegistration
+from apps.events.checkin_roster import host_waiver_state
 from apps.events.serializers_checkin import (
     EventCheckInResolveRequestSerializer,
     EventCheckInResolveResponseSerializer,
@@ -23,8 +24,7 @@ from apps.events.views_admin import _manageable_event
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.member_activity_service import active_membership
-from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
-from apps.makerspaces.waiver_state import acceptance_on_file_q
+from apps.makerspaces.models import MakerspaceWaiver
 from apps.payments.models import Payment
 from apps.presence.guard import MemberPresenceRequired
 
@@ -33,33 +33,6 @@ from apps.presence.guard import MemberPresenceRequired
 # by the QR route and the member-activity token so the two cannot disagree about whether a
 # code is usable.
 CHECKABLE_EVENT_STATUSES = (Event.Status.PUBLISHED, Event.Status.COMPLETED)
-
-
-def host_waiver_state(registration):
-    """Which waiver evidence exists for this registration, across BOTH locations.
-
-    A visitor's acceptance is stamped on the registration; a host member's lives on their
-    MakerspaceMembership. Reading only the first is why every host member was told to take
-    a waiver at the desk. Deliberately NOT compared against the waiver's current version:
-    a host revising its terms must not retroactively invalidate an acceptance somebody
-    already gave, the same rule the QR gate follows.
-    """
-    if not MakerspaceWaiver.objects.filter(
-        makerspace_id=registration.event.makerspace_id,
-        is_active=True,
-    ).exists():
-        return "not_required"
-
-    if registration.host_waiver_id:
-        return "on_file"
-
-    if registration.member_id and MakerspaceMembership.objects.filter(
-        user_id=registration.member_id,
-        makerspace_id=registration.event.makerspace_id,
-    ).filter(acceptance_on_file_q()).exists():
-        return "on_file"
-
-    return "missing"
 
 
 class EventCheckInResolveView(APIView):

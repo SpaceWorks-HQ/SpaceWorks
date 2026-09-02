@@ -13,6 +13,14 @@ MEMBERSHIP_DEPENDENT_MODELS = {
         retained_by_import=False,
         reason="Transient claim credentials are omitted from tenant archives.",
     ),
+    "events.MemberCalendarFeed": MembershipDependency(
+        retained_by_import=False,
+        reason=(
+            "A deployment-local bearer credential over the member's registration history. "
+            "It is already omitted from tenant archives, so a restored tenant reissues it "
+            "rather than carrying a live subscribable token across deployments."
+        ),
+    ),
     "makerspaces.MemberProfile": MembershipDependency(
         retained_by_import=True,
         reason="A member profile is owned by one non-null makerspace membership.",

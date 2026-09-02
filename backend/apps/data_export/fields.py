@@ -47,11 +47,15 @@ ALWAYS_OMITTED = {
     ("bookings.BookableSpace", "public_token"): "Source bearer/status token.",
     ("bookings.Booking", "public_token"): "Source bearer/status token.",
     ("events.Event", "public_token"): "Source bearer/status token.",
+    ("events.EventSeries", "public_token"): "Source bearer/status token.",
     ("events.EventRegistration", "checkin_token"): "Source check-in bearer token.",
     ("events.EventRegistration", "email_exact_hash"): "Deployment-local blind index.",
     ("events.EventRegistration", "email_hash_generation"): "Deployment-local key generation.",
     ("evidence.EvidenceObjectRetentionState", "claim_token"): (
         "Transient object-expiry claim credential."
+    ),
+    ("events.EventCollaborator", "source_series_collaboration"): (
+        "Projection provenance is rebuilt from the canonical series collaboration."
     ),
     ("hardware_requests.HardwareRequest", "public_token"): "Source bearer/status token.",
     ("integrations.NotificationDestination", "webhook_url"): "Encrypted webhook credential.",
@@ -109,6 +113,8 @@ EXTERNAL_REFERENCE_SNAPSHOTS = {
 }
 
 EXTERNAL_REFERENCES = {
+    ("events.EventSeriesCollaborator", "series"),
+    ("events.EventSeriesCollaborator", "makerspace"),
     ("events.EventCollaborator", "event"),
     # Both directions of a collaboration are exported (the predicate matches on
     # `event__makerspace` OR `makerspace`), and each direction has a different foreign

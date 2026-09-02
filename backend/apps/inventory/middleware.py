@@ -72,6 +72,14 @@ class FrontendHMACMiddleware:
         )
 
     def _is_protected_path(self, request):
+        # A subscribable calendar client cannot produce SpaceWorks HMAC headers. The
+        # 256-bit, independently rate-limited feed token is the authentication for this
+        # one route, so applying the frontend-client gate would make every subscription
+        # fail when API_CLIENT_AUTH_REQUIRED is enabled.
+        from apps.events.middleware import is_calendar_feed_bearer_path
+
+        if is_calendar_feed_bearer_path(request.path_info):
+            return False
         return any(
             request.path.startswith(p) for p in settings.HMAC_PROTECTED_PATH_PREFIXES
         )

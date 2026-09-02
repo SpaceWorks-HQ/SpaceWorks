@@ -21,6 +21,13 @@ class EventOrganizer(models.Model):
         related_name="+",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    source_series_organizer = models.ForeignKey(
+        "events.EventSeriesOrganizer",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="occurrence_organizers",
+    )
 
     class Meta:
         constraints = [

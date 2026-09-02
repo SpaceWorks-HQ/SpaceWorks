@@ -99,6 +99,8 @@ EXPECTED = dict(
         *_fields("bookings.Booking", "public_token", D.RESET),
         *_fields("events.Event", "is_public status", D.PRESERVE),
         *_fields("events.Event", "public_token", D.RESET),
+        *_fields("events.EventSeries", "is_public status", D.PRESERVE),
+        *_fields("events.EventSeries", "public_token", D.RESET),
         *_fields(
             "events.EventRegistration",
             "checkin_token registered_via_makerspace payment_via_makerspace",

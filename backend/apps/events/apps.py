@@ -6,6 +6,7 @@ class EventsConfig(AppConfig):
     name = "apps.events"
 
     def ready(self):
+        from apps.events import station_auth  # noqa: F401
         from apps.separability.tombstones import register_separable_app
 
         register_separable_app("events")

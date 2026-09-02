@@ -27,6 +27,7 @@ import {
 } from "./staffTabs";
 import { type Makerspace, useStaffGet } from "./panels/shared";
 import { useTenant } from "../../lib/tenant";
+import { wipeOfflineScopes } from "./eventCheckInOfflineStore";
 
 export function useStaffSession(guestOnly: boolean) {
   const tenant = useTenant();
@@ -74,6 +75,7 @@ export function useStaffSession(guestOnly: boolean) {
   }, [hydrateUser]);
 
   const expireSession = useCallback(() => {
+    void wipeOfflineScopes("staff:");
     setUser(null);
     setSelected(null);
     setTab("");
@@ -179,6 +181,7 @@ export function useStaffSession(guestOnly: boolean) {
 
   const signOut = async () => {
     await logoutStaff();
+    await wipeOfflineScopes("staff:");
     setUser(null);
     setSelected(null);
     queryClient.clear();

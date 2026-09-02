@@ -17,9 +17,15 @@ EXPORTED_MODEL_FIELDS = {
     "boxes.BoxScan": "id makerspace box request actor context created_at",
     "boxes.QrCode": "id makerspace payload target_type target_id status created_by revoked_at created_at updated_at",
     "boxes.QrScanEvent": "id makerspace qr_code request actor context created_at",
-    "events.Event": "id public_token makerspace title description starts_at ends_at location location_kind custom_form capacity payment_amount is_public image_key status created_by created_at updated_at",
-    "events.EventCollaborator": "id event makerspace status invited_by responded_by created_at responded_at",
-    "events.EventRegistration": "id event checkin_token name email phone member registered_via_makerspace payment_via_makerspace host_waiver host_waiver_accepted_at host_waiver_version_accepted email_exact_hash email_hash_generation custom_answers status created_at",
+    "events.EventSeries": "id public_token calendar_uid calendar_sequence calendar_updated_at makerspace title description location location_kind custom_form capacity payment_amount registration_requires_approval registration_cutoff_lead_minutes is_public image_key recurrence_timezone dtstart_local_date dtstart_local_time recurrence_rule duration_minutes revision status last_materialized_at last_generation_error_code created_by created_at updated_at",
+    "events.EventSeriesCollaborator": "id series makerspace status invited_by responded_by created_at responded_at",
+    "events.Event": "id public_token calendar_uid calendar_sequence calendar_updated_at timezone_name badge_template makerspace series series_occurrence_key series_revision series_override_fields title description starts_at ends_at location location_kind custom_form capacity payment_amount registration_requires_approval registration_cutoff_at registration_cutoff_lead_minutes is_public image_key status created_by created_at updated_at",
+    "events.EventCollaborator": "id event makerspace status invited_by responded_by created_at responded_at source_series_collaboration",
+    "events.EventRegistration": "id event checkin_token name email phone member registered_via_makerspace payment_via_makerspace host_waiver host_waiver_accepted_at host_waiver_version_accepted email_exact_hash email_hash_generation custom_answers status calendar_sequence calendar_updated_at created_at",
+    "events.EventCheckInEvent": "id makerspace event registration operation_id source attended_at recorded_at actor session_id station_version",
+    "events.EventFeedbackSurvey": "id event title thank_you_text questions is_open certificate_enabled answered_question_ids opened_at closed_at created_at updated_at",
+    "events.EventFeedbackResponse": "id survey registration answers_snapshot certificate_requested created_at",
+    "events.EventAttendanceCertificate": "id response registration serial revision recipient_name event_title event_starts_at event_ends_at issuer_name object_key content_type size_bytes sha256 status issued_at rendered_at revoked_at revoked_by revocation_reason",
     "evidence.EvidencePhoto": "id makerspace evidence_type object_key content_type size_bytes uploaded_by created_at",
     "evidence.EvidenceObjectRetentionState": "evidence status claim_token claimed_at object_expired_at expired_size_bytes last_error updated_at",
     "evidence.EvidenceRetentionPolicy": "makerspace object_retention_days updated_at",
@@ -105,6 +111,12 @@ GLOBAL_MODELS = {
 }
 
 OMITTED_MODELS = {
+    "events.EventCheckInStationCredential": (
+        "Live event-station authentication authority; a restored tenant must rotate a new PIN."
+    ),
+    "events.MemberCalendarFeed": (
+        "Deployment-local bearer credential over member registration history; restored tenants must reissue it."
+    ),
     "apiclients.ApiClientImportApproval": "Artifact-bound target authority approval is deployment-local coordination state.",
     "accounts.DailyOtpEmailCounter": "Platform authentication telemetry.",
     "accounts.DeviceAttestationChallenge": "Transient authentication state.",
@@ -174,6 +186,10 @@ OMITTED_MODELS = {
     "operations.PeriodicTaskRun": "Deployment scheduler state.",
     "operations.ReportRollupCursor": "Rebuildable report rollup coordination and retention-fence state.",
     "events.EventOrganizer": (
+        "It references a deployment-global organization that does not travel with "
+        "a tenant export."
+    ),
+    "events.EventSeriesOrganizer": (
         "It references a deployment-global organization that does not travel with "
         "a tenant export."
     ),

@@ -94,6 +94,12 @@ FEATURE_DEFINITIONS = (
         # reactivated delegated access without anybody opting in again.
         requires_modules=("maintenance", "machines"),
     ),
+    FeatureDefinition(
+        "events.offline_checkin", "events", "Offline & station check-in",
+        "Store a minimal expiring roster on event devices and enable event-scoped "
+        "PIN stations.",
+        default_enabled=False,
+    ),
 )
 FEATURES = {definition.key: definition for definition in FEATURE_DEFINITIONS}
 # A feature's parent/required modules are validated against the module registry

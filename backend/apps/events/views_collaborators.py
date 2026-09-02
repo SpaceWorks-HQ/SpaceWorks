@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.events import collaborator_services
+from apps.events.exceptions import UseSeriesCollaborators
 from apps.events.organizer_authority import organizer_event_q
 from apps.events.models import Event, EventCollaborator
 from apps.events.serializers_collaborators import (
@@ -108,6 +109,8 @@ class EventCollaboratorListView(APIView):
     )
     def put(self, request, pk, *args, **kwargs):
         event = _manageable_event(request.user, pk)
+        if event.series_id:
+            raise UseSeriesCollaborators()
         serializer = EventCollaboratorReplaceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         collaborators = collaborator_services.invite_collaborators(
@@ -147,6 +150,8 @@ class EventCollaborationRemoveView(APIView):
             .distinct(),
             pk=pk,
         )
+        if collaboration.source_series_collaboration_id:
+            raise UseSeriesCollaborators()
         _manageable_event(request.user, collaboration.event_id)
         collaborator_services.remove_collaborator(pk, actor=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

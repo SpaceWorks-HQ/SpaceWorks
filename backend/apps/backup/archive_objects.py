@@ -21,6 +21,13 @@ NON_OBJECT_KEY_FIELDS = frozenset({
     ("audit.AuditSigningKeyRotation", "new_key"),
     ("audit.AuditSigningKeyRotation", "old_key"),
     ("backup.RestoreRollbackObject", "module_key"),
+    # Logical identity strings, not object-store pointers: the occurrence key names a
+    # position within a recurring series, and the rollup keys name which metric a row
+    # holds. Nothing is stored in a bucket for any of them.
+    ("events.Event", "series_occurrence_key"),
+    ("operations.ReportMetricRollup", "dimension_key"),
+    ("operations.ReportMetricRollup", "metric_key"),
+    ("operations.ReportMetricRollup", "report_key"),
     ("backup.RestoreRollbackObject", "source_key"),
     # Run-owned promotion staging is retry coordination, not durable archive
     # content. The final object and artifact ledger are the restore authority.
@@ -167,6 +174,8 @@ def capture_objects(root, object_keys, modes):
 def module_for_model(label):
     return {
         "events.Event": "events",
+        "events.EventSeries": "events",
+        "events.EventAttendanceCertificate": "events",
         "bookings.BookableSpace": "bookings",
         "maintenance.MaintenanceLogDocument": "maintenance",
         "procurement.ToBuyReceipt": "procurement",

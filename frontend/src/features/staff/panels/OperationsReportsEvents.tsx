@@ -22,7 +22,7 @@ export function OperationsReportsEvents(props: FablabPanelProps) {
 }
 
 function EventsReport({ rows, data }: { rows: EventAttendanceRow[]; data?: ReportResponse<EventAttendanceRow> }) {
-  const statusRows = ["registered", "waitlisted", "cancelled", "attended"].map((key) => ({ label: key, value: sum(rows, key) }));
+  const statusRows = ["pending_approval", "registered", "waitlisted", "rejected", "cancelled", "attended"].map((key) => ({ label: key, value: sum(rows, key) }));
   return <>
     <StatCards stats={[["Events", rows.length], ["Registrations", sum(rows, "registrations")], ["Confirmed", sum(rows, "confirmed")], ["Attended", sum(rows, "attended")]]} />
     <div className="mt-4 grid gap-4 lg:grid-cols-2">

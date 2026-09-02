@@ -81,6 +81,10 @@ ROUTE_KWARGS = {
         "pk": 1,
     },
     "member-event-checkin-qr": {"makerspace_id": "claim", "pk": 1},
+    "member-event-calendar": {"makerspace_id": "claim"},
+    "member-event-calendar-feed": {"makerspace_id": "claim"},
+    "member-event-feedback": {"makerspace_id": "claim", "pk": 1},
+    "member-event-certificate-download": {"makerspace_id": "claim", "pk": 1},
     "public-membership-request": {"makerspace_slug": "claim"},
 }
 REFUSED_KEYS = sorted(

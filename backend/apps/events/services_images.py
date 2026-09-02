@@ -46,7 +46,13 @@ def update_image(event, actor, object_key):
             locked.makerspace, old_key
         )
     locked.image_key = object_key
-    locked.save(update_fields=["image_key", "updated_at"])
+    update_fields = ["image_key", "updated_at"]
+    if locked.series_id:
+        locked.series_override_fields = sorted(
+            set(locked.series_override_fields or []) | {"image_key"}
+        )
+        update_fields.append("series_override_fields")
+    locked.save(update_fields=update_fields)
     audit.record(
         actor,
         "event.image_updated",
@@ -62,10 +68,18 @@ def update_image(event, actor, object_key):
 def remove_image(event, actor):
     locked = _locked_event(event.pk)
     old_key = locked.image_key
-    if not old_key:
+    if not old_key and (
+        locked.series_id is None or "image_key" in (locked.series_override_fields or [])
+    ):
         return locked
     locked.image_key = ""
-    locked.save(update_fields=["image_key", "updated_at"])
+    update_fields = ["image_key", "updated_at"]
+    if locked.series_id:
+        locked.series_override_fields = sorted(
+            set(locked.series_override_fields or []) | {"image_key"}
+        )
+        update_fields.append("series_override_fields")
+    locked.save(update_fields=update_fields)
     audit.record(
         actor,
         "event.image_removed",

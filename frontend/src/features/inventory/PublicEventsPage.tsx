@@ -8,12 +8,13 @@ import { SiteFooter } from "../../components/SiteFooter";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { Card, EmptyState, Skeleton, StatusBadge } from "../../components/ui";
 import type { ApiPath } from "../../generated/api";
-import { StructuredApiError, tenantPublicRequest } from "../../lib/api";
+import { StructuredApiError, tenantPublicRequest, tenantPublicRequestBlob } from "../../lib/api";
 import { useTenant, useTenantPath } from "../../lib/tenant";
 import { EventRegistrationForm } from "./EventRegistrationForm";
 import { formatSlug } from "./PublicInventoryParts";
 import { useTenantBootstrap } from "./usePublicInventory";
 import { SkipLink } from "../../components/SkipLink";
+import type { CustomFormSchema } from "../forms/customFormTypes";
 
 type PublicEvent = {
   public_token: string;
@@ -24,8 +25,13 @@ type PublicEvent = {
   location: string;
   capacity: number | null;
   availability: "Available" | "Limited" | "Full";
+  registration_requires_approval: boolean;
+  effective_registration_cutoff_at: string | null;
+  registration_open: boolean;
   image_url: string | null;
   status: "published";
+  custom_form: CustomFormSchema;
+  series: { public_token: string; title: string } | null;
 };
 
 const PUBLIC_EVENTS_PATH: ApiPath = "/api/v1/public/{makerspace_slug}/events/";
@@ -47,6 +53,8 @@ export function PublicEventsPage() {
   const bootstrapQuery = useTenantBootstrap(makerspaceSlug, tenant.mode === "central");
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
   const [activeToken, setActiveToken] = useState<string | null>(null);
+  const [calendarToken, setCalendarToken] = useState<string | null>(null);
+  const [calendarError, setCalendarError] = useState<{ token: string; message: string } | null>(null);
   const events = useQuery({
     queryKey: ["public-events", makerspaceSlug],
     queryFn: () => tenantPublicRequest<PublicEvent[]>(makerspaceSlug, publicEventsPath(makerspaceSlug)),
@@ -57,6 +65,34 @@ export function PublicEventsPage() {
   const unavailable = apiError?.status === 400;
   const missing = apiError?.status === 404;
   const throttled = apiError?.status === 429;
+  const groupedEvents = (events.data ?? []).reduce<Array<{
+    key: string; title: string | null; items: PublicEvent[];
+  }>>((groups, item) => {
+    const key = item.series?.public_token ?? item.public_token;
+    const group = groups.find((candidate) => candidate.key === key);
+    if (group) group.items.push(item);
+    else groups.push({ key, title: item.series?.title ?? null, items: [item] });
+    return groups;
+  }, []);
+
+  async function downloadCalendar(item: PublicEvent) {
+    setCalendarToken(item.public_token);
+    setCalendarError(null);
+    try {
+      const path = `${publicEventsPath(makerspaceSlug)}${item.public_token}/calendar.ics`;
+      const blob = await tenantPublicRequestBlob(makerspaceSlug, path);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${item.title.replace(/[^A-Za-z0-9._-]+/g, "-") || "event"}.ics`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      setCalendarError({ token: item.public_token, message: cause instanceof Error ? cause.message : "Could not download this calendar." });
+    } finally {
+      setCalendarToken(null);
+    }
+  }
 
   return <main className="desk-shell flex min-h-screen flex-col">
     <SkipLink />
@@ -76,23 +112,29 @@ export function PublicEventsPage() {
         {!missing && !unavailable ? <button className="desk-button mt-4" type="button" onClick={() => events.refetch()}>Retry</button> : null}
       </Card> : null}
       {events.data && !events.data.length ? <div className="[&>div]:border-secondary"><EmptyState title="No upcoming events" description="New public events will appear here when they are published." /></div> : null}
-      {events.data?.length ? <div className="grid gap-5">{events.data.map((item) => {
+      {groupedEvents.length ? <div className="grid gap-7">{groupedEvents.map((group) => <section key={group.key} aria-label={group.title ?? undefined}>
+        {group.title ? <div className="mb-3"><p className="eyebrow text-secondary-ink">Recurring series</p><h2 className="title-panel">{group.title}</h2></div> : null}
+        <div className="grid gap-5">{group.items.map((item) => {
         const unlimited = item.capacity === 0 || item.capacity === null;
         const waitlist = item.availability === "Full";
         const open = activeToken === item.public_token;
+        const actionLabel = item.registration_requires_approval ? "Apply" : waitlist ? "Join waitlist" : "Register";
         return <article key={item.public_token} className="desk-panel overflow-hidden p-0">
           {/* Decorative: the title beside it already names the event, so alt is empty
               rather than a duplicate announcement for screen-reader users. */}
           {item.image_url ? <img src={item.image_url} alt="" loading="lazy" className="h-48 w-full object-cover sm:h-56" /> : null}
           <div className="p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h2 className="title-panel">{item.title}</h2><p className="eyebrow mt-1"><time dateTime={item.starts_at}>{eventTime(item)}</time></p>{item.location ? <p className="eyebrow mt-1">{item.location}</p> : null}</div><StatusBadge status={item.status} /></div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="title-panel">{item.title}</h3><p className="eyebrow mt-1"><time dateTime={item.starts_at}>{eventTime(item)}</time></p>{item.location ? <p className="eyebrow mt-1">{item.location}</p> : null}</div><StatusBadge status={item.status} /></div>
           {item.description ? <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink">{item.description}</p> : null}
           <dl className="mt-4 flex flex-wrap gap-4 text-sm"><div><dt className="eyebrow">Capacity</dt><dd className="font-mono font-semibold text-ink">{unlimited ? "Unlimited" : item.capacity}</dd></div><div><dt className="eyebrow">Availability</dt><dd className="font-mono font-semibold text-ink">{item.availability}</dd></div></dl>
-          <button className="desk-button-primary mt-4" type="button" aria-expanded={open} onClick={() => setActiveToken(open ? null : item.public_token)}>{open ? "Close form" : waitlist ? "Join waitlist" : "Register"}</button>
-          {open ? <div className="mt-4"><EventRegistrationForm key={item.public_token} makerspaceSlug={makerspaceSlug} publicToken={item.public_token} waitlist={waitlist} /></div> : null}
+          {!item.registration_open ? <p className="mt-4 text-sm font-semibold text-muted">Registration closed{item.effective_registration_cutoff_at ? ` · ${new Date(item.effective_registration_cutoff_at).toLocaleString()}` : ""}</p> : null}
+          <div className="mt-4 flex flex-wrap gap-2"><button className="desk-button-primary" type="button" disabled={!item.registration_open} aria-expanded={open} onClick={() => setActiveToken(open ? null : item.public_token)}>{open ? "Close form" : actionLabel}</button>
+          <button className="desk-button" type="button" disabled={calendarToken === item.public_token} onClick={() => downloadCalendar(item)}>{calendarToken === item.public_token ? "Preparing…" : "Add to calendar"}</button></div>
+          {calendarError?.token === item.public_token ? <p className="mt-2 text-sm text-danger" role="alert">{calendarError.message}</p> : null}
+          {open && item.registration_open ? <div className="mt-4"><EventRegistrationForm key={item.public_token} makerspaceSlug={makerspaceSlug} publicToken={item.public_token} waitlist={waitlist} approvalRequired={item.registration_requires_approval} customForm={item.custom_form} /></div> : null}
           </div>
         </article>;
-      })}</div> : null}
+      })}</div></section>)}</div> : null}
     </section>
     <SiteFooter />
   </main>;

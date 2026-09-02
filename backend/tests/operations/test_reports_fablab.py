@@ -49,7 +49,8 @@ def test_detailed_fablab_metrics_and_decimal_contract():
     assert usage[0]["usage_hours"] == "2.50"
     assert usage[0]["is_active"] is False
     attendance = reports.report_data("event-attendance", space.id)["typed_rows"][0]
-    assert (attendance["registrations"], attendance["confirmed"], attendance["attendance_rate_percent"]) == (4, 2, 50.0)
+    assert (attendance["registrations"], attendance["confirmed"], attendance["attendance_rate_percent"]) == (6, 2, 50.0)
+    assert attendance["pending_approval"] == attendance["rejected"] == 1
     booking = reports.report_data("booking-utilization", space.id, date_range=(start, end))["typed_rows"][0]
     assert booking["reserved_hours"] == "4.00"
     assert booking["completed_hours"] == "2.00"

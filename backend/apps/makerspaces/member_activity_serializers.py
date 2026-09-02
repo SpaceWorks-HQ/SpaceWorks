@@ -36,6 +36,9 @@ class MemberEventRegistrationActivitySerializer(serializers.Serializer):
     ends_at = serializers.DateTimeField()
     status = serializers.CharField()
     waitlist_position = serializers.IntegerField(allow_null=True)
+    feedback_available = serializers.BooleanField()
+    feedback_path = serializers.CharField(allow_null=True)
+    certificate = serializers.DictField(allow_null=True)
 
 
 class MemberMachineServiceActivitySerializer(serializers.Serializer):

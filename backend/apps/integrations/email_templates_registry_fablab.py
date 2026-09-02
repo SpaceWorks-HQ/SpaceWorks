@@ -44,6 +44,10 @@ EVENTS_KEYS = (
     "registration_cancelled",
     "registration_promoted",
     "registration_attended",
+    "series_published",
+    "series_cancelled",
+    "series_completed",
+    "series_generation_failed",
 )
 BOOKINGS_KEYS = ("created", "confirmed", "rejected", "cancelled", "completed", "no_show")
 MAINTENANCE_KEYS = (

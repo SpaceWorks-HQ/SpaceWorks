@@ -8,7 +8,7 @@ names, so `origin_scope_routes` (keyed by bare `url_name`), the OpenAPI snapshot
 every `reverse()` are unaffected. No `app_name`, matching `admin_api`.
 """
 
-from django.urls import path
+from django.urls import include, path
 
 from apps.events.views_admin import (
     EventCancelView,
@@ -17,21 +17,112 @@ from apps.events.views_admin import (
     EventDetailView,
     EventListCreateView,
     EventPublishView,
+    EventRegistrationApproveView,
     EventRegistrationListView,
     EventRegistrationMarkAttendedView,
+    EventRegistrationPromoteView,
+    EventRegistrationRejectView,
 )
 from apps.events.views_admin_organized import OrganizedEventListView
 from apps.events.views_admin_image import EventImageView
 from apps.events.views_admin_organizers import EventOrganizerView
 from apps.events.views_checkin import EventCheckInResolveView
+from apps.events.views_feedback_admin import (
+    EventCertificateDownloadView,
+    EventCertificateReissueView,
+    EventCertificateRevokeView,
+    EventFeedbackResponseListView,
+    EventFeedbackSurveyCloseView,
+    EventFeedbackSurveyOpenView,
+    EventFeedbackSurveyView,
+    EventRegistrationCorrectAttendanceView,
+)
 from apps.events.views_collaborators import (
     EventCollaborationInboxView,
     EventCollaborationRemoveView,
     EventCollaborationRespondView,
     EventCollaboratorListView,
 )
+from apps.events.views_series import (
+    EventSeriesCancelView,
+    EventSeriesCompleteView,
+    EventSeriesDetailView,
+    EventSeriesExtendView,
+    EventSeriesListCreateView,
+    EventSeriesOccurrenceListView,
+    EventSeriesPublishView,
+)
+from apps.events.views_series_collaboration import (
+    EventSeriesCollaborationInboxView,
+    EventSeriesCollaborationRemoveView,
+    EventSeriesCollaborationRespondView,
+    EventSeriesCollaboratorListView,
+)
+from apps.events.views_series_image import EventSeriesImageView
+from apps.events.views_badges import EventBadgePdfView, EventBadgeTemplateView
 
 urlpatterns = [
+    path("", include("apps.events.urls_checkin_admin")),
+    path(
+        'makerspaces/<int:makerspace_id>/event-series/',
+        EventSeriesListCreateView.as_view(),
+        name='admin-event-series-list-create',
+    ),
+    path(
+        'event-series/<int:pk>/',
+        EventSeriesDetailView.as_view(),
+        name='admin-event-series-detail',
+    ),
+    path(
+        'event-series/<int:pk>/occurrences/',
+        EventSeriesOccurrenceListView.as_view(),
+        name='admin-event-series-occurrences',
+    ),
+    path(
+        'event-series/<int:pk>/publish/',
+        EventSeriesPublishView.as_view(),
+        name='admin-event-series-publish',
+    ),
+    path(
+        'event-series/<int:pk>/cancel/',
+        EventSeriesCancelView.as_view(),
+        name='admin-event-series-cancel',
+    ),
+    path(
+        'event-series/<int:pk>/complete/',
+        EventSeriesCompleteView.as_view(),
+        name='admin-event-series-complete',
+    ),
+    path(
+        'event-series/<int:pk>/extend/',
+        EventSeriesExtendView.as_view(),
+        name='admin-event-series-extend',
+    ),
+    path(
+        'event-series/<int:pk>/image',
+        EventSeriesImageView.as_view(),
+        name='admin-event-series-image',
+    ),
+    path(
+        'event-series/<int:pk>/collaborators/',
+        EventSeriesCollaboratorListView.as_view(),
+        name='admin-event-series-collaborators',
+    ),
+    path(
+        'event-series-collaborations/<int:pk>/remove/',
+        EventSeriesCollaborationRemoveView.as_view(),
+        name='admin-event-series-collaboration-remove',
+    ),
+    path(
+        'makerspaces/<int:makerspace_id>/event-series-collaborations/',
+        EventSeriesCollaborationInboxView.as_view(),
+        name='admin-event-series-collaboration-inbox',
+    ),
+    path(
+        'event-series-collaborations/<int:pk>/respond/',
+        EventSeriesCollaborationRespondView.as_view(),
+        name='admin-event-series-collaboration-respond',
+    ),
     path(
         'makerspaces/<int:makerspace_id>/events/',
         EventListCreateView.as_view(),
@@ -73,6 +164,36 @@ urlpatterns = [
         name='admin-event-organizers',
     ),
     path(
+        'events/<int:pk>/badge-template/',
+        EventBadgeTemplateView.as_view(),
+        name='admin-event-badge-template',
+    ),
+    path(
+        'events/<int:pk>/badges.pdf',
+        EventBadgePdfView.as_view(),
+        name='admin-event-badges-pdf',
+    ),
+    path(
+        'events/<int:pk>/feedback-survey/',
+        EventFeedbackSurveyView.as_view(),
+        name='admin-event-feedback-survey',
+    ),
+    path(
+        'events/<int:pk>/feedback-survey/open/',
+        EventFeedbackSurveyOpenView.as_view(),
+        name='admin-event-feedback-survey-open',
+    ),
+    path(
+        'events/<int:pk>/feedback-survey/close/',
+        EventFeedbackSurveyCloseView.as_view(),
+        name='admin-event-feedback-survey-close',
+    ),
+    path(
+        'events/<int:pk>/feedback-responses/',
+        EventFeedbackResponseListView.as_view(),
+        name='admin-event-feedback-responses',
+    ),
+    path(
         'events/<int:pk>/collaborators/',
         EventCollaboratorListView.as_view(),
         name='admin-event-collaborators',
@@ -92,13 +213,6 @@ urlpatterns = [
         EventCollaborationRespondView.as_view(),
         name='admin-event-collaboration-respond',
     ),
-    # Keep the kwarg named `pk`: origin scope resolves MODEL_LOOKUPS from
-    # kwargs.get('pk'), so another name would deny every custom-domain request.
-    path(
-        'events/<int:pk>/check-in/resolve/',
-        EventCheckInResolveView.as_view(),
-        name='admin-event-check-in-resolve',
-    ),
     path(
         'events/<int:pk>/eligible-members/',
         EventEligibleMemberListView.as_view(),
@@ -108,6 +222,41 @@ urlpatterns = [
         'event-registrations/<int:pk>/mark-attended/',
         EventRegistrationMarkAttendedView.as_view(),
         name='admin-event-registration-mark-attended',
+    ),
+    path(
+        'event-registrations/<int:pk>/correct-attendance/',
+        EventRegistrationCorrectAttendanceView.as_view(),
+        name='admin-event-registration-correct-attendance',
+    ),
+    path(
+        'event-certificates/<int:pk>/download/',
+        EventCertificateDownloadView.as_view(),
+        name='admin-event-certificate-download',
+    ),
+    path(
+        'event-certificates/<int:pk>/revoke/',
+        EventCertificateRevokeView.as_view(),
+        name='admin-event-certificate-revoke',
+    ),
+    path(
+        'event-certificates/<int:pk>/reissue/',
+        EventCertificateReissueView.as_view(),
+        name='admin-event-certificate-reissue',
+    ),
+    path(
+        'event-registrations/<int:pk>/approve/',
+        EventRegistrationApproveView.as_view(),
+        name='admin-event-registration-approve',
+    ),
+    path(
+        'event-registrations/<int:pk>/reject/',
+        EventRegistrationRejectView.as_view(),
+        name='admin-event-registration-reject',
+    ),
+    path(
+        'event-registrations/<int:pk>/promote/',
+        EventRegistrationPromoteView.as_view(),
+        name='admin-event-registration-promote',
     ),
     path(
         'organized-events/',

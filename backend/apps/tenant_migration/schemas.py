@@ -27,6 +27,7 @@ def array_schema(items):
 # silently produced nothing.
 MAKERSPACE = object_schema(name=STRING, slug=STRING)
 EVENT = object_schema(title=STRING, starts_at=TIMESTAMP, ends_at=TIMESTAMP)
+EVENT_SERIES = object_schema(title=STRING)
 CONTAINER = object_schema(label=STRING, makerspace=MAKERSPACE)
 SOURCE_REFERENCE = object_schema(
     source_id=INTEGER,
@@ -65,6 +66,8 @@ WARRANTY_DOCUMENT = object_schema(
 EDGE_SCHEMAS = {
     ("events.EventCollaborator", "event"): EVENT,
     ("events.EventCollaborator", "makerspace"): MAKERSPACE,
+    ("events.EventSeriesCollaborator", "series"): EVENT_SERIES,
+    ("events.EventSeriesCollaborator", "makerspace"): MAKERSPACE,
     ("events.EventRegistration", "registered_via_makerspace"): MAKERSPACE,
     ("events.EventRegistration", "payment_via_makerspace"): MAKERSPACE,
     ("operations.StockTransfer", "source_container"): CONTAINER,

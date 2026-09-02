@@ -50,6 +50,7 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         ("bookings.BookableSpace", "public_token"),
         ("bookings.Booking", "public_token"),
         ("events.Event", "public_token"),
+        ("events.EventSeries", "public_token"),
         # Deliberately invalidate source event check-in QR codes at the trust boundary.
         ("events.EventRegistration", "checkin_token"),
         ("hardware_requests.HardwareRequest", "public_token"),
@@ -92,6 +93,13 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
     **_rules(
         NULL,
         ("backup.MakerspaceArchiveRecipient", "verified_at"),
+        # Projection provenance only: the target rebuilds the link from the canonical
+        # series collaboration, and a carried-over id would point at a source row.
+        ("events.EventCollaborator", "source_series_collaboration"),
+        # A transient object-expiry claim credential. Nullable, and the sweep reissues
+        # one when it next claims the row; carrying it would hand the target a live
+        # claim it never issued.
+        ("evidence.EvidenceObjectRetentionState", "claim_token"),
         ("backup.MakerspaceArchiveRecipient", "challenge_issued_at"),
         # Nullable AND globally unique, so the guard requires NULL: a freshly
         # generated identity would claim provenance the target has not attested. The

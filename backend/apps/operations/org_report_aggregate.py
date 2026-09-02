@@ -59,8 +59,8 @@ def _event_total(rows):
     if not rows:
         return []
     fields = (
-        "capacity", "registrations", "confirmed", "registered", "waitlisted",
-        "cancelled", "attended",
+        "capacity", "registrations", "confirmed", "pending_approval", "registered",
+        "waitlisted", "rejected", "cancelled", "attended",
     )
     total = _summed(rows, fields)
     completed = [row for row in rows if row.get("status") == "completed"]
