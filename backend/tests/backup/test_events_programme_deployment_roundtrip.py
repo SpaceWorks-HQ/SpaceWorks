@@ -1,5 +1,6 @@
 """Deployment backup/restore coverage for the phase 1-9 programme graph."""
 
+import hashlib
 from datetime import timedelta
 from pathlib import Path
 
@@ -7,10 +8,11 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from apps.backup import archive_builder, archive_payload
+from apps.backup import archive_builder, storage as backup_storage
 from apps.backup.projection_databases import restore_dump, temporary_database
 from apps.bookings.models import BookableSpace, Booking
 from apps.events.models import Event, EventRegistration
+from apps.evidence.models import EvidenceObjectRetentionState
 from apps.hardware_requests.models import HardwareRequest
 from apps.makerspaces import archive_requests, module_purge
 from apps.makerspaces.models import (
@@ -19,6 +21,7 @@ from apps.makerspaces.models import (
 from tests.backup.test_compound_archive_e3 import (
     _archive,
     _prepare,
+    _sovereign,
     allow_projection_databases,
 )
 from tests.encryption.conftest import enabled_encryption
@@ -26,6 +29,7 @@ from tests.tenant_migration.programme_graph import create_programme_graph
 
 
 pytestmark = pytest.mark.django_db(transaction=True)
+OBJECT_BYTES = b"%PDF-1.7\nprogramme deployment artifact\n%%EOF\n"
 
 PHASE_LABELS = (
     "events.EventSeries", "events.Event", "events.EventRegistration",
@@ -146,6 +150,8 @@ def test_deployment_restore_preserves_disabled_archived_graph_and_two_key_reques
         monkeypatch.setattr(archive_requests, "schedule_resolved", lambda _pk: None)
         request = archive_requests.create(space, manager, "Lease ended.")
         archive_requests.approve(request, resolver, "Independent approval.")
+        # approve() stamps archived_at in the database; the local object is stale.
+        space.refresh_from_db()
         expected = _rows(space.pk)
 
         # A second tenant takes the destructive path. Its archive must not recreate
@@ -168,10 +174,52 @@ def test_deployment_restore_preserves_disabled_archived_graph_and_two_key_reques
             membership__makerspace=purged_space
         ).exists()
 
+        # A deployment archive is a COMPOUND archive: the readable main is derived by
+        # excluding tenants that hold their own custody, and the source verifier proves
+        # main + slices == the full dump. Give the run one sovereign tenant so this test
+        # exercises that supported shape. (A deployment with NO sovereign tenant — the
+        # default, since superadmin_access_enabled starts True — cannot build a
+        # deployment archive at all today; that gap is tracked separately and is not
+        # what this test is for.)
+        _sovereign()
         _prepare(monkeypatch, settings)
-        monkeypatch.setattr(archive_payload, "_object_closure", lambda: {})
-        monkeypatch.setattr(archive_payload, "_capture_objects", lambda *_args: [])
+        # Capture the object bytes for real against a fake bucket. Stubbing capture out
+        # cannot work on the compound path: the ownership plan is built from the rows
+        # themselves, and bind_component proves the manifest EQUALS that closure, so an
+        # empty manifest is a mismatch rather than a shortcut. Expired evidence needs no
+        # bytes -- it is captured as a tombstone and asserted absent from the bucket.
+        def _download(_bucket, key, destination, *, versioned):
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(OBJECT_BYTES)
+            return {
+                "key": key,
+                "version_id": "programme-v1",
+                "size": len(OBJECT_BYTES),
+                "sha256": hashlib.sha256(OBJECT_BYTES).hexdigest(),
+                "metadata": {},
+                "content_type": "application/octet-stream",
+                "headers": {},
+            }
+
+        absent = []
+        monkeypatch.setattr(backup_storage, "download_object", _download)
+        monkeypatch.setattr(
+            backup_storage,
+            "assert_object_absent",
+            lambda _bucket, key: absent.append(key),
+        )
         _sealed, _manifest, tempdir, _digest = archive_builder.build_archive(_archive())
+        # Expired evidence travels as a tombstone, and capture has to PROVE no bytes
+        # survive it -- under the final key and under the staging key a presign writes.
+        expired_keys = list(
+            EvidenceObjectRetentionState.objects.filter(
+                status=EvidenceObjectRetentionState.Status.EXPIRED
+            ).values_list("evidence__object_key", flat=True)
+        )
+        assert len(expired_keys) == 2
+        assert sorted(absent) == sorted(
+            key for base in expired_keys for key in (base, f"staging/{base}")
+        )
         try:
             dump = Path(tempdir.name, "bundle", "database.dump")
             with temporary_database("programme_restore") as (using, database_name):

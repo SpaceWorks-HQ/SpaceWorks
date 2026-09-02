@@ -2461,6 +2461,17 @@ never seen the key looks like. The collision check itself consults the **object 
 not the row table, because the constraint being protected is storage-key uniqueness in the target
 bucket; that also catches an orphaned object squatting a key.
 
+The same rule governs a **non-regenerable** identity, and there the harness cannot simply let the
+collision happen: `unique_values` marks two policies whose "generator" only raises —
+`events.EventCheckInEvent.operation_id` and `events.EventAttendanceCertificate.serial`, both PRESERVE,
+both meant to STOP an import rather than remint an immutable value. A collision cannot occur between
+two real deployments (`pairing` refuses a same-deployment move outright), so a test that meets one has
+modelled the world wrong. `SimpleImportCase.release_non_regenerable_identities()` drops the local rows
+carrying such an identity — through the `app.allow_immutable_delete` hatch, because
+`EventCheckInEvent` is trigger-immutable and cannot be re-stamped — and it is driven off a
+`_refuses_collision` marker so a future refuse-policy is covered without touching the harness. Call it
+after the source objects are captured and before materialization.
+
 **A DROP disposition is enforced at BOTH ends, and they are not redundant.** PORTABLE export omits a
 drop-disposition row entirely (`admission.export_row_policy`) — `MembershipRequest.invite_email` is a
 stranger's email address, and a row that can never become live has no business travelling to a

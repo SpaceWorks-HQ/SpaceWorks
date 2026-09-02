@@ -19,7 +19,7 @@ from apps.events.models import (
     EventSeriesOrganizer,
     MemberCalendarFeed,
 )
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.models import Makerspace, default_enabled_modules
 from apps.operations.models import ReportMetricRollup, ReportRollupCursor
 from apps.organizations.models import OrganizationMakerspace
 from apps.payments.models import Payment
@@ -79,6 +79,7 @@ def test_complete_programme_graph_round_trips_with_target_pii_and_expiry(
             assert tombstone["source_key"] == graph["photo"].object_key
             assert tombstone["expired_size_bytes"] == 321
             assert len(absent) == 2
+            case.release_non_regenerable_identities()
             result = materialize_tenant(
                 case.root,
                 case.job,
@@ -96,7 +97,12 @@ def test_complete_programme_graph_round_trips_with_target_pii_and_expiry(
         response = EventFeedbackResponse.objects.get(survey=survey)
         certificate = EventAttendanceCertificate.objects.get(registration=registration)
 
-        assert target.enabled_modules == source.enabled_modules
+        # The programme's DATA travels; its module installation does not. Enabling a
+        # module is target superadmin policy (TARGET_FIELD_PROJECTION resolves
+        # enabled_modules from the registry), so the import lands on the target's own
+        # opt-in set and a superadmin installs `events` afterwards.
+        assert target.enabled_modules == default_enabled_modules()
+        assert target.enabled_modules != source.enabled_modules
         assert (series.title, series.recurrence_rule, series.duration_minutes) == (
             "Monthly safety lab", "FREQ=MONTHLY;COUNT=3", 90,
         )
@@ -113,12 +119,19 @@ def test_complete_programme_graph_round_trips_with_target_pii_and_expiry(
         assert check_in.event_id == event.pk
         assert check_in.registration_id == registration.pk
         assert check_in.actor_id == registration.member_id
+        # Both identities are preserved rather than reminted: the operation UUID is the
+        # provenance of an immutable check-in, and the serial is printed inside the PDF.
+        assert check_in.operation_id == graph["check_in"].operation_id
+        assert certificate.serial == graph["certificate"].serial
         assert survey.questions == [QUESTION]
         assert json.loads(response.answers_snapshot) == {"rating": 5}
         assert response.registration_id == registration.pk
         assert certificate.response_id == response.pk
         assert certificate.recipient_name == "Archive Member"
-        assert certificate.object_key != graph["certificate"].object_key
+        # The private certificate key is preserved, not reminted: the target deployment
+        # holds no object under it, and the PDF the key names is the immutable artifact
+        # the serial is printed inside. Only an actual target collision regenerates it.
+        assert certificate.object_key == graph["certificate"].object_key
         assert memory_objects["private"][certificate.object_key] == CERTIFICATE_BYTES
 
         payment = Payment.objects.get(makerspace=target)
@@ -144,7 +157,11 @@ def test_complete_programme_graph_round_trips_with_target_pii_and_expiry(
         imported_audit = AuditLog.objects.get(
             makerspace=target, action="events.programme_fixture_created"
         )
-        assert imported_audit.actor_id == registration.member_id
+        # An imported audit row never names a live target actor: attributing a source
+        # action to a target account would forge immutable attribution on a deployment
+        # that never saw it (semantic_remap._remap_audit). Its TARGET is still remapped,
+        # so the row keeps pointing at the check-in it describes.
+        assert imported_audit.actor_id is None
         assert imported_audit.target_type == "events.eventcheckinevent"
         assert imported_audit.target_id == str(check_in.pk)
         assert imported_audit.meta == {}

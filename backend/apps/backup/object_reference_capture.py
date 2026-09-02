@@ -44,7 +44,15 @@ def build_object_ownership_plan(sovereign_makerspace_ids):
             )
         rows = model._base_manager.exclude(**{rule.field_name: ""}).values(*query_fields)
         for row in rows.iterator(chunk_size=500):
-            key = str(row[rule.field_name])
+            # A NULL key column survives the exclude() above -- Django keeps NULL rows
+            # out of an `exclude(field="")` -- and str(None) would enter the closure as
+            # an object literally named "None" that no bucket holds. Only
+            # bookings.BookableSpace.image_key is nullable today; the legacy closure in
+            # archive_objects.collect_model_objects tests the raw value and skips it.
+            raw_key = row[rule.field_name]
+            if raw_key is None:
+                continue
+            key = str(raw_key)
             if not key:
                 continue
             bucket = row["bucket_kind"] if rule.bucket == BucketRule.FROM_ROW else rule.bucket

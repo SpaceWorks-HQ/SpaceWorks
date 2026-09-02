@@ -154,7 +154,7 @@ console shows you:
 | **Inventory** *(always on)* | The catalogue, request workflow, QR/evidence spine, asset units, containers, transfers, QR print batches, front-desk handover and purchasing |
 | **Stocktake** | Scan-first stock counts and variance reporting |
 | **Machines** | Machine registry, the service/print queue, maintenance and warranty |
-| **Events** | Event scheduling and registrations, QR check-in at the door, and cross-makerspace collaborative events |
+| **Events** | Event scheduling and registrations — recurring series, approval and waitlists, QR check-in at the door, post-event feedback and attendance certificates, member calendar feeds, printable attendee badges, and cross-makerspace collaborative events |
 | **Bookings** | Resource booking and public self-booking |
 | **Membership** | Join requests, waivers, referrals, member activity, maker profiles, presence — and the member-facing identity ecosystem |
 | **Notifications** | The in-app inbox and every outbound channel |
@@ -237,7 +237,7 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | | [`machine_service`](docs/MODULES.md#machine_service) | | | The service/job queue |
 | | [`printing`](docs/MODULES.md#printing) | | | 3D printing on top of `machine_service` |
 | | [`maintenance`](docs/MODULES.md#maintenance) | | | Scheduled and reactive maintenance |
-| **Events** | [`events`](docs/MODULES.md#events) | | | Scheduling, registrations, QR check-in, collaborative events |
+| **Events** | [`events`](docs/MODULES.md#events) | | | Scheduling, recurring series, registrations and waitlists, QR check-in, feedback and certificates, collaborative events |
 | **Bookings** | [`bookings`](docs/MODULES.md#bookings) | | | Resource booking and public self-booking |
 | **Membership** | [`membership`](docs/MODULES.md#membership) | | | Join requests, waivers, referrals, maker profiles |
 | | [`member_accounts`](docs/MODULES.md#member_accounts) | | | Member sign-up and member sign-in |
@@ -274,6 +274,8 @@ Manager** in the console rather than a superadmin.
 | `payments.events` | `events` | | Charge for event registration |
 | `payments.membership` | `membership` | | Charge membership dues |
 | `mobile.push` | `mobile` | ● | Native push notifications |
+| `events.offline_checkin` | `events` | | Expiring on-device roster and event-scoped PIN check-in stations |
+| `notifications.delegated_recipients` | `notifications` | | Machine-scoped maintainers manage maintenance recipients for their own machines (also needs `maintenance` and `machines`) |
 | `inventory.self_checkout` | — | ● | Member self-checkout and staff direct handouts |
 | `presence.geofence` | — | ● | Advisory location check at check-in (never blocks) |
 

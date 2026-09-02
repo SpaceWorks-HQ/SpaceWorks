@@ -8,6 +8,17 @@ def _extension(value):
     return suffix.rsplit(".", 1)[1] if "." in suffix else ""
 
 
+def _refuses_collision(handler):
+    """Mark a handler that stops the import instead of minting a replacement value.
+
+    A collision on one of these identities cannot happen between two deployments that
+    pairing would allow to trade a tenant, so reaching one means an assumption broke.
+    The marker lets a caller enumerate them without matching on function names.
+    """
+    handler.refuses_collision = True
+    return handler
+
+
 def evidence_key(row, target, _source_value):
     from apps.evidence.storage import evidence_object_key
 
@@ -18,6 +29,7 @@ def certificate_key(row, target, _source_value):
     return f"event-certificates/{target.pk}/{row['serial']}.pdf"
 
 
+@_refuses_collision
 def refuse_certificate_serial_collision(row, target, source_value):
     raise RuntimeError(
         "An attendance-certificate serial collision cannot be regenerated because "
@@ -25,6 +37,7 @@ def refuse_certificate_serial_collision(row, target, source_value):
     )
 
 
+@_refuses_collision
 def refuse_checkin_operation_collision(row, target, source_value):
     raise RuntimeError(
         "An immutable check-in operation UUID collision cannot be regenerated without "

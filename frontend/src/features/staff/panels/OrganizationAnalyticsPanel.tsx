@@ -43,11 +43,13 @@ export function OrganizationAnalyticsPanel({ makerspaces }: { makerspaces: Maker
             value={reportKey}
             onChange={(event) => setReportKey(event.target.value as ReportKey)}
           >
-            {reportDefinitions.map((definition) => (
-              <option key={definition.key} value={definition.key}>
-                {definition.title}
-              </option>
-            ))}
+            {reportDefinitions
+              .filter((definition) => definition.aggregate_supported)
+              .map((definition) => (
+                <option key={definition.key} value={definition.key}>
+                  {definition.title}
+                </option>
+              ))}
           </select>
         </label>
       </div>
