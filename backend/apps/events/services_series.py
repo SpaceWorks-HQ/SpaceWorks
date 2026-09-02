@@ -19,6 +19,11 @@ from apps.events.services_recurrence import (
     occurrences,
     validate_series_recurrence,
 )
+from apps.events.services_calendar import (
+    CALENDAR_SERIES_FIELDS,
+    calendar_event_changed,
+    calendar_series_changed,
+)
 from apps.forms_schema.validation import validate_form_schema
 from apps.makerspaces import limits
 from apps.makerspaces.guards import require_module_locked
@@ -50,6 +55,8 @@ def occurrence_inherited_value(event, field):
         return start + timedelta(minutes=series.duration_minutes)
     if field == "registration_cutoff_at":
         return None
+    if field == "timezone_name":
+        return series.recurrence_timezone
     if field == "image_key":
         return ""
     return getattr(series, field)
@@ -92,6 +99,7 @@ def _event_values(series, occurrence):
             if series.status == EventSeries.Status.PUBLISHED
             else Event.Status.DRAFT
         ),
+        "timezone_name": series.recurrence_timezone,
         "created_by": series.created_by,
     }
 
@@ -183,6 +191,8 @@ def _apply_template(series, event, changed_fields):
             applied.append(field)
     if applied:
         event.save(update_fields=(*sorted(applied), "updated_at"))
+        if set(applied) & {"title", "description", "location", "is_public"}:
+            calendar_event_changed(event)
 
 
 @transaction.atomic
@@ -204,6 +214,8 @@ def update_series(series, *, actor, effective_from=None, **changes):
         locked.revision += 1
     _validate(locked)
     locked.save(update_fields=(*sorted(changes), "revision", "updated_at"))
+    if set(changes) & CALENDAR_SERIES_FIELDS:
+        calendar_series_changed(locked)
 
     future = list(Event.objects.select_for_update().filter(
         series=locked, starts_at__gte=cutoff,

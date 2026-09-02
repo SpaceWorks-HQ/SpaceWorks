@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { Skeleton, StatusBadge } from "../../components/ui";
 import EventCheckInScanner from "./EventCheckInScanner";
+import { EventBadgeActions } from "./EventBadgeActions";
 import { EventRegisterMember } from "./EventRegisterMember";
 import { PaymentReconcileActions } from "./PaymentReconcileActions";
 import { useCorrectAttendance } from "./eventFeedbackApi";
@@ -21,6 +22,8 @@ export function EventRegistrationRoster({ event, makerspaceId }: {
 }) {
   const [page, setPage] = useState(1);
   const [scanning, setScanning] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [includeAttended, setIncludeAttended] = useState(false);
   const rows = useEventRegistrations(event.id, page);
   const approve = useApproveEventRegistration(makerspaceId, event.id);
   const reject = useRejectEventRegistration(makerspaceId, event.id);
@@ -53,7 +56,8 @@ export function EventRegistrationRoster({ event, makerspaceId }: {
       ? <EventCheckInScanner makerspaceId={makerspaceId} eventId={event.id} onClose={() => setScanning(false)} />
       : <button className="desk-button mt-3" type="button" onClick={() => setScanning(true)}>Scan check-in</button>
     ) : null}
-    {rows.data?.results.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Event registration contact details</caption><thead><tr><th className="eyebrow p-2">Name</th><th className="eyebrow p-2">Contact</th><th className="eyebrow p-2">Status</th><th className="eyebrow p-2">Action</th></tr></thead><tbody>
+    {rows.data?.results.length ? <EventBadgeActions event={event} makerspaceId={makerspaceId} selectedIds={selectedIds} includeAttended={includeAttended} onIncludeAttended={(value) => { setIncludeAttended(value); if (!value) setSelectedIds([]); }} /> : null}
+    {rows.data?.results.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Event registration contact details and badge selection</caption><thead><tr><th className="eyebrow p-2">Badge</th><th className="eyebrow p-2">Name</th><th className="eyebrow p-2">Contact</th><th className="eyebrow p-2">Status</th><th className="eyebrow p-2">Action</th></tr></thead><tbody>
       {rows.data.results.map((row) => {
         const pending = pendingFor(row.id);
         const rowError = errorFor(row.id);
@@ -62,6 +66,7 @@ export function EventRegistrationRoster({ event, makerspaceId }: {
           || (row.status === "registered" && checkable)
           || row.status === "attended";
         return <tr key={row.id} className="border-t border-line">
+          <td className="p-2"><input type="checkbox" aria-label={`Select ${row.name} for a badge`} disabled={row.status !== "registered" && !(includeAttended && row.status === "attended")} checked={selectedIds.includes(row.id)} onChange={(e) => setSelectedIds((ids) => e.target.checked ? [...ids, row.id] : ids.filter((id) => id !== row.id))} /></td>
           <td className="p-2">{row.name}<PaymentReconcileActions makerspaceId={makerspaceId} payment={row.payment} invalidateKeys={[["event", event.id, "registrations"], ["event", event.id], ["events", makerspaceId]]} /></td>
           <td className="p-2"><a className="block hover:underline" href={`mailto:${row.email}`}>{row.email}</a><a className="block text-muted hover:underline" href={`tel:${row.phone}`}>{row.phone}</a></td>
           <td className="p-2"><StatusBadge status={row.status} /></td>

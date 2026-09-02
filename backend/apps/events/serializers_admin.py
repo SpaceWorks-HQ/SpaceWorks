@@ -16,6 +16,7 @@ class EventWriteSerializer(serializers.Serializer):
     description = serializers.CharField(allow_blank=True, default='', required=False)
     starts_at = serializers.DateTimeField()
     ends_at = serializers.DateTimeField()
+    timezone_name = serializers.CharField(max_length=64, required=False)
     location = serializers.CharField(
         allow_blank=True,
         default='',
@@ -130,6 +131,7 @@ class EventAdminSerializer(serializers.ModelSerializer):
             'description',
             'starts_at',
             'ends_at',
+            'timezone_name',
             'location',
             'location_kind',
             'custom_form',

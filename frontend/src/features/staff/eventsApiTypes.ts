@@ -19,6 +19,7 @@ export type StaffEvent = {
   description: string;
   starts_at: string;
   ends_at: string;
+  timezone_name: string;
   location: string;
   capacity: number;
   payment_amount: string;
@@ -58,6 +59,7 @@ export type EventPayload = {
   description: string;
   starts_at: string;
   ends_at: string;
+  timezone_name: string;
   location: string;
   capacity: number;
   payment_amount: string;
@@ -98,6 +100,7 @@ export const eventKeys = {
   list: (makerspaceId: number) => ["events", makerspaceId, "list"] as const,
   detail: (eventId: number) => ["event", eventId] as const,
   registrations: (eventId: number) => ["event", eventId, "registrations"] as const,
+  badgeTemplate: (eventId: number) => ["event", eventId, "badge-template"] as const,
 };
 
 export function eligibleMemberKey(eventId: number) {

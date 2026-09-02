@@ -103,6 +103,8 @@ MODEL_LOOKUPS = {
     'admin-event-cancel': ('events.Event', 'makerspace_id'),
     'admin-event-complete': ('events.Event', 'makerspace_id'),
     'admin-event-registration-list': ('events.Event', 'makerspace_id'),
+    'admin-event-badge-template': ('events.Event', 'makerspace_id'),
+    'admin-event-badges-pdf': ('events.Event', 'makerspace_id'),
     'admin-event-feedback-survey': ('events.Event', 'makerspace_id'),
     'admin-event-feedback-survey-open': ('events.Event', 'makerspace_id'),
     'admin-event-feedback-survey-close': ('events.Event', 'makerspace_id'),

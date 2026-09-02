@@ -33,6 +33,8 @@ PUBLIC_CLAIM_ROUTES = {
     ("public-printer-service-request", "OPTIONS"): AnonymousRead(),
     **_anonymous("public-printer-service-status"),
     **_anonymous("public-event-list"),
+    **_anonymous("public-event-calendar"),
+    **_anonymous("public-event-calendar-feed"),
     ("public-event-register", "POST"): Allowed(
         tenant=PUBLIC_TOKEN, audited=True
     ),

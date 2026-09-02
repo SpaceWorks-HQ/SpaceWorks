@@ -58,6 +58,7 @@ from apps.events.views_series_collaboration import (
     EventSeriesCollaboratorListView,
 )
 from apps.events.views_series_image import EventSeriesImageView
+from apps.events.views_badges import EventBadgePdfView, EventBadgeTemplateView
 
 urlpatterns = [
     path(
@@ -154,6 +155,16 @@ urlpatterns = [
         'events/<int:pk>/registrations/',
         EventRegistrationListView.as_view(),
         name='admin-event-registration-list',
+    ),
+    path(
+        'events/<int:pk>/badge-template/',
+        EventBadgeTemplateView.as_view(),
+        name='admin-event-badge-template',
+    ),
+    path(
+        'events/<int:pk>/badges.pdf',
+        EventBadgePdfView.as_view(),
+        name='admin-event-badges-pdf',
     ),
     path(
         'events/<int:pk>/feedback-survey/',

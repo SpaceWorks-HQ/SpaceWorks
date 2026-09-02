@@ -41,8 +41,12 @@ def events_delete(makerspace, cursor):
         EventRegistration,
         EventSeries,
         EventSeriesCollaborator,
+        MemberCalendarFeed,
     )
 
+    feeds, feed_labels = _delete(
+        MemberCalendarFeed.objects.filter(membership__makerspace=makerspace)
+    )
     projected_collaborations, projected_collaboration_labels = _delete(
         EventCollaborator.objects.filter(
             source_series_collaboration__makerspace=makerspace
@@ -84,6 +88,7 @@ def events_delete(makerspace, cursor):
             collaboration_labels | certificate_labels | response_labels
             | survey_labels | checkin_labels | registration_labels | event_labels
             | projected_collaboration_labels | series_collaboration_labels | series_labels
+            | feed_labels
         ),
         event_series_collaboration_projections=projected_collaborations,
         event_series_collaborations=series_collaborations,
@@ -96,6 +101,7 @@ def events_delete(makerspace, cursor):
         event_registrations=registrations,
         events=events,
         event_series=series,
+        event_calendar_feeds=feeds,
     )
 
 

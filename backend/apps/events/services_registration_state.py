@@ -15,6 +15,7 @@ from apps.events.service_payments import (
     cancel_for_registration,
     create_for_registered_registration,
 )
+from apps.events.services_calendar import calendar_registration_changed
 
 
 def _boundary():
@@ -51,6 +52,7 @@ def _promote(event, actor, waiters, count=None, *, mode):
         registration.event = event
         registration.status = EventRegistration.Status.REGISTERED
         registration.save(update_fields=["status"])
+        calendar_registration_changed(registration)
         create_for_registered_registration(registration, actor)
         meta = {"registration_id": registration.pk, "promotion_mode": mode}
         services._audit(
@@ -89,6 +91,7 @@ def approve_registration(registration, *, actor):
     )
     locked.status = new_status
     locked.save(update_fields=["status"])
+    calendar_registration_changed(locked)
     if new_status == EventRegistration.Status.REGISTERED:
         create_for_registered_registration(locked, actor)
     services._audit(
@@ -123,6 +126,7 @@ def reject_registration(registration, *, actor):
     old_status = locked.status
     locked.status = EventRegistration.Status.REJECTED
     locked.save(update_fields=["status"])
+    calendar_registration_changed(locked)
     services._audit(
         event,
         actor,
@@ -171,6 +175,7 @@ def cancel_registration(registration, *, actor=None):
     old_status = locked.status
     locked.status = EventRegistration.Status.CANCELLED
     locked.save(update_fields=["status"])
+    calendar_registration_changed(locked)
     services._audit(
         event,
         actor,

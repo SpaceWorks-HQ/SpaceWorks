@@ -260,6 +260,20 @@ export async function tenantPublicRequest<T>(
   return publicV1Request<T>(path, options, publishableKey);
 }
 
+export async function tenantPublicRequestBlob(slug: string, path: string): Promise<Blob> {
+  const normalized = slug.trim();
+  let publishableKey = tenantPublishableKeys.get(normalized);
+  if (!publishableKey) {
+    const bootstrap = await bootstrapTenant({ slug: normalized });
+    publishableKey = bootstrap.public_api.publishable_key;
+  }
+  const response = await fetch(`${API_V1_URL}${path}`, {
+    headers: { ...(await publicHeaders(publishableKey)), ...authHeaders() },
+  });
+  if (!response.ok) throw apiError(response.status, await response.json().catch(() => ({})));
+  return response.blob();
+}
+
 export function setAccessToken(token: string) {
   accessToken = token;
   cleanupLegacyAccessToken();
@@ -400,6 +414,12 @@ export async function memberRequest<T>(
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
+}
+
+export async function memberRequestBlob(path: string): Promise<Blob> {
+  const response = await staffFetch(path, {}, true);
+  if (!response.ok) throw apiError(response.status, await response.json().catch(() => ({})));
+  return response.blob();
 }
 
 export async function downloadStaffFile(path: string, filename: string) {

@@ -15,6 +15,9 @@ vi.mock("../../../lib/api", async () => {
 const event: EventAdmin = {
   id: 73,
   makerspace_id: 19,
+  series_summary: null,
+  series_revision: null,
+  series_override_fields: [],
   title: "Community repair night",
   description: "Repair together.",
   starts_at: "2026-09-04T12:00:00Z",

@@ -11,6 +11,7 @@ from apps.events.models_series import (
     EventSeriesCollaborator,
     EventSeriesOrganizer,
 )
+from apps.events.models_calendar import MemberCalendarFeed
 
 __all__ = [
     "Event",
@@ -24,4 +25,5 @@ __all__ = [
     "EventSeries",
     "EventSeriesCollaborator",
     "EventSeriesOrganizer",
+    "MemberCalendarFeed",
 ]

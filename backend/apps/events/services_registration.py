@@ -19,6 +19,7 @@ from apps.events.exceptions import (
 from apps.events.models import EventRegistration
 from apps.forms_schema.validation import validate_answers
 from apps.makerspaces.guards import require_module_locked
+from apps.events.services_calendar import calendar_registration_changed
 
 
 @transaction.atomic
@@ -102,6 +103,7 @@ def register(
             "member", "registered_via_makerspace", "payment_via_makerspace", "name",
             "email", "phone", "custom_answers", "status", "created_at",
         ])
+        calendar_registration_changed(existing)
         return _record_registration(locked, actor, existing, status)
     if existing:
         if existing.status == EventRegistration.Status.REJECTED:

@@ -120,6 +120,8 @@ export const openApiPaths = [
   "/api/v1/admin/event-series/{id}/occurrences/",
   "/api/v1/admin/event-series/{id}/publish/",
   "/api/v1/admin/events/{id}/",
+  "/api/v1/admin/events/{id}/badge-template/",
+  "/api/v1/admin/events/{id}/badges.pdf",
   "/api/v1/admin/events/{id}/cancel/",
   "/api/v1/admin/events/{id}/check-in/resolve/",
   "/api/v1/admin/events/{id}/collaborators/",
@@ -440,7 +442,9 @@ export const openApiPaths = [
   "/api/v1/member/makerspaces/{makerspace_id}/collaborative-events/{id}/register/",
   "/api/v1/member/makerspaces/{makerspace_id}/directory",
   "/api/v1/member/makerspaces/{makerspace_id}/directory/{membership_id}",
+  "/api/v1/member/makerspaces/{makerspace_id}/event-calendar-feed/",
   "/api/v1/member/makerspaces/{makerspace_id}/event-certificates/{id}/download/",
+  "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/calendar.ics",
   "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/{id}/feedback/",
   "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/{id}/qr",
   "/api/v1/member/makerspaces/{makerspace_id}/payments",
@@ -473,7 +477,9 @@ export const openApiPaths = [
   "/api/v1/public/machine-service/3d-printer/requests/{public_token}/status",
   "/api/v1/public/makerspaces/",
   "/api/v1/public/requests/{public_token}/status",
+  "/api/v1/public/{makerspace_slug}/event-calendar/{raw_token}.ics",
   "/api/v1/public/{makerspace_slug}/events/",
+  "/api/v1/public/{makerspace_slug}/events/{public_token}/calendar.ics",
   "/api/v1/public/{makerspace_slug}/events/{public_token}/feedback/",
   "/api/v1/public/{makerspace_slug}/events/{public_token}/register/",
   "/api/v1/public/{makerspace_slug}/inventory/",
@@ -901,6 +907,30 @@ export type BackupDownload = {
   "url": string;
   "expires_at": string;
   "purge_warning": string;
+};
+
+export type BadgePdfRequest = {
+  "registration_ids": Array<number>;
+  "template_override"?: BadgeTemplate | null;
+  "include_attended"?: boolean;
+};
+
+export type BadgeTemplate = {
+  "version"?: number;
+  "paper_size"?: PaperSizeEnum;
+  "orientation"?: OrientationEnum;
+  "page_width_mm"?: number | null;
+  "page_height_mm"?: number | null;
+  "card_width_mm"?: number;
+  "card_height_mm"?: number;
+  "margin_mm"?: number;
+  "gap_mm"?: number;
+  "template"?: string;
+  "fields"?: Array<string>;
+  "font_size_pt"?: number;
+  "name_font_size_pt"?: number;
+  "text_align"?: TextAlignEnum;
+  "include_qr"?: boolean;
 };
 
 export type BlankEnum = "";
@@ -1611,6 +1641,7 @@ export type EventAdmin = {
   "description": string;
   "starts_at": string;
   "ends_at": string;
+  "timezone_name": string;
   "location": string;
   "location_kind": LocationKindEnum;
   "custom_form": unknown | null;
@@ -1854,6 +1885,7 @@ export type EventWrite = {
   "description"?: string;
   "starts_at": string;
   "ends_at": string;
+  "timezone_name"?: string;
   "location"?: string;
   "location_kind"?: LocationKindEnum;
   "custom_form"?: unknown | null;
@@ -2950,6 +2982,23 @@ export type MemberActivityRow = {
   "verified_members": number;
 };
 
+export type MemberCalendarFeedIssue = {
+  "confirm_bearer_risk": boolean;
+};
+
+export type MemberCalendarFeedIssued = {
+  "feed_url": string;
+  "token_hint": string;
+  "created_at": string;
+};
+
+export type MemberCalendarFeedState = {
+  "enabled": boolean;
+  "token_hint": string | null;
+  "created_at": string | null;
+  "rotated_at": string | null;
+};
+
 export type MemberClaimCode = {
   "id": number;
   "membership_id": number;
@@ -3418,6 +3467,8 @@ export type OrganizationReportRows = {
 }>;
 };
 
+export type OrientationEnum = "portrait" | "landscape";
+
 export type OtpResetPasswordConfirm = {
   "email": string;
   "code": string;
@@ -3602,6 +3653,8 @@ export type PairingCreate = {
 };
 };
 
+export type PaperSizeEnum = "A4" | "LETTER" | "custom";
+
 export type PasswordResetAcknowledgement = {
   "detail": string;
 };
@@ -3745,6 +3798,7 @@ export type PatchedEventWrite = {
   "description"?: string;
   "starts_at"?: string;
   "ends_at"?: string;
+  "timezone_name"?: string;
   "location"?: string;
   "location_kind"?: LocationKindEnum;
   "custom_form"?: unknown | null;
@@ -5670,6 +5724,8 @@ export type TenantBootstrapPublicApi = {
   "publishable_key": string;
   "inventory_path": string;
 };
+
+export type TextAlignEnum = "left" | "center";
 
 export type TimelineActor = {
   "username": string;

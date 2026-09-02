@@ -19,8 +19,19 @@ from apps.events.views_member_events import (
     MemberCollaborativeEventListView,
     MemberCollaborativeEventRegistrationView,
 )
+from apps.events.views_calendar import MemberEventCalendarFeedView, MemberEventCalendarView
 
 urlpatterns = [
+    path(
+        'makerspaces/<int:makerspace_id>/event-registrations/calendar.ics',
+        MemberEventCalendarView.as_view(),
+        name='member-event-calendar',
+    ),
+    path(
+        'makerspaces/<int:makerspace_id>/event-calendar-feed/',
+        MemberEventCalendarFeedView.as_view(),
+        name='member-event-calendar-feed',
+    ),
     path(
         'makerspaces/<int:makerspace_id>/collaborative-events/',
         MemberCollaborativeEventListView.as_view(),

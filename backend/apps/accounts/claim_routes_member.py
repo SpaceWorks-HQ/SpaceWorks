@@ -107,6 +107,25 @@ MEMBER_CLAIM_ROUTES = {
         ownership=RowOwnership.MIXED_REFUSED,
     ),
     **_options("member-event-checkin-qr"),
+    ("member-event-calendar", "GET"): Refused(
+        "event calendars can contain foreign-hosted registration rows",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    ("member-event-calendar", "HEAD"): Refused(
+        "event calendars can contain foreign-hosted registration rows",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    **_options("member-event-calendar"),
+    ("member-event-calendar-feed", "GET"): Refused(
+        "claim sessions cannot manage durable bearer credentials"
+    ),
+    ("member-event-calendar-feed", "POST"): Refused(
+        "claim sessions cannot manage durable bearer credentials"
+    ),
+    ("member-event-calendar-feed", "DELETE"): Refused(
+        "claim sessions cannot manage durable bearer credentials"
+    ),
+    **_options("member-event-calendar-feed"),
     ("member-event-feedback", "GET"): Refused(
         "event feedback can return foreign-hosted registration rows",
         ownership=RowOwnership.MIXED_REFUSED,

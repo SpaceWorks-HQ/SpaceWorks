@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 from apps.encryption.mappers import ScopedPiiModelMixin
 from apps.events.models_event import Event
 
@@ -84,6 +85,8 @@ class EventRegistration(ScopedPiiModelMixin, models.Model):
         choices=Status.choices,
         default=Status.REGISTERED,
     )
+    calendar_sequence = models.PositiveIntegerField(default=0)
+    calendar_updated_at = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

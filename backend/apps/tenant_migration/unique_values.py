@@ -127,8 +127,18 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
     ("events.Event", "field:public_token"): _policy(
         FRESH, "Source bearer tokens are replaced."
     ),
+    ("events.Event", "field:calendar_uid"): _policy(
+        PRESERVE,
+        "Keep stable calendar identity unless the target already uses it.",
+        field="calendar_uid",
+    ),
     ("events.EventSeries", "field:public_token"): _policy(
         FRESH, "Source series bearer tokens are replaced."
+    ),
+    ("events.EventSeries", "field:calendar_uid"): _policy(
+        PRESERVE,
+        "Keep stable series calendar identity unless the target already uses it.",
+        field="calendar_uid",
     ),
     ("events.Event", "uniq_event_series_occurrence_key"): _policy(
         REMAP, "The series reference is remapped with its occurrence identity."

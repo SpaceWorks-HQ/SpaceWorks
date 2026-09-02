@@ -217,6 +217,7 @@ JSON_FIELDS = frozenset(
         ("bookings.BookableSpace", "custom_form"),
         ("bookings.Booking", "custom_answers"),
         ("events.Event", "custom_form"),
+        ("events.Event", "badge_template"),
         ("events.Event", "series_override_fields"),
         ("events.EventSeries", "custom_form"),
         ("events.EventRegistration", "custom_answers"),

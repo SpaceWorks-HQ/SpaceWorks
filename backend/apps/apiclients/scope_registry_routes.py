@@ -57,6 +57,8 @@ _ROUTE_DEFINITIONS = (
         TARGET_TENANT_SLUG, False, True,
     ),
     ("public-event-list", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-event-calendar", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-event-calendar-feed", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, False),
     ("public-event-register", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
     ("public-event-feedback", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_TOKEN, False, False),
     ("public-event-feedback", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_TOKEN, False, False),

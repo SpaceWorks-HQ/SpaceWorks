@@ -27,6 +27,7 @@ openpyxl>=3.1,<4
 Pillow
 reportlab>=4.2,<5
 python-dateutil>=2.9,<3
+icalendar>=7.0,<8
 celery[redis]>=5.4,<6
 redis>=5.0,<7
 dnspython>=2.7,<3

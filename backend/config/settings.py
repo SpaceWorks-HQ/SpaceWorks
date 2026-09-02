@@ -188,6 +188,7 @@ INSTALLED_APPS = [
 TOMBSTONED_APPS = tombstoned_app_labels()
 
 MIDDLEWARE = [
+    "apps.events.middleware.CalendarFeedLogRedactionMiddleware",
     "apps.backup.middleware.DeploymentRecoveryGateMiddleware",
     "apps.tenant_migration.middleware.SourceMigrationGateMiddleware",
     "apps.makerspaces.middleware.TenantHostValidationMiddleware",
@@ -812,6 +813,12 @@ REST_FRAMEWORK = {
         ),
         "event_checkin_resolve": env(
             "THROTTLE_EVENT_CHECKIN_RESOLVE", default="60/min"
+        ),
+        "event_calendar_feed_token": env(
+            "THROTTLE_EVENT_CALENDAR_FEED_TOKEN", default="120/hour"
+        ),
+        "event_calendar_feed_ip": env(
+            "THROTTLE_EVENT_CALENDAR_FEED_IP", default="300/hour"
         ),
         "public_stats": env("THROTTLE_PUBLIC_STATS", default="30/min"),
         "client_public": env("THROTTLE_CLIENT_PUBLIC", default="30/min"),

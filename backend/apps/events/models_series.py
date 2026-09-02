@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 from apps.forms_schema.validation import validate_form_schema
 
@@ -17,6 +18,9 @@ class EventSeries(models.Model):
         COMPLETED = "completed", "Completed"
 
     public_token = models.UUIDField(default=uuid4, editable=False, unique=True, db_index=True)
+    calendar_uid = models.UUIDField(default=uuid4, editable=False, unique=True)
+    calendar_sequence = models.PositiveIntegerField(default=0)
+    calendar_updated_at = models.DateTimeField(default=timezone.now)
     makerspace = models.ForeignKey(
         "makerspaces.Makerspace", on_delete=models.CASCADE, related_name="event_series"
     )
@@ -77,8 +81,11 @@ class EventSeries(models.Model):
     def save(self, *args, **kwargs):
         self.title = (self.title or "").strip()
         if self.pk:
-            original = type(self).objects.only("public_token", "makerspace_id").get(pk=self.pk)
+            original = type(self).objects.only(
+                "public_token", "calendar_uid", "makerspace_id"
+            ).get(pk=self.pk)
             self.public_token = original.public_token
+            self.calendar_uid = original.calendar_uid
             self.makerspace_id = original.makerspace_id
         super().save(*args, **kwargs)
 

@@ -9,6 +9,7 @@ export type EventFormValues = Omit<EventPayload, "starts_at" | "ends_at" | "regi
 
 export const emptyEventForm: EventFormValues = {
   title: "", description: "", starts_at: "", ends_at: "", location: "",
+  timezone_name: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
   capacity: 0, payment_amount: "0.00", registration_requires_approval: false,
   registration_cutoff_at: null, registration_cutoff_lead_minutes: null,
   is_public: false,
@@ -24,6 +25,7 @@ export function valuesFor(event: StaffEvent): EventFormValues {
   return {
     title: event.title, description: event.description,
     starts_at: localDate(event.starts_at), ends_at: localDate(event.ends_at),
+    timezone_name: event.timezone_name,
     location: event.location, capacity: event.capacity,
     payment_amount: event.payment_amount,
     registration_requires_approval: event.registration_requires_approval,
@@ -53,6 +55,7 @@ export function EventFields({ values, setValues, disabled = false, approvalLocke
     <label className="grid gap-1 text-sm font-semibold text-ink sm:col-span-2">Title<input className="desk-input" value={values.title} onChange={(e) => set("title", e.target.value)} required disabled={disabled} maxLength={200} /></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Starts<input className="desk-input" type="datetime-local" value={values.starts_at} onChange={(e) => set("starts_at", e.target.value)} required disabled={disabled} /></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Ends<input className="desk-input" type="datetime-local" value={values.ends_at} onChange={(e) => set("ends_at", e.target.value)} required disabled={disabled} /></label>
+    <label className="grid gap-1 text-sm font-semibold text-ink sm:col-span-2">Event time zone<input className="desk-input font-mono" value={values.timezone_name} onChange={(e) => set("timezone_name", e.target.value)} required disabled={disabled} maxLength={64} /><span className="text-xs font-normal text-muted">Use an IANA name such as Asia/Kolkata. Review migrated events because their original zone was not recorded.</span></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Location<input className="desk-input" value={values.location} onChange={(e) => set("location", e.target.value)} disabled={disabled} maxLength={255} /></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Capacity<input className="desk-input" type="number" min="0" value={values.capacity} onChange={(e) => set("capacity", Number(e.target.value))} disabled={disabled} /><span className="text-xs font-normal text-muted">Use 0 for Unlimited.</span></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Registration price<input className="desk-input" type="number" min="0" step="0.01" value={values.payment_amount} onChange={(e) => set("payment_amount", e.target.value)} disabled={disabled} /><span className="text-xs font-normal text-muted">Charged only when a place is confirmed.</span></label>

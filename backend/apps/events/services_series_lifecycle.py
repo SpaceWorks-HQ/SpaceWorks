@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
 from apps.audit import services as audit
@@ -7,6 +8,7 @@ from apps.events.exceptions import EventInvalidTransition
 from apps.events.models import Event, EventSeries
 from apps.events.notifications import notify_series_lifecycle
 from apps.events.services_recurrence import recurrence_exhausted
+from apps.events.services_calendar import calendar_series_changed
 from apps.makerspaces import limits
 from apps.makerspaces.guards import require_module_locked
 
@@ -26,11 +28,15 @@ def publish_series(series, *, actor):
         series=locked, status=Event.Status.DRAFT, ends_at__gte=timezone.now()
     ).order_by("pk"))
     limits.check_quota(locked.makerspace, "events", adding=len(events))
+    now = timezone.now()
     Event.objects.filter(pk__in=[event.pk for event in events]).update(
-        status=Event.Status.PUBLISHED
+        status=Event.Status.PUBLISHED,
+        calendar_sequence=F("calendar_sequence") + 1,
+        calendar_updated_at=now,
     )
     locked.status = EventSeries.Status.PUBLISHED
     locked.save(update_fields=("status", "updated_at"))
+    calendar_series_changed(locked, now=now)
     audit.record(
         actor, "event.series_published", makerspace=locked.makerspace, target=locked,
         meta={"published_count": len(events)},
@@ -52,6 +58,7 @@ def cancel_series(series, *, actor):
         services.cancel(event, actor=actor, notify=False)
     locked.status = EventSeries.Status.CANCELLED
     locked.save(update_fields=("status", "updated_at"))
+    calendar_series_changed(locked)
     audit.record(
         actor, "event.series_cancelled", makerspace=locked.makerspace, target=locked,
         meta={"cancelled_count": len(events)},
@@ -73,6 +80,7 @@ def complete_series(series, *, actor):
         raise EventInvalidTransition("Complete or cancel every occurrence first.")
     locked.status = EventSeries.Status.COMPLETED
     locked.save(update_fields=("status", "updated_at"))
+    calendar_series_changed(locked)
     audit.record(actor, "event.series_completed", makerspace=locked.makerspace, target=locked)
     notify_series_lifecycle(locked, "series_completed")
     return locked

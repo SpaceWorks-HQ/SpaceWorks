@@ -4308,6 +4308,251 @@
                 }
             }
         },
+        "/api/v1/admin/events/{id}/badge-template/": {
+            "get": {
+                "operationId": "api_v1_admin_events_badge_template_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadgeTemplate"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "operationId": "api_v1_admin_events_badge_template_update",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BadgeTemplate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BadgeTemplate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BadgeTemplate"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadgeTemplate"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        },
+                        "description": "Invalid event details."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event state or capacity conflict."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/events/{id}/badges.pdf": {
+            "post": {
+                "operationId": "api_v1_admin_events_badges.pdf_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin events"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BadgePdfRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BadgePdfRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BadgePdfRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": "Print-ready badge PDF."
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        },
+                        "description": "Invalid event details."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Event state or capacity conflict."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/events/{id}/cancel/": {
             "post": {
                 "operationId": "api_v1_admin_events_cancel_create",
@@ -32310,6 +32555,250 @@
                 }
             }
         },
+        "/api/v1/member/makerspaces/{makerspace_id}/event-calendar-feed/": {
+            "get": {
+                "operationId": "api_v1_member_makerspaces_event_calendar_feed_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCalendarFeedState"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_member_makerspaces_event_calendar_feed_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member events"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCalendarFeedIssue"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCalendarFeedIssue"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCalendarFeedIssue"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCalendarFeedIssued"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Concurrent rotation conflict."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "api_v1_member_makerspaces_event_calendar_feed_destroy",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/member/makerspaces/{makerspace_id}/event-certificates/{id}/download/": {
             "get": {
                 "operationId": "api_v1_member_makerspaces_event_certificates_download_retrieve",
@@ -32687,6 +33176,82 @@
                             }
                         },
                         "description": "Registration not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/calendar.ics": {
+            "get": {
+                "operationId": "api_v1_member_makerspaces_event_registrations_calendar.ics_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member events"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "text/calendar": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": "RFC 5545 calendar (`text/calendar; charset=utf-8`)."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Active membership required."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace not found."
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Events module unavailable."
                     }
                 }
             }
@@ -35000,6 +35565,65 @@
                 }
             }
         },
+        "/api/v1/public/{makerspace_slug}/event-calendar/{raw_token}.ics": {
+            "get": {
+                "operationId": "api_v1_public_event_calendar_.ics_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "raw_token",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Public events"
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "text/calendar": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": "RFC 5545 calendar (`text/calendar; charset=utf-8`)."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Calendar not found."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rate limit exceeded."
+                    }
+                }
+            }
+        },
         "/api/v1/public/{makerspace_slug}/events/": {
             "get": {
                 "operationId": "api_v1_public_events_list",
@@ -35058,6 +35682,76 @@
                                 "schema": {
                                     "type": "object",
                                     "additionalProperties": {}
+                                }
+                            }
+                        },
+                        "description": "Rate limit exceeded."
+                    }
+                }
+            }
+        },
+        "/api/v1/public/{makerspace_slug}/events/{public_token}/calendar.ics": {
+            "get": {
+                "operationId": "api_v1_public_events_calendar.ics_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Public events"
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "text/calendar": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": "RFC 5545 calendar (`text/calendar; charset=utf-8`)."
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Events module unavailable."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Calendar not found."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
                                 }
                             }
                         },
@@ -39270,6 +39964,98 @@
                     "url"
                 ]
             },
+            "BadgePdfRequest": {
+                "type": "object",
+                "properties": {
+                    "registration_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "maxItems": 200
+                    },
+                    "template_override": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/BadgeTemplate"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "include_attended": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                },
+                "required": [
+                    "registration_ids"
+                ]
+            },
+            "BadgeTemplate": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "integer"
+                    },
+                    "paper_size": {
+                        "$ref": "#/components/schemas/PaperSizeEnum"
+                    },
+                    "orientation": {
+                        "$ref": "#/components/schemas/OrientationEnum"
+                    },
+                    "page_width_mm": {
+                        "type": "number",
+                        "format": "double",
+                        "nullable": true
+                    },
+                    "page_height_mm": {
+                        "type": "number",
+                        "format": "double",
+                        "nullable": true
+                    },
+                    "card_width_mm": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "card_height_mm": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "margin_mm": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "gap_mm": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "template": {
+                        "type": "string"
+                    },
+                    "fields": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 80
+                        }
+                    },
+                    "font_size_pt": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "name_font_size_pt": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "text_align": {
+                        "$ref": "#/components/schemas/TextAlignEnum"
+                    },
+                    "include_qr": {
+                        "type": "boolean"
+                    }
+                }
+            },
             "BlankEnum": {
                 "enum": [
                     ""
@@ -42124,6 +42910,10 @@
                         "format": "date-time",
                         "readOnly": true
                     },
+                    "timezone_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
                     "location": {
                         "type": "string",
                         "readOnly": true
@@ -42250,6 +43040,7 @@
                     "series_summary",
                     "starts_at",
                     "status",
+                    "timezone_name",
                     "title",
                     "updated_at"
                 ]
@@ -43238,6 +44029,10 @@
                     "ends_at": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "timezone_name": {
+                        "type": "string",
+                        "maxLength": 64
                     },
                     "location": {
                         "type": "string",
@@ -47812,6 +48607,73 @@
                     "verified_members"
                 ]
             },
+            "MemberCalendarFeedIssue": {
+                "type": "object",
+                "properties": {
+                    "confirm_bearer_risk": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "confirm_bearer_risk"
+                ]
+            },
+            "MemberCalendarFeedIssued": {
+                "type": "object",
+                "properties": {
+                    "feed_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "readOnly": true
+                    },
+                    "token_hint": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "feed_url",
+                    "token_hint"
+                ]
+            },
+            "MemberCalendarFeedState": {
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "token_hint": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "rotated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "enabled",
+                    "rotated_at",
+                    "token_hint"
+                ]
+            },
             "MemberClaimCode": {
                 "type": "object",
                 "properties": {
@@ -49644,6 +50506,14 @@
                     "rows"
                 ]
             },
+            "OrientationEnum": {
+                "enum": [
+                    "portrait",
+                    "landscape"
+                ],
+                "type": "string",
+                "description": "* `portrait` - portrait\n* `landscape` - landscape"
+            },
             "OtpResetPasswordConfirm": {
                 "type": "object",
                 "properties": {
@@ -50435,6 +51305,15 @@
                     "target"
                 ]
             },
+            "PaperSizeEnum": {
+                "enum": [
+                    "A4",
+                    "LETTER",
+                    "custom"
+                ],
+                "type": "string",
+                "description": "* `A4` - A4\n* `LETTER` - LETTER\n* `custom` - custom"
+            },
             "PasswordResetAcknowledgement": {
                 "type": "object",
                 "properties": {
@@ -50974,6 +51853,10 @@
                     "ends_at": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "timezone_name": {
+                        "type": "string",
+                        "maxLength": 64
                     },
                     "location": {
                         "type": "string",
@@ -58494,6 +59377,14 @@
                     "inventory_path",
                     "publishable_key"
                 ]
+            },
+            "TextAlignEnum": {
+                "enum": [
+                    "left",
+                    "center"
+                ],
+                "type": "string",
+                "description": "* `left` - left\n* `center` - center"
             },
             "TimelineActor": {
                 "type": "object",

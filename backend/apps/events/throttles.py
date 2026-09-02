@@ -1,3 +1,5 @@
+import hashlib
+
 from rest_framework.throttling import SimpleRateThrottle
 
 from apps.apiclients.throttling import ClientTierRateThrottle
@@ -63,3 +65,21 @@ class EventCheckInResolveThrottle(SimpleRateThrottle):
         if user is None or not user.is_authenticated:
             return None
         return self.cache_format % {"scope": self.scope, "ident": user.pk}
+
+
+class EventCalendarFeedTokenThrottle(SimpleRateThrottle):
+    scope = "event_calendar_feed_token"
+
+    def get_cache_key(self, request, view):
+        raw_token = view.kwargs.get("raw_token", "")
+        if not raw_token:
+            return None
+        digest = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        return self.cache_format % {"scope": self.scope, "ident": digest}
+
+
+class EventCalendarFeedIpThrottle(SimpleRateThrottle):
+    scope = "event_calendar_feed_ip"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}

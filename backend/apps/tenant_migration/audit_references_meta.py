@@ -143,6 +143,7 @@ AUDIT_META_REFERENCES = {
         R, "makerspaces.MakerspaceMembership",
         ("membership.waiver_witnessed", "membership_id"),
         ("staff.role_assigned", "membership_id"),
+        ("event.calendar_feed_revoked", "membership_id"),
     ),
     **_reference(
         R, "integrations.NotificationDestination",

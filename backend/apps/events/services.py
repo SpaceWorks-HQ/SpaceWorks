@@ -13,8 +13,6 @@ from apps.events.exceptions import (
 )
 from apps.events.models import (
     Event,
-    EventAttendanceCertificate,
-    EventFeedbackSurvey,
     EventRegistration,
 )
 from apps.events.notifications import notify_event_lifecycle
@@ -27,7 +25,7 @@ EVENT_FIELDS = frozenset(
     {'title', 'description', 'starts_at', 'ends_at', 'location',
      'location_kind', 'custom_form', 'capacity', 'is_public', 'payment_amount',
      'registration_requires_approval', 'registration_cutoff_at',
-     'registration_cutoff_lead_minutes'}
+     'registration_cutoff_lead_minutes', 'timezone_name'}
 )
 INHERITABLE_FIELDS = EVENT_FIELDS | {"image_key"}
 
@@ -74,6 +72,7 @@ def create_event(
     capacity, is_public, location_kind=Event.LocationKind.OTHER, custom_form=None,
     payment_amount=0, registration_requires_approval=False,
     registration_cutoff_at=None, registration_cutoff_lead_minutes=None,
+    timezone_name=None,
 ):
     locked_space = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
     require_module_locked(locked_space, "events")
@@ -93,6 +92,7 @@ def create_event(
         registration_cutoff_at=registration_cutoff_at,
         registration_cutoff_lead_minutes=registration_cutoff_lead_minutes,
         is_public=is_public,
+        **({"timezone_name": timezone_name} if timezone_name else {}),
     )
     _validate(event)
     event.save()
@@ -102,6 +102,8 @@ def create_event(
 
 @transaction.atomic
 def update_event(event, *, actor, inherit_fields=(), **changes):
+    from apps.events.services_calendar import CALENDAR_EVENT_FIELDS, calendar_event_changed
+
     locked = _locked_event(event.pk)
     if locked.status not in (Event.Status.DRAFT, Event.Status.PUBLISHED):
         raise EventInvalidTransition("Terminal events cannot be updated.")
@@ -179,6 +181,8 @@ def update_event(event, *, actor, inherit_fields=(), **changes):
             locked.series_override_fields = sorted(overrides)
             update_fields.add("series_override_fields")
         locked.save(update_fields=[*sorted(update_fields), "updated_at"])
+        if set(changes) & CALENDAR_EVENT_FIELDS:
+            calendar_event_changed(locked)
         if "image_key" in inherit_fields and old_image_key:
             from apps.inventory import public_image_storage
 
@@ -199,93 +203,6 @@ def update_event(event, *, actor, inherit_fields=(), **changes):
     return _refresh(locked)
 
 
-def _transition(event, actor, expected, new_status, action):
-    locked = _locked_event(event.pk)
-    if locked.status != expected:
-        message = f"Cannot transition event from {locked.status} to {new_status}."
-        raise EventInvalidTransition(message)
-    locked.status = new_status
-    locked.save(update_fields=["status", "updated_at"])
-    meta = {"old_status": expected, "new_status": new_status}
-    _audit(locked, actor, action, locked, meta)
-    notify_event_lifecycle(locked, new_status)
-    return _refresh(locked)
-
-
-@transaction.atomic
-def publish(event, *, actor):
-    locked = _locked_event(event.pk)
-    if locked.status != Event.Status.DRAFT:
-        raise EventInvalidTransition("Only draft events can be published.")
-    _validate(locked)
-    if locked.ends_at < timezone.now():
-        raise EventInvalidTransition("Ended events cannot be published.")
-    require_module_locked(locked.makerspace, "events")
-    limits.check_quota(locked.makerspace, "events", adding=1)
-    locked.status = Event.Status.PUBLISHED
-    locked.save(update_fields=["status", "updated_at"])
-    meta = {"old_status": Event.Status.DRAFT, "new_status": Event.Status.PUBLISHED}
-    _audit(locked, actor, "event.published", locked, meta)
-    notify_event_lifecycle(locked, "published")
-    return _refresh(locked)
-
-
-@transaction.atomic
-def cancel(event, *, actor, notify=True):
-    locked = _locked_event(event.pk)
-    if locked.status != Event.Status.PUBLISHED:
-        raise EventInvalidTransition(
-            f"Cannot transition event from {locked.status} to {Event.Status.CANCELLED}."
-        )
-    survey = EventFeedbackSurvey.objects.select_for_update().filter(event=locked).first()
-    certificates = list(
-        EventAttendanceCertificate.objects.select_for_update().filter(
-            registration__event=locked,
-            status=EventAttendanceCertificate.Status.ACTIVE,
-        )
-    )
-    now = timezone.now()
-    if survey is not None and survey.is_open:
-        survey.is_open = False
-        survey.closed_at = now
-        survey.save(update_fields=["is_open", "closed_at", "updated_at"])
-        _audit(locked, actor, "event.feedback_survey_closed", survey, {"reason": "event_cancelled"})
-    for certificate in certificates:
-        certificate.status = EventAttendanceCertificate.Status.REVOKED
-        certificate.revoked_at = now
-        certificate.revoked_by = actor
-        certificate.revocation_reason = (
-            EventAttendanceCertificate.RevocationReason.EVENT_CANCELLED
-        )
-        certificate.save(
-            update_fields=["status", "revoked_at", "revoked_by", "revocation_reason"]
-        )
-        _audit(
-            locked,
-            actor,
-            "event.certificate_revoked",
-            certificate,
-            {"reason": certificate.revocation_reason, "revision": certificate.revision},
-        )
-    locked.status = Event.Status.CANCELLED
-    locked.save(update_fields=["status", "updated_at"])
-    _audit(
-        locked,
-        actor,
-        "event.cancelled",
-        locked,
-        {"old_status": Event.Status.PUBLISHED, "new_status": Event.Status.CANCELLED},
-    )
-    if notify:
-        notify_event_lifecycle(locked, "cancelled")
-    return _refresh(locked)
-
-
-@transaction.atomic
-def complete(event, *, actor):
-    return _transition(event, actor, Event.Status.PUBLISHED, Event.Status.COMPLETED, "event.completed")
-
-
 from apps.events.services_registration import register  # noqa: E402
 from apps.events.services_registration_state import (  # noqa: E402
     approve_registration,
@@ -296,3 +213,4 @@ from apps.events.services_registration_state import (  # noqa: E402
     promote_registration,
     reject_registration,
 )
+from apps.events.services_lifecycle import cancel, complete, publish  # noqa: E402

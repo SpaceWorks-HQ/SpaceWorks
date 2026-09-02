@@ -8,7 +8,7 @@ import { SiteFooter } from "../../components/SiteFooter";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { Card, EmptyState, Skeleton, StatusBadge } from "../../components/ui";
 import type { ApiPath } from "../../generated/api";
-import { StructuredApiError, tenantPublicRequest } from "../../lib/api";
+import { StructuredApiError, tenantPublicRequest, tenantPublicRequestBlob } from "../../lib/api";
 import { useTenant, useTenantPath } from "../../lib/tenant";
 import { EventRegistrationForm } from "./EventRegistrationForm";
 import { formatSlug } from "./PublicInventoryParts";
@@ -53,6 +53,8 @@ export function PublicEventsPage() {
   const bootstrapQuery = useTenantBootstrap(makerspaceSlug, tenant.mode === "central");
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
   const [activeToken, setActiveToken] = useState<string | null>(null);
+  const [calendarToken, setCalendarToken] = useState<string | null>(null);
+  const [calendarError, setCalendarError] = useState<{ token: string; message: string } | null>(null);
   const events = useQuery({
     queryKey: ["public-events", makerspaceSlug],
     queryFn: () => tenantPublicRequest<PublicEvent[]>(makerspaceSlug, publicEventsPath(makerspaceSlug)),
@@ -72,6 +74,25 @@ export function PublicEventsPage() {
     else groups.push({ key, title: item.series?.title ?? null, items: [item] });
     return groups;
   }, []);
+
+  async function downloadCalendar(item: PublicEvent) {
+    setCalendarToken(item.public_token);
+    setCalendarError(null);
+    try {
+      const path = `${publicEventsPath(makerspaceSlug)}${item.public_token}/calendar.ics`;
+      const blob = await tenantPublicRequestBlob(makerspaceSlug, path);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${item.title.replace(/[^A-Za-z0-9._-]+/g, "-") || "event"}.ics`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      setCalendarError({ token: item.public_token, message: cause instanceof Error ? cause.message : "Could not download this calendar." });
+    } finally {
+      setCalendarToken(null);
+    }
+  }
 
   return <main className="desk-shell flex min-h-screen flex-col">
     <SkipLink />
@@ -107,7 +128,9 @@ export function PublicEventsPage() {
           {item.description ? <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink">{item.description}</p> : null}
           <dl className="mt-4 flex flex-wrap gap-4 text-sm"><div><dt className="eyebrow">Capacity</dt><dd className="font-mono font-semibold text-ink">{unlimited ? "Unlimited" : item.capacity}</dd></div><div><dt className="eyebrow">Availability</dt><dd className="font-mono font-semibold text-ink">{item.availability}</dd></div></dl>
           {!item.registration_open ? <p className="mt-4 text-sm font-semibold text-muted">Registration closed{item.effective_registration_cutoff_at ? ` · ${new Date(item.effective_registration_cutoff_at).toLocaleString()}` : ""}</p> : null}
-          <button className="desk-button-primary mt-4" type="button" disabled={!item.registration_open} aria-expanded={open} onClick={() => setActiveToken(open ? null : item.public_token)}>{open ? "Close form" : actionLabel}</button>
+          <div className="mt-4 flex flex-wrap gap-2"><button className="desk-button-primary" type="button" disabled={!item.registration_open} aria-expanded={open} onClick={() => setActiveToken(open ? null : item.public_token)}>{open ? "Close form" : actionLabel}</button>
+          <button className="desk-button" type="button" disabled={calendarToken === item.public_token} onClick={() => downloadCalendar(item)}>{calendarToken === item.public_token ? "Preparing…" : "Add to calendar"}</button></div>
+          {calendarError?.token === item.public_token ? <p className="mt-2 text-sm text-danger" role="alert">{calendarError.message}</p> : null}
           {open && item.registration_open ? <div className="mt-4"><EventRegistrationForm key={item.public_token} makerspaceSlug={makerspaceSlug} publicToken={item.public_token} waitlist={waitlist} approvalRequired={item.registration_requires_approval} customForm={item.custom_form} /></div> : null}
           </div>
         </article>;

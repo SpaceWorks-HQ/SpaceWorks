@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import F, Q
+from django.utils import timezone
 from apps.forms_schema.validation import validate_form_schema
 
 
@@ -26,6 +27,11 @@ class Event(models.Model):
         unique=True,
         db_index=True,
     )
+    calendar_uid = models.UUIDField(default=uuid4, editable=False, unique=True)
+    calendar_sequence = models.PositiveIntegerField(default=0)
+    calendar_updated_at = models.DateTimeField(default=timezone.now)
+    timezone_name = models.CharField(max_length=64, default=settings.TIME_ZONE)
+    badge_template = models.JSONField(default=dict, blank=True)
     makerspace = models.ForeignKey(
         "makerspaces.Makerspace",
         on_delete=models.CASCADE,
@@ -159,6 +165,12 @@ class Event(models.Model):
 
     def clean(self):
         super().clean()
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+        try:
+            ZoneInfo(self.timezone_name)
+        except (ZoneInfoNotFoundError, ValueError, TypeError) as exc:
+            raise ValidationError({"timezone_name": "Use a valid IANA timezone name."}) from exc
         if (
             self.registration_cutoff_at is not None
             and self.registration_cutoff_lead_minutes is not None
@@ -190,9 +202,12 @@ class Event(models.Model):
     def save(self, *args, **kwargs):
         self.title = (self.title or "").strip()
         if self.pk:
-            original = type(self).objects.only("public_token", "makerspace_id").get(
+            original = type(self).objects.only(
+                "public_token", "calendar_uid", "makerspace_id"
+            ).get(
                 pk=self.pk
             )
             self.public_token = original.public_token
+            self.calendar_uid = original.calendar_uid
             self.makerspace_id = original.makerspace_id
         super().save(*args, **kwargs)
