@@ -35,7 +35,7 @@ class ExpiryClaim:
     recorded_size: int
 
 
-def sweep_evidence_retention(*, dry_run=False, now=None):
+def sweep_evidence_retention(*, dry_run=False, now=None, batch_size=None):
     now = now or timezone.now()
     summary = {
         "makerspaces_scanned": 0,
@@ -48,15 +48,18 @@ def sweep_evidence_retention(*, dry_run=False, now=None):
         "continuation_required": False,
     }
     if not settings.EVIDENCE_OBJECT_EXPIRY_ENABLED and not dry_run:
-        return summary
+        return _logged_summary(summary, dry_run=dry_run, disabled=True)
     if not DeploymentRecoveryState.objects.filter(
         pk=1, mode=DeploymentRecoveryState.Mode.NORMAL
     ).exists():
         summary["makerspaces_skipped"] = servable_queryset().count()
-        return summary
+        return _logged_summary(summary, dry_run=dry_run, recovery_blocked=True)
 
     run_id = uuid.uuid4()
-    batch_size = min(max(int(settings.EVIDENCE_RETENTION_BATCH_SIZE), 1), 1000)
+    configured_batch_size = (
+        settings.EVIDENCE_RETENTION_BATCH_SIZE if batch_size is None else batch_size
+    )
+    batch_size = min(max(int(configured_batch_size), 1), 1000)
     gate_counts = {"skipped": 0}
     for makerspace in servable_queryset().order_by("pk").iterator(chunk_size=100):
         summary["makerspaces_scanned"] += 1
@@ -80,6 +83,16 @@ def sweep_evidence_retention(*, dry_run=False, now=None):
                 summary=summary,
             )
     summary["makerspaces_skipped"] += gate_counts["skipped"]
+    return _logged_summary(
+        summary, dry_run=dry_run, batch_size=batch_size,
+    )
+
+
+def _logged_summary(summary, *, dry_run, **context):
+    logger.info(
+        "evidence_object_expiry_sweep_completed",
+        extra={"dry_run": dry_run, **context, **summary},
+    )
     return summary
 
 

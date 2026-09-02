@@ -23,7 +23,7 @@ can find, and rate-limiting it correctly is more work than a cron entry.
 """
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
@@ -151,11 +151,25 @@ class Command(BaseCommand):
             help="Skip tasks run more recently than their declared interval.",
         )
         parser.add_argument("--task", help="Run only this task name.")
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Preview evidence expiry without deleting objects.",
+        )
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            help="Evidence rows per makerspace (clamped to 1..1000).",
+        )
 
     def handle(self, *args, **options):
         from apps.operations.models_scheduling import PeriodicTaskRun
 
         only = options.get("task")
+        if (options["dry_run"] or options["batch_size"] is not None) and only != "evidence-object-expiry":
+            raise CommandError(
+                "--dry-run and --batch-size require --task evidence-object-expiry."
+            )
         now = timezone.now()
         for name, dotted_path, interval_minutes in SCHEDULED_TASKS:
             if only and name != only:
@@ -170,14 +184,22 @@ class Command(BaseCommand):
                 if options["due_only"] and not row.is_due(now, interval_minutes):
                     self.stdout.write(f"skip {name} (last run {row.last_run_at:%Y-%m-%d %H:%M})")
                     continue
-                row.last_run_at = now
-                row.save(update_fields=["last_run_at"])
+                # A preview must not postpone the next real sweep under --due-only.
+                if not options["dry_run"]:
+                    row.last_run_at = now
+                    row.save(update_fields=["last_run_at"])
 
             try:
                 # Called directly, not via .delay(): under eager mode they are the
                 # same thing, and with a broker configured this command should still
                 # do the work rather than queue it behind a worker that may not exist.
-                _import_task(dotted_path)()
+                task_options = {}
+                if name == "evidence-object-expiry":
+                    task_options = {
+                        "dry_run": options["dry_run"],
+                        "batch_size": options["batch_size"],
+                    }
+                _import_task(dotted_path)(**task_options)
             except Exception as exc:  # noqa: BLE001 - one failing task must not stop the rest
                 with transaction.atomic():
                     row = PeriodicTaskRun.objects.select_for_update().get(name=name)
