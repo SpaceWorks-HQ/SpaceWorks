@@ -13,7 +13,13 @@ from django.utils import timezone
 from apps.bookings.models import BookableSpace, Booking
 from apps.encryption.crypto import is_envelope
 from apps.encryption.registry import ALL_FIELDS
-from apps.events.models import Event, EventRegistration
+from apps.events.models import (
+    Event,
+    EventAttendanceCertificate,
+    EventFeedbackResponse,
+    EventFeedbackSurvey,
+    EventRegistration,
+)
 from apps.hardware_requests.models import HardwareRequest
 from apps.integrations.admin_email_logs import EmailLogAdmin
 from apps.integrations.models import EmailLog
@@ -40,9 +46,29 @@ def _objects():
     machine_type = MachineType.objects.create(makerspace=space, slug=f"sweep-{stamp}", name="Sweep machine")
     machine = Machine.objects.create(makerspace=space, machine_type=machine_type, name="Sweep machine")
     service_bucket = ServiceBucket.objects.create(machine=machine, name="Sweep service")
+    registration = EventRegistration.objects.create(
+        event=event, name="Base", email=f"base-{stamp}@example.test", phone="1",
+    )
+    survey = EventFeedbackSurvey.objects.create(
+        event=event, title="Sweep survey",
+        questions=[{"id": "q1", "label": "Rating", "type": "number", "options": [], "required": True}],
+    )
+    # event_feedback_response_mode_matches_identity: a response carries its registration
+    # only when a certificate was requested; an anonymous one must stay unattributed.
+    response = EventFeedbackResponse.objects.create(
+        survey=survey, registration=registration, answers_snapshot="{}",
+        certificate_requested=True,
+    )
     return {
         "hardware_requests.HardwareRequest": HardwareRequest.objects.create(makerspace=space, requester=user, requester_username=user.username),
-        "events.EventRegistration": EventRegistration.objects.create(event=event, name="Base", email=f"base-{stamp}@example.test", phone="1"),
+        "events.EventRegistration": registration,
+        "events.EventFeedbackResponse": response,
+        "events.EventAttendanceCertificate": EventAttendanceCertificate.objects.create(
+            response=response, registration=registration, revision=1,
+            recipient_name="Base", event_title="Sweep event",
+            event_starts_at=now, event_ends_at=now + timedelta(hours=1),
+            issuer_name="Sweep", object_key=f"certificates/sweep-{stamp}.pdf",
+        ),
         "bookings.Booking": Booking.objects.create(space=bookable, name="Base", email=f"booking-{stamp}@example.test", phone="1", starts_at=now + timedelta(days=1), ends_at=now + timedelta(days=1, hours=1)),
         "machines.MachineServiceRequest": MachineServiceRequest.objects.create(bucket=service_bucket, requester=user, title="Sweep service"),
         "machines.MachineUsageEntry": MachineUsageEntry.objects.create(machine=machine, logged_by=user),
@@ -66,6 +92,44 @@ def test_every_mapped_value_is_an_envelope_and_not_a_raw_database_leak(item, cap
             row = MachineUsageEntry.objects.create(
                 machine=row.machine,
                 logged_by=row.logged_by,
+                **{item.field_name: value},
+            )
+        elif item.model_label == "events.EventFeedbackResponse":
+            # Feedback answers are an immutable snapshot. Written anonymously here so the
+            # identity-mode check constraint holds without a second registration.
+            row = EventFeedbackResponse.objects.create(
+                survey=row.survey,
+                registration=None,
+                certificate_requested=False,
+                **{item.field_name: value},
+            )
+        elif item.model_label == "events.EventAttendanceCertificate":
+            # Certificate issuance snapshots are immutable, uniq_live_event_certificate
+            # allows one non-revoked certificate per registration, and a database trigger
+            # refuses a pending -> revoked shortcut. So the sentinel certificate is issued
+            # for a FRESH registration rather than contorting the base row.
+            stamp = uuid4().hex[:8]
+            fresh = EventRegistration.objects.create(
+                event=row.registration.event,
+                name="Sweep",
+                email=f"sweep-cert-{stamp}@example.test",
+                phone="1",
+            )
+            fresh_response = EventFeedbackResponse.objects.create(
+                survey=row.response.survey,
+                registration=fresh,
+                certificate_requested=True,
+                answers_snapshot="{}",
+            )
+            row = EventAttendanceCertificate.objects.create(
+                response=fresh_response,
+                registration=fresh,
+                revision=1,
+                event_title=row.event_title,
+                event_starts_at=row.event_starts_at,
+                event_ends_at=row.event_ends_at,
+                issuer_name=row.issuer_name,
+                object_key=f"certificates/sweep-{stamp}.pdf",
                 **{item.field_name: value},
             )
         else:
