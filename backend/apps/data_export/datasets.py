@@ -82,6 +82,7 @@ DATASET_SPECS = {
     "operations.InventoryAdjustment": ("operations/inventory_adjustments.csv", P(("makerspace",))),
     "operations.QrPrintBatch": ("operations/qr_print_batches.csv", P(("makerspace",))),
     "operations.QrPrintBatchItem": ("operations/qr_print_batch_items.csv", P(("batch__makerspace",))),
+    "operations.ReportMetricRollup": ("reports/metric_rollups.csv", P(("makerspace",))),
     "operations.StocktakeLedgerEntry": ("stocktake/ledger.csv", P(("makerspace",), ("stocktake__makerspace",))),
     "operations.StocktakeLine": ("stocktake/lines.csv", P(("stocktake__makerspace",), ("product__makerspace", "asset__makerspace", "container__makerspace"))),
     "operations.StocktakeSession": ("stocktake/sessions.csv", P(("makerspace",), ("container__makerspace",))),

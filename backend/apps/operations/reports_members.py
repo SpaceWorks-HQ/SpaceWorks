@@ -18,7 +18,7 @@ def build_member_activity(makerspace_id, *, limit=None, date_range=None):
     aggregate = makerspace_id is None
     memberships = MakerspaceMembership.objects.filter(makerspace_id=OuterRef("pk"))
     requests = MembershipRequest.objects.filter(makerspace_id=OuterRef("pk"))
-    queryset = Makerspace.objects.filter(id__in=scoped_ids(makerspace_id)).annotate(
+    queryset = Makerspace.objects.filter(id__in=scoped_ids(makerspace_id, "membership")).annotate(
         makerspace_id=F("id"),
         makerspace_name=F("name"),
         new_members=_count(memberships.filter(_in_range("activated_at", date_range))),

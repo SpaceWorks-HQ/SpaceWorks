@@ -15,6 +15,7 @@ type Props = {
   canManage: boolean;
   machineServiceEnabled: boolean;
   printingEnabled: boolean;
+  reportsEnabled?: boolean;
   machineType: MachineType;
   allMachines: Machine[];
   visibleMachines: Machine[];
@@ -43,6 +44,7 @@ export function MachineTypePage({
   canManage,
   machineServiceEnabled,
   printingEnabled,
+  reportsEnabled = true,
   machineType,
   allMachines,
   visibleMachines,
@@ -118,7 +120,7 @@ export function MachineTypePage({
             </div>
           </section>
           {isBuiltinPrinterType(machineType) ? (
-            <PrinterServiceConsole makerspaceId={makerspaceId} canManage={canManage} printingEnabled={printingEnabled} machineType={machineType} machines={allMachines} pools={formPools} draft={draft} setDraft={setDraft} />
+            <PrinterServiceConsole makerspaceId={makerspaceId} canManage={canManage} printingEnabled={printingEnabled} reportsEnabled={reportsEnabled} machineType={machineType} machines={allMachines} pools={formPools} draft={draft} setDraft={setDraft} />
           ) : (
             <MachineServiceConsole makerspaceId={makerspaceId} canManage={canManage} machineType={machineType} machines={allMachines} pools={formPools} draft={draft} setDraft={setDraft} />
           )}

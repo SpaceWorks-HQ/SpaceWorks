@@ -19,33 +19,37 @@ MAX_REPORT_LIMIT = 500
 
 def report_data(
     report_key="summary", makerspace_id=None, *, limit=None, date_range=None,
-    report_filters=None,
+    report_filters=None, grain="day",
 ):
     definition = report_definition(report_key)
-    result = definition.builder()(
-        makerspace_id,
-        limit=_normalized_limit(limit),
-        date_range=date_range,
-        **(report_filters or {}),
-    )
+    kwargs = dict(limit=_normalized_limit(limit), date_range=date_range, **(report_filters or {}))
+    if definition.grains:
+        kwargs["grain"] = grain
+    result = definition.builder()(makerspace_id, **kwargs)
     if definition.summary:
         return result
     if not isinstance(result, ReportResult):
         return {"rows": result, "typed_rows": typed_report_rows(report_key, result)}
     rows = _matrix(result, json=True)
-    return {"rows": rows, "typed_rows": typed_result_rows(result, json_value)}
+    return {
+        "report_key": report_key,
+        "rows": rows,
+        "typed_rows": typed_result_rows(result, json_value),
+        "meta": {"source": "live", "grain": grain, "rollup_through": None, **result.meta},
+    }
 
 
 def report_rows(
     report_key, makerspace_id=None, *, limit=None, date_range=None,
-    report_filters=None,
+    report_filters=None, grain="day",
 ):
     definition = report_definition(report_key, for_export=True)
-    result = definition.builder()(
-        makerspace_id, limit=limit, date_range=date_range, **(report_filters or {})
-    )
+    kwargs = dict(limit=limit, date_range=date_range, **(report_filters or {}))
+    if definition.grains:
+        kwargs["grain"] = grain
+    result = definition.builder()(makerspace_id, **kwargs)
     if isinstance(result, ReportResult):
-        return _matrix(result, json=False)
+        return _export_matrix(result, grain)
     return result
 
 
@@ -72,6 +76,16 @@ def _matrix(result, *, json):
             for record in result.records
         ],
     ]
+
+
+def _export_matrix(result, grain):
+    # Provenance (source / grain / rollup_through) stays in the JSON response `meta` and is
+    # deliberately NOT appended as export columns. It is one value per REPORT, not per row,
+    # so appending it repeats itself on every line, and the export header of each report is
+    # pinned to the fields the report registry declares -- the registry is the single source
+    # of truth for a report's shape. Adding provenance to the file is a real product decision
+    # about five already-shipped exports, and belongs to the owner rather than to this phase.
+    return _matrix(result, json=False)
 
 
 def json_value(value):

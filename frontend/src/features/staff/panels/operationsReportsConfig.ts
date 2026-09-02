@@ -1,43 +1,35 @@
-export const reportDefinitions = [
-  { key: "summary", title: "Summary" },
-  { key: "taken-items", title: "Taken items" },
-  { key: "active-loans", title: "Active loans" },
-  { key: "returns", title: "Returns" },
-  { key: "damaged-missing", title: "Damaged / missing" },
-  { key: "damaged-lost", title: "Damaged / lost" },
-  { key: "qr-scans", title: "QR scans" },
-  { key: "most-lent", title: "Most lent" },
-  { key: "top-borrowers", title: "Top borrowers" },
-  { key: "recently-added", title: "Recently added" },
-  { key: "machine-usage", title: "Machine usage" },
-  { key: "event-attendance", title: "Event attendance" },
-  { key: "booking-utilization", title: "Booking utilization" },
-  { key: "maintenance-activity", title: "Maintenance activity" },
-  { key: "member-activity", title: "Member activity" },
-  { key: "fablab-health", title: "FabLab health" },
-  { key: "payment-reconciliation", title: "Payment reconciliation" },
-] as const;
+export type ReportCatalogItem = {
+  key: string; title: string; fields: string[]; exportable: boolean; summary: boolean;
+  required_modules: string[]; available: boolean | null; unavailable_reason: string | null;
+  grains: string[]; chart_hint: string; aggregate_supported: boolean;
+};
+export type ReportCatalog = { results: ReportCatalogItem[] };
+export type ReportKey = string;
 
-export type ReportKey = (typeof reportDefinitions)[number]["key"];
+export const reportDefinitions: ReportCatalogItem[] = [
+  "summary", "taken-items", "active-loans", "returns", "damaged-missing",
+  "damaged-lost", "qr-scans", "most-lent", "top-borrowers", "recently-added",
+  "machine-usage", "event-attendance", "booking-utilization", "maintenance-activity",
+  "member-activity", "machine-service", "printer-service", "fablab-health",
+  "payment-reconciliation", "loan-throughput", "inventory-control",
+  "evidence-compliance", "import-quality", "procurement-performance",
+  "communications-health", "community-engagement", "module-operational-health",
+].map((key) => ({
+  key, title: key.replace(/-/g, " ").replace(/^./, (letter) => letter.toUpperCase()),
+  fields: [], exportable: key !== "summary", summary: key === "summary",
+  required_modules: [], available: true, unavailable_reason: null,
+  grains: ["day"], chart_hint: "table", aggregate_supported: false,
+}));
 
 export type SavedReportView = {
   id: string; name: string; startDate: string; endDate: string;
-  scope: "all" | `makerspace:${number}`; scopeLabel: string;
-  selectedReport: ReportKey;
+  scope: "all" | `makerspace:${number}`; scopeLabel: string; selectedReport: ReportKey;
 };
 
 export const savedViewsStorageKey = "operations-reports-saved-views-v1";
-export const exportReports = reportDefinitions.map((report) => report.key).filter((key) => key !== "summary");
 
-export function sourceModule(key: ReportKey) {
-  if (key === "machine-usage" || key === "maintenance-activity") return "machines";
-  if (key === "event-attendance") return "events";
-  if (key === "booking-utilization") return "bookings";
-  return null;
-}
-
-export function reportTitle(key: ReportKey) {
-  return reportDefinitions.find((report) => report.key === key)?.title ?? key;
+export function reportTitle(key: ReportKey, definitions = reportDefinitions) {
+  return definitions.find((report) => report.key === key)?.title ?? key;
 }
 
 export function newSavedViewId() {
@@ -55,8 +47,7 @@ export function loadSavedReportViews(): SavedReportView[] {
       view && typeof view.id === "string" && typeof view.name === "string" &&
       typeof view.startDate === "string" && typeof view.endDate === "string" &&
       typeof view.scope === "string" && typeof view.scopeLabel === "string" &&
-      typeof view.selectedReport === "string" &&
-      reportDefinitions.some((report) => report.key === view.selectedReport),
+      typeof view.selectedReport === "string",
     ));
   } catch {
     return [];

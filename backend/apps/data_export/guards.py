@@ -225,6 +225,16 @@ def validate_user_edges(user_edges=USER_EDGES):
         _equal(f"{fidelity} user-edge decisions", declared, expected)
 
 
+# JSON fields that hold NO object or user references and therefore have no reference
+# schema. Declared here rather than inline so that exempting a field stays a visible,
+# reviewable act: the guard below still demands EXACT equality, so any JSON field that is
+# neither declared in JSON_FIELDS nor listed here still fails discovery.
+NON_REFERENCE_JSON_FIELDS = frozenset({
+    # Controlled metric dimension labels (module key, period, report key) -- never an id.
+    ("operations.ReportMetricRollup", "dimensions"),
+})
+
+
 def validate_semantic_references(semantic_references=SEMANTIC_REFERENCES):
     actual_polymorphic = set()
     actual_json = set()
@@ -237,7 +247,11 @@ def validate_semantic_references(semantic_references=SEMANTIC_REFERENCES):
             if isinstance(field, models.JSONField):
                 actual_json.add((label, field.name))
     _equal("polymorphic reference pairs", actual_polymorphic, set(POLYMORPHIC_PAIRS))
-    _equal("JSON reference schemas", actual_json, set(JSON_FIELDS))
+    _equal(
+        "JSON reference schemas",
+        actual_json,
+        set(JSON_FIELDS) | NON_REFERENCE_JSON_FIELDS,
+    )
     for fidelity in Fidelity:
         expected = {
             (label, location) for label, location in POLYMORPHIC_PAIRS

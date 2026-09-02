@@ -143,6 +143,20 @@ STRATEGIES = {
         ), ordering=(),
         text=(("*_enabled", "ANY"), ("*_available", "ALL among enabled makerspaces; false when none enabled")),
     ),
+    "evidence-compliance": _strategy(
+        AggregationKind.WEIGHTED_RATE, ("period", "evidence_type"),
+        (
+            "period", "evidence_type", "created_count", "attached_count",
+            "unattached_count", "object_live_count", "object_expired_count",
+            "metadata_retained_count", "bytes", "attachment_rate_percent",
+        ),
+        ordering=("period", "evidence_type"),
+        text=(
+            ("period", "group and carry"),
+            ("evidence_type", "group and carry"),
+            ("attachment_rate_percent", "recompute from summed attached and created counts"),
+        ),
+    ),
 }
 
 

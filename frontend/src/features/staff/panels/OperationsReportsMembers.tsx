@@ -1,4 +1,4 @@
-import { DataState, StatCards } from "./OperationsReportsParts";
+import { BarChart, DataState, ReportTable, StatCards } from "./OperationsReportsParts";
 import { Panel } from "./shared";
 import { useMemberActivityReport, type MemberActivityReportProps, type MemberActivityRow } from "./operationsReportsMembersApi";
 
@@ -47,10 +47,19 @@ function MemberActivityMetrics({ row }: { row: MemberActivityRow }) {
         ["Revocations (current timestamp in range)", row.revoked_members],
         ["Active referral joins decided in range", row.referred_joins],
       ]} />
+      <div className="mt-4">
+        <BarChart rows={[
+          { label: "Active", value: row.active_members },
+          { label: "Pending", value: row.pending_requests },
+          { label: "Invited", value: row.open_invites },
+          { label: "Verified", value: row.verified_members },
+        ]} valueLabel="members" />
+      </div>
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
         <MetricDetail label="Membership policy" value={humanizePolicy(row.membership_policy)} />
         <MetricDetail label="Referrals" value={row.referrals_enabled ? "Enabled" : "Disabled"} />
       </dl>
+      <ReportTable data={{ rows: [Object.keys(row), Object.values(row).map((value) => value ?? null)] }} />
     </>
   );
 }

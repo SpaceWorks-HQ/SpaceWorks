@@ -586,6 +586,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.data_export.tasks.purge_expired_exports_task",
         "schedule": crontab(hour=3, minute=45),
     },
+    "finalize-report-rollups": {
+        "task": "apps.operations.tasks.finalize_report_rollups_task",
+        "schedule": crontab(hour=1, minute=0),
+    },
     "scheduled-deployment-backup": {
         "task": "apps.backup.tasks.scheduled_deployment_backup_task",
         "schedule": crontab(hour=2, minute=0),

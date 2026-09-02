@@ -15,6 +15,7 @@ type Props = {
   makerspaceId: number;
   canManage: boolean;
   printingEnabled: boolean;
+  reportsEnabled?: boolean;
   machineType: MachineType;
   machines: Machine[];
   pools: PrinterPool[];
@@ -26,7 +27,7 @@ const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-
 // Mirrors backend `printer_capabilities.PRINTER_SLUG`.
 const PRINTER_SLUG = "3d_printer";
 
-export function PrinterServiceConsole({ makerspaceId, canManage, printingEnabled, machineType, machines, pools, draft, setDraft }: Props) {
+export function PrinterServiceConsole({ makerspaceId, canManage, printingEnabled, reportsEnabled = true, machineType, machines, pools, draft, setDraft }: Props) {
   const queryClient = useQueryClient();
   // Filter by the stable machine-type ID, not the slug: slugs are not unique across the
   // global/tenant split, so a makerspace-local type sharing a built-in's slug would pull in
@@ -50,7 +51,7 @@ export function PrinterServiceConsole({ makerspaceId, canManage, printingEnabled
     // the whole Machines panel dies in its error boundary. This console only ever mounts
     // for the global built-in printer, so the literal slug is exactly right here.
     `/admin/makerspace/${makerspaceId}/machine-service-report?machine_type=${PRINTER_SLUG}`,
-    canManage && printingEnabled,
+    canManage && printingEnabled && reportsEnabled,
   );
   const printerUsage = useMemo(
     () => (manualUsage.data ?? []).filter((entry) => entry.metering_unit === "weight"),
@@ -63,6 +64,7 @@ export function PrinterServiceConsole({ makerspaceId, canManage, printingEnabled
     queryClient.invalidateQueries({ queryKey: ["machine-service-requests", makerspaceId, machineType.id] }),
     queryClient.invalidateQueries({ queryKey: ["machine-service-manual", makerspaceId, machineType.id] }),
     queryClient.invalidateQueries({ queryKey: ["printer-service-report", makerspaceId, machineType.id] }),
+    queryClient.invalidateQueries({ queryKey: ["operations-report"] }),
     queryClient.invalidateQueries({ queryKey: poolQueryKey(makerspaceId) }),
     // Service transitions change the assigned machine's status, and manual usage its
     // usage hours; without this the integrated machine row and the status filter
@@ -124,7 +126,7 @@ export function PrinterServiceConsole({ makerspaceId, canManage, printingEnabled
         <ManualUsageForm draft={draft} setDraft={setDraft} printers={machines} pools={manualPools} pending={submitManual.isPending} onSubmit={() => submitManual.mutate()} />
         <div className="mt-3 grid gap-2">{printerUsage.map((entry) => <p className="rounded-md border border-line p-2 font-mono text-sm" key={entry.id}>{entry.outcome} · {entry.consumed_grams}g · {entry.duration_minutes} min{entry.outcome === "failed" ? ` · ${entry.percent_complete}%` : ""}</p>)}</div>
       </Subsection>
-      {printingEnabled ? (
+      {printingEnabled && reportsEnabled ? (
         <Subsection title="Printer reports">
           <div className="grid gap-2 md:grid-cols-2">
             {report.data?.printer_metrics.map((metric) => <p className="rounded-md border border-line p-3 text-sm" key={`${metric.makerspace_id ?? makerspaceId}:${metric.machine_id}`}><strong>{metric.machine_name}</strong><span className="mt-1 block text-xs text-muted">{metric.completed_hours}h complete - {metric.failed_partial_hours}h failed - {metric.manual_hours}h manual - {metric.consumed_grams}g used</span></p>)}
