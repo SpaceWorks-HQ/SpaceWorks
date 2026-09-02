@@ -182,7 +182,10 @@ def create_programme_graph(space, user, _request):
     )
     membership = space.memberships.get(user=user)
     MemberCalendarFeed.objects.create(
-        membership=membership, token_digest=hashlib.sha256(b"calendar-token").digest(),
+        membership=membership,
+        # token_digest is GLOBALLY unique, so it must be scoped per makerspace exactly
+        # like the invitation digest above -- the graph is built for more than one tenant.
+        token_digest=hashlib.sha256(f"calendar-token:{space.pk}".encode()).digest(),
         token_hint="deadbeef",
     )
     EventCheckInStationCredential.objects.create(

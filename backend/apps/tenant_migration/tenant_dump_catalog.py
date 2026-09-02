@@ -42,7 +42,9 @@ class TenantDumpCatalogError(AssertionError):
 # check-in ledger, feedback, certificates, station credential), the organization layer
 # and the evidence retention state. Neither branch's pinned value describes the merge,
 # so this was recomputed after the merge rather than taken from either side.
-CATALOG_SCHEMA_SHA256 = "eff14cebc1c741bc00072a0c3184f83f22d322ccccfe1755755fd125353943d2"
+# Re-blessed again after both evidence retention models gained a normal auto primary key
+# so that it can travel with a tenant at all.
+CATALOG_SCHEMA_SHA256 = "3822e7a1d25be00cb59304f0afa3d576f59c63aa065a7b91d991156b33bd4c70"
 
 
 def catalog_models(apps_registry=apps):

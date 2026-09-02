@@ -35,6 +35,22 @@ class ImportAccounting:
         other.setdefault(key, 0)
 
 
+def source_pk(model_or_label, row):
+    """The row's primary key AS EXPORTED, which is not always ``id``.
+
+    ``EvidenceObjectRetentionState``'s primary key is a ``OneToOneField`` to the photo,
+    so its exported column is ``evidence_id`` and the table has no ``id`` at all.
+    Reading ``row["id"]`` unconditionally made a tenant move raise KeyError for any
+    tenant that had ever run the evidence retention sweep.
+    """
+    model = (
+        apps.get_model(model_or_label)
+        if isinstance(model_or_label, str)
+        else model_or_label
+    )
+    return row[model._meta.pk.attname]
+
+
 def row_disposition(model_label, row, references):
     policy = ROW_POLICIES.get(model_label)
     if policy is not None and condition_matches(policy.condition, row):
@@ -60,7 +76,7 @@ def row_disposition(model_label, row, references):
         if (
             label == model_label
             and rule.disposition is MissingReferenceDisposition.DROP_WITH_PROVENANCE
-            and references.get(model_label, row["id"], field_name)
+            and references.get(model_label, source_pk(model_label, row), field_name)
         ):
             return "drop"
     for edge, typed_rules in MOVABLE_DISCRIMINATOR_REFERENCES.items():
@@ -73,31 +89,31 @@ def row_disposition(model_label, row, references):
         if (
             rule is not None
             and rule.disposition is MissingReferenceDisposition.DROP_WITH_PROVENANCE
-            and references.get(model_label, row["id"], "target_type+target_id")
+            and references.get(model_label, source_pk(model_label, row), "target_type+target_id")
         ):
             return "drop"
     for (label, field_name), disposition in CROSS_TENANT_DEPENDENT_REFERENCES.items():
         if (
             label == model_label
             and disposition is MissingReferenceDisposition.DROP_WITH_PROVENANCE
-            and references.get(model_label, row["id"], field_name)
+            and references.get(model_label, source_pk(model_label, row), field_name)
         ):
             return "drop"
 
     # Both foreign-collaboration shapes have a non-null FK to a row that is not
     # imported. Their typed snapshot survives separately, anchored where possible.
     if model_label == "events.EventCollaborator" and (
-        references.get(model_label, row["id"], "event")
-        or references.get(model_label, row["id"], "makerspace")
+        references.get(model_label, source_pk(model_label, row), "event")
+        or references.get(model_label, source_pk(model_label, row), "makerspace")
     ):
         return "drop"
     # An inbound transfer is foreign-owned. It is provenance, not a live transfer.
     if model_label == "operations.StockTransfer" and references.get(
-        model_label, row["id"], "source_makerspace"
+        model_label, source_pk(model_label, row), "source_makerspace"
     ):
         return "drop"
     if model_label == "payments.Payment" and references.get(
-        model_label, row["id"], "subject_id"
+        model_label, source_pk(model_label, row), "subject_id"
     ):
         return "drop"
     return "insert"
@@ -109,7 +125,7 @@ def preallocate_model(
     label = model._meta.label
     if label == "makerspaces.Makerspace":
         source = next(archive.rows(label))
-        pk_map.add_many(model, [(source["id"], target.pk)])
+        pk_map.add_many(model, [(source_pk(model, source), target.pk)])
         accounting.increment("resolved", label)
         return
     if label == "accounts.User":
@@ -131,12 +147,12 @@ def preallocate_model(
         required_identities.add_row(model, row)
         resolved_pk = _seeded_target_pk(label, row, target)
         if resolved_pk is not None:
-            pk_map.add_many(model, [(row["id"], resolved_pk)])
+            pk_map.add_many(model, [(source_pk(model, row), resolved_pk)])
             accounting.increment("resolved", label)
         elif disposition == "resolve":
             accounting.increment("dropped", label)
         else:
-            source_ids.append(row["id"])
+            source_ids.append(source_pk(model, row))
             if len(source_ids) == 1_000:
                 pk_map.reserve(model, source_ids)
                 source_ids.clear()

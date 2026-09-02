@@ -14,12 +14,19 @@ class Migration(migrations.Migration):
             name="EvidenceRetentionPolicy",
             fields=[
                 (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
                     "makerspace",
                     models.OneToOneField(
                         on_delete=django.db.models.deletion.CASCADE,
-                        primary_key=True,
                         related_name="evidence_retention_policy",
-                        serialize=False,
                         to="makerspaces.makerspace",
                     ),
                 ),
@@ -39,12 +46,19 @@ class Migration(migrations.Migration):
             name="EvidenceObjectRetentionState",
             fields=[
                 (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
                     "evidence",
                     models.OneToOneField(
                         on_delete=django.db.models.deletion.CASCADE,
-                        primary_key=True,
                         related_name="object_retention_state",
-                        serialize=False,
                         to="evidence.evidencephoto",
                     ),
                 ),

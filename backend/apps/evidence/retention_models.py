@@ -10,10 +10,11 @@ MAX_RETENTION_DAYS = 3650
 class EvidenceRetentionPolicy(models.Model):
     """Optional tenant override; absence means use the deployment default."""
 
+    # NOT primary_key=True, for the same reason as the retention state below: tenant
+    # migration supports only an auto-integer or UUID primary key.
     makerspace = models.OneToOneField(
         "makerspaces.Makerspace",
         on_delete=models.CASCADE,
-        primary_key=True,
         related_name="evidence_retention_policy",
     )
     object_retention_days = models.PositiveIntegerField(
@@ -43,10 +44,13 @@ class EvidenceObjectRetentionState(models.Model):
         EXPIRING = "expiring", "Expiring"
         EXPIRED = "expired", "Expired"
 
+    # NOT primary_key=True: tenant migration only supports an auto-integer or UUID
+    # primary key, so a OneToOneField PK made this model unable to travel at all -- a
+    # tenant that had run the retention sweep could not be migrated. OneToOneField is
+    # already unique, so one state row per photo still holds.
     evidence = models.OneToOneField(
         "evidence.EvidencePhoto",
         on_delete=models.CASCADE,
-        primary_key=True,
         related_name="object_retention_state",
     )
     status = models.CharField(
