@@ -93,8 +93,9 @@ def test_stream_requires_auth_and_reports_503_without_redis(settings, monkeypatc
     assert APIClient().get(url).status_code in (401, 403)
     space = make_space("live-503")
     manager = make_member("live-503-manager", space)
-    response = authenticated_client(manager).get(url)
+    response = authenticated_client(manager).get(url, HTTP_ACCEPT="text/event-stream")
     assert response.status_code == 503
+    assert response["Content-Type"].startswith("application/json")
 
 
 def test_stream_emits_events_from_the_subscribed_channels(settings, monkeypatch):
@@ -122,7 +123,8 @@ def test_stream_emits_events_from_the_subscribed_channels(settings, monkeypatch)
     monkeypatch.setattr(live, "redis_client", lambda: FakeClient())
     space = make_space("live-stream")
     manager = make_member("live-stream-manager", space)
-    response = authenticated_client(manager).get(reverse("live"))
+    # Browsers ask for text/event-stream explicitly; DRF negotiation must not answer 406.
+    response = authenticated_client(manager).get(reverse("live"), HTTP_ACCEPT="text/event-stream")
     assert response.status_code == 200
     assert response["Content-Type"].startswith("text/event-stream")
     assert response["X-Accel-Buffering"] == "no"

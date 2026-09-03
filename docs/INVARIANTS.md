@@ -1179,6 +1179,16 @@ no timeout, no `--max-requests`) behind an nginx `location /api/v1/live/` that s
 buffering off; it answers 503 when the deployment has no Redis and browsers keep polling. Neither
 `/api/v1/metrics/` nor `/api/v1/live/` belongs in the API-client scope registry.
 
+**Browser and accessibility gates (forward plan phase 2, 2026-09-03).** The Hard Rules are pinned by
+`frontend/e2e/` against a real stack (`scripts/e2e-local.sh`, CI job `e2e`): a request is accepted,
+issued with a container code and a real presigned photo upload, and returned with container code, photo
+and remark, and the API's 400s for a missing photo, box or remark are asserted directly. The public
+catalogue spec asserts the seeded storage location, box label and box code never appear in the DOM. The
+accessibility floor is enforced, not documented: `frontend/src/test/axe.ts` in panel tests (jsdom, no
+colour contrast) and `e2e/a11y.spec.ts` in Chromium (WCAG 2.1 AA including contrast) — a violation is a
+red build, and there is no allow-list. `text-ink/<alpha>` for body copy is therefore off-limits; use the
+`muted` token, which is tuned to clear 4.5:1 on every surface it sits on.
+
 ## Handover roles and the retired Guest Admin
 
 **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`); handover staff get a **custom

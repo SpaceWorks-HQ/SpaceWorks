@@ -12,12 +12,11 @@ import logging
 import time
 
 from django.conf import settings
-from django.http import StreamingHttpResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
-from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
+from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.views import APIView
 
 from apps.accounts import rbac
@@ -57,9 +56,30 @@ def _event_stream(pubsub, deadline):
             last_beat = time.monotonic()
 
 
+class EventStreamRenderer(BaseRenderer):
+    """Lets DRF's content negotiation accept ``Accept: text/event-stream``.
+
+    Without it the browser's EventSource-style request is refused with 406 before ``get``
+    runs. The body itself is a StreamingHttpResponse, so ``render`` only ever sees the
+    error payloads, which are returned as plain JsonResponse objects instead.
+    """
+
+    media_type = "text/event-stream"
+    format = "sse"
+    charset = "utf-8"
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return b"" if data is None else str(data).encode("utf-8")
+
+
+def _unavailable(detail):
+    return JsonResponse({"detail": detail}, status=503)
+
+
 class LiveStreamView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = []
+    renderer_classes = [EventStreamRenderer, JSONRenderer]
 
     @extend_schema(
         tags=["Health"],
@@ -76,20 +96,14 @@ class LiveStreamView(APIView):
     def get(self, request, *args, **kwargs):
         client = live.redis_client()
         if client is None:
-            return Response(
-                {"detail": "Live updates are not available on this deployment."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
+            return _unavailable("Live updates are not available on this deployment.")
         channels = subscribed_channels(request.user)
         try:
             pubsub = client.pubsub()
             pubsub.subscribe(*channels)
         except Exception:
             logger.warning("live_subscribe_failed", extra={"user_id": request.user.pk})
-            return Response(
-                {"detail": "Live updates are temporarily unavailable."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
+            return _unavailable("Live updates are temporarily unavailable.")
         deadline = time.monotonic() + getattr(settings, "LIVE_MAX_STREAM_SECONDS", MAX_STREAM_SECONDS)
         response = StreamingHttpResponse(
             _event_stream(pubsub, deadline), content_type="text/event-stream"

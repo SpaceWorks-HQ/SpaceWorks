@@ -87,6 +87,10 @@ row commits, so queues update without polling; the stream runs on the dedicated 
 falls back to polling (503) on a deployment without Redis. Public routes are lazy chunks and the eleven
 over-ceiling frontend files were split.
 
+**Browser and accessibility gates (phase 2).** `frontend/e2e/` (Playwright) drives the loan spine through a
+real browser and object storage — `scripts/e2e-local.sh` locally, the `e2e` job in CI — and axe runs in
+both jsdom panel tests and Chromium. `manage.py seed_e2e` seeds a disposable makerspace per run.
+
 Stack (in use):
 
 - **Backend:** Django 6 + Django REST Framework (`backend/`). Requires Python 3.12+.

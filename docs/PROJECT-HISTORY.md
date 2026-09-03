@@ -6,6 +6,14 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-09-03 — forward plan phase 2: the Hard Rules pinned in a real browser.** A Playwright suite
+  (`frontend/e2e/`, `scripts/e2e-local.sh`, CI job `e2e`) seeds a disposable makerspace and walks a
+  request from accept to issue (container code + real presigned photo upload) to return (container code,
+  photo, remark), asserts the console's refusal copy and the API's 400s when any of those is missing,
+  proves the public catalogue never leaks the storage location or box code, and runs axe (WCAG 2.1 AA,
+  contrast included) on the catalogue, login and requests console. Writing it found and fixed two
+  defects — the SSE endpoint answered 406 to `Accept: text/event-stream`, and the frontend's API base
+  URL bypassed the Vite proxy — plus a real contrast failure in the request queue.
 - **2026-09-03 — forward plan phase 1: live updates, one search contract, frontend delivery.** Every
   committed audit row now publishes a PII-free hint over Redis pub/sub, and the staff console holds one
   Server-Sent Events stream (`/api/v1/live/`, its own `live` gunicorn service so worker recycling never
