@@ -96,6 +96,12 @@ endpoint and a signing secret receives every matrix-routed notification as signe
 (`docs/api-client-protocol.md` → "Outbound webhooks"), through the same delivery log and retries as the
 chat channels; failed deliveries can be re-queued from `/control/`.
 
+**Editions and the single box (phase 4).** `SPACEWORKS_EDITION` (`makerspace`, `events`, `bookings`,
+`organization`) hides the loan or events surfaces and 404s their public routes without changing any
+capability (`docs/MODULES.md` → Editions); `events` and `bookings` install profiles match. The single-box
+shape (`Dockerfile.allinone`, `docker/compose.single.yml`, `.spaceworks-layer`) runs everything but
+Postgres and MinIO in one container; setup asks for both the edition and the shape.
+
 Stack (in use):
 
 - **Backend:** Django 6 + Django REST Framework (`backend/`). Requires Python 3.12+.

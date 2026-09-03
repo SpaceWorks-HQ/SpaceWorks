@@ -415,3 +415,17 @@ appear for `reports` or printing-related workflows.
 
 A makerspace's `frontend_domain` and its `cors_allowed_origins` (API-client origins) are used for
 per-tenant browser access; only the `frontend_domain` origin may hold a staff session.
+
+## The single-box install
+
+`setup.sh` asks "How should it run?". **Single box** runs nginx, the built frontend, gunicorn, the live
+update stream, a Celery worker, the scheduler loop and Redis in ONE container (`spaceworks-allinone`,
+built from `Dockerfile.allinone`) beside Postgres and MinIO. It is the same code and the same fail-closed
+process entrypoint per role; it only reduces what an operator has to run. The choice is persisted in
+`.spaceworks-layer`, which `scripts/spaceworks-compose.sh` reads so updates keep the shape. To switch by
+hand: `SPACEWORKS_COMPOSE_LAYER=single scripts/spaceworks-compose.sh bundled up -d` (or write `single`
+to `.spaceworks-layer`). The container listens on 8080 internally and is published on `HTTP_PORT`; the
+Django control plane (`/control/`) is still not proxied through it. Redis state lives in the
+`allinone_state` volume so rate-limit counters survive a restart; queued deliveries do not need to (tasks
+acknowledge late and are re-enqueued on commit).
+

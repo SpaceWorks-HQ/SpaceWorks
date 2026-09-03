@@ -217,6 +217,38 @@ services:
     volumes:
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
 
+  # Single-box shape, published as its own image (see Dockerfile.allinone). Activated only
+  # by SPACEWORKS_COMPOSE_LAYER=single through scripts/spaceworks-compose.sh.
+  app:
+    profiles: ["single"]
+    image: ${MAKERSPACE_ALLINONE_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-allinone}:${MAKERSPACE_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      TENANT_API_URL: ${TENANT_API_URL:-/api}
+      TENANT_TOKEN: ${TENANT_TOKEN:-}
+    ports:
+      - "${HTTP_PORT:-80}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/api/v1/health/readiness/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 90s
+    depends_on:
+      db:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+      orchestration-ready:
+        condition: service_completed_successfully
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
+      - allinone_state:/var/lib/spaceworks/redis
+
   orchestration-init:
     <<: *host-bootstrap
     depends_on:
@@ -322,3 +354,4 @@ volumes:
   makerspace_manager_pgdata:
   minio_data:
   celerybeat_data:
+  allinone_state:

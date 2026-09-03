@@ -6,6 +6,15 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-09-03 — forward plan phase 4: editions and the single-box install.** A deployment-level
+  `SPACEWORKS_EDITION` hides the loan and machine surfaces on an events-only or bookings-only box (or
+  events on a bookings box) by removing their keys from every module list clients receive and answering
+  404 on their public routes, while every capability, staff endpoint, migration and backup stays
+  identical — Option B from the vertical-deployments plan, built where Option A would need it. `events`
+  and `bookings` install profiles, an edition-aware public home, and an `organization` labelling edition
+  that keeps `Event.makerspace` as the anchor. The single-box image runs nginx, the frontend, gunicorn,
+  the live stream, a worker, the scheduler loop and Redis in one unprivileged container beside Postgres
+  and MinIO; the installer asks for the shape and persists it in `.spaceworks-layer`.
 - **2026-09-03 — forward plan phase 3: outbound signed webhooks.** A `webhook` notification channel
   module: a destination carries an encrypted endpoint URL and signing secret, the feature × channel matrix
   routes to it like any room, and each notification arrives as JSON with an HMAC-SHA256 signature over the

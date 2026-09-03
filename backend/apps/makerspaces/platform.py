@@ -134,7 +134,14 @@ def available_modules(makerspace):
     `/control/` and for `module_install`, which must show and edit what is stored,
     not what happens to be reachable today.
     """
-    return sorted(key for key in set(makerspace.enabled_modules or []) if module_available(key))
+    from apps.makerspaces.editions import hidden_module_keys
+
+    hidden = hidden_module_keys()
+    return sorted(
+        key
+        for key in set(makerspace.enabled_modules or [])
+        if module_available(key) and key not in hidden
+    )
 
 
 def feature_enabled(makerspace, key):
@@ -159,6 +166,8 @@ def feature_enabled(makerspace, key):
     ) and all(feature_enabled(makerspace, feature) for feature in definition.requires_features)
 
 def bootstrap_payload(makerspace):
+    from apps.makerspaces.editions import current_edition
+
     modules = sorted(key for key in available_modules(makerspace) if is_frontend_exposed(key))
     features = sorted(key for key, definition in FEATURES.items() if definition.frontend_exposed and feature_enabled(makerspace, key))
     theme = default_theme_config()
@@ -218,6 +227,7 @@ def bootstrap_payload(makerspace):
             "allowed_origins": sorted(makerspace_public_origins(makerspace)),
         },
         "modules": modules,
+        "edition": current_edition().key,
         "features": features,
         "workflows": workflows,
         "theme": theme,

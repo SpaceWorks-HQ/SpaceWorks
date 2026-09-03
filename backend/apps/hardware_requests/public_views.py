@@ -293,5 +293,8 @@ def _requestable_products(product_ids, makerspace):
 
 
 def _require_module(makerspace, module_key):
+    from apps.makerspaces.editions import require_public_surface
+
+    require_public_surface(module_key)
     if not module_enabled(makerspace, module_key):
         raise ValidationError({"module": f"{module_key} is disabled for this makerspace."})

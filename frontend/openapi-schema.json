@@ -63113,6 +63113,9 @@
                             "type": "string"
                         }
                     },
+                    "edition": {
+                        "type": "string"
+                    },
                     "features": {
                         "type": "array",
                         "items": {
@@ -63136,6 +63139,7 @@
                 },
                 "required": [
                     "branding",
+                    "edition",
                     "email_enabled",
                     "features",
                     "frontend",

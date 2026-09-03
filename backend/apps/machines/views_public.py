@@ -8,6 +8,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
 
 from apps.inventory.search import apply_q
+from apps.makerspaces.editions import require_public_surface
 from apps.apiclients.throttling import ClientTierRateThrottle
 from apps.machines.models import Machine
 from apps.machines.serializers_public_machines import PublicMachineSerializer
@@ -43,6 +44,7 @@ class PublicMachineListView(ListAPIView):
 
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs['makerspace_slug'])
+        require_public_surface('machines')
         if not makerspace.public_inventory_enabled or not module_enabled(
             makerspace, 'machines'
         ):

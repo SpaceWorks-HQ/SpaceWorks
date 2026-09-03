@@ -7,6 +7,7 @@ from rest_framework.permissions import AllowAny
 
 from apps.apiclients.throttling import ClientTierRateThrottle
 from apps.inventory.search import apply_q
+from apps.makerspaces.editions import public_surface_available
 from apps.inventory.serializers import (
     PublicCategorySerializer,
     PublicMakerspaceSerializer,
@@ -81,9 +82,10 @@ class PublicInventoryListView(ListAPIView):
 
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs["makerspace_slug"])
-        if not makerspace.public_inventory_enabled or not module_enabled(
-            makerspace,
-            "public_inventory",
+        if (
+            not public_surface_available("public_inventory")
+            or not makerspace.public_inventory_enabled
+            or not module_enabled(makerspace, "public_inventory")
         ):
             raise Http404
 
@@ -139,9 +141,10 @@ class PublicCategoryListView(ListAPIView):
 
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs["makerspace_slug"])
-        if not makerspace.public_inventory_enabled or not module_enabled(
-            makerspace,
-            "public_inventory",
+        if (
+            not public_surface_available("public_inventory")
+            or not makerspace.public_inventory_enabled
+            or not module_enabled(makerspace, "public_inventory")
         ):
             raise Http404
         return (
@@ -170,9 +173,10 @@ class PublicInventoryDetailView(RetrieveAPIView):
 
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs["makerspace_slug"])
-        if not makerspace.public_inventory_enabled or not module_enabled(
-            makerspace,
-            "public_inventory",
+        if (
+            not public_surface_available("public_inventory")
+            or not makerspace.public_inventory_enabled
+            or not module_enabled(makerspace, "public_inventory")
         ):
             raise Http404
         return servable_queryset(

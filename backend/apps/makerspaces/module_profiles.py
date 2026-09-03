@@ -15,6 +15,10 @@ LENDING = "lending"
 WORKSHOP = "workshop"
 RECOMMENDED = "recommended"
 EVERYTHING = "everything"
+# Edition profiles (phase 4): what an events-only or bookings-only box installs. Core is
+# present too -- it always is -- but the matching SPACEWORKS_EDITION hides it.
+EVENTS_ONLY = "events"
+BOOKINGS_ONLY = "bookings"
 
 # Core plus what a makerspace lending hardware realistically needs on day one:
 # the inventory lifecycle, reporting, and machines.
@@ -66,6 +70,13 @@ _CLOUD_EXTRAS = frozenset({
     "notifications", "email", "payments",
 })
 
+_EVENTS_ONLY_EXTRAS = frozenset({
+    "events", "notifications", "email", "member_accounts", "membership", "payments", "reports",
+})
+_BOOKINGS_ONLY_EXTRAS = frozenset({
+    "bookings", "notifications", "email", "member_accounts", "membership", "payments", "reports",
+})
+
 PROFILES = {
     MINIMAL: "Core only -- the smallest coherent install.",
     CLOUD: "A single Django process: no worker, no beat, object storage on R2.",
@@ -74,6 +85,8 @@ PROFILES = {
     WORKSHOP: "A machine shop: machines, the service queue and maintenance.",
     RECOMMENDED: "Core plus the inventory lifecycle, reports and machines.",
     EVERYTHING: "Every module (the pre-opt-in default).",
+    EVENTS_ONLY: "An events programme: events, sign-ups, check-in, notifications and payments.",
+    BOOKINGS_ONLY: "Bookable rooms and resources with notifications and payments.",
 }
 
 # NOTE ON HOW LEAN A PROFILE CAN GET. Six modules are core and no profile can drop them
@@ -101,6 +114,10 @@ def profile_modules(name):
         keys = core_module_keys() | _LENDING_EXTRAS
     elif name == WORKSHOP:
         keys = core_module_keys() | _WORKSHOP_EXTRAS
+    elif name == EVENTS_ONLY:
+        keys = core_module_keys() | _EVENTS_ONLY_EXTRAS
+    elif name == BOOKINGS_ONLY:
+        keys = core_module_keys() | _BOOKINGS_ONLY_EXTRAS
     else:
         keys = set(core_module_keys())
     return sorted(with_dependencies(keys))

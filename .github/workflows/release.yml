@@ -71,9 +71,16 @@ jobs:
       matrix:
         include:
           - context: backend
+            dockerfile: backend/Dockerfile
             image: spaceworks-backend
           - context: frontend
+            dockerfile: frontend/Dockerfile
             image: spaceworks-frontend
+          # The single-box image (Dockerfile.allinone) builds from the repo root because it
+          # needs both trees.
+          - context: .
+            dockerfile: Dockerfile.allinone
+            image: spaceworks-allinone
     steps:
       - uses: actions/checkout@v4
 
@@ -97,6 +104,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./${{ matrix.context }}
+          file: ./${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -127,6 +135,7 @@ jobs:
 
             - `ghcr.io/${{ needs.prepare.outputs.registry_owner }}/spaceworks-backend:${{ needs.prepare.outputs.version }}`
             - `ghcr.io/${{ needs.prepare.outputs.registry_owner }}/spaceworks-frontend:${{ needs.prepare.outputs.version }}`
+            - `ghcr.io/${{ needs.prepare.outputs.registry_owner }}/spaceworks-allinone:${{ needs.prepare.outputs.version }}` (single-box)
 
   promote-latest:
     needs:
@@ -174,7 +183,7 @@ jobs:
           SERIES: ${{ needs.prepare.outputs.series }}
         run: |
           set -euo pipefail
-          for package in spaceworks-backend spaceworks-frontend; do
+          for package in spaceworks-backend spaceworks-frontend spaceworks-allinone; do
             image="ghcr.io/${OWNER}/${package}"
             docker buildx imagetools create \
               --tag "${image}:${SERIES}" \
@@ -245,6 +254,7 @@ jobs:
             --owner "$OWNER" \
             --package spaceworks-backend \
             --package spaceworks-frontend \
+            --package spaceworks-allinone \
             --version "$VERSION" \
             --sha-tag "sha-${SHORT_SHA}" \
             --series "$SERIES" \

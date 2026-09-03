@@ -6029,6 +6029,7 @@ export type TenantBootstrap = {
   "makerspace": TenantBootstrapMakerspace;
   "frontend": TenantBootstrapFrontend;
   "modules": Array<string>;
+  "edition": string;
   "features": Array<string>;
   "workflows": Array<string>;
   "theme": unknown;

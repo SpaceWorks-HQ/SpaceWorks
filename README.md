@@ -49,6 +49,9 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
 - **Live staff console and one search box** — queues, loans and check-ins update the moment a change
   commits (Server-Sent Events over the deployment's Redis; falls back to polling without it), and every
   inventory, machine and event list answers `?q=` with full-text search that tolerates typos.
+- **Editions and a single box** — an events-only or bookings-only installation hides the loan spine it
+  does not use (`SPACEWORKS_EDITION`), and the whole application can run as one container beside
+  Postgres and MinIO when a makerspace has one small server and nobody to operate a stack.
 - **Operable in production** — every request carries an `X-Request-ID` through JSON logs and Celery,
   a token-protected Prometheus endpoint reports queue depth, delivery failures and storage, and CI runs
   the whole suite before an image is published.

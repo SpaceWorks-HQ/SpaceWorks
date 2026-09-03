@@ -192,6 +192,41 @@ services:
       orchestration-ready:
         condition: service_completed_successfully
 
+  # The single-box shape (docker/compose.single.yml + `--profile single`): nginx, the built
+  # frontend, gunicorn, the SSE process, a worker, the scheduler loop and Redis in one
+  # container. Not started by a plain `up`; the overlay parks the multi-service processes.
+  app:
+    profiles: ["single"]
+    build:
+      context: .
+      dockerfile: Dockerfile.allinone
+    container_name: spaceworks-app
+    environment:
+      <<: *backend-env
+      TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-1}
+      TENANT_API_URL: ${TENANT_API_URL:-/api}
+      TENANT_TOKEN: ${TENANT_TOKEN:-}
+    ports:
+      - "${HTTP_PORT:-80}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/api/v1/health/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
+      - allinone_state:/var/lib/spaceworks/redis
+    depends_on:
+      db:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+      orchestration-ready:
+        condition: service_completed_successfully
+
   orchestration-init:
     build:
       context: ./backend
@@ -324,3 +359,4 @@ volumes:
   makerspace_manager_pgdata:
   minio_data:
   celerybeat_data:
+  allinone_state:

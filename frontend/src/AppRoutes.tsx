@@ -1,9 +1,11 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Route, Routes, useLocation, useParams } from "react-router-dom";
 
 import { PublicInventoryPage } from "./features/inventory/PublicInventoryPage";
+import { useTenantBootstrap } from "./features/inventory/usePublicInventory";
 import { KioskPage, ScannerPage, SuperadminPage } from "./features/staff/PlatformApps";
 import { StaffApp } from "./features/staff/StaffApp";
+import { useTenant } from "./lib/tenant";
 
 // Every public surface below is its own chunk. The catalogue and the staff shell stay eager
 // because they are the two pages almost every visit lands on; everything else loads when its
@@ -28,6 +30,20 @@ function NotFoundPage() {
   return <main className="grid min-h-screen place-items-center bg-bg px-6"><div className="text-center"><p className="eyebrow font-mono">404</p><h1 className="title-page mt-2">Page not found</h1></div></main>;
 }
 
+// The public home of a makerspace depends on the deployment edition (phase 4): an
+// events-only or bookings-only box lands on that programme, not on a loan catalogue it
+// does not run. The backend already strips edition-hidden module keys from `modules`.
+function EditionHome() {
+  const tenant = useTenant();
+  const { slug = "" } = useParams();
+  const bootstrapQuery = useTenantBootstrap(slug, tenant.mode === "central" && Boolean(slug));
+  const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
+  const edition = bootstrap?.edition ?? "makerspace";
+  if (edition === "events") return <PublicEventsPage />;
+  if (edition === "bookings") return <PublicBookingsPage />;
+  return <PublicInventoryPage />;
+}
+
 function RouteFallback() {
   return <main className="grid min-h-screen place-items-center bg-bg px-6"><p className="text-sm font-semibold text-muted">Loading...</p></main>;
 }
@@ -41,7 +57,7 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
     routes = <Routes><Route path="/organization-invitations/redeem/:token" element={<OrganizationInvitationRedeemPage />} /></Routes>;
   } else if (mode === "single") {
     routes = <Routes>
-      <Route path="/" element={<PublicInventoryPage />} />
+      <Route path="/" element={<EditionHome />} />
       <Route path="/checkout" element={<PublicSelfCheckoutPage />} />
       <Route path="/events" element={<PublicEventsPage />} />
       <Route path="/events/:publicToken/feedback" element={<PublicEventFeedbackPage />} />
@@ -63,7 +79,7 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
       <Route path="/" element={landing} />
       <Route path="/about" element={<AboutPage />} />
       <Route path="/o/:organizationSlug" element={<PublicOrganizationPage />} />
-      <Route path="/m/:slug" element={<PublicInventoryPage />} />
+      <Route path="/m/:slug" element={<EditionHome />} />
       <Route path="/m/:slug/checkout" element={<PublicSelfCheckoutPage />} />
       <Route path="/m/:slug/events" element={<PublicEventsPage />} />
       <Route path="/m/:slug/events/:publicToken/feedback" element={<PublicEventFeedbackPage />} />

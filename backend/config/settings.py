@@ -1101,6 +1101,15 @@ LOGGING = build_logging(LOG_LEVEL, json_output=env.bool("LOG_JSON", default=not 
 LIVE_REDIS_URL = env("LIVE_REDIS_URL", default="")
 LIVE_MAX_STREAM_SECONDS = env.int("LIVE_MAX_STREAM_SECONDS", default=3600)
 
+# What this deployment is FOR (apps/makerspaces/editions.py): makerspace (default), events,
+# bookings or organization. Hides surfaces and public routes; never changes core modules.
+SPACEWORKS_EDITION = env("SPACEWORKS_EDITION", default="makerspace").strip().lower()
+if SPACEWORKS_EDITION not in ("makerspace", "events", "bookings", "organization"):
+    raise ImproperlyConfigured(
+        f"SPACEWORKS_EDITION={SPACEWORKS_EDITION!r} is not an edition "
+        "(makerspace, events, bookings, organization)."
+    )
+
 # Static bearer token for GET /api/v1/metrics/ (Prometheus text). Unset => the route is 404.
 METRICS_TOKEN = env("METRICS_TOKEN", default="")
 

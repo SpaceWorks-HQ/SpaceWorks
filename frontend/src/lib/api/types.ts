@@ -24,6 +24,10 @@ export type TenantBootstrap = {
   modules: string[];
   features: string[];
   workflows: string[];
+  // Deployment edition (phase 4): `makerspace` (default), `events`, `bookings`, `organization`.
+  // Absent on backends that predate it. Module keys the edition hides are already removed
+  // from `modules`, so route gating needs nothing beyond that list.
+  edition?: string;
   theme: Record<string, string>;
   branding: Record<string, string>;
   email_enabled: boolean;
