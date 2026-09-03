@@ -6,6 +6,15 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-09-03 — 0.8.2: GitHub Release history became permanent.** The release workflow had kept only
+  the current and immediately previous release, deleting every older release **and its Git tag** on each
+  run, which is why the Releases page never showed history. Neither is deleted any more. Container
+  versions are still pruned, deliberately kept as a separate concern: images consume real registry
+  storage while a release row does not, and the digest-based retention rules that exist because of a
+  real `manifest unknown` outage are unchanged. The loop still computes `previous_version`, because
+  `ghcr-retention.py` needs it to keep the previous version's images for the installer's
+  rollback-to-previous-release path -- so deleting releases would eventually have stranded that
+  rollback, not merely lost history.
 - **2026-09-03 — 0.8.1: split-frontend deployment, and a verification round that finally ran.**
   `netlify.toml` makes backend-on-your-server plus frontend-on-Netlify a configured topology rather
   than a guess: Netlify builds only the React app (the generated API client is committed, so the
