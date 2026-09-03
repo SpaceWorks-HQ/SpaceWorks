@@ -566,6 +566,45 @@ pointer/CAS adapter, never ambient shell state. The Cloud static-environment ini
 callbacks are not implemented yet, so the older Supabase path is suitable only for a non-H1 demo—not a
 supported restore topology.
 
+### Split deployment: backend on your server, frontend on Netlify
+
+Supported, and `netlify.toml` in the repo root configures it. Netlify builds **only** the React app —
+it never touches the Dockerfiles or compose files, and because `frontend/src/generated/api.ts` is
+committed, the build never has to reach your server.
+
+Netlify picks up `base = frontend`, `npm run build`, `publish = dist` and `NODE_VERSION = 22` from
+that file (Vite 8 needs Node 20.19+/22.12+, and Netlify's default image can be older). It also adds
+the catch-all rewrite to `index.html`, without which every deep link — `/m/<slug>`, `/admin/*`,
+`/event-check-in/<token>` — 404s on refresh. Set **`VITE_API_URL`** in the Netlify UI to your API,
+e.g. `https://api.example.org/api`.
+
+The backend then has to accept a browser on a different origin. Auth already defaults to cross-site
+cookies (`AUTH_COOKIE_SAMESITE=None`, `AUTH_COOKIE_SECURE=True`), **which only works if both sides
+are HTTPS**:
+
+```env
+ENABLE_HTTPS=True
+ALLOWED_HOSTS=api.example.org
+CORS_ALLOWED_ORIGINS=https://your-site.netlify.app
+CSRF_TRUSTED_ORIGINS=https://your-site.netlify.app
+```
+
+Three more that are easy to miss:
+
+- **Set each makerspace's `frontend_domain`** to the site's domain. Origin scoping validates it, so
+  tenant-scoped routes are rejected without it.
+- **Object storage must be addressed publicly.** `AWS_S3_PUBLIC_ENDPOINT_URL` and
+  `PUBLIC_IMAGE_BASE_URL` are baked into presigned URLs and every public image `src`, so a
+  `localhost` value yields a site that works only from the server console and shows broken images to
+  everyone else. On R2 or S3 also set `STORAGE_PRESIGN_METHOD=put`, and allow your site's origin in
+  the bucket's CORS rules **in the provider dashboard**.
+- **Keep a scheduler.** Hosting the frontend elsewhere does not affect scheduled work, but the
+  backend profile you choose does: `docker-compose.prod.yml` runs Celery `beat`, while
+  `docker-compose.cloud.yml` has no beat and relies on its `cron` service instead. With neither,
+  `.delay()` still runs inline so nothing looks broken, yet return reminders, the evidence-retention
+  sweep and event-series extension silently never fire. If you use the cloud profile, drop only its
+  `frontend` service — never `cron`.
+
 ### Moving a makerspace onto its own server
 
 A space that started as a tenant on someone else's instance can take its data with it. A superadmin

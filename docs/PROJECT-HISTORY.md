@@ -6,6 +6,18 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-09-03 — 0.8.1: split-frontend deployment, and a verification round that finally ran.**
+  `netlify.toml` makes backend-on-your-server plus frontend-on-Netlify a configured topology rather
+  than a guess: Netlify builds only the React app (the generated API client is committed, so the
+  build never reaches the server), Node is pinned for Vite 8, and a catch-all rewrite stops every
+  deep link 404ing on refresh. README documents the cross-site cookie, CORS/CSRF, `frontend_domain`
+  and public-object-URL settings the split needs, plus the scheduler caveat that the cloud profile
+  relies on its `cron` service where prod runs Celery beat. The same batch executed phase 10's
+  backup/tenant-migration round-trips for the first time (1517 passed, 0 failed), which closed the
+  check-in `operation_id` collision question without a schema change; added a catalog-driven guard
+  asserting every projected model's primary key is importable and every deployment-global unique
+  column has a collision rule; and removed a duplicated `LandingPage` that left the extracted
+  module dead code.
 - **2026-09-02 — Events-programme round-trip hardening after integration.** The phase-10 graph exposed
   defects that declaration-only guards could not: `EventSeriesCollaborator.series` and `.makerspace` were
   unclassified cross-tenant edges, so tenant projection refused them until the rules explicitly matched

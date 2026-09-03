@@ -2,7 +2,7 @@
     "openapi": "3.0.3",
     "info": {
         "title": "Space Works API",
-        "version": "0.8.0",
+        "version": "0.8.1",
         "description": "Multi-tenant makerspace hardware loan system.\n\nPublic flow: browse inventory, search with `q`, page with `page`, sign in as a member, submit a borrow request, then track it by public token.\n\nAdmin flow: authenticate with JWT, manage makerspaces, inventory, staff, QR labels, bulk imports, request review, issue, and return.\n\nAuthentication: staff/admin endpoints use `Authorization: Bearer <access>`. Public browser endpoints can use `X-Publishable-Key` when public key hardening is enabled. Server API clients send `X-Client-Id`, `X-Timestamp`, `X-Nonce`, and `X-Signature`. Generate a unique, unpredictable `X-Nonce` for every request and sign the byte sequence `METHOD\\nFULL_PATH\\nTIMESTAMP\\nNONCE\\nBODY` with HMAC-SHA256. The nonce uses 1-128 characters from `A-Z`, `a-z`, `0-9`, `.`, `_`, `~`, and `-`. A deployment may temporarily accept the legacy nonce-less signed format while `APICLIENT_REQUIRE_NONCE` is disabled."
     },
     "paths": {
