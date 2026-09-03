@@ -23,25 +23,14 @@ import {
   type StaffMembershipRow,
   type StaffRole,
 } from "./rolesApi";
-
-const emptyStaffForm: StaffForm = {
-  username: "",
-  email: "",
-  first_name: "",
-  last_name: "",
-  password: "",
-  role_id: "",
-  makerspace_id: "",
-};
-const emptyRestrictForm: RestrictForm = { status: "restricted", reason: "" };
-const emptyMakerspaceForm: MakerspaceForm = {
-  name: "",
-  public_code: "",
-  slug: "",
-  location: "",
-  superadmin_access_enabled: true,
-};
-const emptyResetPasswordForm: ResetPasswordForm = { password: "" };
+import {
+  emptyMakerspaceForm,
+  emptyResetPasswordForm,
+  emptyRestrictForm,
+  emptyStaffForm,
+  makerspacePayload,
+  staffPayload,
+} from "./users/forms";
 
 export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }: {
   makerspaces: Makerspace[];
@@ -282,25 +271,4 @@ export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }:
       />
     </Panel>
   );
-}
-
-function staffPayload(form: StaffForm) {
-  return {
-    username: form.username.trim(),
-    email: form.email.trim(),
-    first_name: form.first_name.trim(),
-    last_name: form.last_name.trim(),
-    password: form.password,
-    role_id: Number(form.role_id),
-  };
-}
-
-function makerspacePayload(form: MakerspaceForm) {
-  return {
-    name: form.name.trim(),
-    public_code: form.public_code.trim(),
-    slug: form.slug.trim(),
-    location: form.location.trim(),
-    superadmin_access_enabled: form.superadmin_access_enabled,
-  };
 }

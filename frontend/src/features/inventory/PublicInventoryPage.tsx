@@ -1,15 +1,10 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
-import { MakerspaceBrand } from "../../components/MakerspaceBrand";
-import { MakerspaceMapLink } from "../../components/MakerspaceMapLink";
-import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
-import { ThemeToggle } from "../../components/ThemeToggle";
-import { ChartIcon, UserIcon } from "../../components/icons";
-import { Card, Field, IconLink } from "../../components/ui";
+import { Card, Field } from "../../components/ui";
 import { useTenant, useTenantPath } from "../../lib/tenant";
-import type { Product, RequestCartItem } from "../../types/inventory";
+import type { Product } from "../../types/inventory";
 import { ProductCard } from "./ProductCard";
 import { ProductQuickViewModal } from "./ProductQuickViewModal";
 import {
@@ -22,6 +17,8 @@ import {
 } from "./PublicInventoryParts";
 import { PublicRequestPanel } from "./PublicRequestPanel";
 import { SkipLink } from "../../components/SkipLink";
+import { PublicInventoryHeader } from "./publicInventory/PublicInventoryHeader";
+import { useInventoryCart } from "./publicInventory/useInventoryCart";
 import { usePublicCategories, usePublicInventory, useTenantBootstrap } from "./usePublicInventory";
 
 const PAGE_SIZE = 24;
@@ -35,7 +32,7 @@ export function PublicInventoryPage() {
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<View>({ kind: "all" });
-  const [cart, setCart] = useState<Record<number, RequestCartItem>>({});
+  const { cart, selectedItems, incrementItem, decrementItem, clearCart } = useInventoryCart();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const categoryParam = view.kind === "category" ? view.slug : "";
   const sortParam = view.kind === "sort" ? view.sort : "name";
@@ -62,56 +59,6 @@ export function PublicInventoryPage() {
     1,
     Math.ceil((inventoryQuery.data?.count ?? 0) / PAGE_SIZE),
   );
-  const selectedItems = useMemo(() => Object.values(cart), [cart]);
-
-  function maxQuantity(product: Product): number {
-    if (
-      product.availability?.mode === "exact_count" &&
-      typeof product.availability.count === "number"
-    ) {
-      return product.availability.count;
-    }
-
-    return 99;
-  }
-
-  function incrementItem(product: Product) {
-    if (product.availability?.label === "Unavailable") {
-      return;
-    }
-
-    setCart((current) => {
-      const existing = current[product.id];
-      const quantity = Math.min((existing?.quantity ?? 0) + 1, maxQuantity(product));
-      return {
-        ...current,
-        [product.id]: {
-          productId: product.id,
-          name: product.name,
-          quantity,
-        },
-      };
-    });
-  }
-
-  function decrementItem(product: Product) {
-    setCart((current) => {
-      const existing = current[product.id];
-      if (!existing || existing.quantity <= 1) {
-        const next = { ...current };
-        delete next[product.id];
-        return next;
-      }
-
-      return {
-        ...current,
-        [product.id]: {
-          ...existing,
-          quantity: existing.quantity - 1,
-        },
-      };
-    });
-  }
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -127,70 +74,13 @@ export function PublicInventoryPage() {
   return (
     <main className="desk-shell">
       <SkipLink />
-      <header className="material-chrome border-b border-line">
-        <div className="mx-auto flex max-w-screen-2xl flex-col gap-2 px-5 py-4 sm:px-8">
-          <p className="eyebrow text-secondary-ink">
-            Public Inventory
-          </p>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="title-page">
-                <MakerspaceBrand
-                  name={displayName}
-                  logoUrl={bootstrap?.makerspace.logo_url}
-                  size="xl"
-                />
-              </h1>
-              <p className="mt-1 text-sm text-muted">
-                Shared tools and equipment published by this makerspace.
-              </p>
-              <MakerspaceMapLink
-                makerspace={bootstrap?.makerspace}
-                className="mt-1"
-              />
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <div className="flex items-center justify-end gap-2">
-                {bootstrap?.makerspace.public_stats_enabled ? (
-                  <IconLink label="Stats" to={tenantPath("stats")}>
-                    <ChartIcon />
-                  </IconLink>
-                ) : null}
-                <ThemeToggle variant="icon" />
-                <IconLink label="Staff login" to="/admin">
-                  <UserIcon />
-                </IconLink>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <SpaceWorksBadge />
-                <div className="rounded-lg border border-secondary bg-secondary/15 px-3 py-2 font-mono text-sm text-secondary-ink">
-                  {inventoryQuery.data?.count ?? "-"} listed items
-                </div>
-                {modules.has("printing") ? (
-                  <Link className="desk-button" to={tenantPath("print")}>
-                    Request a 3D print
-                  </Link>
-                ) : null}
-                {modules.has("events") ? (
-                  <Link className="desk-button" to={tenantPath("events")}>
-                    Events
-                  </Link>
-                ) : null}
-                {modules.has("machines") ? (
-                  <Link className="desk-button" to={tenantPath("machines")}>
-                    Machines
-                  </Link>
-                ) : null}
-                {modules.has("bookings") ? (
-                  <Link className="desk-button" to={tenantPath("bookings")}>
-                    Book a space
-                  </Link>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PublicInventoryHeader
+        displayName={displayName}
+        makerspace={bootstrap?.makerspace}
+        modules={modules}
+        tenantPath={tenantPath}
+        listedCount={inventoryQuery.data?.count}
+      />
 
       <section className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-5 px-5 py-6 sm:px-8 lg:grid-cols-[200px_minmax(0,1fr)_360px]" id="main-content" tabIndex={-1}>
         <CatalogSidebar
@@ -287,7 +177,7 @@ export function PublicInventoryPage() {
           <PublicRequestPanel
             items={selectedItems}
             makerspaceSlug={makerspaceSlug}
-            onClear={() => setCart({})}
+            onClear={clearCart}
             disabled={!requestEnabled}
             requestAccess={bootstrap?.makerspace.request_access}
           />

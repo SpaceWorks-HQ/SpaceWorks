@@ -7,38 +7,26 @@ import { staffRequest } from "../../lib/api";
 import { usePaginatedQuery } from "../../lib/usePaginatedQuery";
 import { DirectLoanList, type DirectLoan } from "./DirectLoanList";
 import { invalidateInventoryViews } from "./queryInvalidation";
-import { DirectLoanReturnModal, type DirectLoanResolution } from "./DirectLoanReturnModal";
+import { DirectLoanReturnModal } from "./DirectLoanReturnModal";
 import { Panel, type Makerspace, useStaffGet } from "./StaffPanels";
-import { WalkInMemberForm } from "./WalkInMemberForm";
-import { MemberClaimCodes, type ClaimableMember } from "./MemberClaimCodes";
-import { EvidenceUpload } from "./panels/EvidenceUpload";
-
-type ProductOption = {
-  id: number;
-  name: string;
-  storage_location: string;
-  available_quantity: number;
-  tracking_mode: string;
-  is_public: boolean;
-  public_self_checkout_enabled: boolean;
-  is_archived: boolean;
-};
-type ContainerOption = { id: number; label: string };
-type ContainerResponse = ContainerOption[] | { results: ContainerOption[] };
-// Phase 7 D4 replaced the inline shape with ClaimableMember, which the claim-code
-// surface also consumes: a member the desk can hand a tool to is the same member the
-// desk can issue a claim code for, so one type keeps the two panels honest.
-type DirectLoanMember = ClaimableMember;
-type DirectLoanMemberResponse = DirectLoanMember[] | { results: DirectLoanMember[] };
-type LineDraft = { key: number; productId: string; quantity: string };
-type ScannedPayload = { payload: string; label: string };
-type ReturnLoanPayload = { loanId: number; evidenceId: number; notes: string; qrPayload: string; resolutions: DirectLoanResolution[] };
-type QrResolveResponse = {
-  target:
-    | { type: "product"; id: number; name: string }
-    | { type: "asset"; id: number; asset_tag: string; product: string; status: string }
-    | { type: "box"; id: number; label: string; code: string };
-};
+import { MemberClaimCodes } from "./MemberClaimCodes";
+import {
+  DirectLoanBorrowerFields,
+  DirectLoanContainerField,
+  DirectLoanIssueEvidence,
+  DirectLoanItemLines,
+  DirectLoanQrSection,
+} from "./DirectLoanIssueFields";
+import { useDirectLoanReturn } from "./useDirectLoanReturn";
+import {
+  labelForTarget,
+  type ContainerResponse,
+  type DirectLoanMemberResponse,
+  type LineDraft,
+  type ProductOption,
+  type QrResolveResponse,
+  type ScannedPayload,
+} from "./DirectLoansTypes";
 
 export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
   const queryClient = useQueryClient();
@@ -51,13 +39,9 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
   const [containerId, setContainerId] = useState("");
   const [showContainerScanner, setShowContainerScanner] = useState(false);
   const [containerScanError, setContainerScanError] = useState("");
-  const [returningLoan, setReturningLoan] = useState<DirectLoan | null>(null);
   const [issueEvidenceId, setIssueEvidenceId] = useState<number | null>(null);
   const [issueRemark, setIssueRemark] = useState("Issued from direct handout.");
   const [issueUploadKey, setIssueUploadKey] = useState(0);
-  const [returnEvidenceId, setReturnEvidenceId] = useState<number | null>(null);
-  const [returnNotes, setReturnNotes] = useState("");
-  const [returnQrPayload, setReturnQrPayload] = useState("");
   useEffect(() => {
     setBorrowerId("");
     setLineRows([{ key: 1, productId: "", quantity: "1" }]);
@@ -68,14 +52,11 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
     setContainerId("");
     setShowContainerScanner(false);
     setContainerScanError("");
-    setReturningLoan(null);
     setIssueEvidenceId(null);
     setIssueRemark("Issued from direct handout.");
     setIssueUploadKey((key) => key + 1);
-    setReturnEvidenceId(null);
-    setReturnNotes("");
-    setReturnQrPayload("");
   }, [makerspace.id]);
+  const returnFlow = useDirectLoanReturn(makerspace);
   const products = useStaffGet<{ results: ProductOption[] }>(
     ["inventory-all", makerspace.id],
     `/admin/makerspace/${makerspace.id}/inventory?page_size=1000`,
@@ -97,9 +78,6 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
   const memberOptions = Array.isArray(members.data)
     ? members.data
     : members.data?.results ?? [];
-  const selectedMember = memberOptions.find(
-    (member) => String(member.user_id) === borrowerId,
-  );
   const containerOptions = Array.isArray(containers.data)
     ? containers.data
     : containers.data?.results ?? [];
@@ -142,18 +120,6 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
       setIssueUploadKey((key) => key + 1);
     },
   });
-  const witnessWaiver = useMutation({
-    mutationFn: () => {
-      if (!selectedMember) throw new Error("Select a member first.");
-      return staffRequest(
-        `/admin/memberships/${selectedMember.membership_id}/waiver/witness`,
-        { method: "POST", body: JSON.stringify({}) },
-      );
-    },
-    onSuccess: () => queryClient.invalidateQueries({
-      queryKey: ["members", makerspace.id],
-    }),
-  });
   const pastedQrPayloads = qrPayloads.split("\n").map((value) => value.trim()).filter(Boolean);
   const validManualLines = lineRows.filter((line) => {
     const product = productById.get(Number(line.productId));
@@ -166,47 +132,6 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
     hasIssueContent &&
     issueEvidenceId !== null &&
     !issue.isPending;
-  const returnLoan = useMutation({
-    mutationFn: ({ loanId, evidenceId, notes, qrPayload, resolutions }: ReturnLoanPayload) =>
-      staffRequest(`/admin/direct-loans/${loanId}/return`, {
-        method: "POST",
-        body: JSON.stringify({ evidence_id: evidenceId, notes, qr_payload: qrPayload.trim(), resolutions }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["direct-loans", makerspace.id] });
-      invalidateInventoryViews(queryClient, makerspace.id, makerspace.slug);
-      resetReturnState();
-    },
-  });
-  const resetReturnState = () => {
-    setReturningLoan(null);
-    setReturnEvidenceId(null);
-    setReturnNotes("");
-    setReturnQrPayload("");
-  };
-  const openReturnModal = (loan: DirectLoan) => {
-    returnLoan.reset();
-    setReturningLoan(loan);
-    setReturnEvidenceId(null);
-    setReturnNotes("");
-    setReturnQrPayload("");
-  };
-  const closeReturnModal = () => {
-    if (returnLoan.isPending) return;
-    returnLoan.reset();
-    resetReturnState();
-  };
-  const submitReturn = (resolutions: DirectLoanResolution[]) => {
-    if (!returningLoan || returnEvidenceId === null || !returnNotes.trim()) return;
-    if (returningLoan.return_scan_required && !returnQrPayload.trim()) return;
-    returnLoan.mutate({
-      loanId: returningLoan.id,
-      evidenceId: returnEvidenceId,
-      notes: returnNotes.trim(),
-      qrPayload: returnQrPayload,
-      resolutions,
-    });
-  };
   const addLine = () => {
     setLineRows((rows) => [...rows, { key: nextLineKey, productId: "", quantity: "1" }]);
     setNextLineKey((key) => key + 1);
@@ -266,139 +191,49 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
   return (
     <div className="grid gap-4">
       <Panel title="Direct handout">
-        <label className="block text-sm font-medium text-ink" htmlFor="direct-loan-borrower">
-          Borrowing member
-        </label>
-        <select
-          id="direct-loan-borrower"
-          className="desk-input mt-1 w-full"
-          value={borrowerId}
-          disabled={members.isLoading}
-          onChange={(event) => {
-            setBorrowerId(event.target.value);
-            witnessWaiver.reset();
-          }}
-        >
-          <option value="">Select an active member</option>
-          {memberOptions.map((member) => (
-            <option key={member.user_id} value={member.user_id}>
-              {member.display_name || member.username}
-            </option>
-          ))}
-        </select>
-        {members.error ? <p className="mt-2 text-sm text-danger">{members.error.message}</p> : null}
-        {selectedMember ? (
-          <button
-            className="desk-button mt-2"
-            type="button"
-            disabled={witnessWaiver.isPending}
-            onClick={() => witnessWaiver.mutate()}
-          >
-            Record witnessed waiver acceptance
-          </button>
-        ) : null}
-        {witnessWaiver.isSuccess ? <p className="mt-2 text-sm text-success-ink">Waiver acceptance recorded.</p> : null}
-        {witnessWaiver.error ? <p className="mt-2 text-sm text-danger">{witnessWaiver.error.message}</p> : null}
-        <WalkInMemberForm
+        <DirectLoanBorrowerFields
           makerspaceId={makerspace.id}
-          onCreated={(userId) => setBorrowerId(String(userId))}
+          borrowerId={borrowerId}
+          onBorrowerIdChange={setBorrowerId}
+          memberOptions={memberOptions}
+          membersLoading={members.isLoading}
+          membersError={members.error?.message}
         />
-        <label className="mt-4 block text-sm font-medium text-ink" htmlFor="direct-loan-container">Container (optional)</label>
-        <div className="mt-1 flex flex-col gap-2 md:flex-row">
-          <select
-            id="direct-loan-container"
-            className="desk-input w-full"
-            value={containerId}
-            disabled={containers.isLoading}
-            onChange={(e) => setContainerId(e.target.value)}
-          >
-            <option value="">No container</option>
-            {containerOptions.map((container) => (
-              <option key={container.id} value={container.id}>{container.label}</option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="desk-button"
-            onClick={() => {
-              setContainerScanError("");
-              setShowContainerScanner(true);
-            }}
-          >
-            Scan container
-          </button>
-        </div>
-        {containerScanError ? <p className="mt-1 text-sm text-danger">{containerScanError}</p> : null}
-        <div className="mt-4">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <h3 className="title-section">Items</h3>
-            <button className="desk-button" type="button" onClick={addLine}>Add item</button>
-          </div>
-          <div className="grid gap-2">
-            {lineRows.map((line) => {
-              const selectedLineProduct = productById.get(Number(line.productId));
-              const selectedIndividual = selectedLineProduct?.tracking_mode === "individual";
-              return (
-                <div key={line.key} className="grid gap-2 md:grid-cols-[1fr_120px_auto]">
-                  <select aria-label="Product" className="desk-input" value={line.productId} disabled={products.isLoading} onChange={(e) => updateLine(line.key, { productId: e.target.value })}>
-                    <option value="">Inventory item</option>
-                    {activeProducts.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name} | {product.tracking_mode} | {product.available_quantity} available
-                        {product.storage_location ? ` - Shelf: ${product.storage_location}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <input aria-label="Quantity" className="desk-input" min={1} inputMode="numeric" type="number" value={line.quantity} disabled={selectedIndividual} onChange={(e) => updateLine(line.key, { quantity: e.target.value })} />
-                  <button className="desk-button" type="button" onClick={() => removeLine(line.key)}>Remove</button>
-                  {selectedLineProduct ? <p className="font-mono text-xs uppercase text-muted md:col-span-3">{selectedLineProduct.tracking_mode}{selectedIndividual ? " | scan unit QR" : ""}</p> : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        <div className="mt-4">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <h3 className="title-section">QR payloads</h3>
-            <button className="desk-button" type="button" onClick={() => setShowScanner(true)}>Scan QR</button>
-          </div>
-          {scanned.length ? (
-            <div className="mb-3 flex flex-wrap gap-2">
-              {scanned.map((item) => (
-                <span key={item.payload} className="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-1 text-sm text-ink">
-                  {item.label}
-                  <button className="desk-button-ghost px-2 text-danger" type="button" onClick={() => removeScanned(item.payload)}>Remove</button>
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <textarea
-          aria-label="QR payloads"
-          className="desk-input mt-3 h-24 w-full font-mono text-sm"
-          placeholder="Optional QR payloads, one per line"
-          value={qrPayloads}
-          onChange={(e) => setQrPayloads(e.target.value)}
+        <DirectLoanContainerField
+          containerId={containerId}
+          onContainerIdChange={setContainerId}
+          containerOptions={containerOptions}
+          containersLoading={containers.isLoading}
+          scanError={containerScanError}
+          onScanClick={() => {
+            setContainerScanError("");
+            setShowContainerScanner(true);
+          }}
         />
-        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr]">
-          <EvidenceUpload
-            key={issueUploadKey}
-            makerspaceId={makerspace.id}
-            evidenceType="issue"
-            disabled={issue.isPending}
-            onUploaded={setIssueEvidenceId}
-          />
-          <label className="block">
-            <span className="eyebrow mb-1 block">
-              Issue remark
-            </span>
-            <textarea
-              className="desk-input min-h-20 w-full"
-              value={issueRemark}
-              onChange={(event) => setIssueRemark(event.target.value)}
-            />
-          </label>
-        </div>
+        <DirectLoanItemLines
+          lineRows={lineRows}
+          activeProducts={activeProducts}
+          productById={productById}
+          productsLoading={products.isLoading}
+          onAdd={addLine}
+          onUpdate={updateLine}
+          onRemove={removeLine}
+        />
+        <DirectLoanQrSection
+          scanned={scanned}
+          qrPayloads={qrPayloads}
+          onOpenScanner={() => setShowScanner(true)}
+          onRemoveScanned={removeScanned}
+          onQrPayloadsChange={setQrPayloads}
+        />
+        <DirectLoanIssueEvidence
+          uploadKey={issueUploadKey}
+          makerspaceId={makerspace.id}
+          disabled={issue.isPending}
+          onUploaded={setIssueEvidenceId}
+          remark={issueRemark}
+          onRemarkChange={setIssueRemark}
+        />
         {issueEvidenceId === null ? <p className="mt-3 text-sm text-muted">Upload an issue photo before issuing.</p> : null}
         {!hasIssueContent ? <p className="mt-3 text-sm text-muted">Add at least one item, QR payload, or container before issuing.</p> : null}
         <button className="desk-button-primary mt-3" disabled={!canIssue} onClick={() => issue.mutate()}>
@@ -411,28 +246,22 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
         {showContainerScanner ? <QrScanner onScan={handleContainerScan} onClose={() => setShowContainerScanner(false)} /> : null}
       </Panel>
       <MemberClaimCodes makerspaceId={makerspace.id} members={memberOptions} />
-      <DirectLoanList loans={loans.results} onReturn={openReturnModal} />
+      <DirectLoanList loans={loans.results} onReturn={returnFlow.openReturnModal} />
       <Pagination page={loans.page} totalPages={loans.totalPages} onChange={loans.setPage} count={loans.count} pageSize={loans.pageSize} />
       <DirectLoanReturnModal
-        loan={returningLoan}
+        loan={returnFlow.returningLoan}
         makerspaceId={makerspace.id}
-        evidenceId={returnEvidenceId}
-        notes={returnNotes}
-        qrPayload={returnQrPayload}
-        pending={returnLoan.isPending}
-        error={returnLoan.error?.message ?? ""}
-        onEvidenceUploaded={setReturnEvidenceId}
-        onNotesChange={setReturnNotes}
-        onQrPayloadChange={setReturnQrPayload}
-        onCancel={closeReturnModal}
-        onSubmit={submitReturn}
+        evidenceId={returnFlow.returnEvidenceId}
+        notes={returnFlow.returnNotes}
+        qrPayload={returnFlow.returnQrPayload}
+        pending={returnFlow.pending}
+        error={returnFlow.error}
+        onEvidenceUploaded={returnFlow.setReturnEvidenceId}
+        onNotesChange={returnFlow.setReturnNotes}
+        onQrPayloadChange={returnFlow.setReturnQrPayload}
+        onCancel={returnFlow.closeReturnModal}
+        onSubmit={returnFlow.submitReturn}
       />
     </div>
   );
-}
-
-function labelForTarget(target: QrResolveResponse["target"], fallback: string) {
-  if (target.type === "product") return `Item: ${target.name || fallback}`;
-  if (target.type === "asset") return `Unit: ${target.product} | ${target.asset_tag} | ${target.status}`;
-  return `Container: ${target.label || target.code || fallback}`;
 }
