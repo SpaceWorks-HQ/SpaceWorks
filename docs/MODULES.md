@@ -116,7 +116,10 @@ thirteen modules under it are optional.
 - **Without it** — not an option: hardware cannot be issued without an issue photo, nor returned without
   a return photo and a remark. That is the accountability rule the product is built around.
 - **Data** — core; not separately purgeable. Evidence rows are immutable and only ever removed when the
-  whole makerspace is purged.
+  whole makerspace is purged. The *object bytes* are a separate question: an optional per-makerspace
+  retention policy deletes the stored image once its window passes, keeping the immutable row, the
+  remarks, the QR scans and the audit trail. An expired photo then reads as a truthful expired state
+  (410) rather than a broken link, so the accountability record survives the picture.
 
 ### qr_management
 

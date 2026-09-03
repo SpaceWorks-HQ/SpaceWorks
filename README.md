@@ -38,10 +38,20 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
   remark) → accountability, all audited. Direct staff handouts too.
 - **3D-printing manager** — public print requests, printer/spool management, filament tracking,
   slicer estimates, and an optional (staff-private) cash charge at collection.
+- **Events & bookings** — one-off events or recurring series, registration with optional approval and
+  waitlists, QR check-in at the door (plus an expiring offline roster and event-scoped PIN stations for
+  a desk with no signal), post-event feedback, attendance certificates, printable badges, member
+  calendar feeds, and bookable spaces.
+- **Organizations across makerspaces** — a network, university or chain registered as an organization
+  linked to any number of spaces, with a public profile and a cross-makerspace event catalogue. An
+  organization grant confers **actions, never identity**.
 - **QR everywhere** — boxes, tools, and individual assets; immutable scan history.
 - **Action-based staff console** — editable per-makerspace roles over a fixed action set, four seeded
   defaults, and a superadmin-only Django control plane.
-- **Reports & ledger** — what's out, who has it, overdue tracking, CSV/XLSX export.
+- **Reports & ledger** — what's out, who has it, overdue tracking, CSV/XLSX export, plus accessible
+  charts with table fallbacks and append-only metric rollups where a correction adds a revision rather
+  than rewriting history. Every module is covered either by a substantive report or an explicitly
+  gated row.
 - **Notifications** — per-makerspace **Telegram, Slack, Mattermost and Discord** alerts plus async
   (Celery) email, with a per-feature × per-channel matrix. Each channel is its own module.
 - **Modular by install** — turn whole modules on and off per makerspace; uninstalling hides surfaces
@@ -52,7 +62,10 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
 - **Maker profiles** — an opt-in per-makerspace profile with projects, interests, education and an
   optional GitHub contribution count, plus a member directory that lists only the people who chose to
   be listed.
-- **Traceable by design** — append-only audit log; immutable evidence photos and scan records.
+- **Traceable by design** — append-only audit log; immutable evidence photo records and scan history.
+  Photo *bytes* can expire under a per-makerspace retention policy, while the photo metadata, remarks,
+  scans and audit trail are kept — so the accountability record outlives the image itself, and an
+  expired photo reads as a truthful expired state rather than a missing one.
 
 > **What works out of the box:** username/password. Google, Apple and OIDC need credentials you
 > create with that provider, and phone sign-in needs an SMS account — none of them can ship
