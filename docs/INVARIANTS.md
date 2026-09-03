@@ -1215,6 +1215,22 @@ staff. `Event.makerspace` remains the tenancy anchor in all editions. The single
 own `--role`, runs unprivileged, keeps `/control/` unproxied, and dies as a unit when any process dies
 (`docker/allinone/run.sh`); the install shape persists in `.spaceworks-layer`.
 
+**Member ID cards (forward plan phase 5, 2026-09-03).** `makerspaces.MemberCard` is `membership`-module
+behaviour with no module key: its QR is a core `boxes.QrCode` with `target_type=member_card`, so
+revocation, active-target uniqueness and the immutable `QrScanEvent` history are the ones every QR has.
+**Identity never travels through the inventory scanner**: `qr_target_payload` and `QrResolveView` raise
+404 for a member-card target; only `member_card_services.resolve` (action `scan_member_cards`) may resolve
+one, it records a `member_lookup` scan even when refused, and it refuses uniformly (a foreign tenant's
+card, a box QR and garbage all 404). Authority is by action, never role name: `manage_member_cards`
+implies `scan_member_cards`, is granted to the protected Space Manager default (migration 0069 backfills
+existing rows), and custom roles receive nothing until granted. `printed_name` is scoped source PII
+(`encryption/registry.py`); `photo_object_key` is a PRIVATE object (`backup/object_ownership_registry.py`)
+whose final key is never client-writable (staging presign → single promotion in
+`member_card_storage.finalize_photo`) and whose bytes need recorded consent. **Revoke redacts
+immediately** (photo bytes deleted, quota freed, name blanked); reissue rotates the QR and the old payload
+resolves as `revoked` forever; reprint never rotates. No rendered PDF is written to storage. The
+`membership` purge revokes the QRs and deletes the cards and photo bytes.
+
 ## Handover roles and the retired Guest Admin
 
 **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`); handover staff get a **custom
@@ -1789,6 +1805,23 @@ Load-bearing details that carried over unchanged:
     dependencies, so `makerspaces` left unpinned yields a historical `Makerspace` behind the real
     table; Django applies field defaults in Python rather than DDL, so the INSERT omits newer
     columns and Postgres rejects the NOT NULL. Rewind the full graph forward in `finally`.
+
+- **Certification gating (forward plan phase 5, 2026-09-04) is one function and fails CLOSED.**
+  `machines/certifications.py::require_certification` is the only place that decides "is this member
+  trained"; `service_workflow_actions.submit` and `services_bookings.create_booking` call it and let it
+  raise. It is a no-op while the `machines.certifications` feature is off or the `machines` module is
+  uninstalled (a bookings-only space is never gated by a module it lacks — `BookableSpace.machine_type`
+  is nullable and the import is lazy), and once on, no resolvable membership or no live grant is a
+  refusal, never a pass. Requirements live on the **machine type** (`CertificationType`, flags
+  `is_required_for_service` / `is_required_for_booking`), so adding a machine cannot un-gate it; a grant's
+  expiry is the **stored** `expires_at`, so tightening `validity_days` later cannot retroactively
+  invalidate correctly-issued training. Authority to define types, grant, revoke or **override** is
+  `access.can_create_machine` — machine-TYPE authority, never a per-machine link — and every honoured
+  override writes `certification.override` naming the type it skipped. Types are deactivated, never
+  deleted (grants are evidence); grants are revoked, never edited. Publication is consent, not
+  configuration: certifications reach the maker profile only through `MemberProfile.show_certifications`,
+  a separate opt-in from `is_visible`, and reach a printed card only when the template lists the
+  `certifications` field.
 
 ## Events program invariants (four phases, `f16896f`..`dab0354`)
 

@@ -235,13 +235,18 @@ thirteen modules under it are optional.
   colour can be shared across every printer of a type instead of being re-entered per machine. Each pool
   also carries a hex swatch for the staff console and its own public/private flag. A public pool appears
   in the public printing form as material and colour name only — never the hex value, the lot code or
-  the remaining grams — and only while it is active with stock left.
+  the remaining grams — and only while it is active with stock left. With the `machines.certifications`
+  feature switched on, a makerspace defines certification types per machine type and issues grants to
+  memberships; an uncertified member is refused when booking a linked space or requesting work, and an
+  override needs machine-type authority plus a recorded, audited reason. The `certification-coverage`
+  report shows trained members per type.
 - **Without it** — the whole machine side of the product disappears: no registry, no service queue
   (which needs machines to point at), no maintenance schedules, no per-machine consumables. A pure tool
   library runs exactly like this — see the `lending` profile.
 - **Data** — **not separately purgeable**, and the command says why: machine rows host warranty records,
   inventory-backed consumables and service history, so deleting them piecemeal would orphan other
-  modules. Purge `machine_service` first, then archive and purge the makerspace.
+  modules. Purge `machine_service` first, then archive and purge the makerspace. Certification grants
+  are training evidence: a type is deactivated, never deleted, and a grant is revoked, never edited.
 
 ### machine_service
 
@@ -335,8 +340,16 @@ Required by `printing`.
   a stranger walk past the requirement you just switched on. Turning it back off does **not** re-open
   account-less requests — that is an explicit choice, made with
   `manage.py set_request_access --mode anyone`.
-- **Data** — purgeable: join requests and member profiles with their projects and imagery. Memberships,
-  waivers and acceptance evidence **stay** — they are core RBAC and liability state.
+- **Member ID cards live here.** A card is a revocable QR credential over one membership (`MemberCard`),
+  issued, reissued, revoked and printed by staff holding `manage_member_cards` (Space Managers by default)
+  and resolvable at a scanner only by `scan_member_cards` — never through the inventory scanner, so an
+  inventory-only role can never turn a QR into a person. The printed name is scoped PII, the photo is a
+  private object stored only with the member's recorded consent, and revoking a card deletes the photo
+  and blanks the name immediately while the redacted row, the revoked QR, the scans and the audit entries
+  stay. Cards print as one CR80 card or an A4/Letter sheet; nothing rendered is stored.
+- **Data** — purgeable: join requests, member profiles with their projects and imagery, and member cards
+  with their photos (their QR codes are revoked, never deleted). Memberships, waivers and acceptance
+  evidence **stay** — they are core RBAC and liability state.
 
 ---
 
@@ -519,6 +532,7 @@ in the console rather than a superadmin. A feature is inert while its parent mod
 | `payments.membership` | `membership` | | Charge membership dues | Dues are collected out of band |
 | `mobile.push` | `mobile` | ● | Native push notifications | Apps rely on in-app/inbox notifications |
 | `events.offline_checkin` | `events` | | Expiring on-device roster plus event-scoped PIN check-in stations | Check-in needs a live connection and an authenticated staff actor |
+| `machines.certifications` | `machines` | | Members need an unexpired certification per machine type to book a linked space or request work; overrides need machine-type authority and are audited | Training is tracked out of band; nothing gates a request or booking |
 | `notifications.delegated_recipients` | `notifications` | | Machine-scoped maintainers manage maintenance alert recipients for their own machines. Needs `maintenance` and `machines` too | Only makerspace-level staff manage recipients |
 | `inventory.self_checkout` | — | ● | Member self-checkout and staff direct handouts | Every handover goes through a staff-issued request |
 | `presence.geofence` | — | ● | Advisory location check at check-in | Check-in records no location. It is advisory either way — it never blocks |

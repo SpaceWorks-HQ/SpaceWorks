@@ -6,6 +6,16 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-09-04 — forward plan phase 5: member ID cards and certification gating.** Member cards
+  (`makerspaces.MemberCard`) are membership-module behaviour over a core QR target type: issued, reissued
+  (rotating the QR; the old payload scans as revoked forever), revoked (redacting name and photo at once)
+  and printed as one CR80 card or an A4/Letter sheet by staff holding `manage_member_cards`, and resolved
+  only through a dedicated `scan_member_cards` path — the inventory scanner refuses to turn a QR into a
+  person. Members set their printed name, upload a private photo behind an explicit consent, and preview
+  a watermarked card. Certification types per machine type and grants per membership gate machine-service
+  requests and bookings of linked spaces behind the `machines.certifications` feature switch; an override
+  needs machine-type authority and a recorded reason. Held certifications print as an optional card field,
+  reach the maker profile only after a separate opt-in, and roll up in the `certification-coverage` report.
 - **2026-09-03 — forward plan phase 4: editions and the single-box install.** A deployment-level
   `SPACEWORKS_EDITION` hides the loan and machine surfaces on an events-only or bookings-only box (or
   events on a bookings box) by removing their keys from every module list clients receive and answering

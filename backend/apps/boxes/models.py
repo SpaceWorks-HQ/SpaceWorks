@@ -115,6 +115,9 @@ class QrCode(models.Model):
         BOX = "box", "Box"
         PRODUCT = "product", "Product"
         ASSET = "asset", "Asset"
+        # A member ID card (makerspaces.MemberCard). Resolved ONLY through the dedicated
+        # member-card resolver, never the generic scanner path.
+        MEMBER_CARD = "member_card", "Member card"
 
     class Status(models.TextChoices):
         ACTIVE = "active", "Active"
@@ -166,6 +169,7 @@ class QrScanEvent(models.Model):
         INVENTORY_CHECK = "inventory_check", "Inventory Check"
         REASSIGNMENT = "reassignment", "Reassignment"
         SCANNER_LOOKUP = "scanner_lookup", "Scanner Lookup"
+        MEMBER_LOOKUP = "member_lookup", "Member card lookup"
 
     makerspace = models.ForeignKey(
         Makerspace,

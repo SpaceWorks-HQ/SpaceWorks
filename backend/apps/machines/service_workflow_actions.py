@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from apps.makerspaces import limits
 from apps.machines import role_scope
+from apps.machines.certifications import require_certification_for_member
 from apps.machines.models import Machine, MachineServiceRequest, ServiceBucket, ServiceQueue, get_or_create_default_bucket
 from apps.machines.service_consumption import debit_consumptions
 from apps.machines.service_errors import ServiceConsumptionInvalid, ServiceInvalidTransition, ServiceMachineUnavailable
@@ -29,7 +30,7 @@ from apps.machines.service_workflow_helpers import (
 )
 
 
-def submit(bucket_or_machine, requester, *, requester_name, contact_email, contact_phone, title, description="", source_link="", actor=None, member=None, capability_payload=None):
+def submit(bucket_or_machine, requester, *, requester_name, contact_email, contact_phone, title, description="", source_link="", actor=None, member=None, capability_payload=None, certification_override_reason=""):
     """Create a pending legacy bucket request or unassigned pooled request."""
     with transaction.atomic():
         _assert_submission_write_allowed(bucket_or_machine)
@@ -37,6 +38,13 @@ def submit(bucket_or_machine, requester, *, requester_name, contact_email, conta
         makerspace = target.makerspace
         machine_type = target.machine_type if isinstance(target, ServiceQueue) else target.machine_type
         _validate_capability_payload(machine_type, capability_payload or {})
+        # Certification gating. Only for a member-attributed submission: an anonymous or
+        # staff-entered request is somebody asking staff to run the machine, which is not
+        # the member operating it, so there is nothing to have been trained for.
+        require_certification_for_member(
+            makerspace, member, machine_type, purpose="service", actor=actor,
+            override_reason=certification_override_reason,
+        )
         _require_module(makerspace, locked=True)
         limits.check_quota(makerspace, "machine_service_open", adding=1)
         limits.check_quota(makerspace, "machine_service_submit", adding=1)

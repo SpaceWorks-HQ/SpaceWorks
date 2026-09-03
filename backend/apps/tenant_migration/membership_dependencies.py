@@ -25,6 +25,10 @@ MEMBERSHIP_DEPENDENT_MODELS = {
         retained_by_import=True,
         reason="A member profile is owned by one non-null makerspace membership.",
     ),
+    "machines.CertificationGrant": MembershipDependency(
+        retained_by_import=True,
+        reason="A certification grant records that one membership was trained; it travels with the membership.",
+    ),
     "presence.PresenceSession": MembershipDependency(
         retained_by_import=True,
         reason="Presence retains its non-null protected membership attribution.",

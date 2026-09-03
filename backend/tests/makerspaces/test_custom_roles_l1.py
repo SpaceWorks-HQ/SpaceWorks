@@ -1,3 +1,5 @@
+from importlib import import_module
+
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
@@ -113,7 +115,11 @@ def test_seed_and_backfill_migration_round_trip():
         }
         assert set(seeded) == set(HISTORICAL_ROLE_VALUES)
         assert seeded[MakerspaceMembership.Role.PRINT_MANAGER].granted_actions == ["manage_printing"]
-        for legacy_role, name, granted_actions in roles.DEFAULT_ROLE_DEFINITIONS:
+        # 0039 seeds ITS OWN frozen action lists; actions added to a protected default later
+        # arrive through additive backfills (0069 `manage_member_cards`), never by editing
+        # the historical seed.
+        seed_module = import_module("apps.makerspaces.migrations.0039_seed_and_backfill_roles")
+        for legacy_role, name, granted_actions in seed_module.DEFAULT_ROLE_DEFINITIONS:
             role = seeded[legacy_role]
             assert role.name == name
             assert role.slug == legacy_role
@@ -122,6 +128,11 @@ def test_seed_and_backfill_migration_round_trip():
             assert role.is_protected is True
             membership = NewMembership.objects.get(id=memberships[legacy_role])
             assert membership.assigned_role_id == role.id
+        # Seed + every later backfill must land exactly on today's definitions.
+        import_module("apps.makerspaces.migrations.0069_member_card_actions").forwards(new_apps, None)
+        for legacy_role, name, granted_actions in roles.DEFAULT_ROLE_DEFINITIONS:
+            role = NewMakerspaceRole.objects.get(makerspace_id=makerspace.id, legacy_role=legacy_role)
+            assert role.granted_actions == sorted(granted_actions)
 
         executor = MigrationExecutor(connection)
         executor.migrate(schema_target)
@@ -148,6 +159,10 @@ def test_seed_and_backfill_migration_round_trip():
             with connection.cursor() as cursor:
                 cursor.execute(
                     "DELETE FROM makerspaces_makerspacemembership WHERE makerspace_id = %s",
+                    [makerspace_id],
+                )
+                cursor.execute(
+                    "DELETE FROM makerspaces_makerspacerole WHERE makerspace_id = %s",
                     [makerspace_id],
                 )
                 cursor.execute(

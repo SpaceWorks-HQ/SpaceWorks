@@ -1,3 +1,4 @@
+from .urls_certifications import urlpatterns as certification_urlpatterns
 from .urls_api_clients import (
     client_urlpatterns,
     makerspace_urlpatterns as api_client_makerspace_urlpatterns,
@@ -19,6 +20,7 @@ urlpatterns = [
     *machine_service_urlpatterns,
     *management_urlpatterns,
     *machine_urlpatterns,
+    *certification_urlpatterns,
     *settings_urlpatterns,
     *makerspace_urlpatterns,
     *inventory_urlpatterns,

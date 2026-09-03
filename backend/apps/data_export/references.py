@@ -51,6 +51,8 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("apiclients.ApiKeyRequest", "resolved_by"),
         ("audit.AuditLog", "actor"),
         ("bookings.BookableSpace", "created_by"),
+        ("machines.CertificationGrant", "granted_by"),
+        ("machines.CertificationGrant", "revoked_by"),
         ("bookings.Booking", "member"),
         ("boxes.BoxScan", "actor"),
         ("boxes.QrCode", "created_by"),

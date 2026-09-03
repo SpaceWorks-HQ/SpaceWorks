@@ -44,6 +44,23 @@ def _audit(space, actor, action, target, meta=None):
     )
 
 
+def _require_certification(space, member, actor, override_reason):
+    """Gate a member's booking on machine-type training, when the space names a type.
+
+    Imported lazily and skipped entirely unless `machine_type_id` is set, so `bookings`
+    never starts requiring the `machines` module: a space with no machine type (every
+    space in a bookings-only install) never reaches this import.
+    """
+    if member is None or not space.machine_type_id:
+        return
+    from apps.machines.certifications import require_certification_for_member
+
+    require_certification_for_member(
+        space.makerspace, member, space.machine_type, purpose='booking',
+        actor=actor, override_reason=override_reason,
+    )
+
+
 def _refresh(instance):
     instance.refresh_from_db()
     return instance
@@ -52,7 +69,7 @@ def _refresh(instance):
 @transaction.atomic
 def create_booking(
     space, *, starts_at, ends_at, member=None, name=None, email=None, phone=None,
-    custom_answers=None, note='', actor=None,
+    custom_answers=None, note='', actor=None, certification_override_reason='',
 ):
     from apps.bookings.services_rules import enforce_booking_rules
     from apps.encryption.write_fence import assert_mapped_write_allowed
@@ -61,6 +78,7 @@ def create_booking(
     locked_space = _locked_space(space.pk)
     if not locked_space.is_active:
         raise BookingInvalidTransition('Inactive spaces cannot accept bookings.')
+    _require_certification(locked_space, member, actor, certification_override_reason)
 
     now = timezone.now()
     status = (

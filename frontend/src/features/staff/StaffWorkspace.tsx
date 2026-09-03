@@ -56,6 +56,7 @@ export function StaffWorkspace({
     canIssueDirectLoan,
     canCollectServiceRequests,
     canManageMakerspace,
+    canUseMemberCards,
     canManageEvents,
     canManageBookings,
     canManageMachines,
@@ -159,6 +160,7 @@ export function StaffWorkspace({
               canUseToBuy={canUseToBuy}
               canManageQr={canManageQr}
               canManageMakerspace={canManageMakerspace}
+              canUseMemberCards={canUseMemberCards}
               canManageEvents={canManageEvents}
               canManageBookings={canManageBookings}
               canManageMachines={canManageMachines}

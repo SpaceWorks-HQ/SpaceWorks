@@ -108,9 +108,15 @@ EXPECTED = dict(
         ),
         *_fields(
             "makerspaces.MemberProfile",
-            "is_visible show_attended_events headline institution bio avatar_key "
+            "is_visible show_attended_events show_certifications headline institution bio avatar_key "
             "interests languages education github_username github_contributions "
             "github_synced_at",
+            (D.PRESERVE, D.DROP),
+        ),
+        *_fields(
+            "makerspaces.MemberCard",
+            "printed_name photo_object_key photo_content_type photo_size_bytes photo_consent_at "
+            "photo_consent_version",
             (D.PRESERVE, D.DROP),
         ),
         *_fields(

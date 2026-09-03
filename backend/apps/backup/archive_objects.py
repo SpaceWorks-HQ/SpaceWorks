@@ -10,6 +10,7 @@ from apps.data_export.datasets import DATASET_SPECS
 OBJECT_FIELD_NAMES = frozenset({
     "object_key", "image_key", "avatar_key", "cover_image_key", "copy_key",
     "logo_key",
+    "photo_object_key",
 })
 
 NON_OBJECT_KEY_FIELDS = frozenset({

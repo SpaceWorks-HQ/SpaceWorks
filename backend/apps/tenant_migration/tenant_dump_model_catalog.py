@@ -38,7 +38,8 @@ PROJECTED_MODEL_LABELS = frozenset(
     integrations.DestinationMachineScope integrations.DestinationMachineTypeScope
     integrations.EmailTemplate integrations.MachineTypeEmailTemplate
     integrations.NotificationDestination inventory.Category inventory.InventoryAsset
-    inventory.InventoryProduct machines.Machine machines.MachineConsumable
+    inventory.InventoryProduct machines.CertificationGrant machines.CertificationType
+    machines.Machine machines.MachineConsumable
     machines.MachineConsumableAdjustment machines.MachineConsumablePool
     machines.MachineDocument machines.MachineErrorLog machines.MachineServiceRequest
     machines.MachineType machines.MachineUsageEntry
@@ -47,7 +48,8 @@ PROJECTED_MODEL_LABELS = frozenset(
     maintenance.MaintenanceLog maintenance.MaintenanceLogDocument
     maintenance.MaintenanceSchedule makerspaces.Makerspace
     makerspaces.MakerspaceMembership makerspaces.MakerspaceWaiver
-    makerspaces.MemberProfile makerspaces.MemberProject makerspaces.MembershipRequest
+    makerspaces.MemberCard makerspaces.MemberProfile makerspaces.MemberProject
+    makerspaces.MembershipRequest
     notifications.Notification operations.InventoryAdjustment operations.QrPrintBatch
     operations.QrPrintBatchItem operations.ReportMetricRollup operations.StockTransfer
     operations.StockTransferLine

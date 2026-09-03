@@ -198,7 +198,7 @@ _ENTRIES = (
     ),
     *_same(
         "makerspaces.MemberProfile",
-        "is_visible show_attended_events",
+        "is_visible show_attended_events show_certifications",
         (D.PRESERVE, D.DROP),
         "Full-user consent travels; every stub-linked profile is dropped.",
     ),

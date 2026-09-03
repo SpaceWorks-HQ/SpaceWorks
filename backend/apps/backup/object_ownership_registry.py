@@ -69,6 +69,8 @@ FIELD_OBJECT_RULES = (
     FieldObjectRule("makerspaces.Makerspace", "cover_image_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("makerspaces.Makerspace", "logo_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("makerspaces.MemberProfile", "avatar_key", BucketRule.PUBLIC_IMAGE),
+    # A member card photo is a face: private bucket, short-lived signed reads only.
+    FieldObjectRule("makerspaces.MemberCard", "photo_object_key", BucketRule.PRIVATE),
     FieldObjectRule("makerspaces.MemberProject", "image_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("organizations.Organization", "logo_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("procurement.ToBuyReceipt", "object_key", BucketRule.PRIVATE),

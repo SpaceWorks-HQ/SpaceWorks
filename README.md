@@ -298,6 +298,7 @@ Manager** in the console rather than a superadmin.
 | `payments.membership` | `membership` | | Charge membership dues |
 | `mobile.push` | `mobile` | ● | Native push notifications |
 | `events.offline_checkin` | `events` | | Expiring on-device roster and event-scoped PIN check-in stations |
+| `machines.certifications` | `machines` | | Members need an unexpired certification per machine type to book a linked space or request work; overrides need machine-type authority and are audited |
 | `notifications.delegated_recipients` | `notifications` | | Machine-scoped maintainers manage maintenance recipients for their own machines (also needs `maintenance` and `machines`) |
 | `inventory.self_checkout` | — | ● | Member self-checkout and staff direct handouts |
 | `presence.geofence` | — | ● | Advisory location check at check-in (never blocks) |

@@ -44,7 +44,10 @@ class TenantDumpCatalogError(AssertionError):
 # so this was recomputed after the merge rather than taken from either side.
 # Re-blessed again after both evidence retention models gained a normal auto primary key
 # so that it can travel with a tenant at all.
-CATALOG_SCHEMA_SHA256 = "3822e7a1d25be00cb59304f0afa3d576f59c63aa065a7b91d991156b33bd4c70"
+# Re-blessed for the forward plan (2026-09-04): trigger-maintained `search_vector` columns on
+# Event/InventoryProduct/Machine (phase 1, DERIVED on import), MemberCard, CertificationType,
+# CertificationGrant, BookableSpace.machine_type and MemberProfile.show_certifications (phase 5).
+CATALOG_SCHEMA_SHA256 = "1d3ae4a9443527928ef25b3221951bf237ff90e549a5c59bea0956db4ef422b1"
 
 
 def catalog_models(apps_registry=apps):

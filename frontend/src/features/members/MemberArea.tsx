@@ -10,6 +10,7 @@ import { presenceStartLocation } from "./geolocation";
 import { MemberActivityPanel, type MemberActivity } from "./MemberActivity";
 import { PartnerEvents } from "./PartnerEvents";
 import { MemberDirectory } from "./MemberDirectory";
+import { MemberCardPanel } from "./MemberCardPanel";
 import { MemberProfilePanel } from "./MemberProfilePanel";
 import { MemberReferrals, type ClaimableInvitation } from "./MemberReferrals";
 import { MemberPaymentRows, type MemberPayment } from "./MemberPayments";
@@ -74,6 +75,9 @@ export function MemberArea() {
   const spaceInvitations = invitations.data?.invitations.filter((item) => item.makerspace.slug === resolvedSlug) ?? [];
   const error = bootstrap.error ?? (!unauthenticated ? memberships.error : null) ?? request.error ?? accept.error ?? start.error ?? end.error ?? activity.error ?? generatePaymentLink.error;
   const policy: MembershipPolicyEnum | undefined = bootstrap.data?.makerspace.membership_policy;
+  // The card panel exists only where the `membership` module is installed -- the card is
+  // hung off a membership, so every one of its endpoints 404s without it.
+  const membershipModuleOn = (bootstrap.data?.modules ?? []).includes("membership");
 
   if (restoring) return <main className="desk-shell grid place-items-center px-5 text-sm text-muted">Restoring session…</main>;
   if (showSignIn) return <MemberAuthPanel makerspaceSlug={resolvedSlug} onAuthenticated={() => { setShowSignIn(false); void client.invalidateQueries({ queryKey: ["member"] }); }} />;
@@ -91,7 +95,7 @@ export function MemberArea() {
       <section className={`desk-panel ${presence.data?.active ? "border-success" : "border-secondary"} p-5`}><h2 className="title-panel">Presence</h2><p className="mt-1 text-sm text-muted">{presence.data?.active ? <>Active until <span className="font-mono">{new Date(presence.data.session?.expires_at ?? "").toLocaleTimeString()}</span></> : "No active session."}</p><button className="desk-button-secondary mt-4" disabled={start.isPending || end.isPending || (!presence.data?.active && !bootstrap.data)} onClick={() => presence.data?.active ? end.mutate() : start.mutate()}>{presence.data?.active ? "End presence" : "Start 2-hour presence"}</button></section>
       {activity.data ? <MemberActivityPanel activity={activity.data} makerspaceId={makerspaceId} makerspaceSlug={resolvedSlug} /> : null}
       {membership?.membership_status === "active" ? <PartnerEvents makerspaceId={makerspaceId} slug={resolvedSlug} /> : null}
-      {membership.membership_status === "active" && makerspaceId >= 0 ? <><MemberProfilePanel makerspaceId={makerspaceId} /><MemberDirectory makerspaceId={makerspaceId} /></> : null}{payments.data?.length ? <section className="desk-panel p-5"><h2 className="title-panel">Payments</h2><MemberPaymentRows payments={payments.data} checkoutPaymentId={generatePaymentLink.isPending ? generatePaymentLink.variables : undefined} onCheckout={(paymentId) => generatePaymentLink.mutate(paymentId)} /></section> : null}</> : null}
+      {membership.membership_status === "active" && makerspaceId >= 0 ? <><MemberProfilePanel makerspaceId={makerspaceId} />{membershipModuleOn ? <MemberCardPanel makerspaceId={makerspaceId} /> : null}<MemberDirectory makerspaceId={makerspaceId} /></> : null}{payments.data?.length ? <section className="desk-panel p-5"><h2 className="title-panel">Payments</h2><MemberPaymentRows payments={payments.data} checkoutPaymentId={generatePaymentLink.isPending ? generatePaymentLink.variables : undefined} onCheckout={(paymentId) => generatePaymentLink.mutate(paymentId)} /></section> : null}</> : null}
     {memberships.data && resolvedSlug && makerspaceId >= 0 ? <MemberReferrals
       canRefer={membership?.membership_status === "active" && membership.can_refer}
       referralsEnabled={membership?.membership_status === "active" && membership.referrals_enabled}

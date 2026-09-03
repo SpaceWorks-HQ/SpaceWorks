@@ -31,6 +31,11 @@ class Action:
     MANAGE_QR = "manage_qr"
     MANAGE_PRINTING = "manage_printing"
     MANAGE_MACHINES = "manage_machines"
+    # Member ID cards (phase 5). SCAN resolves a card to minimal identity; MANAGE issues,
+    # reissues, revokes and prints, and implies SCAN. Deliberately not part of
+    # VIEW_INVENTORY: an inventory-only role must never resolve a person from a QR.
+    SCAN_MEMBER_CARDS = "scan_member_cards"
+    MANAGE_MEMBER_CARDS = "manage_member_cards"
     VIEW_AUDIT = "view_audit"
     TRANSFER_STOCK = "transfer_stock"        # superadmin only
     MANAGE_STAFF = "manage_staff"            # superadmin only
@@ -43,6 +48,7 @@ IMPLIED_ACTIONS = {
     # MANAGE_MACHINES, so they keep collect authority without a single stored role
     # changing. Only a role that holds *neither* has to be given the narrow action.
     Action.MANAGE_MACHINES: {Action.MANAGE_PRINTING, Action.COLLECT_SERVICE_REQUEST},
+    Action.MANAGE_MEMBER_CARDS: {Action.SCAN_MEMBER_CARDS},
 }
 
 
@@ -82,7 +88,7 @@ _SPACE_MANAGER_ACTIONS = {
     Action.ISSUE_DIRECT_LOAN, Action.RETURN_REQUEST, Action.UPLOAD_EVIDENCE,
     Action.MANAGE_QR, Action.MANAGE_PRINTING, Action.VIEW_AUDIT,
     Action.MANAGE_MAKERSPACE, Action.MANAGE_MACHINES, Action.MANAGE_EVENTS,
-    Action.MANAGE_BOOKINGS,
+    Action.MANAGE_BOOKINGS, Action.MANAGE_MEMBER_CARDS,
 }
 _PRINT_MANAGER_ACTIONS = {
     Action.MANAGE_PRINTING,

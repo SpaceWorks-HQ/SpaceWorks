@@ -98,6 +98,9 @@ export const openApiPaths = [
   "/api/v1/admin/bookings/{id}/no-show/",
   "/api/v1/admin/bookings/{id}/reject/",
   "/api/v1/admin/categories/{id}",
+  "/api/v1/admin/certification-grants/{id}/revoke",
+  "/api/v1/admin/certification-types/{id}",
+  "/api/v1/admin/certification-types/{id}/grants",
   "/api/v1/admin/containers/{id}",
   "/api/v1/admin/containers/{id}/contents",
   "/api/v1/admin/containers/{id}/history",
@@ -233,6 +236,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/archive-requests/{id}/withdraw",
   "/api/v1/admin/makerspace/{makerspace_id}/backups",
   "/api/v1/admin/makerspace/{makerspace_id}/categories",
+  "/api/v1/admin/makerspace/{makerspace_id}/certification-types",
   "/api/v1/admin/makerspace/{makerspace_id}/containers",
   "/api/v1/admin/makerspace/{makerspace_id}/cover",
   "/api/v1/admin/makerspace/{makerspace_id}/dashboard",
@@ -318,6 +322,11 @@ export const openApiPaths = [
   "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/typed-manual-usage",
   "/api/v1/admin/makerspaces/{makerspace_id}/machines/{machine_id}/maintenance/logs/",
   "/api/v1/admin/makerspaces/{makerspace_id}/machines/{machine_id}/maintenance/schedules/",
+  "/api/v1/admin/makerspaces/{makerspace_id}/member-card-template",
+  "/api/v1/admin/makerspaces/{makerspace_id}/member-cards",
+  "/api/v1/admin/makerspaces/{makerspace_id}/member-cards.pdf",
+  "/api/v1/admin/makerspaces/{makerspace_id}/member-cards/resolve",
+  "/api/v1/admin/makerspaces/{makerspace_id}/member-cards/{membership_id}/issue",
   "/api/v1/admin/makerspaces/{makerspace_id}/member-claim-codes",
   "/api/v1/admin/makerspaces/{makerspace_id}/member-claim-codes/{claim_id}/revoke",
   "/api/v1/admin/makerspaces/{makerspace_id}/memberships",
@@ -330,6 +339,9 @@ export const openApiPaths = [
   "/api/v1/admin/makerspaces/{makerspace_id}/uploads/evidence-url",
   "/api/v1/admin/makerspaces/{makerspace_id}/waiver",
   "/api/v1/admin/makerspaces/{makerspace_id}/walk-in-members",
+  "/api/v1/admin/member-cards/{id}/print.pdf",
+  "/api/v1/admin/member-cards/{id}/reissue",
+  "/api/v1/admin/member-cards/{id}/revoke",
   "/api/v1/admin/membership-requests",
   "/api/v1/admin/membership-requests/{id}/approve",
   "/api/v1/admin/membership-requests/{id}/revoke",
@@ -472,6 +484,9 @@ export const openApiPaths = [
   "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/calendar.ics",
   "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/{id}/feedback/",
   "/api/v1/member/makerspaces/{makerspace_id}/event-registrations/{id}/qr",
+  "/api/v1/member/makerspaces/{makerspace_id}/member-card",
+  "/api/v1/member/makerspaces/{makerspace_id}/member-card/photo",
+  "/api/v1/member/makerspaces/{makerspace_id}/member-card/preview.pdf",
   "/api/v1/member/makerspaces/{makerspace_id}/payments",
   "/api/v1/member/makerspaces/{makerspace_id}/payments/{payment_id}/checkout",
   "/api/v1/member/makerspaces/{makerspace_id}/payments/{payment_id}/mobile-intent",
@@ -1145,8 +1160,10 @@ export type CertificateDownload = {
 };
 
 export type CertificateRevoke = {
-  "reason": ReasonEnum;
+  "reason": CertificateRevokeReasonEnum;
 };
+
+export type CertificateRevokeReasonEnum = "staff_revoked";
 
 export type CertificateSummary = {
   "id": number;
@@ -1158,6 +1175,43 @@ export type CertificateSummary = {
 };
 
 export type CertificateSummaryStatusEnum = "pending" | "rendering" | "active" | "failed" | "revoked";
+
+export type CertificationGrant = {
+  "id": number;
+  "certification_type": number;
+  "membership": number;
+  "member_name": string;
+  "granted_by": number | null;
+  "granted_at": string;
+  "expires_at": string | null;
+  "revoked_at": string | null;
+  "revoked_by": number | null;
+  "notes": string;
+  "is_live": string;
+};
+
+export type CertificationGrantCreate = {
+  "membership_id": number;
+  "expires_at"?: string | null;
+  "notes"?: string;
+};
+
+export type CertificationGrantRevoke = {
+  "notes"?: string;
+};
+
+export type CertificationType = {
+  "id": number;
+  "machine_type": number;
+  "name": string;
+  "description"?: string;
+  "validity_days"?: number | null;
+  "is_required_for_service"?: boolean;
+  "is_required_for_booking"?: boolean;
+  "is_active": boolean;
+  "created_at": string;
+  "updated_at": string;
+};
 
 export type ChangePassword = {
   "current_password": string;
@@ -3069,6 +3123,86 @@ export type MemberCalendarFeedState = {
   "rotated_at": string | null;
 };
 
+export type MemberCard = {
+  "id": number;
+  "card_number": number;
+  "printed_name": string;
+  "membership_id": number | null;
+  "is_active": boolean;
+  "photo_set": boolean;
+  "photo_consent_at": string | null;
+  "qr_active": boolean;
+  "print_count": number;
+  "last_printed_at": string | null;
+  "issued_at": string;
+  "revoked_at": string | null;
+  "revoked_reason": string;
+  "created_at": string;
+  "updated_at": string;
+};
+
+export type MemberCardIssue = {
+  "printed_name"?: string;
+};
+
+export type MemberCardPhotoFinalize = {
+  "object_key": string;
+  "content_type": string;
+  "consent": boolean;
+};
+
+export type MemberCardPhotoPresign = {
+  "content_type": string;
+};
+
+export type MemberCardPrint = {
+  "card_ids"?: Array<number>;
+  "preset"?: PresetEnum;
+};
+
+export type MemberCardReissue = {
+  "reason": MemberCardReissueReasonEnum;
+};
+
+export type MemberCardReissueReasonEnum = "lost" | "stolen" | "damaged" | "renewed";
+
+export type MemberCardResolve = {
+  "payload": string;
+};
+
+export type MemberCardResolveResult = {
+  "outcome": MemberCardResolveResultOutcomeEnum;
+  "card_id"?: number;
+  "card_number"?: number;
+  "printed_name"?: string;
+  "membership_id"?: number;
+  "membership_status"?: string;
+  "photo_url"?: string | null;
+};
+
+export type MemberCardResolveResultOutcomeEnum = "ok" | "revoked" | "inactive";
+
+export type MemberCardRevoke = {
+  "reason"?: string;
+};
+
+export type MemberCardTemplate = {
+  "version"?: number;
+  "page"?: string;
+  "orientation"?: string;
+  "card_width_mm"?: number;
+  "card_height_mm"?: number;
+  "margin_mm"?: number;
+  "gap_mm"?: number;
+  "front_fields"?: Array<string>;
+  "back_text"?: string;
+  "include_photo"?: boolean;
+  "include_qr"?: boolean;
+  "name_font_size_pt"?: number;
+  "font_size_pt"?: number;
+  "crop_marks"?: boolean;
+};
+
 export type MemberClaimCode = {
   "id": number;
   "membership_id": number;
@@ -3178,6 +3312,7 @@ export type MembershipList = {
   "makerspace_slug": string;
   "role": Role827Enum;
   "assigned_role": MembershipRoleSummary | null;
+  "status": Status37fEnum;
   "created_at": string;
   "payment": StaffPaymentSummary | null;
 };
@@ -4005,6 +4140,19 @@ export type PatchedCategoryAdmin = {
   "updated_at"?: string;
 };
 
+export type PatchedCertificationTypeUpdate = {
+  "id"?: number;
+  "machine_type"?: number;
+  "name"?: string;
+  "description"?: string;
+  "validity_days"?: number | null;
+  "is_required_for_service"?: boolean;
+  "is_required_for_booking"?: boolean;
+  "is_active"?: boolean;
+  "created_at"?: string;
+  "updated_at"?: string;
+};
+
 export type PatchedEmailTemplateUpdate = {
   "subject"?: string;
   "text_body"?: string;
@@ -4216,6 +4364,10 @@ export type PatchedMakerspacePaymentSettings = {
   "connect_payouts_enabled"?: boolean;
   "connect_status_updated_at"?: string;
   "effective_mode"?: string;
+};
+
+export type PatchedMemberCardOwnUpdate = {
+  "printed_name"?: string;
 };
 
 export type PatchedMembershipCapabilities = {
@@ -4506,6 +4658,8 @@ export type PresenceStart = {
   "accuracy"?: number;
 };
 
+export type PresetEnum = "sheet" | "single";
+
 export type PrinterPool = {
   "id": number;
   "machine_id": number | null;
@@ -4614,6 +4768,8 @@ export type ProfileRead = {
   "display_name": string;
   "is_visible": boolean;
   "show_attended_events": boolean;
+  "show_certifications": boolean;
+  "certifications": Array<string>;
   "headline": string;
   "institution": string;
   "bio": string;
@@ -4630,6 +4786,7 @@ export type ProfileRead = {
 export type ProfileWrite = {
   "is_visible"?: boolean;
   "show_attended_events"?: boolean;
+  "show_certifications"?: boolean;
   "headline"?: string;
   "institution"?: string;
   "bio"?: string;
@@ -5124,7 +5281,7 @@ export type QrCode = {
   "revoked_at": string | null;
 };
 
-export type QrCodeTargetTypeEnum = "box" | "product" | "asset";
+export type QrCodeTargetTypeEnum = "box" | "product" | "asset" | "member_card";
 
 export type QrHistoryItem = {
   "id": string;
@@ -5251,8 +5408,6 @@ export type Readiness = {
   "database": string;
   "archive_custody": ArchiveCustodyReadiness;
 };
-
-export type ReasonEnum = "staff_revoked";
 
 export type ReceiptEnvelope = {
   "payload": {

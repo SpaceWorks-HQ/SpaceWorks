@@ -53,4 +53,11 @@ SUPPLEMENTAL_AUTHORITY_ENTRIES = (
         D.RESET,
         "Provider handles and cross-tenant routing cannot authorize target operations.",
     ),
+    *_same(
+        "makerspaces.MemberCard",
+        "printed_name photo_object_key photo_content_type photo_size_bytes photo_consent_at "
+        "photo_consent_version",
+        (D.PRESERVE, D.DROP),
+        "Full-user card identity travels; stub-linked identity content does not.",
+    ),
 )

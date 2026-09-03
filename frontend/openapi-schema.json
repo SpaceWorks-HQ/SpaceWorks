@@ -359,6 +359,7 @@
                             "enum": [
                                 "active-loans",
                                 "booking-utilization",
+                                "certification-coverage",
                                 "communications-health",
                                 "community-engagement",
                                 "damaged-lost",
@@ -1796,6 +1797,264 @@
                 "responses": {
                     "204": {
                         "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/certification-grants/{id}/revoke": {
+            "post": {
+                "operationId": "api_v1_admin_certification_grants_revoke_create",
+                "summary": "Revoke a certification grant",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin machines"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CertificationGrantRevoke"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CertificationGrantRevoke"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CertificationGrantRevoke"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CertificationGrant"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Already revoked."
+                    },
+                    "403": {
+                        "description": "Machine type authority required."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/certification-types/{id}": {
+            "patch": {
+                "operationId": "api_v1_admin_certification_types_partial_update",
+                "summary": "Update a certification type",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin machines"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedCertificationTypeUpdate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedCertificationTypeUpdate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedCertificationTypeUpdate"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CertificationType"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid certification type."
+                    },
+                    "403": {
+                        "description": "Machine type authority required."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "api_v1_admin_certification_types_destroy",
+                "summary": "Deactivate a certification type",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin machines"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CertificationType"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "Machine type authority required."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/certification-types/{id}/grants": {
+            "get": {
+                "operationId": "api_v1_admin_certification_types_grants_list",
+                "summary": "List grants for a certification type",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin machines"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/CertificationGrant"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_certification_types_grants_create",
+                "summary": "Grant a certification to a membership",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin machines"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CertificationGrantCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CertificationGrantCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CertificationGrantCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CertificationGrant"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid grant."
+                    },
+                    "403": {
+                        "description": "Machine type authority required."
                     }
                 }
             }
@@ -14726,6 +14985,105 @@
                 }
             }
         },
+        "/api/v1/admin/makerspace/{makerspace_id}/certification-types": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_certification_types_list",
+                "summary": "List certification types in a makerspace",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin machines"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/CertificationType"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspace_certification_types_create",
+                "summary": "Create a certification type",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin machines"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CertificationType"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CertificationType"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CertificationType"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CertificationType"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid certification type."
+                    },
+                    "403": {
+                        "description": "Machine type authority required."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspace/{makerspace_id}/containers": {
             "get": {
                 "operationId": "api_v1_admin_makerspace_containers_list",
@@ -19275,6 +19633,7 @@
                             "enum": [
                                 "active-loans",
                                 "booking-utilization",
+                                "certification-coverage",
                                 "communications-health",
                                 "community-engagement",
                                 "damaged-lost",
@@ -22817,6 +23176,353 @@
                 }
             }
         },
+        "/api/v1/admin/makerspaces/{makerspace_id}/member-card-template": {
+            "get": {
+                "operationId": "api_v1_admin_makerspaces_member_card_template_retrieve",
+                "summary": "Read the card layout template",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCardTemplate"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "Missing member-card action."
+                    },
+                    "404": {
+                        "description": "Not found."
+                    }
+                }
+            },
+            "put": {
+                "operationId": "api_v1_admin_makerspaces_member_card_template_update",
+                "summary": "Replace the card layout template",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardTemplate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardTemplate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardTemplate"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCardTemplate"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "Missing member-card action."
+                    },
+                    "404": {
+                        "description": "Not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspaces/{makerspace_id}/member-cards": {
+            "get": {
+                "operationId": "api_v1_admin_makerspaces_member_cards_list",
+                "summary": "List member cards",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "status",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "active | revoked"
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/MemberCard"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "Missing member-card action."
+                    },
+                    "404": {
+                        "description": "Not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspaces/{makerspace_id}/member-cards.pdf": {
+            "post": {
+                "operationId": "api_v1_admin_makerspaces_member_cards.pdf_create",
+                "summary": "Print a sheet of cards",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardPrint"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardPrint"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardPrint"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "Missing member-card action."
+                    },
+                    "404": {
+                        "description": "Not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspaces/{makerspace_id}/member-cards/{membership_id}/issue": {
+            "post": {
+                "operationId": "api_v1_admin_makerspaces_member_cards_issue_create",
+                "summary": "Issue a card to a membership",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "membership_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardIssue"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardIssue"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardIssue"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCard"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "Missing member-card action."
+                    },
+                    "404": {
+                        "description": "Not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspaces/{makerspace_id}/member-cards/resolve": {
+            "post": {
+                "operationId": "api_v1_admin_makerspaces_member_cards_resolve_create",
+                "summary": "Resolve a scanned member card to minimal identity",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardResolve"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardResolve"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardResolve"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCardResolveResult"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "Missing member-card action."
+                    },
+                    "404": {
+                        "description": "Not found."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspaces/{makerspace_id}/member-claim-codes": {
             "get": {
                 "operationId": "api_v1_admin_makerspaces_member_claim_codes_list",
@@ -24689,6 +25395,172 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/member-cards/{id}/print.pdf": {
+            "post": {
+                "operationId": "api_v1_admin_member_cards_print.pdf_create",
+                "summary": "Print one card (CR80 PDF)",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "Missing member-card action."
+                    },
+                    "404": {
+                        "description": "Not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/member-cards/{id}/reissue": {
+            "post": {
+                "operationId": "api_v1_admin_member_cards_reissue_create",
+                "summary": "Reissue (rotate the QR of) a card",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardReissue"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardReissue"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardReissue"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCard"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "Missing member-card action."
+                    },
+                    "404": {
+                        "description": "Not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/member-cards/{id}/revoke": {
+            "post": {
+                "operationId": "api_v1_admin_member_cards_revoke_create",
+                "summary": "Revoke a card (redacts name and photo)",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardRevoke"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardRevoke"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardRevoke"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCard"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "Missing member-card action."
+                    },
+                    "404": {
+                        "description": "Not found."
                     }
                 }
             }
@@ -28905,6 +29777,7 @@
                             "enum": [
                                 "active-loans",
                                 "booking-utilization",
+                                "certification-coverage",
                                 "communications-health",
                                 "community-engagement",
                                 "damaged-lost",
@@ -35693,6 +36566,316 @@
                             }
                         },
                         "description": "Events module unavailable."
+                    }
+                }
+            }
+        },
+        "/api/v1/member/makerspaces/{makerspace_id}/member-card": {
+            "get": {
+                "operationId": "api_v1_member_makerspaces_member_card_retrieve",
+                "summary": "Read my member card",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCard"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "An active membership is required."
+                    },
+                    "404": {
+                        "description": "No card has been issued to this membership."
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "api_v1_member_makerspaces_member_card_partial_update",
+                "summary": "Set the name printed on my card",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMemberCardOwnUpdate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMemberCardOwnUpdate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMemberCardOwnUpdate"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCard"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "An active membership is required."
+                    },
+                    "404": {
+                        "description": "No card has been issued to this membership."
+                    }
+                }
+            }
+        },
+        "/api/v1/member/makerspaces/{makerspace_id}/member-card/photo": {
+            "post": {
+                "operationId": "api_v1_member_makerspaces_member_card_photo_create",
+                "summary": "Create a card photo upload URL (staging only)",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardPhotoPresign"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardPhotoPresign"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardPhotoPresign"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "An active membership is required."
+                    },
+                    "404": {
+                        "description": "No card has been issued to this membership."
+                    },
+                    "503": {
+                        "description": "Storage unavailable."
+                    }
+                }
+            },
+            "put": {
+                "operationId": "api_v1_member_makerspaces_member_card_photo_update",
+                "summary": "Attach an uploaded card photo (requires consent)",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardPhotoFinalize"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardPhotoFinalize"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MemberCardPhotoFinalize"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCard"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "An active membership is required."
+                    },
+                    "404": {
+                        "description": "No card has been issued to this membership."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "api_v1_member_makerspaces_member_card_photo_destroy",
+                "summary": "Remove my card photo",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberCard"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "An active membership is required."
+                    },
+                    "404": {
+                        "description": "No card has been issued to this membership."
+                    }
+                }
+            }
+        },
+        "/api/v1/member/makerspaces/{makerspace_id}/member-card/preview.pdf": {
+            "get": {
+                "operationId": "api_v1_member_makerspaces_member_card_preview.pdf_retrieve",
+                "summary": "Preview my card as a watermarked PDF",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Member profile"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "An active membership is required."
+                    },
+                    "404": {
+                        "description": "No card has been issued to this membership."
                     }
                 }
             }
@@ -43422,12 +44605,19 @@
                 "type": "object",
                 "properties": {
                     "reason": {
-                        "$ref": "#/components/schemas/ReasonEnum"
+                        "$ref": "#/components/schemas/CertificateRevokeReasonEnum"
                     }
                 },
                 "required": [
                     "reason"
                 ]
+            },
+            "CertificateRevokeReasonEnum": {
+                "enum": [
+                    "staff_revoked"
+                ],
+                "type": "string",
+                "description": "* `staff_revoked` - staff_revoked"
             },
             "CertificateSummary": {
                 "type": "object",
@@ -43485,6 +44675,157 @@
                 ],
                 "type": "string",
                 "description": "* `pending` - Pending\n* `rendering` - Rendering\n* `active` - Active\n* `failed` - Failed\n* `revoked` - Revoked"
+            },
+            "CertificationGrant": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "certification_type": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "membership": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "member_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "granted_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "granted_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "revoked_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "revoked_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "notes": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "is_live": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "certification_type",
+                    "expires_at",
+                    "granted_at",
+                    "granted_by",
+                    "id",
+                    "is_live",
+                    "member_name",
+                    "membership",
+                    "notes",
+                    "revoked_at",
+                    "revoked_by"
+                ]
+            },
+            "CertificationGrantCreate": {
+                "type": "object",
+                "properties": {
+                    "membership_id": {
+                        "type": "integer"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "notes": {
+                        "type": "string",
+                        "default": ""
+                    }
+                },
+                "required": [
+                    "membership_id"
+                ]
+            },
+            "CertificationGrantRevoke": {
+                "type": "object",
+                "properties": {
+                    "notes": {
+                        "type": "string",
+                        "default": ""
+                    }
+                }
+            },
+            "CertificationType": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "machine_type": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "validity_days": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0,
+                        "nullable": true
+                    },
+                    "is_required_for_service": {
+                        "type": "boolean"
+                    },
+                    "is_required_for_booking": {
+                        "type": "boolean"
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "id",
+                    "is_active",
+                    "machine_type",
+                    "name",
+                    "updated_at"
+                ]
             },
             "ChangePassword": {
                 "type": "object",
@@ -51384,6 +52725,295 @@
                     "token_hint"
                 ]
             },
+            "MemberCard": {
+                "type": "object",
+                "description": "Never carries the photo key or a URL that outlives the response.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "card_number": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "printed_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "membership_id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "photo_set": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "photo_consent_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "qr_active": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "print_count": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "last_printed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "issued_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "revoked_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "revoked_reason": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "card_number",
+                    "created_at",
+                    "id",
+                    "is_active",
+                    "issued_at",
+                    "last_printed_at",
+                    "membership_id",
+                    "photo_consent_at",
+                    "photo_set",
+                    "print_count",
+                    "printed_name",
+                    "qr_active",
+                    "revoked_at",
+                    "revoked_reason",
+                    "updated_at"
+                ]
+            },
+            "MemberCardIssue": {
+                "type": "object",
+                "properties": {
+                    "printed_name": {
+                        "type": "string",
+                        "maxLength": 200
+                    }
+                }
+            },
+            "MemberCardPhotoFinalize": {
+                "type": "object",
+                "properties": {
+                    "object_key": {
+                        "type": "string",
+                        "maxLength": 300
+                    },
+                    "content_type": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "consent": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "consent",
+                    "content_type",
+                    "object_key"
+                ]
+            },
+            "MemberCardPhotoPresign": {
+                "type": "object",
+                "properties": {
+                    "content_type": {
+                        "type": "string",
+                        "maxLength": 64
+                    }
+                },
+                "required": [
+                    "content_type"
+                ]
+            },
+            "MemberCardPrint": {
+                "type": "object",
+                "properties": {
+                    "card_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "preset": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/PresetEnum"
+                            }
+                        ],
+                        "default": "sheet"
+                    }
+                }
+            },
+            "MemberCardReissue": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "$ref": "#/components/schemas/MemberCardReissueReasonEnum"
+                    }
+                },
+                "required": [
+                    "reason"
+                ]
+            },
+            "MemberCardReissueReasonEnum": {
+                "enum": [
+                    "lost",
+                    "stolen",
+                    "damaged",
+                    "renewed"
+                ],
+                "type": "string",
+                "description": "* `lost` - lost\n* `stolen` - stolen\n* `damaged` - damaged\n* `renewed` - renewed"
+            },
+            "MemberCardResolve": {
+                "type": "object",
+                "properties": {
+                    "payload": {
+                        "type": "string",
+                        "maxLength": 64
+                    }
+                },
+                "required": [
+                    "payload"
+                ]
+            },
+            "MemberCardResolveResult": {
+                "type": "object",
+                "properties": {
+                    "outcome": {
+                        "$ref": "#/components/schemas/MemberCardResolveResultOutcomeEnum"
+                    },
+                    "card_id": {
+                        "type": "integer"
+                    },
+                    "card_number": {
+                        "type": "integer"
+                    },
+                    "printed_name": {
+                        "type": "string"
+                    },
+                    "membership_id": {
+                        "type": "integer"
+                    },
+                    "membership_status": {
+                        "type": "string"
+                    },
+                    "photo_url": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "outcome"
+                ]
+            },
+            "MemberCardResolveResultOutcomeEnum": {
+                "enum": [
+                    "ok",
+                    "revoked",
+                    "inactive"
+                ],
+                "type": "string",
+                "description": "* `ok` - ok\n* `revoked` - revoked\n* `inactive` - inactive"
+            },
+            "MemberCardRevoke": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "maxLength": 32
+                    }
+                }
+            },
+            "MemberCardTemplate": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "integer"
+                    },
+                    "page": {
+                        "type": "string"
+                    },
+                    "orientation": {
+                        "type": "string"
+                    },
+                    "card_width_mm": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "card_height_mm": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "margin_mm": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "gap_mm": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "front_fields": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "back_text": {
+                        "type": "string"
+                    },
+                    "include_photo": {
+                        "type": "boolean"
+                    },
+                    "include_qr": {
+                        "type": "boolean"
+                    },
+                    "name_font_size_pt": {
+                        "type": "integer"
+                    },
+                    "font_size_pt": {
+                        "type": "integer"
+                    },
+                    "crop_marks": {
+                        "type": "boolean"
+                    }
+                }
+            },
             "MemberClaimCode": {
                 "type": "object",
                 "properties": {
@@ -51912,6 +53542,14 @@
                         "readOnly": true,
                         "nullable": true
                     },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Status37fEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -51935,6 +53573,7 @@
                     "makerspace_slug",
                     "payment",
                     "role",
+                    "status",
                     "user"
                 ]
             },
@@ -55192,6 +56831,52 @@
                     }
                 }
             },
+            "PatchedCertificationTypeUpdate": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "machine_type": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "validity_days": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0,
+                        "nullable": true
+                    },
+                    "is_required_for_service": {
+                        "type": "boolean"
+                    },
+                    "is_required_for_booking": {
+                        "type": "boolean"
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
             "PatchedEmailTemplateUpdate": {
                 "type": "object",
                 "properties": {
@@ -56015,6 +57700,15 @@
                     "effective_mode": {
                         "type": "string",
                         "readOnly": true
+                    }
+                }
+            },
+            "PatchedMemberCardOwnUpdate": {
+                "type": "object",
+                "properties": {
+                    "printed_name": {
+                        "type": "string",
+                        "maxLength": 200
                     }
                 }
             },
@@ -57165,6 +58859,14 @@
                     "duration_minutes"
                 ]
             },
+            "PresetEnum": {
+                "enum": [
+                    "sheet",
+                    "single"
+                ],
+                "type": "string",
+                "description": "* `sheet` - sheet\n* `single` - single"
+            },
             "PrinterPool": {
                 "type": "object",
                 "properties": {
@@ -57583,6 +59285,15 @@
                     "show_attended_events": {
                         "type": "boolean"
                     },
+                    "show_certifications": {
+                        "type": "boolean"
+                    },
+                    "certifications": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
                     "headline": {
                         "type": "string"
                     },
@@ -57620,6 +59331,7 @@
                     "activity",
                     "avatar_url",
                     "bio",
+                    "certifications",
                     "display_name",
                     "education",
                     "github_contributions",
@@ -57631,7 +59343,8 @@
                     "languages",
                     "membership_id",
                     "projects",
-                    "show_attended_events"
+                    "show_attended_events",
+                    "show_certifications"
                 ]
             },
             "ProfileWrite": {
@@ -57641,6 +59354,9 @@
                         "type": "boolean"
                     },
                     "show_attended_events": {
+                        "type": "boolean"
+                    },
+                    "show_certifications": {
                         "type": "boolean"
                     },
                     "headline": {
@@ -59709,10 +61425,11 @@
                 "enum": [
                     "box",
                     "product",
-                    "asset"
+                    "asset",
+                    "member_card"
                 ],
                 "type": "string",
-                "description": "* `box` - Box\n* `product` - Product\n* `asset` - Asset"
+                "description": "* `box` - Box\n* `product` - Product\n* `asset` - Asset\n* `member_card` - Member card"
             },
             "QrHistoryItem": {
                 "type": "object",
@@ -60146,13 +61863,6 @@
                     "database",
                     "status"
                 ]
-            },
-            "ReasonEnum": {
-                "enum": [
-                    "staff_revoked"
-                ],
-                "type": "string",
-                "description": "* `staff_revoked` - staff_revoked"
             },
             "ReceiptEnvelope": {
                 "type": "object",

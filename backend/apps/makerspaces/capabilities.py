@@ -95,6 +95,12 @@ FEATURE_DEFINITIONS = (
         requires_modules=("maintenance", "machines"),
     ),
     FeatureDefinition(
+        "machines.certifications", "machines", "Certification gating",
+        "Members must hold an unexpired certification for a machine type before "
+        "booking it or requesting work on it.",
+        default_enabled=False,
+    ),
+    FeatureDefinition(
         "events.offline_checkin", "events", "Offline & station check-in",
         "Store a minimal expiring roster on event devices and enable event-scoped "
         "PIN stations.",

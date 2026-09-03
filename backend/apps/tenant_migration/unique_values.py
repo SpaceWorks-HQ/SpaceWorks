@@ -205,6 +205,10 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
         field="object_key",
         generator=_maintenance_document_key,
     ),
+    ("makerspaces.MemberCard", "field:membership"): _policy(
+        REMAP,
+        "One card per membership: the remapped membership reference keeps the pair unique.",
+    ),
     ("makerspaces.Makerspace", "field:anonymous_requester"): _policy(
         NULL,
         "The anonymous-request principal is a per-deployment system row, not a person: "

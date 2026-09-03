@@ -44,6 +44,11 @@ COVERAGE_REPORT_DEFINITIONS = (
         section_modules=("membership", "member_accounts", "mobile"),
     ),
     ReportDefinition(
+        "certification-coverage", "apps.machines.reports_certifications.build_certification_coverage",
+        ("machine_type", "certification_type", "gating_enabled", "required_for_service", "required_for_booking", "active_members", "certified_members", "expiring_30d", "revoked_grants", "coverage_percent"),
+        ("machines",), title="Certification coverage", chart_hint="grouped_bar", section_modules=("machines",),
+    ),
+    ReportDefinition(
         "module-operational-health", "apps.operations.reports_module_health.build_module_operational_health",
         ("module_key", "enabled", "runtime_available", "coverage_kind", "activity_count", "failure_count", "last_activity_at", "rollup_watermark", "rollup_state"),
         required_action=rbac.Action.MANAGE_MAKERSPACE, title="Module operational health",

@@ -16,6 +16,12 @@ Two rules every collector here obeys:
   scope would drag half the app graph into every `manage.py` invocation.
 """
 from apps.makerspaces.module_purge_collectors_machine_service import machine_service_delete
+from apps.makerspaces.module_purge_collectors_membership import (
+    membership_delete,
+    membership_private_key_sizes,
+    membership_private_keys,
+    membership_public_image_keys,
+)
 from apps.makerspaces.module_purge_collectors_single_model import (
     _counts,
     _delete,
@@ -258,47 +264,3 @@ def discord_destinations_delete(makerspace, cursor):
 
 def webhook_destinations_delete(makerspace, cursor):
     return _chat_destinations_delete(makerspace, "webhook")
-
-
-def membership_public_image_keys(makerspace):
-    """Avatars and project images, collected BEFORE the rows that name them go.
-
-    Without this the objects outlive every row that could name them: nothing else in the
-    system knows a `member/<id>/...` key exists once the profile is deleted, so they
-    would sit in the bucket forever and keep counting against the space's storage.
-    """
-    from apps.makerspaces.models import MemberProfile, MemberProject
-
-    keys = list(
-        MemberProfile.objects.filter(membership__makerspace=makerspace).values_list(
-            "avatar_key", flat=True
-        )
-    )
-    keys += list(
-        MemberProject.objects.filter(
-            profile__membership__makerspace=makerspace
-        ).values_list("image_key", flat=True)
-    )
-    return [key for key in dict.fromkeys(keys) if key]
-
-
-def membership_delete(makerspace, cursor):
-    from apps.makerspaces.models import MemberProfile, MembershipRequest
-
-    # `MakerspaceMembership` itself is core RBAC state and is NEVER deleted here -- the
-    # module gates community enrolment/content, not the roster (plan A7). Waivers and
-    # both acceptance evidence types are core liability records and likewise survive.
-    # Profiles go even though the membership stays: a profile is community content the
-    # module owns, not the RBAC state the module deliberately leaves behind. Projects
-    # cascade from the profile.
-    profiles, profile_labels = _delete(
-        MemberProfile.objects.filter(membership__makerspace=makerspace)
-    )
-    requests, request_labels = _delete(
-        MembershipRequest.objects.filter(makerspace=makerspace)
-    )
-    return _counts(
-        model_labels=profile_labels | request_labels,
-        member_profiles=profiles,
-        membership_requests=requests,
-    )

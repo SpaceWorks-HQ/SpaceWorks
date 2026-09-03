@@ -1,7 +1,6 @@
 """Reading and writing a member's own profile, and the member-visible directory."""
 
 from django.db import transaction
-from django.db.models import Q
 
 from apps.audit import services as audit
 from apps.inventory import public_image_storage
@@ -26,6 +25,15 @@ def display_name_for(membership):
     return user.display_name or user.get_full_name().strip() or user.username
 
 
+def _published_certifications(membership, profile):
+    """Live certification names, only once the member has opted in (consent, not config)."""
+    if not profile.show_certifications:
+        return []
+    from apps.machines.certifications import live_certification_names
+
+    return list(live_certification_names(membership))
+
+
 def read_profile(membership, *, include_activity=True, local_activity_only=False):
     # Reads must not call the write-side ``profile_for`` helper. An unsaved model
     # instance gives serializers the model defaults without publishing a row merely
@@ -38,6 +46,8 @@ def read_profile(membership, *, include_activity=True, local_activity_only=False
         "display_name": display_name_for(membership),
         "is_visible": profile.is_visible,
         "show_attended_events": profile.show_attended_events,
+        "show_certifications": profile.show_certifications,
+        "certifications": _published_certifications(membership, profile),
         "headline": profile.headline,
         "institution": profile.institution,
         "bio": profile.bio,
@@ -133,8 +143,8 @@ def save_profile(membership, data):
     project_count_before = profile.projects.count()
     fields = []
     for field in (
-        "is_visible", "show_attended_events", "headline", "institution", "bio",
-        "interests", "languages", "education",
+        "is_visible", "show_attended_events", "show_certifications", "headline",
+        "institution", "bio", "interests", "languages", "education",
     ):
         if field in data:
             setattr(profile, field, data[field])
@@ -179,7 +189,7 @@ def _audit_profile_saved(
     copy member PII into a store that is deliberately impossible to edit or delete. The
     meta therefore names the fields touched and the boolean publication transitions.
     """
-    profile.refresh_from_db(fields=["is_visible", "show_attended_events"])
+    profile.refresh_from_db(fields=["is_visible", "show_attended_events", "show_certifications"])
     audit.record(
         membership.user,
         "member.profile_updated",
@@ -190,6 +200,7 @@ def _audit_profile_saved(
             "visibility_changed": was_visible != profile.is_visible,
             "is_visible": profile.is_visible,
             "attended_events_shown": profile.show_attended_events,
+            "certifications_shown": profile.show_certifications,
             "attended_events_changed": (
                 attended_events_were_shown != profile.show_attended_events
             ),
@@ -247,53 +258,11 @@ def save_projects(profile, rows):
     ).delete()
 
 
-def directory(makerspace, query=""):
-    """Visible profiles, plus a count of everyone who did not opt in.
+# The member-visible directory lives in its own module (file-size ceiling); re-exported so
+# `profile_services.directory` / `.visible_profile` keep resolving for views and tests.
+from apps.makerspaces.profile_directory import directory, visible_profile  # noqa: E402
 
-    ``query`` matches the plain-text identity columns only (username, display name, profile
-    headline and institution). Contact fields are scoped PII and are never searched here.
-    """
-    memberships = MakerspaceMembership.objects.filter(
-        makerspace=makerspace, status="active", user__is_active=True
-    ).select_related("user", "profile")
-    query = (query or "").strip()[:200]
-    if query:
-        memberships = memberships.filter(
-            Q(user__username__icontains=query)
-            | Q(user__display_name__icontains=query)
-            | Q(user__first_name__icontains=query)
-            | Q(user__last_name__icontains=query)
-            | Q(profile__headline__icontains=query)
-            | Q(profile__institution__icontains=query)
-        )
-    members, hidden = [], 0
-    for membership in memberships:
-        profile = getattr(membership, "profile", None)
-        # No profile row at all is the same answer as one that is not visible: nobody
-        # is listed until they choose to be.
-        if profile is None or not profile.is_visible:
-            hidden += 1
-            continue
-        members.append(
-            {
-                "membership_id": membership.pk,
-                "display_name": display_name_for(membership),
-                "headline": profile.headline,
-                "avatar_url": public_image_storage.public_url(profile.avatar_key) or None,
-            }
-        )
-    members.sort(key=lambda row: row["display_name"].lower())
-    return {"members": members, "hidden_count": hidden}
-
-
-def visible_profile(makerspace, membership_id, *, local_activity_only=False):
-    """One other member's profile, or None when it is not theirs to see."""
-    membership = MakerspaceMembership.objects.select_related("user", "profile").filter(
-        pk=membership_id, makerspace=makerspace, status="active", user__is_active=True
-    ).first()
-    if membership is None:
-        return None
-    profile = getattr(membership, "profile", None)
-    if profile is None or not profile.is_visible:
-        return None
-    return read_profile(membership, local_activity_only=local_activity_only)
+__all__ = [
+    "directory", "display_name_for", "profile_activity", "profile_for", "read_profile",
+    "save_profile", "save_projects", "visible_profile",
+]

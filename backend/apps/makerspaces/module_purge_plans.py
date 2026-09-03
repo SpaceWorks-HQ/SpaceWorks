@@ -36,6 +36,8 @@ from apps.makerspaces.module_purge_collectors import (
     maintenance_private_key_sizes,
     maintenance_private_keys,
     membership_delete,
+    membership_private_key_sizes,
+    membership_private_keys,
     membership_public_image_keys,
     notifications_delete,
     procurement_delete,
@@ -131,6 +133,9 @@ PLANS = (
         "Join requests and member profiles with their projects and imagery. "
         "Memberships, waivers and acceptance evidence stay as core RBAC/liability state.",
         membership_delete,
+        pii_labels=("makerspaces.MemberCard",),
+        private_keys=membership_private_keys,
+        private_key_sizes=membership_private_key_sizes,
         public_image_keys=membership_public_image_keys,
     ),
     ModulePurgePlan(

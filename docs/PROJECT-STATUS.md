@@ -102,6 +102,14 @@ capability (`docs/MODULES.md` → Editions); `events` and `bookings` install pro
 shape (`Dockerfile.allinone`, `docker/compose.single.yml`, `.spaceworks-layer`) runs everything but
 Postgres and MinIO in one container; setup asks for both the edition and the shape.
 
+**Member ID cards and certification gating (phase 5).** A member card is a revocable QR credential over one
+membership, printed as a CR80 card or a sheet, resolvable only by staff holding `scan_member_cards`, with a
+consent-gated private photo that is deleted the moment the card is revoked (`docs/INVARIANTS.md` → Member ID
+cards). `machines.certifications` (a Space-Manager feature switch) requires an unexpired certification per
+machine type before a member may book a linked space or request work; an override needs machine-type
+authority and a recorded reason. Held certifications print as an optional card field, appear on the maker
+profile only after a separate opt-in, and roll up in the `certification-coverage` report row.
+
 Stack (in use):
 
 - **Backend:** Django 6 + Django REST Framework (`backend/`). Requires Python 3.12+.
