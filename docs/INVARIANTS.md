@@ -2877,3 +2877,14 @@ implementation that silently stops deleting is invisible in CI; the fixture-driv
 directions — children survive, and genuinely stale versions are still deleted. `release.yml` runs
 `scripts/verify-release-images.sh` after cleanup so a release that orphaned its own images fails at
 the release rather than at the next person's install.
+
+**GitHub Release history is PERMANENT; container versions are not** (owner decision 2026-09-03).
+`release.yml` used to keep only the current and immediately previous release, deleting every older
+release *and its Git tag*. It no longer deletes either, and must not be changed back: a release row
+and a tag cost nothing, while the history is the only record of what a given deployment was told to
+install. The step is now named "Prune superseded container versions" to keep the two apart, because
+**image** pruning stays — those consume real registry storage, and the digest-based rules above still
+govern it. The one thing the release loop still computes is `previous_version`, taken from the first
+listed tag that is not the current one: `ghcr-retention.py` needs it to keep the previous version's
+images so the installer's rollback-to-previous-release path has something to fall back to. Deleting
+releases would therefore not just lose history, it would eventually strand that rollback.
