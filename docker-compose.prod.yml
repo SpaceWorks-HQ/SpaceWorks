@@ -200,6 +200,23 @@ services:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
       - ./scripts:/run/spaceworks-privileged-scripts:ro
+  # Server-Sent Events stream (/api/v1/live/): dedicated process so gunicorn's worker
+  # recycling (--max-requests on `backend`) never severs an open stream. See frontend/nginx.conf.
+  live:
+    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment: *backend-env
+    command: ["--role", "backend", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "-k", "gthread", "--threads", "${LIVE_THREADS:-32}", "--timeout", "0", "--access-logfile", "-", "--error-logfile", "-"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      orchestration-ready:
+        condition: service_completed_successfully
+    volumes:
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+
   orchestration-init:
     <<: *host-bootstrap
     depends_on:

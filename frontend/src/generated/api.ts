@@ -460,6 +460,7 @@ export const openApiPaths = [
   "/api/v1/integrations/telegram/webhook",
   "/api/v1/internal/cron/return-reminders",
   "/api/v1/internal/tls-check",
+  "/api/v1/live/",
   "/api/v1/member/archived-payments",
   "/api/v1/member/makerspaces/{makerspace_id}/activity",
   "/api/v1/member/makerspaces/{makerspace_id}/collaborative-events/",

@@ -71,6 +71,11 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         # cannot survive: the target recomputes it under the TARGET key after all
         # remapping. Never carry the source value.
         ("audit.AuditLog", "row_mac"),
+        # Full-text vectors are recomputed by the search trigger on the first write the
+        # importer makes; carrying a source value would only be overwritten.
+        ("inventory.InventoryProduct", "search_vector"),
+        ("machines.Machine", "search_vector"),
+        ("events.Event", "search_vector"),
     ),
     **_rules(
         EMPTY_STRING,

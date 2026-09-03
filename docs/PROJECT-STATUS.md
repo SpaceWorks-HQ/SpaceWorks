@@ -79,6 +79,14 @@ is unchanged. `GET /api/v1/metrics/` serves Prometheus text behind `METRICS_TOKE
 topologies, the frontend build and the CLAUDE.md/AGENTS.md drift check, and the release workflow depends on
 it. The forward plan itself is local-only under `docs/plans/2026-09-03-forward-plan/`.
 
+**Search and live updates (phase 1).** Every inventory, machine and event list accepts `?q=` (full-text with
+phrase and exclusion syntax, typo-tolerant on the name) through `apps/inventory/search.py`; the member
+directory matches identity fields only. The staff console holds one Server-Sent Events stream
+(`/api/v1/live/`, `frontend/src/lib/live.ts`) and invalidates the matching TanStack queries when an audit
+row commits, so queues update without polling; the stream runs on the dedicated `live` compose service and
+falls back to polling (503) on a deployment without Redis. Public routes are lazy chunks and the eleven
+over-ceiling frontend files were split.
+
 Stack (in use):
 
 - **Backend:** Django 6 + Django REST Framework (`backend/`). Requires Python 3.12+.

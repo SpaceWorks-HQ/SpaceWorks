@@ -46,6 +46,12 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
   linked to any number of spaces, with a public profile and a cross-makerspace event catalogue. An
   organization grant confers **actions, never identity**.
 - **QR everywhere** — boxes, tools, and individual assets; immutable scan history.
+- **Live staff console and one search box** — queues, loans and check-ins update the moment a change
+  commits (Server-Sent Events over the deployment's Redis; falls back to polling without it), and every
+  inventory, machine and event list answers `?q=` with full-text search that tolerates typos.
+- **Operable in production** — every request carries an `X-Request-ID` through JSON logs and Celery,
+  a token-protected Prometheus endpoint reports queue depth, delivery failures and storage, and CI runs
+  the whole suite before an image is published.
 - **Action-based staff console** — editable per-makerspace roles over a fixed action set, four seeded
   defaults, and a superadmin-only Django control plane.
 - **Reports & ledger** — what's out, who has it, overdue tracking, CSV/XLSX export, plus accessible

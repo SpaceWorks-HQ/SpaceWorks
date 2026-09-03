@@ -1,6 +1,7 @@
 """Reading and writing a member's own profile, and the member-visible directory."""
 
 from django.db import transaction
+from django.db.models import Q
 
 from apps.audit import services as audit
 from apps.inventory import public_image_storage
@@ -246,11 +247,25 @@ def save_projects(profile, rows):
     ).delete()
 
 
-def directory(makerspace):
-    """Visible profiles, plus a count of everyone who did not opt in."""
+def directory(makerspace, query=""):
+    """Visible profiles, plus a count of everyone who did not opt in.
+
+    ``query`` matches the plain-text identity columns only (username, display name, profile
+    headline and institution). Contact fields are scoped PII and are never searched here.
+    """
     memberships = MakerspaceMembership.objects.filter(
         makerspace=makerspace, status="active", user__is_active=True
     ).select_related("user", "profile")
+    query = (query or "").strip()[:200]
+    if query:
+        memberships = memberships.filter(
+            Q(user__username__icontains=query)
+            | Q(user__display_name__icontains=query)
+            | Q(user__first_name__icontains=query)
+            | Q(user__last_name__icontains=query)
+            | Q(profile__headline__icontains=query)
+            | Q(profile__institution__icontains=query)
+        )
     members, hidden = [], 0
     for membership in memberships:
         profile = getattr(membership, "profile", None)

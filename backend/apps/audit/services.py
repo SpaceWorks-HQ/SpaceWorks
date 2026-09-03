@@ -17,6 +17,7 @@ from apps.audit.keys import (
 )
 from apps.audit.models import AuditLog
 from apps.encryption.blind_index import canonical_email
+from apps.operations import live
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +143,13 @@ def record(actor, action, *, makerspace=None, target=None, target_type="", meta=
     # Correlation lives in the log line, not in `meta`: the row's MAC covers meta, and the
     # request id is an operational breadcrumb rather than part of the attested record. The
     # log formatter adds request_id, so `grep <event_uuid>` finds the request that wrote it.
+    live.publish_audit_event(
+        action=action,
+        makerspace_id=makerspace_id,
+        target_type=target_type,
+        target_id=target_id,
+        actor_id=actor_id,
+    )
     logger.info(
         "audit_recorded",
         extra={

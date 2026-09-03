@@ -1,5 +1,5 @@
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
@@ -28,6 +28,21 @@ from apps.inventory.models import InventoryProduct
 from apps.makerspaces.guards import require_module
 
 
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="q", type=str, location=OpenApiParameter.QUERY, required=False,
+                description=(
+                    "Full-text search over name, storage location, tracking mode and description "
+                    "(\"phrases\", -exclusions, typo-tolerant on the name), or a category name."
+                ),
+            ),
+            OpenApiParameter(name="archived", type=str, location=OpenApiParameter.QUERY, required=False, description="`true` or `false`."),
+            OpenApiParameter(name="low_stock", type=str, location=OpenApiParameter.QUERY, required=False, description="`true` to list items at or below 20% of total."),
+        ]
+    )
+)
 @extend_schema(tags=["Admin inventory"], summary="List or create inventory products")
 class InventoryListCreateView(generics.ListCreateAPIView):
     serializer_class = InventoryProductAdminSerializer

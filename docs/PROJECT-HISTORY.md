@@ -6,6 +6,16 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-09-03 — forward plan phase 1: live updates, one search contract, frontend delivery.** Every
+  committed audit row now publishes a PII-free hint over Redis pub/sub, and the staff console holds one
+  Server-Sent Events stream (`/api/v1/live/`, its own `live` gunicorn service so worker recycling never
+  severs it) that invalidates the matching TanStack queries — queues update without polling, and a box
+  without Redis simply keeps polling. `?q=` became one contract: trigger-maintained Postgres search
+  vectors on products, machines and events with websearch syntax plus trigram typo tolerance, declared
+  as derived columns in all three export/migration registries; the member directory searches identity
+  fields only and requester PII stays out of every index. Public routes are lazy chunks with stable
+  react/tanstack vendor chunks, and the eleven frontend files over the 300-line ceiling were split with
+  no behaviour change (`lib/api.ts` is now a barrel over `lib/api/`).
 - **2026-09-03 — forward plan phase 0: CI that runs the suite, observability, performance close-out.**
   `.github/workflows/tests.yml` runs the host-topology backend suite, the pg-client-16 backup and
   tenant-migration suites, the frontend typecheck/tests/build and the CLAUDE.md/AGENTS.md drift check on

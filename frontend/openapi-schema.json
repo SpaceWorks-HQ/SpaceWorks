@@ -60,7 +60,7 @@
                         "schema": {
                             "type": "string"
                         },
-                        "description": "Search public products by name or description."
+                        "description": "Full-text search over name, storage location, tracking mode and description; supports \"phrases\" and -exclusions, tolerates typos in the name."
                     },
                     {
                         "in": "query",
@@ -16125,6 +16125,22 @@
                 "summary": "List or create inventory products",
                 "parameters": [
                     {
+                        "in": "query",
+                        "name": "archived",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "`true` or `false`."
+                    },
+                    {
+                        "in": "query",
+                        "name": "low_stock",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "`true` to list items at or below 20% of total."
+                    },
+                    {
                         "in": "path",
                         "name": "makerspace_id",
                         "schema": {
@@ -16149,6 +16165,14 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Full-text search over name, storage location, tracking mode and description (\"phrases\", -exclusions, typo-tolerant on the name), or a category name."
                     }
                 ],
                 "tags": [
@@ -17281,6 +17305,14 @@
                             "type": "integer"
                         },
                         "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Full-text search over name, location, firmware version and notes."
                     }
                 ],
                 "tags": [
@@ -21761,6 +21793,14 @@
                             "type": "integer"
                         },
                         "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Full-text search over title, location and description."
                     }
                 ],
                 "tags": [
@@ -34511,6 +34551,36 @@
                 }
             }
         },
+        "/api/v1/live/": {
+            "get": {
+                "operationId": "api_v1_live_retrieve",
+                "description": "text/event-stream of `change` events `{kind, makerspace_id, target_type, target_id, actor_id, ts}` for every makerspace the session may see. Clients invalidate cached queries on an event and refetch; no tenant content travels on the stream. 503 when the deployment has no Redis.",
+                "summary": "Live update stream (Server-Sent Events)",
+                "tags": [
+                    "Health"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/api/v1/member/archived-payments": {
             "get": {
                 "operationId": "api_v1_member_archived_payments_list",
@@ -34804,6 +34874,14 @@
                             "type": "integer"
                         },
                         "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Match on username, display name, headline or institution. Contact details are never searched."
                     }
                 ],
                 "tags": [
@@ -38029,6 +38107,14 @@
                             "type": "string"
                         },
                         "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Full-text search over title, location and description; supports \"phrases\" and -exclusions, tolerates typos in the title."
                     }
                 ],
                 "tags": [
@@ -38535,7 +38621,7 @@
                         "schema": {
                             "type": "string"
                         },
-                        "description": "Search public products by name or description."
+                        "description": "Full-text search over name, storage location, tracking mode and description; supports \"phrases\" and -exclusions, tolerates typos in the name."
                     },
                     {
                         "in": "query",
@@ -39022,6 +39108,14 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Full-text search over name, location, firmware version and notes; tolerates typos in the name."
                     }
                 ],
                 "tags": [

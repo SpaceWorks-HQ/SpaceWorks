@@ -173,6 +173,25 @@ services:
       orchestration-ready:
         condition: service_completed_successfully
 
+  # Server-Sent Events stream (/api/v1/live/). Its own process because SSE holds a connection
+  # open: thread workers, no request timeout, and NO --max-requests recycling, which would
+  # sever every open stream. Same image, same env, same fail-closed entrypoint role.
+  live:
+    build:
+      context: ./backend
+    container_name: spaceworks-live
+    environment: *backend-env
+    command: ["--role", "backend", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "-k", "gthread", "--threads", "32", "--timeout", "0"]
+    volumes:
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      orchestration-ready:
+        condition: service_completed_successfully
+
   orchestration-init:
     build:
       context: ./backend

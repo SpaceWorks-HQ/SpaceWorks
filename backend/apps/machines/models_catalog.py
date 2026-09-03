@@ -1,4 +1,6 @@
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 from django.db.models import Q
 from apps.machines.metering import MeteringUnit, validate_type_config
@@ -136,9 +138,12 @@ class Machine(models.Model):
         on_delete=models.SET_NULL,
         related_name="+",
     )
+    # Derived: trigger-maintained (machines migration 0023); see apps/inventory/search.py.
+    search_vector = SearchVectorField(null=True, editable=False)
 
     class Meta:
         ordering = ["makerspace__name", "name"]
+        indexes = [GinIndex(fields=["search_vector"], name="machine_search_gin")]
 
     def __str__(self):
         return self.name

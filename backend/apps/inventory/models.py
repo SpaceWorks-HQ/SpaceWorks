@@ -1,4 +1,6 @@
 from django.core.exceptions import ValidationError
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 
 from apps.makerspaces.models import Makerspace
@@ -93,12 +95,16 @@ class InventoryProduct(models.Model):
     is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Derived: filled by the Postgres trigger in migration 0010, never written by Django,
+    # omitted from export and tenant migration (apps/inventory/search.py).
+    search_vector = SearchVectorField(null=True, editable=False)
 
     class Meta:
         verbose_name = "Inventory item"
         verbose_name_plural = "Inventory"
         indexes = [
             models.Index(fields=["makerspace", "is_public", "is_archived"]),
+            GinIndex(fields=["search_vector"], name="inventoryproduct_search_gin"),
         ]
         constraints = [
             models.CheckConstraint(

@@ -22,6 +22,11 @@ USER_PROJECTIONS = {
 }
 
 ALWAYS_OMITTED = {
+    # Trigger-maintained full-text vectors: derived from exported columns and rebuilt by
+    # the search trigger on the target, so they never travel (apps/inventory/search.py).
+    ("inventory.InventoryProduct", "search_vector"): "Derived search vector, rebuilt by trigger.",
+    ("machines.Machine", "search_vector"): "Derived search vector, rebuilt by trigger.",
+    ("events.Event", "search_vector"): "Derived search vector, rebuilt by trigger.",
     ("apiclients.ApiClient", "client_id"): "A rebuild issues a fresh client identifier.",
     ("apiclients.ApiClient", "secret_encrypted"): "API client credential.",
     ("apiclients.ApiClient", "previous_secret_encrypted"): (

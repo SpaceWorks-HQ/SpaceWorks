@@ -180,3 +180,27 @@ Host fallback (faster `pytest` / one-off `manage.py`; needs `backend/.venv` + `n
 
 - Public inventory page: `http://localhost:5000/m/makerspace`
 - API: `http://localhost:8000/api` — Swagger UI at `/docs/`, ReDoc at `/redoc/`, schema at `/schema/`.
+
+## The `live` service (SSE)
+
+`docker-compose.yml` and `docker-compose.prod.yml` run a second backend process, `live`
+(`spaceworks-live`), that serves only `/api/v1/live/`: gunicorn `-k gthread --timeout 0` and **no**
+`--max-requests`, because recycling a worker severs every open stream. `frontend/nginx.conf` routes
+`/api/v1/live/` to it above the `/api/` block with buffering off. The host-run fallback (mode 3) has no
+`live` process; the Vite proxy sends `/api/v1/live/` to the single runserver, which works for development
+but holds a runserver thread per open tab. `LIVE_REDIS_URL` defaults to the Celery broker; empty (or the
+eager, broker-less local flow) makes the endpoint answer 503 and the console keeps polling.
+
+## End-to-end tests (Playwright)
+
+`frontend/e2e/` drives a REAL stack — never mocks — and pins the Hard Rules through a browser and a real
+presigned upload to object storage. `./scripts/e2e-local.sh` is the one recipe for a laptop and CI: it
+migrates, runs `manage.py seed_e2e --reset` (the `e2e-space` makerspace only; refuses unless `DEBUG` or
+`E2E_SEED_ALLOWED=1`), starts Django on :8100 and Vite on :5100 (so it can run beside a dev stack on
+8000/5000), and runs `npx playwright test`. Same infrastructure overrides as `dev-local.sh test`
+(`PG_PORT`, `MINIO_PORT`, `DATABASE_URL`); `PYTHON=python` when there is no `backend/.venv` (CI).
+`E2E_KEEP=1` leaves the servers up for debugging. The seed constants live in
+`frontend/e2e/helpers.ts` and `backend/apps/operations/management/commands/seed_e2e.py` — change one,
+change the other. Unit-level accessibility checks use `frontend/src/test/axe.ts` (jsdom cannot compute
+colour contrast; `e2e/a11y.spec.ts` covers that in Chromium).
+

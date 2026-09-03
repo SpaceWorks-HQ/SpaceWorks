@@ -1095,6 +1095,12 @@ SPECTACULAR_SETTINGS = {
 LOG_LEVEL = env("LOG_LEVEL", default="INFO")
 LOGGING = build_logging(LOG_LEVEL, json_output=env.bool("LOG_JSON", default=not DEBUG))
 
+# Live-update stream (SSE over Redis pub/sub). Defaults to the Celery broker; empty means the
+# stream answers 503 and browsers fall back to polling. Bounded stream length so a thread is
+# never held forever -- the browser reconnects.
+LIVE_REDIS_URL = env("LIVE_REDIS_URL", default="")
+LIVE_MAX_STREAM_SECONDS = env.int("LIVE_MAX_STREAM_SECONDS", default=3600)
+
 # Static bearer token for GET /api/v1/metrics/ (Prometheus text). Unset => the route is 404.
 METRICS_TOKEN = env("METRICS_TOKEN", default="")
 

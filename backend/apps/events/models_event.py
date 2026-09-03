@@ -3,6 +3,8 @@ from uuid import uuid4
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 from django.db.models import F, Q
 from django.utils import timezone
@@ -95,6 +97,8 @@ class Event(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Derived: trigger-maintained (events migration 0022); see apps/inventory/search.py.
+    search_vector = SearchVectorField(null=True, editable=False)
 
     class Meta:
         ordering = ["starts_at", "id"]
@@ -146,6 +150,7 @@ class Event(models.Model):
             ),
         ]
         indexes = [
+            GinIndex(fields=["search_vector"], name="event_search_gin"),
             models.Index(
                 fields=["makerspace", "starts_at"],
                 name="event_ms_starts_idx",

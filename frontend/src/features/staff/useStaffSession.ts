@@ -27,6 +27,7 @@ import {
 } from "./staffTabs";
 import { type Makerspace, useStaffGet } from "./panels/shared";
 import { useTenant } from "../../lib/tenant";
+import { useLiveUpdates } from "../../lib/useLiveUpdates";
 import { wipeOfflineScopes } from "./eventCheckInOfflineStore";
 
 export function useStaffSession(guestOnly: boolean) {
@@ -178,6 +179,10 @@ export function useStaffSession(guestOnly: boolean) {
     }
     setSelected(routeMakerspace.id);
   }, [routeMakerspace, selected, setSelected, singleTenantLocked]);
+
+  // Live hints for the signed-in console: every committed change invalidates the matching
+  // queries instead of waiting for a poll. Off when signed out; pauses while the tab is hidden.
+  useLiveUpdates(Boolean(user));
 
   const signOut = async () => {
     await logoutStaff();

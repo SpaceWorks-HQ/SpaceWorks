@@ -1162,6 +1162,23 @@ content. It is outside `HMAC_PROTECTED_PATH_PREFIXES`, so it must NOT be added t
 registry (an entry there would be stale). Any new `env(...)` read in `settings.py` must be listed in
 `apps/backup/settings_policy.py::ENV_SURFACE`, or the env-surface drift guard fails.
 
+**Search and live updates (forward plan phase 1, 2026-09-03).** `?q=` is one contract, implemented once in
+`apps/inventory/search.py::apply_q`: a `websearch`-syntax full-text match on a trigger-maintained
+`search_vector` column ORed with trigram similarity on the primary label, ordered by rank. The vectors on
+`inventory.InventoryProduct`, `machines.Machine` and `events.Event` are **derived** columns: filled by a
+Postgres trigger (never by `save()`), declared in all three registries (`data_export` classification +
+`ALWAYS_OMITTED`, `tenant_migration.OMITTED_FIELD_RECONSTRUCTIONS` DERIVED) and rebuilt on the target
+after a tenant move. **A trigger may only concatenate plain columns — scoped-PII fields are never
+indexed**, which is why `HardwareRequest` has no vector and its queue keeps the blind-index search, and
+why the member directory matches username/display name/headline/institution only. Live updates ride the
+audit log: `audit.services.record` schedules `operations.live.publish_audit_event` on commit, and the
+payload is `{kind, makerspace_id, target_type, target_id, actor_id, ts}` — never `meta`, never content.
+`GET /api/v1/live/` subscribes a session to its own user channel plus every makerspace
+`rbac.scope_by_makerspace` returns; it is served by the separate `live` compose service (thread workers,
+no timeout, no `--max-requests`) behind an nginx `location /api/v1/live/` that sits above `/api/` with
+buffering off; it answers 503 when the deployment has no Redis and browsers keep polling. Neither
+`/api/v1/metrics/` nor `/api/v1/live/` belongs in the API-client scope registry.
+
 ## Handover roles and the retired Guest Admin
 
 **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`); handover staff get a **custom
