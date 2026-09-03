@@ -160,6 +160,7 @@ PROBES = {
     "stocktake": _inventory_probe("stocktake"),
     "telegram": _telegram,
     "updates": None,
+    "webhook": None,
 }
 
 

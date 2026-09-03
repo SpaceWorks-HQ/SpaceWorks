@@ -4,6 +4,7 @@ export const CHANNELS = [
   { key: "mattermost", label: "Mattermost" },
   { key: "discord", label: "Discord" },
   { key: "telegram", label: "Telegram" },
+  { key: "webhook", label: "Signed webhook" },
 ] as const;
 
 export const DESTINATIONS_KEY = (makerspaceId: number) =>

@@ -1189,6 +1189,32 @@ colour contrast) and `e2e/a11y.spec.ts` in Chromium (WCAG 2.1 AA including contr
 red build, and there is no allow-list. `text-ink/<alpha>` for body copy is therefore off-limits; use the
 `muted` token, which is tuned to clear 4.5:1 on every surface it sits on.
 
+**Signed webhooks (forward plan phase 3, 2026-09-03).** `webhook` is a notification channel, not a second
+integration system: a `NotificationDestination` with `channel="webhook"` carries an encrypted endpoint URL
+**and** an encrypted `signing_secret`, is routed by the same feature × channel matrix, and is written to the
+same `NotificationDeliveryLog` with the same Celery retries. A destination without a signing secret is
+*not-configured* (terminal FAILED), never sent unsigned. The body is `webhooks.webhook_event_body(log)` —
+the notification's text, event, feature, ids and the matrix `payload` — i.e. exactly what a chat room
+would receive; nothing from audit `meta` and no contact fields travel. The signature is
+`t=<unix>,v1=<hex hmac-sha256(secret, "<t>." + body)>` over the exact bytes sent, mirroring the API-client
+HMAC discipline. Endpoint URLs pass `webhook_validation.validate_webhook_url` (https, no private or
+loopback ranges) at save time and are re-resolved and pinned at send time; a delivery error never stores
+the URL. Both secrets are `ALWAYS_OMITTED` from export and DERIVED-omitted from tenant migration. The
+superadmin "Re-queue failed deliveries" admin action is the dead-letter path and audits each row.
+
+**Editions and the single box (forward plan phase 4, 2026-09-03).** `SPACEWORKS_EDITION` is a
+**deployment**-level setting (`apps/makerspaces/editions.py`), never per makerspace, exactly like
+`member_accounts`/`updates` are read deployment-wide. An edition hides a fixed set of module keys:
+`platform.available_modules()` (and therefore every bootstrap `modules` list and staff `enabled_modules`
+payload) omits them, and the public loan/machine routes check `editions.public_surface_available(key)`
+and answer 404 when hidden. It does **not** change `core_module_keys()`, `module_enabled()` or any
+`require_module` gate: staff endpoints, workflows, migrations, purge plans and backups behave identically in
+every edition, so a hidden surface is recoverable and nothing that was recorded becomes unreachable to
+staff. `Event.makerspace` remains the tenancy anchor in all editions. The single-box image
+(`Dockerfile.allinone`) launches every Django process through `scripts/spaceworks_entrypoint.py` with its
+own `--role`, runs unprivileged, keeps `/control/` unproxied, and dies as a unit when any process dies
+(`docker/allinone/run.sh`); the install shape persists in `.spaceworks-layer`.
+
 ## Handover roles and the retired Guest Admin
 
 **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`); handover staff get a **custom

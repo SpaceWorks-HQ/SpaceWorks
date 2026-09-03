@@ -64,6 +64,7 @@ ALWAYS_OMITTED = {
     ),
     ("hardware_requests.HardwareRequest", "public_token"): "Source bearer/status token.",
     ("integrations.NotificationDestination", "webhook_url"): "Encrypted webhook credential.",
+    ("integrations.NotificationDestination", "signing_secret"): "Encrypted webhook signing secret.",
     ("machines.Machine", "camera_feed_url"): "May embed camera credentials.",
     ("machines.Machine", "legacy_print_printer_id"): "Retired cutover provenance.",
     ("machines.MachineConsumableAdjustment", "legacy_filament_adjustment_id"): "Retired cutover provenance.",

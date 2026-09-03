@@ -44,6 +44,7 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         # Webhook destinations cannot satisfy their credential check constraint after
         # the encrypted webhook is removed, even when the source row is inactive.
         ("integrations.NotificationDestination", "webhook_url"),
+        ("integrations.NotificationDestination", "signing_secret"),
     ),
     **_rules(
         FRESH,

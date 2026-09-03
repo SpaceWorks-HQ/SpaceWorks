@@ -43,7 +43,7 @@ EXPORTED_MODEL_FIELDS = {
     "integrations.EmailNotificationMute": "id makerspace target stream event audience created_at created_by",
     "integrations.EmailTemplate": "id stream audience key makerspace subject text_body html_body is_active created_at updated_at",
     "integrations.MachineTypeEmailTemplate": "id stream audience key makerspace machine_type subject text_body html_body is_active created_at updated_at",
-    "integrations.NotificationDestination": "id makerspace channel label webhook_url telegram_chat_id is_active created_at updated_at",
+    "integrations.NotificationDestination": "id makerspace channel label webhook_url telegram_chat_id signing_secret is_active created_at updated_at",
     "integrations.NotificationPreference": "id makerspace feature channel enabled updated_by created_at updated_at",
     "integrations.NotificationRecipient": "id makerspace feature event kind role user created_at created_by",
     "integrations.RecipientCategoryScope": "id recipient category",

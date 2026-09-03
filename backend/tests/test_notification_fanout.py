@@ -178,6 +178,7 @@ def test_raising_build_and_dispatch_never_escape(monkeypatch):
         NotificationChannel.SLACK: 1,
         NotificationChannel.MATTERMOST: 1,
         NotificationChannel.DISCORD: 1,
+        NotificationChannel.WEBHOOK: 1,
         NotificationChannel.NATIVE_PUSH: 1,
     }
 

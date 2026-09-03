@@ -52,7 +52,7 @@ core modules cannot be uninstalled at all.
 **Events**: [events](#events) — **Bookings**: [bookings](#bookings) —
 **Membership**: [membership](#membership)
 **Notifications**: [notifications](#notifications) · [email](#email) · [telegram](#telegram) ·
-[slack](#slack) · [mattermost](#mattermost) · [discord](#discord) — **Reports**: [reports](#reports) —
+[slack](#slack) · [mattermost](#mattermost) · [discord](#discord) · [webhook](#webhook) — **Reports**: [reports](#reports) —
 **Payments**: [payments](#payments) — **Accounts**: [member_accounts](#member_accounts) —
 **Mobile apps**: [mobile](#mobile) — **Updates**: [updates](#updates)
 
@@ -417,6 +417,22 @@ stored credential**, so re-enabling needs no re-entry.
 - **Without it** — no Discord surface ships at all for this space.
 - **Data** — purgeable: Discord destinations and their stored webhooks (delivery logs survive).
 
+### webhook
+
+- **What it is** — per-makerspace **signed JSON webhooks** to systems of your own (an ERP, a Slack bot you
+  wrote, a spreadsheet bridge). Not a chat room, but it sits in the same matrix: a webhook destination
+  receives exactly the notification a room would, as JSON, signed with a per-destination secret.
+- **What it adds** — `webhook` as a destination channel in the notification matrix, with an HTTPS endpoint
+  and a signing secret per destination; `X-SpaceWorks-Signature: t=<unix>,v1=<hex>` is HMAC-SHA256 over
+  `"<t>.<body>"`, plus `X-SpaceWorks-Event` and `X-SpaceWorks-Delivery` headers. Retries and the durable
+  delivery log are the ones every non-email channel already has; a superadmin can re-queue failed
+  deliveries from `/control/`. Verification recipe: `docs/api-client-protocol.md` → "Outbound webhooks".
+- **Without it** — no signed-webhook surface ships for this space. The inbound API-client protocol is
+  unaffected; other systems poll instead of being told.
+- **Data** — purgeable: webhook destinations with their endpoint URLs and signing secrets (delivery logs
+  survive). Endpoint URLs are validated against private and loopback ranges when saved and re-resolved at
+  send time, like every other webhook channel.
+
 ---
 
 ## Reports
@@ -511,6 +527,29 @@ The four `payments.<area>` switches are **off by default and stay inert until cr
 turning one on cannot start charging anyone by itself. `inventory.self_checkout` and `presence.geofence`
 belong to no module: they are standalone capabilities that apply whenever you enable them.
 
+## Editions
+
+A deployment has one **edition**, set by `SPACEWORKS_EDITION` (setup asks; default `makerspace`). It answers
+"what is this box for" one level above modules: the six core modules are the hardware loan spine and cannot
+be uninstalled, so an events-only or bookings-only installation would otherwise still show a catalogue, a
+borrow flow and a scanner it never uses. The edition **hides** those surfaces and makes their public routes
+answer 404; it does not delete tables, endpoints or data, and every staff endpoint keeps answering so data
+stays recoverable. Frontend bootstrap payloads carry `edition`, and edition-hidden module keys are already
+removed from the `modules` list they return, so the console's tabs and the public site's routes need no
+separate switch.
+
+| Edition | Hidden module keys | Public home |
+|---|---|---|
+| `makerspace` (default) | none | the catalogue |
+| `events` | `public_inventory request_workflow scanner asset_units containers bulk_import stock_transfers qr_print_batches guest_handover procurement stocktake machines machine_service printing maintenance bookings` | the events page |
+| `bookings` | the same set with `bookings` visible and `events` hidden | the bookings page |
+| `organization` | none — a labelling edition: one makerspace row is presented as "the organization" (`branding.display_name`) | the catalogue |
+
+`Event.makerspace` stays the tenancy anchor in every edition (locked 2026-08-19); an organization-first
+install is one `Makerspace` row with an organization label, never a re-anchoring. Turning an edition into a
+genuinely smaller schema (removing the loan apps) is the separate `TOMBSTONED_APPS` axis and a future
+"Option A"; see `docs/INVARIANTS.md` → Editions.
+
 ## Install profiles
 
 `setup.sh` asks, or pass `--profile`. Every profile is dependency-closed and always includes the six core
@@ -523,7 +562,9 @@ modules.
 | `lending` | 17 | A tool library: the full lending lifecycle, no machines |
 | `recommended` | 20 | Core plus the inventory lifecycle, reports and machines (the default) |
 | `cloud` | 24 | A managed box: everything that runs on a single Django process, no worker or beat |
-| `everything` / `full` | 32 | All modules |
+| `everything` / `full` | 33 | All modules |
+| `events` | 12 | An events programme: events, notifications, email, member accounts, membership, payments, reports (core is present but hidden by the `events` edition) |
+| `bookings` | 12 | Bookable rooms and resources: bookings, notifications, email, member accounts, membership, payments, reports (core hidden by the `bookings` edition) |
 
 **Installing without a profile** gives you **8 modules**: the six core ones plus `payments` and
 `updates`. Member accounts and mobile apps are opt-in; installing `mobile` also installs its

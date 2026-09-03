@@ -31,6 +31,7 @@ export function DestinationForm({
   const [label, setLabel] = useState(destination?.label ?? "");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [chatId, setChatId] = useState(destination?.telegram_chat_id ?? "");
+  const [signingSecret, setSigningSecret] = useState("");
   const [isActive, setIsActive] = useState(destination?.is_active ?? true);
   const [scope, setScope] = useState<DestinationScope>(destination?.scope ?? EMPTY_SCOPE);
   const [error, setError] = useState("");
@@ -47,6 +48,7 @@ export function DestinationForm({
             // Blank on edit means "keep the stored credential" — it cannot be read back,
             // so requiring it to rename a room would force a re-entry.
             ...(webhookUrl ? { webhook_url: webhookUrl } : {}),
+            ...(channel === "webhook" && signingSecret ? { signing_secret: signingSecret } : {}),
             telegram_chat_id: channel === "telegram" ? chatId : "",
             is_active: isActive,
             scope,
@@ -128,6 +130,28 @@ export function DestinationForm({
           />
         </label>
       )}
+
+      {channel === "webhook" ? (
+        <label className="grid gap-1 text-sm">
+          <span className="text-muted">
+            Signing secret{destination?.signing_secret_set ? " (leave blank to keep)" : ""}
+          </span>
+          <input
+            autoComplete="off"
+            className="desk-input"
+            minLength={16}
+            onChange={(event) => setSigningSecret(event.target.value)}
+            placeholder="At least 16 characters; your endpoint verifies X-SpaceWorks-Signature with it"
+            required={!destination?.signing_secret_set}
+            type="password"
+            value={signingSecret}
+          />
+          <span className="text-xs text-muted">
+            Every notification routed to this endpoint arrives as JSON with an HMAC-SHA256
+            signature over the exact body. It is the same message a chat room would receive.
+          </span>
+        </label>
+      ) : null}
 
       <label className="flex items-center gap-2 text-sm">
         <input

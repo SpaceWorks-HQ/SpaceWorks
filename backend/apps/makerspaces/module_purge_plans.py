@@ -45,6 +45,7 @@ from apps.makerspaces.module_purge_collectors import (
     stock_transfers_delete,
     stocktake_delete,
     telegram_destinations_delete,
+    webhook_destinations_delete,
 )
 
 
@@ -158,6 +159,11 @@ PLANS = (
     ),
     ModulePurgePlan(
         "discord", "Discord destinations and their stored webhooks.", discord_destinations_delete
+    ),
+    ModulePurgePlan(
+        "webhook",
+        "Signed-webhook destinations, their endpoint URLs and signing secrets.",
+        webhook_destinations_delete,
     ),
     ModulePurgePlan("stocktake", "Stocktake sessions, lines and ledger entries.", stocktake_delete),
     ModulePurgePlan("stock_transfers", "Stock transfers and their lines.", stock_transfers_delete),

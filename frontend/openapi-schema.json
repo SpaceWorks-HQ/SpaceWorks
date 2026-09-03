@@ -43514,27 +43514,29 @@
                     "detail"
                 ]
             },
-            "Channel7a7Enum": {
+            "Channel59dEnum": {
                 "enum": [
                     "telegram",
                     "slack",
                     "mattermost",
-                    "discord"
+                    "discord",
+                    "webhook"
                 ],
                 "type": "string",
-                "description": "* `telegram` - Telegram\n* `slack` - Slack\n* `mattermost` - Mattermost\n* `discord` - Discord"
+                "description": "* `telegram` - Telegram\n* `slack` - Slack\n* `mattermost` - Mattermost\n* `discord` - Discord\n* `webhook` - Signed webhook"
             },
-            "ChannelCbbEnum": {
+            "ChannelC17Enum": {
                 "enum": [
                     "email",
                     "telegram",
                     "slack",
                     "mattermost",
                     "discord",
+                    "webhook",
                     "native_push"
                 ],
                 "type": "string",
-                "description": "* `email` - Email\n* `telegram` - Telegram\n* `slack` - Slack\n* `mattermost` - Mattermost\n* `discord` - Discord\n* `native_push` - Native push"
+                "description": "* `email` - Email\n* `telegram` - Telegram\n* `slack` - Slack\n* `mattermost` - Mattermost\n* `discord` - Discord\n* `webhook` - Signed webhook\n* `native_push` - Native push"
             },
             "CheckoutUrl": {
                 "type": "object",
@@ -48480,17 +48482,18 @@
                     "evidence_id"
                 ]
             },
-            "KeyCbbEnum": {
+            "KeyC17Enum": {
                 "enum": [
                     "email",
                     "telegram",
                     "slack",
                     "mattermost",
                     "discord",
+                    "webhook",
                     "native_push"
                 ],
                 "type": "string",
-                "description": "* `email` - Email\n* `telegram` - Telegram\n* `slack` - Slack\n* `mattermost` - Mattermost\n* `discord` - Discord\n* `native_push` - Native push"
+                "description": "* `email` - Email\n* `telegram` - Telegram\n* `slack` - Slack\n* `mattermost` - Mattermost\n* `discord` - Discord\n* `webhook` - Signed webhook\n* `native_push` - Native push"
             },
             "KeyD07Enum": {
                 "enum": [
@@ -52662,7 +52665,7 @@
                 "type": "object",
                 "properties": {
                     "key": {
-                        "$ref": "#/components/schemas/KeyCbbEnum"
+                        "$ref": "#/components/schemas/KeyC17Enum"
                     },
                     "label": {
                         "type": "string"
@@ -52683,7 +52686,7 @@
                     "channel": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/Channel7a7Enum"
+                                "$ref": "#/components/schemas/Channel59dEnum"
                             }
                         ],
                         "readOnly": true
@@ -52701,6 +52704,10 @@
                         "readOnly": true
                     },
                     "credential_set": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "signing_secret_set": {
                         "type": "string",
                         "readOnly": true
                     },
@@ -52727,6 +52734,7 @@
                     "is_active",
                     "label",
                     "scope",
+                    "signing_secret_set",
                     "telegram_chat_id",
                     "updated_at"
                 ]
@@ -52735,7 +52743,7 @@
                 "type": "object",
                 "properties": {
                     "channel": {
-                        "$ref": "#/components/schemas/Channel7a7Enum"
+                        "$ref": "#/components/schemas/Channel59dEnum"
                     },
                     "label": {
                         "type": "string",
@@ -52749,6 +52757,20 @@
                     "telegram_chat_id": {
                         "type": "string",
                         "maxLength": 64
+                    },
+                    "signing_secret": {
+                        "writeOnly": true,
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "maxLength": 512,
+                                "minLength": 16
+                            },
+                            {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        ]
                     },
                     "is_active": {
                         "type": "boolean",
@@ -52803,7 +52825,7 @@
                         "$ref": "#/components/schemas/FeatureEnum"
                     },
                     "channel": {
-                        "$ref": "#/components/schemas/ChannelCbbEnum"
+                        "$ref": "#/components/schemas/ChannelC17Enum"
                     },
                     "enabled": {
                         "type": "boolean"
@@ -52834,7 +52856,7 @@
                         "$ref": "#/components/schemas/FeatureEnum"
                     },
                     "channel": {
-                        "$ref": "#/components/schemas/ChannelCbbEnum"
+                        "$ref": "#/components/schemas/ChannelC17Enum"
                     },
                     "enabled": {
                         "type": "boolean"

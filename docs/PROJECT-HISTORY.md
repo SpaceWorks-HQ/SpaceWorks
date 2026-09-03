@@ -6,6 +6,12 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-09-03 — forward plan phase 3: outbound signed webhooks.** A `webhook` notification channel
+  module: a destination carries an encrypted endpoint URL and signing secret, the feature × channel matrix
+  routes to it like any room, and each notification arrives as JSON with an HMAC-SHA256 signature over the
+  exact body plus event and delivery headers — through the existing delivery log, retries, SSRF validation
+  and pinned HTTPS. Superadmins can re-queue failed deliveries. The verification recipe is in
+  `docs/api-client-protocol.md`. The generated Python client was deferred.
 - **2026-09-03 — forward plan phase 2: the Hard Rules pinned in a real browser.** A Playwright suite
   (`frontend/e2e/`, `scripts/e2e-local.sh`, CI job `e2e`) seeds a disposable makerspace and walks a
   request from accept to issue (container code + real presigned photo upload) to return (container code,

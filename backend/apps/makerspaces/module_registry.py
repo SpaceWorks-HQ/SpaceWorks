@@ -181,6 +181,14 @@ MODULES = (
         "discord", "Discord", "Per-makerspace Discord incoming-webhook alerts.",
         "integrations", GUARD, group=GROUP_NOTIFICATIONS,
     ),
+    # Not a chat room: an HTTPS endpoint of the makerspace's own that receives every
+    # notification the matrix routes to it as signed JSON. Same destination model, same
+    # matrix, same retry and delivery log as the chat channels.
+    ModuleDefinition(
+        "webhook", "Signed webhooks",
+        "Per-makerspace signed JSON webhooks to your own systems.",
+        "integrations", GUARD, group=GROUP_NOTIFICATIONS,
+    ),
     # These keys were placed in front of substrate that had been unconditionally
     # present, so migration 0057 backfilled their original keys onto existing rows.
     # Payments and updates remain default-enabled; member accounts and mobile are now

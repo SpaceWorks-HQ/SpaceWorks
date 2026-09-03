@@ -1168,9 +1168,9 @@ export type ChangePasswordResponse = {
   "detail": string;
 };
 
-export type Channel7a7Enum = "telegram" | "slack" | "mattermost" | "discord";
+export type Channel59dEnum = "telegram" | "slack" | "mattermost" | "discord" | "webhook";
 
-export type ChannelCbbEnum = "email" | "telegram" | "slack" | "mattermost" | "discord" | "native_push";
+export type ChannelC17Enum = "email" | "telegram" | "slack" | "mattermost" | "discord" | "webhook" | "native_push";
 
 export type CheckoutUrl = {
   "checkout_url": string;
@@ -2400,7 +2400,7 @@ export type IssueRequest = {
   "rejects"?: Array<IssueReject>;
 };
 
-export type KeyCbbEnum = "email" | "telegram" | "slack" | "mattermost" | "discord" | "native_push";
+export type KeyC17Enum = "email" | "telegram" | "slack" | "mattermost" | "discord" | "webhook" | "native_push";
 
 export type KeyD07Enum = "hardware_requests" | "printing" | "events" | "bookings" | "maintenance" | "members";
 
@@ -3387,27 +3387,29 @@ export type Notification = {
 };
 
 export type NotificationChannel = {
-  "key": KeyCbbEnum;
+  "key": KeyC17Enum;
   "label": string;
 };
 
 export type NotificationDestination = {
   "id": number;
-  "channel": Channel7a7Enum;
+  "channel": Channel59dEnum;
   "label": string;
   "telegram_chat_id": string;
   "is_active": boolean;
   "credential_set": string;
+  "signing_secret_set": string;
   "scope": string;
   "created_at": string;
   "updated_at": string;
 };
 
 export type NotificationDestinationWrite = {
-  "channel": Channel7a7Enum;
+  "channel": Channel59dEnum;
   "label": string;
   "webhook_url"?: string;
   "telegram_chat_id"?: string;
+  "signing_secret"?: string;
   "is_active"?: boolean;
   "scope"?: DestinationScope;
 };
@@ -3424,7 +3426,7 @@ export type NotificationMarkAllRead = {
 
 export type NotificationPreferenceCell = {
   "feature": FeatureEnum;
-  "channel": ChannelCbbEnum;
+  "channel": ChannelC17Enum;
   "enabled": boolean;
   "source": NotificationPreferenceCellSourceEnum;
 };
@@ -3433,7 +3435,7 @@ export type NotificationPreferenceCellSourceEnum = "default" | "override";
 
 export type NotificationPreferenceChange = {
   "feature": FeatureEnum;
-  "channel": ChannelCbbEnum;
+  "channel": ChannelC17Enum;
   "enabled": boolean;
 };
 

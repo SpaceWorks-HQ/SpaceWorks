@@ -91,6 +91,11 @@ over-ceiling frontend files were split.
 real browser and object storage — `scripts/e2e-local.sh` locally, the `e2e` job in CI — and axe runs in
 both jsdom panel tests and Chromium. `manage.py seed_e2e` seeds a disposable makerspace per run.
 
+**Signed webhooks (phase 3).** `webhook` is a notification channel module: a destination with an HTTPS
+endpoint and a signing secret receives every matrix-routed notification as signed JSON
+(`docs/api-client-protocol.md` → "Outbound webhooks"), through the same delivery log and retries as the
+chat channels; failed deliveries can be re-queued from `/control/`.
+
 Stack (in use):
 
 - **Backend:** Django 6 + Django REST Framework (`backend/`). Requires Python 3.12+.

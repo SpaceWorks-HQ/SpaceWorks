@@ -256,6 +256,10 @@ def discord_destinations_delete(makerspace, cursor):
     return _chat_destinations_delete(makerspace, "discord")
 
 
+def webhook_destinations_delete(makerspace, cursor):
+    return _chat_destinations_delete(makerspace, "webhook")
+
+
 def membership_public_image_keys(makerspace):
     """Avatars and project images, collected BEFORE the rows that name them go.
 

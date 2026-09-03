@@ -154,7 +154,7 @@ def test_modules_are_opt_in_and_a_new_makerspace_gets_approved_defaults():
     # stays opt-in. The final four keys are the other registry growth since the legacy
     # baseline; only payments and updates remain default-enabled.
     POST_LEGACY_KEYS = {
-        "notifications", "email", "slack", "mattermost", "discord",
+        "notifications", "email", "slack", "mattermost", "discord", "webhook",
         "payments", "member_accounts", "mobile", "updates",
     }
 
@@ -225,7 +225,7 @@ def test_registry_is_internally_consistent():
     # per-channel notification keys `slack`/`mattermost`/`discord`, plus the four
     # phase-3 keys placed in front of previously ungated substrate: `payments`,
     # `member_accounts`, `mobile` and `updates`.
-    assert len(module_registry.MODULES) == 32
+    assert len(module_registry.MODULES) == 33
     assert len(module_registry.BY_KEY) == len(module_registry.MODULES)
     for definition in module_registry.MODULES:
         assert definition.label and definition.description and definition.app_label

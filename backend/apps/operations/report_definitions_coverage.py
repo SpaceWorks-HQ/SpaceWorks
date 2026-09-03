@@ -35,7 +35,7 @@ COVERAGE_REPORT_DEFINITIONS = (
         "communications-health", "apps.integrations.reports_communications.build_communications_health",
         ("module_key", "channel", "feature", "status", "delivery_count", "attempt_count", "destination_count", "success_rate_percent", "unread_count", "last_activity_at"),
         required_action=rbac.Action.MANAGE_MAKERSPACE, title="Communications health",
-        chart_hint="stacked_bar", section_modules=("notifications", "email", "telegram", "slack", "mattermost", "discord"),
+        chart_hint="stacked_bar", section_modules=("notifications", "email", "telegram", "slack", "mattermost", "discord", "webhook"),
     ),
     ReportDefinition(
         "community-engagement", "apps.makerspaces.reports_community.build_community_engagement",
@@ -48,7 +48,7 @@ COVERAGE_REPORT_DEFINITIONS = (
         ("module_key", "enabled", "runtime_available", "coverage_kind", "activity_count", "failure_count", "last_activity_at", "rollup_watermark", "rollup_state"),
         required_action=rbac.Action.MANAGE_MAKERSPACE, title="Module operational health",
         chart_hint="status_grid", section_modules=(
-            "public_inventory", "request_workflow", "staff_admin", "guest_handover", "scanner", "printing", "telegram", "evidence_uploads", "qr_management", "bulk_import", "containers", "stock_transfers", "stocktake", "reports", "qr_print_batches", "asset_units", "procurement", "machines", "machine_service", "events", "bookings", "maintenance", "membership", "notifications", "email", "slack", "mattermost", "discord", "payments", "member_accounts", "mobile", "updates",
+            "public_inventory", "request_workflow", "staff_admin", "guest_handover", "scanner", "printing", "telegram", "evidence_uploads", "qr_management", "bulk_import", "containers", "stock_transfers", "stocktake", "reports", "qr_print_batches", "asset_units", "procurement", "machines", "machine_service", "events", "bookings", "maintenance", "membership", "notifications", "email", "slack", "mattermost", "discord", "webhook", "payments", "member_accounts", "mobile", "updates",
         ),
     ),
 )

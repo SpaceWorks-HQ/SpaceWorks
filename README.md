@@ -266,6 +266,7 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | | [`slack`](docs/MODULES.md#slack) | | | Slack alerts |
 | | [`mattermost`](docs/MODULES.md#mattermost) | | | Mattermost alerts |
 | | [`discord`](docs/MODULES.md#discord) | | | Discord alerts |
+| | [`webhook`](docs/MODULES.md#webhook) | | | Signed JSON webhooks to your own systems |
 | **Reports** | [`reports`](docs/MODULES.md#reports) | | | Analytics, the ledger and CSV/XLSX export |
 | **Payments** | [`payments`](docs/MODULES.md#payments) | | ● | Taking money online (Stripe or Razorpay) |
 | **Mobile apps** | [`mobile`](docs/MODULES.md#mobile) | | | Attested device sessions, native push, payment sheet |
@@ -315,7 +316,7 @@ Stripe or Razorpay credentials resolve. The same is true of push (needs FCM/APNs
 
 ### Notification channels are modules
 
-`email`, `telegram`, `slack`, `mattermost` and `discord` are each a module, so a space that lives in
+`email`, `telegram`, `slack`, `mattermost`, `discord` and `webhook` are each a module, so a space that lives in
 Discord ships no Slack surface at all. Turning a channel's module on never makes it start sending on
 its own — you still add the webhook or token, and you still enable the events you want in the
 per-feature × per-channel matrix. Turning it off stops delivery but **keeps the stored credential**,

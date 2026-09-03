@@ -91,7 +91,7 @@ FIRST_PARTY_FIELD_NAMES = {
     'integrations.DailyNotificationCounter': frozenset('channel count day id makerspace'.split()),
     'integrations.ChatTemplate': frozenset('created_at event feature id is_active makerspace text_body updated_at updated_by'.split()),
     'integrations.MachineTypeEmailTemplate': frozenset('audience created_at html_body id is_active key machine_type makerspace stream subject text_body updated_at'.split()),
-    'integrations.NotificationDestination': frozenset('channel created_at id is_active label makerspace telegram_chat_id updated_at webhook_url'.split()),
+    'integrations.NotificationDestination': frozenset('channel created_at id is_active label makerspace signing_secret telegram_chat_id updated_at webhook_url'.split()),
     'integrations.DestinationMachineTypeScope': frozenset('destination id machine_type'.split()),
     'integrations.DestinationMachineScope': frozenset('destination id machine'.split()),
     'integrations.DestinationCategoryScope': frozenset('category destination id'.split()),
