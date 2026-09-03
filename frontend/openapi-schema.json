@@ -36727,6 +36727,37 @@
                 }
             }
         },
+        "/api/v1/metrics/": {
+            "get": {
+                "operationId": "api_v1_metrics_retrieve",
+                "description": "Prometheus text exposition of queue depth, request states, notification delivery outcomes, storage accounting and evidence retention. Requires the deployment's METRICS_TOKEN as a bearer token; 404 when no token is configured.",
+                "summary": "Prometheus metrics",
+                "tags": [
+                    "Health"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "No response body"
+                    },
+                    "404": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/api/v1/notifications/makerspace/{makerspace_id}": {
             "get": {
                 "operationId": "api_v1_notifications_makerspace_list",

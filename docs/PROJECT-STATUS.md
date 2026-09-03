@@ -67,6 +67,18 @@ analytics/ledger/exports, Users CRUD, and the FabLab modules). The detailed PRDs
 **internal planning docs kept local only** (gitignored); "PRD §N" references point to those. Google Sheets
 OAuth publishing, native apps, and physical label-printer control remain out of scope.
 
+## Observability (phase 0 of the 2026-09-03 forward plan)
+
+Every request carries an `X-Request-ID` (honoured from a proxy when it is short plain ASCII, minted
+otherwise), bound in `config/request_id.py` and echoed on the response. Log lines are JSON in production
+(`config/log_setup.py`; `LOG_JSON` overrides), each stamped with that id, and Celery messages carry it into
+the worker (`config/celery_signals.py`). Audit rows are correlated **through the log line**
+(`audit_recorded` with the row's `event_uuid`), not by writing the id into `meta`, so the attested record
+is unchanged. `GET /api/v1/metrics/` serves Prometheus text behind `METRICS_TOKEN` (404 when unset);
+`SENTRY_DSN` opts into error tracking with PII off. CI: `.github/workflows/tests.yml` runs both test
+topologies, the frontend build and the CLAUDE.md/AGENTS.md drift check, and the release workflow depends on
+it. The forward plan itself is local-only under `docs/plans/2026-09-03-forward-plan/`.
+
 Stack (in use):
 
 - **Backend:** Django 6 + Django REST Framework (`backend/`). Requires Python 3.12+.

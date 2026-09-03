@@ -1,0 +1,204 @@
+name: Tests
+
+# The suite that every pull request must pass, and that the release workflow depends on.
+# Environment parity with scripts/dev-local.sh is deliberate: the host topology there is
+# what developers run, and a CI job that reproduced a different one would report reds
+# nobody can see locally (docs/DEV-WORKFLOW.md, "Docker vs host test split").
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+
+jobs:
+  docs-drift:
+    name: CLAUDE.md and AGENTS.md are one document
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: diff CLAUDE.md AGENTS.md
+
+  frontend:
+    name: Frontend typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc -b
+      - run: npm test
+      - run: npm run build
+
+  backend-host:
+    # Mirrors `./scripts/dev-local.sh test`: Postgres, Redis and MinIO as services, the
+    # Django test process on the runner. tests/backup and tests/tenant_migration are
+    # excluded here and run in the job below with a version-matched Postgres client.
+    name: Backend suite (host topology)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: makerspace
+          POSTGRES_PASSWORD: makerspace
+          POSTGRES_DB: makerspace_manager
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U makerspace"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 20
+    # GitHub Actions does not support YAML anchors, so this block is repeated verbatim in
+    # backend-pg-client below; keep the two in step.
+    env:
+      DATABASE_URL: postgres://makerspace:makerspace@localhost:5432/makerspace_manager
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      AWS_S3_ENDPOINT_URL: http://localhost:9200
+      AWS_S3_PUBLIC_ENDPOINT_URL: http://localhost:9200
+      PUBLIC_IMAGE_BASE_URL: http://localhost:9200/public-images
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_STORAGE_BUCKET_NAME: evidence
+      PUBLIC_IMAGE_BUCKET: public-images
+      STORAGE_PRESIGN_METHOD: post
+      DEBUG: "True"
+      SECRET_KEY: ci-only-secret-key-not-for-production
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      CORS_ALLOWED_ORIGINS: http://localhost:5000,http://localhost:5173
+      AUTH_COOKIE_SECURE: "False"
+      AUTH_COOKIE_SAMESITE: Lax
+      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start MinIO and create the buckets the compose stack creates
+        run: |
+          set -euo pipefail
+          docker run -d --name minio -p 9200:9000 minio/minio:latest server /data
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:9200/minio/health/live && break
+            sleep 1
+          done
+          docker run --rm --network host --entrypoint sh minio/mc:latest -c '
+            mc alias set local http://localhost:9200 minioadmin minioadmin &&
+            mc mb --ignore-existing local/evidence &&
+            mc version enable local/evidence &&
+            mc anonymous set none local/evidence &&
+            mc mb --ignore-existing local/public-images &&
+            mc version enable local/public-images &&
+            mc anonymous set download local/public-images'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - name: Django system checks
+        working-directory: backend
+        run: python manage.py check
+      - name: pytest (excluding the Postgres-client-bound suites)
+        working-directory: backend
+        run: >-
+          pytest -q -p no:cacheprovider
+          --ignore=tests/backup --ignore=tests/tenant_migration
+
+  backend-pg-client:
+    # tests/backup and tests/tenant_migration shell out to pg_dump/pg_restore and refuse
+    # unless the client MAJOR equals the server's (16). The runner gets postgresql-client-16
+    # from PGDG so postgres_client.client_binary resolves /usr/lib/postgresql/16/bin.
+    name: Backup and tenant-migration suites (pg client 16)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: makerspace
+          POSTGRES_PASSWORD: makerspace
+          POSTGRES_DB: makerspace_manager
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U makerspace"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgres://makerspace:makerspace@localhost:5432/makerspace_manager
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      AWS_S3_ENDPOINT_URL: http://localhost:9200
+      AWS_S3_PUBLIC_ENDPOINT_URL: http://localhost:9200
+      PUBLIC_IMAGE_BASE_URL: http://localhost:9200/public-images
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_STORAGE_BUCKET_NAME: evidence
+      PUBLIC_IMAGE_BUCKET: public-images
+      STORAGE_PRESIGN_METHOD: post
+      DEBUG: "True"
+      SECRET_KEY: ci-only-secret-key-not-for-production
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      CORS_ALLOWED_ORIGINS: http://localhost:5000,http://localhost:5173
+      AUTH_COOKIE_SECURE: "False"
+      AUTH_COOKIE_SAMESITE: Lax
+      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install postgresql-client-16 and age
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client-16 age
+          /usr/lib/postgresql/16/bin/pg_dump --version
+      - name: Start MinIO and create buckets
+        run: |
+          set -euo pipefail
+          docker run -d --name minio -p 9200:9000 minio/minio:latest server /data
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:9200/minio/health/live && break
+            sleep 1
+          done
+          docker run --rm --network host --entrypoint sh minio/mc:latest -c '
+            mc alias set local http://localhost:9200 minioadmin minioadmin &&
+            mc mb --ignore-existing local/evidence &&
+            mc version enable local/evidence &&
+            mc anonymous set none local/evidence &&
+            mc mb --ignore-existing local/public-images &&
+            mc version enable local/public-images &&
+            mc anonymous set download local/public-images'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - name: pytest tests/backup tests/tenant_migration
+        working-directory: backend
+        run: pytest -q -p no:cacheprovider tests/backup tests/tenant_migration

@@ -6,6 +6,19 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-09-03 — forward plan phase 0: CI that runs the suite, observability, performance close-out.**
+  `.github/workflows/tests.yml` runs the host-topology backend suite, the pg-client-16 backup and
+  tenant-migration suites, the frontend typecheck/tests/build and the CLAUDE.md/AGENTS.md drift check on
+  every pull request; the release workflow now depends on it, so an image is never published from a red
+  tree. Requests carry an `X-Request-ID` bound in a contextvar, stamped on every log line (JSON in
+  production), propagated into Celery, and correlated with audit rows through an `audit_recorded` log line
+  rather than by writing into attested `meta`. `GET /api/v1/metrics/` serves Prometheus text behind
+  `METRICS_TOKEN`; `SENTRY_DSN` opts into error tracking with PII off. `CONN_MAX_AGE` defaults to 60 with
+  health checks (pooler deployments keep 0). The June performance audit was re-measured item by item and
+  closed in its report; `tests/perf/` puts a query ceiling on the hot list endpoints. The superadmin
+  series-organizer admin, which wrote occurrence organizers straight to the ORM, now routes through a
+  series-level service with the module lock and authority check. The stale file-ceiling sentence in
+  `CLAUDE.md` was corrected (five `apps/` files over 300 lines, not 37).
 - **2026-09-03 — 0.8.2: GitHub Release history became permanent.** The release workflow had kept only
   the current and immediately previous release, deleting every older release **and its Git tag** on each
   run, which is why the Releases page never showed history. Neither is deleted any more. Container

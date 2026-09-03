@@ -1149,6 +1149,19 @@ loan shows the contact the borrower gave rather than the principal's internal `m
 the principal is refused at the write side by
 `accounts.principal_guards.refuse_anonymous_requester_access_mutation` — it would restrict every future
 account-less requester at once — and the read-side exclusion is the backstop for rows predating that guard.
+**Observability (forward plan phase 0, 2026-09-03).** Every request carries an `X-Request-ID`: honoured
+from the caller only when it matches `^[A-Za-z0-9_.:-]{1,64}$`, minted otherwise, bound in a
+`contextvars.ContextVar` by `config.request_id.RequestIdMiddleware` (third in `MIDDLEWARE`, after the
+recovery gate pinned first and the calendar-feed log redactor second) and echoed on the response. Log
+records carry it through `config.log_setup.RequestIdFilter`; Celery messages carry it in a
+`spaceworks_request_id` header (`config/celery_signals.py`). **The id never enters audit `meta`** — the
+row MAC covers `meta`, and correlation is done from the `audit_recorded` log line that `record()` emits
+with the row's `event_uuid`. `GET /api/v1/metrics/` (Prometheus text) fails closed: 404 when
+`METRICS_TOKEN` is unset, 401 on a wrong bearer, and it exposes counts and ids only, never tenant
+content. It is outside `HMAC_PROTECTED_PATH_PREFIXES`, so it must NOT be added to the API-client scope
+registry (an entry there would be stale). Any new `env(...)` read in `settings.py` must be listed in
+`apps/backup/settings_policy.py::ENV_SURFACE`, or the env-surface drift guard fails.
+
 ## Handover roles and the retired Guest Admin
 
 **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`); handover staff get a **custom

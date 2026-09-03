@@ -150,12 +150,14 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   the original file as a **thin re-export barrel** (explicit `from .submodule import (...)`, never
   `import *`) so `from app.views import X` and `views.X` keep resolving; for `admin.py` the barrel must
   still import the admin submodules so the `@admin.register` side effects fire. **The ceiling is enforced
-  on what you touch, and it is NOT currently met repo-wide: 37 backend files exceed 300 lines** — largest
-  first, `config/settings.py` (929, the accepted exception — Django settings are conventionally a single
-  file), `admin_api/urls.py` (825), `makerspaces/models.py` (682), `accounts/rbac.py` (609),
-  `inventory/availability.py` (596), `admin_api/serializers_makerspaces.py` (561),
-  `makerspaces/module_registry.py` (503), `machines/role_scope.py` (489). Measured 2026-08-20; an earlier
-  version of this line claimed every file but `settings.py` was compliant, which was false by 36 files.
+  on what you touch, and it is nearly met repo-wide: five `backend/apps/` files (non-migration, non-test)
+  exceed 300 lines** — `machines/access.py` (367), `makerspaces/module_registry.py` (310),
+  `inventory/middleware.py` (308), `tenant_migration/tenant_dump_authority.py` (305),
+  `tenant_migration/source_gate_guards.py` (301) — plus `config/settings.py` (1081, the accepted
+  exception — Django settings are conventionally a single file). `backend/tests/` is not held to the
+  ceiling. Frontend: eleven non-test, non-generated files exceed it, largest
+  `features/staff/panels/Inventory.tsx` (499) and `lib/api.ts` (439). Measured 2026-09-03; the previous
+  version of this line (37 files, 2026-08-20) was already stale by the time it was read.
   **Split an over-ceiling file in its own commit before adding to it**, and when splitting one that other
   modules import from, check for guards pinned to its path: `tests/makerspaces/test_tenant_servability_guard.py`
   pins two function *bodies* to `accounts/rbac.py` by `(path, function)`, and

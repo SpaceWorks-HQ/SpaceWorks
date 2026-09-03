@@ -7,6 +7,7 @@ import environ
 from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 
+from config.log_setup import build_logging
 from config.storage_validation import assert_distinct_storage_buckets
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -193,6 +194,9 @@ MIDDLEWARE = [
     "apps.backup.middleware.DeploymentRecoveryGateMiddleware",
     # Second, so it still wraps every view that could log a calendar-feed bearer token.
     "apps.events.middleware.CalendarFeedLogRedactionMiddleware",
+    # Binds the per-request correlation id before any layer below can log. The two gates
+    # above refuse without logging through it; that is the accepted cost of their position.
+    "config.request_id.RequestIdMiddleware",
     "apps.tenant_migration.middleware.SourceMigrationGateMiddleware",
     "apps.makerspaces.middleware.TenantHostValidationMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -232,7 +236,12 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASES = {"default": env.db()}
-DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=0)
+# Persistent connections by default: gunicorn's worker processes otherwise open and close
+# a Postgres connection per request. Transaction-mode poolers (Supabase :6543, PgBouncer)
+# hand back a different server connection each time, so deployments on one set
+# CONN_MAX_AGE=0 explicitly -- .env.production.example and docs/deploy-production.md do.
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = env.bool("CONN_HEALTH_CHECKS", default=True)
 DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = env.bool(
     "DISABLE_SERVER_SIDE_CURSORS", default=False
 )
@@ -1079,3 +1088,29 @@ SPECTACULAR_SETTINGS = {
         {"name": "Notifications", "description": "Persistent staff inbox notifications."},
     ],
 }
+
+# --- Observability -----------------------------------------------------------------------
+# JSON log lines in production (one object per line, request_id on every record); the plain
+# single-line format when DEBUG, because a person is reading it. LOG_JSON overrides either.
+LOG_LEVEL = env("LOG_LEVEL", default="INFO")
+LOGGING = build_logging(LOG_LEVEL, json_output=env.bool("LOG_JSON", default=not DEBUG))
+
+# Static bearer token for GET /api/v1/metrics/ (Prometheus text). Unset => the route is 404.
+METRICS_TOKEN = env("METRICS_TOKEN", default="")
+
+# Error tracking is opt-in and only imported when a DSN is configured, so the SDK is never
+# on the import path of a deployment that did not ask for it. PII stays off: scoped PII
+# fields are encrypted at rest and must not leave the box through an error report.
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration(), CeleryIntegration()],
+        send_default_pii=False,
+        traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
+        environment=env("SENTRY_ENVIRONMENT", default="production" if not DEBUG else "development"),
+    )

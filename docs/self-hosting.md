@@ -327,7 +327,11 @@ If an instance flips from managed → self-host after deploy, run
 | `HTTP_PORT` | no (default 80) | Published frontend port |
 | `EMAIL_*`, `DEFAULT_FROM_EMAIL` | no | Global fallback SMTP (per-makerspace SMTP overrides it) |
 | `MANAGED_POSTGRES` | no (default `False`) | `True` on managed Postgres (Supabase): purge suspends immutability triggers via a custom GUC instead of `session_replication_role` (which needs superuser) |
-| `CONN_MAX_AGE` | no (default `0`) | Persistent DB connection lifetime; keep `0` on the Supabase transaction pooler |
+| `CONN_MAX_AGE` | no (default `60`) | Persistent DB connection lifetime in seconds; set `0` on the Supabase transaction pooler (port 6543), which hands back a different server connection per transaction |
+| `CONN_HEALTH_CHECKS` | no (default `True`) | Verify a persistent connection before reuse so a restarted Postgres does not surface as a request error |
+| `LOG_LEVEL`, `LOG_JSON` | no (`INFO`; JSON when `DEBUG` is off) | Log verbosity and format. Every line carries the `X-Request-ID` of the request that produced it |
+| `METRICS_TOKEN` | no (unset) | Bearer token for `GET /api/v1/metrics/` (Prometheus text). Unset means the route answers 404 |
+| `SENTRY_DSN` | no (unset) | Opt-in error tracking; the SDK is only imported when set, and PII is never sent |
 | `DISABLE_SERVER_SIDE_CURSORS` | no (default `False`) | Set `True` on the Supabase transaction pooler (no server-side cursors) |
 | `STORAGE_PRESIGN_METHOD` | no (default `post`) | `put` for Supabase Storage presigned PUT uploads (server re-validates size at attach) |
 | `CRON_SECRET` | no (default empty) | Enables `POST /api/v1/internal/cron/return-reminders` (header `X-Cron-Secret`); 404s while unset |

@@ -15,8 +15,17 @@ permissions:
   packages: write
 
 jobs:
+  # Images are never published from a red tree: the whole test workflow runs first and
+  # every job below waits on it.
+  tests:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/tests.yml
+    permissions:
+      contents: read
+
   prepare:
     if: github.ref == 'refs/heads/main'
+    needs: tests
     runs-on: ubuntu-latest
     outputs:
       base: ${{ steps.release.outputs.base }}

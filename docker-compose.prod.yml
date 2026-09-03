@@ -119,7 +119,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?use scripts/spaceworks-compose.sh}
       SPACEWORKS_DB_POINTER_GENERATION: ${SPACEWORKS_DB_POINTER_GENERATION:?use scripts/spaceworks-compose.sh}
       MANAGED_POSTGRES: ${MANAGED_POSTGRES:-False}
-      CONN_MAX_AGE: ${CONN_MAX_AGE:-0}
+      CONN_MAX_AGE: ${CONN_MAX_AGE:-60}
       DISABLE_SERVER_SIDE_CURSORS: ${DISABLE_SERVER_SIDE_CURSORS:-False}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       # Absolute base for links in outbound email. Unset => links are emitted as bare

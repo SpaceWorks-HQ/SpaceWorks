@@ -483,6 +483,7 @@ export const openApiPaths = [
   "/api/v1/memberships/invitations/{id}/claim",
   "/api/v1/memberships/me",
   "/api/v1/memberships/{id}/accept-invitation",
+  "/api/v1/metrics/",
   "/api/v1/notifications/makerspace/{makerspace_id}",
   "/api/v1/notifications/makerspace/{makerspace_id}/read-all",
   "/api/v1/notifications/makerspace/{makerspace_id}/unread-count",

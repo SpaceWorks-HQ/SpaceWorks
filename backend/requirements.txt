@@ -32,3 +32,5 @@ celery[redis]>=5.4,<6
 redis>=5.0,<7
 dnspython>=2.7,<3
 stripe==15.3.1
+# Imported only when SENTRY_DSN is set (config/settings.py); pinned so pip-audit tracks it.
+sentry-sdk[django,celery]>=2.30,<3

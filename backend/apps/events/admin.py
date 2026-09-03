@@ -2,7 +2,7 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin
 
 from apps.accounts import rbac
-from apps.audit import services as audit
+from apps.events import services_series_organizers
 from apps.events.models import Event, EventOrganizer, EventSeries, EventSeriesOrganizer
 from apps.separability.tombstones import app_is_tombstoned
 from config.admin_access import SuperuserOnlyModelAdmin
@@ -65,42 +65,20 @@ class EventSeriesOrganizerAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
             )
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    # Superadmin operations route through services, never the ORM: the service takes the
+    # series row lock and the events module lock, checks authority, projects the organizer
+    # onto every occurrence and writes the audit entry. The admin only chooses the rows.
     def save_model(self, request, obj, form, change):
-        if not change:
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
-        for event in obj.series.occurrences.all():
-            EventOrganizer.objects.get_or_create(
-                event=event,
-                organization=obj.organization,
-                defaults={"created_by": request.user, "source_series_organizer": obj},
-            )
-        audit.record(
-            request.user,
-            "event.series_organizer_created" if not change else "event.series_organizer_updated",
-            makerspace=obj.series.makerspace,
-            target=obj,
-            meta={"series_id": obj.series_id, "organization_slug": obj.organization.slug},
+        services_series_organizers.add_series_organizer(
+            obj.series, actor=request.user, organization=obj.organization
         )
 
     def delete_model(self, request, obj):
-        EventOrganizer.objects.filter(source_series_organizer=obj).delete()
-        audit.record(
-            request.user, "event.series_organizer_deleted",
-            makerspace=obj.series.makerspace, target=obj,
-            meta={"series_id": obj.series_id, "organization_slug": obj.organization.slug},
-        )
-        super().delete_model(request, obj)
+        services_series_organizers.remove_series_organizer(obj, actor=request.user)
 
     def delete_queryset(self, request, queryset):
         for obj in queryset.select_related("series__makerspace", "organization"):
-            EventOrganizer.objects.filter(source_series_organizer=obj).delete()
-            audit.record(
-                request.user, "event.series_organizer_deleted",
-                makerspace=obj.series.makerspace, target=obj,
-                meta={"series_id": obj.series_id, "organization_slug": obj.organization.slug},
-            )
-        super().delete_queryset(request, queryset)
+            services_series_organizers.remove_series_organizer(obj, actor=request.user)
 
 
 if not app_is_tombstoned("events"):
