@@ -181,7 +181,7 @@ jobs:
           tag_name: ${{ needs.prepare.outputs.tag }}
           make_latest: true
 
-      - name: Retain current and previous releases and container versions
+      - name: Prune superseded container versions (release history is kept forever)
         if: steps.head.outputs.current == 'true'
         continue-on-error: true
         shell: bash
@@ -214,25 +214,21 @@ jobs:
             echo "::warning::Could not list releases after retries; cleanup will run again on the next release."
             exit 0
           fi
+          # RELEASE HISTORY IS PERMANENT (owner decision 2026-09-03). Every published
+          # GitHub Release and its Git tag is kept forever -- this step deletes neither,
+          # and must not be "restored" to doing so. Container versions are a separate
+          # question and are still pruned below, because images consume real registry
+          # storage while a release row does not.
+          #
+          # `gh release list` returns newest first, so the first tag that is not the
+          # current one is the immediately previous release. That value is still needed:
+          # ghcr-retention.py keeps the previous version's images so the installer's
+          # rollback-to-previous-release path has something to fall back to.
           previous_release_tag=""
           while IFS= read -r tag; do
             [[ -z "$tag" || "$tag" == "$CURRENT_TAG" ]] && continue
-            if [[ -z "$previous_release_tag" ]]; then
-              previous_release_tag="$tag"
-              continue
-            fi
-            if ! retry gh release delete "$tag" --yes; then
-              echo "::warning::Could not remove release ${tag} after retries."
-              continue
-            fi
-            if output="$(retry gh api --method DELETE \
-              "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}" 2>&1)"; then
-              echo "Removed Git tag ${tag}."
-            elif [[ "$output" == *"HTTP 404"* || "$output" == *"HTTP 422"* ]]; then
-              echo "Git tag ${tag} is already absent."
-            else
-              echo "::warning::Could not remove Git tag ${tag}: ${output}"
-            fi
+            previous_release_tag="$tag"
+            break
           done <<< "$release_tags"
           previous_version="${previous_release_tag#v}"
 
