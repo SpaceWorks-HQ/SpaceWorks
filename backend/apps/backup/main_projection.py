@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from django.core.exceptions import EmptyResultSet
 from django.db import connections, transaction
 
 from apps.backup.main_projection_registry import (
@@ -123,8 +124,23 @@ def _mark_queryset(cursor, using, queryset, name):
     than on the model's own column.
     """
     query = queryset.order_by().values("pk").query
-    sql, params = query.get_compiler(using=using).as_sql()
     marker = f"lane_e_{name}"
+    try:
+        sql, params = query.get_compiler(using=using).as_sql()
+    except EmptyResultSet:
+        # Django refuses to compile a WHERE that can never match. Every boundary is
+        # unsatisfiable (`__in=()`) on a deployment with no sovereign tenant, which is
+        # the DEFAULT -- superadmin_access_enabled starts True, so a deployment where
+        # nobody has taken custody freezes zero slices. The marker must still exist and
+        # be empty, because _apply_marker joins it unconditionally; build it from the
+        # model's own primary key so the join keeps its exact type.
+        quote = cursor.db.ops.quote_name
+        model = queryset.model
+        sql = (
+            f'SELECT {quote(model._meta.pk.column)} AS "pk" '
+            f'FROM {quote(model._meta.db_table)} WHERE false'
+        )
+        params = ()
     cursor.execute(f'CREATE TEMP TABLE "{marker}" ON COMMIT DROP AS {sql}', params)
     return marker
 

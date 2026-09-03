@@ -72,7 +72,10 @@ export function ProcurementPanel({
   // Server-derived, and it already accounts for the stream, so it needs no local
   // `createsPrintingByDefault` qualifier.
   const requiresMachineType = procurementMachineTypeRequired(machineTypes.data);
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["procurement", makerspace.id] });
+  const invalidate = () => void Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["procurement", makerspace.id] }),
+    queryClient.invalidateQueries({ queryKey: ["operations-report"] }),
+  ]);
 
   const create = useMutation({
     mutationFn: () => {

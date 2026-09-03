@@ -18,7 +18,7 @@ UNSUPPORTED_LIST_OBJECT_VERSIONS_ERROR_CODES = frozenset(
 )
 
 
-def delete_all_versions(client, *, bucket, key):
+def delete_all_versions(client, *, bucket, key, require_version_listing=False):
     """Delete every retained version and delete marker for one exact key.
 
     Some S3-compatible providers do not implement ``ListObjectVersions``. In that
@@ -30,7 +30,10 @@ def delete_all_versions(client, *, bucket, key):
         first_page = client.list_object_versions(**params)
     except ClientError as exc:
         code = exc.response.get("Error", {}).get("Code")
-        if code in UNSUPPORTED_LIST_OBJECT_VERSIONS_ERROR_CODES:
+        if (
+            code in UNSUPPORTED_LIST_OBJECT_VERSIONS_ERROR_CODES
+            and not require_version_listing
+        ):
             logger.warning(
                 "object_version_listing_failed_falling_back",
                 extra={"bucket": bucket, "object_key": key, "error_code": code},

@@ -90,6 +90,12 @@ def test_unlinked_organizer_can_manage_only_its_exact_event():
     registration = EventRegistration.objects.create(
         event=event, name="Organizer guest", email="organizer@example.test", phone="1"
     )
+    event.registration_requires_approval = True
+    event.save(update_fields=["registration_requires_approval"])
+    pending = EventRegistration.objects.create(
+        event=event, name="Pending guest", email="pending-organizer@example.test",
+        phone="1", status=EventRegistration.Status.PENDING_APPROVAL,
+    )
     other_registration = EventRegistration.objects.create(
         event=other, name="Other guest", email="other@example.test", phone="1"
     )
@@ -106,10 +112,16 @@ def test_unlinked_organizer_can_manage_only_its_exact_event():
         {},
         format="json",
     )
+    approved = client_for(actor).post(
+        reverse("admin-event-registration-approve", kwargs={"pk": pending.pk}),
+        {},
+        format="json",
+    )
 
     assert loaded.status_code == 200
     assert edited.status_code == 200
     assert attended.status_code == 200
+    assert approved.status_code == 200
     assert client_for(actor).get(detail_url(other)).status_code == 404
     assert client_for(actor).post(
         reverse(

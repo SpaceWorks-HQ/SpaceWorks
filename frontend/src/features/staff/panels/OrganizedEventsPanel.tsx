@@ -120,13 +120,19 @@ export function OrganizedEventsPanel() {
 }
 
 function RegistrationTotals({ event }: { event: EventAdmin }) {
-  const counts = event.registration_counts;
-  const total = counts.registered + counts.attended + counts.waitlisted + counts.cancelled;
+  const counts = event.registration_counts as typeof event.registration_counts & {
+    pending_approval?: number;
+    rejected?: number;
+  };
+  const pending = counts.pending_approval ?? 0;
+  const rejected = counts.rejected ?? 0;
+  const total = counts.registered + counts.attended + counts.waitlisted + counts.cancelled + pending + rejected;
   return (
     <div className="font-mono text-xs text-muted">
       <span className="block text-sm font-medium text-ink">{total} total</span>
       <span className="block">{counts.registered} registered · {counts.attended} attended</span>
       <span className="block">{counts.waitlisted} waitlisted · {counts.cancelled} cancelled</span>
+      <span className="block">{pending} pending · {rejected} rejected</span>
     </div>
   );
 }

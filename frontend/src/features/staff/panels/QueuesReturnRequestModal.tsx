@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { ErrorText, Modal } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
+import { evidenceErrorText } from "../evidenceUi";
 import { EvidenceUpload } from "./EvidenceUpload";
 import { BoxCodeField, FormFooter, ShelfLine, submitForm } from "./QueuesModalShared";
 import type { AssetReturnOutcome, FormModalProps, ReturnRequestValues } from "./QueuesModalTypes";
@@ -18,10 +19,12 @@ export function ReturnRequestModal({ row, open, pending, error, onClose, onSubmi
   const [assetOutcomes, setAssetOutcomes] = useState<AssetOutcomeState>({});
   const [validationError, setValidationError] = useState("");
   const [issueUrl, setIssueUrl] = useState("");
+  const [issueError, setIssueError] = useState("");
 
   useEffect(() => {
     if (!open || !row) {
       setIssueUrl("");
+      setIssueError("");
       return;
     }
     setEvidenceId(null);
@@ -29,6 +32,7 @@ export function ReturnRequestModal({ row, open, pending, error, onClose, onSubmi
     setRemark("");
     setValidationError("");
     setIssueUrl("");
+    setIssueError("");
     setResolutions(row.items.map((item) => item.requires_asset_qr ? { item_id: item.id, returned: 0, damaged: 0, missing: 0, assets: [] } : {
       item_id: item.id,
       returned: remainingCount(item),
@@ -41,6 +45,7 @@ export function ReturnRequestModal({ row, open, pending, error, onClose, onSubmi
   useEffect(() => {
     if (!open || !row?.issue_evidence_id) {
       setIssueUrl("");
+      setIssueError("");
       return;
     }
     let cancelled = false;
@@ -48,8 +53,11 @@ export function ReturnRequestModal({ row, open, pending, error, onClose, onSubmi
       .then((result) => {
         if (!cancelled) setIssueUrl(result.url);
       })
-      .catch(() => {
-        if (!cancelled) setIssueUrl("");
+      .catch((loadError) => {
+        if (!cancelled) {
+          setIssueUrl("");
+          setIssueError(evidenceErrorText(loadError));
+        }
       });
     return () => {
       cancelled = true;
@@ -69,6 +77,7 @@ export function ReturnRequestModal({ row, open, pending, error, onClose, onSubmi
       <form id="return-request-form" className="grid gap-3" onSubmit={(event) => submitForm(event, submitReturn)}>
         <div className="grid gap-3 sm:grid-cols-2">
           {issueUrl ? <div className="grid min-w-0 gap-1 text-sm"><span className="font-medium text-ink">Issue photo</span><img src={issueUrl} alt="Issue photo for comparison" className="max-h-56 w-full rounded-md border border-line object-contain" /></div> : null}
+          {issueError ? <p className="text-sm text-warning" role="status">{issueError}</p> : null}
           <div className="grid min-w-0 gap-1 text-sm"><span className="font-medium text-ink">Return photo</span><EvidenceUpload makerspaceId={makerspaceId} evidenceType="return" disabled={pending} onUploaded={setEvidenceId} /></div>
         </div>
         {row?.assigned_box_label ? <p className="text-xs text-muted">Box: <span className="font-medium text-ink">{row.assigned_box_label}</span></p> : null}

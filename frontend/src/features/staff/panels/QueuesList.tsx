@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { StatusStepper, statusStageLabel } from "../../../components/ui/StatusStepper";
 import { staffRequest } from "../../../lib/api";
+import { evidenceErrorText } from "../evidenceUi";
 import type { HardwareRequest } from "./Queues";
 import { RequestTimelineBlock } from "./LoanTimeline";
 
@@ -24,7 +25,7 @@ export function RequestList({ rows, actions, canViewAudit = false }: { rows: Har
     } catch (error) {
       setEvidenceError({
         requestId,
-        message: error instanceof Error ? error.message : "Could not load evidence photo.",
+        message: evidenceErrorText(error),
       });
     }
   };
@@ -138,4 +139,3 @@ function statusBadgeClassName(status: string) {
       return "";
   }
 }
-

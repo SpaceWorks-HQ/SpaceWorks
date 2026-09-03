@@ -27,6 +27,26 @@ def package_staged_objects(staging_root, bundle_root, entries):
         member = PurePosixPath(
             "objects", _BUCKET_DIRECTORIES[bucket_kind], opaque
         )
+        if entry.get("retention_state") == "expired":
+            if not isinstance(entry.get("object_expired_at"), str):
+                raise TenantDumpVerificationError(
+                    "Lane D expiry tombstone has no terminal timestamp."
+                )
+            manifest.append(
+                {
+                    "bucket_kind": bucket_kind,
+                    "member_path": None,
+                    "original_key": original_key,
+                    "version_id": None,
+                    "size": 0,
+                    "content_type": "",
+                    "sha256": "",
+                    "retention_state": "expired",
+                    "object_expired_at": entry.get("object_expired_at"),
+                    "expired_size_bytes": entry.get("expired_size_bytes"),
+                }
+            )
+            continue
         source_member = PurePosixPath(entry.get("member_path", str(member)))
         if source_member.is_absolute() or ".." in source_member.parts:
             raise TenantDumpVerificationError("Unsafe immutable object member path.")
@@ -58,7 +78,7 @@ def package_staged_objects(staging_root, bundle_root, entries):
                 "sha256": digest,
             }
         )
-    return tuple(sorted(manifest, key=lambda item: item["member_path"]))
+    return tuple(sorted(manifest, key=lambda item: item["member_path"] or ""))
 
 
 def _file_digest(path):

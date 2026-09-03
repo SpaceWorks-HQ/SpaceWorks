@@ -20,6 +20,7 @@ from apps.makerspaces.models import (
     MakerspaceWaiver,
 )
 from apps.makerspaces.module_install import install_module, uninstall_module
+from tests.module_helpers import disable_module
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -38,7 +39,7 @@ def space(slug, *, membership_enabled):
     if membership_enabled:
         install_module(item, "membership")
     else:
-        uninstall_module(item, "membership")
+        disable_module(item, "membership")
     item.refresh_from_db()
     return item
 

@@ -11,7 +11,10 @@ from apps.events.exceptions import (
     CapacityConflict,
     EventInvalidTransition,
 )
-from apps.events.models import Event, EventRegistration
+from apps.events.models import (
+    Event,
+    EventRegistration,
+)
 from apps.events.notifications import notify_event_lifecycle
 from apps.forms_schema.validation import validate_form_schema
 from apps.makerspaces import limits
@@ -20,8 +23,11 @@ from apps.makerspaces.models import Makerspace
 
 EVENT_FIELDS = frozenset(
     {'title', 'description', 'starts_at', 'ends_at', 'location',
-     'location_kind', 'custom_form', 'capacity', 'is_public', 'payment_amount'}
+     'location_kind', 'custom_form', 'capacity', 'is_public', 'payment_amount',
+     'registration_requires_approval', 'registration_cutoff_at',
+     'registration_cutoff_lead_minutes', 'timezone_name'}
 )
+INHERITABLE_FIELDS = EVENT_FIELDS | {"image_key"}
 
 
 def _locked_event(event_id):
@@ -60,34 +66,13 @@ def _may_promote(event, now):
     return event.status == Event.Status.PUBLISHED and event.ends_at >= now
 
 
-def _lock_waiters(event):
-    return list(
-        EventRegistration.objects.select_for_update().filter(
-            event=event, status=EventRegistration.Status.WAITLISTED
-        ).order_by("created_at", "id")
-    )
-
-
-def _promote(event, actor, waiters, count=None):
-    selected = waiters if count is None else waiters[:count]
-    for registration in selected:
-        registration.event = event
-        registration.status = EventRegistration.Status.REGISTERED
-        registration.save(update_fields=["status"])
-        from apps.events.service_payments import create_for_registered_registration
-
-        create_for_registered_registration(registration, actor)
-        meta = {"registration_id": registration.pk}
-        _audit(event, actor, "event.registration_promoted", registration, meta)
-        notify_event_lifecycle(event, "registration_promoted", registration.pk)
-    return selected
-
-
 @transaction.atomic
 def create_event(
     *, makerspace, actor, title, description, starts_at, ends_at, location,
     capacity, is_public, location_kind=Event.LocationKind.OTHER, custom_form=None,
-    payment_amount=0,
+    payment_amount=0, registration_requires_approval=False,
+    registration_cutoff_at=None, registration_cutoff_lead_minutes=None,
+    timezone_name=None,
 ):
     locked_space = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
     require_module_locked(locked_space, "events")
@@ -103,7 +88,11 @@ def create_event(
         custom_form=_canonical_form(custom_form),
         capacity=capacity,
         payment_amount=payment_amount,
+        registration_requires_approval=registration_requires_approval,
+        registration_cutoff_at=registration_cutoff_at,
+        registration_cutoff_lead_minutes=registration_cutoff_lead_minutes,
         is_public=is_public,
+        **({"timezone_name": timezone_name} if timezone_name else {}),
     )
     _validate(event)
     event.save()
@@ -112,7 +101,9 @@ def create_event(
 
 
 @transaction.atomic
-def update_event(event, *, actor, **changes):
+def update_event(event, *, actor, inherit_fields=(), **changes):
+    from apps.events.services_calendar import CALENDAR_EVENT_FIELDS, calendar_event_changed
+
     locked = _locked_event(event.pk)
     if locked.status not in (Event.Status.DRAFT, Event.Status.PUBLISHED):
         raise EventInvalidTransition("Terminal events cannot be updated.")
@@ -121,12 +112,38 @@ def update_event(event, *, actor, **changes):
         raise serializers.ValidationError(
             {field: "This field cannot be updated." for field in sorted(unknown)}
         )
+    inherit_fields = set(inherit_fields or ())
+    invalid_inherit = inherit_fields - INHERITABLE_FIELDS
+    if invalid_inherit:
+        raise serializers.ValidationError(
+            {field: "This field cannot inherit from a series." for field in invalid_inherit}
+        )
+    if inherit_fields & set(changes):
+        raise serializers.ValidationError(
+            {field: "A field cannot be changed and inherited together." for field in inherit_fields & set(changes)}
+        )
+    if inherit_fields and locked.series_id is None:
+        raise serializers.ValidationError({"inherit_fields": "This event is not in a series."})
+    if inherit_fields:
+        from apps.events.services_series import occurrence_inherited_value
+
+        for field in inherit_fields:
+            changes[field] = occurrence_inherited_value(locked, field)
 
     if 'custom_form' in changes:
         changes['custom_form'] = _canonical_form(changes['custom_form'])
+    if (
+        "registration_requires_approval" in changes
+        and changes["registration_requires_approval"]
+        != locked.registration_requires_approval
+        and locked.status != Event.Status.DRAFT
+    ):
+        raise EventInvalidTransition(
+            "Approval policy can only be changed while the event is a draft."
+        )
 
     now = timezone.now()
-    old_capacity, old_ends_at = locked.capacity, locked.ends_at
+    old_capacity, old_ends_at, old_image_key = locked.capacity, locked.ends_at, locked.image_key
     for field, value in changes.items():
         setattr(locked, field, value)
     _validate(locked)
@@ -148,17 +165,33 @@ def update_event(event, *, actor, **changes):
         _may_promote(locked, now)
         and (locked.capacity == 0 or locked.capacity > confirmed)
     ):
-        waiters = _lock_waiters(locked)
-        if locked.capacity == 0:
-            promoted = _promote(locked, actor, waiters)
-        else:
-            promoted = _promote(
-                locked, actor, waiters, locked.capacity - confirmed
+        if not locked.registration_requires_approval:
+            promoted = promote_automatically(
+                locked,
+                actor,
+                None if locked.capacity == 0 else locked.capacity - confirmed,
             )
 
     if changes:
-        locked.save(update_fields=[*sorted(changes), "updated_at"])
+        update_fields = set(changes)
+        if locked.series_id:
+            overrides = set(locked.series_override_fields or [])
+            overrides.update(set(changes) - inherit_fields)
+            overrides.difference_update(inherit_fields)
+            locked.series_override_fields = sorted(overrides)
+            update_fields.add("series_override_fields")
+        locked.save(update_fields=[*sorted(update_fields), "updated_at"])
+        if set(changes) & CALENDAR_EVENT_FIELDS:
+            calendar_event_changed(locked)
+        if "image_key" in inherit_fields and old_image_key:
+            from apps.inventory import public_image_storage
+
+            public_image_storage.release_public_image_on_commit(
+                locked.makerspace, old_image_key
+            )
     meta = {"changed_fields": sorted(changes)}
+    if inherit_fields:
+        meta["inherited_fields"] = sorted(inherit_fields)
     if capacity_changed:
         meta.update(
             old_capacity=old_capacity,
@@ -170,94 +203,14 @@ def update_event(event, *, actor, **changes):
     return _refresh(locked)
 
 
-def _transition(event, actor, expected, new_status, action):
-    locked = _locked_event(event.pk)
-    if locked.status != expected:
-        message = f"Cannot transition event from {locked.status} to {new_status}."
-        raise EventInvalidTransition(message)
-    locked.status = new_status
-    locked.save(update_fields=["status", "updated_at"])
-    meta = {"old_status": expected, "new_status": new_status}
-    _audit(locked, actor, action, locked, meta)
-    notify_event_lifecycle(locked, new_status)
-    return _refresh(locked)
-
-
-@transaction.atomic
-def publish(event, *, actor):
-    locked = _locked_event(event.pk)
-    if locked.status != Event.Status.DRAFT:
-        raise EventInvalidTransition("Only draft events can be published.")
-    _validate(locked)
-    if locked.ends_at < timezone.now():
-        raise EventInvalidTransition("Ended events cannot be published.")
-    require_module_locked(locked.makerspace, "events")
-    limits.check_quota(locked.makerspace, "events", adding=1)
-    locked.status = Event.Status.PUBLISHED
-    locked.save(update_fields=["status", "updated_at"])
-    meta = {"old_status": Event.Status.DRAFT, "new_status": Event.Status.PUBLISHED}
-    _audit(locked, actor, "event.published", locked, meta)
-    notify_event_lifecycle(locked, "published")
-    return _refresh(locked)
-
-
-@transaction.atomic
-def cancel(event, *, actor):
-    return _transition(event, actor, Event.Status.PUBLISHED, Event.Status.CANCELLED, "event.cancelled")
-
-
-@transaction.atomic
-def complete(event, *, actor):
-    return _transition(event, actor, Event.Status.PUBLISHED, Event.Status.COMPLETED, "event.completed")
-
-
-@transaction.atomic
-def cancel_registration(registration, *, actor=None):
-    event = _locked_event(registration.event_id)
-    locked = EventRegistration.objects.select_for_update().get(pk=registration.pk)
-    if locked.event_id != event.pk or locked.status not in (
-        EventRegistration.Status.REGISTERED,
-        EventRegistration.Status.WAITLISTED,
-    ):
-        raise EventInvalidTransition("This registration cannot be cancelled.")
-    old_status = locked.status
-    locked.status = EventRegistration.Status.CANCELLED
-    locked.save(update_fields=["status"])
-    meta = {"registration_id": locked.pk, "old_status": old_status}
-    _audit(event, actor, "event.registration_cancelled", locked, meta)
-    notify_event_lifecycle(event, "registration_cancelled", locked.pk)
-    from apps.events.service_payments import cancel_for_registration
-
-    cancel_for_registration(locked, actor)
-    if (
-        old_status == EventRegistration.Status.REGISTERED
-        and event.capacity > 0
-        and _may_promote(event, timezone.now())
-    ):
-        waiters = _lock_waiters(event)
-        if waiters:
-            _promote(event, actor, waiters, 1)
-    return _refresh(locked)
-
-
-@transaction.atomic
-def mark_attended(registration, *, actor):
-    event = _locked_event(registration.event_id)
-    locked = EventRegistration.objects.select_for_update().get(pk=registration.pk)
-    if (
-        locked.event_id != event.pk
-        or locked.status != EventRegistration.Status.REGISTERED
-        or event.status not in (Event.Status.PUBLISHED, Event.Status.COMPLETED)
-    ):
-        raise EventInvalidTransition("This registration cannot be marked attended.")
-    locked.status = EventRegistration.Status.ATTENDED
-    locked.save(update_fields=["status"])
-    _audit(
-        event, actor, "event.registration_attended", locked,
-        {"registration_id": locked.pk},
-    )
-    notify_event_lifecycle(event, "registration_attended", locked.pk)
-    return _refresh(locked)
-
-
 from apps.events.services_registration import register  # noqa: E402
+from apps.events.services_registration_state import (  # noqa: E402
+    approve_registration,
+    cancel_registration,
+    correct_attendance,
+    promote_automatically,
+    promote_registration,
+    reject_registration,
+)
+from apps.events.services_checkin import mark_attended  # noqa: E402
+from apps.events.services_lifecycle import cancel, complete, publish  # noqa: E402

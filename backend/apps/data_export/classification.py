@@ -17,10 +17,18 @@ EXPORTED_MODEL_FIELDS = {
     "boxes.BoxScan": "id makerspace box request actor context created_at",
     "boxes.QrCode": "id makerspace payload target_type target_id status created_by revoked_at created_at updated_at",
     "boxes.QrScanEvent": "id makerspace qr_code request actor context created_at",
-    "events.Event": "id public_token makerspace title description starts_at ends_at location location_kind custom_form capacity payment_amount is_public image_key status created_by created_at updated_at",
-    "events.EventCollaborator": "id event makerspace status invited_by responded_by created_at responded_at",
-    "events.EventRegistration": "id event checkin_token name email phone member registered_via_makerspace payment_via_makerspace host_waiver host_waiver_accepted_at host_waiver_version_accepted email_exact_hash email_hash_generation custom_answers status created_at",
+    "events.EventSeries": "id public_token calendar_uid calendar_sequence calendar_updated_at makerspace title description location location_kind custom_form capacity payment_amount registration_requires_approval registration_cutoff_lead_minutes is_public image_key recurrence_timezone dtstart_local_date dtstart_local_time recurrence_rule duration_minutes revision status last_materialized_at last_generation_error_code created_by created_at updated_at",
+    "events.EventSeriesCollaborator": "id series makerspace status invited_by responded_by created_at responded_at",
+    "events.Event": "id public_token calendar_uid calendar_sequence calendar_updated_at timezone_name badge_template makerspace series series_occurrence_key series_revision series_override_fields title description starts_at ends_at location location_kind custom_form capacity payment_amount registration_requires_approval registration_cutoff_at registration_cutoff_lead_minutes is_public image_key status created_by created_at updated_at",
+    "events.EventCollaborator": "id event makerspace status invited_by responded_by created_at responded_at source_series_collaboration",
+    "events.EventRegistration": "id event checkin_token name email phone member registered_via_makerspace payment_via_makerspace host_waiver host_waiver_accepted_at host_waiver_version_accepted email_exact_hash email_hash_generation custom_answers status calendar_sequence calendar_updated_at created_at",
+    "events.EventCheckInEvent": "id makerspace event registration operation_id source attended_at recorded_at actor session_id station_version",
+    "events.EventFeedbackSurvey": "id event title thank_you_text questions is_open certificate_enabled answered_question_ids opened_at closed_at created_at updated_at",
+    "events.EventFeedbackResponse": "id survey registration answers_snapshot certificate_requested created_at",
+    "events.EventAttendanceCertificate": "id response registration serial revision recipient_name event_title event_starts_at event_ends_at issuer_name object_key content_type size_bytes sha256 status issued_at rendered_at revoked_at revoked_by revocation_reason",
     "evidence.EvidencePhoto": "id makerspace evidence_type object_key content_type size_bytes uploaded_by created_at",
+    "evidence.EvidenceObjectRetentionState": "id evidence status claim_token claimed_at object_expired_at expired_size_bytes last_error updated_at",
+    "evidence.EvidenceRetentionPolicy": "id makerspace object_retention_days updated_at",
     "hardware_requests.HardwareRequest": "id makerspace requester requester_username requester_name requester_contact_email requester_contact_phone requester_contact_verified anonymous_idempotency_key_fingerprint anonymous_payload_fingerprint status requested_for rejection_reason accepted_by accepted_at assigned_box issued_by issued_at return_due_at return_reminder_sent_at issue_evidence issue_remark closed_by closed_at public_token created_at updated_at",
     "hardware_requests.HardwareRequestItem": "id request product requested_quantity accepted_quantity issued_quantity returned_quantity damaged_quantity missing_quantity needs_fix_quantity",
     "hardware_requests.HardwareRequestItemAsset": "id request_item asset outcome issued_at returned_at return_event",
@@ -75,6 +83,7 @@ EXPORTED_MODEL_FIELDS = {
     "operations.InventoryAdjustment": "id makerspace stocktake transfer product asset delta_available delta_damaged delta_lost reason created_by created_at",
     "operations.QrPrintBatch": "id makerspace title status created_by created_at printed_at",
     "operations.QrPrintBatchItem": "id batch qr_code label_text target_type target_id sort_order",
+    "operations.ReportMetricRollup": "id makerspace source_module report_key metric_key bucket_start grain dimension_key dimensions value sample_count revision source_cutoff computed_at checksum",
     "operations.StocktakeLedgerEntry": "id makerspace stocktake line product asset bucket delta old_asset_status new_asset_status reason created_by created_at",
     "operations.StocktakeLine": "id stocktake product asset container expected_quantity counted_quantity variance_quantity condition notes",
     "operations.StocktakeSession": "id makerspace container status started_by approved_by started_at completed_at approved_at notes",
@@ -102,6 +111,12 @@ GLOBAL_MODELS = {
 }
 
 OMITTED_MODELS = {
+    "events.EventCheckInStationCredential": (
+        "Live event-station authentication authority; a restored tenant must rotate a new PIN."
+    ),
+    "events.MemberCalendarFeed": (
+        "Deployment-local bearer credential over member registration history; restored tenants must reissue it."
+    ),
     "apiclients.ApiClientImportApproval": "Artifact-bound target authority approval is deployment-local coordination state.",
     "accounts.DailyOtpEmailCounter": "Platform authentication telemetry.",
     "accounts.DeviceAttestationChallenge": "Transient authentication state.",
@@ -169,7 +184,12 @@ OMITTED_MODELS = {
     "makerspaces.ImportedUserReconciliation": "Target-side operator reconciliation input.",
     "makerspaces.SubdomainRequest": "Source-deployment routing request.",
     "operations.PeriodicTaskRun": "Deployment scheduler state.",
+    "operations.ReportRollupCursor": "Rebuildable report rollup coordination and retention-fence state.",
     "events.EventOrganizer": (
+        "It references a deployment-global organization that does not travel with "
+        "a tenant export."
+    ),
+    "events.EventSeriesOrganizer": (
         "It references a deployment-global organization that does not travel with "
         "a tenant export."
     ),
@@ -178,6 +198,9 @@ OMITTED_MODELS = {
     ),
     "organizations.OrganizationMembership": (
         "Live cross-tenant organization authorization."
+    ),
+    "organizations.OrganizationInvitation": (
+        "Deployment-local bearer authorization state for a global organization."
     ),
     "tenant_migration.TenantImportJob": "Target-side tenant import coordination state.",
     "tenant_migration.TenantImportObject": (

@@ -1,7 +1,7 @@
 """Relational and semantic reference registries for the global User closure."""
-
 from .fields import FIELDS
 from .models import EXPORTED_MODELS
+from .references_json_fields import JSON_REFERENCE_FIELDS
 from .types import (
     Fidelity,
     Omitted,
@@ -9,12 +9,8 @@ from .types import (
     SourceLocalProvenance,
     UserEdge,
 )
-
-
 class DanglingUserReferenceError(RuntimeError):
     """A raw user ID cannot be bound safely in a portable archive."""
-
-
 def require_raw_user(fidelity, *, model, row_pk, field, user_id, existing_user_ids):
     """Enforce the declared no-dangling contract before a raw ID is remapped."""
     if fidelity is Fidelity.PORTABLE and user_id not in existing_user_ids:
@@ -22,7 +18,6 @@ def require_raw_user(fidelity, *, model, row_pk, field, user_id, existing_user_i
             f"{model} row {row_pk} has dangling {field}={user_id}"
         )
     return user_id
-
 RAW_USER_REFERENCE_FIELDS = frozenset(  # Raw integers are not discoverable as FKs.
     {
         ("encryption.PiiGlobalWriteFence", "actor_id"),
@@ -30,7 +25,6 @@ RAW_USER_REFERENCE_FIELDS = frozenset(  # Raw integers are not discoverable as F
         ("machines.ServiceRequestFile", "owner_user_id"),
     }
 )
-
 # Every forward relation to accounts.User in the internal model graph, including M2M.
 RELATIONAL_USER_FIELDS = frozenset(
     {
@@ -62,10 +56,16 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("boxes.QrCode", "created_by"),
         ("boxes.QrScanEvent", "actor"),
         ("events.Event", "created_by"),
+        ("events.EventSeries", "created_by"),
+        ("events.EventSeriesCollaborator", "invited_by"),
+        ("events.EventSeriesCollaborator", "responded_by"),
+        ("events.EventSeriesOrganizer", "created_by"),
         ("events.EventCollaborator", "invited_by"),
         ("events.EventCollaborator", "responded_by"),
         ("events.EventOrganizer", "created_by"),
         ("events.EventRegistration", "member"),
+        ("events.EventCheckInEvent", "actor"),
+        ("events.EventAttendanceCertificate", "revoked_by"),
         ("evidence.EvidencePhoto", "uploaded_by"),
         ("hardware_requests.HardwareRequest", "requester"),
         ("hardware_requests.HardwareRequest", "accepted_by"),
@@ -151,6 +151,8 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("organizations.OrganizationMakerspace", "created_by"),
         ("organizations.OrganizationMembership", "user"),
         ("organizations.OrganizationMembership", "created_by"),
+        ("organizations.OrganizationInvitation", "created_by"),
+        ("organizations.OrganizationInvitation", "redeemed_by"),
         ("payments.Payment", "member"),
         ("payments.Payment", "created_by"),
         ("payments.StripeConnectOAuthState", "initiated_by"),
@@ -201,43 +203,7 @@ POLYMORPHIC_PAIRS = frozenset(
     }
 )
 
-JSON_FIELDS = frozenset(
-    {
-        ("apiclients.ApiClient", "scopes"),
-        ("apiclients.ApiClient", "allowed_origins"),
-        ("apiclients.ApiKeyRequest", "allowed_origins"),
-        ("audit.AuditLog", "meta"),
-        # Phase 7 imported-actor provenance. Each holds actor_username,
-        # actor_display, source_user_id and recorded_at.
-        ("makerspaces.MakerspaceMembership", "witnessed_actor_snapshot"),
-        ("makerspaces.MakerspaceMembership", "verified_actor_snapshot"),
-        ("makerspaces.MakerspaceMembership", "activated_actor_snapshot"),
-        ("makerspaces.MakerspaceMembership", "revoked_actor_snapshot"),
-        ("bookings.BookableSpace", "custom_form"),
-        ("bookings.Booking", "custom_answers"),
-        ("events.Event", "custom_form"),
-        ("events.EventRegistration", "custom_answers"),
-        ("hardware_requests.PublicToolLoan", "asset_ids"),
-        ("hardware_requests.PublicToolLoan", "qr_ids"),
-        ("machines.Machine", "service_file_policy"),
-        ("machines.Machine", "type_payload"),
-        ("machines.MachineServiceRequest", "capability_payload"),
-        ("machines.MachineType", "capability_config"),
-        ("makerspaces.Makerspace", "cors_allowed_origins"),
-        ("makerspaces.Makerspace", "enabled_modules"),
-        ("makerspaces.Makerspace", "enabled_features"),
-        ("makerspaces.Makerspace", "resource_limit_overrides"),
-        ("makerspaces.Makerspace", "theme_config"),
-        ("makerspaces.Makerspace", "branding_config"),
-        ("makerspaces.Makerspace", "presence_preset_minutes"),
-        ("makerspaces.MakerspaceRole", "granted_actions"),
-        ("makerspaces.MemberProfile", "interests"),
-        ("makerspaces.MemberProfile", "languages"),
-        ("makerspaces.MemberProfile", "education"),
-        ("makerspaces.MemberProject", "links"),
-        ("tenant_migration.ExternalTenantReference", "snapshot"),
-    }
-)
+JSON_FIELDS = JSON_REFERENCE_FIELDS
 
 SEMANTIC_REFERENCES = {}
 for _fidelity in Fidelity:

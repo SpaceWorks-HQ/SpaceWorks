@@ -66,8 +66,20 @@ def _delete_object_graph(makerspace):
         AuditSigningKeyRotationEvent,
     )
     from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
-    from apps.evidence.models import EvidencePhoto
-    from apps.events.models import EventOrganizer, EventRegistration
+    from apps.evidence.models import EvidencePhoto, EvidenceRetentionPolicy
+    from apps.events.models import (
+        Event,
+        EventAttendanceCertificate,
+        EventCheckInEvent,
+        EventCheckInStationCredential,
+        EventCollaborator,
+        EventFeedbackResponse,
+        EventFeedbackSurvey,
+        EventOrganizer,
+        EventRegistration,
+        EventSeries,
+        EventSeriesCollaborator,
+    )
     from apps.hardware_requests.models import HardwareRequest
     from apps.hardware_requests.models import PublicToolLoan, RequesterAccountability
     from apps.hardware_requests.models import ReturnEvent
@@ -128,6 +140,7 @@ def _delete_object_graph(makerspace):
         ReturnEvent.objects.filter(makerspace=makerspace).delete()
         HardwareRequest.objects.filter(makerspace=makerspace).delete()
         EvidencePhoto.objects.filter(makerspace=makerspace).delete()
+        EvidenceRetentionPolicy.objects.filter(makerspace=makerspace).delete()
         QrCode.objects.filter(makerspace=makerspace).delete()
 
         # Machines + their maintenance/children/consumables cascade from the Machine
@@ -192,10 +205,27 @@ def _delete_object_graph(makerspace):
         # Organizer attribution is owned by the hosted event, never by whichever
         # makerspaces happen to be linked to its deployment-global organization.
         EventOrganizer.objects.filter(event__makerspace=makerspace).delete()
+        EventAttendanceCertificate.objects.filter(
+            registration__event__makerspace=makerspace
+        ).delete()
+        EventFeedbackResponse.objects.filter(
+            survey__event__makerspace=makerspace
+        ).delete()
+        EventFeedbackSurvey.objects.filter(event__makerspace=makerspace).delete()
+        EventCheckInStationCredential.objects.filter(
+            event__makerspace=makerspace
+        ).delete()
+        EventCheckInEvent.objects.filter(makerspace=makerspace).delete()
         # Registrations otherwise survive until the final makerspace cascade. Delete
         # hosted rows explicitly so any PROTECT FK they gain cannot fail that cascade;
         # collaborator provenance must not remove another host's registration.
         EventRegistration.objects.filter(event__makerspace=makerspace).delete()
+        EventCollaborator.objects.filter(
+            source_series_collaboration__makerspace=makerspace
+        ).exclude(event__makerspace=makerspace).delete()
+        EventSeriesCollaborator.objects.filter(makerspace=makerspace).delete()
+        Event.objects.filter(makerspace=makerspace).delete()
+        EventSeries.objects.filter(makerspace=makerspace).delete()
         # Encryption key rows carry a PROTECT FK + a no-delete ORM guard/trigger, so
         # raw-delete them inside this authorized purge context (session_replication_role
         # =replica self-host, or app.allow_immutable_delete GUC managed) before the

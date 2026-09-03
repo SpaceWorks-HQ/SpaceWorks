@@ -5,6 +5,9 @@ from apps.makerspaces.anonymous_requesters import anonymous_requester_ids
 from apps.hardware_requests.display import label_from_candidates, requester_label
 from apps.hardware_requests.models import HardwareRequest, HardwareRequestItem
 from apps.inventory.models import InventoryAsset, InventoryProduct
+from apps.makerspaces.models import Makerspace
+from apps.makerspaces.module_registry import module_available
+from apps.makerspaces.platform import module_enabled
 from apps.operations.report_scope import eligible_makerspace_ids
 
 
@@ -243,7 +246,11 @@ def _assets(makerspace_id):
     # consistent with the archived-excluded product/quantity figures.
     qs = InventoryAsset.objects.exclude(product__is_archived=True)
     if makerspace_id is None:
-        return qs.filter(makerspace_id__in=eligible_makerspace_ids())
+        ids = eligible_makerspace_ids("asset_units") if module_available("asset_units") else []
+        return qs.filter(makerspace_id__in=ids)
+    makerspace = Makerspace.objects.filter(id=makerspace_id).first()
+    if makerspace is None or not module_enabled(makerspace, "asset_units"):
+        return qs.none()
     return qs.filter(makerspace_id=makerspace_id)
 
 

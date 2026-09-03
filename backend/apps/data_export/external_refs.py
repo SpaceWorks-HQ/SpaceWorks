@@ -16,6 +16,7 @@ _CONTAINER_EDGES = frozenset({
     ("operations.StockTransfer", "destination_container"),
 })
 _EVENT_EDGES = frozenset({("events.EventCollaborator", "event")})
+_SERIES_EDGES = frozenset({("events.EventSeriesCollaborator", "series")})
 
 
 def select_related_paths(model_label):
@@ -32,6 +33,8 @@ def select_related_paths(model_label):
         # The hosted-collaboration anchor is the local Event, so it is needed even
         # when the projected field is the collaborator's own foreign makerspace.
         paths.add("event")
+    if model_label == "events.EventSeriesCollaborator":
+        paths.add("series")
     paths.update(closure_paths(model_label, MOVABLE_ROW_REFERENCES))
     return paths
 
@@ -148,7 +151,7 @@ class ExternalReferenceWriter:
 
 
 def _owner_makerspace_id(edge, related):
-    if edge in _CONTAINER_EDGES or edge in _EVENT_EDGES:
+    if edge in _CONTAINER_EDGES or edge in _EVENT_EDGES or edge in _SERIES_EDGES:
         return related.makerspace_id
     return related.pk
 
@@ -160,6 +163,8 @@ def _snapshot(edge, related):
             "starts_at": related.starts_at.isoformat(),
             "ends_at": related.ends_at.isoformat(),
         }
+    if edge in _SERIES_EDGES:
+        return {"title": related.title}
     if edge in _CONTAINER_EDGES:
         return {
             "label": related.label,
@@ -179,4 +184,6 @@ def _anchor(row, edge):
         # it belongs to is the Event. Several foreign collaborators of one event all
         # anchor here, which is why the anchor index is not unique.
         return row.event._meta.label, str(row.event_id)
+    if edge == ("events.EventSeriesCollaborator", "makerspace"):
+        return row.series._meta.label, str(row.series_id)
     return row._meta.label, str(row.pk)

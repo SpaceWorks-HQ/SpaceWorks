@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
@@ -111,44 +112,50 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
         return self._makerspace_object
 
     def perform_update(self, serializer):
-        previous_features = list(serializer.instance.enabled_features)
-        previous_geofence = {
-            "enabled": serializer.instance.geofence_enabled,
-            "configured": serializer.instance.geofence_effective,
-            "radius_m": serializer.instance.geofence_radius_m,
-            "latitude": str(serializer.instance.geofence_latitude),
-            "longitude": str(serializer.instance.geofence_longitude),
-        }
-        instance = serializer.save()
-        audit.record(
-            self.request.user,
-            "makerspace.updated",
-            makerspace=instance,
-            target=instance,
-        )
-        if previous_features != instance.enabled_features:
+        # Feature OFF must serialize with services that re-check the same row under
+        # lock. Otherwise a station sync can pass its gate while this PATCH commits OFF.
+        with transaction.atomic():
+            serializer.instance = Makerspace.objects.select_for_update().get(
+                pk=serializer.instance.pk
+            )
+            previous_features = list(serializer.instance.enabled_features)
+            previous_geofence = {
+                "enabled": serializer.instance.geofence_enabled,
+                "configured": serializer.instance.geofence_effective,
+                "radius_m": serializer.instance.geofence_radius_m,
+                "latitude": str(serializer.instance.geofence_latitude),
+                "longitude": str(serializer.instance.geofence_longitude),
+            }
+            instance = serializer.save()
             audit.record(
                 self.request.user,
-                "makerspace.features_changed",
+                "makerspace.updated",
                 makerspace=instance,
                 target=instance,
-                meta={"before": previous_features, "after": instance.enabled_features},
             )
-        current_geofence = {
-            "enabled": instance.geofence_enabled,
-            "configured": instance.geofence_effective,
-            "radius_m": instance.geofence_radius_m,
-            "latitude": str(instance.geofence_latitude),
-            "longitude": str(instance.geofence_longitude),
-        }
-        if previous_geofence != current_geofence:
-            audit.record(
-                self.request.user,
-                "makerspace.geofence_updated",
-                makerspace=instance,
-                target=instance,
-                meta=current_geofence,
-            )
+            if previous_features != instance.enabled_features:
+                audit.record(
+                    self.request.user,
+                    "makerspace.features_changed",
+                    makerspace=instance,
+                    target=instance,
+                    meta={"before": previous_features, "after": instance.enabled_features},
+                )
+            current_geofence = {
+                "enabled": instance.geofence_enabled,
+                "configured": instance.geofence_effective,
+                "radius_m": instance.geofence_radius_m,
+                "latitude": str(instance.geofence_latitude),
+                "longitude": str(instance.geofence_longitude),
+            }
+            if previous_geofence != current_geofence:
+                audit.record(
+                    self.request.user,
+                    "makerspace.geofence_updated",
+                    makerspace=instance,
+                    target=instance,
+                    meta=current_geofence,
+                )
 
 
 @extend_schema(tags=["Admin makerspaces"], summary="Retrieve or update return policy")

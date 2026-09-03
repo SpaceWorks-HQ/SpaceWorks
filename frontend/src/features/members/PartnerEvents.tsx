@@ -7,6 +7,12 @@ import type { CustomAnswers, CustomFormSchema } from "../forms/customFormTypes";
 import { staffRequest } from "../../lib/api";
 
 const EVENT_TONES = ["border-accent", "border-secondary", "border-success", "border-warn"] as const;
+type CollaborativeEventWithPolicy = CollaborativeEvent & {
+  registration_requires_approval: boolean;
+  effective_registration_cutoff_at: string | null;
+  registration_open: boolean;
+  series: { public_token: string; title: string } | null;
+};
 
 /** Events hosted by makerspaces that have accepted a collaboration with this one.
  *
@@ -25,7 +31,7 @@ export function PartnerEvents({
   const queryClient = useQueryClient();
   const events = useQuery({
     queryKey: ["member", slug, "partner-events"],
-    queryFn: () => staffRequest<CollaborativeEvent[]>(
+    queryFn: () => staffRequest<CollaborativeEventWithPolicy[]>(
       `/member/makerspaces/${makerspaceId}/collaborative-events/`,
     ),
     enabled: makerspaceId >= 0,
@@ -72,6 +78,15 @@ export function PartnerEvents({
   });
 
   const rows = events.data ?? [];
+  const groups = rows.reduce<Array<{
+    key: string; title: string | null; events: CollaborativeEventWithPolicy[];
+  }>>((result, event) => {
+    const key = event.series?.public_token ?? `event-${event.id}`;
+    const group = result.find((candidate) => candidate.key === key);
+    if (group) group.events.push(event);
+    else result.push({ key, title: event.series?.title ?? null, events: [event] });
+    return result;
+  }, []);
   if (!rows.length) return null;
 
   return (
@@ -83,8 +98,10 @@ export function PartnerEvents({
         Your makerspace collaborates with these hosts, so you can register even when the
         event is not listed publicly.
       </p>
-      <ul className="mt-3 space-y-3 text-sm">
-        {rows.map((event) => {
+      <div className="mt-3 space-y-5 text-sm">
+        {groups.map((group) => <section key={group.key} aria-label={group.title ?? undefined}>
+          {group.title ? <div className="mb-2"><p className="eyebrow text-secondary-ink">Recurring series</p><h3 className="title-section">{group.title}</h3></div> : null}
+          <ul className="space-y-3">{group.events.map((event) => {
           // A host may attach a custom form, and the backend validates required answers.
           // Without rendering those fields the button would post `{}` and such an event
           // would simply be unregisterable through this surface.
@@ -108,7 +125,7 @@ export function PartnerEvents({
             <li key={event.id} className={`border-l-2 ${EVENT_TONES[event.id % EVENT_TONES.length]} py-2 pl-3`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="title-section">{event.title}</h3>
+                  {group.title ? <h4 className="title-section">{event.title}</h4> : <h3 className="title-section">{event.title}</h3>}
                   <p className="eyebrow mt-1">
                     Hosted by {event.host_name} · <span className="font-mono">{new Date(event.starts_at).toLocaleString()}</span>
                   </p>
@@ -116,7 +133,7 @@ export function PartnerEvents({
                 <button
                   type="button"
                   className="desk-button-secondary"
-                  disabled={register.isPending || (open && blocked)}
+                  disabled={!event.registration_open || register.isPending || (open && blocked)}
                   onClick={() => {
                     if (mustExpand && !open) {
                       setAnswers({});
@@ -133,9 +150,10 @@ export function PartnerEvents({
                     });
                   }}
                 >
-                  {mustExpand && !open ? "Register…" : "Register"}
+                  {!event.registration_open ? "Registration closed" : mustExpand && !open ? `${event.registration_requires_approval ? "Apply" : "Register"}…` : event.registration_requires_approval ? "Apply" : "Register"}
                 </button>
               </div>
+              {!event.registration_open && event.effective_registration_cutoff_at ? <p className="mt-2 text-xs text-muted">Closed at {new Date(event.effective_registration_cutoff_at).toLocaleString()}</p> : null}
               {/* Unmounted when closed rather than hidden, so keyboard users cannot tab
                   into fields for an event they are not registering for. */}
               {open && waiver ? (
@@ -168,8 +186,8 @@ export function PartnerEvents({
               ) : null}
             </li>
           );
-        })}
-      </ul>
+        })}</ul></section>)}
+      </div>
       {register.error ? (
         <p className="mt-2 text-sm text-danger" role="alert">
           {register.error instanceof Error ? register.error.message : "Could not register."}

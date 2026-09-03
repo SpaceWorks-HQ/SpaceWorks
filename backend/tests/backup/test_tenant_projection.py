@@ -61,6 +61,29 @@ def test_event_collaboration_is_snapshot_only_in_both_directions():
     }
 
 
+def test_event_registration_policy_is_preserved_in_backup_projection():
+    own, _foreign = spaces()
+    start = timezone.now() + timedelta(days=1)
+    event = Event.objects.create(
+        makerspace=own,
+        title="Policy event",
+        starts_at=start,
+        ends_at=start + timedelta(hours=1),
+        registration_requires_approval=True,
+        registration_cutoff_lead_minutes=60,
+    )
+
+    payload, _references, included = project(
+        "events.Event", Event.objects.filter(pk=event.pk), own.pk,
+    )
+    fields = json.loads(payload)[0]["fields"]
+
+    assert included == [event.pk]
+    assert fields["registration_requires_approval"] is True
+    assert fields["registration_cutoff_at"] is None
+    assert fields["registration_cutoff_lead_minutes"] == 60
+
+
 def test_cross_tenant_fields_are_nulled_and_preserved_as_provenance():
     own, foreign = spaces()
     actor = get_user_model().objects.create_user(username="operator")

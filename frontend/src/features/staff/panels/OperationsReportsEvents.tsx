@@ -1,4 +1,4 @@
-import { BarChart, DataState, PieChart, ReportTable, StatCards } from "./OperationsReportsParts";
+import { BarChart, DataState, LineChart, PieChart, ReportTable, StatCards } from "./OperationsReportsParts";
 import { Panel } from "./shared";
 import { groupReportByMakerspace, sum, useFablabReport, type EventAttendanceRow, type FablabPanelProps, type ReportResponse } from "./operationsReportsFablabApi";
 
@@ -22,12 +22,13 @@ export function OperationsReportsEvents(props: FablabPanelProps) {
 }
 
 function EventsReport({ rows, data }: { rows: EventAttendanceRow[]; data?: ReportResponse<EventAttendanceRow> }) {
-  const statusRows = ["registered", "waitlisted", "cancelled", "attended"].map((key) => ({ label: key, value: sum(rows, key) }));
+  const statusRows = ["pending_approval", "registered", "waitlisted", "rejected", "cancelled", "attended"].map((key) => ({ label: key, value: sum(rows, key) }));
   return <>
     <StatCards stats={[["Events", rows.length], ["Registrations", sum(rows, "registrations")], ["Confirmed", sum(rows, "confirmed")], ["Attended", sum(rows, "attended")]]} />
     <div className="mt-4 grid gap-4 lg:grid-cols-2">
       <PieChart rows={statusRows} valueLabel="registrations" />
       <BarChart rows={rows.filter((row) => row.attendance_rate_percent !== null).map((row) => ({ label: row.title, value: row.attendance_rate_percent ?? 0 }))} valueLabel="% attended" />
+      <LineChart rows={[...rows].sort((a, b) => a.starts_at.localeCompare(b.starts_at)).map((row) => ({ label: row.starts_at, value: row.registrations }))} valueLabel="registrations" />
     </div>
     <ReportTable data={data} />
   </>;

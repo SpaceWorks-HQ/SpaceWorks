@@ -116,7 +116,10 @@ thirteen modules under it are optional.
 - **Without it** — not an option: hardware cannot be issued without an issue photo, nor returned without
   a return photo and a remark. That is the accountability rule the product is built around.
 - **Data** — core; not separately purgeable. Evidence rows are immutable and only ever removed when the
-  whole makerspace is purged.
+  whole makerspace is purged. The *object bytes* are a separate question: an optional per-makerspace
+  retention policy deletes the stored image once its window passes, keeping the immutable row, the
+  remarks, the QR scans and the audit trail. An expired photo then reads as a truthful expired state
+  (410) rather than a broken link, so the accountability record survives the picture.
 
 ### qr_management
 
@@ -280,13 +283,20 @@ Required by `printing`.
 
 ### events
 
-- **What it is** — event scheduling and registration, including QR check-in at the door and
-  cross-makerspace collaborative events.
-- **What it adds** — the events console, the public event list, member registration, staff-side
-  registration, QR check-in, collaborators and host waivers, and attended events on the maker profile.
-- **Without it** — the space runs no events in-app: no public listing, no registrations, no check-in, and
-  no attended-event history on member profiles. `payments.events` becomes inert.
-- **Data** — purgeable: events and their registrations (registrations hold PII and are handled as such).
+- **What it is** — event scheduling and registration: one-off events or recurring series, registration
+  with optional approval and waitlists, QR check-in at the door, post-event feedback and attendance
+  certificates, and cross-makerspace collaborative events.
+- **What it adds** — the events console, the public event list, member and staff-side registration,
+  registration approval and waitlist promotion, QR check-in, printable attendee badges, post-event
+  feedback surveys with the attendance certificates they issue, per-member calendar feeds,
+  organization-hosted events, collaborators and host waivers, and attended events on the maker profile.
+- **Without it** — the space runs no events in-app: no public listing, no registrations, no check-in, no
+  feedback or certificates, no calendar feeds, and no attended-event history on member profiles.
+  `payments.events` and `events.offline_checkin` become inert.
+- **Data** — purgeable: events and series, registrations (they hold PII and are handled as such),
+  check-in history, station credentials, feedback surveys and responses, attendance certificates and the
+  stored PDFs they name, calendar feeds, and collaboration records. Payment routing on a registration is
+  deliberately left intact, so a receipt stays readable and a charge raised later stays payable.
 
 ---
 
@@ -414,13 +424,17 @@ stored credential**, so re-enabling needs no re-entry.
 ### reports
 
 - **What it is** — analytics, the report registry and CSV/XLSX exports.
-- **What it adds** — the `analytics` and `report_export` workflows: dashboards, the ledger, problem
-  reports and every registered report.
+- **What it adds** — the `analytics` and `report_export` workflows: a server-provided report catalog,
+  dashboards, accessible charts with table fallbacks, the ledger, problem reports and every registered
+  report. The catalog covers every module either with a substantive report or an explicitly gated row in
+  a composite operational-health report.
 - **Without it** — no analytics screens and no exports from the console. It is a **standalone area
   rather than part of Inventory** on purpose: switching Inventory off would otherwise take the machine
   and event reports with it.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately; reports read
-  other modules' rows.
+- **Data** — closed historical buckets are stored as append-only, non-PII metric rollups; corrections add
+  a revision rather than rewriting history. Automatic evidence retention must finalize its rollup fence
+  first, so it cannot change historical figures. Whole-tenant purge removes the rollups through tenant
+  ownership, and an explicit source-module purge removes that module's derived rollups too.
 
 ---
 
@@ -488,6 +502,8 @@ in the console rather than a superadmin. A feature is inert while its parent mod
 | `payments.events` | `events` | | Charge for event registration | Registration is free in-app |
 | `payments.membership` | `membership` | | Charge membership dues | Dues are collected out of band |
 | `mobile.push` | `mobile` | ● | Native push notifications | Apps rely on in-app/inbox notifications |
+| `events.offline_checkin` | `events` | | Expiring on-device roster plus event-scoped PIN check-in stations | Check-in needs a live connection and an authenticated staff actor |
+| `notifications.delegated_recipients` | `notifications` | | Machine-scoped maintainers manage maintenance alert recipients for their own machines. Needs `maintenance` and `machines` too | Only makerspace-level staff manage recipients |
 | `inventory.self_checkout` | — | ● | Member self-checkout and staff direct handouts | Every handover goes through a staff-issued request |
 | `presence.geofence` | — | ● | Advisory location check at check-in | Check-in records no location. It is advisory either way — it never blocks |
 

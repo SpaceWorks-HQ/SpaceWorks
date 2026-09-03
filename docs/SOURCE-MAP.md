@@ -24,10 +24,18 @@
   over `lifecycle_archive.py`, `lifecycle_purge.py` and `lifecycle_storage.py`),
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
 - `backend/apps/organizations/` — `Organization` (platform entity, creatable before any makerspace, NOT a
-  module_registry key), `OrganizationMakerspace` (the many-to-many link, at most one `owner` per space) and
-  `OrganizationMembership` (org-level `granted_actions`). Authority is resolved through
-  `accounts/rbac.py` with its organization layer in `accounts/rbac_organizations.py`, never mirrored into
-  `MakerspaceMembership`; `accounts/org_payload.py` projects it into the auth payload.
+  module_registry key), its opt-in public profile and cross-makerspace event catalogue,
+  `OrganizationMakerspace` (the many-to-many link, at most one `owner` per space),
+  `OrganizationMembership` (org-level makerspace grants plus separate organization-governance actions),
+  and digest-only single-use `OrganizationInvitation` grants. Organization profile/member governance
+  lives in `governance.py` + `services_profiles.py`/`services_invitations.py`; makerspace authority is
+  resolved through `accounts/rbac.py` with its organization layer in `accounts/rbac_organizations.py`,
+  never mirrored into `MakerspaceMembership`; `accounts/org_payload.py` projects it into the auth payload.
+  `models.py` is the schema source of truth; `governance.py` owns the fixed organization-only action
+  vocabulary, `access.py` the visible/locked authorization queries, and the two `services_*` modules the
+  transactional audited profile and invitation mutations. `public_catalog.py` is the canonical public
+  organization-event queryset; `urls_public.py` withdraws that separable events route when `apps.events`
+  is tombstoned, while `urls_admin.py` and the corresponding `views_*`/`serializers_*` expose governance.
 - `backend/apps/apiclients/` — `ApiClient` (client_id + Fernet-encrypted HMAC secret), `ApiKeyRequest`, and
   `scope_registry.py`/`scope_registry_routes.py` — the single source of truth for which protected route each
   scope authorizes, keyed on the versioned `view_name`. `checks.py` is the deployment-time guard that a
@@ -40,6 +48,15 @@
   object-store/HTTP collector protocols behind the `anchors.py` barrel.
 - `backend/apps/evidence/` — immutable evidence photos, S3 storage helpers, signed upload/view URLs gated by
   per-makerspace `UPLOAD_EVIDENCE` + active status.
+  `retention_models.py` owns the optional per-makerspace `EvidenceRetentionPolicy` override and per-photo
+  `EvidenceObjectRetentionState`, re-exported by
+  `models.py`; both use normal primary keys plus unique one-to-ones so they can travel through tenant
+  migration. `retention_policy.py` is the single source of truth for the effective window and candidate/
+  preview query. `services_retention.py` owns the bounded idempotent sweep: it observes deployment recovery
+  and each tenant source gate, removes both final and staging bytes, credits confirmed storage and audits a
+  terminal expired state without mutating the `EvidencePhoto` row. `sweep_evidence_retention()` is the
+  single sweep entry point, `tasks.py` is its Celery/scheduled-task adapter, and `views_retention.py` exposes
+  the policy and preview API.
 - `backend/apps/boxes/` — `QrCode`/`Box` payloads, immutable `BoxScan`/`QrScanEvent`, `qr_render.py`
   (namespaced standalone SVG shared by QR-print + batch ZIP), QR rebind. Camera scanner at
   `frontend/src/components/ui/QrScanner.tsx` (native `BarcodeDetector` + `zxing-wasm` fallback).
@@ -153,6 +170,18 @@
   thin `role_scope.py` import surface over `role_scope_resolution.py` (including the identity-sensitive
   `EXEMPT`/`NOTHING` sentinels), `role_scope_grants.py`, and `role_scope_queries.py`; scope mutations remain
   in `role_scope_services.py`.
+- `backend/apps/events/` — the separable events module. `models.py` is the stable explicit re-export barrel
+  over `models_event.py`, `models_registration.py`, `models_attendance.py`, `models_feedback.py`,
+  `models_certificates.py`, `models_series.py`, `models_calendar.py`, `models_collaborators.py` and
+  `organizer_models.py`; those focused files are the schema sources for events/occurrences, approval and
+  waitlist registrations, immutable check-in history and PIN credentials, feedback, certificate artifacts,
+  recurring series, member feed credentials, makerspace collaboration and organization attribution.
+  `services.py` remains the audited transactional boundary for one-off event and registration mutations,
+  delegating lifecycle and registration-state transitions to `services_lifecycle.py`,
+  `services_registration.py` and `services_registration_state.py`. The other `services_*` modules own the
+  corresponding series/recurrence/collaboration, calendar/feed, badge, check-in/offline-sync/station,
+  feedback/certificate, image and organizer workflows; `urls_admin.py`, `urls_member.py`, `urls_public.py`
+  and `urls_station.py` divide the staff, authenticated-member, public and anonymous-station surfaces.
 - `backend/apps/warranty/`, `apps/maintenance/`, `apps/events/`, `apps/bookings/`, `apps/forms_schema/`,
   `apps/encryption/`, `apps/procurement/`, `apps/notifications/`, `apps/operations/report_registry.py` — the
   remaining FabLab + governance modules.
@@ -165,3 +194,12 @@
   `frontend/src/features/auth/` + `members/MemberAuthPanel.tsx` — provider-config-driven social/member auth.
   `frontend/src/features/printing|bookings|forms|...` — feature slices. `frontend/src/lib/`,
   `components/ui/`, `types/`, `generated/api.ts`.
+- `frontend/src/features/events/` — the standalone anonymous PIN-station route. Its
+  `EventCheckInStationPage.tsx` exchanges the event-scoped PIN, then reuses the offline roster/sync API,
+  IndexedDB state and operator UI owned by `features/staff/eventCheckInOfflineApi.ts`,
+  `eventCheckInOfflineStore.ts` and `OfflineCheckInOperator.tsx`.
+- `frontend/src/features/organizations/` — public organization presentation and invitation redemption:
+  `PublicOrganizationPage.tsx` renders the public profile and paginated cross-makerspace event catalogue,
+  `OrganizationInvitationRedeemPage.tsx` binds a single-use invitation after member sign-in, and
+  `publicOrganizationsApi.ts` owns their TanStack Query keys and public API calls. Staff profile,
+  membership, invitation and event-organizer controls remain under `frontend/src/features/staff/`.

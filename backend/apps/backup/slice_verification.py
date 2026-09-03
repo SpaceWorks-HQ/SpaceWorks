@@ -97,6 +97,12 @@ def _verify_json(path, expected, label):
 def _verify_objects(root, manifest):
     for item in manifest:
         path = root / item["bucket_kind"] / item["key"]
+        if item.get("retention_state") == "expired":
+            if path.exists() or item.get("size") != 0 or item.get("sha256") != "":
+                raise BackupBuildError(
+                    "Sovereign slice expiry tombstone verification failed."
+                )
+            continue
         try:
             size = path.stat().st_size
             digest = sha256_file(path)

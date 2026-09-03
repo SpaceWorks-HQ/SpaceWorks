@@ -77,7 +77,7 @@ def _manageable_event(actor, pk):
         field='makerspace_id',
     )
     event = get_object_or_404(
-        Event.objects.select_related('makerspace')
+        Event.objects.select_related('makerspace', 'series')
         .prefetch_related('organizers__organization')
         .filter(
             Q(pk__in=venue_scoped.values('pk'))
@@ -161,6 +161,7 @@ class EventListCreateView(APIView):
         )
         queryset = (
             _annotate_registration_counts(queryset)
+            .select_related('series')
             .prefetch_related('organizers__organization')
             .order_by('starts_at', 'id')
         )
@@ -181,10 +182,12 @@ class EventListCreateView(APIView):
         makerspace = _visible_makerspace(request.user, makerspace_id)
         serializer = EventWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        values = dict(serializer.validated_data)
+        values.pop('inherit_fields', None)
         event = services.create_event(
             makerspace=makerspace,
             actor=request.user,
-            **serializer.validated_data,
+            **values,
         )
         return Response(
             EventAdminSerializer(event).data,
@@ -274,4 +277,3 @@ class EventCompleteView(_EventActionView):
     )
     def post(self, request, pk, *args, **kwargs):
         return self.execute(request, pk)
-

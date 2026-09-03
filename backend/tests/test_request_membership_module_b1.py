@@ -120,19 +120,47 @@ def test_membership_off_does_not_relax_other_physical_action_surfaces():
     modules = [key for key in profile_modules(EVERYTHING) if key != "membership"]
     space = _space("physical-actions-stay-member-only", modules)
     client = _client(_user("physical-action-outsider"))
+    # Self-checkout is the requester PHYSICALLY taking and returning a tool, so it stays
+    # member-only whether or not the community module is installed.
     urls = [
         reverse("hardware_requests:public-tool-evidence-url", args=[space.slug]),
         reverse("hardware_requests:public-tool-checkout", args=[space.slug]),
         reverse("hardware_requests:public-tool-return", args=[space.slug]),
-        reverse("public-machine-service-request-submit", args=[space.slug]),
-        reverse("public-printer-service-upload", args=[space.slug]),
-        reverse("public-printer-service-request", args=[space.slug]),
     ]
 
     for url in urls:
         response = client.post(url, {}, format="json")
         assert response.status_code == 403, (url, response.data)
         assert response.data["code"] == "membership_required", (url, response.data)
+
+
+def test_membership_off_lets_an_account_propose_machine_and_printer_service():
+    """The machine/printer service submits are PROPOSALS, not physical custody.
+
+    They deliberately mirror the public borrow request: a membership when that module is
+    installed, an active account otherwise. Asserting `membership_required` here instead
+    is what let the `recommended` profile ship a surface that refused every ordinary
+    account -- `recommended` has `machine_service` and no `membership`.
+    """
+    modules = [key for key in profile_modules(EVERYTHING) if key != "membership"]
+    space = _space("service-proposals-take-accounts", modules)
+    urls = [
+        reverse("public-machine-service-request-submit", args=[space.slug]),
+        reverse("public-printer-service-upload", args=[space.slug]),
+        reverse("public-printer-service-request", args=[space.slug]),
+    ]
+
+    client = _client(_user("service-proposal-account"))
+    for url in urls:
+        response = client.post(url, {}, format="json")
+        # Past the identity gate and into validation -- never a membership refusal.
+        assert response.status_code == 400, (url, response.data)
+        assert response.data.get("code") != "membership_required", (url, response.data)
+
+    # ...but still not open to the public: no account, no proposal.
+    for url in urls:
+        response = _client().post(url, {}, format="json")
+        assert response.status_code in (401, 403), (url, response.data)
 
 
 def test_membership_off_does_not_relax_event_registration():

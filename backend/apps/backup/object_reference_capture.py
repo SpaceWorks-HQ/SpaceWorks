@@ -34,9 +34,25 @@ def build_object_ownership_plan(sovereign_makerspace_ids):
             query_fields.append(owner_lookup)
         if rule.coordination_path and rule.coordination_path not in query_fields:
             query_fields.append(rule.coordination_path)
+        if rule.retention_aware:
+            query_fields.extend(
+                [
+                    "object_retention_state__status",
+                    "object_retention_state__object_expired_at",
+                    "object_retention_state__expired_size_bytes",
+                ]
+            )
         rows = model._base_manager.exclude(**{rule.field_name: ""}).values(*query_fields)
         for row in rows.iterator(chunk_size=500):
-            key = str(row[rule.field_name])
+            # A NULL key column survives the exclude() above -- Django keeps NULL rows
+            # out of an `exclude(field="")` -- and str(None) would enter the closure as
+            # an object literally named "None" that no bucket holds. Only
+            # bookings.BookableSpace.image_key is nullable today; the legacy closure in
+            # archive_objects.collect_model_objects tests the raw value and skips it.
+            raw_key = row[rule.field_name]
+            if raw_key is None:
+                continue
+            key = str(raw_key)
             if not key:
                 continue
             bucket = row["bucket_kind"] if rule.bucket == BucketRule.FROM_ROW else rule.bucket
@@ -47,6 +63,14 @@ def build_object_ownership_plan(sovereign_makerspace_ids):
             if rule.policy == ReferencePolicy.COORDINATION_ONLY:
                 component = None
             coordination_id = row.get(rule.coordination_path) if rule.coordination_path else None
+            retention_state = row.get("object_retention_state__status") or "live"
+            if retention_state == "expiring":
+                raise BackupBuildError(
+                    "Evidence expiry is in progress; retry archive capture later."
+                )
+            expired_at = row.get("object_retention_state__object_expired_at")
+            if retention_state == "expired" and expired_at is None:
+                raise BackupBuildError("Expired evidence lacks terminal state.")
             references.append(ObjectReference(
                 bucket_kind=str(bucket), object_key=key,
                 site=f"{rule.model_label}:{row['pk']}:{rule.field_name}",
@@ -59,6 +83,11 @@ def build_object_ownership_plan(sovereign_makerspace_ids):
                     else (rule.coordination_reason if coordination_id else "")
                 ),
                 coordination_makerspace_id=coordination_id,
+                retention_state=retention_state,
+                object_expired_at=(expired_at.isoformat() if expired_at else ""),
+                expired_size_bytes=row.get(
+                    "object_retention_state__expired_size_bytes"
+                ),
             ))
     references.extend(_audit_meta_references())
     return ObjectOwnershipPlan(references, sovereign)

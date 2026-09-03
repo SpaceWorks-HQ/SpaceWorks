@@ -21,6 +21,13 @@ NON_OBJECT_KEY_FIELDS = frozenset({
     ("audit.AuditSigningKeyRotation", "new_key"),
     ("audit.AuditSigningKeyRotation", "old_key"),
     ("backup.RestoreRollbackObject", "module_key"),
+    # Logical identity strings, not object-store pointers: the occurrence key names a
+    # position within a recurring series, and the rollup keys name which metric a row
+    # holds. Nothing is stored in a bucket for any of them.
+    ("events.Event", "series_occurrence_key"),
+    ("operations.ReportMetricRollup", "dimension_key"),
+    ("operations.ReportMetricRollup", "metric_key"),
+    ("operations.ReportMetricRollup", "report_key"),
     ("backup.RestoreRollbackObject", "source_key"),
     # Run-owned promotion staging is retry coordination, not durable archive
     # content. The final object and artifact ledger are the restore authority.
@@ -63,6 +70,9 @@ def collect_model_objects(queryset, model, result, fixed_makerspace_id=None):
     for field in model._meta.concrete_fields:
         if field.name not in OBJECT_FIELD_NAMES:
             continue
+        if model._meta.label == "evidence.EvidencePhoto" and field.name == "object_key":
+            _collect_evidence_objects(queryset, result, fixed_makerspace_id)
+            continue
         if field.name == "copy_key":
             rows = queryset.exclude(copy_key="").values_list(
                 "copy_key", "bucket_kind", "makerspace_id", "module_key"
@@ -92,6 +102,40 @@ def collect_model_objects(queryset, model, result, fixed_makerspace_id=None):
                 }
 
 
+def _collect_evidence_objects(queryset, result, fixed_makerspace_id):
+    rows = queryset.exclude(object_key="").values(
+        "object_key",
+        "makerspace_id",
+        "object_retention_state__status",
+        "object_retention_state__object_expired_at",
+        "object_retention_state__expired_size_bytes",
+    )
+    for row in rows:
+        status = row["object_retention_state__status"]
+        if status == "expiring":
+            raise storage.BackupStorageError(
+                "Evidence expiry is in progress; retry the archive after it completes."
+            )
+        ownership = {
+            "makerspace_id": fixed_makerspace_id or row["makerspace_id"],
+            "module_key": "",
+        }
+        if status == "expired":
+            expired_at = row["object_retention_state__object_expired_at"]
+            if expired_at is None:
+                raise storage.BackupStorageError(
+                    "Expired evidence is missing its terminal timestamp."
+                )
+            ownership.update(
+                retention_state="expired",
+                object_expired_at=expired_at.isoformat(),
+                expired_size_bytes=row[
+                    "object_retention_state__expired_size_bytes"
+                ],
+            )
+        result["private"][str(row["object_key"])] = ownership
+
+
 def capture_objects(root, object_keys, modes):
     manifest = []
     buckets = {
@@ -102,6 +146,23 @@ def capture_objects(root, object_keys, modes):
         if kind not in buckets:
             raise ValueError(f"Unsupported backup bucket kind: {kind!r}.")
         for key, ownership in sorted(keys.items()):
+            if ownership.get("retention_state") == "expired":
+                storage.assert_object_absent(buckets[kind], key)
+                storage.assert_object_absent(buckets[kind], f"staging/{key}")
+                manifest.append(
+                    {
+                        "bucket_kind": kind,
+                        **ownership,
+                        "key": key,
+                        "version_id": None,
+                        "size": 0,
+                        "sha256": "",
+                        "metadata": {},
+                        "content_type": "",
+                        "headers": {},
+                    }
+                )
+                continue
             destination = root / kind / key
             item = storage.download_object(
                 buckets[kind], key, destination, versioned=modes[kind] == "versioned"
@@ -113,6 +174,8 @@ def capture_objects(root, object_keys, modes):
 def module_for_model(label):
     return {
         "events.Event": "events",
+        "events.EventSeries": "events",
+        "events.EventAttendanceCertificate": "events",
         "bookings.BookableSpace": "bookings",
         "maintenance.MaintenanceLogDocument": "maintenance",
         "procurement.ToBuyReceipt": "procurement",

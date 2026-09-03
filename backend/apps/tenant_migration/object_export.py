@@ -11,6 +11,9 @@ from apps.makerspaces.storage_key_collectors import (
     collect_private_object_keys,
     collect_public_image_keys,
 )
+from apps.evidence.models import EvidenceObjectRetentionState
+from apps.evidence.retention_objects import retention_object_states
+from apps.evidence.storage import staging_key
 
 
 class SourceMigrationObjectError(RuntimeError):
@@ -35,6 +38,7 @@ def capture_tenant_objects(root, makerspace, storage_modes):
     )
     records = []
     source_keys = set()
+    evidence_states = retention_object_states(makerspace)
     for bucket_kind, bucket, keys in closures:
         for source_key in sorted(keys):
             if source_key in source_keys:
@@ -42,6 +46,33 @@ def capture_tenant_objects(root, makerspace, storage_modes):
                     source_key, "is referenced from more than one bucket"
                 )
             source_keys.add(source_key)
+            retention = evidence_states.get(source_key)
+            if retention and retention["status"] == EvidenceObjectRetentionState.Status.EXPIRING:
+                raise SourceMigrationObjectError(
+                    source_key, "is currently being expired; retry after the sweep"
+                )
+            if retention and retention["status"] == EvidenceObjectRetentionState.Status.EXPIRED:
+                try:
+                    storage.assert_object_absent(bucket, source_key)
+                    storage.assert_object_absent(bucket, staging_key(source_key))
+                except Exception as exc:
+                    raise SourceMigrationObjectError(
+                        source_key, "is marked expired but bytes still exist"
+                    ) from exc
+                records.append(
+                    {
+                        "bucket_kind": bucket_kind,
+                        "source_key": source_key,
+                        "size": 0,
+                        "sha256": "",
+                        "version_id": None,
+                        "content_type": "",
+                        "retention_state": "expired",
+                        "object_expired_at": retention["object_expired_at"].isoformat(),
+                        "expired_size_bytes": retention["expired_size_bytes"],
+                    }
+                )
+                continue
             destination = root / object_member_path(bucket_kind, source_key)
             try:
                 # There is no ObjectVersion ledger yet. Even for a versioned bucket,

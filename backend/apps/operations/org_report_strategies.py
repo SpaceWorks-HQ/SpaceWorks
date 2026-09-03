@@ -114,11 +114,16 @@ STRATEGIES = {
     ),
     "event-attendance": _strategy(
         AggregationKind.WEIGHTED_RATE, (),
-        ("capacity", "registrations", "confirmed", "registered", "waitlisted", "cancelled", "attended", "attendance_rate_percent"),
-        breakdown=("event_id", "title", "starts_at", "status", "organizers"),
+        ("capacity", "registrations", "confirmed", "pending_approval", "registered", "waitlisted", "rejected", "cancelled", "attended",
+         "feedback_responses", "active_certificates", "revoked_certificates", "attendance_rate_percent"),
+        breakdown=("event_id", "title", "starts_at", "status", "organizers",
+                   "series_id", "series_title", "series_occurrence_key"),
         ordering=(), text=(
             ("title", "breakdown-only"), ("starts_at", "breakdown-only"),
             ("status", "breakdown-only"), ("organizers", "breakdown-only"),
+            # Recurrence provenance describes WHICH occurrence a row is; summing it
+            # across makerspaces would be meaningless.
+            ("series_title", "breakdown-only"), ("series_occurrence_key", "breakdown-only"),
         ),
     ),
     "booking-utilization": _strategy(
@@ -142,6 +147,20 @@ STRATEGIES = {
             "maintenance_enabled", "maintenance_available", "maintenance_logs", "maintenance_total_cost", "maintenance_overdue_schedules",
         ), ordering=(),
         text=(("*_enabled", "ANY"), ("*_available", "ALL among enabled makerspaces; false when none enabled")),
+    ),
+    "evidence-compliance": _strategy(
+        AggregationKind.WEIGHTED_RATE, ("period", "evidence_type"),
+        (
+            "period", "evidence_type", "created_count", "attached_count",
+            "unattached_count", "object_live_count", "object_expired_count",
+            "metadata_retained_count", "bytes", "attachment_rate_percent",
+        ),
+        ordering=("period", "evidence_type"),
+        text=(
+            ("period", "group and carry"),
+            ("evidence_type", "group and carry"),
+            ("attachment_rate_percent", "recompute from summed attached and created counts"),
+        ),
     ),
 }
 

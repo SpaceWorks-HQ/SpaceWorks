@@ -6,7 +6,7 @@ from apps.data_export import storage as export_storage
 from apps.data_export.models import DataExportJob
 from apps.events.models import Event
 from apps.evidence import storage as evidence_storage
-from apps.evidence.models import EvidencePhoto
+from apps.evidence.models import EvidenceObjectRetentionState, EvidencePhoto
 from apps.inventory import public_image_storage
 from apps.inventory.models import InventoryProduct
 from apps.machines import storage as machine_storage
@@ -45,7 +45,16 @@ class Command(BaseCommand):
         for makerspace in makerspaces.order_by("pk"):
             try:
                 values = {
-                    "evidence": self._sum(EvidencePhoto.objects.filter(makerspace=makerspace).values_list("object_key", "size_bytes"), evidence_storage.object_size, True),
+                    "evidence": self._sum(
+                        EvidencePhoto.objects.filter(makerspace=makerspace)
+                        .exclude(
+                            object_retention_state__status=
+                            EvidenceObjectRetentionState.Status.EXPIRED
+                        )
+                        .values_list("object_key", "size_bytes"),
+                        evidence_storage.object_size,
+                        True,
+                    ),
                     "print_files": self._sum(ServiceRequestFile.objects.filter(makerspace=makerspace).values_list("object_key", "size_bytes"), machine_storage.object_size, True),
                     "public_images": self._sum(((key, None) for key in self._public_image_keys(makerspace)), public_image_storage.object_size),
                     "machine_documents": self._sum(((key, None) for key in MachineDocument.objects.filter(machine__makerspace=makerspace).values_list("object_key", flat=True)), machine_storage.object_size),

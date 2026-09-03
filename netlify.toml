@@ -1,0 +1,28 @@
+# Netlify builds the React SPA and nothing else -- no Docker, no compose, no backend.
+# The generated API client (frontend/src/generated/api.ts) is committed, so the build
+# never has to reach your server.
+#
+# Point the app at your API with VITE_API_URL in the Netlify UI
+# (Site configuration -> Environment variables), e.g. https://api.example.org/api.
+# The backend needs matching CORS/CSRF/cookie settings -- see "Split deployment:
+# backend on your server, frontend on Netlify" in README.md.
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  # Relative to `base`, so this is frontend/dist.
+  publish = "dist"
+
+[build.environment]
+  # Vite 8 requires Node 20.19+ / 22.12+. Netlify's build image can default to an older
+  # Node, which fails the build with an error that does not mention the Node version.
+  NODE_VERSION = "22"
+
+# Client-side routing. Every deep link -- /m/<slug>, /admin/*, /member,
+# /event-check-in/<stationToken>, /o/<organizationSlug> -- is a React route, not a file
+# on disk, so a refresh or a shared link 404s without this rewrite. Status 200 (rewrite),
+# not 301: the URL must stay as the visitor typed it for the router to read it.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

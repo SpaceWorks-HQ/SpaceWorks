@@ -129,6 +129,22 @@ def _purge(makerspace, plan, cursor):
             counts["pii_blind_index"] = deleted
     outcome = plan.delete(makerspace, cursor)
     counts.update(outcome)
+    # Derived facts follow their source module during an explicit destructive purge.
+    # Automatic retention never reaches this path; preserving rollups there is the
+    # historical-report guarantee. A module purge is different: retaining its derived
+    # tenant data would violate the operator's explicit deletion boundary.
+    from apps.operations.models import ReportMetricRollup, ReportRollupCursor
+
+    rollups = ReportMetricRollup.objects.filter(
+        makerspace=makerspace, source_module=plan.key
+    ).delete()[0]
+    cursors = ReportRollupCursor.objects.filter(
+        makerspace=makerspace, source_module=plan.key
+    ).delete()[0]
+    if rollups:
+        counts["report_metric_rollups"] = rollups
+    if cursors:
+        counts["report_rollup_cursors"] = cursors
     # Read the attribute directly. Every collector returns a ``PurgeResult``, so a
     # ``getattr`` default would only ever hide a future collector that forgot to report
     # its labels -- and the symptom of that is provenance silently outliving the rows it

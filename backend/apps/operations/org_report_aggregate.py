@@ -31,6 +31,8 @@ def aggregate_rows(report_key, rows_by_space, *, limit):
         return _maintenance_total(rows)
     if report_key == "fablab-health":
         return _health_total(rows)
+    if report_key == "evidence-compliance":
+        return _evidence_totals(rows, limit)
     return _ordered_rows(report_key, rows)[:limit]
 
 
@@ -57,8 +59,8 @@ def _event_total(rows):
     if not rows:
         return []
     fields = (
-        "capacity", "registrations", "confirmed", "registered", "waitlisted",
-        "cancelled", "attended",
+        "capacity", "registrations", "confirmed", "pending_approval", "registered",
+        "waitlisted", "rejected", "cancelled", "attended",
     )
     total = _summed(rows, fields)
     completed = [row for row in rows if row.get("status") == "completed"]
@@ -130,6 +132,31 @@ def _health_total(rows):
         total["bookings_reserved_hours"], booking_denominator
     )
     return [total]
+
+
+def _evidence_totals(rows, limit):
+    groups = {}
+    additive = (
+        "created_count", "attached_count", "unattached_count",
+        "object_live_count", "object_expired_count", "metadata_retained_count",
+        "bytes",
+    )
+    for row in rows:
+        key = (row.get("period"), row.get("evidence_type"))
+        target = groups.setdefault(
+            key,
+            {"period": key[0], "evidence_type": key[1]},
+        )
+        for field in additive:
+            target[field] = target.get(field, 0) + (row.get(field) or 0)
+    for total in groups.values():
+        total["attachment_rate_percent"] = _percent(
+            total["attached_count"], total["created_count"]
+        )
+    return [
+        groups[key]
+        for key in sorted(groups, key=lambda item: tuple(str(value or "") for value in item))
+    ][:limit]
 
 
 def _available_sum(rows, field):

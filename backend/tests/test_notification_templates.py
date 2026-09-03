@@ -2,7 +2,7 @@
 
 The security assertion in this file is `test_chat_rendering_refuses_requester_content`:
 a chat channel is a ROOM, so member-facing wording must never be routable to one. The
-rest is coverage — 20 events x 2 audiences must each render against their own declared
+rest is coverage — 24 events x 2 audiences must each render against their own declared
 sample context, because a template that only fails at send time fails in production.
 """
 
@@ -40,12 +40,12 @@ FABLAB_ENTRIES = [
 ]
 
 
-# --- D6: 20 events x both audiences, all rendering -----------------------------------
+# --- D6: 24 events x both audiences, all rendering -----------------------------------
 
 
-def test_the_registry_covers_twenty_events_in_both_audiences():
-    assert sum(len(keys) for keys in FABLAB_STREAM_KEYS.values()) == 20
-    assert len(FABLAB_ENTRIES) == 40
+def test_the_registry_covers_twenty_four_events_in_both_audiences():
+    assert sum(len(keys) for keys in FABLAB_STREAM_KEYS.values()) == 24
+    assert len(FABLAB_ENTRIES) == 48
     for coordinates in FABLAB_ENTRIES:
         assert get_entry(*coordinates) is not None, coordinates
 

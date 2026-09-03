@@ -25,6 +25,8 @@ from apps.makerspaces.module_purge_collectors import (
     bookings_public_images,
     discord_destinations_delete,
     events_delete,
+    events_private_key_sizes,
+    events_private_keys,
     events_public_images,
     mattermost_destinations_delete,
     machine_service_delete,
@@ -89,8 +91,19 @@ NOT_SEPARABLE = {
 
 PLANS = (
     ModulePurgePlan(
-        "events", "Events and their registrations.", events_delete,
-        pii_labels=("events.EventRegistration",),
+        # The one-line description is what the purge confirmation shows an operator, so it
+        # has to name what actually goes: registrations are only the first layer.
+        "events",
+        "Events, series, registrations, check-in history, feedback, certificates and "
+        "calendar feeds.",
+        events_delete,
+        pii_labels=(
+            "events.EventRegistration",
+            "events.EventFeedbackResponse",
+            "events.EventAttendanceCertificate",
+        ),
+        private_keys=events_private_keys,
+        private_key_sizes=events_private_key_sizes,
         public_image_keys=events_public_images,
     ),
     ModulePurgePlan(

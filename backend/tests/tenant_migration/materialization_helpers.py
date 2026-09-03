@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 from datetime import timedelta
 
+from django.apps import apps
+from django.db import connection, transaction
 from django.utils import timezone
 
 from apps.data_export.runner import build_archive
@@ -10,7 +12,17 @@ from apps.hardware_requests.models import HardwareRequest
 from apps.makerspaces.models import MakerspaceMembership
 from apps.tenant_migration.keys import collect_source_keys
 from apps.tenant_migration.models import ImportIdentityDecision, TenantImportJob
+from apps.tenant_migration.unique_values import DEPLOYMENT_GLOBAL_UNIQUE_RULES
 from tests.data_export.portable_helpers import make_job
+
+
+def _models_with_non_regenerable_identity():
+    """Every exported model carrying a value the importer refuses to remint."""
+    return [
+        apps.get_model(label)
+        for (label, _rule), policy in DEPLOYMENT_GLOBAL_UNIQUE_RULES.items()
+        if getattr(policy.generator, "refuses_collision", False)
+    ]
 
 
 @contextmanager
@@ -36,6 +48,8 @@ def portable_import_case(space, source_user, *, rotate=None, prepare_source=None
         starts_at=timezone.now() + timedelta(days=1),
         ends_at=timezone.now() + timedelta(days=1, hours=2),
         created_by=source_user,
+        registration_requires_approval=True,
+        registration_cutoff_lead_minutes=45,
     )
     registration = EventRegistration.objects.create(
         event=event,
@@ -86,6 +100,25 @@ def portable_import_case(space, source_user, *, rotate=None, prepare_source=None
 class SimpleImportCase:
     def __init__(self, **values):
         self.__dict__.update(values)
+
+    def release_non_regenerable_identities(self):
+        """Make this database stand in for a target deployment, not its own source.
+
+        The archive is built from rows that stay in this one test database and is then
+        imported back as if it came from the ``source-test`` deployment. A real import
+        never meets its own source — ``pairing`` refuses a same-deployment move — so a
+        preserved value the target already holds is a contradiction, and the importer
+        is right to stop rather than remint an immutable identity. Drop the local rows
+        that carry one, through the same append-only escape hatch a tenant purge uses,
+        and the import gets the clean target the protocol actually guarantees it.
+
+        Call this after the source objects are captured and before materialization.
+        """
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("SET LOCAL app.allow_immutable_delete = 'on'")
+            for model in _models_with_non_regenerable_identity():
+                model._base_manager.all().delete()
 
     def decide_walk_in(self, source_user):
         return ImportIdentityDecision.objects.create(

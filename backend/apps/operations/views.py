@@ -79,6 +79,8 @@ from apps.operations.views_reports import (
     AggregateAnalyticsView,
     AggregateReportExportView,
     AnalyticsView,
+    AggregateReportCatalogView,
+    ReportCatalogView,
     ReportExportView,
     _csv_response,
     _makerspace_for_inventory_view,

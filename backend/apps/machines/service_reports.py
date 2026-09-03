@@ -74,7 +74,7 @@ def build_printer_service_report(makerspace_id, *, limit=None, date_range=None, 
     It is intentionally a report-registry builder seam, not a printer endpoint:
     the generic service report remains unchanged for non-printer machines.
     """
-    ids = scoped_ids(makerspace_id, "machine_service")
+    ids = scoped_ids(makerspace_id, "printing")
     aggregate = makerspace_id is None
     terminal = Q(status__in=COMPLETED) | Q(status=MachineServiceRequest.Status.FAILED)
     printer_type = resolve_global_printer_type()

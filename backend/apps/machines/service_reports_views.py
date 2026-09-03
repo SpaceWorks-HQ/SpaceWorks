@@ -46,12 +46,14 @@ class MakerspaceMachineServiceReportView(APIView):
         # uniform 403 and never leaks its module state via a 400-vs-403 difference.
         if not rbac.can(request.user, rbac.Action.MANAGE_MACHINES, makerspace_id):
             raise PermissionDenied()
+        require_module(makerspace_id, "reports")
         require_module(makerspace_id, "machine_service")
         # The report carries per-machine hours, consumption and payment snapshots, so it
         # is narrowed to the machines this role actually runs. An exempt actor (space
         # manager, superadmin) resolves to an empty filter and sees the whole lab.
         machine_scope = role_scope.manage_scope_for(request.user, makerspace_id)
         if request.query_params.get("machine_type") == "3d_printer":
+            require_module(makerspace_id, "printing")
             result = build_printer_service_report(
                 makerspace_id, date_range=_date_range(request), machine_scope=machine_scope
             )
@@ -67,6 +69,8 @@ class SuperadminMachineServiceReportView(APIView):
         if not _is_superadmin(request.user):
             raise PermissionDenied()
         if request.query_params.get("machine_type") == "3d_printer":
+            # This aggregate cannot use a per-makerspace module gate; the builder scopes
+            # its rows to makerspaces with printing enabled instead.
             result = build_printer_service_report(None, date_range=_date_range(request))
             return Response(PrinterServiceReportSerializer({"printer_metrics": result.records}).data)
         return Response(MachineServiceReportSerializer(report_sections(build_machine_service_report(None, date_range=_date_range(request)))).data)

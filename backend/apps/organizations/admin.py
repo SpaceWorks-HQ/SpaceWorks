@@ -10,6 +10,7 @@ from apps.organizations.models import (
     OrganizationMakerspace,
     OrganizationMembership,
 )
+from apps.organizations.governance import GOVERNANCE_ACTIONS
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -216,6 +217,21 @@ class OrganizationMembershipForm(forms.ModelForm):
                 "machine scope is derived from a makerspace membership."
             )
         return sorted(values)
+
+    def clean_governance_actions(self):
+        actions = self.cleaned_data.get("governance_actions")
+        if actions in (None, ""):
+            return []
+        if not isinstance(actions, list) or any(
+            not isinstance(item, str) for item in actions
+        ):
+            raise forms.ValidationError("Use a list of governance action values.")
+        unknown = set(actions) - GOVERNANCE_ACTIONS
+        if unknown:
+            raise forms.ValidationError(
+                f"Unknown governance action: {sorted(unknown)[0]}."
+            )
+        return sorted(set(actions))
 
 
 @admin.register(OrganizationMembership)

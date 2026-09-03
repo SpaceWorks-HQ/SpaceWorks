@@ -55,7 +55,7 @@ def mock_apple_provider(monkeypatch, challenge):
     )
 
 
-def attested_login(client, user, settings, monkeypatch):
+def attested_login(client, user, settings, monkeypatch, *, password="strong-device-password"):
     configure_apple(settings)
     challenge_response = client.post(
         CHALLENGE,
@@ -72,7 +72,7 @@ def attested_login(client, user, settings, monkeypatch):
     mock_apple_provider(monkeypatch, challenge)
     payload = {
         "username": user.username,
-        "password": "strong-device-password",
+        "password": password,
         "platform": "apple",
         "app_id": "org.spaceworks.app",
         "environment": "development",

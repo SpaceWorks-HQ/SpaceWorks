@@ -1,3 +1,5 @@
+import hashlib
+
 from rest_framework.throttling import SimpleRateThrottle
 
 from apps.apiclients.throttling import ClientTierRateThrottle
@@ -63,3 +65,77 @@ class EventCheckInResolveThrottle(SimpleRateThrottle):
         if user is None or not user.is_authenticated:
             return None
         return self.cache_format % {"scope": self.scope, "ident": user.pk}
+
+
+class EventCalendarFeedTokenThrottle(SimpleRateThrottle):
+    scope = "event_calendar_feed_token"
+
+    def get_cache_key(self, request, view):
+        raw_token = view.kwargs.get("raw_token", "")
+        if not raw_token:
+            return None
+        digest = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        return self.cache_format % {"scope": self.scope, "ident": digest}
+
+
+class EventCalendarFeedIpThrottle(SimpleRateThrottle):
+    scope = "event_calendar_feed_ip"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
+
+
+class EventOfflineRosterThrottle(SimpleRateThrottle):
+    scope = "event_offline_roster"
+
+    def get_cache_key(self, request, view):
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": user.pk}
+
+
+class EventOfflineSyncThrottle(EventOfflineRosterThrottle):
+    scope = "event_offline_sync"
+
+
+class EventStationPinTokenThrottle(SimpleRateThrottle):
+    scope = "event_station_pin_token"
+
+    def get_cache_key(self, request, view):
+        token = str(view.kwargs.get("public_token", ""))
+        if not token:
+            return None
+        ident = hashlib.sha256(token.encode()).hexdigest()
+        return self.cache_format % {"scope": self.scope, "ident": ident}
+
+
+class EventStationPinIpThrottle(SimpleRateThrottle):
+    scope = "event_station_pin_ip"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
+
+
+class EventStationSessionThrottle(EventStationPinTokenThrottle):
+    scope = "event_station_session"
+
+
+class EventStationRevealThrottle(EventOfflineRosterThrottle):
+    scope = "event_station_reveal"
+
+
+class PublicFeedbackRateThrottle(ClientTierRateThrottle):
+    """Reads and submissions get separate budgets on the public feedback route.
+
+    The scope is chosen HERE rather than in a view-level `get_throttles()` override,
+    because this is a pre-auth claim route: `claim_pre_auth_guard.validate_pre_auth_route`
+    forbids overriding any DRF lifecycle hook on a route that runs before claim-token
+    authentication, so that no per-request view mutation can happen ahead of the
+    authenticator. `ScopedRateThrottle` reads `view.throttle_scope` inside `allow_request`,
+    so setting it from the throttle keeps the exact same two budgets without that override.
+    """
+
+    def allow_request(self, request, view):
+        view.throttle_scope = "public_read" if request.method == "GET" else "event_register"
+        return super().allow_request(request, view)

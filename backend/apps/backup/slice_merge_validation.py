@@ -171,9 +171,11 @@ def _validate_objects(root, objects):
             "bucket_kind", "key", "version_id", "size", "sha256", "metadata",
             "content_type", "headers",
         }
-        if not required.issubset(item) or set(item) - required > {
-            "makerspace_id", "module_key",
-        }:
+        optional = {
+            "makerspace_id", "module_key", "retention_state",
+            "object_expired_at", "expired_size_bytes",
+        }
+        if not required.issubset(item) or set(item) - required > optional:
             raise SliceMergeError("The slice object manifest is malformed.")
         key = PurePosixPath(str(item["key"]))
         if (
@@ -186,6 +188,19 @@ def _validate_objects(root, objects):
             raise SliceMergeError("The slice object manifest contains a duplicate object.")
         seen.add(identity)
         path = root.joinpath(item["bucket_kind"], *key.parts)
+        if item.get("retention_state") == "expired":
+            valid = (
+                isinstance(item.get("object_expired_at"), str)
+                and bool(item["object_expired_at"])
+                and item["size"] == 0
+                and item["sha256"] == ""
+                and not path.exists()
+            )
+            if not valid:
+                raise SliceMergeError(
+                    "A slice expiry tombstone is malformed or has bytes."
+                )
+            continue
         try:
             valid = path.is_file() and path.stat().st_size == item["size"] and sha256_file(path) == item["sha256"]
         except OSError:

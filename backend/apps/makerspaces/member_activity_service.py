@@ -108,6 +108,8 @@ def _event_registrations(makerspace, member):
     from apps.events.member_history import registrations_for_space
     from apps.events.models import EventRegistration
 
+    now = timezone.now()
+
     waitlisted_before = EventRegistration.objects.filter(
         event_id=OuterRef("event_id"), status=EventRegistration.Status.WAITLISTED,
     ).filter(
@@ -119,7 +121,9 @@ def _event_registrations(makerspace, member):
     # "which registrations does this member hold here" must have exactly one answer:
     # when that predicate widens, a second copy here would make this endpoint and the
     # profile disagree about the same member.
-    rows = registrations_for_space(makerspace, member).select_related("event").annotate(
+    rows = registrations_for_space(makerspace, member).select_related("event").prefetch_related(
+        "event__feedback_survey", "feedback_responses__certificates",
+    ).annotate(
         waitlist_position=Subquery(waitlisted_before, output_field=IntegerField())
     ).only(
         "id", "checkin_token", "status", "created_at", "event__title",
@@ -165,13 +169,46 @@ def _event_registrations(makerspace, member):
             and row.event.status in CHECKABLE_EVENT_STATUSES
         )
 
-    return [{
-        "registration_id": row.id,
-        "checkin_token": str(row.checkin_token) if usable_token(row) else None,
-        "event_title": row.event.title, "starts_at": row.event.starts_at,
-        "ends_at": row.event.ends_at, "status": row.status,
-        "waitlist_position": row.waitlist_position if row.status == EventRegistration.Status.WAITLISTED else None,
-    } for row in ordered]
+    result = []
+    for row in ordered:
+        survey = getattr(row.event, "feedback_survey", None)
+        response = next(iter(row.feedback_responses.all()), None)
+        certificate = None
+        if response is not None:
+            certificate = max(
+                response.certificates.all(), key=lambda item: item.revision, default=None,
+            )
+        feedback_available = bool(
+            survey
+            and survey.is_open
+            and row.event.ends_at <= now
+            and row.event.status in ("published", "completed")
+            and (
+                not survey.certificate_enabled
+                or row.status == EventRegistration.Status.ATTENDED
+            )
+        )
+        result.append({
+            "registration_id": row.id,
+            "checkin_token": str(row.checkin_token) if usable_token(row) else None,
+            "event_title": row.event.title, "starts_at": row.event.starts_at,
+            "ends_at": row.event.ends_at, "status": row.status,
+            "waitlist_position": row.waitlist_position if row.status == EventRegistration.Status.WAITLISTED else None,
+            "feedback_available": feedback_available,
+            "feedback_path": (
+                f"/member/makerspaces/{makerspace.pk}/"
+                f"event-registrations/{row.pk}/feedback/"
+                if feedback_available else None
+            ),
+            "certificate": (
+                None if certificate is None else {
+                    "id": certificate.pk,
+                    "status": certificate.status,
+                    "revision": certificate.revision,
+                }
+            ),
+        })
+    return result
 
 
 def _machine_service_requests(makerspace_id, member):

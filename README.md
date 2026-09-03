@@ -38,10 +38,20 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
   remark) → accountability, all audited. Direct staff handouts too.
 - **3D-printing manager** — public print requests, printer/spool management, filament tracking,
   slicer estimates, and an optional (staff-private) cash charge at collection.
+- **Events & bookings** — one-off events or recurring series, registration with optional approval and
+  waitlists, QR check-in at the door (plus an expiring offline roster and event-scoped PIN stations for
+  a desk with no signal), post-event feedback, attendance certificates, printable badges, member
+  calendar feeds, and bookable spaces.
+- **Organizations across makerspaces** — a network, university or chain registered as an organization
+  linked to any number of spaces, with a public profile and a cross-makerspace event catalogue. An
+  organization grant confers **actions, never identity**.
 - **QR everywhere** — boxes, tools, and individual assets; immutable scan history.
 - **Action-based staff console** — editable per-makerspace roles over a fixed action set, four seeded
   defaults, and a superadmin-only Django control plane.
-- **Reports & ledger** — what's out, who has it, overdue tracking, CSV/XLSX export.
+- **Reports & ledger** — what's out, who has it, overdue tracking, CSV/XLSX export, plus accessible
+  charts with table fallbacks and append-only metric rollups where a correction adds a revision rather
+  than rewriting history. Every module is covered either by a substantive report or an explicitly
+  gated row.
 - **Notifications** — per-makerspace **Telegram, Slack, Mattermost and Discord** alerts plus async
   (Celery) email, with a per-feature × per-channel matrix. Each channel is its own module.
 - **Modular by install** — turn whole modules on and off per makerspace; uninstalling hides surfaces
@@ -52,7 +62,10 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
 - **Maker profiles** — an opt-in per-makerspace profile with projects, interests, education and an
   optional GitHub contribution count, plus a member directory that lists only the people who chose to
   be listed.
-- **Traceable by design** — append-only audit log; immutable evidence photos and scan records.
+- **Traceable by design** — append-only audit log; immutable evidence photo records and scan history.
+  Photo *bytes* can expire under a per-makerspace retention policy, while the photo metadata, remarks,
+  scans and audit trail are kept — so the accountability record outlives the image itself, and an
+  expired photo reads as a truthful expired state rather than a missing one.
 
 > **What works out of the box:** username/password. Google, Apple and OIDC need credentials you
 > create with that provider, and phone sign-in needs an SMS account — none of them can ship
@@ -154,7 +167,7 @@ console shows you:
 | **Inventory** *(always on)* | The catalogue, request workflow, QR/evidence spine, asset units, containers, transfers, QR print batches, front-desk handover and purchasing |
 | **Stocktake** | Scan-first stock counts and variance reporting |
 | **Machines** | Machine registry, the service/print queue, maintenance and warranty |
-| **Events** | Event scheduling and registrations, QR check-in at the door, and cross-makerspace collaborative events |
+| **Events** | Event scheduling and registrations — recurring series, approval and waitlists, QR check-in at the door, post-event feedback and attendance certificates, member calendar feeds, printable attendee badges, and cross-makerspace collaborative events |
 | **Bookings** | Resource booking and public self-booking |
 | **Membership** | Join requests, waivers, referrals, member activity, maker profiles, presence — and the member-facing identity ecosystem |
 | **Notifications** | The in-app inbox and every outbound channel |
@@ -237,7 +250,7 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | | [`machine_service`](docs/MODULES.md#machine_service) | | | The service/job queue |
 | | [`printing`](docs/MODULES.md#printing) | | | 3D printing on top of `machine_service` |
 | | [`maintenance`](docs/MODULES.md#maintenance) | | | Scheduled and reactive maintenance |
-| **Events** | [`events`](docs/MODULES.md#events) | | | Scheduling, registrations, QR check-in, collaborative events |
+| **Events** | [`events`](docs/MODULES.md#events) | | | Scheduling, recurring series, registrations and waitlists, QR check-in, feedback and certificates, collaborative events |
 | **Bookings** | [`bookings`](docs/MODULES.md#bookings) | | | Resource booking and public self-booking |
 | **Membership** | [`membership`](docs/MODULES.md#membership) | | | Join requests, waivers, referrals, maker profiles |
 | | [`member_accounts`](docs/MODULES.md#member_accounts) | | | Member sign-up and member sign-in |
@@ -274,6 +287,8 @@ Manager** in the console rather than a superadmin.
 | `payments.events` | `events` | | Charge for event registration |
 | `payments.membership` | `membership` | | Charge membership dues |
 | `mobile.push` | `mobile` | ● | Native push notifications |
+| `events.offline_checkin` | `events` | | Expiring on-device roster and event-scoped PIN check-in stations |
+| `notifications.delegated_recipients` | `notifications` | | Machine-scoped maintainers manage maintenance recipients for their own machines (also needs `maintenance` and `machines`) |
 | `inventory.self_checkout` | — | ● | Member self-checkout and staff direct handouts |
 | `presence.geofence` | — | ● | Advisory location check at check-in (never blocks) |
 
@@ -550,6 +565,45 @@ as a tenant on their instance. **Prefer managed Postgres?** The database URL mus
 pointer/CAS adapter, never ambient shell state. The Cloud static-environment initializer and D7 provider
 callbacks are not implemented yet, so the older Supabase path is suitable only for a non-H1 demo—not a
 supported restore topology.
+
+### Split deployment: backend on your server, frontend on Netlify
+
+Supported, and `netlify.toml` in the repo root configures it. Netlify builds **only** the React app —
+it never touches the Dockerfiles or compose files, and because `frontend/src/generated/api.ts` is
+committed, the build never has to reach your server.
+
+Netlify picks up `base = frontend`, `npm run build`, `publish = dist` and `NODE_VERSION = 22` from
+that file (Vite 8 needs Node 20.19+/22.12+, and Netlify's default image can be older). It also adds
+the catch-all rewrite to `index.html`, without which every deep link — `/m/<slug>`, `/admin/*`,
+`/event-check-in/<token>` — 404s on refresh. Set **`VITE_API_URL`** in the Netlify UI to your API,
+e.g. `https://api.example.org/api`.
+
+The backend then has to accept a browser on a different origin. Auth already defaults to cross-site
+cookies (`AUTH_COOKIE_SAMESITE=None`, `AUTH_COOKIE_SECURE=True`), **which only works if both sides
+are HTTPS**:
+
+```env
+ENABLE_HTTPS=True
+ALLOWED_HOSTS=api.example.org
+CORS_ALLOWED_ORIGINS=https://your-site.netlify.app
+CSRF_TRUSTED_ORIGINS=https://your-site.netlify.app
+```
+
+Three more that are easy to miss:
+
+- **Set each makerspace's `frontend_domain`** to the site's domain. Origin scoping validates it, so
+  tenant-scoped routes are rejected without it.
+- **Object storage must be addressed publicly.** `AWS_S3_PUBLIC_ENDPOINT_URL` and
+  `PUBLIC_IMAGE_BASE_URL` are baked into presigned URLs and every public image `src`, so a
+  `localhost` value yields a site that works only from the server console and shows broken images to
+  everyone else. On R2 or S3 also set `STORAGE_PRESIGN_METHOD=put`, and allow your site's origin in
+  the bucket's CORS rules **in the provider dashboard**.
+- **Keep a scheduler.** Hosting the frontend elsewhere does not affect scheduled work, but the
+  backend profile you choose does: `docker-compose.prod.yml` runs Celery `beat`, while
+  `docker-compose.cloud.yml` has no beat and relies on its `cron` service instead. With neither,
+  `.delay()` still runs inline so nothing looks broken, yet return reminders, the evidence-retention
+  sweep and event-series extension silently never fire. If you use the cloud profile, drop only its
+  `frontend` service — never `cron`.
 
 ### Moving a makerspace onto its own server
 

@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from apps.audit import services as audit
 from apps.evidence.models import EvidencePhoto
-from apps.evidence.finalization import charge_storage_once
+from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.hardware_requests.direct_loan_returns import validate_evidence_upload
 from apps.hardware_requests.models import PublicProblemReport, RequesterAccountability
 from apps.hardware_requests.workflow_errors import InvalidTransition, RequestValidationError, ReturnValidationError
@@ -41,6 +41,10 @@ def triage_problem_report(report, actor, *, outcome, resolutions, note, evidence
             raise InvalidTransition("Problem report has already been triaged.")
 
         if finalized is not None:
+            if not lock_evidence_for_attachment(evidence.pk):
+                raise RequestValidationError(
+                    "Evidence has expired under the retention policy."
+                )
             charge_storage_once(evidence, finalized.size)
         quantities = []
         if outcome != PublicProblemReport.Outcome.NO_ISSUE:

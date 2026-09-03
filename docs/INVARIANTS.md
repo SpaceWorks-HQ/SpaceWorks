@@ -300,6 +300,31 @@ URLs. Upload validation: strict magic-sniff for PDF/image; the private maker/CAD
 (`apps/maker_file_formats.py`) accepts STL/OBJ/3MF/STEP/etc. on ext+MIME (+signature for 3MF/STEP);
 public-image + evidence buckets stay strictly image-only.
 
+**Evidence object retention bounds live bytes without weakening evidence-row immutability.** Evidence is
+the deliberate exception to the generic POST wording above: both POST and PUT presigns target
+`staging/<final-key>`, and an attaching workflow promotes to the never-client-writable final key. The
+deployment default is 365 days; a makerspace override must be between 30 and 3650 days. The global
+`EVIDENCE_OBJECT_EXPIRY_ENABLED` switch ships false, and policy GET/PATCH plus preview remain available
+while it is false. The six-hour sweep is bounded per tenant, enters one source-gate fan-out boundary per
+makerspace, and refuses to run outside deployment recovery state `NORMAL`.
+
+Expiry locks only long enough to claim in the order `EvidencePhoto`, `EvidenceUploadFinalization`, then
+`EvidenceObjectRetentionState`; all object-store HEAD/delete work happens outside that transaction. A
+claim makes the photo unavailable to finalization and every issue/return attachment path. Success means
+that **all versions and delete markers** of both the final key and its staging key are confirmed deleted;
+an unsupported version-listing API or any transport/auth failure is retryable failure, not best-effort
+success. Only a confirmed two-key deletion may write terminal `expired`, release managed quota once and
+append `evidence.object_expired`. `recompute_storage` excludes only terminal expired rows. The immutable
+`EvidencePhoto` row, its inbound request/return/accountability relationships and the PostgreSQL
+immutability triggers remain unchanged; object expiry does not authorize row pruning.
+
+An expired evidence read returns 410 from the terminal state without contacting object storage. Backup,
+restore and tenant migration treat `expiring` as a refusal and `expired` as a signed, state-backed
+intentional-absence tombstone: both final and staging keys must be absent, while the row and retention
+state remain in the database image. Live missing evidence is still an error. An archive captured before
+expiry can contain and later resurrect the old photo bytes, so this mechanism bounds the live store; it
+is not legal erasure from historical archives.
+
 **Reports/analytics extend one registry** (never a parallel system). `apps/operations/report_registry.py`
 holds canonical `ReportDefinition`s (module-gated, `report_scope.eligible_makerspaces` excludes archived
 + reports-disabled + superadmin-hidden). FabLab domain builders (`reports_events`/`_bookings`/
@@ -1852,6 +1877,36 @@ Load-bearing details that carried over unchanged:
 
 ## Backup, restore and tenant migration (Phase 5A/5B and Lane D D1-D4/D6 built)
 
+### The SHAPE a projected model must have (catalog-driven, 2026-09-03)
+
+Being classified is not the same as being importable. Two shapes break a tenant move
+silently, and each was found only by running a full round-trip *after* the model had
+already shipped, so both are now enumerated over the whole
+`PROJECTED_MODEL_LABELS` catalog by
+`tests/tenant_migration/test_projected_catalog_travel_guard.py` — a newly projected
+model inherits the checks instead of waiting for a bespoke round-trip test:
+
+- **The primary key must be an auto-integer or a UUID.** `pk_maps` can only reserve
+  target values for those shapes and raises `UnsupportedPrimaryKey` otherwise, and a
+  `OneToOneField(primary_key=True)` additionally exports no `id` column at all, so the
+  materializer's read of the pk fails mid-move. **A `OneToOneField(primary_key=True)`
+  on any model that travels is a latent break — prefer a normal auto pk plus a unique
+  `OneToOne`.** Both evidence retention models shipped this way and had to be amended.
+  `pk_maps.SUPPORTED_PK_FIELD_TYPES` is the single source of truth; the guard asserts
+  against it rather than keeping a second copy.
+- **Every deployment-global unique column needs a `DEPLOYMENT_GLOBAL_UNIQUE_RULES`
+  entry** deciding REGENERATE versus PRESERVE-and-refuse. An unruled unique column
+  violates its own constraint the first time a target already holds the value. The one
+  deliberate exemption is `accounts.User.username`, resolved before insertion by
+  `identity_resolution.allocate_username`; the guard holds that exemption as an exact
+  set, so adding a rule for it fails the test until the exemption is removed.
+
+Relational uniqueness is scoped by the row it points at, so a unique `OneToOne` is not
+a deployment-global collision and is deliberately out of scope. Object pointers are a
+separate, already-guarded axis: `tests/backup/test_object_field_coverage.py` requires
+every `*_key` field to be either captured by name in `OBJECT_FIELD_NAMES` or exempted
+with a reason in `NON_OBJECT_KEY_FIELDS`.
+
 ### Lane D tenant-exclusive identity and payment closure (D6, 2026-08-23)
 
 **Lane D does not use the older per-identity `DisclosureClosureApproval` policy.** That
@@ -1907,7 +1962,10 @@ may have only one canonical component candidate: a main/slice or slice/slice con
 archive; first ship never duplicates bytes and has no shared envelope. Historical audit object strings and
 recursive archive pointers are explicit coordination references, not generic JSON discoveries. Each
 component then proves reference/manifest equality, binds immutable captured size and SHA-256 facts, and
-re-reads every packaged byte against them before the readable main can be projected.
+re-reads every packaged byte against them before the readable main can be projected. The only no-byte
+member is an evidence-retention tombstone backed by a terminal `EvidenceObjectRetentionState`: it remains
+part of exact reference/manifest equality, records the expiry timestamp and prior size, and is rejected if
+either final or staging bytes (including historical versions) still exist.
 
 `MakerspaceEncryptionKey` is tenant-owned for Lane E projection even though manager data export omits it.
 Its source-broker row must not survive in the readable main. Inside the same immutable snapshot, W8 freezes
@@ -2231,6 +2289,9 @@ client from `backup/postgres_client.py` creates the custom `--no-owner --no-acl`
 restores it and repeats catalog, FK-closure, open-fence, cache and raw mapped-value digest checks before the
 candidate is atomically exposed. Object members are copied only from immutable capture staging and carry an
 opaque member path plus original key, version ID, size, content type and SHA-256; ETag is never a digest.
+Terminal evidence expiry instead carries a typed tombstone with no member path or bytes, an empty digest,
+the terminal timestamp and the recorded expired size; import allocates/remaps a collision-safe final key
+but creates no staged or promoted object journal row.
 
 **Lane D D3 freezes custody and source bytes as one immutable capture lineage.** The request transaction
 reuses `backup/custody.py::with_makerspace_custody_lock`: makerspace first, every archive-recipient row in
@@ -2430,6 +2491,17 @@ never seen the key looks like. The collision check itself consults the **object 
 not the row table, because the constraint being protected is storage-key uniqueness in the target
 bucket; that also catches an orphaned object squatting a key.
 
+The same rule governs a **non-regenerable** identity, and there the harness cannot simply let the
+collision happen: `unique_values` marks two policies whose "generator" only raises —
+`events.EventCheckInEvent.operation_id` and `events.EventAttendanceCertificate.serial`, both PRESERVE,
+both meant to STOP an import rather than remint an immutable value. A collision cannot occur between
+two real deployments (`pairing` refuses a same-deployment move outright), so a test that meets one has
+modelled the world wrong. `SimpleImportCase.release_non_regenerable_identities()` drops the local rows
+carrying such an identity — through the `app.allow_immutable_delete` hatch, because
+`EventCheckInEvent` is trigger-immutable and cannot be re-stamped — and it is driven off a
+`_refuses_collision` marker so a future refuse-policy is covered without touching the harness. Call it
+after the source objects are captured and before materialization.
+
 **A DROP disposition is enforced at BOTH ends, and they are not redundant.** PORTABLE export omits a
 drop-disposition row entirely (`admission.export_row_policy`) — `MembershipRequest.invite_email` is a
 stranger's email address, and a row that can never become live has no business travelling to a
@@ -2531,6 +2603,24 @@ encoder always emits canonical output, so stored envelopes are unaffected.
   audit scope, storage quota and public venue routing all key on it. An organizer is attribution plus a
   narrow permission, never tenancy, and no organizer feature may move a number, a key, a quota or a
   route away from the venue.
+- **Organization presentation is a global projection, not another tenant surface.** A public organization
+  profile is opt-in (`public_profile_enabled`) and exposes only the explicit public serializer fields.
+  Its event catalogue projects already-public, published, not-ended events and keeps each event's host
+  makerspace visible; the host must remain servable, visible in the central directory and have the events
+  module enabled. Switching either public-profile or host-module gate off hides the projection without
+  deleting the organization, event or organizer bridge.
+- **Organization governance is separate from makerspace RBAC.** `governance_actions` may authorize profile
+  or membership administration, but never becomes a makerspace action and never changes a user's local
+  role identity. Invitations store only a SHA-256 digest of a high-entropy, single-use bearer token; the raw
+  token is returned once and must never enter list responses or audit metadata. Invitation creation and
+  redemption both enforce non-escalation against the creator's current active authority under row locks;
+  suspended memberships are never silently reactivated, and revoke/redeem races have one transactional
+  winner.
+- **Event organizer mutation has one service path.** `services_organizers.replace_organizers()` locks in
+  `event -> makerspace` order, rechecks the events module and action-scoped event authority, requires an
+  active membership in each newly assigned organization (superadmin excepted), replaces the bridge set
+  atomically and emits one makerspace-scoped audit entry. It changes attribution only: the event's
+  `makerspace_id`, routing, PII custody and quotas remain untouched.
 
 ## API client scopes and the protected-route registry
 

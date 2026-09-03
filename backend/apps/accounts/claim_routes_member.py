@@ -107,4 +107,50 @@ MEMBER_CLAIM_ROUTES = {
         ownership=RowOwnership.MIXED_REFUSED,
     ),
     **_options("member-event-checkin-qr"),
+    ("member-event-calendar", "GET"): Refused(
+        "event calendars can contain foreign-hosted registration rows",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    ("member-event-calendar", "HEAD"): Refused(
+        "event calendars can contain foreign-hosted registration rows",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    **_options("member-event-calendar"),
+    ("member-event-calendar-feed", "GET"): Refused(
+        "claim sessions cannot manage durable bearer credentials"
+    ),
+    # DRF derives HEAD from GET, so the pair must be declared together or the route is
+    # half-classified and the matrix guard fails.
+    ("member-event-calendar-feed", "HEAD"): Refused(
+        "claim sessions cannot manage durable bearer credentials"
+    ),
+    ("member-event-calendar-feed", "POST"): Refused(
+        "claim sessions cannot manage durable bearer credentials"
+    ),
+    ("member-event-calendar-feed", "DELETE"): Refused(
+        "claim sessions cannot manage durable bearer credentials"
+    ),
+    **_options("member-event-calendar-feed"),
+    ("member-event-feedback", "GET"): Refused(
+        "event feedback can return foreign-hosted registration rows",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    ("member-event-feedback", "HEAD"): Refused(
+        "event feedback can return foreign-hosted registration rows",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    ("member-event-feedback", "POST"): Refused(
+        "event feedback can write a foreign-hosted response",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    **_options("member-event-feedback"),
+    ("member-event-certificate-download", "GET"): Refused(
+        "event certificates can belong to foreign-hosted registrations",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    ("member-event-certificate-download", "HEAD"): Refused(
+        "event certificates can belong to foreign-hosted registrations",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    **_options("member-event-certificate-download"),
 }

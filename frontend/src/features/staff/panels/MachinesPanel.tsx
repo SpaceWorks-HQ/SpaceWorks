@@ -24,6 +24,7 @@ type Props = {
   maintenanceEnabled: boolean;
   machineServiceEnabled: boolean;
   printingEnabled: boolean;
+  reportsEnabled?: boolean;
   delegatedRecipientRulesEnabled: boolean;
   guestOnly?: boolean;
   makerspaceSlug?: string | null;
@@ -39,6 +40,7 @@ export function MachinesPanel({
   maintenanceEnabled,
   machineServiceEnabled,
   printingEnabled,
+  reportsEnabled = true,
   delegatedRecipientRulesEnabled,
   guestOnly = false,
   makerspaceSlug = null,
@@ -186,6 +188,7 @@ export function MachinesPanel({
           canManage={canManage}
           machineServiceEnabled={machineServiceEnabled}
           printingEnabled={printingEnabled}
+          reportsEnabled={reportsEnabled}
           machineType={shownType}
           allMachines={typeMachines}
           visibleMachines={typeMachines.filter((machine) => statusFilter === "all" || machine.status === statusFilter)}

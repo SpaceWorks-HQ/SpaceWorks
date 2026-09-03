@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 
@@ -15,9 +15,10 @@ from apps.accounts.permissions import (
 )
 from apps.accounts.models import User
 from apps.audit import services as audit
-from apps.evidence.models import EvidencePhoto
+from apps.evidence.models import EvidenceObjectRetentionState, EvidencePhoto
 from apps.evidence.serializers import (
     EvidenceGetResponseSerializer,
+    EvidenceExpiredResponseSerializer,
     EvidenceUrlRequestSerializer,
     EvidenceUrlResponseSerializer,
 )
@@ -135,12 +136,32 @@ class EvidenceDetailView(generics.RetrieveAPIView):
             200: EvidenceGetResponseSerializer,
             404: OpenApiResponse(description="Evidence was not found."),
             409: OpenApiResponse(description="Evidence object has not been uploaded."),
+            410: EvidenceExpiredResponseSerializer,
             503: OpenApiResponse(description="Evidence storage is unavailable."),
         },
     )
     def retrieve(self, request, *args, **kwargs):
         photo = self.get_object()
         require_module(photo.makerspace, "evidence_uploads")
+
+        retention_state = EvidenceObjectRetentionState.objects.filter(
+            evidence=photo,
+            status=EvidenceObjectRetentionState.Status.EXPIRED,
+        ).first()
+        if retention_state is not None:
+            return Response(
+                EvidenceExpiredResponseSerializer(
+                    {
+                        "code": "evidence_expired",
+                        "detail": (
+                            "The evidence object expired under the makerspace "
+                            "retention policy."
+                        ),
+                        "object_expired_at": retention_state.object_expired_at,
+                    }
+                ).data,
+                status=status.HTTP_410_GONE,
+            )
 
         # A presigned upload lands on the staging key and only becomes the final,
         # never-client-writable object when a workflow promotes it. So an uploaded but

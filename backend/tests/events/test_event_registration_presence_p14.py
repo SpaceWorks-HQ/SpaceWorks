@@ -237,8 +237,6 @@ def test_both_guards_share_one_waiver_rule(guard):
         "apps.hardware_requests.direct_loan_workflow",
         "apps.hardware_requests.public_views",
         "apps.bookings.views_public",
-        "apps.machines.views_public_service",
-        "apps.machines.views_public_printer_service",
     ],
 )
 def test_hardware_and_facility_surfaces_still_bind_the_presence_guard(module_path):
@@ -246,8 +244,11 @@ def test_hardware_and_facility_surfaces_still_bind_the_presence_guard(module_pat
 
     Paired with `test_require_active_member_presence_still_requires_a_session`, which
     proves that object still demands a session, this is what stops the refactor from
-    silently relaxing self-checkout, direct handout, hardware requests, bookings or the
-    machine-service surfaces.
+    silently relaxing self-checkout, direct handout, hardware requests or bookings.
+
+    **The two machine-service surfaces deliberately left this list** -- see
+    `test_machine_request_surfaces_bind_the_membership_aware_guard` below, which holds them
+    to the equivalent contract through the helper they now share.
     """
     import importlib
 
@@ -257,6 +258,75 @@ def test_hardware_and_facility_surfaces_still_bind_the_presence_guard(module_pat
         require_active_member_presence
     )
     assert not hasattr(module, "require_active_member")
+
+
+@pytest.mark.parametrize(
+    "module_path",
+    [
+        "apps.machines.views_public_service",
+        "apps.machines.views_public_printer_service",
+    ],
+)
+def test_machine_request_surfaces_bind_the_membership_aware_guard(module_path):
+    """Machine-service and printer submissions are PROPOSALS staff act on.
+
+    They are not the requester operating the machine, so they take the same identity
+    contract as the public borrow request rather than a hard presence requirement:
+    membership when that module is installed, an active account when it is not. Requiring
+    a MakerspaceMembership row unconditionally made both surfaces dead for every ordinary
+    account on the default `recommended` profile, which ships `machine_service` with
+    `membership` off.
+
+    This is still a binding assertion -- it just binds the shared helper instead, and
+    `test_membership_aware_guard_still_demands_presence_when_membership_is_on` proves that
+    helper has not been relaxed.
+    """
+    import importlib
+
+    from apps.machines.views_public_service import require_public_machine_requester
+
+    module = importlib.import_module(module_path)
+
+    assert getattr(module, "require_public_machine_requester", None) is (
+        require_public_machine_requester
+    )
+    assert not hasattr(module, "require_active_member")
+
+
+@pytest.mark.django_db
+def test_membership_aware_guard_still_demands_presence_when_membership_is_on(monkeypatch):
+    """The helper must not become an account-only guard by accident.
+
+    With `membership` installed it must delegate to the unmodified presence guard; with the
+    module absent it must fall back to the account guard and nothing weaker.
+    """
+    from apps.machines import views_public_service
+    from apps.makerspaces.models import Makerspace
+    from apps.makerspaces.module_registry import core_module_keys
+
+    calls = []
+    monkeypatch.setattr(
+        views_public_service, "require_active_member_presence",
+        lambda user, space: calls.append("presence"),
+    )
+    monkeypatch.setattr(
+        views_public_service, "require_active_account",
+        lambda user, space: calls.append("account"),
+    )
+
+    with_membership = Makerspace.objects.create(
+        name="guard-membership-on", slug="guard-membership-on",
+        enabled_modules=sorted(set(core_module_keys()) | {"membership"}),
+    )
+    without_membership = Makerspace.objects.create(
+        name="guard-membership-off", slug="guard-membership-off",
+        enabled_modules=sorted(core_module_keys()),
+    )
+
+    views_public_service.require_public_machine_requester(None, with_membership)
+    views_public_service.require_public_machine_requester(None, without_membership)
+
+    assert calls == ["presence", "account"]
 
 
 def test_event_registration_binds_the_membership_only_guard():

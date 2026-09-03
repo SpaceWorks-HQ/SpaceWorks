@@ -15,7 +15,6 @@ Two rules every collector here obeys:
   which the management command imports at load time; importing app models at module
   scope would drag half the app graph into every `manage.py` invocation.
 """
-
 from apps.makerspaces.module_purge_collectors_machine_service import machine_service_delete
 from apps.makerspaces.module_purge_collectors_single_model import (
     _counts,
@@ -31,8 +30,31 @@ from apps.makerspaces.module_purge_collectors_single_model import (
 
 
 def events_delete(makerspace, cursor):
-    from apps.events.models import Event, EventCollaborator, EventRegistration
+    from apps.events.models import (
+        Event,
+        EventAttendanceCertificate,
+        EventCheckInEvent,
+        EventCheckInStationCredential,
+        EventCollaborator,
+        EventFeedbackResponse,
+        EventFeedbackSurvey,
+        EventRegistration,
+        EventSeries,
+        EventSeriesCollaborator,
+        MemberCalendarFeed,
+    )
 
+    feeds, feed_labels = _delete(
+        MemberCalendarFeed.objects.filter(membership__makerspace=makerspace)
+    )
+    projected_collaborations, projected_collaboration_labels = _delete(
+        EventCollaborator.objects.filter(
+            source_series_collaboration__makerspace=makerspace
+        ).exclude(event__makerspace=makerspace)
+    )
+    series_collaborations, series_collaboration_labels = _delete(
+        EventSeriesCollaborator.objects.filter(makerspace=makerspace)
+    )
     collaborations, collaboration_labels = _delete(
         EventCollaborator.objects.filter(makerspace=makerspace)
     )
@@ -42,25 +64,79 @@ def events_delete(makerspace, cursor):
     provenance_cleared = EventRegistration.objects.filter(
         registered_via_makerspace=makerspace,
     ).exclude(event__makerspace=makerspace).update(registered_via_makerspace=None)
+    station_credentials, station_credential_labels = _delete(
+        EventCheckInStationCredential.objects.filter(event__makerspace=makerspace)
+    )
+    certificates, certificate_labels = _delete(
+        EventAttendanceCertificate.objects.filter(
+            registration__event__makerspace=makerspace
+        )
+    )
+    responses, response_labels = _delete(
+        EventFeedbackResponse.objects.filter(survey__event__makerspace=makerspace)
+    )
+    surveys, survey_labels = _delete(
+        EventFeedbackSurvey.objects.filter(event__makerspace=makerspace)
+    )
+    checkins, checkin_labels = _delete(
+        EventCheckInEvent.objects.filter(makerspace=makerspace)
+    )
     registrations, registration_labels = _delete(
         EventRegistration.objects.filter(event__makerspace=makerspace)
     )
     events, event_labels = _delete(Event.objects.filter(makerspace=makerspace))
+    series, series_labels = _delete(EventSeries.objects.filter(makerspace=makerspace))
     return _counts(
-        model_labels=collaboration_labels | registration_labels | event_labels,
+        model_labels=(
+            collaboration_labels | certificate_labels | response_labels
+            | survey_labels | checkin_labels | registration_labels | event_labels
+            | projected_collaboration_labels | series_collaboration_labels | series_labels
+            | feed_labels | station_credential_labels
+        ),
+        event_series_collaboration_projections=projected_collaborations,
+        event_series_collaborations=series_collaborations,
         event_collaborations=collaborations,
+        event_certificates=certificates,
+        event_feedback_responses=responses,
+        event_feedback_surveys=surveys,
+        event_check_in_events=checkins,
+        event_check_in_station_credentials=station_credentials,
         event_registration_provenance_cleared=provenance_cleared,
         event_registrations=registrations,
         events=events,
+        event_series=series,
+        event_calendar_feeds=feeds,
     )
 
 
 def events_public_images(makerspace):
-    from apps.events.models import Event
+    from apps.events.models import Event, EventSeries
 
-    return list(
-        Event.objects.filter(makerspace=makerspace).values_list("image_key", flat=True)
-    )
+    return [
+        *Event.objects.filter(makerspace=makerspace).values_list("image_key", flat=True),
+        *EventSeries.objects.filter(makerspace=makerspace).values_list("image_key", flat=True),
+    ]
+
+
+def events_private_keys(makerspace, add):
+    from apps.events.models import EventAttendanceCertificate
+
+    for key in EventAttendanceCertificate.objects.filter(
+        registration__event__makerspace=makerspace
+    ).values_list("object_key", flat=True):
+        add(key)
+
+
+def events_private_key_sizes(makerspace):
+    from apps.events.models import EventAttendanceCertificate
+
+    return {
+        key: size
+        for key, size in EventAttendanceCertificate.objects.filter(
+            registration__event__makerspace=makerspace
+        ).values_list("object_key", "size_bytes")
+        if key
+    }
 
 
 def maintenance_delete(makerspace, cursor):

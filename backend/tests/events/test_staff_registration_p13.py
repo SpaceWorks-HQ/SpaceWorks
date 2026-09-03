@@ -139,6 +139,32 @@ def test_capacity_still_waitlists_through_the_staff_path():
     ] == EventRegistration.Status.WAITLISTED
 
 
+def test_staff_registration_obeys_cutoff_and_approval_policy():
+    space = make_space("event-staff-policy")
+    staff, attendee = manager(space), member(space)
+    event = make_event(space)
+    event.registration_requires_approval = True
+    event.registration_cutoff_at = timezone.now() - timedelta(seconds=1)
+    event.save(update_fields=[
+        "registration_requires_approval", "registration_cutoff_at",
+    ])
+    client = authed(staff)
+
+    closed = client.post(
+        register_url(event), {"member_id": attendee.pk}, format="json"
+    )
+    assert closed.status_code == 409
+    assert closed.data["code"] == "registration_closed"
+
+    event.registration_cutoff_at = None
+    event.save(update_fields=["registration_cutoff_at"])
+    pending = client.post(
+        register_url(event), {"member_id": attendee.pk}, format="json"
+    )
+    assert pending.status_code == 201
+    assert pending.data["status"] == EventRegistration.Status.PENDING_APPROVAL
+
+
 def test_registering_twice_is_a_conflict():
     space = make_space()
     staff, attendee = manager(space), member(space)

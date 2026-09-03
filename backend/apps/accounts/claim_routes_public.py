@@ -33,10 +33,20 @@ PUBLIC_CLAIM_ROUTES = {
     ("public-printer-service-request", "OPTIONS"): AnonymousRead(),
     **_anonymous("public-printer-service-status"),
     **_anonymous("public-event-list"),
+    # The organization directory is deployment-global read-only presentation; a walk-in
+    # claim session reads it exactly like any anonymous visitor.
+    **_anonymous("public-organization-detail"),
+    **_anonymous("public-organization-events"),
+    **_anonymous("public-event-calendar"),
+    **_anonymous("public-event-calendar-feed"),
     ("public-event-register", "POST"): Allowed(
         tenant=PUBLIC_TOKEN, audited=True
     ),
     ("public-event-register", "OPTIONS"): AnonymousRead(),
+    **_anonymous("public-event-feedback"),
+    ("public-event-feedback", "POST"): Allowed(
+        tenant=PUBLIC_TOKEN, audited=True
+    ),
     **_anonymous("public-bookable-space-list"),
     **_anonymous("public-space-availability"),
     ("public-booking-submit", "POST"): Allowed(

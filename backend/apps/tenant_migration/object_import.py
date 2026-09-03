@@ -39,6 +39,15 @@ def prepare_import_objects(archive, job):
     regenerated = 0
     regenerated_keys = {}
     for record in records:
+        if record.get("retention_state") == "expired":
+            target_key, changed = object_storage.choose_target_key(
+                record["bucket_kind"], record["source_key"], job.pk
+            )
+            target_keys[record["source_key"]] = target_key
+            regenerated += changed
+            if changed:
+                regenerated_keys[record["source_key"]] = target_key
+            continue
         existing = TenantImportObject.objects.filter(
             job=job, source_key=record["source_key"]
         ).first()
@@ -80,9 +89,10 @@ def prepare_import_objects(archive, job):
         regenerated += changed
         if changed:
             regenerated_keys[record["source_key"]] = target_key
-    _audit_staged(job, len(records), records)
+    live_records = [row for row in records if row.get("retention_state") != "expired"]
+    _audit_staged(job, len(live_records), live_records)
     return ObjectImportPlan(
-        target_keys, len(records), regenerated, regenerated_keys
+        target_keys, len(live_records), regenerated, regenerated_keys
     )
 
 
@@ -143,7 +153,10 @@ def _manifest_records(root):
 
 def _validate_record(record, line_number):
     required = {"bucket_kind", "source_key", "size", "sha256", "version_id"}
-    allowed = required | {"content_type"}
+    tombstone_fields = {
+        "retention_state", "object_expired_at", "expired_size_bytes"
+    }
+    allowed = required | {"content_type"} | tombstone_fields
     if (
         not isinstance(record, dict)
         or not required.issubset(record)
@@ -154,9 +167,19 @@ def _validate_record(record, line_number):
         raise ArchiveFormatError(f"Invalid object bucket at line {line_number}.")
     if not isinstance(record["source_key"], str) or not record["source_key"]:
         raise ArchiveFormatError(f"Invalid object key at line {line_number}.")
+    expired = record.get("retention_state") == "expired"
+    if expired and not tombstone_fields.issubset(record):
+        raise ArchiveFormatError(f"Incomplete expiry tombstone at line {line_number}.")
+    if not expired and tombstone_fields & set(record):
+        raise ArchiveFormatError(f"Unexpected expiry fields at line {line_number}.")
     if type(record["size"]) is not int or record["size"] < 0:
         raise ArchiveFormatError(f"Invalid object size at line {line_number}.")
-    if not isinstance(record["sha256"], str) or not SHA256_RE.fullmatch(record["sha256"]):
+    if expired and (record["size"] != 0 or record["sha256"] != ""):
+        raise ArchiveFormatError(f"Invalid expiry tombstone at line {line_number}.")
+    if not expired and (
+        not isinstance(record["sha256"], str)
+        or not SHA256_RE.fullmatch(record["sha256"])
+    ):
         raise ArchiveFormatError(f"Invalid object checksum at line {line_number}.")
     if record["version_id"] is not None and not isinstance(record["version_id"], str):
         raise ArchiveFormatError(f"Invalid object version at line {line_number}.")
@@ -165,6 +188,14 @@ def _validate_record(record, line_number):
         not isinstance(content_type, str) or len(content_type) > 255
     ):
         raise ArchiveFormatError(f"Invalid object content type at line {line_number}.")
+    if expired:
+        if not isinstance(record["object_expired_at"], str):
+            raise ArchiveFormatError(f"Invalid expiry timestamp at line {line_number}.")
+        expired_size = record["expired_size_bytes"]
+        if expired_size is not None and (
+            type(expired_size) is not int or expired_size < 0
+        ):
+            raise ArchiveFormatError(f"Invalid expired size at line {line_number}.")
 
 
 def _verify_local_member(path, record):

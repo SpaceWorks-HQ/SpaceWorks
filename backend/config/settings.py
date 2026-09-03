@@ -188,7 +188,11 @@ INSTALLED_APPS = [
 TOMBSTONED_APPS = tombstoned_app_labels()
 
 MIDDLEWARE = [
+    # The recovery gate stays FIRST -- it must refuse a request before any other layer
+    # can act on it, and tests/backup/test_recovery_gate.py pins that position.
     "apps.backup.middleware.DeploymentRecoveryGateMiddleware",
+    # Second, so it still wraps every view that could log a calendar-feed bearer token.
+    "apps.events.middleware.CalendarFeedLogRedactionMiddleware",
     "apps.tenant_migration.middleware.SourceMigrationGateMiddleware",
     "apps.makerspaces.middleware.TenantHostValidationMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -328,6 +332,13 @@ STORAGES = {
 EVIDENCE_URL_TTL_SECONDS = env.int("EVIDENCE_URL_TTL_SECONDS", default=300)
 EVIDENCE_MAX_BYTES = env.int("EVIDENCE_MAX_BYTES", default=10485760)
 EVIDENCE_ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"]
+EVIDENCE_OBJECT_RETENTION_DAYS = env.int(
+    "EVIDENCE_OBJECT_RETENTION_DAYS", default=365
+)
+EVIDENCE_OBJECT_EXPIRY_ENABLED = env.bool(
+    "EVIDENCE_OBJECT_EXPIRY_ENABLED", default=False
+)
+EVIDENCE_RETENTION_BATCH_SIZE = env.int("EVIDENCE_RETENTION_BATCH_SIZE", default=100)
 WARRANTY_DOC_MAX_BYTES = env.int("WARRANTY_DOC_MAX_BYTES", default=10485760)
 WARRANTY_DOC_ALLOWED_MIME = env.list(
     "WARRANTY_DOC_ALLOWED_MIME",
@@ -569,6 +580,14 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.hardware_requests.tasks.send_return_reminders_task",
         "schedule": crontab(minute=0),
     },
+    "evidence-object-expiry": {
+        "task": "apps.evidence.tasks.sweep_evidence_retention_task",
+        "schedule": crontab(minute=10, hour="*/6"),
+    },
+    "extend-event-series": {
+        "task": "apps.events.tasks.extend_event_series_task",
+        "schedule": crontab(minute=10),
+    },
     # Spent email/phone verification challenges hold an address or a number and nothing
     # deleted them. Off-peak because it is a pure delete nobody is waiting on.
     "purge-auth-challenges": {
@@ -585,6 +604,10 @@ CELERY_BEAT_SCHEDULE = {
     "purge-expired-data-exports": {
         "task": "apps.data_export.tasks.purge_expired_exports_task",
         "schedule": crontab(hour=3, minute=45),
+    },
+    "finalize-report-rollups": {
+        "task": "apps.operations.tasks.finalize_report_rollups_task",
+        "schedule": crontab(hour=1, minute=0),
     },
     "scheduled-deployment-backup": {
         "task": "apps.backup.tasks.scheduled_deployment_backup_task",
@@ -633,6 +656,12 @@ if "tenant_migration" in TOMBSTONED_APPS:
         for name, entry in CELERY_BEAT_SCHEDULE.items()
         if ".tenant_migration." not in entry["task"]
     }
+if "events" in TOMBSTONED_APPS:
+    CELERY_BEAT_SCHEDULE = {
+        name: entry
+        for name, entry in CELERY_BEAT_SCHEDULE.items()
+        if ".events." not in entry["task"]
+    }
 
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
@@ -645,6 +674,7 @@ CORS_ALLOW_HEADERS = (
     "x-signature",
     "x-timestamp",
     "x-refresh-csrf",
+    "x-station-csrf",
     "x-publishable-key",
 )
 CORS_ALLOW_CREDENTIALS = True
@@ -663,6 +693,26 @@ HMAC_PROTECTED_PATH_PREFIXES = env.list(
 # _fernet() raises ImproperlyConfigured only when a key is actually needed. Tests/CI get a
 # real key from .env / docker-compose (added below).
 API_CLIENT_ENC_KEY = env("API_CLIENT_ENC_KEY", default="")
+# Dedicated domain-separation secret for event-station PIN verification. The raw PIN
+# is encrypted with API_CLIENT_ENC_KEY only because staff reveal is an explicit product
+# requirement; the slow hash plus this independent pepper remains the verifier.
+EVENT_STATION_PIN_PEPPER = env("EVENT_STATION_PIN_PEPPER", default="")
+EVENT_CHECKIN_WINDOW_BEFORE_HOURS = env.int(
+    "EVENT_CHECKIN_WINDOW_BEFORE_HOURS", default=24
+)
+EVENT_CHECKIN_WINDOW_AFTER_HOURS = env.int(
+    "EVENT_CHECKIN_WINDOW_AFTER_HOURS", default=2
+)
+EVENT_CHECKIN_SYNC_GRACE_HOURS = env.int(
+    "EVENT_CHECKIN_SYNC_GRACE_HOURS", default=24
+)
+EVENT_CHECKIN_ROSTER_LIFETIME_HOURS = env.int(
+    "EVENT_CHECKIN_ROSTER_LIFETIME_HOURS", default=24
+)
+EVENT_CHECKIN_CLOCK_SKEW_SECONDS = env.int(
+    "EVENT_CHECKIN_CLOCK_SKEW_SECONDS", default=300
+)
+EVENT_CHECKIN_ROSTER_MAX = env.int("EVENT_CHECKIN_ROSTER_MAX", default=1000)
 # Wraps the per-scope audit row-MAC keys. Independent of PII_MASTER_KEY on purpose: the
 # audit domain gets its own key so a PII key rotation cannot invalidate integrity
 # evidence. Empty means row-MAC attestation is OFF and new audit rows are stored
@@ -802,6 +852,30 @@ REST_FRAMEWORK = {
         ),
         "event_checkin_resolve": env(
             "THROTTLE_EVENT_CHECKIN_RESOLVE", default="60/min"
+        ),
+        "event_offline_roster": env(
+            "THROTTLE_EVENT_OFFLINE_ROSTER", default="10/hour"
+        ),
+        "event_offline_sync": env(
+            "THROTTLE_EVENT_OFFLINE_SYNC", default="60/hour"
+        ),
+        "event_station_pin_token": env(
+            "THROTTLE_EVENT_STATION_PIN_TOKEN", default="10/hour"
+        ),
+        "event_station_pin_ip": env(
+            "THROTTLE_EVENT_STATION_PIN_IP", default="30/hour"
+        ),
+        "event_station_session": env(
+            "THROTTLE_EVENT_STATION_SESSION", default="120/hour"
+        ),
+        "event_station_reveal": env(
+            "THROTTLE_EVENT_STATION_REVEAL", default="5/hour"
+        ),
+        "event_calendar_feed_token": env(
+            "THROTTLE_EVENT_CALENDAR_FEED_TOKEN", default="120/hour"
+        ),
+        "event_calendar_feed_ip": env(
+            "THROTTLE_EVENT_CALENDAR_FEED_IP", default="300/hour"
         ),
         "public_stats": env("THROTTLE_PUBLIC_STATS", default="30/min"),
         "client_public": env("THROTTLE_CLIENT_PUBLIC", default="30/min"),
@@ -959,7 +1033,7 @@ SPECTACULAR_SETTINGS = {
     # `tests/test_version_consistency.py`. It cannot simply READ that file: the backend
     # image is built with `context: ./backend`, so the repo root is outside the build
     # context and the file does not exist inside the container.
-    "VERSION": "0.8.0",
+    "VERSION": "0.8.1",
     "ENUM_NAME_OVERRIDES": {
         "QrPrintBatchStatusEnum": [
             ("draft", "Draft"),

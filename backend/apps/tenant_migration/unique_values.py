@@ -1,10 +1,19 @@
 """Declared handling for deployment-global uniqueness during materialization."""
-
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import PurePosixPath
 from typing import Callable
 
+from .unique_value_generators import (
+    certificate_key as _certificate_key,
+    evidence_key as _evidence_key,
+    machine_document_key as _machine_document_key,
+    maintenance_document_key as _maintenance_document_key,
+    receipt_key as _receipt_key,
+    refuse_certificate_serial_collision as _refuse_certificate_serial_collision,
+    refuse_checkin_operation_collision as _refuse_checkin_operation_collision,
+    service_file_key as _service_file_key,
+    warranty_document_key as _warranty_document_key,
+)
 
 class UniqueValueDisposition(StrEnum):
     DROP_ROW = "drop_row"
@@ -29,52 +38,6 @@ class UniqueValuePolicy:
 
 def _policy(disposition, reason, *, field=None, generator=None):
     return UniqueValuePolicy(disposition, reason, field, generator)
-
-
-def _extension(value):
-    suffix = PurePosixPath(str(value)).name
-    return suffix.rsplit(".", 1)[1] if "." in suffix else ""
-
-
-def _evidence_key(row, target, _source_value):
-    from apps.evidence.storage import evidence_object_key
-
-    return evidence_object_key(target.pk, row["evidence_type"])
-
-
-def _machine_document_key(row, target, source_value):
-    from apps.machines.storage import machine_object_key
-
-    return machine_object_key(target.pk, _extension(source_value))
-
-
-def _service_file_key(row, target, _source_value):
-    from apps.machines.service_storage import service_object_key
-
-    context = row.get("service_request_id") or row.get("queue_id") or row["id"]
-    return service_object_key(target.pk, context)
-
-
-def _maintenance_document_key(row, target, source_value):
-    from apps.maintenance.models import MaintenanceLog
-    from apps.maintenance.storage import log_document_object_key
-
-    machine_id = MaintenanceLog.objects.values_list("machine_id", flat=True).get(
-        pk=row["log_id"]
-    )
-    return log_document_object_key(target.pk, machine_id, _extension(source_value))
-
-
-def _receipt_key(row, target, source_value):
-    from apps.procurement.storage import receipt_object_key
-
-    return receipt_object_key(target.pk, _extension(source_value))
-
-
-def _warranty_document_key(row, target, source_value):
-    from apps.warranty.storage import warranty_object_key
-
-    return warranty_object_key(target.pk, _extension(source_value))
 
 
 FRESH = UniqueValueDisposition.OMITTED_FRESH
@@ -118,8 +81,42 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
     ("events.Event", "field:public_token"): _policy(
         FRESH, "Source bearer tokens are replaced."
     ),
+    ("events.Event", "field:calendar_uid"): _policy(
+        PRESERVE,
+        "Keep stable calendar identity unless the target already uses it.",
+        field="calendar_uid",
+    ),
+    ("events.EventSeries", "field:public_token"): _policy(
+        FRESH, "Source series bearer tokens are replaced."
+    ),
+    ("events.EventSeries", "field:calendar_uid"): _policy(
+        PRESERVE,
+        "Keep stable series calendar identity unless the target already uses it.",
+        field="calendar_uid",
+    ),
+    ("events.Event", "uniq_event_series_occurrence_key"): _policy(
+        REMAP, "The series reference is remapped with its occurrence identity."
+    ),
     ("events.EventRegistration", "field:checkin_token"): _policy(
         FRESH, "Source check-in credentials are replaced."
+    ),
+    ("events.EventCheckInEvent", "field:operation_id"): _policy(
+        PRESERVE,
+        "Preserve immutable synchronization identity; refuse a target collision.",
+        field="operation_id",
+        generator=_refuse_checkin_operation_collision,
+    ),
+    ("events.EventAttendanceCertificate", "field:serial"): _policy(
+        PRESERVE,
+        "Preserve the serial printed inside the immutable PDF; refuse a collision.",
+        field="serial",
+        generator=_refuse_certificate_serial_collision,
+    ),
+    ("events.EventAttendanceCertificate", "field:object_key"): _policy(
+        PRESERVE,
+        "Keep the archived private certificate key unless it collides on the target.",
+        field="object_key",
+        generator=_certificate_key,
     ),
     ("evidence.EvidencePhoto", "field:object_key"): _policy(
         PRESERVE,

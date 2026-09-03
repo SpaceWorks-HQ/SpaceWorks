@@ -12,6 +12,7 @@ from apps.hardware_requests.serializers import AdminRequestSerializer
 from apps.hardware_requests.view_helpers import (
     ADMIN_LIST_ERROR_RESPONSES,
     request_queryset,
+    handover_surface_module,
 )
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.guards import require_module
@@ -92,7 +93,7 @@ class AcceptedRequestsView(generics.ListAPIView):
 
     def get_queryset(self):
         makerspace_id = self.kwargs["makerspace_id"]
-        require_module(makerspace_id, "guest_handover")
+        require_module(makerspace_id, handover_surface_module(self.request))
         _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
         return (
             request_queryset()
@@ -120,7 +121,7 @@ class ActiveLoansView(generics.ListAPIView):
 
     def get_queryset(self):
         makerspace_id = self.kwargs["makerspace_id"]
-        require_module(makerspace_id, "guest_handover")
+        require_module(makerspace_id, handover_surface_module(self.request))
         _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
         return (
             request_queryset()
@@ -155,7 +156,7 @@ class RequestHistoryView(generics.ListAPIView):
 
     def get_queryset(self):
         makerspace_id = self.kwargs["makerspace_id"]
-        require_module(makerspace_id, "guest_handover")
+        require_module(makerspace_id, handover_surface_module(self.request))
         _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
         return (
             request_queryset()

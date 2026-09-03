@@ -23,7 +23,7 @@ can find, and rate-limiting it correctly is more work than a cron entry.
 """
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
@@ -48,6 +48,12 @@ SCHEDULED_TASKS = (
         1,
     ),
     ("return-reminders", "apps.hardware_requests.tasks.send_return_reminders_task", 60),
+    (
+        "evidence-object-expiry",
+        "apps.evidence.tasks.sweep_evidence_retention_task",
+        360,
+    ),
+    ("extend-event-series", "apps.events.tasks.extend_event_series_task", 60),
     ("purge-auth-challenges", "apps.accounts.tasks.purge_auth_challenges_task", 24 * 60),
     # Beat runs this at a fixed hour; the beat-less runner has no wall-clock schedule, so
     # the cadence is expressed as the interval instead. Daily either way.
@@ -62,6 +68,11 @@ SCHEDULED_TASKS = (
     (
         "purge-expired-data-exports",
         "apps.data_export.tasks.purge_expired_exports_task",
+        24 * 60,
+    ),
+    (
+        "finalize-report-rollups",
+        "apps.operations.tasks.finalize_report_rollups_task",
         24 * 60,
     ),
     (
@@ -119,6 +130,8 @@ if "tenant_migration" in settings.TOMBSTONED_APPS:
     SCHEDULED_TASKS = tuple(
         task for task in SCHEDULED_TASKS if ".tenant_migration." not in task[1]
     )
+if "events" in settings.TOMBSTONED_APPS:
+    SCHEDULED_TASKS = tuple(task for task in SCHEDULED_TASKS if ".events." not in task[1])
 
 
 def _import_task(dotted_path):
@@ -138,11 +151,25 @@ class Command(BaseCommand):
             help="Skip tasks run more recently than their declared interval.",
         )
         parser.add_argument("--task", help="Run only this task name.")
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Preview evidence expiry without deleting objects.",
+        )
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            help="Evidence rows per makerspace (clamped to 1..1000).",
+        )
 
     def handle(self, *args, **options):
         from apps.operations.models_scheduling import PeriodicTaskRun
 
         only = options.get("task")
+        if (options["dry_run"] or options["batch_size"] is not None) and only != "evidence-object-expiry":
+            raise CommandError(
+                "--dry-run and --batch-size require --task evidence-object-expiry."
+            )
         now = timezone.now()
         for name, dotted_path, interval_minutes in SCHEDULED_TASKS:
             if only and name != only:
@@ -157,14 +184,22 @@ class Command(BaseCommand):
                 if options["due_only"] and not row.is_due(now, interval_minutes):
                     self.stdout.write(f"skip {name} (last run {row.last_run_at:%Y-%m-%d %H:%M})")
                     continue
-                row.last_run_at = now
-                row.save(update_fields=["last_run_at"])
+                # A preview must not postpone the next real sweep under --due-only.
+                if not options["dry_run"]:
+                    row.last_run_at = now
+                    row.save(update_fields=["last_run_at"])
 
             try:
                 # Called directly, not via .delay(): under eager mode they are the
                 # same thing, and with a broker configured this command should still
                 # do the work rather than queue it behind a worker that may not exist.
-                _import_task(dotted_path)()
+                task_options = {}
+                if name == "evidence-object-expiry":
+                    task_options = {
+                        "dry_run": options["dry_run"],
+                        "batch_size": options["batch_size"],
+                    }
+                _import_task(dotted_path)(**task_options)
             except Exception as exc:  # noqa: BLE001 - one failing task must not stop the rest
                 with transaction.atomic():
                     row = PeriodicTaskRun.objects.select_for_update().get(name=name)

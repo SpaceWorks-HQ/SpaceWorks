@@ -29,6 +29,7 @@ class FieldObjectRule:
     policy: ReferencePolicy = ReferencePolicy.CANONICAL
     coordination_path: str | None = None
     coordination_reason: str = ""
+    retention_aware: bool = False
 
 
 # Literal, field-specific declarations are intentional. The equality guard below
@@ -50,7 +51,16 @@ FIELD_OBJECT_RULES = (
                     coordination_path="makerspace_id",
                     coordination_reason="data_export_coordination"),
     FieldObjectRule("events.Event", "image_key", BucketRule.PUBLIC_IMAGE),
-    FieldObjectRule("evidence.EvidencePhoto", "object_key", BucketRule.PRIVATE),
+    FieldObjectRule("events.EventSeries", "image_key", BucketRule.PUBLIC_IMAGE),
+    FieldObjectRule("events.EventAttendanceCertificate", "object_key", BucketRule.PRIVATE),
+    # retention_aware: phase 9 may expire these bytes while the row survives, so capture
+    # must tolerate a missing object rather than treat it as corruption.
+    FieldObjectRule(
+        "evidence.EvidencePhoto",
+        "object_key",
+        BucketRule.PRIVATE,
+        retention_aware=True,
+    ),
     FieldObjectRule("inventory.InventoryProduct", "image_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("machines.Machine", "image_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("machines.MachineDocument", "object_key", BucketRule.PRIVATE),

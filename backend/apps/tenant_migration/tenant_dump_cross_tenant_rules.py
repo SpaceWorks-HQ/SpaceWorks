@@ -24,6 +24,14 @@ CROSS_TENANT_EDGE_RULES = {
     ("events.EventCollaborator", "makerspace"): CrossTenantRule(
         CrossTenantDisposition.DROP_ROW, "A foreign collaborator grant is dropped."
     ),
+    # A series collaboration mirrors the per-occurrence one: the series and the invited
+    # makerspace can sit in different tenants, and a half-owned grant must not travel.
+    ("events.EventSeriesCollaborator", "series"): CrossTenantRule(
+        CrossTenantDisposition.DROP_ROW, "A foreign-hosted series collaboration is dropped."
+    ),
+    ("events.EventSeriesCollaborator", "makerspace"): CrossTenantRule(
+        CrossTenantDisposition.DROP_ROW, "A foreign series-collaborator grant is dropped."
+    ),
     ("operations.StockTransfer", "source_makerspace"): CrossTenantRule(
         CrossTenantDisposition.NULL_WITH_PAIRED_CONTAINER,
         "A foreign source and its source container are nulled together.",
