@@ -64,6 +64,26 @@ def notify_request_returned(request):
     )
 
 
+def notify_loan_charge(request, event, payment):
+    """`deposit_raised` / `late_fee_raised`. Chat, push and webhook text only: there is
+    no email template for loan charges yet, so the email channel gets no deliveries."""
+    label = "Loan deposit" if event == "deposit_raised" else "Late return fee"
+    text = (
+        f"Hardware request #{request.pk}: {label} of "
+        f"{payment.amount} {payment.currency.upper()} raised."
+    )
+    logger.info(
+        "Hardware request loan charge notification.",
+        extra={"request_id": request.pk, "makerspace_id": request.makerspace_id, "event": event},
+    )
+    return notify_lifecycle(
+        request.makerspace,
+        feature="hardware_requests",
+        event=event,
+        build=lambda: LifecyclePayload(text=text, emails=()),
+    )
+
+
 def notify_return_due(request):
     result = _notify(
         request,

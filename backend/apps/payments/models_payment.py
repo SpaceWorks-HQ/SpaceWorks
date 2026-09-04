@@ -10,6 +10,15 @@ class Payment(models.Model):
         BOOKING = "booking", "Booking"
         EVENT_REGISTRATION = "event_registration", "Event registration"
         MAKERSPACE_MEMBERSHIP = "makerspace_membership", "Makerspace membership"
+        # subject_id is the `makerspaces.MembershipTerm` pk: the membership pk is already
+        # taken by the dues charge above, and one term gets exactly one renewal charge.
+        MEMBERSHIP_TERM = "membership_term", "Membership renewal"
+        # Loan charges (forward plan phase 6). subject_id is the HardwareRequest id, so
+        # the one-per-subject constraint gives one deposit and one late fee per loan.
+        LOAN_DEPOSIT = "loan_deposit", "Loan deposit"
+        LOAN_LATE_FEE = "loan_late_fee", "Loan late fee"
+
+    LOAN_SUBJECT_TYPES = ("loan_deposit", "loan_late_fee")
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -170,6 +179,22 @@ class Payment(models.Model):
                     raise ValidationError(
                         {"subject_id": "Payment subject must belong to the payment makerspace."}
                     )
+        if self.subject_type in self.LOAN_SUBJECT_TYPES and self.subject_id:
+            from apps.hardware_requests.models import HardwareRequest
+
+            if not subject_identity_unchanged and not HardwareRequest.objects.filter(
+                pk=self.subject_id,
+                makerspace_id=self.makerspace_id,
+            ).exists():
+                raise ValidationError({"subject_id": "Payment subject must belong to the payment makerspace."})
+        if self.subject_type == self.SubjectType.MEMBERSHIP_TERM and self.subject_id:
+            from apps.makerspaces.models import MembershipTerm
+
+            if not subject_identity_unchanged and not MembershipTerm.objects.filter(
+                pk=self.subject_id,
+                membership__makerspace_id=self.makerspace_id,
+            ).exists():
+                raise ValidationError({"subject_id": "Payment subject must belong to the payment makerspace."})
         if self.subject_type == self.SubjectType.MAKERSPACE_MEMBERSHIP and self.subject_id:
             from apps.makerspaces.models import MakerspaceMembership
 

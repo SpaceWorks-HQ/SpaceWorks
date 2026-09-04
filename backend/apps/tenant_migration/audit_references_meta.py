@@ -4,6 +4,10 @@ from .audit_references_targets import (
     AuditReference,
     AuditReferenceDisposition,
 )
+from .audit_references_meta_membership import MEMBERSHIP_AUDIT_EDGES
+from .audit_references_meta_payments import PAYMENT_AUDIT_EDGES
+from .audit_references_meta_phase5 import PHASE5_AUDIT_EDGES
+from .audit_references_meta_reports import REPORT_SCHEDULE_AUDIT_EDGES
 from .audit_references_meta_source_local import SOURCE_LOCAL_AUDIT_EDGES
 
 _SOURCE_LOCAL_EDGES = SOURCE_LOCAL_AUDIT_EDGES
@@ -263,33 +267,7 @@ AUDIT_META_REFERENCES.update(
 AUDIT_META_REFERENCES.update(
     _reference(S, "boxes.QrScanEvent", ("qr.scanned", "scan_id"))
 )
-# Member ID cards (forward plan phase 5): card ids remap to the exported MemberCard row;
-# the scan-time QR id remaps like every other QR reference.
-AUDIT_META_REFERENCES.update(
-    _reference(
-        R, "makerspaces.MemberCard",
-        ("member_card.created", "card_id"), ("member_card.issued", "card_id"),
-        ("member_card.reissued", "card_id"), ("member_card.revoked", "card_id"),
-        ("member_card.printed", "card_id"), ("member_card.name_updated", "card_id"),
-        ("member_card.photo_updated", "card_id"), ("member_card.photo_removed", "card_id"),
-    )
-)
-AUDIT_META_REFERENCES.update(_reference(R, "boxes.QrCode", ("member_card.scanned", "qr_id")))
-# Certification gating (phase 5, machines lane).
-AUDIT_META_REFERENCES.update(
-    _reference(
-        R, "machines.CertificationType",
-        ("certification.granted", "certification_type_id"),
-        ("certification.revoked", "certification_type_id"),
-        ("certification.override", "certification_type_id"),
-    )
-)
-AUDIT_META_REFERENCES.update(
-    _reference(
-        R, "makerspaces.MakerspaceMembership",
-        ("certification.granted", "membership_id"), ("certification.revoked", "membership_id"),
-    )
-)
-AUDIT_META_REFERENCES.update(
-    _reference(R, "machines.MachineType", ("certification_type.created", "machine_type_id"))
-)
+AUDIT_META_REFERENCES.update(PHASE5_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(MEMBERSHIP_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(PAYMENT_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(REPORT_SCHEDULE_AUDIT_EDGES)

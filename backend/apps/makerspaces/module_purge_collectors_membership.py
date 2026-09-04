@@ -47,7 +47,14 @@ def membership_private_key_sizes(makerspace):
 
 
 def membership_delete(makerspace, cursor):
-    from apps.makerspaces.models import MemberCard, MemberProfile, MembershipRequest
+    from apps.makerspaces.models import (
+        InvitationRequest,
+        MemberCard,
+        MemberProfile,
+        MembershipPlan,
+        MembershipRequest,
+        MembershipTerm,
+    )
 
     # `MakerspaceMembership` itself is core RBAC state and is NEVER deleted here -- the
     # module gates community enrolment/content, not the roster (plan A7). Waivers and
@@ -70,9 +77,22 @@ def membership_delete(makerspace, cursor):
         status=QrCode.Status.ACTIVE,
     ).update(status=QrCode.Status.REVOKED)
     cards, card_labels = _delete(MemberCard.objects.filter(makerspace=makerspace))
+    # Terms before plans: a term PROTECTs its plan. Renewal Payment rows are money and
+    # stay (the FK to them lives on the term side); the leads queue goes with the module.
+    terms, term_labels = _delete(
+        MembershipTerm.objects.filter(membership__makerspace=makerspace)
+    )
+    plans, plan_labels = _delete(MembershipPlan.objects.filter(makerspace=makerspace))
+    leads, lead_labels = _delete(InvitationRequest.objects.filter(makerspace=makerspace))
     return _counts(
-        model_labels=profile_labels | request_labels | card_labels,
+        model_labels=(
+            profile_labels | request_labels | card_labels | term_labels | plan_labels
+            | lead_labels
+        ),
         member_cards=cards,
         member_profiles=profiles,
         membership_requests=requests,
+        membership_terms=terms,
+        membership_plans=plans,
+        invitation_requests=leads,
     )

@@ -344,6 +344,22 @@ per-makerspace breakdown is always present in the same response; (4) `ReportScop
 mode permitted to flatten, and only for that resolved set. Anything wider is still a regression. Deployment
 -wide aggregates are unchanged: they stay grouped by `makerspace_id`.
 
+
+**Report provenance and scheduled delivery (forward plan phase 6, 2026-09-04).** Every CSV/XLSX export
+leaves through `apps/operations/report_exports.py` with an `ExportProvenance`: CSV line 1 is a raw
+`# generated_at=… generated_by=… makerspace_id=<id|all> report_key=… report_version=… filters=<json>` row
+and XLSX carries a second `Provenance` sheet; the data columns stay exactly the registry fields, CSV is
+streamed and XLSX is written write-only, and `ReportDefinition.version` is bumped whenever a report's shape
+changes. A `ReportSchedule` runs only through `run_report_schedules` → the same `report_rows` builder as the
+manual export (`generated_by="schedule:<id>"`), inside a per-tenant `fanout_tenant_write`, after a
+`skip_locked` claim that advances `next_run_at` before any work (idempotent under a coarse cron); it is
+skipped and audited (`report_schedule.skipped`) when the makerspace is not report-eligible or the creator no
+longer holds the definition's `required_action`. Deliveries never carry bytes into chat: the file lives in
+the private bucket under `reports/<makerspace_id>/…`, recipients get a signed URL bounded by
+`REPORT_DELIVERY_URL_TTL_SECONDS` (default 6h — the one presign that deliberately outlives a quiesce drain,
+read-only), the object is swept after expiry, email delivery is link-only, and `ReportSchedule` is a Lane D
+DROP like every other live disclosure rule. `recipient_emails` is staff-entered contact data and is NOT in
+the encryption registry (no existing JSON-list email column to mirror) — an owner call if that should change.
 **Scoped PII encryption (Part H, `apps/encryption/`; dormant unless enabled).** Per-makerspace DEK via a
 key broker (local/AWS-KMS), AAD-authenticated envelope crypto, `ScopedPiiModelMixin` on the 6 PII-holding
 models with a save-boundary that single-INSERTs envelopes + dual-read cache. Blind-index search
@@ -353,6 +369,16 @@ search plaintext via ORM. Write-fence (`PiiGlobalWriteFence`/`PiiMakerspaceWrite
 during maintenance; mapped services acquire the fence **before** their domain row lock. Enabling is a
 staged dual-read rollout; `decrypt_scoped_pii` is the fenced rollback. **Encryption is never enabled
 before H3 (search) ships.**
+
+**`warranty.Warranty.vendor_contact` is NOT registered as PII — by decision, not omission (forward plan
+phase 6, owner decision 6, 2026-09-04).** It is a free-text vendor/business contact (a support desk, a
+reseller's sales line), and no vendor or business contact anywhere in `warranty` or `procurement` is
+classified as scoped PII; the registries are self-consistent on that reading. The alternative — a
+`procurement.Vendor` record with `ScopedPiiModelMixin` contact fields, a data migration moving each
+distinct `vendor_contact` value into an encrypted vendor row, and a sweep test over contact-like columns
+— is written up in `docs/plans/2026-09-03-forward-plan/phase-6-money-and-membership.md` ("Vendor record")
+and should be built only if the owner decides vendors can be named individuals. Until then, do not
+re-raise the question from a grep for "contact" columns; this entry is the answer.
 
 **Custom editable per-makerspace roles (Part L).** The 5 legacy roles are now editable protected default
 `Role` rows; authority is **action-based** via the assigned role (dual-read with legacy fallback:
@@ -588,6 +614,21 @@ intent down **one** path in `membership_services.invite_membership`, discriminat
 role granting actions is a staff invitation and must keep working with the module off. Module gates are
 **additive `AND`s** — `refer_membership` still checks `referrals_enabled` and `can_refer`.
 
+**Membership plans, terms and invitation requests (forward plan phase 6, 2026-09-04).** Plans are optional
+and never an access state: a `MembershipTerm` expiring changes neither `MakerspaceMembership.status` nor
+`User.access_status`; the only effect is the per-makerspace opt-in `lapsed_members_cannot_borrow`, enforced
+solely by `request_access.require_current_term` AFTER the who-may-submit rule has admitted the member
+("active" = `status=active AND ends_at > now`, so it does not depend on the hourly sweep), and a member who
+has never held a term is untouched. One renewal charge per term, raised only by
+`membership_plan_services.run_membership_renewals` as `Payment(subject_type=membership_term,
+subject_id=term.pk)` inside the 7-day window and only when `online_payments_enabled(ms, "membership")` —
+the Payment unique constraint is the idempotency, a payment failure is logged and never touches the term,
+and settlement does not auto-open the next term (staff do). An `InvitationRequest` is a lead, not authority:
+name/email/phone are scoped source PII (encrypted at rest, purged with `membership`, `(PRESERVE, DROP)` in
+tenant dumps), the public endpoint answers the same 202 to real and honeypotted submissions, and "Invite"
+only ever calls `membership_services.invite_membership`, inheriting the role non-escalation and the
+community/staff discrimination of a hand-typed invitation.
+
 **Payments (Stripe, C.2/C.3; dormant until configured).** `apps/payments.Payment` is the **single payment
 authority** (one row per subject via unique `(makerspace, subject_type, subject_id)`; positive amount;
 statuses pending/paid_online/paid_offline/waived/canceled; terminal rows immutable — **enforced by a Postgres
@@ -623,6 +664,23 @@ in-flight checkout/webhook sessions. Booking, event-registration, membership-due
 charges all create the same immutable `Payment` subject rows. Reconciliation is makerspace-scoped through
 RBAC, reports/dashboard aggregates never flatten tenants, and offline/waive actions audit the actor and
 best-effort expire live online sessions.
+
+**Refunds and loan charges (forward plan phase 6, 2026-09-04; owner decision 7 defaulted to "charging
+allowed, off by default").** A `Payment` row never changes for a refund: refunds are `payments.Refund`
+ledger lines on a `paid_online` Payment, the sum of PENDING+SUCCEEDED refunds never exceeds
+`payment.amount` (enforced under the Payment row lock and in `Refund.clean()`), a settled refund is
+immutable, provider I/O happens outside every row lock, and webhooks (`charge.refunded`/`refund.*`,
+`refund.processed`) only ever settle a locally raised PENDING row through `_record_once` — a dashboard
+refund this deployment never raised is logged, never invented. Loan charges (`LOAN_DEPOSIT`,
+`LOAN_LATE_FEE`, one each per request by the subject uniqueness) are raised only by the workflow module,
+post-commit, through `apps/hardware_requests/loan_payments.py`, and never block a handover or return —
+except the one opt-in gate: with `loan_deposit_blocks_issue` on, `issue_request` refuses with
+`deposit_required` (409) **before** the QR/evidence Hard Rules, fails OPEN on payment-system errors, and
+the deposit it raised is the row the later issue accepts. A late fee is computed exactly once at close
+(`ceil(days past due + grace) × per_day`, capped when the cap is > 0) and never recomputed; an uncollected
+deposit is cancelled at close, a collected one is released only by a staff refund. `payments.loans` is an
+additive AND behind `payments.enabled`, the `payments` module and resolvable credentials; off means nothing
+is raised and lateness is only recorded.
 
 **Native clients use attested device grants, never browser-token shortcuts.** Device login starts with a
 short-lived attestation challenge and creates a revocable `DeviceGrant`; access tokens carry

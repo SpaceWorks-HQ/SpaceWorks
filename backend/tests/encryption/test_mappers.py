@@ -45,9 +45,10 @@ def test_registry_matches_the_post_b7c_source_and_secondary_allowlists():
     # EventFeedbackResponse.answers_snapshot and EventAttendanceCertificate.recipient_name.
     # The counts are asserted so that encrypting a new column is a visible decision here.
     # 21 with makerspaces.MemberCard.printed_name (forward plan phase 5).
-    assert len(SOURCE_FIELDS) == 21
+    # 21 -> 24 with InvitationRequest name/email/phone (forward plan phase 6).
+    assert len(SOURCE_FIELDS) == 24
     assert len(SECONDARY_FIELDS) == 4
-    assert len(ALL_FIELDS) == 25
+    assert len(ALL_FIELDS) == 28
     assert {item.model_label for item in SECONDARY_FIELDS} == {"integrations.EmailLog"}
 
 

@@ -326,6 +326,11 @@ Required by `printing`.
   the member directory and member activity.
 - **What it adds** — the join-request queue, member capabilities and memberships in the console, the
   opt-in maker profile and directory, and per-member activity history.
+  Plans and terms (monthly, yearly or custom-length, priced or free) can be attached to a membership;
+  a beat-less sweep raises one renewal charge per term before it ends when `payments.membership` is on,
+  and an optional per-makerspace rule can stop lapsed members from borrowing. Prospective members can
+  send an invitation request from the public site (throttled, honeypot-guarded, PII encrypted at rest);
+  staff invite or decline it from the same queue as join requests.
 - **Without it** — people can still exist as members and still borrow: staff create walk-in member
   records, and identity can come from `member_accounts` or an external OIDC provider. What goes is the
   *enrolment and community* layer — no join requests to approve, no waivers, no referrals, no profiles,
@@ -456,14 +461,18 @@ stored credential**, so re-enabling needs no re-entry.
 - **What it adds** — the `analytics` and `report_export` workflows: a server-provided report catalog,
   dashboards, accessible charts with table fallbacks, the ledger, problem reports and every registered
   report. The catalog covers every module either with a substantive report or an explicitly gated row in
-  a composite operational-health report.
-- **Without it** — no analytics screens and no exports from the console. It is a **standalone area
+  a composite operational-health report. Every CSV/XLSX export carries provenance (who generated it,
+  when, for which makerspace, which report version and filters) as the first CSV line or a `Provenance`
+  sheet, and staff can schedule a report to be delivered daily, weekly or monthly to a notification
+  destination or a list of email recipients as a short-lived signed download link.
+- **Without it** — no analytics screens, no exports and no scheduled deliveries from the console. It is a **standalone area
   rather than part of Inventory** on purpose: switching Inventory off would otherwise take the machine
   and event reports with it.
 - **Data** — closed historical buckets are stored as append-only, non-PII metric rollups; corrections add
   a revision rather than rewriting history. Automatic evidence retention must finalize its rollup fence
   first, so it cannot change historical figures. Whole-tenant purge removes the rollups through tenant
-  ownership, and an explicit source-module purge removes that module's derived rollups too.
+  ownership, and an explicit source-module purge removes that module's derived rollups too. Purging
+  `reports` deletes report schedules and their delivered files (private objects); the rollups stay.
 
 ---
 
@@ -474,8 +483,10 @@ stored credential**, so re-enabling needs no re-entry.
 **On by default.**
 
 - **What it is** — taking money online, through Stripe or Razorpay behind one provider seam.
-- **What it adds** — the payment surfaces, charges, receipts, reconciliation and (with `mobile`) the
-  in-app payment sheet.
+- **What it adds** — the payment surfaces, charges, receipts, reconciliation, refunds (full or partial,
+  through the same provider seam, as ledger lines that never edit the charge) and (with `mobile`) the
+  in-app payment sheet. With `payments.loans` on, issuing a loan raises a deposit and a late return
+  raises a capped fee, both from the request workflow itself.
 - **Without it** — no online payment surfaces exist. Money is handled outside the system.
 - **Installed ≠ charging.** The module being on means the *surfaces* exist. No charge can be created
   until a Space Manager turns on a `payments.<area>` feature **and** valid credentials resolve.
@@ -530,6 +541,7 @@ in the console rather than a superadmin. A feature is inert while its parent mod
 | `payments.bookings` | `bookings` | | Charge for bookings | Bookings are free in-app |
 | `payments.events` | `events` | | Charge for event registration | Registration is free in-app |
 | `payments.membership` | `membership` | | Charge membership dues | Dues are collected out of band |
+| `payments.loans` | `payments` | | Raise a deposit when a loan is issued and a capped late fee when it comes back late | Lateness is recorded (due dates, reminders) but never charged |
 | `mobile.push` | `mobile` | ● | Native push notifications | Apps rely on in-app/inbox notifications |
 | `events.offline_checkin` | `events` | | Expiring on-device roster plus event-scoped PIN check-in stations | Check-in needs a live connection and an authenticated staff actor |
 | `machines.certifications` | `machines` | | Members need an unexpired certification per machine type to book a linked space or request work; overrides need machine-type authority and are audited | Training is tracked out of band; nothing gates a request or booking |

@@ -69,6 +69,12 @@ PUBLIC_CLAIM_ROUTES = {
         "walk-ins cannot satisfy verified-email eligibility"
     ),
     ("public-membership-request", "OPTIONS"): AnonymousRead(),
+    # A walk-in already holds a membership claim; asking to be invited makes no sense
+    # from inside one, and the anonymous path stays open to everyone else.
+    ("public-invitation-request", "POST"): Refused(
+        "walk-ins already hold a membership; invitation requests are for outsiders"
+    ),
+    ("public-invitation-request", "OPTIONS"): AnonymousRead(),
     ("hardware_requests:request-submit", "POST"): Allowed(
         tenant=SLUG, audited=True
     ),

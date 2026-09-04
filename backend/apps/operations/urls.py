@@ -3,8 +3,16 @@ from django.urls import path
 from apps.operations import views
 from apps.operations.views_live import LiveStreamView
 from apps.operations.views_metrics import MetricsView
+from apps.operations.views_report_schedules import (
+    ReportScheduleDetailView,
+    ReportScheduleListCreateView,
+    ReportScheduleRunNowView,
+)
 
 urlpatterns = [
+    path("admin/makerspaces/<int:makerspace_id>/report-schedules", ReportScheduleListCreateView.as_view(), name="report-schedules"),
+    path("admin/report-schedules/<int:pk>", ReportScheduleDetailView.as_view(), name="report-schedule-detail"),
+    path("admin/report-schedules/<int:pk>/run-now", ReportScheduleRunNowView.as_view(), name="report-schedule-run-now"),
     path("health/", views.HealthView.as_view(), name="health"),
     path("health/readiness/", views.ReadinessView.as_view(), name="readiness"),
     path("metrics/", MetricsView.as_view(), name="metrics"),

@@ -14,6 +14,7 @@ export const FEATURE_DEFINITIONS: readonly FeatureDefinition[] = [
   { key: "payments.bookings", parent_module: "bookings", label: "Booking payments" },
   { key: "payments.events", parent_module: "events", label: "Event payments" },
   { key: "payments.membership", parent_module: "membership", label: "Membership payments" },
+  { key: "payments.loans", parent_module: "payments", label: "Loan deposits and late fees" },
   { key: "inventory.self_checkout", parent_module: null, label: "Self checkout" },
   { key: "payments.enabled", parent_module: "payments", label: "Payments" },
   { key: "mobile.push", parent_module: "mobile", label: "Native push" },

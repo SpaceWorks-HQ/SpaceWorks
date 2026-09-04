@@ -8,13 +8,13 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
-from apps.admin_api.serializers_member_memberships import (AdminMembershipSerializer, InvitationSerializer,
-    MembershipRequestSerializer, RevokeSerializer, RoleIdSerializer)
+from apps.admin_api.serializers_member_memberships import (AdminMembershipSerializer, ApproveRequestSerializer,
+    InvitationSerializer, MembershipRequestSerializer, RevokeSerializer, RoleIdSerializer)
 from apps.admin_api.serializers_payment_summary import scoped_payment_context
 from apps.admin_api.views_roles import ERRORS
 from apps.makerspaces import membership_services, waiver_services
 from apps.makerspaces.guards import require_module
-from apps.makerspaces.models import MakerspaceMembership, MakerspaceRole, MakerspaceWaiver, MembershipRequest
+from apps.makerspaces.models import MakerspaceMembership, MakerspaceRole, MakerspaceWaiver, MembershipPlan, MembershipRequest
 from apps.makerspaces.serializers_memberships import WaiverPublishSerializer
 from apps.makerspaces.servability import servable_queryset
 from apps.payments.models import Payment
@@ -110,14 +110,17 @@ class AdminInvitationView(APIView):
 class AdminRequestApproveView(APIView):
     permission_classes = [IsActiveStaff]
 
-    @extend_schema(tags=["Admin memberships"], request=RoleIdSerializer, responses={200: AdminMembershipSerializer, **ERRORS})
+    @extend_schema(tags=["Admin memberships"], request=ApproveRequestSerializer, responses={200: AdminMembershipSerializer, **ERRORS})
     def post(self, request, pk):
         item = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_MAKERSPACE, MembershipRequest.objects.select_related("makerspace")), pk=pk)
         makerspace = _makerspace(request.user, item.makerspace_id)
         require_module(makerspace, "membership")
-        serializer = RoleIdSerializer(data=request.data)
+        serializer = ApproveRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        membership = membership_services.approve_request(request.user, item, _role(makerspace, serializer.validated_data["role_id"]))
+        plan = None
+        if serializer.validated_data.get("plan_id") is not None:
+            plan = get_object_or_404(MembershipPlan.objects.filter(makerspace=makerspace), pk=serializer.validated_data["plan_id"])
+        membership = membership_services.approve_request(request.user, item, _role(makerspace, serializer.validated_data["role_id"]), plan=plan)
         membership = MakerspaceMembership.objects.select_related(
             "user", "assigned_role"
         ).get(pk=membership.pk)

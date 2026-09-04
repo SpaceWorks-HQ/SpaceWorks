@@ -195,6 +195,7 @@ ROW_POLICIES = {
     "integrations.RecipientMachineTypeScope": RowPolicy(RowDisposition.DROP, "A child of a dropped recipient cannot arrive live."),
     "integrations.RecipientMachineScope": RowPolicy(RowDisposition.DROP, "A child of a dropped recipient cannot arrive live."),
     "integrations.RecipientCategoryScope": RowPolicy(RowDisposition.DROP, "A child of a dropped recipient cannot arrive live."),
+    "operations.ReportSchedule": RowPolicy(RowDisposition.DROP, "A scheduled report delivery is a live disclosure rule the target must re-create."),
     "integrations.NotificationDestination": RowPolicy(
         RowDisposition.STAGE_INERT,
         "Imported Telegram rooms require target-authorized activation.",

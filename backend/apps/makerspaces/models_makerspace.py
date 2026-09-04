@@ -103,6 +103,10 @@ class Makerspace(MakerspaceSecretsMixin, models.Model):
         validators=[MinValueValidator(0)],
     )
     referrals_enabled = models.BooleanField(default=False)
+    # Opt-in: a member whose membership terms have all expired or been cancelled is
+    # refused a borrow request like a non-member. A member with no term at all is never
+    # affected -- plans are optional. Enforced by `request_access.require_current_term`.
+    lapsed_members_cannot_borrow = models.BooleanField(default=False)
     # 0 = off. When > 0, active filament spools at/below this remaining weight
     # can auto-create a printing procurement item.
     filament_low_stock_threshold_grams = models.DecimalField(

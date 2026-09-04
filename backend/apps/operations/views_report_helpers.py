@@ -18,8 +18,15 @@ def _require_source_modules(makerspace, modules):
 
 
 def _date_range(request):
-    start = _date_param(request, "start")
-    end = _date_param(request, "end")
+    return date_range_from_dates(_date_param(request, "start"), _date_param(request, "end"))
+
+
+def date_range_from_dates(start, end):
+    """Inclusive calendar dates -> the half-open aware datetime range every builder takes.
+
+    Shared by the export views and the scheduled-report runner so a schedule's stored
+    `start`/`end` mean exactly what the same dates mean on a manual export.
+    """
     if start and end and start > end:
         raise ValidationError({"end": "End date must be on or after start date."})
     start_dt = timezone.make_aware(datetime.combine(start, time.min)) if start else None

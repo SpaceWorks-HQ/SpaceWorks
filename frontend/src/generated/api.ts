@@ -157,6 +157,8 @@ export const openApiPaths = [
   "/api/v1/admin/inventory/{id}/needs-fix",
   "/api/v1/admin/inventory/{id}/qr-history",
   "/api/v1/admin/inventory/{product_pk}/assets",
+  "/api/v1/admin/invitation-requests/{id}/decline",
+  "/api/v1/admin/invitation-requests/{id}/invite",
   "/api/v1/admin/ledger",
   "/api/v1/admin/ledger/export",
   "/api/v1/admin/machine-service-report",
@@ -284,6 +286,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/payments/bulk/mark-offline",
   "/api/v1/admin/makerspace/{makerspace_id}/payments/bulk/waive",
   "/api/v1/admin/makerspace/{makerspace_id}/payments/{payment_id}/mark-offline",
+  "/api/v1/admin/makerspace/{makerspace_id}/payments/{payment_id}/refund",
   "/api/v1/admin/makerspace/{makerspace_id}/payments/{payment_id}/waive",
   "/api/v1/admin/makerspace/{makerspace_id}/pending-requests",
   "/api/v1/admin/makerspace/{makerspace_id}/presence-sessions/current",
@@ -317,6 +320,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspaces/{makerspace_id}/events/",
   "/api/v1/admin/makerspaces/{makerspace_id}/evidence-retention",
   "/api/v1/admin/makerspaces/{makerspace_id}/evidence-retention/preview",
+  "/api/v1/admin/makerspaces/{makerspace_id}/invitation-requests",
   "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/consumable-pools",
   "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/requests",
   "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/typed-manual-usage",
@@ -329,8 +333,10 @@ export const openApiPaths = [
   "/api/v1/admin/makerspaces/{makerspace_id}/member-cards/{membership_id}/issue",
   "/api/v1/admin/makerspaces/{makerspace_id}/member-claim-codes",
   "/api/v1/admin/makerspaces/{makerspace_id}/member-claim-codes/{claim_id}/revoke",
+  "/api/v1/admin/makerspaces/{makerspace_id}/membership-plans",
   "/api/v1/admin/makerspaces/{makerspace_id}/memberships",
   "/api/v1/admin/makerspaces/{makerspace_id}/memberships/{membership_id}/role",
+  "/api/v1/admin/makerspaces/{makerspace_id}/report-schedules",
   "/api/v1/admin/makerspaces/{makerspace_id}/roles",
   "/api/v1/admin/makerspaces/{makerspace_id}/roles/capabilities",
   "/api/v1/admin/makerspaces/{makerspace_id}/roles/{role_id}",
@@ -342,14 +348,17 @@ export const openApiPaths = [
   "/api/v1/admin/member-cards/{id}/print.pdf",
   "/api/v1/admin/member-cards/{id}/reissue",
   "/api/v1/admin/member-cards/{id}/revoke",
+  "/api/v1/admin/membership-plans/{id}",
   "/api/v1/admin/membership-requests",
   "/api/v1/admin/membership-requests/{id}/approve",
   "/api/v1/admin/membership-requests/{id}/revoke",
+  "/api/v1/admin/membership-terms/{id}/cancel",
   "/api/v1/admin/memberships",
   "/api/v1/admin/memberships/{id}",
   "/api/v1/admin/memberships/{id}/capabilities",
   "/api/v1/admin/memberships/{id}/revoke",
   "/api/v1/admin/memberships/{id}/role",
+  "/api/v1/admin/memberships/{id}/terms",
   "/api/v1/admin/memberships/{id}/unverify",
   "/api/v1/admin/memberships/{id}/verify",
   "/api/v1/admin/memberships/{id}/waiver/witness",
@@ -391,6 +400,8 @@ export const openApiPaths = [
   "/api/v1/admin/qr/{id}/print",
   "/api/v1/admin/qr/{id}/rebind-target",
   "/api/v1/admin/qr/{id}/revoke",
+  "/api/v1/admin/report-schedules/{id}",
+  "/api/v1/admin/report-schedules/{id}/run-now",
   "/api/v1/admin/reports/catalog",
   "/api/v1/admin/reports/{report_key}/export",
   "/api/v1/admin/requests/{id}/accept",
@@ -528,6 +539,7 @@ export const openApiPaths = [
   "/api/v1/public/{makerspace_slug}/inventory/",
   "/api/v1/public/{makerspace_slug}/inventory/categories/",
   "/api/v1/public/{makerspace_slug}/inventory/{id}/",
+  "/api/v1/public/{makerspace_slug}/invitation-requests",
   "/api/v1/public/{makerspace_slug}/machine-service-requests",
   "/api/v1/public/{makerspace_slug}/machine-service/3d-printer/consumable-pools",
   "/api/v1/public/{makerspace_slug}/machine-service/3d-printer/queues",
@@ -766,6 +778,11 @@ export type ApiKeyRequest = {
 };
 
 export type ApprovalModeEnum = "instant" | "approve";
+
+export type ApproveRequest = {
+  "role_id": number;
+  "plan_id"?: number | null;
+};
 
 export type ArchiveCustodyReadiness = {
   "below_floor_makerspaces": number;
@@ -1132,6 +1149,8 @@ export type BulkImportPreview = {
 }>;
   "mapping"?: unknown;
 };
+
+export type CadenceEnum = "daily" | "weekly" | "monthly";
 
 export type Capability = {
   "value": string;
@@ -2156,6 +2175,8 @@ export type ForgotPasswordRequest = {
   "email": string;
 };
 
+export type FormatEnum = "csv" | "xlsx";
+
 export type FrontendDomainStatusEnum = "pending" | "verified" | "failed";
 
 export type GenericAnalyticsReport = {
@@ -2301,6 +2322,8 @@ export type IntegrationWorkerHealth = {
   "stale"?: boolean;
 };
 
+export type IntervalEnum = "monthly" | "yearly" | "custom_days";
+
 export type InventoryAssetAdmin = {
   "id": number;
   "makerspace": number;
@@ -2441,6 +2464,32 @@ export type InvitationList = {
   "invitations": Array<ClaimableInvitation>;
 };
 
+export type InvitationRequest = {
+  "id": number;
+  "name": string;
+  "email": string;
+  "phone": string;
+  "message": string;
+  "status": InvitationRequestStatusEnum;
+  "handled_by": number | null;
+  "handled_at": string | null;
+  "created_at": string;
+};
+
+export type InvitationRequestAck = {
+  "detail": string;
+};
+
+export type InvitationRequestCreate = {
+  "name": string;
+  "email": string;
+  "phone"?: string;
+  "message"?: string;
+  "website"?: string;
+};
+
+export type InvitationRequestStatusEnum = "pending" | "invited" | "declined";
+
 export type IssueReject = {
   "item_id": number;
   "broken"?: number;
@@ -2531,6 +2580,8 @@ export type LinkMachineConsumable = {
   "low_threshold"?: string | null;
   "note"?: string;
 };
+
+export type LoanDepositModeEnum = "none" | "fixed" | "per_product";
 
 export type LocationKindEnum = "indoor" | "outdoor" | "other";
 
@@ -3058,6 +3109,12 @@ export type MakerspacePaymentSettings = {
   "connect_payouts_enabled": boolean;
   "connect_status_updated_at": string;
   "effective_mode": string;
+  "loan_deposit_mode"?: LoanDepositModeEnum;
+  "loan_deposit_amount"?: string;
+  "loan_late_fee_per_day"?: string;
+  "loan_late_fee_cap"?: string;
+  "loan_grace_days"?: number;
+  "loan_deposit_blocks_issue"?: boolean;
 };
 
 export type ManagedPolicyMarker = {
@@ -3326,6 +3383,18 @@ export type MembershipOutcome = {
 
 export type MembershipOutcomeOutcomeEnum = "joined" | "requested";
 
+export type MembershipPlan = {
+  "id": number;
+  "name": string;
+  "interval": IntervalEnum;
+  "custom_days"?: number | null;
+  "amount"?: string;
+  "currency"?: string;
+  "is_active"?: boolean;
+  "created_at": string;
+  "updated_at": string;
+};
+
 export type MembershipPolicyEnum = "request" | "open" | "invite_only";
 
 export type MembershipRequest = {
@@ -3367,6 +3436,26 @@ export type MembershipRoleSummary = {
   "is_default": boolean;
   "is_protected": boolean;
 };
+
+export type MembershipTerm = {
+  "id": number;
+  "membership": number;
+  "plan": number;
+  "plan_name": string;
+  "starts_at": string;
+  "ends_at": string;
+  "status": MembershipTermStatusEnum;
+  "renewal_payment": number | null;
+  "created_by": number | null;
+  "created_at": string;
+};
+
+export type MembershipTermCreate = {
+  "plan_id": number;
+  "starts_at"?: string | null;
+};
+
+export type MembershipTermStatusEnum = "active" | "expired" | "cancelled";
 
 export type MemberSignUp = {
   "display_name": string;
@@ -3967,6 +4056,13 @@ export type PaginatedQrPrintBatchList = {
   "results": Array<QrPrintBatch>;
 };
 
+export type PaginatedReportScheduleList = {
+  "count": number;
+  "next"?: string | null;
+  "previous"?: string | null;
+  "results": Array<ReportSchedule>;
+};
+
 export type PaginatedStaffMembershipList = {
   "count": number;
   "next"?: string | null;
@@ -4364,6 +4460,12 @@ export type PatchedMakerspacePaymentSettings = {
   "connect_payouts_enabled"?: boolean;
   "connect_status_updated_at"?: string;
   "effective_mode"?: string;
+  "loan_deposit_mode"?: LoanDepositModeEnum;
+  "loan_deposit_amount"?: string;
+  "loan_late_fee_per_day"?: string;
+  "loan_late_fee_cap"?: string;
+  "loan_grace_days"?: number;
+  "loan_deposit_blocks_issue"?: boolean;
 };
 
 export type PatchedMemberCardOwnUpdate = {
@@ -4373,6 +4475,18 @@ export type PatchedMemberCardOwnUpdate = {
 export type PatchedMembershipCapabilities = {
   "can_refer"?: boolean;
   "can_verify"?: boolean;
+};
+
+export type PatchedMembershipPlan = {
+  "id"?: number;
+  "name"?: string;
+  "interval"?: IntervalEnum;
+  "custom_days"?: number | null;
+  "amount"?: string;
+  "currency"?: string;
+  "is_active"?: boolean;
+  "created_at"?: string;
+  "updated_at"?: string;
 };
 
 export type PatchedMembershipRoleAssign = {
@@ -4463,6 +4577,25 @@ export type PatchedPrinterPoolVisibility = {
   "is_public"?: boolean;
 };
 
+export type PatchedReportSchedule = {
+  "id"?: number;
+  "makerspace"?: number;
+  "report_key"?: ReportKeyEnum;
+  "filters"?: unknown;
+  "grain"?: string;
+  "format"?: FormatEnum;
+  "cadence"?: CadenceEnum;
+  "next_run_at"?: string;
+  "last_run_at"?: string | null;
+  "is_active"?: boolean;
+  "destination"?: number | null;
+  "recipient_emails"?: Array<string>;
+  "created_by"?: number | null;
+  "created_at"?: string;
+  "updated_at"?: string;
+  "last_delivery"?: ReportDelivery | null;
+};
+
 export type PatchedReturnPolicy = {
   "id"?: number;
   "default_loan_days"?: number;
@@ -4518,6 +4651,8 @@ export type PaymentReconciliation = {
   "status": Status66aEnum;
   "amount": string;
   "currency": string;
+  "refunded_amount": number;
+  "refunds": Array<Refund>;
   "created_at": string;
   "updated_at": string;
 };
@@ -4535,6 +4670,11 @@ export type PaymentReconciliationReportRow = {
   "payment_count": number;
   "amount_total": string;
   "outstanding_amount": string;
+};
+
+export type PaymentRefundRequest = {
+  "amount": string;
+  "reason"?: string;
 };
 
 export type PaymentSettingsError = {
@@ -5533,6 +5673,18 @@ export type RefreshResponse = {
   "access": string;
 };
 
+export type Refund = {
+  "id": number;
+  "amount": string;
+  "currency": string;
+  "status": RefundStatusEnum;
+  "reason": string;
+  "created_at": string;
+  "settled_at": string | null;
+};
+
+export type RefundStatusEnum = "pending" | "succeeded" | "failed";
+
 export type RejectRequest = {
   "reason": string;
 };
@@ -5555,9 +5707,41 @@ export type ReportCatalogItem = {
   "aggregate_supported": boolean;
 };
 
+export type ReportDelivery = {
+  "id": number;
+  "status": ReportDeliveryStatusEnum;
+  "error": string;
+  "created_at": string;
+  "expires_at": string | null;
+  "download_url": string;
+};
+
+export type ReportDeliveryStatusEnum = "sent" | "failed";
+
 export type ReportError = {
   "detail": string;
   "code"?: string;
+};
+
+export type ReportKeyEnum = "summary" | "taken-items" | "active-loans" | "returns" | "damaged-missing" | "damaged-lost" | "qr-scans" | "most-lent" | "top-borrowers" | "recently-added" | "machine-usage" | "event-attendance" | "booking-utilization" | "maintenance-activity" | "member-activity" | "machine-service" | "printer-service" | "fablab-health" | "payment-reconciliation" | "loan-throughput" | "inventory-control" | "evidence-compliance" | "import-quality" | "procurement-performance" | "communications-health" | "community-engagement" | "certification-coverage" | "module-operational-health";
+
+export type ReportSchedule = {
+  "id": number;
+  "makerspace": number;
+  "report_key": ReportKeyEnum;
+  "filters"?: unknown;
+  "grain"?: string;
+  "format"?: FormatEnum;
+  "cadence"?: CadenceEnum;
+  "next_run_at"?: string;
+  "last_run_at": string | null;
+  "is_active"?: boolean;
+  "destination"?: number | null;
+  "recipient_emails"?: Array<string>;
+  "created_by": number | null;
+  "created_at": string;
+  "updated_at": string;
+  "last_delivery": ReportDelivery | null;
 };
 
 export type RequestAccessEnum = "anyone";
@@ -6151,7 +6335,7 @@ export type SubdomainRequestError = {
   "detail": string;
 };
 
-export type SubjectTypeEnum = "machine_service_request" | "booking" | "event_registration" | "makerspace_membership";
+export type SubjectTypeEnum = "machine_service_request" | "booking" | "event_registration" | "makerspace_membership" | "membership_term" | "loan_deposit" | "loan_late_fee";
 
 export type Surface356Enum = "member" | "staff";
 

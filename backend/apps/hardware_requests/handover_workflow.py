@@ -9,7 +9,7 @@ from apps.boxes.models import Box, BoxScan
 from apps.evidence import storage
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.evidence.models import EvidencePhoto
-from apps.hardware_requests import notifications
+from apps.hardware_requests import loan_payments, notifications
 from apps.hardware_requests.handover_issue_helpers import (
     issue_individual_assets,
     validate_broken_rejects,
@@ -91,6 +91,10 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
         for entry in (rejects or [])
         if int(entry.get("broken", 0)) > 0
     }
+    # Payment gate FIRST, then the QR/evidence Hard Rules: an unpaid blocking deposit is
+    # reported before a missing photo, so staff are not asked for evidence of a handover
+    # that cannot happen yet. It never refuses unless the makerspace opted into blocking.
+    loan_payments.require_deposit_settled(request, actor)
     evidence = EvidencePhoto.objects.filter(
         pk=evidence_id,
         makerspace_id=request.makerspace_id,
@@ -184,6 +188,8 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
             meta={"box_id": locked.assigned_box_id, "evidence_id": evidence.pk},
         )
         notifications.notify_request_issued(locked)
+        request_id = locked.pk
+        transaction.on_commit(lambda: loan_payments.raise_deposit(request_id, actor))
         return locked
 
 def set_return_due(actor, request, return_due_at):

@@ -258,6 +258,12 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
     ): _policy(
         NULL, "The omitted external_payment_id makes this target constraint inert."
     ),
+    (
+        "payments.Refund",
+        "refund_external_once_per_provider",
+    ): _policy(
+        NULL, "The omitted external_refund_id makes this target constraint inert."
+    ),
     ("procurement.ToBuyReceipt", "field:object_key"): _policy(
         PRESERVE,
         "Keep the archived receipt key unless it collides on the target.",

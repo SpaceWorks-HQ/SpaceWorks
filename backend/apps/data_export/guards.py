@@ -232,6 +232,9 @@ def validate_user_edges(user_edges=USER_EDGES):
 NON_REFERENCE_JSON_FIELDS = frozenset({
     # Controlled metric dimension labels (module key, period, report key) -- never an id.
     ("operations.ReportMetricRollup", "dimensions"),
+    # Export inputs (dates, day window, payment enums) and staff-entered emails; no ids.
+    ("operations.ReportSchedule", "filters"),
+    ("operations.ReportSchedule", "recipient_emails"),
 })
 
 

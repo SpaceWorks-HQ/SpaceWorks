@@ -419,8 +419,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -7334,6 +7337,104 @@
                 }
             }
         },
+        "/api/v1/admin/invitation-requests/{id}/decline": {
+            "post": {
+                "operationId": "api_v1_admin_invitation_requests_decline_create",
+                "summary": "Decline an invitation request",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InvitationRequest"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid input or request already handled."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/invitation-requests/{id}/invite": {
+            "post": {
+                "operationId": "api_v1_admin_invitation_requests_invite_create",
+                "summary": "Turn an invitation request into a membership invitation",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RoleId"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RoleId"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RoleId"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InvitationRequest"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid input or request already handled."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/ledger": {
             "get": {
                 "operationId": "api_v1_admin_ledger_retrieve",
@@ -11198,8 +11299,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -11335,8 +11439,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -11472,8 +11579,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -11609,8 +11719,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -11746,8 +11859,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -11883,8 +11999,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -12020,8 +12139,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -12157,8 +12279,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -12294,8 +12419,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -12431,8 +12559,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -12568,8 +12699,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -12705,8 +12839,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -12842,8 +12979,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -12979,8 +13119,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -13116,8 +13259,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -13253,8 +13399,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -13390,8 +13539,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -13527,8 +13679,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -18710,8 +18865,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -18861,6 +19019,111 @@
                             }
                         },
                         "description": "Payment is already terminal."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/payments/{payment_id}/refund": {
+            "post": {
+                "operationId": "api_v1_admin_makerspace_payments_refund_create",
+                "description": "Sends money back through the provider that took it and records a Refund line on the payment. Only `paid_online` payments qualify; the sum of pending and succeeded refunds can never exceed the payment amount. The Payment row itself is immutable -- refund state lives on the Refund rows returned in `refunds`.",
+                "summary": "Refund a payment settled online, fully or partially",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "payment_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Payments"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PaymentRefundRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PaymentRefundRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PaymentRefundRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentReconciliation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Refund not allowed or over the balance."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Payment or makerspace not found."
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "The provider rejected the refund."
                     }
                 }
             }
@@ -19693,8 +19956,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -22435,6 +22701,45 @@
                 }
             }
         },
+        "/api/v1/admin/makerspaces/{makerspace_id}/invitation-requests": {
+            "get": {
+                "operationId": "api_v1_admin_makerspaces_invitation_requests_list",
+                "summary": "List invitation requests (optionally filtered by ?status=)",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/InvitationRequest"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspaces/{makerspace_id}/machine-service/consumable-pools": {
             "get": {
                 "operationId": "api_v1_admin_makerspaces_machine_service_consumable_pools_list",
@@ -23820,6 +24125,102 @@
                 }
             }
         },
+        "/api/v1/admin/makerspaces/{makerspace_id}/membership-plans": {
+            "get": {
+                "operationId": "api_v1_admin_makerspaces_membership_plans_list",
+                "summary": "List membership plans",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/MembershipPlan"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspaces_membership_plans_create",
+                "summary": "Create a membership plan",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipPlan"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipPlan"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipPlan"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipPlan"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid input."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspaces/{makerspace_id}/memberships": {
             "get": {
                 "operationId": "api_v1_admin_makerspaces_memberships_list",
@@ -24119,6 +24520,165 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspaces/{makerspace_id}/report-schedules": {
+            "get": {
+                "operationId": "api_v1_admin_makerspaces_report_schedules_list",
+                "summary": "List report schedules",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedReportScheduleList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Invalid schedule or module disabled."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace or schedule not found."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspaces_report_schedules_create",
+                "summary": "Create report schedule",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReportSchedule"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReportSchedule"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReportSchedule"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportSchedule"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Invalid schedule or module disabled."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace or schedule not found."
                     }
                 }
             }
@@ -25565,6 +26125,64 @@
                 }
             }
         },
+        "/api/v1/admin/membership-plans/{id}": {
+            "patch": {
+                "operationId": "api_v1_admin_membership_plans_partial_update",
+                "summary": "Update a membership plan",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMembershipPlan"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMembershipPlan"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMembershipPlan"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipPlan"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid input."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/membership-requests": {
             "get": {
                 "operationId": "api_v1_admin_membership_requests_list",
@@ -25671,17 +26289,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/RoleId"
+                                "$ref": "#/components/schemas/ApproveRequest"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/RoleId"
+                                "$ref": "#/components/schemas/ApproveRequest"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/RoleId"
+                                "$ref": "#/components/schemas/ApproveRequest"
                             }
                         }
                     },
@@ -25856,6 +26474,45 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/membership-terms/{id}/cancel": {
+            "post": {
+                "operationId": "api_v1_admin_membership_terms_cancel_create",
+                "summary": "Cancel an active term",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipTerm"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid input."
                     }
                 }
             }
@@ -26284,6 +26941,102 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/memberships/{id}/terms": {
+            "get": {
+                "operationId": "api_v1_admin_memberships_terms_list",
+                "summary": "List the terms of a membership",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/MembershipTerm"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_memberships_terms_create",
+                "summary": "Open a term for a membership",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipTermCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipTermCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipTermCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipTerm"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid input."
                     }
                 }
             }
@@ -26758,8 +27511,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -29734,6 +30490,224 @@
                 }
             }
         },
+        "/api/v1/admin/report-schedules/{id}": {
+            "patch": {
+                "operationId": "api_v1_admin_report_schedules_partial_update",
+                "summary": "Update report schedule",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedReportSchedule"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedReportSchedule"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedReportSchedule"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportSchedule"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Invalid schedule or module disabled."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace or schedule not found."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "api_v1_admin_report_schedules_destroy",
+                "summary": "Delete report schedule",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Invalid schedule or module disabled."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace or schedule not found."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/report-schedules/{id}/run-now": {
+            "post": {
+                "operationId": "api_v1_admin_report_schedules_run_now_create",
+                "summary": "Run a report schedule now",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportDelivery"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Schedule inactive or skipped."
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Invalid schedule or module disabled."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace or schedule not found."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/reports/{report_key}/export": {
             "get": {
                 "operationId": "api_v1_admin_reports_export_retrieve",
@@ -29837,8 +30811,11 @@
                             "enum": [
                                 "booking",
                                 "event_registration",
+                                "loan_deposit",
+                                "loan_late_fee",
                                 "machine_service_request",
-                                "makerspace_membership"
+                                "makerspace_membership",
+                                "membership_term"
                             ]
                         }
                     }
@@ -39960,6 +40937,86 @@
                 }
             }
         },
+        "/api/v1/public/{makerspace_slug}/invitation-requests": {
+            "post": {
+                "operationId": "api_v1_public_invitation_requests_create",
+                "summary": "Ask a makerspace to invite you",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Memberships"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InvitationRequestCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InvitationRequestCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InvitationRequestCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InvitationRequestAck"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "Unknown makerspace or membership disabled."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/public/{makerspace_slug}/machine-service-requests": {
             "post": {
                 "operationId": "api_v1_public_machine_service_requests_create",
@@ -42996,6 +44053,21 @@
                 "type": "string",
                 "description": "* `instant` - Instant confirmation\n* `approve` - Staff approval required"
             },
+            "ApproveRequest": {
+                "type": "object",
+                "properties": {
+                    "role_id": {
+                        "type": "integer"
+                    },
+                    "plan_id": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "role_id"
+                ]
+            },
             "ArchiveCustodyReadiness": {
                 "type": "object",
                 "properties": {
@@ -44490,6 +45562,15 @@
                     },
                     "mapping": {}
                 }
+            },
+            "CadenceEnum": {
+                "enum": [
+                    "daily",
+                    "weekly",
+                    "monthly"
+                ],
+                "type": "string",
+                "description": "* `daily` - Daily\n* `weekly` - Weekly\n* `monthly` - Monthly"
             },
             "Capability": {
                 "type": "object",
@@ -48697,6 +49778,14 @@
                     "email"
                 ]
             },
+            "FormatEnum": {
+                "enum": [
+                    "csv",
+                    "xlsx"
+                ],
+                "type": "string",
+                "description": "* `csv` - CSV\n* `xlsx` - XLSX"
+            },
             "FrontendDomainStatusEnum": {
                 "enum": [
                     "pending",
@@ -49184,6 +50273,15 @@
                         "type": "boolean"
                     }
                 }
+            },
+            "IntervalEnum": {
+                "enum": [
+                    "monthly",
+                    "yearly",
+                    "custom_days"
+                ],
+                "type": "string",
+                "description": "* `monthly` - Monthly\n* `yearly` - Yearly\n* `custom_days` - Custom number of days"
             },
             "InventoryAssetAdmin": {
                 "type": "object",
@@ -49772,6 +50870,118 @@
                     "invitations"
                 ]
             },
+            "InvitationRequest": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "email": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "phone": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/InvitationRequestStatusEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "handled_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "handled_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "email",
+                    "handled_at",
+                    "handled_by",
+                    "id",
+                    "message",
+                    "name",
+                    "phone",
+                    "status"
+                ]
+            },
+            "InvitationRequestAck": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "InvitationRequestCreate": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 254
+                    },
+                    "phone": {
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 32
+                    },
+                    "message": {
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 1000
+                    },
+                    "website": {
+                        "type": "string",
+                        "writeOnly": true
+                    }
+                },
+                "required": [
+                    "email",
+                    "name"
+                ]
+            },
+            "InvitationRequestStatusEnum": {
+                "enum": [
+                    "pending",
+                    "invited",
+                    "declined"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `invited` - Invited\n* `declined` - Declined"
+            },
             "IssueReject": {
                 "type": "object",
                 "properties": {
@@ -50145,6 +51355,15 @@
                 "required": [
                     "measurement"
                 ]
+            },
+            "LoanDepositModeEnum": {
+                "enum": [
+                    "none",
+                    "fixed",
+                    "per_product"
+                ],
+                "type": "string",
+                "description": "* `none` - No deposit\n* `fixed` - Fixed amount per loan\n* `per_product` - Sum of product deposits"
             },
             "LocationKindEnum": {
                 "enum": [
@@ -52463,6 +53682,32 @@
                     "effective_mode": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "loan_deposit_mode": {
+                        "$ref": "#/components/schemas/LoanDepositModeEnum"
+                    },
+                    "loan_deposit_amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    },
+                    "loan_late_fee_per_day": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    },
+                    "loan_late_fee_cap": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    },
+                    "loan_grace_days": {
+                        "type": "integer",
+                        "maximum": 32767,
+                        "minimum": 0
+                    },
+                    "loan_deposit_blocks_issue": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
@@ -53606,6 +54851,57 @@
                 "type": "string",
                 "description": "* `joined` - joined\n* `requested` - requested"
             },
+            "MembershipPlan": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "interval": {
+                        "$ref": "#/components/schemas/IntervalEnum"
+                    },
+                    "custom_days": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0,
+                        "nullable": true
+                    },
+                    "amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "maxLength": 3
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "id",
+                    "interval",
+                    "name",
+                    "updated_at"
+                ]
+            },
             "MembershipPolicyEnum": {
                 "enum": [
                     "request",
@@ -53780,6 +55076,97 @@
                     "name",
                     "slug"
                 ]
+            },
+            "MembershipTerm": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "membership": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "plan": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "plan_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "ends_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/MembershipTermStatusEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "renewal_payment": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "created_by",
+                    "ends_at",
+                    "id",
+                    "membership",
+                    "plan",
+                    "plan_name",
+                    "renewal_payment",
+                    "starts_at",
+                    "status"
+                ]
+            },
+            "MembershipTermCreate": {
+                "type": "object",
+                "properties": {
+                    "plan_id": {
+                        "type": "integer"
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "plan_id"
+                ]
+            },
+            "MembershipTermStatusEnum": {
+                "enum": [
+                    "active",
+                    "expired",
+                    "cancelled"
+                ],
+                "type": "string",
+                "description": "* `active` - Active\n* `expired` - Expired\n* `cancelled` - Cancelled"
             },
             "MethodEnum": {
                 "enum": [
@@ -56156,6 +57543,37 @@
                     }
                 }
             },
+            "PaginatedReportScheduleList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=2"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ReportSchedule"
+                        }
+                    }
+                }
+            },
             "PaginatedStaffMembershipList": {
                 "type": "object",
                 "required": [
@@ -57700,6 +59118,32 @@
                     "effective_mode": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "loan_deposit_mode": {
+                        "$ref": "#/components/schemas/LoanDepositModeEnum"
+                    },
+                    "loan_deposit_amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    },
+                    "loan_late_fee_per_day": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    },
+                    "loan_late_fee_cap": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    },
+                    "loan_grace_days": {
+                        "type": "integer",
+                        "maximum": 32767,
+                        "minimum": 0
+                    },
+                    "loan_deposit_blocks_issue": {
+                        "type": "boolean"
                     }
                 }
             },
@@ -57720,6 +59164,50 @@
                     },
                     "can_verify": {
                         "type": "boolean"
+                    }
+                }
+            },
+            "PatchedMembershipPlan": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "interval": {
+                        "$ref": "#/components/schemas/IntervalEnum"
+                    },
+                    "custom_days": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0,
+                        "nullable": true
+                    },
+                    "amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "maxLength": 3
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
                     }
                 }
             },
@@ -58044,6 +59532,82 @@
                     }
                 }
             },
+            "PatchedReportSchedule": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "makerspace": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "report_key": {
+                        "$ref": "#/components/schemas/ReportKeyEnum"
+                    },
+                    "filters": {},
+                    "grain": {
+                        "type": "string",
+                        "maxLength": 8
+                    },
+                    "format": {
+                        "$ref": "#/components/schemas/FormatEnum"
+                    },
+                    "cadence": {
+                        "$ref": "#/components/schemas/CadenceEnum"
+                    },
+                    "next_run_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "last_run_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "destination": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "recipient_emails": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "email"
+                        },
+                        "maxItems": 10
+                    },
+                    "created_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "last_delivery": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ReportDelivery"
+                            }
+                        ],
+                        "nullable": true,
+                        "readOnly": true
+                    }
+                }
+            },
             "PatchedReturnPolicy": {
                 "type": "object",
                 "properties": {
@@ -58280,6 +59844,18 @@
                         "type": "string",
                         "readOnly": true
                     },
+                    "refunded_amount": {
+                        "type": "number",
+                        "format": "double",
+                        "readOnly": true
+                    },
+                    "refunds": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Refund"
+                        },
+                        "readOnly": true
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -58296,6 +59872,8 @@
                     "created_at",
                     "currency",
                     "id",
+                    "refunded_amount",
+                    "refunds",
                     "status",
                     "subject_id",
                     "subject_label",
@@ -58361,6 +59939,24 @@
                     "payment_count",
                     "status",
                     "subject_type"
+                ]
+            },
+            "PaymentRefundRequest": {
+                "type": "object",
+                "properties": {
+                    "amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "amount"
                 ]
             },
             "PaymentSettingsError": {
@@ -62340,6 +63936,66 @@
                     "access"
                 ]
             },
+            "Refund": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$",
+                        "readOnly": true
+                    },
+                    "currency": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/RefundStatusEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "reason": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "settled_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "amount",
+                    "created_at",
+                    "currency",
+                    "id",
+                    "reason",
+                    "settled_at",
+                    "status"
+                ]
+            },
+            "RefundStatusEnum": {
+                "enum": [
+                    "pending",
+                    "succeeded",
+                    "failed"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `succeeded` - Succeeded\n* `failed` - Failed"
+            },
             "RejectRequest": {
                 "type": "object",
                 "properties": {
@@ -62427,6 +64083,59 @@
                     "unavailable_reason"
                 ]
             },
+            "ReportDelivery": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ReportDeliveryStatusEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "error": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "download_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "download_url",
+                    "error",
+                    "expires_at",
+                    "id",
+                    "status"
+                ]
+            },
+            "ReportDeliveryStatusEnum": {
+                "enum": [
+                    "sent",
+                    "failed"
+                ],
+                "type": "string",
+                "description": "* `sent` - Sent\n* `failed` - Failed"
+            },
             "ReportError": {
                 "type": "object",
                 "properties": {
@@ -62439,6 +64148,126 @@
                 },
                 "required": [
                     "detail"
+                ]
+            },
+            "ReportKeyEnum": {
+                "enum": [
+                    "summary",
+                    "taken-items",
+                    "active-loans",
+                    "returns",
+                    "damaged-missing",
+                    "damaged-lost",
+                    "qr-scans",
+                    "most-lent",
+                    "top-borrowers",
+                    "recently-added",
+                    "machine-usage",
+                    "event-attendance",
+                    "booking-utilization",
+                    "maintenance-activity",
+                    "member-activity",
+                    "machine-service",
+                    "printer-service",
+                    "fablab-health",
+                    "payment-reconciliation",
+                    "loan-throughput",
+                    "inventory-control",
+                    "evidence-compliance",
+                    "import-quality",
+                    "procurement-performance",
+                    "communications-health",
+                    "community-engagement",
+                    "certification-coverage",
+                    "module-operational-health"
+                ],
+                "type": "string",
+                "description": "* `summary` - summary\n* `taken-items` - taken-items\n* `active-loans` - active-loans\n* `returns` - returns\n* `damaged-missing` - damaged-missing\n* `damaged-lost` - damaged-lost\n* `qr-scans` - qr-scans\n* `most-lent` - most-lent\n* `top-borrowers` - top-borrowers\n* `recently-added` - recently-added\n* `machine-usage` - machine-usage\n* `event-attendance` - event-attendance\n* `booking-utilization` - booking-utilization\n* `maintenance-activity` - maintenance-activity\n* `member-activity` - member-activity\n* `machine-service` - machine-service\n* `printer-service` - printer-service\n* `fablab-health` - fablab-health\n* `payment-reconciliation` - payment-reconciliation\n* `loan-throughput` - loan-throughput\n* `inventory-control` - inventory-control\n* `evidence-compliance` - evidence-compliance\n* `import-quality` - import-quality\n* `procurement-performance` - procurement-performance\n* `communications-health` - communications-health\n* `community-engagement` - community-engagement\n* `certification-coverage` - certification-coverage\n* `module-operational-health` - module-operational-health"
+            },
+            "ReportSchedule": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "makerspace": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "report_key": {
+                        "$ref": "#/components/schemas/ReportKeyEnum"
+                    },
+                    "filters": {},
+                    "grain": {
+                        "type": "string",
+                        "maxLength": 8
+                    },
+                    "format": {
+                        "$ref": "#/components/schemas/FormatEnum"
+                    },
+                    "cadence": {
+                        "$ref": "#/components/schemas/CadenceEnum"
+                    },
+                    "next_run_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "last_run_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "destination": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "recipient_emails": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "email"
+                        },
+                        "maxItems": 10
+                    },
+                    "created_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "last_delivery": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ReportDelivery"
+                            }
+                        ],
+                        "nullable": true,
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "created_by",
+                    "id",
+                    "last_delivery",
+                    "last_run_at",
+                    "makerspace",
+                    "report_key",
+                    "updated_at"
                 ]
             },
             "RequestAccessEnum": {
@@ -64720,10 +66549,13 @@
                     "machine_service_request",
                     "booking",
                     "event_registration",
-                    "makerspace_membership"
+                    "makerspace_membership",
+                    "membership_term",
+                    "loan_deposit",
+                    "loan_late_fee"
                 ],
                 "type": "string",
-                "description": "* `machine_service_request` - Machine service request\n* `booking` - Booking\n* `event_registration` - Event registration\n* `makerspace_membership` - Makerspace membership"
+                "description": "* `machine_service_request` - Machine service request\n* `booking` - Booking\n* `event_registration` - Event registration\n* `makerspace_membership` - Makerspace membership\n* `membership_term` - Membership renewal\n* `loan_deposit` - Loan deposit\n* `loan_late_fee` - Loan late fee"
             },
             "Surface356Enum": {
                 "enum": [

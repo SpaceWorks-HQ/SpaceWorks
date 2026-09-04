@@ -6,12 +6,14 @@ import { StructuredApiError, staffRequest } from "../../lib/api";
 import {
   PAYMENT_STATUSES,
   PAYMENT_SUBJECTS,
+  formatMoney,
   invalidatePaymentViews,
   paymentListKey,
   paymentListPath,
   reconcilePayment,
   type PaymentRow,
 } from "./paymentsApi";
+import { PaymentRefundDialog } from "./PaymentRefundDialog";
 import { Panel } from "./panels/shared";
 
 type Action = "mark-offline" | "waive";
@@ -22,6 +24,7 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
   const [subject, setSubject] = useState("");
   const [selected, setSelected] = useState<number[]>([]);
   const [conflict, setConflict] = useState("");
+  const [refundRow, setRefundRow] = useState<PaymentRow | null>(null);
   const payments = useQuery({
     queryKey: paymentListKey(makerspaceId, status, subject),
     queryFn: () => staffRequest<PaymentRow[]>(paymentListPath(makerspaceId, status, subject)),
@@ -50,6 +53,7 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
     { key: "subject_type", header: "Type", render: (row) => labelFor(PAYMENT_SUBJECTS, row.subject_type) },
     { key: "status", header: "Status", render: (row) => labelFor(PAYMENT_STATUSES, row.status) },
     { key: "amount", header: "Amount", render: (row) => formatMoney(row.amount, row.currency), className: "font-semibold" },
+    { key: "refunded_amount", header: "Refunded", render: (row) => Number(row.refunded_amount) > 0 ? formatMoney(row.refunded_amount, row.currency) : "—" },
     { key: "created_at", header: "Created", render: (row) => new Date(row.created_at).toLocaleString() },
     {
       key: "actions",
@@ -62,6 +66,11 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
           <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("waive", [row.id], false)}>
             Waive
           </button>
+          {row.status === "paid_online" ? (
+            <button className="desk-button" type="button" onClick={() => setRefundRow(row)}>
+              Refund
+            </button>
+          ) : null}
         </div>
       ),
     },
@@ -102,23 +111,23 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
         columns={columns}
         data={payments.data ?? []}
         loading={payments.isLoading}
-        skeletonCols={6}
+        skeletonCols={7}
         selectedIds={selected}
         onSelectionChange={(ids) => setSelected(ids.map(Number))}
         emptyTitle="No matching payments"
       />
+      {refundRow ? (
+        <PaymentRefundDialog
+          key={refundRow.id}
+          makerspaceId={makerspaceId}
+          payment={refundRow}
+          onClose={() => setRefundRow(null)}
+        />
+      ) : null}
     </Panel>
   );
 }
 
 function labelFor(options: readonly (readonly [string, string])[], value: string) {
   return options.find(([key]) => key === value)?.[1] ?? value.replace(/_/g, " ");
-}
-
-function formatMoney(amount: string, currency: string) {
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency: currency.toUpperCase() }).format(Number(amount));
-  } catch {
-    return `${currency.toUpperCase()} ${amount}`;
-  }
 }

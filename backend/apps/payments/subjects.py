@@ -57,11 +57,18 @@ def resolve_subject_labels(payments):
                 makerspace_id,
                 member_id,
             )
+    fixed_labels = {
+        Payment.SubjectType.MAKERSPACE_MEMBERSHIP: "Membership dues",
+        Payment.SubjectType.MEMBERSHIP_TERM: "Membership renewal",
+        Payment.SubjectType.LOAN_DEPOSIT: "Loan deposit",
+        Payment.SubjectType.LOAN_LATE_FEE: "Late return fee",
+    }
     for payment in rows:
-        if payment.subject_type != Payment.SubjectType.MAKERSPACE_MEMBERSHIP:
+        label = fixed_labels.get(payment.subject_type)
+        if label is None:
             continue
         labels[(payment.subject_type, payment.subject_id)] = (
-            "Membership dues",
+            label,
             payment.makerspace_id,
             None,
         )

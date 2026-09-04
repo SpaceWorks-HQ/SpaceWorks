@@ -26,6 +26,7 @@ SOURCE_FIELDS = (
     *_fields("events.EventFeedbackResponse", ("answers_snapshot",), "survey.event.makerspace_id", "source", ((None,), ("none",))),
     *_fields("events.EventAttendanceCertificate", ("recipient_name",), "registration.event.makerspace_id", "source", ((None,), ("none",))),
     *_fields("makerspaces.MemberCard", ("printed_name",), "makerspace_id", "source", ((200,), ("none",))),
+    *_fields("makerspaces.InvitationRequest", ("name", "email", "phone"), "makerspace_id", "source", ((200, 254, 32), ("none", "none", "none"))),
     *_fields("bookings.Booking", ("name", "email", "phone", "note"), "space.makerspace_id", "source", ((200, 254, 32, None), ("none", "none", "none", "none"))),
     *_fields("machines.MachineServiceRequest", ("requester_name", "contact_email", "contact_phone"), "makerspace_id", "source", ((None, None, None), ("bloom", "bloom_exact", "none"))),
     *_fields("machines.MachineUsageEntry", ("requester_name", "contact_email", "contact_phone", "note"), "machine.makerspace_id", "source", ((120, 254, 40, None), ("bloom", "bloom_exact", "none", "none"))),

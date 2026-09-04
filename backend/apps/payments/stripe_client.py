@@ -75,6 +75,17 @@ def create_payment_intent(makerspace_or_settings, *, idempotency_key, **params):
     )
 
 
+def create_refund(makerspace_or_settings, *, idempotency_key, **params):
+    """Refund a captured PaymentIntent, fully or partially, exactly once per key."""
+    source = _source(makerspace_or_settings)
+    if source is None:
+        raise PaymentsUnavailable('Stripe is not configured for this makerspace.')
+    options = {'idempotency_key': idempotency_key}
+    if source.provider == 'connect' and source.connected_account_id:
+        options['stripe_account'] = source.connected_account_id
+    return build_client(source).v1.refunds.create(params=params, options=options)
+
+
 def retrieve_payment_intent(makerspace_or_settings, intent_id):
     source = _source(makerspace_or_settings)
     if source is None:

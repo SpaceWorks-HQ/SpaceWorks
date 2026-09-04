@@ -49,12 +49,13 @@ PROJECTED_MODEL_LABELS = frozenset(
     maintenance.MaintenanceSchedule makerspaces.Makerspace
     makerspaces.MakerspaceMembership makerspaces.MakerspaceWaiver
     makerspaces.MemberCard makerspaces.MemberProfile makerspaces.MemberProject
-    makerspaces.MembershipRequest
+    makerspaces.MembershipRequest makerspaces.MembershipPlan makerspaces.MembershipTerm
+    makerspaces.InvitationRequest
     notifications.Notification operations.InventoryAdjustment operations.QrPrintBatch
     operations.QrPrintBatchItem operations.ReportMetricRollup operations.StockTransfer
     operations.StockTransferLine
     operations.StocktakeLedgerEntry operations.StocktakeLine operations.StocktakeSession
-    payments.MakerspacePaymentSettings payments.Payment presence.PresenceSession
+    payments.MakerspacePaymentSettings payments.Payment payments.Refund presence.PresenceSession
     procurement.ToBuyItem procurement.ToBuyReceipt
     tenant_migration.ExternalTenantReference warranty.Warranty
     warranty.WarrantyDocument""".split()
@@ -69,6 +70,7 @@ EXPLICIT_DROP_MODEL_REASONS = {
     "integrations.EmailNotificationMute": "Source delivery suppression does not control target mail.",
     "integrations.NotificationPreference": "Target notification defaults are authoritative.",
     "integrations.NotificationRecipient": "Every explicit recipient is a live disclosure rule.",
+    "operations.ReportSchedule": "A scheduled report delivery is a live disclosure rule; the target re-creates it.",
     "integrations.RecipientCategoryScope": "The owning disclosure recipient is dropped.",
     "integrations.RecipientMachineScope": "The owning disclosure recipient is dropped.",
     "integrations.RecipientMachineTypeScope": "The owning disclosure recipient is dropped.",

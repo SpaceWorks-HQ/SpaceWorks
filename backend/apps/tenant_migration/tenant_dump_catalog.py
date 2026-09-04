@@ -46,8 +46,10 @@ class TenantDumpCatalogError(AssertionError):
 # so that it can travel with a tenant at all.
 # Re-blessed for the forward plan (2026-09-04): trigger-maintained `search_vector` columns on
 # Event/InventoryProduct/Machine (phase 1, DERIVED on import), MemberCard, CertificationType,
-# CertificationGrant, BookableSpace.machine_type and MemberProfile.show_certifications (phase 5).
-CATALOG_SCHEMA_SHA256 = "1d3ae4a9443527928ef25b3221951bf237ff90e549a5c59bea0956db4ef422b1"
+# CertificationGrant, BookableSpace.machine_type and MemberProfile.show_certifications (phase 5);
+# again for phase 6: Refund, loan settings/deposit_amount, MembershipPlan/Term, InvitationRequest,
+# Makerspace.lapsed_members_cannot_borrow, ReportSchedule/ReportDelivery.
+CATALOG_SCHEMA_SHA256 = "d7caf0b78fd4e358699600ede5cea478d4cef8f5921b3e6a7d604887060a7916"
 
 
 def catalog_models(apps_registry=apps):

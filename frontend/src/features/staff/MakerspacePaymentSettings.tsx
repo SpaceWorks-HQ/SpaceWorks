@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Badge, Field } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
+import { featureEnabled } from "../../lib/features";
+import { MakerspaceLoanSettings } from "./MakerspaceLoanSettings";
 import { type Makerspace, useStaffGet } from "./StaffPanels";
 
 type PaymentSettings = {
@@ -162,6 +164,9 @@ export function MakerspacePaymentSettings({ makerspace }: { makerspace: Makerspa
         <p className="mt-2 text-sm text-danger" role="alert">
           {(settings.error || save.error || clear.error || onboard.error)?.message}
         </p>
+      ) : null}
+      {featureEnabled(makerspace.enabled_features ?? [], "payments.loans") ? (
+        <MakerspaceLoanSettings makerspaceId={makerspace.id} />
       ) : null}
     </section>
   );

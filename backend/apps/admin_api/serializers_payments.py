@@ -47,6 +47,12 @@ class MakerspacePaymentSettingsSerializer(serializers.ModelSerializer):
             "connect_payouts_enabled",
             "connect_status_updated_at",
             "effective_mode",
+            "loan_deposit_mode",
+            "loan_deposit_amount",
+            "loan_late_fee_per_day",
+            "loan_late_fee_cap",
+            "loan_grace_days",
+            "loan_deposit_blocks_issue",
         )
         read_only_fields = (
             "connect_account_id",

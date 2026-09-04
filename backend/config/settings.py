@@ -339,6 +339,10 @@ STORAGES = {
 }
 
 EVIDENCE_URL_TTL_SECONDS = env.int("EVIDENCE_URL_TTL_SECONDS", default=300)
+# Signed download links for scheduled report deliveries; the stored file is swept once
+# this window has passed. Longer than an evidence presign because the link lands in an
+# inbox or a chat room and is read later, but still bounded and never a public URL.
+REPORT_DELIVERY_URL_TTL_SECONDS = env.int("REPORT_DELIVERY_URL_TTL_SECONDS", default=6 * 60 * 60)
 EVIDENCE_MAX_BYTES = env.int("EVIDENCE_MAX_BYTES", default=10485760)
 EVIDENCE_ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"]
 EVIDENCE_OBJECT_RETENTION_DAYS = env.int(
@@ -610,6 +614,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.makerspaces.tasks.refresh_github_contributions_task",
         "schedule": crontab(hour=4, minute=15),
     },
+    "membership-renewals": {
+        "task": "apps.makerspaces.tasks_membership.run_membership_renewals_task",
+        "schedule": crontab(minute=30),
+    },
     "purge-expired-data-exports": {
         "task": "apps.data_export.tasks.purge_expired_exports_task",
         "schedule": crontab(hour=3, minute=45),
@@ -617,6 +625,10 @@ CELERY_BEAT_SCHEDULE = {
     "finalize-report-rollups": {
         "task": "apps.operations.tasks.finalize_report_rollups_task",
         "schedule": crontab(hour=1, minute=0),
+    },
+    "report-schedules": {
+        "task": "apps.operations.tasks_report_schedules.run_report_schedules_task",
+        "schedule": crontab(minute="*/15"),
     },
     "scheduled-deployment-backup": {
         "task": "apps.backup.tasks.scheduled_deployment_backup_task",
@@ -848,6 +860,9 @@ REST_FRAMEWORK = {
         "anonymous_request_email": env(
             "THROTTLE_ANONYMOUS_REQUEST_EMAIL",
             default="3/day",
+        ),
+        "public_invitation_request": env(
+            "THROTTLE_PUBLIC_INVITATION_REQUEST", default="10/hour"
         ),
         "print_request_submit": env("THROTTLE_PRINT_REQUEST_SUBMIT", default="10/min"),
         "public_tool_checkout": env("THROTTLE_PUBLIC_TOOL_CHECKOUT", default="10/min"),

@@ -142,8 +142,9 @@ def test_export_helper_compatibility_reexports_remain_live():
 
 
 def _header(response, fmt):
+    # Line 0 of every CSV export is the provenance row; the column header follows it.
     if fmt == "csv":
-        return response.content.decode().splitlines()[0].split(",")
+        return response.content.decode().splitlines()[1].split(",")
     return [cell.value for cell in load_workbook(BytesIO(response.content)).active[1]]
 
 
@@ -155,6 +156,6 @@ def _values(response, fmt):
 
 def _makerspace_ids(response, fmt):
     if fmt == "csv":
-        return {int(line.split(",", 1)[0]) for line in response.content.decode().splitlines()[1:]}
+        return {int(line.split(",", 1)[0]) for line in response.content.decode().splitlines()[2:]}
     rows = load_workbook(BytesIO(response.content)).active.iter_rows(min_row=2, values_only=True)
     return {int(row[0]) for row in rows}

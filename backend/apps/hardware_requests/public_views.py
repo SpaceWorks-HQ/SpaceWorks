@@ -37,7 +37,7 @@ from apps.inventory.models import InventoryProduct
 from apps.makerspaces.anonymous_requesters import get_or_create_anonymous_requester
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.platform import module_enabled
-from apps.makerspaces.request_access import anonymous_requests_allowed
+from apps.makerspaces.request_access import anonymous_requests_allowed, require_current_term
 from apps.makerspaces.servability import servable_queryset
 from apps.presence.guard import require_active_account, require_active_member_presence
 from apps.openapi import (
@@ -114,7 +114,7 @@ class RequestSubmitView(APIView):
         else:
             _require_module(makerspace, "request_workflow")
             if module_enabled(makerspace, "membership"):
-                require_active_member_presence(request.user, makerspace)
+                require_current_term(makerspace, require_active_member_presence(request.user, makerspace).membership)
             else:
                 # Waiver acceptance lives on MakerspaceMembership and cannot be recorded
                 # with membership off. In this configuration the flow is public request ->

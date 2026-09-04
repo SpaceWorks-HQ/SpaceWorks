@@ -46,8 +46,9 @@ def test_current_all_active_tree_has_a_complete_claim_matrix(settings):
     # routes (calendar, calendar feed, feedback, certificate download, check-in
     # station). The count is asserted so that adding a claim-reachable route is a
     # visible decision here, not only inside the matrix. Plus the three member ID card
-    # routes (card, photo, preview) from forward plan phase 5 — all Refused.
-    assert len(validate_claim_route_matrix()) == 88
+    # routes (card, photo, preview) from forward plan phase 5 — all Refused. Plus the
+    # public invitation-request route from forward plan phase 6 (Refused: 88 -> 89).
+    assert len(validate_claim_route_matrix()) == 89
 
 
 def test_unclassified_runtime_lookup_fails_closed_and_middleware_stays_out():

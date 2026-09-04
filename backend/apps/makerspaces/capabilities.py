@@ -50,6 +50,12 @@ FEATURE_DEFINITIONS = (
         requires_modules=("payments",),
     ),
     FeatureDefinition(
+        "payments.loans", "payments", "Loan deposits and late fees",
+        "Raise a deposit when a reviewed loan is issued and a capped late fee when it "
+        "comes back after its due date; both settle through the same payment rails.",
+        default_enabled=False,
+    ),
+    FeatureDefinition(
         "inventory.self_checkout", None, "Self checkout",
         "Member self-checkout and staff direct handouts of QR tools.",
         default_enabled=True,

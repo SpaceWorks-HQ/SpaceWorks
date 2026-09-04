@@ -6,7 +6,7 @@ from apps.boxes.models import Box, BoxScan
 from apps.evidence import storage
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.evidence.models import EvidencePhoto
-from apps.hardware_requests import notifications
+from apps.hardware_requests import loan_payments, notifications
 from apps.hardware_requests.models import (
     HardwareRequest,
     PublicToolLoan,
@@ -68,6 +68,9 @@ def return_items(actor, request, evidence_id, remark, box_code, resolutions):
         request_action = finalize_return_status(locked, actor)
         _audit_return(actor, locked, box, evidence, scan, request_action)
         notifications.notify_request_returned(locked)
+        if locked.status in loan_payments.CLOSED_STATUSES:
+            request_id = locked.pk
+            transaction.on_commit(lambda: loan_payments.on_request_closed(request_id, actor))
         return locked
 
 

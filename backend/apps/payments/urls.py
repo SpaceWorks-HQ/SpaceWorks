@@ -8,6 +8,7 @@ from apps.payments.views_reconciliation import (
     PaymentMarkOfflineView,
     PaymentWaiveView,
 )
+from apps.payments.views_refunds import PaymentRefundView
 
 urlpatterns = [
     path(
@@ -18,6 +19,7 @@ urlpatterns = [
     path("admin/makerspace/<int:makerspace_id>/payments", PaymentListView.as_view(), name="payment-reconciliation-list"),
     path("admin/makerspace/<int:makerspace_id>/payments/<int:payment_id>/mark-offline", PaymentMarkOfflineView.as_view(), name="payment-reconciliation-mark-offline"),
     path("admin/makerspace/<int:makerspace_id>/payments/<int:payment_id>/waive", PaymentWaiveView.as_view(), name="payment-reconciliation-waive"),
+    path("admin/makerspace/<int:makerspace_id>/payments/<int:payment_id>/refund", PaymentRefundView.as_view(), name="payment-reconciliation-refund"),
     path("admin/makerspace/<int:makerspace_id>/payments/bulk/mark-offline", PaymentBulkMarkOfflineView.as_view(), name="payment-reconciliation-bulk-mark-offline"),
     path("admin/makerspace/<int:makerspace_id>/payments/bulk/waive", PaymentBulkWaiveView.as_view(), name="payment-reconciliation-bulk-waive"),
 ]

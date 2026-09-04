@@ -21,6 +21,8 @@ const payment: PaymentRow = {
   status: "pending",
   amount: "125.00",
   currency: "usd",
+  refunded_amount: "0.00",
+  refunds: [],
   created_at: "2026-07-20T10:00:00Z",
   updated_at: "2026-07-20T10:00:00Z",
 };

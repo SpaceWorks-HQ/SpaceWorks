@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import type { ArchivedPaymentSummary, MembershipOutcome, MembershipPolicyEnum } from "../../generated/api";
 import { bootstrapTenant, memberRequest, refreshAccessToken, StructuredApiError } from "../../lib/api";
 import { MemberAuthPanel } from "./MemberAuthPanel";
+import { InvitationRequestForm } from "./InvitationRequestForm";
 import { JoinMembershipCta } from "./JoinMembershipCta";
 import { presenceStartLocation } from "./geolocation";
 import { MemberActivityPanel, type MemberActivity } from "./MemberActivity";
@@ -89,6 +90,7 @@ export function MemberArea() {
     {bootstrap.isError ? <section className="desk-panel p-5"><p className="text-sm text-danger" role="alert">{message(bootstrap.error)}</p></section> : null}
     {policy && !membership && !requested && memberships.isLoading ? <section className="desk-panel p-5 text-sm text-muted">Checking your sign-in status…</section> : null}
     {policy && !membership && !requested && !memberships.isLoading ? <JoinMembershipCta policy={policy} signedIn={Boolean(memberships.data)} pending={request.isPending} onJoin={() => request.mutate()} onSignIn={() => setShowSignIn(true)} /> : null}
+    {membershipModuleOn && resolvedSlug && !membership && !requested && !memberships.isLoading ? <InvitationRequestForm slug={resolvedSlug} /> : null}
     {requested ? <section className="desk-panel p-5"><h2 className="title-panel">Membership request sent</h2><p className="mt-1 text-sm text-muted">Staff will review your request.</p></section> : null}
     {membership ? <><section className={`desk-panel ${membership.membership_status === "active" ? "border-success" : "border-warn"} p-5`}><h2 className="title-panel">Membership</h2><p className="eyebrow mt-2">{membership.makerspace.name} · {membership.membership_status} · {membership.role}</p></section>
       {waiver.data?.has_waiver ? <section className="desk-panel p-5"><h2 className="title-panel">Current waiver (<span className="font-mono">{waiver.data.version}</span>)</h2><p className="mt-3 whitespace-pre-wrap text-sm text-muted">{waiver.data.body}</p><button className="desk-button-secondary mt-4" disabled={accept.isPending} onClick={() => accept.mutate()}>Accept waiver</button></section> : null}

@@ -42,7 +42,10 @@ def test_report_json_adds_typed_rows_without_changing_raw_rows_or_csv_export():
     )
 
     assert export.status_code == 200
-    assert export.content.decode().splitlines() == [
+    lines = export.content.decode().splitlines()
+    # Line 0 is the per-file provenance row (who/when/which report); the data follows.
+    assert lines[0].startswith("# generated_at=")
+    assert lines[1:] == [
         "product_name,times_lent,total_quantity_lent",
         "Typed Scope,1,2",
     ]

@@ -23,6 +23,9 @@ from apps.operations.models import (
 from apps.operations.qr_zip import build_batch_zip
 from config.admin_access import SuperuserOnlyModelAdmin
 
+# Imported for its `@admin.register` side effect (the split pattern from CLAUDE.md).
+from apps.operations import admin_report_schedules  # noqa: F401,E402
+
 
 class StockTransferLineInline(TabularInline):
     # Transfer lines are created by services.apply_stock_transfer with the parent transfer.

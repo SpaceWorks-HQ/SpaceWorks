@@ -79,6 +79,13 @@ from apps.makerspaces.models_profiles import (  # noqa: E402,F401
     MemberProject,
 )
 from apps.makerspaces.models_member_cards import MemberCard  # noqa: E402,F401
+from apps.makerspaces.models_membership_plans import (  # noqa: E402,F401
+    MembershipPlan,
+    MembershipTerm,
+)
+from apps.makerspaces.models_invitation_requests import (  # noqa: E402,F401
+    InvitationRequest,
+)
 from apps.makerspaces.models_archive_requests import (  # noqa: E402,F401
     MakerspaceArchiveRequest,
 )

@@ -10,6 +10,9 @@ import type {
   PatchedMembershipCapabilities,
 } from "../../generated/api";
 import { StructuredApiError, staffRequest } from "../../lib/api";
+import { InvitationRequestsSection } from "./InvitationRequestsSection";
+import { MembershipPlansSection } from "./MembershipPlansSection";
+import { MemberTermsDialog } from "./MemberTermsDialog";
 import { Panel } from "./panels/shared";
 import { PaymentReconcileActions } from "./PaymentReconcileActions";
 
@@ -43,6 +46,7 @@ export function MembersPanel({ makerspaceId, membershipEnabled }: { makerspaceId
   const [roleId, setRoleId] = useState<number | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [waiver, setWaiver] = useState({ version: "", body: "" });
+  const [termsMember, setTermsMember] = useState<AdminMembership | null>(null);
   const refresh = () => client.invalidateQueries({ queryKey: key });
   const revoke = useMutation({ mutationFn: (id: number) => staffRequest(`/admin/memberships/${id}/revoke`, { method: "POST", body: JSON.stringify({}) }), onSuccess: refresh });
   const revokeRequest = useMutation({ mutationFn: (id: number) => staffRequest(`/admin/membership-requests/${id}/revoke`, { method: "POST", body: JSON.stringify({}) }), onSuccess: refresh });
@@ -89,6 +93,7 @@ export function MembersPanel({ makerspaceId, membershipEnabled }: { makerspaceId
         onVerify={() => verify.mutate({ id: row.id, verified: !Boolean(row.verified_at) })}
         onWitness={() => witnessWaiver.mutate(row.id)}
         onRevoke={() => revoke.mutate(row.id)}
+        onTerms={() => setTermsMember(row)}
       />)}
       {roster.isLoading ? <p className="text-sm text-muted">Loading members…</p> : null}
       {roster.isError ? <p className="text-sm text-danger" role="alert">{membershipErrorText(roster.error)}</p> : null}
@@ -96,13 +101,16 @@ export function MembersPanel({ makerspaceId, membershipEnabled }: { makerspaceId
     <Panel title={membershipEnabled ? "Membership requests" : "Invitations"}><div className="mb-3 flex flex-wrap gap-2"><Field label="Invite role"><select className="desk-input" value={selectedRole ?? ""} onChange={(event) => setRoleId(Number(event.target.value))}>{roles.data?.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></Field><Field label="Invite email"><input className="desk-input" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} /></Field><button className="desk-button" disabled={!inviteEmail || !selectedRole || invite.isPending} onClick={() => invite.mutate()}>Invite</button></div>
       {membershipEnabled ? requestRows.map((row) => <div className="flex items-center justify-between gap-3 border-t border-line py-3" key={row.id}><span className="text-sm text-ink">{requestLabel(row)} · {row.kind} · {row.state}</span>{row.state === "requested" ? <div className="flex gap-2"><button className="desk-button-primary" disabled={!selectedRole || approve.isPending} onClick={() => approve.mutate(row.id)}>Approve</button><button className="desk-button" onClick={() => revokeRequest.mutate(row.id)} disabled={revokeRequest.isPending}>Revoke</button></div> : null}</div>) : null}
       {membershipEnabled && requests.isLoading ? <p className="text-sm text-muted">Loading requests…</p> : null}</Panel>
+    {membershipEnabled ? <InvitationRequestsSection makerspaceId={makerspaceId} roles={roles.data ?? []} /> : null}
+    {membershipEnabled ? <MembershipPlansSection makerspaceId={makerspaceId} /> : null}
     <Panel title="Currently present">{presence.data?.length ? presence.data.map((row) => <p className="border-t border-line py-2 text-sm text-ink" key={`${row.display_name}-${row.started_at}`}>{row.display_name} <span className="text-muted">· {row.role_label} · until {new Date(row.expires_at).toLocaleTimeString()}</span></p>) : <p className="text-sm text-muted">No active member presence sessions.</p>}</Panel>
     <Panel title="Current waiver"><div className="grid gap-2"><Field label="Waiver version"><input className="desk-input" value={waiver.version} onChange={(event) => setWaiver({ ...waiver, version: event.target.value })} /></Field><Field label="Waiver text"><textarea className="desk-input min-h-28" value={waiver.body} onChange={(event) => setWaiver({ ...waiver, body: event.target.value })} /></Field><button className="desk-button-primary w-fit" disabled={!waiver.version || !waiver.body || publishWaiver.isPending} onClick={() => publishWaiver.mutate()}>Publish waiver</button></div></Panel>
     {error ? <p className="text-sm text-danger" role="alert">{membershipErrorText(error)}</p> : null}
+    {termsMember ? <MemberTermsDialog key={termsMember.id} makerspaceId={makerspaceId} membershipId={termsMember.id} memberName={termsMember.user.display_name || termsMember.user.username} onClose={() => setTermsMember(null)} /> : null}
   </div>;
 }
 
-function MemberRow({ makerspaceId, member, roles, membershipEnabled, changingRole, changingCapabilities, changingVerification, changingWitness, onChangeRole, onCapability, onVerify, onWitness, onRevoke }: {
+function MemberRow({ makerspaceId, member, roles, membershipEnabled, changingRole, changingCapabilities, changingVerification, changingWitness, onChangeRole, onCapability, onVerify, onWitness, onRevoke, onTerms }: {
   makerspaceId: number;
   member: AdminMembership;
   roles: Role[];
@@ -116,6 +124,7 @@ function MemberRow({ makerspaceId, member, roles, membershipEnabled, changingRol
   onVerify: () => void;
   onWitness: () => void;
   onRevoke: () => void;
+  onTerms: () => void;
 }) {
   const active = member.status === "active";
   const displayName = member.user.display_name || member.user.username;
@@ -123,7 +132,7 @@ function MemberRow({ makerspaceId, member, roles, membershipEnabled, changingRol
     <div><p className="font-semibold text-ink">{displayName}</p><p className="text-xs text-muted">{member.assigned_role?.name ?? "Member"} · {member.status} · waiver {member.waiver_required ? (member.waiver_current ? "current" : "needed") : "not required"}</p><PaymentReconcileActions makerspaceId={makerspaceId} payment={member.payment} invalidateKeys={[["members", makerspaceId]]} /></div>
     <div className="flex flex-wrap items-center gap-2">
       {membershipEnabled ? <Badge tone={member.verified_at ? "success" : "neutral"}>{member.verified_at ? "Verified" : "Not verified"}</Badge> : null}
-      {active ? <>{member.waiver_required && !member.waiver_current ? <button className="desk-button" type="button" disabled={changingWitness} onClick={onWitness}>Record witnessed acceptance</button> : null}{membershipEnabled ? <><label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={member.can_refer} disabled={changingCapabilities} onChange={(event) => onCapability({ can_refer: event.target.checked })} />Can refer</label><label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={member.can_verify} disabled={changingCapabilities} onChange={(event) => onCapability({ can_verify: event.target.checked })} />Can verify</label><button className="desk-button" type="button" disabled={changingVerification} onClick={onVerify}>{member.verified_at ? "Unverify" : "Verify"}</button></> : null}<select aria-label={`Role for ${displayName}`} className="desk-input" defaultValue={member.assigned_role?.id ?? ""} onChange={(event) => onChangeRole(Number(event.target.value))} disabled={changingRole}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select><button className="desk-button" type="button" onClick={onRevoke}>Revoke</button></> : null}
+      {active ? <>{member.waiver_required && !member.waiver_current ? <button className="desk-button" type="button" disabled={changingWitness} onClick={onWitness}>Record witnessed acceptance</button> : null}{membershipEnabled ? <><label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={member.can_refer} disabled={changingCapabilities} onChange={(event) => onCapability({ can_refer: event.target.checked })} />Can refer</label><label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={member.can_verify} disabled={changingCapabilities} onChange={(event) => onCapability({ can_verify: event.target.checked })} />Can verify</label><button className="desk-button" type="button" disabled={changingVerification} onClick={onVerify}>{member.verified_at ? "Unverify" : "Verify"}</button><button className="desk-button" type="button" onClick={onTerms}>Terms</button></> : null}<select aria-label={`Role for ${displayName}`} className="desk-input" defaultValue={member.assigned_role?.id ?? ""} onChange={(event) => onChangeRole(Number(event.target.value))} disabled={changingRole}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select><button className="desk-button" type="button" onClick={onRevoke}>Revoke</button></> : null}
     </div>
   </div>;
 }

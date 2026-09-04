@@ -34,6 +34,9 @@ export type Makerspace = {
   membership_policy?: "request" | "open" | "invite_only";
   membership_dues_amount?: string;
   referrals_enabled?: boolean;
+  // Only present once the makerspace settings serializer exposes it (phase 6 backend);
+  // the membership settings section renders its toggle iff the key is in the payload.
+  lapsed_members_cannot_borrow?: boolean;
   filament_low_stock_threshold_grams?: string | number;
   logo_url?: string | null;
   cover_image_url?: string | null;

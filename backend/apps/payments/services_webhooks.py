@@ -1,4 +1,4 @@
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -6,7 +6,13 @@ from apps.audit import services as audit
 from apps.payments.models import (
     MakerspacePaymentSettings,
     Payment,
-    ProcessedStripeEvent,
+)
+from apps.payments.services_refund_webhooks import (  # noqa: F401  (_record_once re-exported)
+    STRIPE_REFUND_EVENT_TYPES,
+    _record_once,
+    _value,
+    apply_razorpay_refund_event,
+    apply_stripe_refund_event,
 )
 from apps.payments.terminal_settlement import (
     handle_razorpay_paid_after_terminal,
@@ -27,6 +33,10 @@ def apply_webhook_event(
         return None
     event_type, data = _value(event, "type"), _value(event, "data") or {}
     obj = _value(data, "object") or {}
+    if event_type in STRIPE_REFUND_EVENT_TYPES:
+        return apply_stripe_refund_event(
+            makerspace, event, provider=provider, connected_account_id=connected_account_id
+        )
     if event_type not in {
         "checkout.session.completed",
         "checkout.session.async_payment_succeeded",
@@ -223,21 +233,6 @@ def _event_is_stale(event_created, account_assigned_at):
     return event_created < int(account_assigned_at.timestamp())
 
 
-def _record_once(makerspace, event_id, provider=Payment.Provider.STRIPE):
-    """Claim an event id, scoped by provider.
-
-    Two vendors can mint the same event id; without the provider in the key the second
-    one would be swallowed as a duplicate and a real charge would never settle.
-    """
-    try:
-        ProcessedStripeEvent.objects.create(
-            makerspace=makerspace, provider=provider, stripe_event_id=event_id
-        )
-    except IntegrityError:
-        return False
-    return True
-
-
 def apply_razorpay_webhook_event(makerspace, event):
     """Settle a VERIFIED Razorpay event. `event` is a providers.base.WebhookEvent.
 
@@ -250,7 +245,11 @@ def apply_razorpay_webhook_event(makerspace, event):
     * A paid event after waiver corrects the ledger; one after offline settlement raises
       an explicit refund-required audit condition instead of silently double-settling.
     """
-    if not is_servable(makerspace, allow_archived=True) or not event.event_id or not event.is_paid:
+    if not is_servable(makerspace, allow_archived=True) or not event.event_id:
+        return None
+    if event.refund_id:
+        return apply_razorpay_refund_event(makerspace, event)
+    if not event.is_paid:
         # Non-payment events are not recorded: claiming their id would make a later
         # genuine settlement carrying the same delivery id read as a duplicate.
         return None
@@ -291,7 +290,3 @@ def apply_razorpay_webhook_event(makerspace, event):
             meta={"provider": "razorpay", "event_id": event.event_id},
         )
         return payment
-
-
-def _value(value, key):
-    return value.get(key) if isinstance(value, dict) else getattr(value, key, None)

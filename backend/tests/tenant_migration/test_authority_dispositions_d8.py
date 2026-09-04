@@ -119,6 +119,12 @@ EXPECTED = dict(
             "photo_consent_version",
             (D.PRESERVE, D.DROP),
         ),
+        # Membership plans, terms and invitation requests (forward plan phase 6).
+        *_fields("makerspaces.InvitationRequest", "name email phone message", (D.PRESERVE, D.DROP)),
+        *_fields("makerspaces.InvitationRequest", "status", D.PRESERVE),
+        *_fields("makerspaces.MembershipPlan", "is_active", D.PRESERVE),
+        *_fields("makerspaces.MembershipTerm", "status", D.PRESERVE),
+        *_fields("makerspaces.Makerspace", "lapsed_members_cannot_borrow", D.PRESERVE),
         *_fields(
             "makerspaces.MemberProject",
             "id profile title description image_key links position created_at updated_at",
@@ -192,6 +198,12 @@ EXPECTED = dict(
             "stripe_checkout_session_expired_at stripe_payment_intent_id",
             D.RESET,
         ),
+        *_fields(
+            "payments.Refund",
+            "status amount currency provider reason",
+            D.PRESERVE,
+        ),
+        *_fields("payments.Refund", "external_refund_id", D.RESET),
         *_fields("audit.AuditLog", "event_uuid row_mac", D.RESET),
     ]
 )

@@ -89,6 +89,7 @@ ROUTE_KWARGS = {
     "member-card-photo": {"makerspace_id": "claim"},
     "member-card-preview": {"makerspace_id": "claim"},
     "public-membership-request": {"makerspace_slug": "claim"},
+    "public-invitation-request": {"makerspace_slug": "claim"},
 }
 REFUSED_KEYS = sorted(
     (name, method)

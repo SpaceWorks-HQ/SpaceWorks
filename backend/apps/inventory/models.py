@@ -92,6 +92,11 @@ class InventoryProduct(models.Model):
         default=PublicAvailabilityMode.STATUS_ONLY,
     )
     storage_location = models.CharField(max_length=200, blank=True)
+    # Per-unit loan deposit in major units, used only when the makerspace's
+    # `loan_deposit_mode` is `per_product`. Null means "no deposit for this item".
+    deposit_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True
+    )
     is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

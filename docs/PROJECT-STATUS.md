@@ -110,6 +110,14 @@ machine type before a member may book a linked space or request work; an overrid
 authority and a recorded reason. Held certifications print as an optional card field, appear on the maker
 profile only after a separate opt-in, and roll up in the `certification-coverage` report row.
 
+**Money and membership depth (phase 6).** Refunds (full or partial, Stripe and Razorpay, as immutable
+`payments.Refund` ledger lines), the `payments.loans` feature (deposit raised on issue, capped late fee
+raised once at close, optional deposit-blocks-issue gate), membership plans and terms with a beat-less
+renewal charge and an optional lapsed-members-cannot-borrow rule, public invitation requests (throttled,
+honeypot, PII-encrypted) feeding the existing invitation path, provenance on every report export and
+scheduled report delivery to a destination or email list as a signed link. `Warranty.vendor_contact` stays
+non-PII by decision 6 (`docs/INVARIANTS.md`). Phases 7–11 are planned and PAUSED by owner instruction.
+
 Stack (in use):
 
 - **Backend:** Django 6 + Django REST Framework (`backend/`). Requires Python 3.12+.

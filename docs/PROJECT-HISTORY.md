@@ -6,6 +6,14 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-09-04 — forward plan phase 6: money and membership depth.** Refunds as immutable ledger lines
+  over `paid_online` charges, settled through the provider seam and its webhooks; `payments.loans` raises a
+  deposit on issue and a capped late fee once at close, from the workflow module, never blocking unless the
+  opt-in gate is on; membership plans and terms with a beat-less renewal charge and an optional
+  lapsed-members-cannot-borrow rule; public invitation requests (throttled, honeypot, PII-encrypted) that
+  become staff invitations; provenance on every CSV/XLSX export and scheduled deliveries as signed links.
+  Owner decisions 6 and 7 were taken by their plan defaults (vendor contact not PII; charging allowed, off
+  by default). Work paused after this phase by owner instruction; phases 7–11 remain plans.
 - **2026-09-04 — forward plan phase 5: member ID cards and certification gating.** Member cards
   (`makerspaces.MemberCard`) are membership-module behaviour over a core QR target type: issued, reissued
   (rotating the QR; the old payload scans as revoked forever), revoked (redacting name and photo at once)

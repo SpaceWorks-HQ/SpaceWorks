@@ -1,8 +1,11 @@
 """Transactional reconciliation for every payment subject type."""
 
 import logging
+from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import DecimalField, Q, Sum, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied
 
@@ -19,6 +22,10 @@ SUBJECT_ACTIONS = {
     Payment.SubjectType.BOOKING: rbac.Action.MANAGE_BOOKINGS,
     Payment.SubjectType.EVENT_REGISTRATION: rbac.Action.MANAGE_EVENTS,
     Payment.SubjectType.MAKERSPACE_MEMBERSHIP: rbac.Action.MANAGE_MAKERSPACE,
+    # Loan charges follow the handover job: whoever may issue settles the deposit,
+    # whoever may take a return settles the late fee.
+    Payment.SubjectType.LOAN_DEPOSIT: rbac.Action.ISSUE_REQUEST,
+    Payment.SubjectType.LOAN_LATE_FEE: rbac.Action.RETURN_REQUEST,
 }
 
 
@@ -44,7 +51,20 @@ def list_payments(*, actor, makerspace_id, status=None, subject_type=None):
         queryset = queryset.filter(status=status)
     if subject_type:
         queryset = queryset.filter(subject_type=subject_type)
-    return queryset.order_by("-created_at", "-pk")
+    return with_refunds(queryset).order_by("-created_at", "-pk")
+
+
+def with_refunds(queryset):
+    """Annotate the money actually sent back and prefetch the refund lines."""
+    from apps.payments.models import Refund
+
+    return queryset.prefetch_related("refunds").annotate(
+        refunded_amount=Coalesce(
+            Sum("refunds__amount", filter=Q(refunds__status=Refund.Status.SUCCEEDED)),
+            Value(Decimal("0.00")),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+    )
 
 
 def mark_offline(payment, actor):

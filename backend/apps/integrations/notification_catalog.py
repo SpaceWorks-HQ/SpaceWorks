@@ -23,6 +23,7 @@ FEATURE_EVENTS = {
     F.HARDWARE_REQUESTS: (
         "submitted", "accepted", "rejected", "issued", "partially_returned",
         "returned", "closed_with_issue", "return_reminder",
+        "deposit_raised", "late_fee_raised",
     ),
     F.PRINTING: (
         "submitted", "accepted", "started", "rejected", "completed", "failed",

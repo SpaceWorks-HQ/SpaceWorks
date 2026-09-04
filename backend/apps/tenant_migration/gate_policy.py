@@ -177,8 +177,15 @@ TASK_INTERNAL_PARTICIPANTS = {
         "Each rollup finalisation uses the skip-and-count tenant boundary; the "
         "makerspace queryset is servable-filtered before iteration."
     ),
+    "apps.operations.tasks_report_schedules.run_report_schedules_task": (
+        "Each due schedule runs inside its own skip-and-count tenant boundary; the "
+        "due queryset is filtered to report-eligible (servable) makerspaces first."
+    ),
     "apps.makerspaces.tasks.refresh_github_contributions_task": (
         "Each profile refresh uses the skip-and-count tenant boundary."
+    ),
+    "apps.makerspaces.tasks_membership.run_membership_renewals_task": (
+        "Each term expiry and renewal charge uses the skip-and-count tenant boundary."
     ),
     "apps.apiclients.tasks.flush_api_client_usage_task": (
         "Writes only deployment-local last-seen telemetry on ApiClient rows; it moves no "
@@ -198,6 +205,10 @@ FANOUT_GATE_PARTICIPANTS = {
         "Overdue loan reminders."
     ),
     "apps.makerspaces.tasks.refresh_github_contributions_task": "GitHub profile refresh.",
+    "apps.makerspaces.membership_plan_services.run_membership_renewals": (
+        "Membership term expiry and renewal charges."
+    ),
+    "apps.operations.report_schedule_services.run_report_schedules": "Due scheduled report deliveries.",
 }
 
 
@@ -246,6 +257,10 @@ OBJECT_MUTATION_PARTICIPANTS = {
     "apps.maintenance.services_documents.delete_log_document": "Runs inside the model-resolved maintenance document route.",
     "apps.maintenance.services_documents.finalize_log_document": "Runs inside the model-resolved maintenance document route.",
     "apps.makerspaces.lifecycle_storage._delete_public_image_keys": "Tenant purge is an express source-gate exclusion.",
+    "apps.operations.report_delivery_storage.delete_report_object": (
+        "Reached only inside run_report_schedules' skip-and-count tenant boundary, the "
+        "tenant-resolved schedule delete route and the reports module purge."
+    ),
     "apps.makerspaces.profile_images._swap": "Runs inside the authenticated member profile image route.",
     "apps.tenant_migration.tenant_dump_cleanup.cleanup_refused_tenant_dump_artifacts": (
         "Deletes only private Lane D coordination artifacts after a refused run."

@@ -71,6 +71,7 @@ _ROUTE_DEFINITIONS = (
     ("presence-current", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
     ("presence-end", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
     ("public-membership-request", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-invitation-request", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
     (
         "hardware_requests:request-submit", _WRITE, PUBLIC_WRITE_SCOPES,
         TARGET_TENANT_SLUG, False, True,

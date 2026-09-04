@@ -296,6 +296,7 @@ Manager** in the console rather than a superadmin.
 | `payments.bookings` | `bookings` | | Charge for bookings |
 | `payments.events` | `events` | | Charge for event registration |
 | `payments.membership` | `membership` | | Charge membership dues |
+| `payments.loans` | `payments` | | Raise a deposit when a loan is issued and a capped late fee when it comes back late |
 | `mobile.push` | `mobile` | ● | Native push notifications |
 | `events.offline_checkin` | `events` | | Expiring on-device roster and event-scoped PIN check-in stations |
 | `machines.certifications` | `machines` | | Members need an unexpired certification per machine type to book a linked space or request work; overrides need machine-type authority and are audited |

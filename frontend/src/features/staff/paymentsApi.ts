@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-import { staffRequest } from "../../lib/api";
+import { StructuredApiError, staffRequest } from "../../lib/api";
 
 export const PAYMENT_SUBJECTS = [
   ["machine_service_request", "Machine service"],
@@ -17,6 +17,20 @@ export const PAYMENT_STATUSES = [
   ["canceled", "Canceled"],
 ] as const;
 
+// Mirrors `apps/payments/serializers_reconciliation.RefundSerializer`. A refund is a row
+// per ATTEMPT: pending until the provider answers, then succeeded or failed. Pending rows
+// still count against the refundable balance, which is why `remainingRefundable` below
+// subtracts them and not only `refunded_amount` (succeeded only).
+export type RefundRow = {
+  id: number;
+  amount: string;
+  currency: string;
+  status: "pending" | "succeeded" | "failed";
+  reason: string;
+  created_at: string;
+  settled_at: string | null;
+};
+
 export type PaymentRow = {
   id: number;
   subject_type: (typeof PAYMENT_SUBJECTS)[number][0];
@@ -25,6 +39,8 @@ export type PaymentRow = {
   status: (typeof PAYMENT_STATUSES)[number][0];
   amount: string;
   currency: string;
+  refunded_amount: string;
+  refunds: RefundRow[];
   created_at: string;
   updated_at: string;
 };
@@ -59,4 +75,47 @@ export function invalidatePaymentViews(queryClient: QueryClient, makerspaceId: n
   queryClient.invalidateQueries({ queryKey: ["payments", makerspaceId] });
   queryClient.invalidateQueries({ queryKey: ["operations-report", "payment-reconciliation"] });
   queryClient.invalidateQueries({ queryKey: ["dashboard", makerspaceId] });
+}
+
+export function refundPayment(
+  makerspaceId: number,
+  paymentId: number,
+  body: { amount: string; reason: string },
+) {
+  return staffRequest<PaymentRow>(`/admin/makerspace/${makerspaceId}/payments/${paymentId}/refund`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** Amount still refundable: the payment minus every pending or succeeded refund. */
+export function remainingRefundable(row: Pick<PaymentRow, "amount" | "refunds">) {
+  const counted = (row.refunds ?? [])
+    .filter((refund) => refund.status !== "failed")
+    .reduce((total, refund) => total + Number(refund.amount), 0);
+  return Math.max(0, Math.round((Number(row.amount) - counted) * 100) / 100);
+}
+
+// One readable sentence per backend code (`services_refunds.RefundNotAllowed` and
+// `RefundProviderFailure`); anything else falls back to the API's own detail text.
+const REFUND_ERRORS: Record<string, string> = {
+  refund_not_online: "Only payments settled online can be refunded through the provider. Offline and waived charges are corrected in the till.",
+  refund_exceeds_balance: "That amount is more than the remaining refundable balance of this payment.",
+  refund_amount_invalid: "Enter a refund amount greater than zero, with at most two decimals.",
+  refund_provider_failed: "The payment provider rejected the refund. No money was sent back; the failed attempt is recorded on the payment.",
+};
+
+export function refundErrorMessage(error: unknown) {
+  if (error instanceof StructuredApiError && error.code && REFUND_ERRORS[error.code]) {
+    return REFUND_ERRORS[error.code];
+  }
+  return error instanceof Error ? error.message : "Refund failed.";
+}
+
+export function formatMoney(amount: string, currency: string) {
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency: currency.toUpperCase() }).format(Number(amount));
+  } catch {
+    return `${currency.toUpperCase()} ${amount}`;
+  }
 }

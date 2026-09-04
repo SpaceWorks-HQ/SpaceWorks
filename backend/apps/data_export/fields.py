@@ -93,6 +93,7 @@ ALWAYS_OMITTED = {
     ("payments.MakerspacePaymentSettings", "razorpay_webhook_secret"): "Source payment credential.",
     ("payments.Payment", "external_order_id"): "Source provider identifier.",
     ("payments.Payment", "external_payment_id"): "Source provider identifier.",
+    ("payments.Refund", "external_refund_id"): "Source provider identifier.",
     ("payments.Payment", "checkout_url"): "Source checkout bearer URL.",
     ("payments.Payment", "stripe_connected_account_id"): "Source provider account binding.",
     ("payments.Payment", "stripe_checkout_session_id"): "Source provider session identifier.",

@@ -77,6 +77,31 @@ def anonymous_requests_allowed(makerspace) -> bool:
     return effective_policy(makerspace) == ANYONE
 
 
+def require_current_term(makerspace, membership):
+    """The optional "lapsed members cannot borrow" rule, applied AFTER membership passed.
+
+    Plans are optional, so this is deliberately narrow: a member who has never held a
+    term is untouched, and the flag off means nothing here runs. Only a member whose
+    every term has expired or been cancelled is refused -- and refused with the same
+    exception a non-member gets, because that is what the operator asked for. No new
+    access state: `MakerspaceMembership.status` and `User.access_status` stay as they are.
+    """
+    if membership is None or not makerspace.lapsed_members_cannot_borrow:
+        return
+    from django.utils import timezone
+
+    from apps.makerspaces.models import MembershipTerm
+
+    terms = MembershipTerm.objects.filter(membership=membership)
+    if not terms.exists() or terms.filter(
+        status=MembershipTerm.Status.ACTIVE, ends_at__gt=timezone.now()
+    ).exists():
+        return
+    from apps.presence.guard import MemberPresenceRequired
+
+    raise MemberPresenceRequired()
+
+
 class RequestAccessConflict(Exception):
     """Account-less requests were asked for while `membership` is installed."""
 
