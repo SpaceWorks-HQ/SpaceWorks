@@ -12,6 +12,19 @@ def _same(label, names, disposition, reason):
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
     *_same(
+        "makerspaces.Station",
+        "created_by",
+        D.RESET,
+        "Source provisioning provenance cannot assign a target User.",
+    ),
+    *_same(
+        "makerspaces.StationCredential",
+        "id station public_token pin_digest pin_ciphertext version is_enabled rotated_at "
+        "disabled_at created_at updated_at",
+        D.DROP,
+        "Live Station credentials never travel in a portable tenant archive.",
+    ),
+    *_same(
         "bookings.Booking",
         "public_token",
         D.RESET,

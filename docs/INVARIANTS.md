@@ -1933,6 +1933,31 @@ Load-bearing details that carried over unchanged:
 
 ## Events program invariants (four phases, `f16896f`..`dab0354`)
 
+- **The event venue Station is a public bearer channel with a fixed compatibility contract.** Its public
+  token stays in `/api/v1/event-checkin-stations/<public_token>/...`; the signed HttpOnly cookie is named
+  `sw_event_station`, is scoped to that token's API prefix, uses salt
+  `spaceworks.events.station-cookie.v1`, and contains exactly `public_token`, `version`, `session_id` and
+  `expires_at`. PINs are eight digits and their HMAC input remains
+  `spaceworks:event-station-pin:v1:<event_id>:<version>:<pin>` under `EVENT_STATION_PIN_PEPPER`; rotation
+  increments the version and invalidates earlier cookies. Public failures are deliberately uniform, and every
+  success response is no-store. PIN exchange requires the exact allowed Origin/Referer plus
+  `X-Station-CSRF`; the existing token/IP/session/reveal throttle scopes, event window/status checks,
+  `events.offline_checkin` feature gate and tenant source-migration gate are part of the protocol.
+- **Shared Station metadata is inert; credentials are the complete live authority envelope.**
+  `makerspaces.Station` holds only tenant, kind, name and provisioning provenance;
+  `makerspaces.StationCredential` holds the public token, encrypted/revealable PIN, digest, rotation version,
+  enabled state and timestamps. Portable export/import carries Station metadata without `created_by` and
+  without any credential, so it arrives inert. Deployment `database.dump` recovery is different: it preserves
+  Station, binding and every credential field byte-for-byte, so an enabled URL/PIN remains usable and a
+  disabled credential remains disabled.
+- **Event Station authority remains owned by events through `events.EventStationBinding`.** The binding is
+  one-to-one on both event and Station, and services require the same makerspace plus kind `event_checkin`.
+  Events purge locks and collects those Station IDs, then removes their credentials, bindings and Stations;
+  scanner/handover Stations survive an events-only purge, while whole-tenant purge removes every kind. A
+  tombstoned events app mounts no event Station URL. Disabling a credential blocks sessions, while PIN reveal
+  requires a usable-password step-up and keeps the existing audit actions. Roster and synchronization stay
+  event services, and station attendance remains anonymous (`actor=None`, source `venue_station`), distinct
+  from authenticated staff offline check-in.
 - **Registering for an event does NOT require a `PresenceSession`; check-in does.**
   `require_active_member` (identity + membership + waiver) was split out of
   `require_active_member_presence`, and **only** `PublicEventRegistrationView` switched wholesale. The

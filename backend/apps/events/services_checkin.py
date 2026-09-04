@@ -8,9 +8,9 @@ from apps.events.exceptions import DuplicateCheckInOperation, EventInvalidTransi
 from apps.events.models import (
     Event,
     EventCheckInEvent,
-    EventCheckInStationCredential,
     EventRegistration,
 )
+from apps.events.services_station import credential_for_event
 from apps.makerspaces.guards import require_feature_locked
 
 
@@ -52,17 +52,8 @@ def mark_attended_with_event(
             event.makerspace_id, "events.offline_checkin"
         )
     if source == EventCheckInEvent.Source.VENUE_STATION:
-        credential = (
-            EventCheckInStationCredential.objects.select_for_update()
-            .filter(
-                event=event,
-                is_enabled=True,
-                version=station_version,
-            )
-            .only("pk")
-            .first()
-        )
-        if credential is None:
+        credential = credential_for_event(event, lock=True, enabled=True)
+        if credential is None or credential.version != station_version:
             raise PermissionDenied("Invalid station session.")
     operation_id = operation_id or uuid4()
     if EventCheckInEvent.objects.filter(

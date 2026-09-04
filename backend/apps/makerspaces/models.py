@@ -93,3 +93,7 @@ from apps.makerspaces.models_imports import (  # noqa: E402,F401
     ImportedUserReconciliation,
     PendingImportedMembership,
 )
+from apps.makerspaces.models_stations import (  # noqa: E402,F401
+    Station,
+    StationCredential,
+)

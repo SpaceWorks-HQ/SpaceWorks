@@ -41,6 +41,13 @@ EXPECTED = dict(
             "role assigned_role can_refer can_verify receives_notifications",
             D.RESET,
         ),
+        *_fields("makerspaces.Station", "created_by", D.RESET),
+        *_fields(
+            "makerspaces.StationCredential",
+            "id station public_token pin_digest pin_ciphertext version is_enabled "
+            "rotated_at disabled_at created_at updated_at",
+            D.DROP,
+        ),
         *_fields("makerspaces.MembershipRequest", "state", (D.PRESERVE, D.DROP)),
         *_fields(
             "makerspaces.MembershipRequest",

@@ -5,18 +5,28 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import check_password
 from django.utils import timezone
 
 from apps.backup import archive_builder, storage as backup_storage
+from apps.apiclients.crypto import decrypt_secret
 from apps.backup.projection_databases import restore_dump, temporary_database
 from apps.bookings.models import BookableSpace, Booking
 from apps.events.models import Event, EventRegistration
+from apps.events.services_station import (
+    _pin_material,
+    disable as disable_station,
+    rotate as rotate_station,
+    station_url,
+)
 from apps.evidence.models import EvidenceObjectRetentionState
 from apps.hardware_requests.models import HardwareRequest
 from apps.makerspaces import archive_requests, module_purge
 from apps.makerspaces.models import (
     Makerspace, MakerspaceArchiveRequest, MakerspaceMembership, MemberProfile,
+    StationCredential,
 )
 from tests.backup.test_compound_archive_e3 import (
     _archive,
@@ -36,7 +46,8 @@ PHASE_LABELS = (
     "events.EventCheckInEvent", "events.EventFeedbackSurvey",
     "events.EventFeedbackResponse", "events.EventAttendanceCertificate",
     "events.EventSeriesOrganizer", "events.EventOrganizer",
-    "events.MemberCalendarFeed", "events.EventCheckInStationCredential",
+    "events.MemberCalendarFeed", "events.EventStationBinding",
+    "makerspaces.Station", "makerspaces.StationCredential",
     "organizations.Organization", "organizations.OrganizationMakerspace",
     "organizations.OrganizationMembership", "organizations.OrganizationInvitation",
     "operations.ReportMetricRollup", "operations.ReportRollupCursor",
@@ -109,8 +120,10 @@ def _rows(space_id):
             queryset = model.objects.filter(series__makerspace_id=space_id)
         elif label == "events.MemberCalendarFeed":
             queryset = model.objects.filter(membership__makerspace_id=space_id)
-        elif label == "events.EventCheckInStationCredential":
+        elif label == "events.EventStationBinding":
             queryset = model.objects.filter(event__makerspace_id=space_id)
+        elif label == "makerspaces.StationCredential":
+            queryset = model.objects.filter(station__makerspace_id=space_id)
         elif label.startswith("events.EventFeedback"):
             lookup = {
                 "events.EventFeedbackSurvey": "event__makerspace_id",
@@ -138,8 +151,27 @@ def _rows(space_id):
 def test_deployment_restore_preserves_disabled_archived_graph_and_two_key_request(
     allow_projection_databases, monkeypatch, settings
 ):
+    settings.API_CLIENT_ENC_KEY = Fernet.generate_key().decode("ascii")
+    settings.EVENT_STATION_PIN_PEPPER = "deployment-roundtrip-station-pin-pepper"
     with enabled_encryption():
-        space, manager, _graph = _source_graph("programme-deployment")
+        space, manager, graph = _source_graph("programme-deployment")
+        space.enabled_features = [
+            *space.enabled_features,
+            "events.offline_checkin",
+        ]
+        space.save(update_fields=("enabled_features",))
+        enabled_credential, enabled_pin = rotate_station(graph["event"], actor=manager)
+        enabled_url = station_url(graph["event"], enabled_credential.public_token)
+        disabled_event = Event.objects.create(
+            makerspace=space,
+            title="Disabled deployment Station",
+            status=Event.Status.PUBLISHED,
+            starts_at=timezone.now() - timedelta(hours=1),
+            ends_at=timezone.now() + timedelta(hours=1),
+            created_by=manager,
+        )
+        disabled_credential, disabled_pin = rotate_station(disabled_event, actor=manager)
+        disable_station(disabled_event, actor=manager)
         # Uninstall is retention-only: the data remains but the module state stays OFF.
         space.enabled_modules = []
         space.save(update_fields=("enabled_modules",))
@@ -251,5 +283,35 @@ def test_deployment_restore_preserves_disabled_archived_graph_and_two_key_reques
                         pk__in=[row[model._meta.pk.attname] for row in source_rows]
                     ).order_by(model._meta.pk.name).values())
                     assert target_rows == source_rows, label
+                restored_enabled = StationCredential.objects.using(using).get(
+                    pk=enabled_credential.pk
+                )
+                restored_enabled_event = Event.objects.using(using).get(pk=graph["event"].pk)
+                assert station_url(
+                    restored_enabled_event, restored_enabled.public_token
+                ) == enabled_url
+                assert restored_enabled.is_enabled is True
+                assert check_password(
+                    _pin_material(
+                        restored_enabled_event.pk,
+                        restored_enabled.version,
+                        enabled_pin,
+                    ),
+                    restored_enabled.pin_digest,
+                )
+                assert decrypt_secret(restored_enabled.pin_ciphertext) == enabled_pin
+                restored_disabled = StationCredential.objects.using(using).get(
+                    pk=disabled_credential.pk
+                )
+                assert restored_disabled.is_enabled is False
+                assert restored_disabled.disabled_at is not None
+                assert check_password(
+                    _pin_material(
+                        disabled_event.pk,
+                        restored_disabled.version,
+                        disabled_pin,
+                    ),
+                    restored_disabled.pin_digest,
+                )
         finally:
             tempdir.cleanup()

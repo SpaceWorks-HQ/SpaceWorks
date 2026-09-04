@@ -59,6 +59,7 @@ EXPECTED_TARGET_VALUES = {
     ("makerspaces.MakerspaceMembership", "can_refer"): True,
     ("makerspaces.MakerspaceMembership", "can_verify"): False,
     ("makerspaces.MembershipRequest", "auto_activate_on_claim"): False,
+    ("makerspaces.Station", "created_by"): None,
     ("machines.MachineType", "managing_action"): "",
     ("integrations.NotificationDestination", "is_active"): False,
 }
@@ -112,6 +113,7 @@ def test_authority_rows_follow_the_explicit_drop_or_decision_22_policy():
     )
     assert "Owner decision 22" in ROW_POLICIES["machines.MachineOperator"].reason
     assert row_disposition("machines.MachineOperator", {}, None) == "insert"
+    assert ROW_POLICIES["makerspaces.Station"].disposition is RowDisposition.STAGE_INERT
 
 
 def test_only_open_membership_request_states_are_authority_rows():
@@ -195,12 +197,19 @@ def test_deployment_global_uniqueness_risks_are_explicitly_disposed():
         ("boxes.Box", "field:code"),
         ("boxes.QrCode", "field:payload"),
         ("evidence.EvidencePhoto", "field:object_key"),
+        ("events.EventStationBinding", "field:station"),
         ("machines.MachineType", "uniq_global_machinetype_slug"),
     }
     assert all(policy.reason for policy in DEPLOYMENT_GLOBAL_UNIQUE_RULES.values())
     assert (
         DEPLOYMENT_GLOBAL_UNIQUE_RULES[("boxes.QrCode", "field:payload")].disposition
         is UniqueValueDisposition.PRESERVE_OR_REGENERATE
+    )
+    assert (
+        DEPLOYMENT_GLOBAL_UNIQUE_RULES[
+            ("events.EventStationBinding", "field:station")
+        ].disposition
+        is UniqueValueDisposition.REMAPPED_REFERENCE
     )
 
 

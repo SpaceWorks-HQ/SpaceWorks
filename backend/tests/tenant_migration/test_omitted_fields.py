@@ -25,6 +25,9 @@ def _changed(pair, disposition):
 def test_registry_exactly_covers_portable_omissions():
     assert set(OMITTED_FIELD_RECONSTRUCTIONS) == portable_omitted_fields()
     validate_omitted_field_reconstructions()
+    assert OMITTED_FIELD_RECONSTRUCTIONS[
+        ("makerspaces.Station", "created_by")
+    ] is NULL
 
 
 def test_registry_guard_rejects_a_removed_declaration():

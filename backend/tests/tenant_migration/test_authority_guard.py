@@ -38,6 +38,7 @@ def test_declared_relational_and_discriminator_authority_inputs():
         ("integrations.NotificationRecipient", "user"),
         ("makerspaces.MembershipRequest", "assigned_role"),
         ("makerspaces.MembershipRequest", "auto_activate_on_claim"),
+        ("makerspaces.Station", "created_by"),
     }
     assert required <= set(DECLARED_AUTHORITY_FIELDS)
 

@@ -24,6 +24,10 @@
   `module_registry_validation.py`, so add a module to the catalogue), `platform.py` (origin helpers), `limits.py` (fair-use quotas), `lifecycle.py` (archive/purge barrel
   over `lifecycle_archive.py`, `lifecycle_purge.py` and `lifecycle_storage.py`),
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
+  `models_stations.py` owns shared inert `Station` metadata plus the complete live
+  `StationCredential` envelope; `station_credentials.py`, `station_sessions.py`, `station_security.py` and
+  `station_throttles.py` own reusable rotation/reveal/disable, signing, PIN/origin and throttle mechanics
+  without importing event policy.
 - `backend/apps/organizations/` — `Organization` (platform entity, creatable before any makerspace, NOT a
   module_registry key), its opt-in public profile and cross-makerspace event catalogue,
   `OrganizationMakerspace` (the many-to-many link, at most one `owner` per space),
@@ -177,14 +181,16 @@
   in `role_scope_services.py`.
 - `backend/apps/events/` — the separable events module. `models.py` is the stable explicit re-export barrel
   over `models_event.py`, `models_registration.py`, `models_attendance.py`, `models_feedback.py`,
-  `models_certificates.py`, `models_series.py`, `models_calendar.py`, `models_collaborators.py` and
+  `models_station.py`, `models_certificates.py`, `models_series.py`, `models_calendar.py`, `models_collaborators.py` and
   `organizer_models.py`; those focused files are the schema sources for events/occurrences, approval and
-  waitlist registrations, immutable check-in history and PIN credentials, feedback, certificate artifacts,
+  waitlist registrations, immutable check-in history and the event-owned `EventStationBinding`, feedback,
+  certificate artifacts,
   recurring series, member feed credentials, makerspace collaboration and organization attribution.
   `services.py` remains the audited transactional boundary for one-off event and registration mutations,
   delegating lifecycle and registration-state transitions to `services_lifecycle.py`,
   `services_registration.py` and `services_registration_state.py`. The other `services_*` modules own the
-  corresponding series/recurrence/collaboration, calendar/feed, badge, check-in/offline-sync/station,
+  corresponding series/recurrence/collaboration, calendar/feed, badge, check-in/offline-sync and the event
+  policy adapter over the makerspaces Station core,
   feedback/certificate, image and organizer workflows; `urls_admin.py`, `urls_member.py`, `urls_public.py`
   and `urls_station.py` divide the staff, authenticated-member, public and anonymous-station surfaces.
 - `backend/apps/warranty/`, `apps/maintenance/`, `apps/events/`, `apps/bookings/`, `apps/forms_schema/`,

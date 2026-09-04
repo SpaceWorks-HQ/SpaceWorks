@@ -80,3 +80,20 @@ def test_user_group_and_direct_permission_m2ms_are_explicitly_dropped():
         rule = FIELD_POLICIES[("accounts.User", field_name)]
         assert rule.dispositions == (AuthorityDisposition.DROP,)
         assert rule.reason
+
+
+def test_station_credentials_drop_and_creator_provenance_resets():
+    credential_fields = {
+        ("makerspaces.StationCredential", name)
+        for name in (
+            "id station public_token pin_digest pin_ciphertext version is_enabled "
+            "rotated_at disabled_at created_at updated_at"
+        ).split()
+    }
+    for edge in credential_fields:
+        assert AUTHORITY_FIELD_OVERRIDES[edge].dispositions == (
+            AuthorityDisposition.DROP,
+        )
+    assert AUTHORITY_FIELD_OVERRIDES[
+        ("makerspaces.Station", "created_by")
+    ].dispositions == (AuthorityDisposition.RESET,)

@@ -85,6 +85,10 @@ CORE_UNIQUE_RULES = {
         field="operation_id",
         generator=_refuse_checkin_operation_collision,
     ),
+    ("events.EventStationBinding", "field:station"): _policy(
+        REMAP,
+        "The one-to-one Station reference is remapped with the imported Station.",
+    ),
     ("events.EventAttendanceCertificate", "field:serial"): _policy(
         PRESERVE,
         "Preserve the serial printed inside the immutable PDF; refuse a collision.",

@@ -99,6 +99,7 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
     **_rules(
         NULL,
         ("backup.MakerspaceArchiveRecipient", "verified_at"),
+        ("makerspaces.Station", "created_by"),
         # Projection provenance only: the target rebuilds the link from the canonical
         # series collaboration, and a carried-over id would point at a source row.
         ("events.EventCollaborator", "source_series_collaboration"),

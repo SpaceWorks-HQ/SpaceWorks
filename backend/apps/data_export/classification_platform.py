@@ -15,8 +15,8 @@ GLOBAL_MODELS = {
 }
 
 OMITTED_MODELS = {
-    "events.EventCheckInStationCredential": (
-        "Live event-station authentication authority; a restored tenant must rotate a new PIN."
+    "makerspaces.StationCredential": (
+        "Live Station authentication authority; a portable tenant must rotate a new PIN."
     ),
     "events.MemberCalendarFeed": (
         "Deployment-local bearer credential over member registration history; restored tenants must reissue it."

@@ -95,22 +95,3 @@ class EventCheckInEvent(models.Model):
 
     def delete(self, *args, **kwargs):
         raise RuntimeError("EventCheckInEvent rows are immutable.")
-
-
-class EventCheckInStationCredential(models.Model):
-    """Mutable, event-scoped PIN authority; attendee data never lives here."""
-
-    event = models.OneToOneField(
-        Event,
-        on_delete=models.CASCADE,
-        related_name="check_in_station",
-    )
-    public_token = models.UUIDField(default=uuid4, unique=True, editable=False)
-    pin_digest = models.CharField(max_length=128, editable=False)
-    pin_ciphertext = models.BinaryField(editable=False)
-    version = models.PositiveIntegerField(default=1, editable=False)
-    is_enabled = models.BooleanField(default=True)
-    rotated_at = models.DateTimeField(default=timezone.now)
-    disabled_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)

@@ -28,7 +28,7 @@ PROJECTED_MODEL_LABELS = frozenset(
     """accounts.User apiclients.ApiKeyRequest audit.AuditLog
     backup.MakerspaceArchiveRecipient bookings.BookableSpace bookings.Booking boxes.Box
     boxes.BoxScan boxes.QrCode boxes.QrScanEvent events.EventSeries events.Event events.EventRegistration
-    events.EventCheckInEvent events.EventFeedbackSurvey events.EventFeedbackResponse
+    events.EventCheckInEvent events.EventStationBinding events.EventFeedbackSurvey events.EventFeedbackResponse
     events.EventAttendanceCertificate
     evidence.EvidencePhoto evidence.EvidenceObjectRetentionState
     evidence.EvidenceRetentionPolicy hardware_requests.HardwareRequest
@@ -51,7 +51,7 @@ PROJECTED_MODEL_LABELS = frozenset(
     makerspaces.MakerspaceMembership makerspaces.MakerspaceWaiver
     makerspaces.MemberCard makerspaces.MemberProfile makerspaces.MemberProject
     makerspaces.MembershipRequest makerspaces.MembershipPlan makerspaces.MembershipTerm
-    makerspaces.InvitationRequest
+    makerspaces.InvitationRequest makerspaces.Station
     notifications.Notification operations.InventoryAdjustment operations.QrPrintBatch
     operations.QrPrintBatchItem operations.ReportMetricRollup operations.StockTransfer
     operations.StockTransferLine

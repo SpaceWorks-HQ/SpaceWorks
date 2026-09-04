@@ -16,6 +16,7 @@ from apps.makerspaces.models import MakerspaceMembership
 from .blind_indexes import verify_event_hashes
 from .insertion_errors import ImportVerificationError, PrimaryKeyMapUnavailable
 from .identity_resolution import linked_authority_fingerprint
+from .omitted_fields import NULL, OMITTED_FIELD_RECONSTRUCTIONS
 from .references import (
     AUDIT_TARGET_DISPOSITIONS,
     DISCRIMINATOR_REFERENCES,
@@ -184,7 +185,14 @@ def _verify_reference_remaps(archive, models, pk_map, references):
             names = [field.attname for field in user_fields] + semantic_fields
             actual = model._base_manager.values(*names).get(pk=target_pk)
             for field in user_fields:
-                source_id = source[field.attname]
+                if field.attname not in source:
+                    # An omitted user FK (Station.created_by) has no archived value;
+                    # only a declared NULL reconstruction may make it absent.
+                    if OMITTED_FIELD_RECONSTRUCTIONS.get((label, field.name)) is not NULL:
+                        raise ImportVerificationError(
+                            f"Archive row lacks undeclared {label}.{field.name}."
+                        )
+                source_id = source.get(field.attname)
                 expected = None
                 if source_id and label not in {
                     "audit.AuditLog",

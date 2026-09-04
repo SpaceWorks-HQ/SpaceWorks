@@ -4,6 +4,7 @@ from django.core import signing
 from django.utils import timezone
 
 from apps.events.checkin_policy import roster_expiry, window_for
+from apps.makerspaces.station_sessions import read_session, sign_session
 
 
 LEASE_SALT = "spaceworks.events.checkin-lease.v1"
@@ -35,17 +36,14 @@ def read_lease(token):
 
 
 def sign_station_cookie(*, public_token, version, session_id, expires_at):
-    return signing.dumps(
-        {
-            "public_token": str(public_token),
-            "version": version,
-            "session_id": str(session_id),
-            "expires_at": expires_at.isoformat(),
-        },
+    return sign_session(
+        public_token=public_token,
+        version=version,
+        session_id=session_id,
+        expires_at=expires_at,
         salt=STATION_COOKIE_SALT,
-        compress=True,
     )
 
 
 def read_station_cookie(value):
-    return signing.loads(value, salt=STATION_COOKIE_SALT)
+    return read_session(value, salt=STATION_COOKIE_SALT)

@@ -172,6 +172,10 @@ TARGET_FIELD_PROJECTION = {
     ("makerspaces.MembershipRequest", "auto_activate_on_claim"): TargetField(
         False, reason="Claim-time admission must be explicitly re-authorized on the target."
     ),
+    ("makerspaces.Station", "created_by"): TargetField(
+        None,
+        reason="Source provisioning provenance cannot assign a target User.",
+    ),
     ("machines.MachineType", "managing_action"): TargetField(
         "", condition=("is_builtin", False),
         reason="Custom type authorization hooks are server-controlled and normally forced blank."
@@ -184,6 +188,10 @@ TARGET_FIELD_PROJECTION = {
 
 
 ROW_POLICIES = {
+    "makerspaces.Station": RowPolicy(
+        RowDisposition.STAGE_INERT,
+        "Portable Station metadata has no credential and contributes no live authority edges.",
+    ),
     "machines.MachineOperator": RowPolicy(
         RowDisposition.PRESERVE_LIVE,
         "Owner decision 22: preserve the exact live machine grant and provenance.",
