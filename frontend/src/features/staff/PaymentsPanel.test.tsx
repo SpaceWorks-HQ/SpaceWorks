@@ -71,12 +71,23 @@ describe("PaymentsPanel", () => {
     const invalidate = vi.spyOn(queryClient, "invalidateQueries");
     await waitForPayment();
 
+    // Marking paid offline is two steps now: the API requires a receipt saying how and
+    // when the money arrived, so the button opens the form and the request only goes
+    // once staff confirm it.
     fireEvent.click(screen.getByRole("button", { name: "Mark offline" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm payment" }));
 
     await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(
       "/admin/makerspace/7/payments/41/mark-offline",
-      { method: "POST" },
+      expect.objectContaining({ method: "POST" }),
     ));
+    // Pick the settlement call itself: a list refetch follows it with no body.
+    const call = staffRequest.mock.calls.find(
+      ([path]) => path === "/admin/makerspace/7/payments/41/mark-offline",
+    )!;
+    const settlement = JSON.parse((call[1] as { body: string }).body).settlement;
+    expect(settlement.method).toBe("cash");
+    expect(settlement.received_at).toEqual(expect.any(String));
     await waitFor(() => {
       expect(invalidate).toHaveBeenCalledWith({ queryKey: ["payments", 7] });
       expect(invalidate).toHaveBeenCalledWith({ queryKey: ["operations-report", "payment-reconciliation"] });

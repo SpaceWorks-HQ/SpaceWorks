@@ -57,17 +57,37 @@ export function paymentListPath(makerspaceId: number, status: string, subject: s
   return `/admin/makerspace/${makerspaceId}/payments${suffix ? `?${suffix}` : ""}`;
 }
 
+export const SETTLEMENT_METHODS = [
+  ["cash", "Cash"],
+  ["upi", "UPI"],
+  ["bank_transfer", "Bank transfer"],
+  ["card_machine", "Card machine"],
+  ["cheque", "Cheque"],
+  ["other", "Other"],
+] as const;
+
+export type Settlement = { method: string; reference: string; received_at: string };
+
 export function reconcilePayment(
   makerspaceId: number,
   action: "mark-offline" | "waive",
   ids: number[],
   bulk: boolean,
+  settlement?: Settlement,
 ) {
   const base = `/admin/makerspace/${makerspaceId}/payments`;
   const path = bulk ? `${base}/bulk/${action}` : `${base}/${ids[0]}/${action}`;
+  // Marking paid offline REQUIRES the receipt -- how and when the money arrived -- and
+  // the API refuses without it. Waiving carries none, because no money moved.
+  const body =
+    action === "mark-offline"
+      ? { ...(bulk ? { ids } : {}), settlement }
+      : bulk
+        ? { ids }
+        : undefined;
   return staffRequest<PaymentRow | PaymentRow[]>(path, {
     method: "POST",
-    ...(bulk ? { body: JSON.stringify({ ids }) } : {}),
+    ...(body ? { body: JSON.stringify(body) } : {}),
   });
 }
 

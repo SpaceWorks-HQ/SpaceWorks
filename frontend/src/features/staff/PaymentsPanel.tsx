@@ -12,8 +12,10 @@ import {
   paymentListPath,
   reconcilePayment,
   type PaymentRow,
+  type Settlement,
 } from "./paymentsApi";
 import { PaymentRefundDialog } from "./PaymentRefundDialog";
+import { SettlementDialog } from "./SettlementDialog";
 import { Panel } from "./panels/shared";
 
 type Action = "mark-offline" | "waive";
@@ -29,12 +31,17 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
     queryKey: paymentListKey(makerspaceId, status, subject),
     queryFn: () => staffRequest<PaymentRow[]>(paymentListPath(makerspaceId, status, subject)),
   });
+  // Marking paid offline is a two-step now: the API requires a receipt, so the click
+  // opens the form rather than firing the mutation.
+  const [settling, setSettling] = useState<{ ids: number[]; bulk: boolean } | null>(null);
   const mutation = useMutation({
-    mutationFn: ({ action, ids, bulk }: { action: Action; ids: number[]; bulk: boolean }) =>
-      reconcilePayment(makerspaceId, action, ids, bulk),
+    mutationFn: ({ action, ids, bulk, settlement }: {
+      action: Action; ids: number[]; bulk: boolean; settlement?: Settlement;
+    }) => reconcilePayment(makerspaceId, action, ids, bulk, settlement),
     onSuccess: () => {
       setConflict("");
       setSelected([]);
+      setSettling(null);
       invalidatePaymentViews(queryClient, makerspaceId);
     },
     onError: (error) => {
@@ -46,6 +53,10 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
   });
   const run = (action: Action, ids: number[], bulk: boolean) => {
     setConflict("");
+    if (action === "mark-offline") {
+      setSettling({ ids, bulk });
+      return;
+    }
     mutation.mutate({ action, ids, bulk });
   };
   const columns: DataTableColumn<PaymentRow>[] = [
@@ -104,6 +115,21 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
           </>
         )}
       />
+      {settling ? (
+        <SettlementDialog
+          count={settling.ids.length}
+          pending={mutation.isPending}
+          onCancel={() => setSettling(null)}
+          onConfirm={(settlement) =>
+            mutation.mutate({
+              action: "mark-offline",
+              ids: settling.ids,
+              bulk: settling.bulk,
+              settlement,
+            })
+          }
+        />
+      ) : null}
       {conflict ? <p role="alert" className="my-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{conflict}</p> : null}
       {payments.error && !payments.data ? <p className="mb-3 text-sm text-danger">{payments.error.message}</p> : null}
       {mutation.error && !conflict ? <p role="alert" className="mb-3 text-sm text-danger">{mutation.error.message}</p> : null}

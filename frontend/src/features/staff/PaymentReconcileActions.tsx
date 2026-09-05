@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { StatusBadge } from "../../components/ui";
 import {
   invalidatePaymentViews,
   reconcilePayment,
+  type Settlement,
 } from "./paymentsApi";
+import { SettlementDialog } from "./SettlementDialog";
 
 export type PaymentSummary = {
   id: number;
@@ -23,10 +26,15 @@ export function PaymentReconcileActions({
   invalidateKeys?: readonly (readonly unknown[])[];
 }) {
   const queryClient = useQueryClient();
+  // Marking paid offline needs the receipt the API requires, so the button opens the
+  // form rather than settling straight away.
+  const [settling, setSettling] = useState(false);
   const mutation = useMutation({
-    mutationFn: (action: "mark-offline" | "waive") =>
-      reconcilePayment(makerspaceId, action, [payment!.id], false),
+    mutationFn: ({ action, settlement }: {
+      action: "mark-offline" | "waive"; settlement?: Settlement;
+    }) => reconcilePayment(makerspaceId, action, [payment!.id], false, settlement),
     onSuccess: () => {
+      setSettling(false);
       invalidatePaymentViews(queryClient, makerspaceId);
       for (const queryKey of invalidateKeys) {
         queryClient.invalidateQueries({ queryKey });
@@ -49,7 +57,7 @@ export function PaymentReconcileActions({
             className="desk-button-success"
             type="button"
             disabled={mutation.isPending}
-            onClick={() => mutation.mutate("mark-offline")}
+            onClick={() => setSettling(true)}
           >
             Mark offline
           </button>
@@ -57,7 +65,7 @@ export function PaymentReconcileActions({
             className="desk-button-warn"
             type="button"
             disabled={mutation.isPending}
-            onClick={() => mutation.mutate("waive")}
+            onClick={() => mutation.mutate({ action: "waive" })}
           >
             Waive
           </button>
@@ -65,6 +73,18 @@ export function PaymentReconcileActions({
       ) : null}
       {mutation.error ? (
         <span className="text-danger" role="alert">{mutation.error.message}</span>
+      ) : null}
+      {settling ? (
+        <div className="w-full">
+          <SettlementDialog
+            count={1}
+            pending={mutation.isPending}
+            onCancel={() => setSettling(false)}
+            onConfirm={(settlement) =>
+              mutation.mutate({ action: "mark-offline", settlement })
+            }
+          />
+        </div>
       ) : null}
     </div>
   );
