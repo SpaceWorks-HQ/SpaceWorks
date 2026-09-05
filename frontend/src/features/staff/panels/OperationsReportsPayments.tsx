@@ -1,4 +1,4 @@
-import { BarChart, DataState } from "./OperationsReportsParts";
+import { BarChart, DataState, PieChart } from "./OperationsReportsParts";
 import { Panel, useStaffGet } from "./shared";
 
 type PaymentReportRow = {
@@ -6,6 +6,7 @@ type PaymentReportRow = {
   currency: string;
   subject_type: string;
   status: string;
+  settlement_method: string;
   payment_count: number;
   amount_total: string;
   outstanding_amount: string;
@@ -55,6 +56,15 @@ function PaymentChart({ rows }: { rows: PaymentReportRow[] }) {
         <BarChart rows={group.map((row) => ({ label: label(row.status), value: row.payment_count }))} valueLabel="payments" />
         <BarChart rows={group.map((row) => ({ label: label(row.status), value: Number(row.amount_total) }))} valueLabel={`${currency.toUpperCase()} total`} />
       </div>
+      {/* Where settled money actually came from -- cash vs UPI vs card -- which is what
+          reconciles against a physical cash box. Only settled rows carry a method, so a
+          space that has collected nothing yet simply gets no slice. */}
+      {methodSlices(group).length ? (
+        <div className="mt-4">
+          <h5 className="eyebrow">Settled by method</h5>
+          <PieChart rows={methodSlices(group)} valueLabel={`${currency.toUpperCase()} settled`} />
+        </div>
+      ) : null}
     </section>
   ))}</div>;
 }
@@ -65,14 +75,16 @@ function PaymentTable({ rows }: { rows: PaymentReportRow[] }) {
       <table className="w-full text-left text-sm">
         <thead className="eyebrow bg-surface"><tr>
           <th scope="col" className="px-3 py-2">Currency</th><th scope="col" className="px-3 py-2">Subject</th>
-          <th scope="col" className="px-3 py-2">Status</th><th scope="col" className="px-3 py-2">Payments</th>
+          <th scope="col" className="px-3 py-2">Status</th><th scope="col" className="px-3 py-2">Method</th>
+          <th scope="col" className="px-3 py-2">Payments</th>
           <th scope="col" className="px-3 py-2">Total</th><th scope="col" className="px-3 py-2">Outstanding</th>
         </tr></thead>
         <tbody>{rows.map((row, index) => (
-          <tr className="border-t border-line" key={`${row.currency}-${row.subject_type}-${row.status}-${index}`}>
+          <tr className="border-t border-line" key={`${row.currency}-${row.subject_type}-${row.status}-${row.settlement_method}-${index}`}>
             <td className="px-3 py-2 uppercase">{row.currency}</td>
             <td className="px-3 py-2">{label(row.subject_type)}</td>
             <td className="px-3 py-2">{label(row.status)}</td>
+            <td className="px-3 py-2">{row.settlement_method ? label(row.settlement_method) : "—"}</td>
             <td className="px-3 py-2 font-mono">{row.payment_count}</td>
             <td className="px-3 py-2 font-mono">{money(row.amount_total, row.currency)}</td>
             <td className="px-3 py-2 font-mono font-semibold">{money(row.outstanding_amount, row.currency)}</td>
@@ -81,6 +93,15 @@ function PaymentTable({ rows }: { rows: PaymentReportRow[] }) {
       </table>
     </div>
   );
+}
+
+function methodSlices(rows: PaymentReportRow[]) {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.settlement_method) continue;
+    totals.set(row.settlement_method, (totals.get(row.settlement_method) ?? 0) + Number(row.amount_total));
+  }
+  return [...totals].map(([method, value]) => ({ label: label(method), value }));
 }
 
 function paymentGroups(rows: PaymentReportRow[]) {

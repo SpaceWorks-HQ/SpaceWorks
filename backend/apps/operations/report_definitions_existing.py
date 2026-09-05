@@ -36,8 +36,16 @@ EXISTING_REPORT_DEFINITIONS = (
     ), title="FabLab health", chart_hint="status_grid", section_modules=("events", "bookings", "machines", "maintenance")),
     ReportDefinition(
         "payment-reconciliation", "apps.operations.reports_payments.build_payment_reconciliation",
-        ("currency", "subject_type", "status", "payment_count", "amount_total", "outstanding_amount"),
+        (
+            "currency", "subject_type", "status", "settlement_method",
+            "payment_count", "amount_total", "outstanding_amount",
+        ),
         required_action=rbac.Action.MANAGE_MAKERSPACE, title="Payment reconciliation",
         chart_hint="stacked_bar",
+        # v2: `settlement_method` splits settled money by how it actually arrived, so the
+        # column set and the row grain both changed. Deliberately NOT module-gated -- a
+        # space with the payments module uninstalled still tracks and settles money, and
+        # this is where it reconciles the cash box.
+        version=2,
     ),
 )

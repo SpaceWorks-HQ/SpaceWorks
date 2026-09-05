@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -222,9 +222,19 @@ def build_dashboard(
 
     if include_pending_payments and not restricted:
         try:
-            counts["pending_payments"] = Payment.objects.filter(
+            pending = Payment.objects.filter(
                 makerspace=makerspace, status=Payment.Status.PENDING
-            ).count()
+            )
+            counts["pending_payments"] = pending.count()
+            # How much, not just how many. Grouped BY CURRENCY and never summed across
+            # them: a space taking both INR and USD has two outstanding figures, and one
+            # combined number would be meaningless money.
+            counts["outstanding_by_currency"] = {
+                row["currency"]: str(row["total"])
+                for row in pending.values("currency")
+                .annotate(total=Sum("amount"))
+                .order_by("currency")
+            }
         except Exception:
             pass
     elif not restricted:
