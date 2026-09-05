@@ -55,7 +55,8 @@ PROJECTED_MODEL_LABELS = frozenset(
     operations.QrPrintBatchItem operations.ReportMetricRollup operations.StockTransfer
     operations.StockTransferLine
     operations.StocktakeLedgerEntry operations.StocktakeLine operations.StocktakeSession
-    payments.MakerspacePaymentSettings payments.Payment payments.Refund presence.PresenceSession
+    payments.MakerspacePaymentSettings payments.ManualSettlement payments.Payment
+    payments.Refund presence.PresenceSession
     procurement.ToBuyItem procurement.ToBuyReceipt
     tenant_migration.ExternalTenantReference warranty.Warranty
     warranty.WarrantyDocument""".split()

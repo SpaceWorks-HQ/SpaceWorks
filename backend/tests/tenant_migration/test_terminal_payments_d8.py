@@ -4,7 +4,7 @@ import pytest
 
 from apps.payments.models import Payment
 from apps.tenant_migration.tenant_dump_cross_tenant import PAYMENT_CLEARED_VALUES
-from tests.return_helpers import authenticated_client, make_member, make_space
+from tests.return_helpers import authenticated_client, make_member, make_space, settlement_payload
 
 
 pytestmark = pytest.mark.django_db
@@ -80,7 +80,12 @@ def test_each_restored_terminal_payment_is_readable_secret_free_and_provider_ine
     base = f"/api/v1/admin/makerspace/{space.pk}/payments"
 
     listed = client.get(base)
-    reconciled = client.post(f"{base}/{payment.pk}/mark-offline")
+    # The receipt body is required now, and validation runs before the terminal check --
+    # without it the response would be a 400 about the missing receipt, masking the 409
+    # this test exists to pin.
+    reconciled = client.post(
+        f"{base}/{payment.pk}/mark-offline", settlement_payload(), format="json"
+    )
 
     assert listed.status_code == 200
     row = next(item for item in listed.data if item["id"] == payment.pk)

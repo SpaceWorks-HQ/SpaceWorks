@@ -264,6 +264,13 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
     ): _policy(
         NULL, "The omitted external_refund_id makes this target constraint inert."
     ),
+    # `amends` is a OneToOne, so it is deployment-globally unique: only one correction
+    # may replace a given receipt, which is what stops an amendment chain branching.
+    # REMAP, not PRESERVE: it is a reference to another settlement row, so it follows
+    # that row's imported identity. There is nothing to regenerate on a collision.
+    ("payments.ManualSettlement", "field:amends"): _policy(
+        REMAP, "The one-to-one amendment reference is remapped to the imported receipt."
+    ),
     ("procurement.ToBuyReceipt", "field:object_key"): _policy(
         PRESERVE,
         "Keep the archived receipt key unless it collides on the target.",

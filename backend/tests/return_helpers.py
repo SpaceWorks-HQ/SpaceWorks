@@ -46,6 +46,19 @@ def enable_online_rail(makerspace, domain):
     return makerspace
 
 
+def settlement_payload(**overrides):
+    """The receipt body every mark-offline endpoint now requires.
+
+    A charge marked paid offline must be able to say how and when the money arrived, so
+    method and received_at are mandatory at the API boundary.
+    """
+    from django.utils import timezone
+
+    payload = {"method": "cash", "reference": "", "received_at": timezone.now().isoformat()}
+    payload.update(overrides)
+    return {"settlement": payload}
+
+
 def make_member(
     username,
     makerspace,

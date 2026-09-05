@@ -43,6 +43,7 @@ FIRST_PARTY_FIELD_NAMES = {
     'organizations.OrganizationMembership': frozenset('created_at created_by governance_actions granted_actions id organization status updated_at user'.split()),
     'organizations.OrganizationInvitation': frozenset('created_at created_by expires_at governance_actions granted_actions id organization redeemed_at redeemed_by revoked_at token_digest updated_at'.split()),
     'payments.MakerspacePaymentSettings': frozenset('connect_account_assigned_at connect_account_id connect_charges_enabled connect_payouts_enabled connect_status connect_status_updated_at default_currency id loan_deposit_amount loan_deposit_blocks_issue loan_deposit_mode loan_grace_days loan_late_fee_cap loan_late_fee_per_day makerspace provider razorpay_key_id razorpay_key_secret razorpay_webhook_secret stripe_publishable_key stripe_secret_key stripe_webhook_secret'.split()),
+    'payments.ManualSettlement': frozenset('amends amount created_at currency id method payment received_at recorded_by reference'.split()),
     'payments.Refund': frozenset('amount created_at created_by currency external_refund_id id payment provider reason settled_at status'.split()),
     'payments.PlatformStripeConnectSettings': frozenset('application_fee_bps id stripe_connect_client_id stripe_publishable_key stripe_secret_key stripe_webhook_secret updated_at'.split()),
     'payments.StripeConnectOAuthState': frozenset('consumed_at created_at expires_at id initiated_by makerspace state_digest'.split()),

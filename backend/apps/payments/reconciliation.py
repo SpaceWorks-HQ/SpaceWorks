@@ -123,10 +123,20 @@ def _compat_reconcile(*, payment, actor, target_status):
 
 
 @transaction.atomic
-def reconcile_payments(*, actor, makerspace_id, payment_ids, target_status):
-    """Lock, validate, then reconcile a batch without partial mutations."""
+def reconcile_payments(
+    *, actor, makerspace_id, payment_ids, target_status, settlement=None
+):
+    """Lock, validate, then reconcile a batch without partial mutations.
+
+    `settlement` is the manual receipt -- method, reference, received_at -- recorded for
+    a PAID_OFFLINE batch. It is written in the same transaction as the status flip, so a
+    settled charge can never exist without the cash-book row that explains it. Waiving
+    takes no settlement: no money changed hands.
+    """
     if target_status not in {Payment.Status.PAID_OFFLINE, Payment.Status.WAIVED}:
         raise ValueError("Unsupported reconciliation status.")
+    if settlement and target_status != Payment.Status.PAID_OFFLINE:
+        raise ValueError("Only an offline settlement carries receipt details.")
 
     requested_ids = list(payment_ids)
     locked = list(
@@ -159,5 +169,31 @@ def reconcile_payments(*, actor, makerspace_id, payment_ids, target_status):
                 "updated_at",
             ]
         )
-        audit.record(actor, action, makerspace=payment.makerspace, target=payment)
+        meta = None
+        if settlement and target_status == Payment.Status.PAID_OFFLINE:
+            receipt = _record_settlement(payment, actor, settlement)
+            meta = {"method": receipt.method, "settlement_id": receipt.pk}
+        audit.record(
+            actor, action, makerspace=payment.makerspace, target=payment, meta=meta
+        )
     return [by_id[payment_id] for payment_id in requested_ids]
+
+
+def _record_settlement(payment, actor, settlement):
+    """Append the cash-book row for one settled charge.
+
+    Amount and currency are taken from the PAYMENT, never from the caller: the receipt
+    describes the debt that was settled, and letting a client name its own figure would
+    let the books disagree with the ledger they are supposed to explain.
+    """
+    from apps.payments.models import ManualSettlement
+
+    return ManualSettlement.objects.create(
+        payment=payment,
+        method=settlement["method"],
+        reference=settlement.get("reference", ""),
+        received_at=settlement["received_at"],
+        amount=payment.amount,
+        currency=payment.currency,
+        recorded_by=actor,
+    )

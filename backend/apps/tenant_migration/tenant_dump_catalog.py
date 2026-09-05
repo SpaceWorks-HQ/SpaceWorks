@@ -49,7 +49,10 @@ class TenantDumpCatalogError(AssertionError):
 # CertificationGrant, BookableSpace.machine_type and MemberProfile.show_certifications (phase 5);
 # again for phase 6: Refund, loan settings/deposit_amount, MembershipPlan/Term, InvitationRequest,
 # Makerspace.lapsed_members_cannot_borrow, ReportSchedule/ReportDelivery.
-CATALOG_SCHEMA_SHA256 = "d7caf0b78fd4e358699600ede5cea478d4cef8f5921b3e6a7d604887060a7916"
+# Re-blessed for the manual-settlement ledger: `payments.ManualSettlement` is the
+# append-only cash book recording how and when an offline charge was actually paid, so
+# it must travel with the payments it explains.
+CATALOG_SCHEMA_SHA256 = "edd192655861c8c54d1802960fb6ffa7c3503cf7a6f5a2773a85a407fd61a2ef"
 
 
 def catalog_models(apps_registry=apps):

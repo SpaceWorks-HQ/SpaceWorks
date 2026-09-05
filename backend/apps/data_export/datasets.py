@@ -111,6 +111,7 @@ DATASET_SPECS = {
     "operations.StockTransferLine": ("transfers/lines.csv", P(("transfer__makerspace", "transfer__source_makerspace", "transfer__destination_makerspace"))),
     "payments.MakerspacePaymentSettings": ("makerspace/payment_settings.csv", P(("makerspace",))),
     "payments.Payment": ("payments/payments.csv", P(("makerspace",))),
+    "payments.ManualSettlement": ("payments/manual_settlements.csv", P(("payment__makerspace",))),
     "payments.Refund": ("payments/refunds.csv", P(("payment__makerspace",))),
     "presence.PresenceSession": ("presence/sessions.csv", P(("makerspace",), ("membership__makerspace",))),
     "procurement.ToBuyItem": ("procurement/to_buy_items.csv", P(("makerspace",))),

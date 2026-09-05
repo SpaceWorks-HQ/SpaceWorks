@@ -204,6 +204,11 @@ EXPECTED = dict(
             D.PRESERVE,
         ),
         *_fields("payments.Refund", "external_refund_id", D.RESET),
+        *_fields(
+            "payments.ManualSettlement",
+            "method reference received_at amount currency",
+            D.PRESERVE,
+        ),
         *_fields("audit.AuditLog", "event_uuid row_mac", D.RESET),
     ]
 )

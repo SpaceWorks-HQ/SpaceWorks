@@ -160,6 +160,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("organizations.OrganizationInvitation", "redeemed_by"),
         ("payments.Payment", "member"),
         ("payments.Payment", "created_by"),
+        ("payments.ManualSettlement", "recorded_by"),
         ("payments.Refund", "created_by"),
         ("payments.StripeConnectOAuthState", "initiated_by"),
         ("presence.PresenceSession", "member"),

@@ -54,6 +54,13 @@ SUPPLEMENTAL_AUTHORITY_ENTRIES = (
         "Provider handles and cross-tenant routing cannot authorize target operations.",
     ),
     *_same(
+        "payments.ManualSettlement",
+        "method reference received_at amount currency",
+        D.PRESERVE,
+        "The cash book travels with the payments it explains: how and when money was "
+        "taken is the space's own record, not a provider handle.",
+    ),
+    *_same(
         "payments.Refund",
         "status amount currency provider reason",
         D.PRESERVE,

@@ -5,7 +5,7 @@ from apps.payments.models import Payment, ProcessedStripeEvent
 from apps.payments.services import apply_webhook_event
 from tests.payments.test_models import configured_settings
 from tests.payments.test_reconciliation import action_url, payment
-from tests.return_helpers import authenticated_client, make_member, make_space
+from tests.return_helpers import authenticated_client, make_member, make_space, settlement_payload
 
 
 pytestmark = pytest.mark.django_db
@@ -45,7 +45,11 @@ def test_reconciliation_cancels_a_live_native_payment_intent(
         "apps.payments.reconciliation_rail.stripe_client.cancel_payment_intent", cancel
     )
 
-    response = authenticated_client(manager).post(action_url(space, row, action))
+    # Waiving takes no receipt (no money moved); marking offline requires one.
+    body = settlement_payload() if action == "mark-offline" else {}
+    response = authenticated_client(manager).post(
+        action_url(space, row, action), body, format="json"
+    )
 
     assert response.status_code == 200
     row.refresh_from_db()

@@ -16,7 +16,12 @@ from apps.payments.models import (
 from apps.payments.services import create_checkout_url, create_payment
 from apps.payments.stripe_client import PaymentsUnavailable
 from tests.payments.test_machine_payments import service_request
-from tests.return_helpers import enable_online_rail, make_member, make_space
+from tests.return_helpers import (
+    enable_online_rail,
+    make_member,
+    make_space,
+    settlement_payload,
+)
 
 
 pytestmark = pytest.mark.django_db
@@ -513,6 +518,8 @@ def test_raw_payment_fails_closed_after_provider_switch_to_connect(
     )
     reconciled = client.post(
         f"/api/v1/admin/machine-service/payments/{payment.pk}/mark-offline",
+        settlement_payload(),
+        format="json",
         HTTP_HOST="localhost",
     )
 
@@ -585,6 +592,8 @@ def test_connect_payment_keeps_snapshot_after_provider_switch_to_raw(
     )
     reconciled = client.post(
         f"/api/v1/admin/machine-service/payments/{payment.pk}/mark-offline",
+        settlement_payload(),
+        format="json",
         HTTP_HOST="localhost",
     )
 
