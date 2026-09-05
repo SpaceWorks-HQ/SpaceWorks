@@ -26,7 +26,7 @@ from apps.audit import services as audit
 from apps.hardware_requests import notifications
 from apps.hardware_requests.models import HardwareRequest
 from apps.hardware_requests.workflow_errors import DepositRequired
-from apps.payments.availability import online_payments_enabled
+from apps.payments.availability import charge_tracking_enabled, online_payments_enabled
 from apps.payments.models import MakerspacePaymentSettings, Payment
 from apps.payments.reconciliation import cancel_pending
 from apps.payments.services import create_checkout, create_payment
@@ -40,7 +40,15 @@ ZERO = Decimal("0.00")
 
 
 def loans_enabled(makerspace):
-    return online_payments_enabled(makerspace, "loans")
+    """Whether loan deposits and late fees are RECORDED for this space.
+
+    Tracking, not the online rail. `loan_deposit_blocks_issue` reads this, so keying it
+    off gateway credentials would have made that setting silently mean nothing in a
+    cash-only space: staff could switch "a deposit blocks issue" on and it would never
+    block, because no deposit was ever raised to be unpaid. The rail is applied
+    separately in `_schedule_checkout`.
+    """
+    return charge_tracking_enabled(makerspace, "loans")
 
 
 def deposit_amount(request, settings_row):
@@ -197,6 +205,10 @@ def _get_or_create(request, subject_type, amount, currency, actor, label):
 
 
 def _schedule_checkout(payment):
+    # The debt is already recorded by the caller; a rail is optional on top of it.
+    if not online_payments_enabled(payment.makerspace, "loans"):
+        return
+
     def create_safely():
         try:
             create_checkout(payment)

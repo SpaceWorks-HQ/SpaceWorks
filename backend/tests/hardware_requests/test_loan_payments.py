@@ -44,7 +44,9 @@ def quiet_storage_and_stripe(monkeypatch):
 def loan_space(slug, *, feature_on=True, **overrides):
     makerspace = make_space(slug)
     staff = make_member(f"{slug}-staff", makerspace)
-    makerspace.enabled_features = ["payments.enabled"] + (["payments.loans"] if feature_on else [])
+    makerspace.enabled_features = ["payments.enabled", "charges.enabled"] + (
+        ["payments.loans", "charges.loans"] if feature_on else []
+    )
     makerspace.save(update_fields=["enabled_features", "updated_at"])
     settings_row = configured_settings(makerspace)
     for name, value in overrides.items():

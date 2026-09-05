@@ -10,7 +10,7 @@ from apps.machines.service_workflow import accept, complete, start, submit
 from apps.payments.models import Payment
 from apps.payments.services import apply_webhook_event, mark_offline, waive
 from tests.payments.test_models import configured_settings
-from tests.return_helpers import make_member, make_space
+from tests.return_helpers import enable_online_rail, make_member, make_space
 
 
 pytestmark = pytest.mark.django_db
@@ -63,7 +63,7 @@ def test_payment_delete_is_immutable_outside_purge():
 
 def test_verified_webhook_is_idempotent_and_marks_matching_checkout_paid():
     space = make_space("c3-payment-webhook")
-    space.enabled_features = ["payments.enabled", "payments.machines"]
+    space.enabled_features = ["payments.enabled", "payments.machines", "charges.enabled", "charges.machines"]
     space.save(update_fields=["enabled_features", "updated_at"])
     configured_settings(space)
     actor = make_member("c3-payment-webhook-user", space)
@@ -93,7 +93,7 @@ def test_async_checkout_webhook_settles_matching_pending_payment():
 
 def test_completion_creates_payment_and_checkout_failure_never_blocks(monkeypatch):
     space = make_space("c3-payment-complete")
-    space.enabled_features = ["payments.enabled", "payments.machines"]
+    space.enabled_features = ["payments.enabled", "payments.machines", "charges.enabled", "charges.machines"]
     space.save(update_fields=["enabled_features", "updated_at"])
     configured_settings(space)
     actor = make_member("c3-payment-complete-user", space)
@@ -148,6 +148,7 @@ def test_member_can_generate_a_missing_checkout_url(monkeypatch):
     from apps.audit.models import AuditLog
     from rest_framework.test import APIClient
     space = make_space("c3-payment-regenerate")
+    enable_online_rail(space, "machines")
     configured_settings(space)
     actor = make_member("c3-payment-regenerate-user", space)
     payment = payment_for(service_request(space, actor), actor)

@@ -55,6 +55,53 @@ FEATURE_DEFINITIONS = (
         "comes back after its due date; both settle through the same payment rails.",
         default_enabled=False,
     ),
+    # --- Charge tracking (money owed) -------------------------------------------------
+    # Deliberately NOT dependent on the `payments` module. Recording what a member owes
+    # and collecting it online are different capabilities: a space that takes cash still
+    # needs the debt on its books, visible in the member area, settleable by staff and
+    # counted in reports. The `payments.*` family above stays the ONLINE-RAIL capability
+    # set and keeps its `payments` module dependency; these govern whether a charge is
+    # recorded at all.
+    #
+    # Each keeps its real DOMAIN dependency -- there is no point tracking booking money
+    # in a space with no bookings -- but never a payments one. `charges.enabled` is the
+    # standalone master switch, and a space that charges for nothing simply turns it off.
+    # It is NOT expressed as `requires_features` on the domain keys: that would make the
+    # kill switch un-flippable until every domain was unticked first (the A6 rule).
+    FeatureDefinition(
+        "charges.enabled", None, "Track money owed",
+        "Record what members owe for bookings, events, machine jobs, dues and loans -- "
+        "whether or not online payment is configured. Off means the space charges for "
+        "nothing.",
+        default_enabled=True,
+    ),
+    FeatureDefinition(
+        "charges.bookings", "bookings", "Track booking charges",
+        "Record a charge when a paid booking is confirmed.",
+        default_enabled=True,
+    ),
+    FeatureDefinition(
+        "charges.events", "events", "Track event charges",
+        "Record a charge when a member registers for a paid event.",
+        default_enabled=True,
+    ),
+    FeatureDefinition(
+        "charges.machines", "machines", "Track machine job charges",
+        "Record a charge when a priced machine service request completes.",
+        default_enabled=True,
+        requires_modules=("machine_service",),
+    ),
+    FeatureDefinition(
+        "charges.membership", "membership", "Track membership charges",
+        "Record dues and renewal charges for members.",
+        default_enabled=True,
+    ),
+    FeatureDefinition(
+        "charges.loans", "request_workflow", "Track loan charges",
+        "Record loan deposits and late fees. Parented to the core request workflow, so "
+        "it never drags the payments module into lending.",
+        default_enabled=True,
+    ),
     FeatureDefinition(
         "inventory.self_checkout", None, "Self checkout",
         "Member self-checkout and staff direct handouts of QR tools.",

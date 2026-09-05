@@ -2,7 +2,7 @@
 
 from django.db import IntegrityError, transaction
 
-from apps.payments.availability import online_payments_enabled
+from apps.payments.availability import charge_tracking_enabled, online_payments_enabled
 from apps.payments.models import MakerspacePaymentSettings, Payment
 from apps.payments.reconciliation import cancel_pending
 from apps.payments.services import create_checkout, create_payment
@@ -16,11 +16,15 @@ def create_for_confirmed_booking(booking, actor):
         if (
             member is None
             or space.payment_amount <= 0
-            or not online_payments_enabled(makerspace, "bookings")
+            or not charge_tracking_enabled(makerspace, "bookings")
         ):
             return None
+        # The debt is recorded whether or not it can be collected online; the rail is
+        # only added when one is actually live.
         payment = _get_or_create(booking, actor or member)
-        if payment.status == Payment.Status.PENDING:
+        if payment.status == Payment.Status.PENDING and online_payments_enabled(
+            makerspace, "bookings"
+        ):
             _schedule_checkout(payment)
         return payment
     except Exception:

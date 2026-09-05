@@ -25,7 +25,7 @@ from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.makerspaces.module_install import install_module, uninstall_module
 from apps.makerspaces.module_registry import core_module_keys, with_dependencies
-from apps.payments.availability import online_payments_enabled
+from apps.payments.availability import charge_tracking_enabled, online_payments_enabled
 from apps.payments.models import MakerspacePaymentSettings, Payment
 from tests.return_helpers import authenticated_client, make_member
 
@@ -49,7 +49,10 @@ def _configured_space(slug, domain, *, payments_on):
         name=slug,
         slug=slug,
         enabled_modules=modules,
-        enabled_features=["payments.enabled", f"payments.{domain}"],
+        enabled_features=[
+            "payments.enabled", f"payments.{domain}",
+            "charges.enabled", f"charges.{domain}",
+        ],
         public_inventory_enabled=True,
     )
     settings = MakerspacePaymentSettings(makerspace=space)
@@ -136,14 +139,49 @@ def _invoke_charge_caller(domain, space, actor):
 
 
 @pytest.mark.parametrize("domain", tuple(DOMAIN_MODULES))
-def test_payments_off_makes_each_online_charge_caller_degrade_without_raising(domain):
-    """Domain success cannot depend on billing: OFF returns no charge, not an error."""
+def test_payments_off_still_records_the_debt_without_an_online_rail(domain):
+    """Uninstalling `payments` removes the RAIL, not the money owed.
+
+    This used to assert the opposite -- no row at all -- which is exactly the bug the
+    charge-tracking split fixes: a space that takes cash lost every debt, so nothing was
+    pending, nothing was settleable and nothing reached the reports. The charge is now
+    recorded and reconciled by hand; only the Stripe/Razorpay rail disappears.
+
+    `charges.*` surviving the uninstall is the point: those keys carry no `payments`
+    dependency, so `uninstall_module`'s dependent-feature pruning must not take them.
+    """
     space = _configured_space(f"money-off-{domain}", domain, payments_on=False)
     actor = make_member(f"money-off-{domain}-member", space)
 
     subject, result = _invoke_charge_caller(domain, space, actor)
 
     assert online_payments_enabled(space, domain) is False
+    assert charge_tracking_enabled(space, domain) is True
+    assert result is not None
+    assert result.status == Payment.Status.PENDING
+    # No rail was raised. The row still carries this space's vendor provenance, because
+    # its credentials do resolve -- the MODULE is what is off. `unclaimed` is the state
+    # for a space with no credentials at all, covered in tests/payments/test_connect.py.
+    assert result.checkout_url == ""
+    assert result.stripe_checkout_url == ""
+    assert result.online_rail is None
+    assert type(subject).objects.filter(pk=subject.pk).exists()
+    assert Payment.objects.filter(makerspace=space).count() == 1
+
+
+@pytest.mark.parametrize("domain", tuple(DOMAIN_MODULES))
+def test_charge_tracking_off_records_nothing_at_all(domain):
+    """The "everything free" space: no rail AND no debt."""
+    space = _configured_space(f"money-untracked-{domain}", domain, payments_on=False)
+    space.enabled_features = [
+        key for key in space.enabled_features if not key.startswith("charges.")
+    ]
+    space.save(update_fields=["enabled_features", "updated_at"])
+    actor = make_member(f"money-untracked-{domain}-member", space)
+
+    subject, result = _invoke_charge_caller(domain, space, actor)
+
+    assert charge_tracking_enabled(space, domain) is False
     assert result is None
     assert type(subject).objects.filter(pk=subject.pk).exists()
     assert not Payment.objects.filter(makerspace=space).exists()

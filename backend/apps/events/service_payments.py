@@ -2,7 +2,7 @@
 
 from django.db import IntegrityError, transaction
 
-from apps.payments.availability import online_payments_enabled
+from apps.payments.availability import charge_tracking_enabled, online_payments_enabled
 from apps.payments.models import MakerspacePaymentSettings, Payment
 from apps.payments.reconciliation import cancel_pending
 from apps.payments.services import create_checkout, create_payment
@@ -15,11 +15,13 @@ def create_for_registered_registration(registration, actor):
         if (
             member is None
             or event.payment_amount <= 0
-            or not online_payments_enabled(event.makerspace, "events")
+            or not charge_tracking_enabled(event.makerspace, "events")
         ):
             return None
         payment = _get_or_create(registration, actor or member)
-        if payment.status == Payment.Status.PENDING:
+        if payment.status == Payment.Status.PENDING and online_payments_enabled(
+            event.makerspace, "events"
+        ):
             _schedule_checkout(payment)
         return payment
     except Exception:

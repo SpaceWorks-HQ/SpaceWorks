@@ -7,7 +7,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.hardware_requests.exceptions import ErrorSerializer
+from apps.payments import stripe_client
 from apps.payments.member_access import member_payment_actor, member_payment_memberships
+from apps.payments.availability import online_payments_enabled_for
 from apps.payments.member_scope import member_payment_queryset
 from apps.payments.models import Payment
 from apps.payments.serializers import (
@@ -122,6 +124,13 @@ class MemberPaymentCheckoutView(APIView):
             raise NotFound()
         if payment.stripe_checkout_url:
             return Response({"checkout_url": payment.stripe_checkout_url})
+        # A charge can exist with no rail behind it (cash-only space, or the rail switched
+        # off after the debt was raised). Refuse rather than mint a link the space cannot
+        # honour; the member settles this one at the desk.
+        if not online_payments_enabled_for(payment):
+            raise stripe_client.PaymentsUnavailable(
+                "Online payment is not available for this charge."
+            )
         try:
             checkout_url = create_checkout_url(payment.pk, actor=request.user)
         except PaymentRailConflict:

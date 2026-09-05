@@ -47,7 +47,7 @@ def member(slug, space):
 
 
 def payments_on(space):
-    space.enabled_features = ["payments.enabled", "payments.membership"]
+    space.enabled_features = ["payments.enabled", "payments.membership", "charges.enabled", "charges.membership"]
     space.save(update_fields=["enabled_features", "updated_at"])
     configured_settings(space)
 
@@ -139,9 +139,20 @@ def test_renewal_sweep_raises_exactly_one_charge_inside_the_window():
     assert AuditLog.objects.filter(action="membership.renewal_raised").count() == 1
 
 
-def test_renewal_sweep_charges_nothing_with_the_feature_off_and_expires_past_terms():
+def test_renewal_sweep_charges_nothing_with_tracking_off_and_expires_past_terms():
+    """Tracking OFF is what stops a renewal charge existing at all.
+
+    The online payments feature no longer decides this: with charge tracking on and no
+    rail, the sweep still records the debt for staff to collect by hand. Switching
+    `charges.membership` off is the "this space charges nothing" case, and it is what
+    this test now pins -- expiry of past terms must keep working either way.
+    """
     space = make_space("plan-renew-off")
     configured_settings(space)  # credentials alone are not consent to charge
+    space.enabled_features = [
+        key for key in space.enabled_features if key != "charges.membership"
+    ]
+    space.save(update_fields=["enabled_features", "updated_at"])
     manager = make_member("plan-renew-off-mgr", space)
     membership = member("plan-renew-off", space)
     monthly = plan(space)

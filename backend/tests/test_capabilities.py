@@ -24,6 +24,12 @@ def test_feature_defaults_are_dormant_except_legacy_compatible_self_checkout():
     # enables nothing by itself: every per-DOMAIN payments feature must still be off by
     # default, which is what the second assertion pins.
     assert default_enabled_features() == [
+        "charges.enabled",
+        "charges.bookings",
+        "charges.events",
+        "charges.machines",
+        "charges.membership",
+        "charges.loans",
         "inventory.self_checkout",
         "payments.enabled",
         "mobile.push",
@@ -32,6 +38,14 @@ def test_feature_defaults_are_dormant_except_legacy_compatible_self_checkout():
     assert not any(
         key.startswith("payments.") and key != "payments.enabled"
         for key in default_enabled_features()
+    )
+    # The `charges.*` family is the deliberate exception to "dormant by default". It
+    # decides whether money owed is RECORDED, not whether it can be collected, so it
+    # cannot make an unconfigured space start charging anyone: the real trigger stays a
+    # configured amount. Defaulting it off would reproduce the bug it exists to fix --
+    # a space with no gateway silently losing every debt.
+    assert all(
+        key.startswith("charges.") for key in default_enabled_features()[:6]
     )
 
 

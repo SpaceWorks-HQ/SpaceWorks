@@ -166,13 +166,16 @@ def _expire(term):
 
 def _raise_renewal(term):
     """One charge, or a logged skip. Returns the counter to bump."""
-    from apps.payments.availability import online_payments_enabled
+    from apps.payments.availability import (
+        charge_tracking_enabled,
+        online_payments_enabled,
+    )
     from apps.payments.models import Payment
     from apps.payments.services import create_checkout, create_payment
 
     makerspace = term.membership.makerspace
     plan = term.plan
-    if plan.amount <= 0 or not online_payments_enabled(makerspace, "membership"):
+    if plan.amount <= 0 or not charge_tracking_enabled(makerspace, "membership"):
         return "skipped"
     lookup = {
         "makerspace": makerspace,
@@ -205,7 +208,9 @@ def _raise_renewal(term):
                     "payment_id": payment.pk,
                 },
             )
-            if payment.status == Payment.Status.PENDING:
+            if payment.status == Payment.Status.PENDING and online_payments_enabled(
+                makerspace, "membership"
+            ):
                 create_checkout(payment)
     except Exception:  # noqa: BLE001 - one failing charge must not stop the sweep
         logger.exception("membership_renewal_charge_failed", extra={"term_id": term.pk})

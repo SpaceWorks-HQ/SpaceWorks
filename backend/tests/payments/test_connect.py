@@ -16,7 +16,7 @@ from apps.payments.models import (
 from apps.payments.services import create_checkout_url, create_payment
 from apps.payments.stripe_client import PaymentsUnavailable
 from tests.payments.test_machine_payments import service_request
-from tests.return_helpers import make_member, make_space
+from tests.return_helpers import enable_online_rail, make_member, make_space
 
 
 pytestmark = pytest.mark.django_db
@@ -460,6 +460,7 @@ def test_raw_payment_fails_closed_after_provider_switch_to_connect(
     platform.stripe_connect_client_id = "ca_platform"
     platform.save()
     makerspace = make_space("raw-snapshot-provider-switch")
+    enable_online_rail(makerspace, "machines")
     merchant = MakerspacePaymentSettings.objects.create(
         makerspace=makerspace,
         connect_account_id="acct_rawswitch",
@@ -531,6 +532,7 @@ def test_connect_payment_keeps_snapshot_after_provider_switch_to_raw(
     platform.stripe_connect_client_id = "ca_platform"
     platform.save()
     makerspace = make_space("connect-snapshot-provider-switch")
+    enable_online_rail(makerspace, "machines")
     merchant = MakerspacePaymentSettings.objects.create(
         makerspace=makerspace,
         connect_account_id="acct_connectswitch",

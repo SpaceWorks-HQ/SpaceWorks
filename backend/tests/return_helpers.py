@@ -25,6 +25,27 @@ def make_space(slug):
     return Makerspace.objects.create(name=slug, slug=slug)
 
 
+def enable_online_rail(makerspace, domain):
+    """Switch the ONLINE rail on for one domain, alongside charge tracking.
+
+    Charge tracking (`charges.*`) decides whether a debt is recorded; the payments
+    feature set decides whether a Stripe/Razorpay rail may be raised for it. A test that
+    exercises checkout, a payment intent, or provider provenance needs both, because the
+    member-facing checkout and mobile-intent endpoints now refuse to mint a provider
+    object for a charge whose space has no live rail.
+    """
+    features = set(makerspace.enabled_features or [])
+    features |= {
+        "payments.enabled",
+        f"payments.{domain}",
+        "charges.enabled",
+        f"charges.{domain}",
+    }
+    makerspace.enabled_features = sorted(features)
+    makerspace.save(update_fields=["enabled_features", "updated_at"])
+    return makerspace
+
+
 def make_member(
     username,
     makerspace,
