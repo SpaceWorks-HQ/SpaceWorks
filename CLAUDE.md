@@ -122,6 +122,17 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
 - Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks
   active status.
 - **Every presigned upload lands on the staging key; the final object key is never client-writable.** A workflow promotes it exactly once, so an accepted evidence photo cannot be replaced through a still-valid presign. Before retention expiry, read paths — the evidence endpoint, the admin preview, and backup/tenant-migration object capture — therefore fall back to the staging key, or an uploaded-but-unconsumed photo reads as missing. A terminal expired state returns 410 and never consults storage.
+- **Money owed is tracked independently of the `payments` module.** `charge_tracking_enabled`
+  (`payments/availability.py`) decides whether a debt is RECORDED and has no module or credential
+  clause; `online_payments_enabled` still governs the Stripe/Razorpay rail only and keeps all four of
+  its clauses. The `charges.*` capability family carries tracking — `charges.enabled` is a standalone
+  master switch (off = the space charges for nothing) and each domain key keeps its real DOMAIN parent,
+  never a payments one. All six charge seams record first and add a rail second; the sixth is the
+  scheduled renewal in `makerspaces/membership_plan_services.py`, which gates independently.
+  **`payments` is now opt-in** and buys the online rail alone. A charge raised with no gateway is
+  stamped `provider=unclaimed` and claimed exactly once by the first checkout that reaches a provider
+  (DB-enforced). Marking one paid offline requires a `ManualSettlement` receipt — method, reference,
+  received date — written in the same transaction and append-only, with corrections as `amends` rows.
 - Evidence photo **rows** and QR scan records are **immutable**; audit logs are **append-only**. Evidence retention may delete every final and staging object version only after the configured window, but it does not update or delete the retained `EvidencePhoto` row.
 - Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos,
   requester history, or hidden counts. Public visibility is governed per-item by `is_public`,

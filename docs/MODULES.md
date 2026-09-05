@@ -480,14 +480,18 @@ stored credential**, so re-enabling needs no re-entry.
 
 ### payments
 
-**On by default.**
+**Opt-in.** It was on by default until charge *tracking* moved out from under it: a space that takes
+cash needs none of this module and still keeps a full ledger of what members owe.
 
-- **What it is** — taking money online, through Stripe or Razorpay behind one provider seam.
-- **What it adds** — the payment surfaces, charges, receipts, reconciliation, refunds (full or partial,
-  through the same provider seam, as ledger lines that never edit the charge) and (with `mobile`) the
-  in-app payment sheet. With `payments.loans` on, issuing a loan raises a deposit and a late return
-  raises a capped fee, both from the request workflow itself.
-- **Without it** — no online payment surfaces exist. Money is handled outside the system.
+- **What it is** — taking money **online**, through Stripe or Razorpay behind one provider seam.
+- **What it adds** — the online rail: checkout, Connect, webhooks, refunds (full or partial, through
+  the same provider seam, as ledger lines that never edit the charge) and (with `mobile`) the in-app
+  payment sheet. With `payments.loans` on, a loan deposit and a capped late fee can be collected
+  online too.
+- **Without it** — money owed is still tracked, listed and reported: the `charges.*` features raise
+  the charge, members see what they owe, and staff settle it in person and record how (cash, UPI,
+  bank transfer, card machine, cheque) in the append-only manual-settlement ledger. What disappears
+  is only the ability to pay by card online.
 - **Installed ≠ charging.** The module being on means the *surfaces* exist. No charge can be created
   until a Space Manager turns on a `payments.<area>` feature **and** valid credentials resolve.
 - **Data** — **payments are never purged by a module purge.** A charge is the record of money that really

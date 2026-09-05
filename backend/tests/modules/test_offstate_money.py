@@ -27,7 +27,7 @@ from apps.makerspaces.module_install import install_module, uninstall_module
 from apps.makerspaces.module_registry import core_module_keys, with_dependencies
 from apps.payments.availability import charge_tracking_enabled, online_payments_enabled
 from apps.payments.models import MakerspacePaymentSettings, Payment
-from tests.return_helpers import authenticated_client, make_member
+from tests.return_helpers import authenticated_client, make_member, settlement_payload
 
 
 pytestmark = pytest.mark.django_db
@@ -262,7 +262,9 @@ def test_payments_off_still_lets_staff_record_offline_money():
         reverse(
             "payment-reconciliation-mark-offline",
             args=[space.pk, payment.pk],
-        )
+        ),
+        settlement_payload(),
+        format="json",
     )
 
     payment.refresh_from_db()

@@ -191,11 +191,20 @@ MODULES = (
     ),
     # These keys were placed in front of substrate that had been unconditionally
     # present, so migration 0057 backfilled their original keys onto existing rows.
-    # Payments and updates remain default-enabled; member accounts and mobile are now
+    # Updates remains default-enabled; member accounts, mobile and now payments are
     # opt-in for newly created makerspaces.
+    #
+    # `payments` stopped being default-enabled when charge TRACKING moved out from under
+    # it (the `charges.*` features). The module now buys one thing: the online rail --
+    # Stripe/Razorpay checkout, Connect, webhooks, the native payment sheet. A space that
+    # takes cash needs none of that and still keeps a full ledger of what members owe, so
+    # installing a payment-provider integration for every new makerspace bought nothing
+    # and implied a gateway nobody had configured. Existing rows are unaffected: they
+    # carry the key from migration 0057.
     ModuleDefinition(
-        "payments", "Payments", "Online payment for machine jobs, bookings, events and dues.",
-        "payments", GUARD, group=GROUP_PAYMENTS, default_enabled=True,
+        "payments", "Payments", "Online card payment (Stripe/Razorpay) for machine jobs, "
+        "bookings, events and dues. Money owed is tracked without it.",
+        "payments", GUARD, group=GROUP_PAYMENTS,
     ),
     # Member-facing identity only. Staff authentication is core RBAC and is NEVER gated:
     # a space that could switch off its own staff logins could not be administered, the

@@ -547,6 +547,17 @@ and catastrophic for an existing one; migration `makerspaces/0050` is the one-ti
 reverse) that keeps every pre-existing space sending mail across the upgrade. Any future default-on module
 key needs the same treatment.
 
+**Charge tracking is separate from the online rail (2026-09-06).** `charge_tracking_enabled` decides
+whether a debt is RECORDED; `online_payments_enabled` decides only whether a Stripe/Razorpay rail may be
+raised for it, and keeps all four of its clauses. The `charges.*` family carries tracking and is
+deliberately free of any `payments` dependency, so uninstalling the module cannot prune it; `payments`
+became **opt-in** at the same time. A charge raised with no gateway carries `provider=unclaimed` and is
+claimed exactly once by the first checkout that reaches a provider, enforced by the payment
+terminal-guard trigger. Settling one offline requires an append-only `ManualSettlement` receipt written
+in the same transaction as the status flip. NOTE: the line below calling `payments.enabled` standalone is
+stale — it is parented to the `payments` module, and the per-domain `payments.*` keys are parented to
+their own domain modules with `payments` in `requires_modules`.
+
 **A6 master switches are additive `AND`s, never replacements.** `payments.enabled`, `mobile.push` and
 `presence.geofence` are standalone (`parent_module=None`) features that sit **in front of** the readiness
 check each capability already had — `online_payments_enabled` still requires the per-domain
