@@ -6,9 +6,9 @@ stored per row, so a new `default_enabled=True` reaches new makerspaces only -- 
 this backfill every existing space would read the keys as OFF and silently stop
 recording booking, event, machine, membership and loan charges the day this ships.
 
-Defaulting these ON cannot invent charges out of nowhere: the real trigger is still a
-configured amount (a booking price, event fee, machine pricing row, dues, or a deposit
-rule). A space that has priced nothing gets no rows either way.
+Each domain key inherits the state of the `payments.<domain>` feature it replaces, so a
+space keeps charging for exactly what it charged for yesterday and nothing more. New
+makerspaces get all six on by default instead, since they have no prior intent to carry.
 
 Same shape as `0050` and `0051`: a one-time backfill with a working reverse, touching
 only rows that lack the keys.
@@ -26,13 +26,32 @@ FEATURE_KEYS = (
 )
 
 
+#: Each tracking key and the online-payment feature whose state it inherits. A space
+#: that deliberately kept `payments.bookings` OFF was not charging for bookings, and
+#: switching tracking on for it would start creating debts it never had -- with
+#: `charges.loans` it could even start BLOCKING issue. So intent is carried across per
+#: domain rather than assumed.
+DOMAIN_SOURCE = {
+    "charges.bookings": "payments.bookings",
+    "charges.events": "payments.events",
+    "charges.machines": "payments.machines",
+    "charges.membership": "payments.membership",
+    "charges.loans": "payments.loans",
+}
+
+
 def enable_tracking(apps, schema_editor):
     Makerspace = apps.get_model("makerspaces", "Makerspace")
     for makerspace in Makerspace.objects.all().iterator():
         features = set(makerspace.enabled_features or [])
-        if features.issuperset(FEATURE_KEYS):
+        # The master switch goes on for everyone: on its own it enables nothing, because
+        # each domain key still has to be present below.
+        wanted = {"charges.enabled"} | {
+            key for key, source in DOMAIN_SOURCE.items() if source in features
+        }
+        if features.issuperset(wanted):
             continue
-        makerspace.enabled_features = sorted(features | set(FEATURE_KEYS))
+        makerspace.enabled_features = sorted(features | wanted)
         makerspace.save(update_fields=["enabled_features"])
 
 

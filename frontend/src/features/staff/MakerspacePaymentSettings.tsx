@@ -165,7 +165,11 @@ export function MakerspacePaymentSettings({ makerspace }: { makerspace: Makerspa
           {(settings.error || save.error || clear.error || onboard.error)?.message}
         </p>
       ) : null}
-      {featureEnabled(makerspace.enabled_features ?? [], "payments.loans") ? (
+      {/* Keyed on charge TRACKING, not the online rail. `payments.loans` is pruned when
+          the payments module is uninstalled, so gating on it hid deposit amounts, caps
+          and the blocking switch from exactly the cash-only spaces that now raise those
+          charges -- they could not configure what the feature promised. */}
+      {featureEnabled(makerspace.enabled_features ?? [], "charges.loans") ? (
         <MakerspaceLoanSettings makerspaceId={makerspace.id} />
       ) : null}
     </section>

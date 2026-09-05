@@ -285,6 +285,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/payments",
   "/api/v1/admin/makerspace/{makerspace_id}/payments/bulk/mark-offline",
   "/api/v1/admin/makerspace/{makerspace_id}/payments/bulk/waive",
+  "/api/v1/admin/makerspace/{makerspace_id}/payments/{payment_id}/amend-settlement",
   "/api/v1/admin/makerspace/{makerspace_id}/payments/{payment_id}/mark-offline",
   "/api/v1/admin/makerspace/{makerspace_id}/payments/{payment_id}/refund",
   "/api/v1/admin/makerspace/{makerspace_id}/payments/{payment_id}/waive",

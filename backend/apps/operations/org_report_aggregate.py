@@ -19,8 +19,11 @@ def aggregate_rows(report_key, rows_by_space, *, limit):
     if report_key == "qr-scans":
         return _group_sum(rows, ("context",), ("count",), limit)
     if report_key == "payment-reconciliation":
+        # `settlement_method` is part of the GRAIN. Omitting it merged cash and UPI rows
+        # that shared a currency, subject and status, and the projection then emitted a
+        # null method -- silently undoing the split the report exists for.
         return _group_sum(
-            rows, ("currency", "subject_type", "status"),
+            rows, ("currency", "subject_type", "status", "settlement_method"),
             ("payment_count", "amount_total", "outstanding_amount"), limit,
         )
     if report_key == "event-attendance":

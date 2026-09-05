@@ -8,7 +8,11 @@ from apps.admin_api.permissions import IsActiveStaff
 from apps.accounts import rbac
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.payments.models import Payment
-from apps.payments.reconciliation import list_payments, reconcile_payments
+from apps.payments.reconciliation import (
+    amend_settlement,
+    list_payments,
+    reconcile_payments,
+)
 from apps.payments.serializers_reconciliation import (
     PaymentBulkActionSerializer,
     PaymentBulkOfflineSerializer,
@@ -112,6 +116,34 @@ class PaymentWaiveView(_PaymentActionView):
     )
     def post(self, request, makerspace_id, payment_id):
         return super().post(request, makerspace_id, payment_id)
+
+
+class PaymentSettlementAmendView(APIView):
+    """Append a corrected receipt to an already-settled charge."""
+
+    permission_classes = [IsActiveStaff]
+
+    @extend_schema(
+        tags=["Payments"], summary="Correct how a settled payment was received",
+        request=PaymentOfflineSerializer,
+        responses={200: PaymentReconciliationSerializer, **ERRORS},
+    )
+    def post(self, request, makerspace_id, payment_id):
+        payload = PaymentOfflineSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        receipt = amend_settlement(
+            actor=request.user,
+            makerspace_id=makerspace_id,
+            payment_id=payment_id,
+            settlement=payload.validated_data["settlement"],
+        )
+        payment = receipt.payment
+        return Response(
+            PaymentReconciliationSerializer(
+                payment,
+                context={"payment_subject_labels": resolve_subject_labels([payment])},
+            ).data
+        )
 
 
 class _PaymentBulkActionView(APIView):
