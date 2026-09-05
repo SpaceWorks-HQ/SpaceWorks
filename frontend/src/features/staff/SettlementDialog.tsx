@@ -24,6 +24,10 @@ export function SettlementDialog({
   const [reference, setReference] = useState("");
   // Defaults to now, which is the common case: staff record the money as they take it.
   const [receivedAt, setReceivedAt] = useState(() => localNow());
+  // The input can be cleared. Confirming with an empty value would throw a RangeError
+  // out of toISOString() before the mutation ran, leaving the operator with a blank
+  // screen and no explanation.
+  const receivedValid = !Number.isNaN(new Date(receivedAt).getTime());
 
   return (
     <div className="desk-panel mt-3 p-4" role="group" aria-label="Record how the money was received">
@@ -66,10 +70,15 @@ export function SettlementDialog({
           />
         </label>
       </div>
+      {receivedValid ? null : (
+        <p className="mt-2 text-sm text-danger" role="alert">
+          Enter the date and time the money was received.
+        </p>
+      )}
       <div className="mt-4 flex gap-2">
         <button
           className="desk-button"
-          disabled={pending}
+          disabled={pending || !receivedValid}
           onClick={() =>
             onConfirm({
               method,

@@ -43,7 +43,8 @@ def delete_for_makerspace(makerspace, cursor):
     cursor.execute("DELETE FROM machines_machineconsumableadjustment WHERE makerspace_id = %s", [makerspace.id])
     cursor.execute("DELETE FROM machines_machineusageentry WHERE machine_id IN (SELECT id FROM machines_machine WHERE makerspace_id = %s)", [makerspace.id])
     ServiceRequestFile.objects.filter(makerspace=makerspace).delete()
-    # Generic-subject payments must go before their MachineServiceRequest subjects.
+    # Manual settlements cascade with their payments (triggers are suspended for
+    # this transaction), so the cash book needs no separate pass.
     Payment.objects.filter(makerspace=makerspace).delete()
     ProcessedStripeEvent.objects.filter(makerspace=makerspace).delete()
     MachineServiceRequest.objects.filter(makerspace=makerspace).delete()

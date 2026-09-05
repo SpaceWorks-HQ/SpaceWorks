@@ -108,16 +108,22 @@ def _create_checkout_url_atomic(payment_id, *, actor=None):
         # An unclaimed row's rail is not known until the source resolves, and it may turn
         # out to be Connect. Taking the platform lock we might not need is safe; discovering
         # we need it after taking the makerspace lock would invert the documented order.
+        unclaimed = payment_snapshot.provider == Payment.Provider.UNCLAIMED
         if (
             payment_snapshot.stripe_provider == Payment.StripeProvider.CONNECT
-            or payment_snapshot.provider == Payment.Provider.UNCLAIMED
+            or unclaimed
         ):
             platform = (
                 PlatformStripeConnectSettings.objects.select_for_update()
                 .filter(pk=1)
                 .first()
             )
-            if platform is None:
+            # An unclaimed row only MIGHT resolve to Connect, so the lock is taken
+            # speculatively to keep the platform -> makerspace -> Payment order. Its
+            # absence is only fatal for a row already stamped Connect: a self-hosted
+            # deployment with raw credentials has no platform row at all, and demanding
+            # one here refused every cash-raised charge the moment Stripe was configured.
+            if platform is None and not unclaimed:
                 raise stripe_client.PaymentsUnavailable(
                     "Stripe Connect is not configured."
                 )

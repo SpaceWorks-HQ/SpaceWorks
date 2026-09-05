@@ -46,8 +46,14 @@ class MemberMobilePaymentIntentView(APIView):
         # Same rule as the web checkout: a debt with no live rail behind it is settled at
         # the desk, not by minting a native intent the space cannot capture.
         if not online_payments_enabled_for(payment):
-            raise stripe_client.PaymentsUnavailable(
-                'Online payment is not available for this charge.'
+            # Same reason as the web surface: the structured 503 handler below wraps only
+            # the intent call, so raising here would surface as a 500.
+            return Response(
+                {
+                    'detail': 'Online payment is not available for this charge.',
+                    'code': 'payments_unavailable',
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         try:
             payload = create_mobile_intent(payment.pk, actor=request.user)

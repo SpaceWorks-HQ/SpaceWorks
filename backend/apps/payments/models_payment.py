@@ -227,7 +227,18 @@ class Payment(models.Model):
                 original["status"] != self.status or original["amount"] != self.amount
             ):
                 raise ValidationError("Terminal payments are immutable.")
-            if original and any(
+            # A charge raised with no gateway configured carries `provider=unclaimed`:
+            # it has no provenance yet, so the first checkout that reaches a provider is
+            # allowed to stamp one, exactly once. Without this exemption the guard below
+            # rejected that stamp and an unclaimed debt could NEVER be claimed, even
+            # after valid credentials were added -- the database trigger permitting the
+            # transition was never reached.
+            claiming = (
+                original
+                and original["provider"] == self.Provider.UNCLAIMED
+                and self.provider != self.Provider.UNCLAIMED
+            )
+            if not claiming and original and any(
                 original[field] != getattr(self, field)
                 for field in ("provider", "stripe_provider", "stripe_connected_account_id", "stripe_application_fee_amount")
             ):

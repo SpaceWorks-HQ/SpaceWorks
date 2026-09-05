@@ -46762,6 +46762,12 @@
                     "pending_payments": {
                         "type": "integer",
                         "default": 0
+                    },
+                    "outstanding_by_currency": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        }
                     }
                 },
                 "required": [

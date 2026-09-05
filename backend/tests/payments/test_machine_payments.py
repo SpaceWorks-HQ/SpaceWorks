@@ -10,7 +10,7 @@ from apps.machines.service_workflow import accept, complete, start, submit
 from apps.payments.models import Payment
 from apps.payments.services import apply_webhook_event, mark_offline, waive
 from tests.payments.test_models import configured_settings
-from tests.return_helpers import enable_online_rail, make_member, make_space
+from tests.return_helpers import enable_online_rail, make_member, make_space, settlement_details
 
 
 pytestmark = pytest.mark.django_db
@@ -41,7 +41,7 @@ def test_terminal_payment_is_immutable_and_reconciliation_is_audited():
     space = make_space("c3-payment-transition")
     actor = make_member("c3-payment-transition-user", space)
     payment = payment_for(service_request(space, actor), actor)
-    assert mark_offline(payment, actor).status == Payment.Status.PAID_OFFLINE
+    assert mark_offline(payment, actor, settlement_details()).status == Payment.Status.PAID_OFFLINE
     payment.amount = Decimal("9.00")
     with pytest.raises(ValidationError):
         payment.save()
@@ -53,7 +53,7 @@ def test_payment_delete_is_immutable_outside_purge():
     actor = make_member("c3-payment-delete-user", space)
     paid = payment_for(service_request(space, actor), actor)
     pending = payment_for(service_request(space, actor), actor)
-    mark_offline(paid, actor)
+    mark_offline(paid, actor, settlement_details())
 
     for payment in (paid, pending):
         with pytest.raises(InternalError):
@@ -120,7 +120,7 @@ def test_reconciliation_expires_an_open_checkout_session(monkeypatch):
     def expire(source, session_id):
         expired.append((source, session_id))
     monkeypatch.setattr("apps.payments.services_checkout.stripe_client.expire_checkout_session", expire)
-    mark_offline(payment, actor)
+    mark_offline(payment, actor, settlement_details())
     assert expired[0][0].provider == Payment.StripeProvider.RAW
     assert expired[0][0].connected_account_id is None
     assert expired[0][1] == "cs_expire"
@@ -134,7 +134,7 @@ def test_terminal_payment_webhook_is_audited_as_an_anomaly(monkeypatch):
     payment = payment_for(service_request(space, actor), actor)
     Payment.objects.filter(pk=payment.pk).update(stripe_checkout_session_id="cs_terminal")
     monkeypatch.setattr("apps.payments.services_checkout.stripe_client.expire_checkout_session", lambda *_: None)
-    mark_offline(payment, actor)
+    mark_offline(payment, actor, settlement_details())
     event = {"id": "evt_terminal", "type": "checkout.session.completed", "data": {"object": {"id": "cs_terminal", "payment_status": "paid"}}}
     result = apply_webhook_event(space, event)
     assert result.status == Payment.Status.PAID_OFFLINE

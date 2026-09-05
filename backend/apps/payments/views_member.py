@@ -119,7 +119,7 @@ def _member_payment_context(rows):
     from apps.payments.models import ManualSettlement
 
     if not rows:
-        return {"online_payment_available": False, "payment_settlements": {}}
+        return {"payment_rails": {}, "payment_settlements": {}}
     settled_ids = [
         row.pk for row in rows if row.status == Payment.Status.PAID_OFFLINE
     ]
@@ -129,10 +129,17 @@ def _member_payment_context(rows):
             payment_id__in=settled_ids, amended_by__isnull=True
         ).order_by("payment_id", "-created_at", "-pk"):
             receipts.setdefault(receipt.payment_id, receipt)
-    return {
-        "online_payment_available": online_payments_enabled_for(rows[0]),
-        "payment_settlements": receipts,
-    }
+    # Keyed by OWNING makerspace, not answered once for the page. A collaborative-event
+    # charge is owned by the host space and merely routed here through `via_makerspace`,
+    # and that host has its own modules, features and credentials -- so one scalar taken
+    # from the first row would hide a valid checkout, or advertise an impossible one, for
+    # every charge belonging to a different owner. Resolved once per distinct owner, so
+    # a page of charges from one space still costs one lookup.
+    rails = {}
+    for row in rows:
+        if (row.makerspace_id, row.subject_type) not in rails:
+            rails[(row.makerspace_id, row.subject_type)] = online_payments_enabled_for(row)
+    return {"payment_rails": rails, "payment_settlements": receipts}
 
 
 class MemberPaymentCheckoutView(APIView):
@@ -157,8 +164,16 @@ class MemberPaymentCheckoutView(APIView):
         # off after the debt was raised). Refuse rather than mint a link the space cannot
         # honour; the member settles this one at the desk.
         if not online_payments_enabled_for(payment):
-            raise stripe_client.PaymentsUnavailable(
-                "Online payment is not available for this charge."
+            # Returned directly, not raised: the handler below that converts provider
+            # failures into a structured 503 only wraps the create_checkout_url call, so
+            # raising here escaped it and DRF answered 500 for an ordinary cash-only
+            # charge.
+            return Response(
+                {
+                    "detail": "Online payment is not available for this charge.",
+                    "code": "payments_unavailable",
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         try:
             checkout_url = create_checkout_url(payment.pk, actor=request.user)

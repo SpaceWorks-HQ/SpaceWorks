@@ -10,18 +10,26 @@ from apps.payments.models import (
 )
 from apps.payments.resolution import source_for_payment
 from apps.payments.services import PaymentRailConflict
+from apps.payments.services_checkout import _claim_provider
 
 
 def create_mobile_intent(payment_id, *, actor):
-    snapshot = Payment.objects.only('makerspace_id', 'stripe_provider').get(pk=payment_id)
+    snapshot = Payment.objects.only(
+        'makerspace_id', 'stripe_provider', 'provider'
+    ).get(pk=payment_id)
     with transaction.atomic():
-        if snapshot.stripe_provider == Payment.StripeProvider.CONNECT:
+        # An unclaimed row's rail is unknown until the source resolves and may turn out
+        # to be Connect, so the platform lock is taken speculatively to preserve the
+        # platform -> makerspace -> Payment order. Its absence only matters for a row
+        # already stamped Connect; a self-hosted deployment has no platform row at all.
+        unclaimed = snapshot.provider == Payment.Provider.UNCLAIMED
+        if snapshot.stripe_provider == Payment.StripeProvider.CONNECT or unclaimed:
             platform = (
                 PlatformStripeConnectSettings.objects.select_for_update()
                 .filter(pk=1)
                 .first()
             )
-            if platform is None:
+            if platform is None and not unclaimed:
                 raise stripe_client.PaymentsUnavailable(
                     'Stripe Connect is not configured.'
                 )
@@ -41,6 +49,12 @@ def create_mobile_intent(payment_id, *, actor):
             raise PaymentRailConflict(
                 'The payment already uses the Checkout payment rail.'
             )
+        # Claim the rail before creating a provider object, exactly as hosted checkout
+        # does. Without this a cash-raised charge could settle online while still stamped
+        # `unclaimed`, which would misreport it and leave refunds with no vendor to
+        # dispatch to.
+        if payment.provider == Payment.Provider.UNCLAIMED:
+            _claim_provider(payment)
         source = source_for_payment(payment)
         if source is None or not source.publishable_key:
             raise stripe_client.PaymentsUnavailable(

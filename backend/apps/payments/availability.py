@@ -1,4 +1,5 @@
 from apps.makerspaces.platform import feature_enabled, module_enabled
+from apps.separability.tombstones import unavailable_apps
 from apps.payments.resolution import resolve_payment_source
 
 
@@ -43,6 +44,13 @@ def charge_tracking_enabled(makerspace, domain):
     `requires_features` edge on the domain keys, which would make it un-flippable until
     every domain was unticked first (the same A6 rule the payments master switch follows).
     """
+    # A deployment built with `TOMBSTONED_APPS=payments` keeps the Payment TABLE but
+    # splices out every payment surface -- member history, checkout, reconciliation. Rows
+    # raised there could be neither seen nor settled by anyone, so tracking fails closed
+    # rather than accruing debts nobody can reach. This is the deployment-level question,
+    # distinct from the per-makerspace module toggle, which deliberately does not gate it.
+    if "payments" in unavailable_apps():
+        return False
     return (
         feature_enabled(makerspace, "charges.enabled")
         and feature_enabled(makerspace, f"charges.{domain}")

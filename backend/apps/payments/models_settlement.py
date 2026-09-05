@@ -31,8 +31,14 @@ class ManualSettlement(models.Model):
         CHEQUE = "cheque", "Cheque"
         OTHER = "other", "Other"
 
+    # CASCADE, not PROTECT: a receipt explains exactly one payment and has no meaning
+    # without it. PROTECT made the lifecycle purge raise ProtectedError instead of
+    # deleting, and it masked the payment's own immutability trigger outside a purge --
+    # a delete attempt failed with the wrong error for the wrong reason. Deletion stays
+    # impossible in normal operation because this table's own trigger refuses DELETE
+    # unless the purge GUC is set, exactly as Payment does.
     payment = models.ForeignKey(
-        Payment, on_delete=models.PROTECT, related_name="manual_settlements"
+        Payment, on_delete=models.CASCADE, related_name="manual_settlements"
     )
     method = models.CharField(max_length=16, choices=Method.choices)
     # A short operator-entered handle: a UPI reference, a cheque number, a terminal slip
@@ -53,7 +59,9 @@ class ManualSettlement(models.Model):
         "self",
         null=True,
         blank=True,
-        on_delete=models.PROTECT,
+        # Same reasoning: the whole correction chain belongs to one payment and dies
+        # with it. PROTECT here meant a chain could only be purged one layer at a time.
+        on_delete=models.CASCADE,
         related_name="amended_by",
     )
     created_at = models.DateTimeField(auto_now_add=True)

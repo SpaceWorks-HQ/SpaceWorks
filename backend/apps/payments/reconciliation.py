@@ -62,11 +62,17 @@ def with_refunds(queryset):
     )
 
 
-def mark_offline(payment, actor):
+def mark_offline(payment, actor, settlement=None):
+    """Settle one charge in cash. `settlement` is REQUIRED -- see reconcile_payments.
+
+    Kept as a one-row convenience over the batch service. Callers that genuinely have no
+    receipt detail want `waive` instead: that is the transition meaning "no money moved".
+    """
     return _compat_reconcile(
         actor=actor,
         payment=payment,
         target_status=Payment.Status.PAID_OFFLINE,
+        settlement=settlement,
     )
 
 
@@ -110,7 +116,7 @@ def cancel_pending(*, makerspace, subject_type, subject_id, actor):
     return payment
 
 
-def _compat_reconcile(*, payment, actor, target_status):
+def _compat_reconcile(*, payment, actor, target_status, settlement=None):
     current = Payment.objects.get(pk=payment.pk)
     if current.status != Payment.Status.PENDING:
         return current
@@ -119,6 +125,7 @@ def _compat_reconcile(*, payment, actor, target_status):
         makerspace_id=current.makerspace_id,
         payment_ids=[current.pk],
         target_status=target_status,
+        settlement=settlement,
     )[0]
 
 
@@ -137,6 +144,11 @@ def reconcile_payments(
         raise ValueError("Unsupported reconciliation status.")
     if settlement and target_status != Payment.Status.PAID_OFFLINE:
         raise ValueError("Only an offline settlement carries receipt details.")
+    # Enforced HERE, not only in the HTTP serializers: `mark_offline()` is exported and
+    # called directly, so a serializer-only rule would let a settled charge exist with no
+    # record of how the money arrived -- exactly what the ledger exists to prevent.
+    if target_status == Payment.Status.PAID_OFFLINE and not settlement:
+        raise ValueError("Marking a payment paid offline requires settlement details.")
 
     requested_ids = list(payment_ids)
     locked = list(

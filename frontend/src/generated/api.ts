@@ -1443,6 +1443,9 @@ export type Dashboard = {
   "warranty_expiring"?: number;
   "maintenance_overdue"?: number;
   "pending_payments"?: number;
+  "outstanding_by_currency"?: {
+  [key: string]: string;
+};
 };
 
 export type DataExportCreate = {

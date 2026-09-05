@@ -46,6 +46,19 @@ def enable_online_rail(makerspace, domain):
     return makerspace
 
 
+def settlement_details(**overrides):
+    """The receipt dict the reconciliation SERVICE requires (not the HTTP body).
+
+    `mark_offline`/`reconcile_payments` refuse a paid-offline transition without it, so a
+    settled charge always records how the money arrived.
+    """
+    from django.utils import timezone
+
+    details = {"method": "cash", "reference": "", "received_at": timezone.now()}
+    details.update(overrides)
+    return details
+
+
 def settlement_payload(**overrides):
     """The receipt body every mark-offline endpoint now requires.
 

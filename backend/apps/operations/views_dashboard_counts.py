@@ -33,6 +33,13 @@ class DashboardSerializer(serializers.Serializer):
     warranty_expiring = serializers.IntegerField(required=False, default=0)
     maintenance_overdue = serializers.IntegerField(required=False, default=0)
     pending_payments = serializers.IntegerField(required=False, default=0)
+    # Declared so the schema and the generated TypeScript carry it: the endpoint emits
+    # this map and an undeclared field is invisible to typed frontend consumers. Amounts
+    # are strings keyed by currency code -- never one combined number, since adding INR
+    # to USD would be meaningless money.
+    outstanding_by_currency = serializers.DictField(
+        child=serializers.CharField(), required=False, default=dict
+    )
 
 
 def build_dashboard(

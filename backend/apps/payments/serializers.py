@@ -44,11 +44,15 @@ class MemberPaymentSerializer(serializers.ModelSerializer):
         re-read settings and credentials for every charge in the list. Falls back to a
         live check only when a caller has not supplied it.
         """
-        cached = self.context.get("online_payment_available")
-        if cached is not None:
-            return bool(cached)
         from apps.payments.availability import online_payments_enabled_for
 
+        rails = self.context.get("payment_rails")
+        if rails is not None:
+            # Keyed by (owning makerspace, subject type): both decide the answer, and a
+            # member list can mix charges owned by different spaces.
+            key = (payment.makerspace_id, payment.subject_type)
+            if key in rails:
+                return bool(rails[key])
         return online_payments_enabled_for(payment)
 
     @extend_schema_field(MemberSettlementSerializer(allow_null=True))
