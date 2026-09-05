@@ -15,6 +15,11 @@ SUBJECT_ACTIONS = {
     Payment.SubjectType.BOOKING: rbac.Action.MANAGE_BOOKINGS,
     Payment.SubjectType.EVENT_REGISTRATION: rbac.Action.MANAGE_EVENTS,
     Payment.SubjectType.MAKERSPACE_MEMBERSHIP: rbac.Action.MANAGE_MAKERSPACE,
+    # A renewal charge is membership money like the dues above, so it takes the same
+    # authority. Its absence here meant `_require_subject_authority` fell through to the
+    # unsupported-subject refusal below and NO actor could ever reconcile a renewal --
+    # a space collecting renewals in cash had no way to mark one paid.
+    Payment.SubjectType.MEMBERSHIP_TERM: rbac.Action.MANAGE_MAKERSPACE,
     # Loan charges follow the handover job: whoever may issue settles the deposit,
     # whoever may take a return settles the late fee.
     Payment.SubjectType.LOAN_DEPOSIT: rbac.Action.ISSUE_REQUEST,

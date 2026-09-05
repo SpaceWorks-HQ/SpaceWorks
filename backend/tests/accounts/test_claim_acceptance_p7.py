@@ -238,7 +238,7 @@ def test_claim_reaches_member_area_and_checks_out_a_locally_owned_charge(monkeyp
         created_by=harness.staff,
     )
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.create_checkout_session",
+        "apps.payments.services_checkout.stripe_client.create_checkout_session",
         lambda *_args, **_kwargs: {
             "id": "cs_claim_acceptance",
             "url": "https://checkout.stripe.test/claim",

@@ -99,7 +99,7 @@ def test_web_checkout_tolerates_archival_for_an_active_member(monkeypatch):
     payment = _membership_payment(space, member)
     _archive(space)
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.create_checkout_session",
+        "apps.payments.services_checkout.stripe_client.create_checkout_session",
         lambda *_args, **_kwargs: {
             "id": "cs_archived",
             "url": "https://checkout.stripe.test/cs_archived",

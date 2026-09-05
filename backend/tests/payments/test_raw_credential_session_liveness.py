@@ -21,7 +21,7 @@ def test_raw_rotation_blocks_terminal_session_when_remote_closure_is_unconfirmed
         stripe_checkout_url="https://checkout.stripe.test/raw-abandoned"
     )
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.expire_checkout_session",
+        "apps.payments.services_checkout.stripe_client.expire_checkout_session",
         lambda *_args: False,
     )
     reconcile(payment, manager)
@@ -52,7 +52,7 @@ def test_raw_rotation_persists_authoritatively_closed_terminal_session(monkeypat
     )
     payment = Payment.objects.get(makerspace=makerspace)
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.expire_checkout_session",
+        "apps.payments.services_checkout.stripe_client.expire_checkout_session",
         lambda *_args: False,
     )
     mark_offline(payment, manager)

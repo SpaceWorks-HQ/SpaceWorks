@@ -117,7 +117,7 @@ def test_failed_connect_expiry_keeps_platform_secret_rotation_and_clear_blocked(
     )
     payment = Payment.objects.get(stripe_provider=Payment.StripeProvider.CONNECT)
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.expire_checkout_session",
+        "apps.payments.services_checkout.stripe_client.expire_checkout_session",
         lambda *_args: False,
     )
 
@@ -143,7 +143,7 @@ def test_successful_connect_expiry_allows_platform_secret_rotation(
     platform, superadmin = pending_connect_settings("platform-expiry-succeeded")
     payment = Payment.objects.get(stripe_provider=Payment.StripeProvider.CONNECT)
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.expire_checkout_session",
+        "apps.payments.services_checkout.stripe_client.expire_checkout_session",
         lambda *_args: True,
     )
 

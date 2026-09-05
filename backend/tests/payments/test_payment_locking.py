@@ -51,7 +51,7 @@ def test_raw_rotation_cannot_commit_between_session_check_and_persist(monkeypatc
         return {"id": "cs_rotation_lock", "url": "https://checkout.test/locked"}
 
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.create_checkout_session", create_session
+        "apps.payments.services_checkout.stripe_client.create_checkout_session", create_session
     )
     update_settings = serializers_payments.update_payment_settings
 
@@ -165,10 +165,10 @@ def test_connect_checkout_waits_for_platform_credential_commit(settings, monkeyp
         paused_validation,
     )
     monkeypatch.setattr(
-        "apps.payments.services.refresh_connected_account", lambda _merchant: merchant
+        "apps.payments.services_checkout.refresh_connected_account", lambda _merchant: merchant
     )
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.create_checkout_session", create_session
+        "apps.payments.services_checkout.stripe_client.create_checkout_session", create_session
     )
 
     def rotation_worker():

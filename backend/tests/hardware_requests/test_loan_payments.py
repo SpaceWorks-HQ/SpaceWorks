@@ -38,7 +38,7 @@ def quiet_storage_and_stripe(monkeypatch):
         lambda evidence, max_bytes: EvidenceValidationResult(size=123, content_type="image/png"),
     )
     # Checkout creation is post-commit and best-effort; keep the test off the network.
-    monkeypatch.setattr("apps.payments.services.create_checkout_url", lambda *args, **kwargs: "")
+    monkeypatch.setattr("apps.payments.services_checkout.create_checkout_url", lambda *args, **kwargs: "")
 
 
 def loan_space(slug, *, feature_on=True, **overrides):

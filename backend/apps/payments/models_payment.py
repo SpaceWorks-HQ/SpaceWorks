@@ -40,6 +40,13 @@ class Payment(models.Model):
 
         STRIPE = "stripe", "Stripe"
         RAZORPAY = "razorpay", "Razorpay"
+        # A debt raised while the space had no gateway configured. It is real money owed
+        # and fully reconcilable offline; it simply has no rail behind it yet. The first
+        # checkout that reaches a provider claims the row (services._claim_provider), and
+        # a DB trigger permits that transition exactly once. Without this state such a row
+        # would be stamped `stripe` and could never be claimed by a gateway configured
+        # later, because provider provenance is immutable.
+        UNCLAIMED = "unclaimed", "No online rail"
 
     class OnlineRail(models.TextChoices):
         CHECKOUT = 'checkout', 'Stripe Checkout'

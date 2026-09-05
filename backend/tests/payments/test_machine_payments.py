@@ -119,7 +119,7 @@ def test_reconciliation_expires_an_open_checkout_session(monkeypatch):
     expired = []
     def expire(source, session_id):
         expired.append((source, session_id))
-    monkeypatch.setattr("apps.payments.services.stripe_client.expire_checkout_session", expire)
+    monkeypatch.setattr("apps.payments.services_checkout.stripe_client.expire_checkout_session", expire)
     mark_offline(payment, actor)
     assert expired[0][0].provider == Payment.StripeProvider.RAW
     assert expired[0][0].connected_account_id is None
@@ -133,7 +133,7 @@ def test_terminal_payment_webhook_is_audited_as_an_anomaly(monkeypatch):
     actor = make_member("c3-payment-terminal-webhook-user", space)
     payment = payment_for(service_request(space, actor), actor)
     Payment.objects.filter(pk=payment.pk).update(stripe_checkout_session_id="cs_terminal")
-    monkeypatch.setattr("apps.payments.services.stripe_client.expire_checkout_session", lambda *_: None)
+    monkeypatch.setattr("apps.payments.services_checkout.stripe_client.expire_checkout_session", lambda *_: None)
     mark_offline(payment, actor)
     event = {"id": "evt_terminal", "type": "checkout.session.completed", "data": {"object": {"id": "cs_terminal", "payment_status": "paid"}}}
     result = apply_webhook_event(space, event)
@@ -151,8 +151,8 @@ def test_member_can_generate_a_missing_checkout_url(monkeypatch):
     configured_settings(space)
     actor = make_member("c3-payment-regenerate-user", space)
     payment = payment_for(service_request(space, actor), actor)
-    monkeypatch.setattr("apps.payments.services.member_payment_return_url", lambda _: "https://space.example/member")
-    monkeypatch.setattr("apps.payments.services.stripe_client.create_checkout_session", lambda *_args, **_kwargs: {"id": "cs_regenerated", "url": "https://checkout.stripe.test/cs_regenerated"})
+    monkeypatch.setattr("apps.payments.services_checkout.member_payment_return_url", lambda _: "https://space.example/member")
+    monkeypatch.setattr("apps.payments.services_checkout.stripe_client.create_checkout_session", lambda *_args, **_kwargs: {"id": "cs_regenerated", "url": "https://checkout.stripe.test/cs_regenerated"})
     client = APIClient()
     client.force_authenticate(actor)
     response = client.post(f"/api/v1/member/makerspaces/{space.pk}/payments/{payment.pk}/checkout")
