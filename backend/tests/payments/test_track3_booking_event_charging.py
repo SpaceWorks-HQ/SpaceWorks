@@ -183,7 +183,7 @@ def test_booking_currency_is_snapshotted_and_cancellation_is_best_effort(monkeyp
     settings.save(update_fields=["default_currency"])
     Payment.objects.filter(pk=payment.pk).update(stripe_checkout_session_id="cs_cancel")
     monkeypatch.setattr(
-        "apps.payments.reconciliation.stripe_client.expire_checkout_session",
+        "apps.payments.reconciliation_rail.stripe_client.expire_checkout_session",
         lambda *_args: (_ for _ in ()).throw(RuntimeError("stripe down")),
     )
 

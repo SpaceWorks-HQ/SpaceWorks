@@ -186,7 +186,7 @@ def test_checkout_expiry_failure_is_best_effort(monkeypatch):
     row = payment(space, manager, Payment.SubjectType.BOOKING, 40)
     Payment.objects.filter(pk=row.pk).update(stripe_checkout_session_id="cs_live")
     monkeypatch.setattr(
-        "apps.payments.reconciliation.stripe_client.expire_checkout_session",
+        "apps.payments.reconciliation_rail.stripe_client.expire_checkout_session",
         lambda *_args: (_ for _ in ()).throw(RuntimeError("Stripe down")),
     )
 

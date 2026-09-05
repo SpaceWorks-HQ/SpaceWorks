@@ -63,14 +63,14 @@ def test_each_restored_terminal_payment_is_readable_secret_free_and_provider_ine
         raise AssertionError("a restored terminal payment reached a provider")
 
     monkeypatch.setattr(
-        "apps.payments.reconciliation.source_for_payment", provider_called
+        "apps.payments.reconciliation_rail.source_for_payment", provider_called
     )
     monkeypatch.setattr(
-        "apps.payments.reconciliation.stripe_client.expire_checkout_session",
+        "apps.payments.reconciliation_rail.stripe_client.expire_checkout_session",
         provider_called,
     )
     monkeypatch.setattr(
-        "apps.payments.reconciliation.stripe_client.cancel_payment_intent",
+        "apps.payments.reconciliation_rail.stripe_client.cancel_payment_intent",
         provider_called,
     )
     monkeypatch.setattr(

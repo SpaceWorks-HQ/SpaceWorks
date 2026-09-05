@@ -42,7 +42,7 @@ def test_reconciliation_cancels_a_live_native_payment_intent(
         return True
 
     monkeypatch.setattr(
-        "apps.payments.reconciliation.stripe_client.cancel_payment_intent", cancel
+        "apps.payments.reconciliation_rail.stripe_client.cancel_payment_intent", cancel
     )
 
     response = authenticated_client(manager).post(action_url(space, row, action))
@@ -57,7 +57,7 @@ def test_reconciliation_cancels_a_live_native_payment_intent(
 def test_native_intent_cancellation_failure_does_not_block_reconciliation(monkeypatch):
     space, manager, row = native_payment("native-cancel-failure")
     monkeypatch.setattr(
-        "apps.payments.reconciliation.stripe_client.cancel_payment_intent",
+        "apps.payments.reconciliation_rail.stripe_client.cancel_payment_intent",
         lambda *_args: (_ for _ in ()).throw(RuntimeError("Stripe down")),
     )
 

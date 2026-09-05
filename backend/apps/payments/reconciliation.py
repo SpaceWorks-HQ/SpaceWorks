@@ -6,27 +6,22 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
-from django.utils import timezone
-from rest_framework.exceptions import APIException, NotFound, PermissionDenied
+from rest_framework.exceptions import APIException, NotFound
 
 from apps.accounts import rbac
 from apps.audit import services as audit
-from apps.payments import stripe_client
 from apps.payments.models import Payment
-from apps.payments.resolution import source_for_payment
+
+# Re-export barrel: these moved to submodules at the 300-line ceiling, but
+# `from apps.payments.reconciliation import X` must keep resolving for every caller.
+from apps.payments.reconciliation_authority import (  # noqa: F401
+    SUBJECT_ACTIONS,
+    _require_machine_scope,
+    _require_subject_authority,
+)
+from apps.payments.reconciliation_rail import _expire_checkout_best_effort  # noqa: F401
 
 logger = logging.getLogger(__name__)
-
-SUBJECT_ACTIONS = {
-    Payment.SubjectType.MACHINE_SERVICE_REQUEST: rbac.Action.MANAGE_MACHINES,
-    Payment.SubjectType.BOOKING: rbac.Action.MANAGE_BOOKINGS,
-    Payment.SubjectType.EVENT_REGISTRATION: rbac.Action.MANAGE_EVENTS,
-    Payment.SubjectType.MAKERSPACE_MEMBERSHIP: rbac.Action.MANAGE_MAKERSPACE,
-    # Loan charges follow the handover job: whoever may issue settles the deposit,
-    # whoever may take a return settles the late fee.
-    Payment.SubjectType.LOAN_DEPOSIT: rbac.Action.ISSUE_REQUEST,
-    Payment.SubjectType.LOAN_LATE_FEE: rbac.Action.RETURN_REQUEST,
-}
 
 
 class PaymentConflict(APIException):
@@ -166,128 +161,3 @@ def reconcile_payments(*, actor, makerspace_id, payment_ids, target_status):
         )
         audit.record(actor, action, makerspace=payment.makerspace, target=payment)
     return [by_id[payment_id] for payment_id in requested_ids]
-
-
-def _require_subject_authority(actor, payments):
-    for subject_type, action in SUBJECT_ACTIONS.items():
-        ids = [payment.pk for payment in payments if payment.subject_type == subject_type]
-        if not ids:
-            continue
-        visible = set(
-            rbac.scope_by_action(
-                actor,
-                action,
-                Payment.objects.filter(pk__in=ids),
-                field="makerspace_id",
-            ).values_list("pk", flat=True)
-        )
-        if visible != set(ids):
-            raise PermissionDenied("Payment action is not permitted.")
-        if subject_type == Payment.SubjectType.MACHINE_SERVICE_REQUEST:
-            _require_machine_scope(actor, payments)
-    if any(payment.subject_type not in SUBJECT_ACTIONS for payment in payments):
-        raise PermissionDenied("Payment subject type is not supported.")
-
-
-def _require_machine_scope(actor, payments):
-    """MANAGE_MACHINES is scoped per role, so reconciling a charge follows the job.
-
-    Imported locally: `apps.machines` reaches into `apps.payments` for service pricing, so
-    a module-level edge back would close the cycle.
-    """
-    from apps.machines.models import MachineServiceRequest
-    from apps.machines.role_scope import EXEMPT, manage_scopes_for, scoped_service_requests
-
-    machine_payments = [
-        payment
-        for payment in payments
-        if payment.subject_type == Payment.SubjectType.MACHINE_SERVICE_REQUEST
-    ]
-    subject_ids = {payment.subject_id for payment in machine_payments}
-    if not subject_ids:
-        return
-    requests = MachineServiceRequest.objects.filter(pk__in=subject_ids)
-    live_ids = set(requests.values_list("pk", flat=True))
-    covered = set(
-        scoped_service_requests(
-            actor,
-            requests,
-            set(requests.values_list("makerspace_id", flat=True)),
-        ).values_list("pk", flat=True)
-    )
-    if covered != live_ids:
-        raise PermissionDenied("Payment action is not permitted.")
-
-    # A charge whose service request was purged names no machine, type or team, so there is
-    # nothing left for machine scoping to answer. Comparing against `subject_ids` here made
-    # the set unequal for every actor, so a pending charge could never be waived or marked
-    # paid in cash -- stranding it forever, which is the exact failure that preserving the
-    # payment exists to prevent. Failing OPEN to every `MANAGE_MACHINES` holder would
-    # silently widen a scoped role, and scoping is documented as failing closed. So the
-    # orphan is actionable only by the actor machine scoping already exempts -- a space
-    # manager, a superadmin, or the null-`assigned_role` legacy fallback -- all of whom are
-    # unscoped everywhere else in this mechanism.
-    orphaned = subject_ids - live_ids
-    if not orphaned:
-        return
-    orphan_makerspace_ids = {
-        payment.makerspace_id
-        for payment in machine_payments
-        if payment.subject_id in orphaned
-    }
-    scopes = manage_scopes_for(actor, orphan_makerspace_ids)
-    if any(scopes.get(ms_id) is not EXEMPT for ms_id in orphan_makerspace_ids):
-        raise PermissionDenied("Payment action is not permitted.")
-
-
-def _expire_checkout_best_effort(payment):
-    """Close a live online rail when staff settle a charge another way.
-
-    Without this a member can still pay a hosted link or confirm a native PaymentIntent
-    for a charge already marked offline or waived. Best-effort by contract: the
-    reconciliation that called this must succeed regardless of what the vendor says.
-    """
-    if (
-        payment.online_rail == Payment.OnlineRail.NATIVE_PAYMENT_INTENT
-        and payment.stripe_payment_intent_id
-    ):
-        try:
-            source = source_for_payment(payment)
-            if source is None:
-                raise stripe_client.PaymentsUnavailable(
-                    "The payment's provider credentials are no longer configured."
-                )
-            if not stripe_client.cancel_payment_intent(
-                source, payment.stripe_payment_intent_id
-            ):
-                logger.warning(
-                    "payment_intent_cancellation_unconfirmed",
-                    extra={"payment_id": payment.pk},
-                )
-        except Exception:
-            logger.exception(
-                "payment_intent_cancellation_failed",
-                extra={"payment_id": payment.pk},
-            )
-        return
-
-    order_id = payment.external_order_id or payment.stripe_checkout_session_id
-    if not order_id or payment.stripe_checkout_session_expired_at:
-        return
-    try:
-        source = source_for_payment(payment)
-        if source is None:
-            raise stripe_client.PaymentsUnavailable(
-                "The payment's provider credentials are no longer configured."
-            )
-        if payment.provider != payment.Provider.STRIPE:
-            from apps.payments.providers import get_provider
-
-            get_provider(payment.provider).expire_checkout(source, order_id)
-            payment.stripe_checkout_session_expired_at = timezone.now()
-        elif stripe_client.expire_checkout_session(source, order_id):
-            payment.stripe_checkout_session_expired_at = timezone.now()
-    except Exception:
-        logger.exception(
-            "payment_checkout_expiry_failed", extra={"payment_id": payment.pk}
-        )
