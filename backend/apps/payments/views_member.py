@@ -101,9 +101,38 @@ class MemberPaymentHistoryView(APIView):
             MemberPaymentSerializer(
                 rows,
                 many=True,
-                context={"payment_subject_labels": resolve_subject_labels(rows)},
+                context={
+                    "payment_subject_labels": resolve_subject_labels(rows),
+                    **_member_payment_context(rows),
+                },
             ).data
         )
+
+
+def _member_payment_context(rows):
+    """Rail availability and receipts for a page of charges, resolved in bulk.
+
+    Both are per-row questions with per-makerspace answers, so asking them inside the
+    serializer would re-read settings, credentials and the settlement table once per
+    charge. Every row in one member list belongs to one space, so the rail resolves once.
+    """
+    from apps.payments.models import ManualSettlement
+
+    if not rows:
+        return {"online_payment_available": False, "payment_settlements": {}}
+    settled_ids = [
+        row.pk for row in rows if row.status == Payment.Status.PAID_OFFLINE
+    ]
+    receipts = {}
+    if settled_ids:
+        for receipt in ManualSettlement.objects.filter(
+            payment_id__in=settled_ids, amended_by__isnull=True
+        ).order_by("payment_id", "-created_at", "-pk"):
+            receipts.setdefault(receipt.payment_id, receipt)
+    return {
+        "online_payment_available": online_payments_enabled_for(rows[0]),
+        "payment_settlements": receipts,
+    }
 
 
 class MemberPaymentCheckoutView(APIView):

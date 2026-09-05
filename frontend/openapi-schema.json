@@ -7992,6 +7992,26 @@
                 "tags": [
                     "Payments"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PaymentOffline"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PaymentOffline"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PaymentOffline"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "jwtAuth": []
@@ -18964,6 +18984,26 @@
                 "tags": [
                     "Payments"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PaymentOffline"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PaymentOffline"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PaymentOffline"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "jwtAuth": []
@@ -19233,17 +19273,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/PaymentBulkAction"
+                                "$ref": "#/components/schemas/PaymentBulkOffline"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/PaymentBulkAction"
+                                "$ref": "#/components/schemas/PaymentBulkOffline"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/PaymentBulkAction"
+                                "$ref": "#/components/schemas/PaymentBulkOffline"
                             }
                         }
                     },
@@ -53742,6 +53782,40 @@
                     "feature"
                 ]
             },
+            "ManualSettlement": {
+                "type": "object",
+                "description": "The receipt required to mark a charge paid offline.\n\nMethod and received date are REQUIRED: the point of the ledger is that a settled\ncharge can always say how and when the money arrived, and an optional field would\nquietly reproduce the bare boolean it replaces. `reference` stays optional because\ncash genuinely has none.",
+                "properties": {
+                    "method": {
+                        "$ref": "#/components/schemas/ManualSettlementMethodEnum"
+                    },
+                    "reference": {
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 64
+                    },
+                    "received_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "method",
+                    "received_at"
+                ]
+            },
+            "ManualSettlementMethodEnum": {
+                "enum": [
+                    "cash",
+                    "upi",
+                    "bank_transfer",
+                    "card_machine",
+                    "cheque",
+                    "other"
+                ],
+                "type": "string",
+                "description": "* `cash` - Cash\n* `upi` - UPI\n* `bank_transfer` - Bank transfer\n* `card_machine` - Card machine\n* `cheque` - Cheque\n* `other` - Other"
+            },
             "Measurement883Enum": {
                 "enum": [
                     "count",
@@ -54525,8 +54599,32 @@
                     "status": {
                         "$ref": "#/components/schemas/Status66aEnum"
                     },
+                    "amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "pattern": "^[a-z]{3}$",
+                        "maxLength": 3
+                    },
                     "checkout_url": {
                         "type": "string",
+                        "readOnly": true
+                    },
+                    "online_payment_available": {
+                        "type": "boolean",
+                        "description": "Whether offering to pay online is honest for this charge.\n\nResolved once per makerspace by the view and passed in: doing it per row would\nre-read settings and credentials for every charge in the list. Falls back to a\nlive check only when a caller has not supplied it.",
+                        "readOnly": true
+                    },
+                    "settlement": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/MemberSettlement"
+                            }
+                        ],
+                        "nullable": true,
                         "readOnly": true
                     },
                     "created_at": {
@@ -54536,9 +54634,13 @@
                     }
                 },
                 "required": [
+                    "amount",
                     "checkout_url",
                     "created_at",
+                    "currency",
                     "id",
+                    "online_payment_available",
+                    "settlement",
                     "subject_label",
                     "subject_type"
                 ]
@@ -54634,6 +54736,27 @@
                     "started_at",
                     "status",
                     "title"
+                ]
+            },
+            "MemberSettlement": {
+                "type": "object",
+                "description": "The receipt for a charge staff settled in person, shown back to the payer.",
+                "properties": {
+                    "method": {
+                        "type": "string"
+                    },
+                    "received_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "reference": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "method",
+                    "received_at",
+                    "reference"
                 ]
             },
             "MemberSignUp": {
@@ -55167,13 +55290,6 @@
                 ],
                 "type": "string",
                 "description": "* `active` - Active\n* `expired` - Expired\n* `cancelled` - Cancelled"
-            },
-            "MethodEnum": {
-                "enum": [
-                    "PUT"
-                ],
-                "type": "string",
-                "description": "* `PUT` - PUT"
             },
             "MigrationExportCreate": {
                 "type": "object",
@@ -59801,6 +59917,36 @@
                 },
                 "required": [
                     "ids"
+                ]
+            },
+            "PaymentBulkOffline": {
+                "type": "object",
+                "properties": {
+                    "ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    "settlement": {
+                        "$ref": "#/components/schemas/ManualSettlement"
+                    }
+                },
+                "required": [
+                    "ids",
+                    "settlement"
+                ]
+            },
+            "PaymentOffline": {
+                "type": "object",
+                "properties": {
+                    "settlement": {
+                        "$ref": "#/components/schemas/ManualSettlement"
+                    }
+                },
+                "required": [
+                    "settlement"
                 ]
             },
             "PaymentReconciliation": {
@@ -65746,7 +65892,7 @@
                         "format": "uri"
                     },
                     "method": {
-                        "$ref": "#/components/schemas/MethodEnum"
+                        "$ref": "#/components/schemas/SpaceImageUploadMethodEnum"
                     },
                     "fields": {
                         "type": "object",
@@ -65760,6 +65906,13 @@
                 "required": [
                     "url"
                 ]
+            },
+            "SpaceImageUploadMethodEnum": {
+                "enum": [
+                    "PUT"
+                ],
+                "type": "string",
+                "description": "* `PUT` - PUT"
             },
             "StaffMembership": {
                 "type": "object",
@@ -65812,15 +65965,6 @@
                     "status": {
                         "$ref": "#/components/schemas/Status66aEnum"
                     },
-                    "checkout_url": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true
-                    },
                     "amount": {
                         "type": "string",
                         "format": "decimal",
@@ -65830,6 +65974,29 @@
                         "type": "string",
                         "pattern": "^[a-z]{3}$",
                         "maxLength": 3
+                    },
+                    "checkout_url": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "online_payment_available": {
+                        "type": "boolean",
+                        "description": "Whether offering to pay online is honest for this charge.\n\nResolved once per makerspace by the view and passed in: doing it per row would\nre-read settings and credentials for every charge in the list. Falls back to a\nlive check only when a caller has not supplied it.",
+                        "readOnly": true
+                    },
+                    "settlement": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/MemberSettlement"
+                            }
+                        ],
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
                     }
                 },
                 "required": [
@@ -65838,6 +66005,8 @@
                     "created_at",
                     "currency",
                     "id",
+                    "online_payment_available",
+                    "settlement",
                     "subject_label",
                     "subject_type"
                 ]

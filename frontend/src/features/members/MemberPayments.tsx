@@ -17,6 +17,14 @@ export function MemberPaymentRows({
         <li key={payment.id}>
           <span className="font-medium text-ink">{payment.subject_label}</span>
           {" · "}{payment.status}
+          {payment.amount ? (
+            <>
+              {" · "}
+              <span className="font-mono">
+                {payment.amount} {(payment.currency ?? "").toUpperCase()}
+              </span>
+            </>
+          ) : null}
           {payment.checkout_url ? (
             <>
               {" · "}
@@ -24,7 +32,7 @@ export function MemberPaymentRows({
                 Pay now
               </a>
             </>
-          ) : payment.status === "pending" ? (
+          ) : payment.status === "pending" && payment.online_payment_available ? (
             <>
               {" · "}
               <button
@@ -35,6 +43,20 @@ export function MemberPaymentRows({
               >
                 Generate payment link
               </button>
+            </>
+          ) : payment.status === "pending" ? (
+            /* No rail behind this charge: the space takes it in person. Offering a
+               payment link here called an endpoint that could not succeed. */
+            <>{" · "}<span className="text-muted">Pay at the space</span></>
+          ) : null}
+          {payment.settlement ? (
+            <>
+              {" · "}
+              <span className="text-muted">
+                Received {new Date(payment.settlement.received_at).toLocaleDateString()}
+                {" by "}
+                {payment.settlement.method.replace(/_/g, " ")}
+              </span>
             </>
           ) : null}
         </li>

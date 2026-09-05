@@ -3123,6 +3123,14 @@ export type ManagedPolicyMarker = {
   "count": number;
 };
 
+export type ManualSettlement = {
+  "method": ManualSettlementMethodEnum;
+  "reference"?: string;
+  "received_at": string;
+};
+
+export type ManualSettlementMethodEnum = "cash" | "upi" | "bank_transfer" | "card_machine" | "cheque" | "other";
+
 export type Measurement883Enum = "count" | "grams";
 
 export type MemberAccountability = {
@@ -3325,7 +3333,11 @@ export type MemberPayment = {
   "subject_type": SubjectTypeEnum;
   "subject_label": string;
   "status"?: Status66aEnum;
+  "amount": string;
+  "currency": string;
   "checkout_url": string;
+  "online_payment_available": boolean;
+  "settlement": MemberSettlement | null;
   "created_at": string;
 };
 
@@ -3349,6 +3361,12 @@ export type MemberPrintActivity = {
   "queue_position": number | null;
   "queue_approved_ahead": number | null;
   "queue_awaiting_review_ahead": number | null;
+};
+
+export type MemberSettlement = {
+  "method": string;
+  "received_at": string;
+  "reference": string;
 };
 
 export type MembershipCreate = {
@@ -3474,8 +3492,6 @@ export type MemberWaiverResponse = {
   "body"?: string;
   "version"?: string;
 };
-
-export type MethodEnum = "PUT";
 
 export type MigrationExportCreate = {
   "approval_id": string;
@@ -4641,6 +4657,15 @@ export type PatchedToBuyItem = {
 
 export type PaymentBulkAction = {
   "ids": Array<number>;
+};
+
+export type PaymentBulkOffline = {
+  "ids": Array<number>;
+  "settlement": ManualSettlement;
+};
+
+export type PaymentOffline = {
+  "settlement": ManualSettlement;
 };
 
 export type PaymentReconciliation = {
@@ -6126,7 +6151,7 @@ export type SpaceImagePresignResponse = {
 
 export type SpaceImageUpload = {
   "url": string;
-  "method"?: MethodEnum;
+  "method"?: SpaceImageUploadMethodEnum;
   "fields"?: {
   [key: string]: unknown;
 };
@@ -6134,6 +6159,8 @@ export type SpaceImageUpload = {
   [key: string]: unknown;
 };
 };
+
+export type SpaceImageUploadMethodEnum = "PUT";
 
 export type StaffMembership = {
   "id": number;
@@ -6149,10 +6176,12 @@ export type StaffPayment = {
   "subject_type": SubjectTypeEnum;
   "subject_label": string;
   "status"?: Status66aEnum;
-  "checkout_url": string;
-  "created_at": string;
   "amount": string;
   "currency": string;
+  "checkout_url": string;
+  "online_payment_available": boolean;
+  "settlement": MemberSettlement | null;
+  "created_at": string;
 };
 
 export type StaffPaymentSummary = {
