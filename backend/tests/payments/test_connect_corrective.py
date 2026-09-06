@@ -68,7 +68,7 @@ def test_callback_rejects_actor_who_lost_account_authority(
         actor.save(update_fields=["access_status"])
     exchanges = []
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code",
+        "apps.payments_rail.views_connect.exchange_oauth_code",
         lambda code: exchanges.append(code),
     )
 
@@ -107,7 +107,7 @@ def test_callback_rejects_space_that_is_no_longer_authorized(
         makerspace.save(update_fields=["superadmin_access_enabled"])
     exchanges = []
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code",
+        "apps.payments_rail.views_connect.exchange_oauth_code",
         lambda code: exchanges.append(code),
     )
 
@@ -140,7 +140,7 @@ def test_callback_rejects_actor_after_manage_action_is_removed(settings, monkeyp
     membership.save(update_fields=["role", "assigned_role"])
     exchanges = []
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code",
+        "apps.payments_rail.views_connect.exchange_oauth_code",
         lambda code: exchanges.append(code),
     )
 
@@ -160,7 +160,7 @@ def test_callback_rejects_actor_after_membership_is_revoked(settings, monkeypatc
     actor.makerspace_memberships.filter(makerspace=makerspace).update(status="revoked")
     exchanges = []
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code",
+        "apps.payments_rail.views_connect.exchange_oauth_code",
         lambda code: exchanges.append(code),
     )
 
@@ -189,14 +189,14 @@ def test_callback_rechecks_authority_after_remote_exchange(settings, monkeypatch
         )
         return "acct_laterevocation"
 
-    monkeypatch.setattr("apps.payments.views_connect.exchange_oauth_code", exchange)
+    monkeypatch.setattr("apps.payments_rail.views_connect.exchange_oauth_code", exchange)
     revoked = []
     monkeypatch.setattr(
         "apps.payments.connect.deauthorize_account",
         lambda account_id: revoked.append(account_id),
     )
     monkeypatch.setattr(
-        "apps.payments.views_connect.fetch_account",
+        "apps.payments_rail.views_connect.fetch_account",
         lambda account_id: {
             "id": account_id,
             "charges_enabled": True,
@@ -237,12 +237,12 @@ def test_callback_cannot_replace_account_with_pending_payments(settings, monkeyp
         created_by=actor,
     )
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code",
+        "apps.payments_rail.views_connect.exchange_oauth_code",
         lambda _code: "acct_replacement",
     )
     fetched = []
     monkeypatch.setattr(
-        "apps.payments.views_connect.fetch_account",
+        "apps.payments_rail.views_connect.fetch_account",
         lambda account_id: fetched.append(account_id),
     )
     revoked = []
@@ -271,11 +271,11 @@ def test_callback_redirects_verified_domain_to_single_tenant_staff_path(
     makerspace.frontend_domain_status = makerspace.DomainStatus.VERIFIED
     makerspace.save(update_fields=["frontend_domain", "frontend_domain_status"])
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code",
+        "apps.payments_rail.views_connect.exchange_oauth_code",
         lambda _code: "acct_verifieddomain",
     )
     monkeypatch.setattr(
-        "apps.payments.views_connect.fetch_account",
+        "apps.payments_rail.views_connect.fetch_account",
         lambda account_id: {
             "id": account_id,
             "charges_enabled": True,

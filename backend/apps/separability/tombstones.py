@@ -33,10 +33,12 @@ from apps.separability.registry import register_runtime_app, registered_runtime_
 # working tombstone.
 SEPARABLE_APPS = frozenset({
     "procurement", "notifications", "warranty", "maintenance", "presence", "events", "bookings",
-    # A makerspace that takes no money online ships no Stripe surfaces at all. The models
-    # stay (historic charges must remain purgeable and readable), and `payments.enabled`
-    # already lets a tenant switch the feature off -- this removes the code paths too.
-    "payments",
+    # A deployment that takes no money online ships no provider surfaces: checkout,
+    # the native payment sheet, Connect, refunds and every webhook. The LEDGER is not
+    # here and cannot be tombstoned -- money owed, its receipts and its reconciliation
+    # must stay readable and settleable on any deployment, which is exactly what
+    # splitting `payments_rail` out of `payments` bought.
+    "payments_rail",
     # Superadmin-only release plumbing. A deployment updated by its own host tooling has
     # no use for the in-app control surface.
     "updates",
@@ -65,6 +67,18 @@ def unavailable_apps():
     return sorted(app for app in SEPARABLE_APPS if not runtime_active(app))
 
 
+#: Labels that have been renamed, mapped to what they mean now. A deployment's env is
+#: written once and lives for years, so an existing `TOMBSTONED_APPS=payments` must keep
+#: working rather than failing startup with separability.E007 on upgrade.
+#:
+#: `payments` -> `payments_rail` also carries the intent across faithfully. It always
+#: meant "this deployment ships no online payment surfaces", and that is now exactly what
+#: the rail label removes -- the difference is that the LEDGER stays, so such a
+#: deployment gains readable receipts and offline reconciliation it should never have
+#: been without.
+RENAMED_LABELS = {"payments": "payments_rail"}
+
+
 def tombstoned_app_labels():
     """Parse the deployment's tombstone list. The one parser; everything else reads it.
 
@@ -74,7 +88,8 @@ def tombstoned_app_labels():
     single spelling of the parse and the two can never disagree.
     """
     raw = os.environ.get("TOMBSTONED_APPS", "")
-    return frozenset(label.strip() for label in raw.split(",") if label.strip())
+    labels = {label.strip() for label in raw.split(",") if label.strip()}
+    return frozenset(RENAMED_LABELS.get(label, label) for label in labels)
 
 
 def app_is_tombstoned(app_label):

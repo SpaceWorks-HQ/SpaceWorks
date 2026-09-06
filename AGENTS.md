@@ -133,6 +133,13 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   stamped `provider=unclaimed` and claimed exactly once by the first checkout that reaches a provider
   (DB-enforced). Marking one paid offline requires a `ManualSettlement` receipt — method, reference,
   received date — written in the same transaction and append-only, with corrections as `amends` rows.
+- **The payment LEDGER is permanently core; only the RAIL is separable.** `apps.payments`
+  (Payment, ManualSettlement, reconciliation, member history, receipts, reports) can never be
+  tombstoned — a deployment that cannot read or settle money it is holding has lost data.
+  `apps.payments_rail` owns the removable half: checkout, the native payment sheet, Connect,
+  refunds, credential settings and every webhook. The `payments` MODULE key belongs to the rail,
+  so tombstoning the rail drops the key. `TOMBSTONED_APPS=payments` still works and is
+  translated to `payments_rail` (`separability.tombstones.RENAMED_LABELS`).
 - Evidence photo **rows** and QR scan records are **immutable**; audit logs are **append-only**. Evidence retention may delete every final and staging object version only after the configured window, but it does not update or delete the retained `EvidencePhoto` row.
 - Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos,
   requester history, or hidden counts. Public visibility is governed per-item by `is_public`,

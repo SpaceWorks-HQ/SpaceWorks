@@ -26,9 +26,12 @@ import pytest
 from apps.separability.tombstones import tombstoned_app_labels
 
 # The apps these tests expect to be tombstoned. Grows by one per phase of plan B6.
+# Compared against `tombstoned_app_labels()`, which TRANSLATES renamed labels -- so the
+# env may still be written `payments` (as every existing deployment and the docs have it)
+# while the profile resolves to `payments_rail`.
 TOMBSTONE_PROFILE_APPS = frozenset({
     "procurement", "notifications", "warranty", "maintenance", "presence", "events", "bookings",
-    "payments", "tenant_migration", "updates",
+    "payments_rail", "tenant_migration", "updates",
 })
 
 _PROFILE_ACTIVE = tombstoned_app_labels() == TOMBSTONE_PROFILE_APPS
@@ -45,7 +48,8 @@ def pytest_configure(config):
         return
     raise pytest.UsageError(
         "tests/tombstone must run under the tombstone profile. Expected "
-        f"TOMBSTONED_APPS={','.join(sorted(TOMBSTONE_PROFILE_APPS))}, got "
+        f"TOMBSTONED_APPS={','.join(sorted(TOMBSTONE_PROFILE_APPS))} "
+        "(`payments` is accepted for `payments_rail`), got "
         f"{','.join(sorted(tombstoned_app_labels())) or '(unset)'}. Set the variable "
         "in the environment before pytest starts -- it is read while Django settings "
         "are imported, so an override_settings is too late."

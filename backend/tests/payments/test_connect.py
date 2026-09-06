@@ -148,7 +148,7 @@ def test_connect_callback_consumes_state_stores_account_and_rejects_replay(
     )
     raw_state = parse_qs(urlparse(started.data["authorize_url"]).query)["state"][0]
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code",
+        "apps.payments_rail.views_connect.exchange_oauth_code",
         lambda code: "acct_callback",
     )
     fetches = []
@@ -168,7 +168,7 @@ def test_connect_callback_consumes_state_stores_account_and_rejects_replay(
         }
 
     monkeypatch.setattr(
-        "apps.payments.views_connect.fetch_account",
+        "apps.payments_rail.views_connect.fetch_account",
         fetch_mapped_account,
     )
 
@@ -253,10 +253,10 @@ def test_connect_callback_replacement_revokes_previous_account(settings, monkeyp
     )
     raw_state = parse_qs(urlparse(started.data["authorize_url"]).query)["state"][0]
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code", lambda _code: "acct_new"
+        "apps.payments_rail.views_connect.exchange_oauth_code", lambda _code: "acct_new"
     )
     monkeypatch.setattr(
-        "apps.payments.views_connect.fetch_account",
+        "apps.payments_rail.views_connect.fetch_account",
         lambda account_id: {
             "id": account_id,
             "charges_enabled": True,
@@ -266,7 +266,7 @@ def test_connect_callback_replacement_revokes_previous_account(settings, monkeyp
     )
     revoked = []
     monkeypatch.setattr(
-        "apps.payments.views_connect.deauthorize_account", revoked.append
+        "apps.payments_rail.views_connect.deauthorize_account", revoked.append
     )
 
     response = APIClient().get(
@@ -315,11 +315,11 @@ def test_older_oauth_callback_cannot_overwrite_newer_onboarding(settings, monkey
     second_state = parse_qs(urlparse(second.data["authorize_url"]).query)["state"][0]
     exchanged = []
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code",
+        "apps.payments_rail.views_connect.exchange_oauth_code",
         lambda code: exchanged.append(code) or f"acct_{code}",
     )
     monkeypatch.setattr(
-        "apps.payments.views_connect.fetch_account",
+        "apps.payments_rail.views_connect.fetch_account",
         lambda account_id: {
             "id": account_id,
             "charges_enabled": True,
@@ -648,7 +648,7 @@ def test_connect_webhook_verifies_platform_secret_and_routes_snapshot(
         },
     }
     construct = Mock(return_value=event)
-    monkeypatch.setattr("apps.payments.views_connect.construct_event", construct)
+    monkeypatch.setattr("apps.payments_rail.views_connect.construct_event", construct)
 
     response = APIClient().generic(
         "POST",
@@ -714,7 +714,7 @@ def test_connect_expired_webhook_confirms_checkout_session_is_closed(
         "data": {"object": {"id": "cs_connect_expired"}},
     }
     monkeypatch.setattr(
-        "apps.payments.views_connect.construct_event", Mock(return_value=event)
+        "apps.payments_rail.views_connect.construct_event", Mock(return_value=event)
     )
 
     response = APIClient().generic(

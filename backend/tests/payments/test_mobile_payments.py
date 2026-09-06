@@ -163,7 +163,7 @@ def test_mobile_endpoint_sanitizes_provider_failure(monkeypatch):
     payment = configured_payment(makerspace, member)
     client = device_client(member, makerspace)
     monkeypatch.setattr(
-        "apps.payments.views_member_mobile.create_mobile_intent",
+        "apps.payments_rail.views_member_mobile.create_mobile_intent",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             RuntimeError("provider secret diagnostic")
         ),

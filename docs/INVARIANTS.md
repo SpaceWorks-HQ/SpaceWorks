@@ -547,6 +547,16 @@ and catastrophic for an existing one; migration `makerspaces/0050` is the one-ti
 reverse) that keeps every pre-existing space sending mail across the upgrade. Any future default-on module
 key needs the same treatment.
 
+**The payment ledger cannot be tombstoned; the rail can (2026-09-06).** `apps.payments` holds
+the models and every ledger surface and is NOT in `SEPARABLE_APPS`; `apps.payments_rail` holds
+checkout, the native intent, Connect, refunds, credential settings and the webhooks, and is what
+a tombstone removes. Before the split, `TOMBSTONED_APPS=payments` withdrew the reconciliation
+console and the member's own payment history — which, once debts could be recorded with no
+gateway, meant such a deployment accrued money owed that nobody could read or settle. Existing
+deployments keep writing `payments` in their env: `RENAMED_LABELS` translates it, so upgrading
+does not fail `separability.E007`. The machine-service mark-offline/waive routes became
+unconditional for the same reason; only the credential routes moved to the rail gate.
+
 **Charge tracking is separate from the online rail (2026-09-06).** `charge_tracking_enabled` decides
 whether a debt is RECORDED; `online_payments_enabled` decides only whether a Stripe/Razorpay rail may be
 raised for it, and keeps all four of its clauses. The `charges.*` family carries tracking and is

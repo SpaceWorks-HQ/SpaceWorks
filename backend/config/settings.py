@@ -150,6 +150,8 @@ INSTALLED_APPS = [
     "apps.makerspaces",
     "apps.organizations",
     "apps.payments",
+    # The provider rail's surfaces, separable from the ledger above.
+    "apps.payments_rail",
     "apps.presence",
     "apps.encryption",
     "apps.apiclients",

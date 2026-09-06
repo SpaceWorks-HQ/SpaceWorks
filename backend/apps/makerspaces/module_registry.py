@@ -199,7 +199,9 @@ MODULES = (
     ModuleDefinition(
         "payments", "Payments",
         "Online card payment (Stripe/Razorpay). Money owed is tracked without it.",
-        "payments", GUARD, group=GROUP_PAYMENTS,
+        # Owned by the RAIL app: tombstoning the rail must drop this key, while the
+        # ledger in `apps.payments` stays reachable either way.
+        "payments_rail", GUARD, group=GROUP_PAYMENTS,
     ),
     # Member-facing identity only. Staff authentication is core RBAC and is NEVER gated:
     # a space that could switch off its own staff logins could not be administered, the

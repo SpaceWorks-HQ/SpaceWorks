@@ -69,7 +69,7 @@ HTTP_ANONYMOUS_EXEMPTIONS = {
     "apps.accounts.views_session.LogoutView.post": "Global user session state.",
     "apps.accounts.views_social.SocialNonceView.post": "Global social-login nonce state.",
     "apps.accounts.views_social.SocialLoginView.post": "Global social identity and session state.",
-    "apps.payments.views_connect.StripeConnectWebhookView.post": "Platform Connect routing state.",
+    "apps.payments_rail.views_connect.StripeConnectWebhookView.post": "Platform Connect routing state.",
     "apps.integrations.views.TelegramWebhookView.post": (
         "Writes nothing at all: the callback route was removed when chat stopped being an "
         "action surface, and the view only acknowledges so an already-registered webhook "

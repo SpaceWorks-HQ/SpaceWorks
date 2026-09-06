@@ -224,6 +224,6 @@ class PlatformStripeConnectSettingsAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
 # `runtime_active` because django.contrib.admin autodiscovers every admin.py *before* the
 # owning app's ready() has registered anything -- the manifest is not populated yet.
 # The classes stay defined either way so the module still imports.
-if not app_is_tombstoned("payments"):
+if not app_is_tombstoned("payments_rail"):
     admin.site.register(MakerspacePaymentSettings, MakerspacePaymentSettingsAdmin)
     admin.site.register(PlatformStripeConnectSettings, PlatformStripeConnectSettingsAdmin)
