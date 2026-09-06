@@ -138,8 +138,10 @@ def inspect_cross_tenant_source(makerspace_id, *, using="default"):
         # owed could be recorded without a gateway -- which made a dump nearly
         # impossible for any space that tracks debts, and tracking is on by default now.
         # Two things make it safe to carry: the preflight refuses any pending row with a
-        # LIVE rail, and projection strips such a row back to `unclaimed` so the target
-        # cannot resume the source's provider. Drift between capture and cutover is
+        # LIVE rail, and projection strips every provider HANDLE off the row -- session,
+        # intent, order id, checkout URL, connected account, rail -- so the target cannot
+        # resume the source's. The `provider` label itself travels, so a charge raised
+        # under one vendor stays attributed to it. Drift between capture and cutover is
         # caught by the capture's money fingerprint.
         if row["status"] == "pending":
             continue

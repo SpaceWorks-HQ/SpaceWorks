@@ -18,6 +18,8 @@ one member's read mark speak for everyone. A derived feed cannot leak, needs no
 migration, and says only things that are true of the member reading it.
 """
 
+from datetime import timedelta
+
 from django.db.models import Sum
 from django.utils import timezone
 
@@ -90,6 +92,10 @@ def membership_dues(membership):
 
     Read through the payments app rather than recomputed here: the ledger is the single
     authority on what is owed, and a second sum would eventually disagree with it.
+
+    `outstanding_by_currency` is `None` when the ledger could not be read at all, which
+    is deliberately distinct from `{}` for "nothing outstanding": a member must never be
+    told they owe nothing on the strength of a query that failed.
     """
     makerspace = membership.makerspace
     totals = {}
@@ -112,8 +118,11 @@ def membership_dues(membership):
         totals = {row["currency"]: str(row["total"]) for row in rows}
     except Exception:
         # A payments failure must not blank a member's loans and bookings: money is one
-        # section of this dashboard, not a precondition for rendering it.
-        totals = {}
+        # section of this dashboard, not a precondition for rendering it. But it must not
+        # read as "you owe nothing" either -- that is a false statement about someone's
+        # money, and the reader cannot tell it from a real zero. `None` means "could not
+        # be read" and renders as unavailable; `{}` means "nothing is outstanding".
+        totals = None
     return {
         "dues_amount": str(makerspace.membership_dues_amount or 0),
         "outstanding_by_currency": totals,
@@ -164,7 +173,9 @@ def notices(membership, activity):
         loan
         for loan in activity.get("active_hardware_loans") or []
         if loan.get("due_at") and not loan.get("overdue")
-        and (loan["due_at"] - now).days <= 1
+        # The whole timedelta, not `.days`: that floors, so everything under 48 hours
+        # reported as 1 and a loan due in two days was announced as due within one.
+        and loan["due_at"] - now <= timedelta(days=1)
     ]
     if due_soon:
         feed.append({

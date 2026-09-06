@@ -28,6 +28,9 @@ export function MemberNotices({ notices }: { notices: MemberActivity["notices"] 
 
 export function MemberDues({ dues }: { dues: MemberActivity["membership_dues"] }) {
   if (!dues) return null;
+  // `null` is "we could not read the ledger", not "nothing is owed". Kept apart all the
+  // way to the screen: collapsing them here would quietly tell a member they are clear.
+  const unavailable = dues.outstanding_by_currency === null;
   const outstanding = Object.entries(dues.outstanding_by_currency ?? {});
   return (
     <section className="desk-panel p-5">
@@ -35,7 +38,11 @@ export function MemberDues({ dues }: { dues: MemberActivity["membership_dues"] }
       <p className="mt-2 text-sm text-muted">
         Dues <span className="font-mono text-ink">{dues.dues_amount}</span>
       </p>
-      {outstanding.length ? (
+      {unavailable ? (
+        <p className="mt-1 text-sm text-muted">
+          Outstanding balance is unavailable right now.
+        </p>
+      ) : outstanding.length ? (
         <p className="mt-1 text-sm text-muted">
           Outstanding{" "}
           {outstanding.map(([currency, amount]) => (

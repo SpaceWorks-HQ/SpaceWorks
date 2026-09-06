@@ -121,3 +121,47 @@ def test_terminal_history_alone_does_not_look_like_drift():
     capture = _Capture(space.pk, money_fingerprint(space.pk))
 
     assert assert_money_unchanged(capture) == capture.money_fingerprint_sha256
+
+
+def test_a_rail_opened_after_the_freeze_refuses_publication():
+    """The hole the first version of the digest left open.
+
+    A pending row can already carry a provider while holding no live handle -- a checkout
+    whose creation failed, or one that expired. `status`, `amount` and `provider` all sit
+    still when the reopened source then mints a session for it, so a digest over those
+    alone still matched and publication shipped an artifact whose handles were stripped
+    while the source stayed payable. Both deployments could then collect the same debt,
+    which is precisely what the preflight refuses before the freeze.
+    """
+    space = _space("money-rail-after")
+    actor = _member("money-rail-after-actor", space)
+    payment = _pending(space, actor, 7)
+    Payment.objects.filter(pk=payment.pk).update(provider=Payment.Provider.STRIPE)
+    capture = _Capture(space.pk, money_fingerprint(space.pk))
+
+    # No status, amount or provider change -- only a rail appearing.
+    Payment.objects.filter(pk=payment.pk).update(
+        online_rail=Payment.OnlineRail.CHECKOUT,
+        stripe_checkout_session_id="cs_test_after_freeze",
+        stripe_checkout_url="https://checkout.stripe.test/cs_test_after_freeze",
+    )
+
+    with pytest.raises(MoneyDriftRefused):
+        assert_money_unchanged(capture)
+
+
+def test_a_native_intent_opened_after_the_freeze_refuses_publication():
+    """The native payment sheet is a live rail exactly like a hosted page."""
+    space = _space("money-intent-after")
+    actor = _member("money-intent-after-actor", space)
+    payment = _pending(space, actor, 8)
+    Payment.objects.filter(pk=payment.pk).update(provider=Payment.Provider.STRIPE)
+    capture = _Capture(space.pk, money_fingerprint(space.pk))
+
+    Payment.objects.filter(pk=payment.pk).update(
+        online_rail=Payment.OnlineRail.NATIVE_PAYMENT_INTENT,
+        stripe_payment_intent_id="pi_test_after_freeze",
+    )
+
+    with pytest.raises(MoneyDriftRefused):
+        assert_money_unchanged(capture)

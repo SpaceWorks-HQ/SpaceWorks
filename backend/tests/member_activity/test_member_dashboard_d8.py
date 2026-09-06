@@ -171,3 +171,60 @@ def test_the_dashboard_does_not_exist_without_the_membership_module():
     response = _client(user).get(_url(space))
 
     assert response.status_code == 400
+
+
+def _active_loan(space, user, label, *, due_in):
+    request = HardwareRequest.objects.create(
+        makerspace=space, requester=user, requester_username=user.username,
+    )
+    return PublicToolLoan.objects.create(
+        makerspace=space, request=request, requester=user, target_type="product",
+        target_id=1, target_label=label, due_at=timezone.now() + due_in,
+    )
+
+
+def test_due_soon_means_within_a_day_not_within_two():
+    """`timedelta.days` floors, so 47 hours read as 1 and got announced as due within a
+    day. The notice is a deadline claim; it has to be measured, not rounded down."""
+    space = _space("dash-due-soon")
+    user = _member(space, "dash-due-soon-member")
+    _active_loan(space, user, "Due in 47 hours", due_in=timedelta(hours=47))
+
+    payload = _client(user).get(_url(space)).data
+
+    assert [n["event"] for n in payload["notices"]] == []
+
+
+def test_a_loan_due_inside_a_day_still_raises_the_notice():
+    space = _space("dash-due-inside")
+    user = _member(space, "dash-due-inside-member")
+    _active_loan(space, user, "Due in 5 hours", due_in=timedelta(hours=5))
+
+    payload = _client(user).get(_url(space)).data
+
+    assert "loan_due_soon" in [n["event"] for n in payload["notices"]]
+
+
+def test_an_unreadable_ledger_is_not_reported_as_nothing_outstanding(monkeypatch):
+    """A failed query must never render as "Nothing outstanding".
+
+    `None` says the amount could not be read; `{}` says the member is clear. Collapsing
+    the two tells someone they owe nothing on the strength of a database failure.
+    """
+    from apps.makerspaces import member_dashboard_service
+
+    space = _space("dash-dues-unreadable")
+    user = _member(space, "dash-dues-unreadable-member")
+
+    def _explode(*args, **kwargs):
+        raise RuntimeError("ledger unavailable")
+
+    # Stands in for any failure reaching the ledger -- a transient database error, or a
+    # deployment mid-migration -- without needing to break the database itself.
+    monkeypatch.setattr(member_dashboard_service, "Sum", _explode)
+
+    payload = _client(user).get(_url(space)).data
+
+    assert payload["membership_dues"]["outstanding_by_currency"] is None
+    # And no debt notice invented from a figure nobody could read.
+    assert "payment_due" not in [n["event"] for n in payload["notices"]]

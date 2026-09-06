@@ -83,8 +83,11 @@ class MemberRequestHistorySerializer(serializers.Serializer):
 class MemberDuesSerializer(serializers.Serializer):
     dues_amount = serializers.CharField()
     # Amounts are strings keyed by currency code, never one summed number: outstanding
-    # money cannot be added across currencies.
-    outstanding_by_currency = serializers.DictField(child=serializers.CharField())
+    # money cannot be added across currencies. Null when the ledger could not be read --
+    # distinct from an empty map, which means nothing is outstanding.
+    outstanding_by_currency = serializers.DictField(
+        child=serializers.CharField(), allow_null=True
+    )
 
 
 class MemberNoticeSerializer(serializers.Serializer):

@@ -36,11 +36,33 @@ def money_fingerprint(makerspace_id, *, using="default"):
     Payment = apps.get_model("payments.Payment")
     ManualSettlement = apps.get_model("payments.ManualSettlement")
 
+    # The live-rail columns are here for a case that is easy to miss. A pending row can
+    # already carry a provider while holding no handle -- a checkout whose creation
+    # failed, or one that expired -- and the reopened source can then mint a fresh
+    # session or intent for it. `status`, `amount` and `provider` all sit still through
+    # that, so on their own the digest matched and publication handed out an artifact
+    # whose handles were stripped while the source stayed payable: the very double
+    # collection `preflight._check_live_checkouts` refuses before the freeze. Same field
+    # set as that check, plus the expiry that makes a handle inert and the rail label,
+    # so a rail appearing after capture is drift like any other.
     payments = list(
         Payment._base_manager.using(using)
         .filter(makerspace_id=makerspace_id, status="pending")
         .order_by("pk")
-        .values("id", "status", "amount", "currency", "provider")
+        .values(
+            "id",
+            "status",
+            "amount",
+            "currency",
+            "provider",
+            "online_rail",
+            "external_order_id",
+            "checkout_url",
+            "stripe_checkout_session_id",
+            "stripe_checkout_url",
+            "stripe_checkout_session_expired_at",
+            "stripe_payment_intent_id",
+        )
     )
     # A receipt appearing (or being amended) against a captured pending row means that
     # row was settled at the source after capture -- exactly the drift this catches.
@@ -70,8 +92,8 @@ class MoneyDriftRefused(Exception):
         self.actual = actual
         super().__init__(
             "Source money state changed after capture: a pending charge was settled, "
-            "raised or amended. The artifact was derived from the frozen image and "
-            "cannot be merged forward -- recapture the tenant."
+            "raised, amended, or given a live payment rail. The artifact was derived "
+            "from the frozen image and cannot be merged forward -- recapture the tenant."
         )
 
 

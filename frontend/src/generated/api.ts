@@ -3310,7 +3310,7 @@ export type MemberDues = {
   "dues_amount": string;
   "outstanding_by_currency": {
   [key: string]: string;
-};
+} | null;
 };
 
 export type MemberEventRegistrationActivity = {

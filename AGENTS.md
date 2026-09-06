@@ -184,12 +184,12 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   `import *`) so `from app.views import X` and `views.X` keep resolving; for `admin.py` the barrel must
   still import the admin submodules so the `@admin.register` side effects fire. **The ceiling is enforced
   on what you touch, and it is nearly met repo-wide: five `backend/apps/` files (non-migration, non-test)
-  exceed 300 lines** — `machines/access.py` (367), `makerspaces/module_registry.py` (318),
+  exceed 300 lines** — `machines/access.py` (367), `makerspaces/module_registry.py` (322),
   `inventory/middleware.py` (308), `tenant_migration/tenant_dump_authority.py` (305),
   `tenant_migration/source_gate_guards.py` (301) — plus `config/settings.py` (1146, the accepted
   exception — Django settings are conventionally a single file). `backend/tests/` is not held to the
   ceiling. Frontend: **zero** non-test, non-generated files exceed it — `8be90478` split all eleven,
-  so a frontend file over the ceiling is now new debt, not inherited. Measured 2026-09-04; every earlier
+  so a frontend file over the ceiling is now new debt, not inherited. Measured 2026-09-06; every earlier
   version of this line (37 files 2026-08-20, eleven frontend files 2026-09-03) was already stale by the
   time it was read.
   **Split an over-ceiling file in its own commit before adding to it**, and when splitting one that other

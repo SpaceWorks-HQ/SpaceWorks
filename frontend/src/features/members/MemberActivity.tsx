@@ -32,7 +32,10 @@ export type MemberRequestHistoryRow = {
   returned_quantity: number; damaged_quantity: number; missing_quantity: number;
 };
 export type MemberDuesSummary = {
-  dues_amount: string; outstanding_by_currency: Record<string, string>;
+  // `null` means the ledger could not be read, which is NOT the same as an empty map
+  // for "nothing outstanding" -- rendering the two alike would tell a member they owe
+  // nothing on the strength of a failed query.
+  dues_amount: string; outstanding_by_currency: Record<string, string> | null;
 };
 
 export type MemberActivity = {
