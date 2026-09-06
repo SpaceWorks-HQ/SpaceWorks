@@ -33,11 +33,15 @@ def test_space_manager_gets_dashboard_with_all_count_keys():
     assert response.status_code == 200
     assert set(response.data) == set(views_dashboard.DashboardSerializer().fields)
     assert response.data["scope_mode"] == "full"
+    # Every count is an integer. `outstanding_by_currency` is deliberately not one: it
+    # is a map of currency -> amount string, because outstanding money cannot be summed
+    # across currencies into a single number.
     assert all(
         isinstance(value, int)
         for key, value in response.data.items()
-        if key != "scope_mode"
+        if key not in {"scope_mode", "outstanding_by_currency"}
     )
+    assert isinstance(response.data["outstanding_by_currency"], dict)
 
 
 def test_pending_payments_are_manager_only_and_ignore_dates_or_modules():
