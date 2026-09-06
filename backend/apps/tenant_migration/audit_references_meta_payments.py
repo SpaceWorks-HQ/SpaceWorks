@@ -17,7 +17,22 @@ def _edges(model, pairs):
     return {edge: AuditReference(R, model) for edge in pairs}
 
 
+#: Settlement receipts are audited too, and their primary keys are semantic references
+#: like any other: left undeclared they would survive a Lane D import as stale SOURCE
+#: ids inside immutable audit metadata, pointing at whatever row happened to take that
+#: number on the target.
+_SETTLEMENT_ACTIONS = ("payment.paid_offline", "payment.settlement_amended")
+
+
 PAYMENT_AUDIT_EDGES = {
+    **_edges(
+        "payments.ManualSettlement",
+        [(action, "settlement_id") for action in _SETTLEMENT_ACTIONS],
+    ),
+    **_edges(
+        "payments.ManualSettlement",
+        [("payment.settlement_amended", "amends_id")],
+    ),
     **_edges(
         "payments.Payment",
         [(action, "payment_id") for action in (*_REFUND_ACTIONS, *_LOAN_ACTIONS)],
