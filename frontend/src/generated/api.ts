@@ -3154,6 +3154,10 @@ export type MemberActivity = {
   "recent_presence_sessions": Array<MemberPresenceActivity>;
   "currently_checked_in": boolean;
   "accountability": MemberAccountability;
+  "loan_history"?: Array<MemberLoanHistory>;
+  "request_history"?: Array<MemberRequestHistory>;
+  "membership_dues"?: MemberDues;
+  "notices"?: Array<MemberNotice>;
 };
 
 export type MemberActivityReport = {
@@ -3302,6 +3306,13 @@ export type MemberClaimCodeIssueResponse = {
   "qr_svg": string;
 };
 
+export type MemberDues = {
+  "dues_amount": string;
+  "outstanding_by_currency": {
+  [key: string]: string;
+};
+};
+
 export type MemberEventRegistrationActivity = {
   "registration_id": number;
   "checkin_token": string | null;
@@ -3324,12 +3335,27 @@ export type MemberLoanActivity = {
   "overdue": boolean;
 };
 
+export type MemberLoanHistory = {
+  "label": string;
+  "checked_out_at": string;
+  "returned_at": string | null;
+  "due_at": string | null;
+  "returned_late": boolean;
+};
+
 export type MemberMachineServiceActivity = {
   "machine_type"?: string;
   "title": string;
   "status": string;
   "created_at": string;
   "queue_position": number | null;
+};
+
+export type MemberNotice = {
+  "level": string;
+  "event": string;
+  "title": string;
+  "body": string;
 };
 
 export type MemberPayment = {
@@ -3365,6 +3391,15 @@ export type MemberPrintActivity = {
   "queue_position": number | null;
   "queue_approved_ahead": number | null;
   "queue_awaiting_review_ahead": number | null;
+};
+
+export type MemberRequestHistory = {
+  "status": string;
+  "created_at": string;
+  "item_count": number;
+  "returned_quantity": number;
+  "damaged_quantity": number;
+  "missing_quantity": number;
 };
 
 export type MemberSettlement = {

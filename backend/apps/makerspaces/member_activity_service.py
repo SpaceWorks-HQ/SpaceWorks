@@ -8,6 +8,7 @@ from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
 from apps.makerspaces.platform import module_enabled
 from apps.makerspaces.servability import servable_queryset
 from apps.makerspaces.waiver_state import current_acceptance
+from apps.makerspaces import member_dashboard_service as dashboard
 from apps.presence.models import PresenceSession
 from apps.separability.registry import runtime_active
 
@@ -71,6 +72,13 @@ def member_activity(membership):
     # "are the tables there?" when this asks "are the surfaces live?".
     if module_enabled(makerspace, "machine_service") and runtime_active("machines"):
         payload["machine_service_requests"] = _machine_service_requests(makerspace.id, member)
+    # The dashboard half (D8): history, money and notices. Only reachable through the
+    # `membership`-gated endpoint, so a space without memberships is unchanged. Notices
+    # are derived LAST because they read the sections above.
+    payload["loan_history"] = dashboard.loan_history(makerspace.id, member)
+    payload["request_history"] = dashboard.request_history(makerspace.id, member)
+    payload["membership_dues"] = dashboard.membership_dues(membership)
+    payload["notices"] = dashboard.notices(membership, payload)
     return payload
 
 

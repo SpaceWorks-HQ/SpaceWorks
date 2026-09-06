@@ -547,6 +547,20 @@ and catastrophic for an existing one; migration `makerspaces/0050` is the one-ti
 reverse) that keeps every pre-existing space sending mail across the upgrade. Any future default-on module
 key needs the same treatment.
 
+**The member dashboard is membership-module-gated; money is not (2026-09-06, D8).**
+`member_activity_views` already calls `require_module(makerspace, "membership")`, so the
+dashboard simply does not exist for a space that runs no memberships — and every frontend query
+feeding it must include `membershipModuleOn` in its `enabled`, or it calls a gated endpoint and
+errors. `member_dashboard_service` adds loan history, request history (previously only ACTIVE
+self-checkout loans were visible, so a member could not see a request they submitted), dues, and
+notices. Notices are DERIVED from member-owned rows: `notifications.Notification` is
+makerspace-wide, has no recipient column and shares one `read_at`, so serving it would leak staff
+alerts and let one member's read mark speak for everyone. Payment/receipt visibility sits OUTSIDE
+the gate — `member_may_see_own_charges` admits an account with no membership that owns a charge
+here, because a loan deposit is raised against a BORROWER who needs an active account rather than
+a membership. It preserves every account-status clause and still refuses a revoked member, which
+is a deliberate pre-existing contract.
+
 **A pending payment no longer refuses a tenant dump (2026-09-06, owner decision D5).** Both
 refusals are gone — `tenant_dump_cross_tenant` and `_source_row_allowed`. What makes carrying an
 unsettled debt safe: (1) `preflight._check_live_checkouts` refuses any pending row with a live

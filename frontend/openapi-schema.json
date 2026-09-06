@@ -54000,6 +54000,27 @@
                     },
                     "accountability": {
                         "$ref": "#/components/schemas/MemberAccountability"
+                    },
+                    "loan_history": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MemberLoanHistory"
+                        }
+                    },
+                    "request_history": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MemberRequestHistory"
+                        }
+                    },
+                    "membership_dues": {
+                        "$ref": "#/components/schemas/MemberDues"
+                    },
+                    "notices": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MemberNotice"
+                        }
                     }
                 },
                 "required": [
@@ -54584,6 +54605,24 @@
                     "status"
                 ]
             },
+            "MemberDues": {
+                "type": "object",
+                "properties": {
+                    "dues_amount": {
+                        "type": "string"
+                    },
+                    "outstanding_by_currency": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "dues_amount",
+                    "outstanding_by_currency"
+                ]
+            },
             "MemberEventRegistrationActivity": {
                 "type": "object",
                 "properties": {
@@ -54665,6 +54704,38 @@
                     "overdue"
                 ]
             },
+            "MemberLoanHistory": {
+                "type": "object",
+                "properties": {
+                    "label": {
+                        "type": "string"
+                    },
+                    "checked_out_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "returned_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "due_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "returned_late": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "checked_out_at",
+                    "due_at",
+                    "label",
+                    "returned_at",
+                    "returned_late"
+                ]
+            },
             "MemberMachineServiceActivity": {
                 "type": "object",
                 "properties": {
@@ -54690,6 +54761,30 @@
                     "created_at",
                     "queue_position",
                     "status",
+                    "title"
+                ]
+            },
+            "MemberNotice": {
+                "type": "object",
+                "description": "A fact about the reader, derived from their own rows.\n\nNot `notifications.Notification`: that table is makerspace-wide, has no recipient\nand shares one `read_at`, so serving it would leak staff alerts.",
+                "properties": {
+                    "level": {
+                        "type": "string"
+                    },
+                    "event": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "body": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "body",
+                    "event",
+                    "level",
                     "title"
                 ]
             },
@@ -54847,6 +54942,38 @@
                     "started_at",
                     "status",
                     "title"
+                ]
+            },
+            "MemberRequestHistory": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "item_count": {
+                        "type": "integer"
+                    },
+                    "returned_quantity": {
+                        "type": "integer"
+                    },
+                    "damaged_quantity": {
+                        "type": "integer"
+                    },
+                    "missing_quantity": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "damaged_quantity",
+                    "item_count",
+                    "missing_quantity",
+                    "returned_quantity",
+                    "status"
                 ]
             },
             "MemberSettlement": {

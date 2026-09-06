@@ -22,6 +22,19 @@ type Registration = {
 };
 type Presence = { started_at: string; expires_at: string; active: boolean };
 
+export type MemberNotice = { level: string; event: string; title: string; body: string };
+export type MemberLoanHistoryRow = {
+  label: string; checked_out_at: string; returned_at: string | null;
+  due_at: string | null; returned_late: boolean;
+};
+export type MemberRequestHistoryRow = {
+  status: string; created_at: string; item_count: number;
+  returned_quantity: number; damaged_quantity: number; missing_quantity: number;
+};
+export type MemberDuesSummary = {
+  dues_amount: string; outstanding_by_currency: Record<string, string>;
+};
+
 export type MemberActivity = {
   active_hardware_loans: Loan[];
   machine_service_requests?: MachineServiceRequest[];
@@ -30,6 +43,12 @@ export type MemberActivity = {
   recent_presence_sessions: Presence[];
   currently_checked_in: boolean;
   accountability: { membership_active: boolean; waiver_acceptance_required: boolean; restriction_code: string | null };
+  // The dashboard half (D8). Optional: the payload omits them for a space whose
+  // `membership` module is off, and this endpoint is not reachable there at all.
+  notices?: MemberNotice[];
+  loan_history?: MemberLoanHistoryRow[];
+  request_history?: MemberRequestHistoryRow[];
+  membership_dues?: MemberDuesSummary;
 };
 
 /** The member's own check-in QR, fetched rather than linked.

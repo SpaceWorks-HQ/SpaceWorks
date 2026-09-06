@@ -209,7 +209,7 @@ def test_revoked_membership_cannot_read_archived_payment_history():
     )
 
     assert response.status_code == 403
-    assert response.data == {"detail": "An active membership is required."}
+    assert response.data == {"detail": "An active membership or an existing charge is required."}
 
 
 @pytest.mark.parametrize(
@@ -230,4 +230,4 @@ def test_blocked_account_cannot_read_archived_payment_history(access_status):
     )
 
     assert response.status_code == 403
-    assert response.data == {"detail": "An active membership is required."}
+    assert response.data == {"detail": "An active membership or an existing charge is required."}

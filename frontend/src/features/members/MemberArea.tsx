@@ -9,6 +9,7 @@ import { InvitationRequestForm } from "./InvitationRequestForm";
 import { JoinMembershipCta } from "./JoinMembershipCta";
 import { presenceStartLocation } from "./geolocation";
 import { MemberActivityPanel, type MemberActivity } from "./MemberActivity";
+import { MemberDues, MemberHistory, MemberNotices } from "./MemberDashboardSections";
 import { PartnerEvents } from "./PartnerEvents";
 import { MemberDirectory } from "./MemberDirectory";
 import { MemberCardPanel } from "./MemberCardPanel";
@@ -44,12 +45,19 @@ export function MemberArea() {
   const unauthenticated = memberships.error instanceof StructuredApiError && memberships.error.status === 401;
   const membership = memberships.data?.memberships.find((row) => row.makerspace.slug === resolvedSlug);
   const requested = memberships.data?.requests.some((row) => row.makerspace.slug === resolvedSlug && row.state === "requested");
+  // Declared before the queries below, which gate on it. The activity endpoint enforces
+  // `require_module(makerspace, "membership")`, so calling it with the module off just
+  // errors -- the dashboard simply does not exist for a space that runs no memberships.
+  const membershipModuleOn = (bootstrap.data?.modules ?? []).includes("membership");
   const profile = useQuery({ queryKey: ["member", "profile"], queryFn: () => memberRequest<Profile>("/auth/me"), enabled: Boolean(memberships.data), retry: false });
   const invitations = useQuery({ queryKey: ["member", "invitations"], queryFn: () => memberRequest<Invitations>("/memberships/invitations"), enabled: Boolean(memberships.data), retry: false });
   const waiver = useQuery({ queryKey: ["member", resolvedSlug, "waiver"], queryFn: () => memberRequest<Waiver>(`/member/makerspaces/${makerspaceId}/waiver`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
   const presence = useQuery({ queryKey: ["member", resolvedSlug, "presence"], queryFn: () => memberRequest<Presence>(`/public/${resolvedSlug}/presence-sessions/current`), enabled: Boolean(resolvedSlug) && membership?.membership_status === "active", retry: false });
-  const activity = useQuery({ queryKey: ["member", resolvedSlug, "activity"], queryFn: () => memberRequest<MemberActivity>(`/member/makerspaces/${makerspaceId}/activity`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
-  const payments = useQuery({ queryKey: ["member", resolvedSlug, "payments"], queryFn: () => memberRequest<MemberPayment[]>(`/member/makerspaces/${makerspaceId}/payments`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
+  const activity = useQuery({ queryKey: ["member", resolvedSlug, "activity"], queryFn: () => memberRequest<MemberActivity>(`/member/makerspaces/${makerspaceId}/activity`), enabled: makerspaceId >= 0 && membership?.membership_status === "active" && membershipModuleOn, retry: false });
+  // NOT gated on an active membership: a loan deposit is raised against a BORROWER, who
+  // needs an active account rather than a membership, and the backend now admits a caller
+  // to charges in their own name. Gating here would hide a debt from the person who owes it.
+  const payments = useQuery({ queryKey: ["member", resolvedSlug, "payments"], queryFn: () => memberRequest<MemberPayment[]>(`/member/makerspaces/${makerspaceId}/payments`), enabled: makerspaceId >= 0, retry: false });
   // Deliberately NOT gated on `memberships.data`. A member whose only makerspace is archived
   // gets an empty `/memberships/me`, and a signed-out one gets a 401 -- gating on it meant the
   // people this recovery route exists for were exactly the people who never saw the link.
@@ -78,7 +86,6 @@ export function MemberArea() {
   const policy: MembershipPolicyEnum | undefined = bootstrap.data?.makerspace.membership_policy;
   // The card panel exists only where the `membership` module is installed -- the card is
   // hung off a membership, so every one of its endpoints 404s without it.
-  const membershipModuleOn = (bootstrap.data?.modules ?? []).includes("membership");
 
   if (restoring) return <main className="desk-shell grid place-items-center px-5 text-sm text-muted">Restoring session…</main>;
   if (showSignIn) return <MemberAuthPanel makerspaceSlug={resolvedSlug} onAuthenticated={() => { setShowSignIn(false); void client.invalidateQueries({ queryKey: ["member"] }); }} />;
@@ -95,9 +102,17 @@ export function MemberArea() {
     {membership ? <><section className={`desk-panel ${membership.membership_status === "active" ? "border-success" : "border-warn"} p-5`}><h2 className="title-panel">Membership</h2><p className="eyebrow mt-2">{membership.makerspace.name} · {membership.membership_status} · {membership.role}</p></section>
       {waiver.data?.has_waiver ? <section className="desk-panel p-5"><h2 className="title-panel">Current waiver (<span className="font-mono">{waiver.data.version}</span>)</h2><p className="mt-3 whitespace-pre-wrap text-sm text-muted">{waiver.data.body}</p><button className="desk-button-secondary mt-4" disabled={accept.isPending} onClick={() => accept.mutate()}>Accept waiver</button></section> : null}
       <section className={`desk-panel ${presence.data?.active ? "border-success" : "border-secondary"} p-5`}><h2 className="title-panel">Presence</h2><p className="mt-1 text-sm text-muted">{presence.data?.active ? <>Active until <span className="font-mono">{new Date(presence.data.session?.expires_at ?? "").toLocaleTimeString()}</span></> : "No active session."}</p><button className="desk-button-secondary mt-4" disabled={start.isPending || end.isPending || (!presence.data?.active && !bootstrap.data)} onClick={() => presence.data?.active ? end.mutate() : start.mutate()}>{presence.data?.active ? "End presence" : "Start 2-hour presence"}</button></section>
+      {/* Notices first: they are the reason to open a dashboard at all. */}
+      {activity.data ? <MemberNotices notices={activity.data.notices} /> : null}
       {activity.data ? <MemberActivityPanel activity={activity.data} makerspaceId={makerspaceId} makerspaceSlug={resolvedSlug} /> : null}
+      {activity.data ? <MemberDues dues={activity.data.membership_dues} /> : null}
+      {activity.data ? <MemberHistory loans={activity.data.loan_history} requests={activity.data.request_history} /> : null}
       {membership?.membership_status === "active" ? <PartnerEvents makerspaceId={makerspaceId} slug={resolvedSlug} /> : null}
-      {membership.membership_status === "active" && makerspaceId >= 0 ? <><MemberProfilePanel makerspaceId={makerspaceId} />{membershipModuleOn ? <MemberCardPanel makerspaceId={makerspaceId} /> : null}<MemberDirectory makerspaceId={makerspaceId} /></> : null}{payments.data?.length ? <section className="desk-panel p-5"><h2 className="title-panel">Payments</h2><MemberPaymentRows payments={payments.data} checkoutPaymentId={generatePaymentLink.isPending ? generatePaymentLink.variables : undefined} onCheckout={(paymentId) => generatePaymentLink.mutate(paymentId)} /></section> : null}</> : null}
+      {membership.membership_status === "active" && makerspaceId >= 0 ? <><MemberProfilePanel makerspaceId={makerspaceId} />{membershipModuleOn ? <MemberCardPanel makerspaceId={makerspaceId} /> : null}<MemberDirectory makerspaceId={makerspaceId} /></> : null}</> : null}
+    {/* OUTSIDE the membership branch. A loan deposit is raised against a borrower, who
+        needs an active account rather than a membership -- nesting this meant the person
+        who owed the money was the one person who could not see it. */}
+    {payments.data?.length ? <section className="desk-panel p-5"><h2 className="title-panel">Payments</h2><MemberPaymentRows payments={payments.data} checkoutPaymentId={generatePaymentLink.isPending ? generatePaymentLink.variables : undefined} onCheckout={(paymentId) => generatePaymentLink.mutate(paymentId)} /></section> : null}
     {memberships.data && resolvedSlug && makerspaceId >= 0 ? <MemberReferrals
       canRefer={membership?.membership_status === "active" && membership.can_refer}
       referralsEnabled={membership?.membership_status === "active" && membership.referrals_enabled}

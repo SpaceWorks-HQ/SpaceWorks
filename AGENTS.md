@@ -147,6 +147,14 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   provider handle on pending rows exactly as on terminal ones, and the capture records a
   `money_fingerprint_sha256` that **publication revalidates** — refusing with `money_drift` if the
   source settled or raised a debt after the freeze, since the artifact cannot be merged forward.
+- **The member dashboard is gated on the `membership` module** (off by default): request
+  history, returned-item history, membership fee plus outstanding-per-currency, and a notices
+  feed, all served by the one `membership`-gated activity endpoint. Its notices are **derived
+  from the member's own rows**, never from `notifications.Notification` — that table is
+  makerspace-wide with no recipient and one shared `read_at`. **Payment visibility is NOT behind
+  that gate**: `member_may_see_own_charges` admits a live, unrestricted account that owns a
+  charge here and holds no membership, so an account-only loan borrower can read their own debt;
+  a REVOKED member is still refused.
 - Evidence photo **rows** and QR scan records are **immutable**; audit logs are **append-only**. Evidence retention may delete every final and staging object version only after the configured window, but it does not update or delete the retained `EvidencePhoto` row.
 - Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos,
   requester history, or hidden counts. Public visibility is governed per-item by `is_public`,

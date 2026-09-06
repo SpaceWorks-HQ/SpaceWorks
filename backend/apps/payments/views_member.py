@@ -8,7 +8,11 @@ from rest_framework.views import APIView
 
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.payments import stripe_client
-from apps.payments.member_access import member_payment_actor, member_payment_memberships
+from apps.payments.member_access import (
+    member_may_see_own_charges,
+    member_payment_actor,
+    member_payment_memberships,
+)
 from apps.payments.availability import online_payments_enabled_for
 from apps.payments.member_scope import member_payment_queryset
 from apps.payments.models import Payment
@@ -92,8 +96,11 @@ class MemberPaymentHistoryView(APIView):
 
     @extend_schema(tags=["Payments"], summary="List the caller's payment history", request=None, responses={200: MemberPaymentSerializer(many=True), 403: OpenApiResponse(ErrorSerializer)})
     def get(self, request, makerspace_id):
-        if member_payment_actor(request.user, makerspace_id) is None:
-            return Response({"detail": "An active membership is required."}, status=403)
+        if not member_may_see_own_charges(request.user, makerspace_id):
+            return Response(
+                {"detail": "An active membership or an existing charge is required."},
+                status=403,
+            )
         rows = list(
             member_payment_queryset(request.user, makerspace_id).order_by("-created_at")
         )

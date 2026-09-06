@@ -63,6 +63,43 @@ class MemberAccountabilitySerializer(serializers.Serializer):
     restriction_code = serializers.CharField(allow_null=True)
 
 
+class MemberLoanHistorySerializer(serializers.Serializer):
+    label = serializers.CharField()
+    checked_out_at = serializers.DateTimeField()
+    returned_at = serializers.DateTimeField(allow_null=True)
+    due_at = serializers.DateTimeField(allow_null=True)
+    returned_late = serializers.BooleanField()
+
+
+class MemberRequestHistorySerializer(serializers.Serializer):
+    status = serializers.CharField()
+    created_at = serializers.DateTimeField()
+    item_count = serializers.IntegerField()
+    returned_quantity = serializers.IntegerField()
+    damaged_quantity = serializers.IntegerField()
+    missing_quantity = serializers.IntegerField()
+
+
+class MemberDuesSerializer(serializers.Serializer):
+    dues_amount = serializers.CharField()
+    # Amounts are strings keyed by currency code, never one summed number: outstanding
+    # money cannot be added across currencies.
+    outstanding_by_currency = serializers.DictField(child=serializers.CharField())
+
+
+class MemberNoticeSerializer(serializers.Serializer):
+    """A fact about the reader, derived from their own rows.
+
+    Not `notifications.Notification`: that table is makerspace-wide, has no recipient
+    and shares one `read_at`, so serving it would leak staff alerts.
+    """
+
+    level = serializers.CharField()
+    event = serializers.CharField()
+    title = serializers.CharField()
+    body = serializers.CharField(allow_blank=True)
+
+
 class MemberActivitySerializer(serializers.Serializer):
     active_hardware_loans = MemberLoanActivitySerializer(many=True)
     print_requests = MemberPrintActivitySerializer(many=True, required=False)
@@ -72,3 +109,7 @@ class MemberActivitySerializer(serializers.Serializer):
     recent_presence_sessions = MemberPresenceActivitySerializer(many=True)
     currently_checked_in = serializers.BooleanField()
     accountability = MemberAccountabilitySerializer()
+    loan_history = MemberLoanHistorySerializer(many=True, required=False)
+    request_history = MemberRequestHistorySerializer(many=True, required=False)
+    membership_dues = MemberDuesSerializer(required=False)
+    notices = MemberNoticeSerializer(many=True, required=False)
