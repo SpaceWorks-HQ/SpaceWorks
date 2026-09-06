@@ -108,10 +108,6 @@ def _source_row_allowed(label, row, makerspace_id, cross_tenant):
         return row["state"] not in {"requested", "invited"}
     if label == "apiclients.ApiKeyRequest":
         return row["status"] != "pending"
-    if label == "payments.Payment" and row["status"] == "pending":
-        raise TenantDumpProjectionError(
-            f"pending Payment {row['id']} is an unresolved obligation"
-        )
     if label == "integrations.NotificationDestination":
         return row["channel"] == "telegram"
     if label == "operations.StockTransfer":

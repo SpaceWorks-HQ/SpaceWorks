@@ -52,7 +52,10 @@ class TenantDumpCatalogError(AssertionError):
 # Re-blessed for the manual-settlement ledger: `payments.ManualSettlement` is the
 # append-only cash book recording how and when an offline charge was actually paid, so
 # it must travel with the payments it explains.
-CATALOG_SCHEMA_SHA256 = "edd192655861c8c54d1802960fb6ffa7c3503cf7a6f5a2773a85a407fd61a2ef"
+# Re-blessed again for `TenantDumpCapture.money_fingerprint_sha256`, which binds a
+# capture to the tenant's unsettled money so publication can refuse a dump the source
+# has since moved past.
+CATALOG_SCHEMA_SHA256 = "5f48719d15dbf79c58c0d70de104e3107a9c15d4895bf9f6fbe1dceb55175c59"
 
 
 def catalog_models(apps_registry=apps):

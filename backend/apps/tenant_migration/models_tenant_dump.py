@@ -48,6 +48,10 @@ class TenantDumpCapture(models.Model):
     database_image_sha256 = models.CharField(max_length=64, blank=True)
     object_ledger = models.JSONField(default=list, blank=True)
     object_ledger_sha256 = models.CharField(max_length=64, blank=True)
+    #: Digest of the tenant's unsettled money at capture, revalidated at cutover so a
+    #: debt settled on the source after the freeze cannot be billed again on the target.
+    #: Blank on captures taken before this existed -- "not recorded", not "nothing owed".
+    money_fingerprint_sha256 = models.CharField(max_length=64, blank=True)
     source_encryption_mode = models.BooleanField()
     catalog_digest = models.CharField(max_length=64)
     capture_completed_at = models.DateTimeField(null=True, blank=True)

@@ -547,6 +547,21 @@ and catastrophic for an existing one; migration `makerspaces/0050` is the one-ti
 reverse) that keeps every pre-existing space sending mail across the upgrade. Any future default-on module
 key needs the same treatment.
 
+**A pending payment no longer refuses a tenant dump (2026-09-06, owner decision D5).** Both
+refusals are gone — `tenant_dump_cross_tenant` and `_source_row_allowed`. What makes carrying an
+unsettled debt safe: (1) `preflight._check_live_checkouts` refuses any pending row with a live
+rail, and it now counts `stripe_payment_intent_id` as live, not just hosted sessions; (2) pending
+rows are held to the same `PAYMENT_CLEARED_VALUES` projection as terminal ones, so no order id,
+session, intent, checkout URL, connected account or routing survives to be resumed on the target;
+(3) `money_digest.money_fingerprint` is taken INSIDE the capture gate over pending payments plus
+the settlement chain, and `publish_tenant_dump` revalidates it under the custody lock, refusing
+with `money_drift` when the source has moved on. Terminal rows are deliberately excluded from the
+digest: they are immutable, so they cannot drift, and including them would make every ordinary
+settlement read as drift. A blank digest (captures predating the field) is not revalidated —
+blank means "not recorded", not "nothing owed". `provider` stays PRESERVE on pending rows: every
+actual handle is cleared, so it is inert, and a target whose vendor differs simply resolves no
+source and settles the charge offline.
+
 **The payment ledger cannot be tombstoned; the rail can (2026-09-06).** `apps.payments` holds
 the models and every ledger surface and is NOT in `SEPARABLE_APPS`; `apps.payments_rail` holds
 checkout, the native intent, Connect, refunds, credential settings and the webhooks, and is what

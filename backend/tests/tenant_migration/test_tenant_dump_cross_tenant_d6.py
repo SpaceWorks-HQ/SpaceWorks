@@ -93,18 +93,52 @@ def test_terminal_payment_preserves_history_and_clears_every_live_handle(status)
         assert projected[column] == value
 
 
-def test_one_pending_payment_refuses_the_entire_source_projection():
+def test_a_pending_payment_also_clears_every_live_handle():
+    """The projection rule that makes carrying an unsettled debt safe.
+
+    A pending row is held to the SAME cleared-handle standard as a terminal one: no
+    order id, session, intent, checkout URL, connected account or routing survives. That
+    is what stops an imported debt resuming the source's rail and collecting twice.
+    """
+    space = _space("payment-pending-handles")
+    actor = _user("payment-pending-handles-actor")
+    payment = _payment(space, actor, Payment.Status.PENDING)
+    source = raw_records(Payment.objects.filter(pk=payment.pk), Payment)[0]
+
+    projected = sanitize_record(Payment, source).values
+
+    assert projected["status"] == Payment.Status.PENDING
+    assert projected["amount"] == Decimal("42.75")
+    for field_name, value in PAYMENT_CLEARED_VALUES.items():
+        column = Payment._meta.get_field(
+            field_name.removesuffix("_id")
+            if field_name == "via_makerspace_id"
+            else field_name
+        ).column
+        assert projected[column] == value
+
+
+def test_a_pending_payment_no_longer_refuses_the_source_projection():
+    """Pending charges travel now (D5).
+
+    One pending row used to refuse the whole dump. That was tenable while a charge could
+    only exist where a gateway was configured; once money owed is tracked by default and
+    without one, it made a portable dump impossible for any space that keeps a ledger.
+
+    What keeps it safe is elsewhere: the preflight refuses a pending row with a LIVE
+    rail, the projection clears every provider handle, and the capture's money
+    fingerprint refuses publication if the source settles the debt in the meantime.
+    """
     space = _space("pending-payment")
     actor = _user("pending-payment-actor")
     _payment(space, actor, Payment.Status.PENDING)
 
-    with pytest.raises(TenantDumpDispositionRefused) as refused:
-        inspect_cross_tenant_source(space.pk)
+    facts = inspect_cross_tenant_source(space.pk)
 
-    assert refused.value.reason_code == "pending_payment"
+    assert facts is not None
 
 
-def test_foreign_registration_payment_route_refuses_while_payment_is_pending():
+def test_foreign_registration_payment_route_travels_with_a_pending_payment():
     host = _space("pending-registration-host")
     via = _space("pending-registration-via")
     actor = _user("pending-registration-actor")
@@ -131,10 +165,11 @@ def test_foreign_registration_payment_route_refuses_while_payment_is_pending():
         via_makerspace=via,
     )
 
-    with pytest.raises(TenantDumpDispositionRefused) as refused:
-        inspect_cross_tenant_source(host.pk)
+    facts = inspect_cross_tenant_source(host.pk)
 
-    assert refused.value.reason_code == "pending_payment"
+    # The foreign routing is still cleared -- that rule is about cross-tenant leakage,
+    # not about the charge being unsettled, and it is unaffected by D5.
+    assert facts is not None
 
 
 def test_collaboration_and_stock_transfer_losses_are_recorded_without_foreign_ids():

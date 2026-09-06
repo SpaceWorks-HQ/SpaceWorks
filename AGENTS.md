@@ -140,6 +140,13 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   refunds, credential settings and every webhook. The `payments` MODULE key belongs to the rail,
   so tombstoning the rail drops the key. `TOMBSTONED_APPS=payments` still works and is
   translated to `payments_rail` (`separability.tombstones.RENAMED_LABELS`).
+- **Pending payments travel in a portable dump.** A single pending row used to refuse the whole
+  dump; that is gone, because money owed is now recorded by default and the refusal made a dump
+  impossible for any space keeping a ledger. Three things replace it: the preflight refuses a
+  pending row with a **live rail** (hosted session OR native intent), the projection clears every
+  provider handle on pending rows exactly as on terminal ones, and the capture records a
+  `money_fingerprint_sha256` that **publication revalidates** — refusing with `money_drift` if the
+  source settled or raised a debt after the freeze, since the artifact cannot be merged forward.
 - Evidence photo **rows** and QR scan records are **immutable**; audit logs are **append-only**. Evidence retention may delete every final and staging object version only after the configured window, but it does not update or delete the retained `EvidencePhoto` row.
 - Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos,
   requester history, or hidden counts. Public visibility is governed per-item by `is_public`,
