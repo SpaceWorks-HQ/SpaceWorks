@@ -248,10 +248,41 @@ starting a build.** These are the rules you must not violate without having read
   container runs as the least-privilege `spaceworks_app` role, which has no CREATEDB, so pytest cannot
   build a test database as itself.
 
+  **CHECK WHICH TREE THE CONTAINER MOUNTS BEFORE BELIEVING ANY RESULT FROM IT.** There is more than
+  one clone of this repo on the dev machine, and `spaceworks-backend` has mounted
+  `~/Projects/SpaceInventory/SpaceWorks` while the session worked in `~/Projects/SpaceWorks/SpaceWorks`.
+  `dev-docker.sh exec` then tests *someone else's checkout* — on 2026-09-07 a whole afternoon of
+  "verification" ran against `b15c4e11`, a tree so old it had no `money_digest.py`, and reported
+  green for code it had never loaded. It also explains a flood of `relation ... does not exist` and
+  truncate-FK teardown errors: that tree predates dozens of migrations. Confirm first, every time:
+
   ```bash
-  ./scripts/dev-docker.sh exec -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
-    -T backend pytest tests/backup tests/tenant_migration -q
+  docker inspect spaceworks-backend --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'
   ```
+
+  **When it is the wrong tree — or the shared stack is busy — run a ONE-OFF container against your
+  own isolated infra.** `--entrypoint pytest` is required: the image entrypoint is a production
+  admission gate that demands `--role <role> <command>` plus a host restore-marker. Supply
+  `API_CLIENT_ENC_KEY` and `AUDIT_MAC_MASTER_KEY` too — both come from `backend/.env` on the host,
+  are **empty in the image**, and without them 19 `tests/tenant_migration` tests fail as
+  `ImproperlyConfigured` buried inside a `PairingError` from `deployment_keys.py`, which reads exactly
+  like a custody regression and is not one. Both are Fernet keys; generate throwaways per run. The
+  `db`/`redis`/`minio` network aliases exist in an isolated compose project too, so the image's baked
+  defaults resolve without further overrides.
+
+  ```bash
+  docker run --rm --network <project>_default --entrypoint pytest \
+    -v "$PWD/backend:/app" -v "$PWD:/workspace" -v "$PWD/scripts:/run/spaceworks-privileged-scripts" \
+    -w /app \
+    -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
+    -e SECRET_KEY=test-only \
+    -e API_CLIENT_ENC_KEY="$(python3 -c 'from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())')" \
+    -e AUDIT_MAC_MASTER_KEY="$(python3 -c 'from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())')" \
+    spaceworks-backend tests/backup tests/tenant_migration -q
+  ```
+
+  Verified this way on 2026-09-07 at `6629e60a`: **1559 passed, 0 failed** in ~59 minutes, which is
+  also the proof that the host's `PostgresClientUnavailable` failures above are purely environmental.
 - **Chain every new migration off the ACTUAL leaf** — `ls backend/apps/<app>/migrations/`, never the number
   a spec quotes.
 - **Commits sit local and unpushed on `dev`; pushing is the owner's call alone.** Ask
@@ -269,6 +300,7 @@ starting a build.** These are the rules you must not violate without having read
 ./scripts/dev-local.sh infra && ./scripts/dev-local.sh test    # host: faster pytest, most of the suite
 
 # In Docker, pytest needs the DB OWNER: the backend runs as `spaceworks_app`, which has no CREATEDB.
+# `tests/backup` and `tests/tenant_migration` additionally need the two Fernet keys above.
 ./scripts/dev-docker.sh exec -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
   -T backend pytest
 ```
