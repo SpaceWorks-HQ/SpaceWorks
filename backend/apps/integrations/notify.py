@@ -129,6 +129,7 @@ def _run_guarded(makerspace, feature, event, build, sync):
             NotificationChannel.SLACK,
             NotificationChannel.MATTERMOST,
             NotificationChannel.DISCORD,
+            NotificationChannel.WEBHOOK,
             NotificationChannel.NATIVE_PUSH,
         ):
             if not enabled[channel]:

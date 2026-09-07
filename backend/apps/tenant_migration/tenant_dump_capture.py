@@ -25,6 +25,7 @@ from .source_gate_release import release_after_copy_capture
 from .tenant_dump_capture_database import capture_database_image
 from .tenant_dump_catalog import CATALOG_SCHEMA_SHA256, validate_catalog
 from .tenant_dump_errors import TenantDumpBuildError, TenantDumpCustodyError
+from .money_digest import money_fingerprint
 from .tenant_dump_lineage import canonical_digest, object_ledger
 from .tenant_dump_staging import create_capture_root, delete_owned_root
 
@@ -146,6 +147,9 @@ def capture_tenant_dump_source(capture_id, *, sleep=None, storage_modes=None):
             )
             modes = storage_modes or _storage_modes()
             objects = capture_tenant_objects(root, capture.makerspace, modes)
+            # Taken INSIDE the gate, against the same quiesced state as the image, so
+            # the digest describes exactly what the artifact will carry.
+            money_sha256 = money_fingerprint(capture.makerspace_id)
 
         ledger = object_ledger(objects)
         database_sha256 = sha256_file(database_image)
@@ -158,6 +162,7 @@ def capture_tenant_dump_source(capture_id, *, sleep=None, storage_modes=None):
             database_sha256=database_sha256,
             objects=ledger,
             object_ledger_sha256=ledger_sha256,
+            money_fingerprint_sha256=money_sha256,
         )
         lineage_persisted = True
         release_after_copy_capture(lease, actor=capture.requested_by)
@@ -199,6 +204,7 @@ def _complete_capture(
     database_sha256,
     objects,
     object_ledger_sha256,
+    money_fingerprint_sha256="",
 ):
     capture = TenantDumpCapture.objects.select_for_update().get(pk=capture_id)
     if capture.status != TenantDumpCapture.Status.CAPTURING:
@@ -211,6 +217,7 @@ def _complete_capture(
     capture.database_image_sha256 = database_sha256
     capture.object_ledger = list(objects)
     capture.object_ledger_sha256 = object_ledger_sha256
+    capture.money_fingerprint_sha256 = money_fingerprint_sha256
     capture.capture_completed_at = timezone.now()
     capture.save()
     audit.record(
@@ -223,6 +230,7 @@ def _complete_capture(
             "gate_fencing_token": lease.fencing_token,
             "database_image_sha256": database_sha256,
             "object_ledger_sha256": object_ledger_sha256,
+            "money_fingerprint_sha256": money_fingerprint_sha256,
         },
     )
 

@@ -1,3 +1,4 @@
+from django.http import Http404
 from rest_framework import serializers
 
 from apps.boxes.models import Box, QrCode, QrScanEvent
@@ -123,6 +124,9 @@ class QrRebindResultSerializer(serializers.Serializer):
 
 
 def qr_target_payload(qr):
+    if qr.target_type == QrCode.TargetType.MEMBER_CARD:
+        # Never a person from the generic scanner: VIEW_INVENTORY must not resolve identity.
+        raise Http404
     if qr.target_type == QrCode.TargetType.BOX:
         box = Box.objects.get(pk=qr.target_id)
         return {"type": "box", "id": box.id, "label": box.label, "code": box.code}

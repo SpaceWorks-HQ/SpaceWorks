@@ -27,6 +27,8 @@ const TAB_MODULES: Record<string, string[]> = {
   handover: ["machine_service"],
   events: ["events"],
   bookings: ["bookings"],
+  // A card belongs to a membership; without that module every member-card endpoint 404s.
+  cards: ["membership"],
   tobuy: ["procurement"],
   transfers: ["stock_transfers"],
   stocktake: ["stocktake"],
@@ -67,6 +69,7 @@ const TAB_PATHS: Record<string, string> = {
   exports: "data-export",
   backups: "backup-restore",
   migration: "tenant-migration",
+  cards: "member-cards",
   organized: "organized-events",
   "organization-analytics": "organization-analytics",
 };

@@ -44,6 +44,7 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         # Webhook destinations cannot satisfy their credential check constraint after
         # the encrypted webhook is removed, even when the source row is inactive.
         ("integrations.NotificationDestination", "webhook_url"),
+        ("integrations.NotificationDestination", "signing_secret"),
     ),
     **_rules(
         FRESH,
@@ -71,6 +72,11 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         # cannot survive: the target recomputes it under the TARGET key after all
         # remapping. Never carry the source value.
         ("audit.AuditLog", "row_mac"),
+        # Full-text vectors are recomputed by the search trigger on the first write the
+        # importer makes; carrying a source value would only be overwritten.
+        ("inventory.InventoryProduct", "search_vector"),
+        ("machines.Machine", "search_vector"),
+        ("events.Event", "search_vector"),
     ),
     **_rules(
         EMPTY_STRING,
@@ -115,6 +121,10 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         ("payments.MakerspacePaymentSettings", "connect_account_id"),
         ("payments.Payment", "external_order_id"),
         ("payments.Payment", "external_payment_id"),
+        # Same rule as the payment's own external ids: a provider-side refund id names a
+        # movement of money at a vendor account the target does not hold, and its unique
+        # constraint is what `unique_values` already calls inert once the value is dropped.
+        ("payments.Refund", "external_refund_id"),
         ("payments.Payment", "stripe_connected_account_id"),
         ("payments.Payment", "stripe_checkout_session_id"),
         ("payments.Payment", "stripe_checkout_session_expired_at"),

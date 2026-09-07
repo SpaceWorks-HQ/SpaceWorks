@@ -56,6 +56,7 @@ describe("organization analytics tab", () => {
         canUseToBuy={false}
         canManageQr={false}
         canManageMakerspace={false}
+        canUseMemberCards={false}
         canManageMachines={false}
         isMachineOnly={false}
         canConfigureMachineTypes={false}

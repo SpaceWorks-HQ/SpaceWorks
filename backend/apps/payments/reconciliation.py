@@ -1,25 +1,27 @@
 """Transactional reconciliation for every payment subject type."""
 
 import logging
+from decimal import Decimal
 
 from django.db import transaction
-from django.utils import timezone
-from rest_framework.exceptions import APIException, NotFound, PermissionDenied
+from django.db.models import DecimalField, Q, Sum, Value
+from django.db.models.functions import Coalesce
+from rest_framework.exceptions import APIException, NotFound
 
 from apps.accounts import rbac
 from apps.audit import services as audit
-from apps.payments import stripe_client
 from apps.payments.models import Payment
-from apps.payments.resolution import source_for_payment
+
+# Re-export barrel: these moved to submodules at the 300-line ceiling, but
+# `from apps.payments.reconciliation import X` must keep resolving for every caller.
+from apps.payments.reconciliation_authority import (  # noqa: F401
+    SUBJECT_ACTIONS,
+    _require_machine_scope,
+    _require_subject_authority,
+)
+from apps.payments.reconciliation_rail import _expire_checkout_best_effort  # noqa: F401
 
 logger = logging.getLogger(__name__)
-
-SUBJECT_ACTIONS = {
-    Payment.SubjectType.MACHINE_SERVICE_REQUEST: rbac.Action.MANAGE_MACHINES,
-    Payment.SubjectType.BOOKING: rbac.Action.MANAGE_BOOKINGS,
-    Payment.SubjectType.EVENT_REGISTRATION: rbac.Action.MANAGE_EVENTS,
-    Payment.SubjectType.MAKERSPACE_MEMBERSHIP: rbac.Action.MANAGE_MAKERSPACE,
-}
 
 
 class PaymentConflict(APIException):
@@ -44,14 +46,33 @@ def list_payments(*, actor, makerspace_id, status=None, subject_type=None):
         queryset = queryset.filter(status=status)
     if subject_type:
         queryset = queryset.filter(subject_type=subject_type)
-    return queryset.order_by("-created_at", "-pk")
+    return with_refunds(queryset).order_by("-created_at", "-pk")
 
 
-def mark_offline(payment, actor):
+def with_refunds(queryset):
+    """Annotate the money actually sent back and prefetch the refund lines."""
+    from apps.payments.models import Refund
+
+    return queryset.prefetch_related("refunds").annotate(
+        refunded_amount=Coalesce(
+            Sum("refunds__amount", filter=Q(refunds__status=Refund.Status.SUCCEEDED)),
+            Value(Decimal("0.00")),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+    )
+
+
+def mark_offline(payment, actor, settlement=None):
+    """Settle one charge in cash. `settlement` is REQUIRED -- see reconcile_payments.
+
+    Kept as a one-row convenience over the batch service. Callers that genuinely have no
+    receipt detail want `waive` instead: that is the transition meaning "no money moved".
+    """
     return _compat_reconcile(
         actor=actor,
         payment=payment,
         target_status=Payment.Status.PAID_OFFLINE,
+        settlement=settlement,
     )
 
 
@@ -95,7 +116,7 @@ def cancel_pending(*, makerspace, subject_type, subject_id, actor):
     return payment
 
 
-def _compat_reconcile(*, payment, actor, target_status):
+def _compat_reconcile(*, payment, actor, target_status, settlement=None):
     current = Payment.objects.get(pk=payment.pk)
     if current.status != Payment.Status.PENDING:
         return current
@@ -104,14 +125,30 @@ def _compat_reconcile(*, payment, actor, target_status):
         makerspace_id=current.makerspace_id,
         payment_ids=[current.pk],
         target_status=target_status,
+        settlement=settlement,
     )[0]
 
 
 @transaction.atomic
-def reconcile_payments(*, actor, makerspace_id, payment_ids, target_status):
-    """Lock, validate, then reconcile a batch without partial mutations."""
+def reconcile_payments(
+    *, actor, makerspace_id, payment_ids, target_status, settlement=None
+):
+    """Lock, validate, then reconcile a batch without partial mutations.
+
+    `settlement` is the manual receipt -- method, reference, received_at -- recorded for
+    a PAID_OFFLINE batch. It is written in the same transaction as the status flip, so a
+    settled charge can never exist without the cash-book row that explains it. Waiving
+    takes no settlement: no money changed hands.
+    """
     if target_status not in {Payment.Status.PAID_OFFLINE, Payment.Status.WAIVED}:
         raise ValueError("Unsupported reconciliation status.")
+    if settlement and target_status != Payment.Status.PAID_OFFLINE:
+        raise ValueError("Only an offline settlement carries receipt details.")
+    # Enforced HERE, not only in the HTTP serializers: `mark_offline()` is exported and
+    # called directly, so a serializer-only rule would let a settled charge exist with no
+    # record of how the money arrived -- exactly what the ledger exists to prevent.
+    if target_status == Payment.Status.PAID_OFFLINE and not settlement:
+        raise ValueError("Marking a payment paid offline requires settlement details.")
 
     requested_ids = list(payment_ids)
     locked = list(
@@ -144,130 +181,80 @@ def reconcile_payments(*, actor, makerspace_id, payment_ids, target_status):
                 "updated_at",
             ]
         )
-        audit.record(actor, action, makerspace=payment.makerspace, target=payment)
+        meta = None
+        if settlement and target_status == Payment.Status.PAID_OFFLINE:
+            receipt = _record_settlement(payment, actor, settlement)
+            meta = {"method": receipt.method, "settlement_id": receipt.pk}
+        audit.record(
+            actor, action, makerspace=payment.makerspace, target=payment, meta=meta
+        )
     return [by_id[payment_id] for payment_id in requested_ids]
 
 
-def _require_subject_authority(actor, payments):
-    for subject_type, action in SUBJECT_ACTIONS.items():
-        ids = [payment.pk for payment in payments if payment.subject_type == subject_type]
-        if not ids:
-            continue
-        visible = set(
-            rbac.scope_by_action(
-                actor,
-                action,
-                Payment.objects.filter(pk__in=ids),
-                field="makerspace_id",
-            ).values_list("pk", flat=True)
-        )
-        if visible != set(ids):
-            raise PermissionDenied("Payment action is not permitted.")
-        if subject_type == Payment.SubjectType.MACHINE_SERVICE_REQUEST:
-            _require_machine_scope(actor, payments)
-    if any(payment.subject_type not in SUBJECT_ACTIONS for payment in payments):
-        raise PermissionDenied("Payment subject type is not supported.")
+@transaction.atomic
+def amend_settlement(*, actor, makerspace_id, payment_id, settlement):
+    """Correct a receipt by APPENDING a replacement, never by editing one.
 
-
-def _require_machine_scope(actor, payments):
-    """MANAGE_MACHINES is scoped per role, so reconciling a charge follows the job.
-
-    Imported locally: `apps.machines` reaches into `apps.payments` for service pricing, so
-    a module-level edge back would close the cycle.
+    The payment itself is already terminal and stays untouched -- this corrects only the
+    record of how the money arrived, which is exactly the case the `amends` chain exists
+    for: a mistyped reference or the wrong method picked at the desk. Without this the
+    field was unreachable and a wrong receipt was permanent, since every reconciliation
+    endpoint refuses a terminal payment.
     """
-    from apps.machines.models import MachineServiceRequest
-    from apps.machines.role_scope import EXEMPT, manage_scopes_for, scoped_service_requests
+    from apps.payments.models import ManualSettlement
 
-    machine_payments = [
-        payment
-        for payment in payments
-        if payment.subject_type == Payment.SubjectType.MACHINE_SERVICE_REQUEST
-    ]
-    subject_ids = {payment.subject_id for payment in machine_payments}
-    if not subject_ids:
-        return
-    requests = MachineServiceRequest.objects.filter(pk__in=subject_ids)
-    live_ids = set(requests.values_list("pk", flat=True))
-    covered = set(
-        scoped_service_requests(
-            actor,
-            requests,
-            set(requests.values_list("makerspace_id", flat=True)),
-        ).values_list("pk", flat=True)
+    payment = (
+        Payment.objects.select_for_update()
+        .select_related("makerspace")
+        .filter(makerspace_id=makerspace_id, pk=payment_id)
+        .first()
     )
-    if covered != live_ids:
-        raise PermissionDenied("Payment action is not permitted.")
+    if payment is None or payment.status != Payment.Status.PAID_OFFLINE:
+        raise NotFound("Settled payment not found.")
+    _require_subject_authority(actor, [payment])
+    current = ManualSettlement.effective_for(payment)
+    if current is None:
+        raise NotFound("This payment has no settlement to correct.")
+    receipt = ManualSettlement.objects.create(
+        payment=payment,
+        method=settlement["method"],
+        reference=settlement.get("reference", ""),
+        received_at=settlement["received_at"],
+        amount=payment.amount,
+        currency=payment.currency,
+        recorded_by=actor,
+        amends=current,
+    )
+    audit.record(
+        actor,
+        "payment.settlement_amended",
+        makerspace=payment.makerspace,
+        target=payment,
+        meta={
+            "settlement_id": receipt.pk,
+            "amends_id": current.pk,
+            "method": receipt.method,
+            "previous_method": current.method,
+        },
+    )
+    return receipt
 
-    # A charge whose service request was purged names no machine, type or team, so there is
-    # nothing left for machine scoping to answer. Comparing against `subject_ids` here made
-    # the set unequal for every actor, so a pending charge could never be waived or marked
-    # paid in cash -- stranding it forever, which is the exact failure that preserving the
-    # payment exists to prevent. Failing OPEN to every `MANAGE_MACHINES` holder would
-    # silently widen a scoped role, and scoping is documented as failing closed. So the
-    # orphan is actionable only by the actor machine scoping already exempts -- a space
-    # manager, a superadmin, or the null-`assigned_role` legacy fallback -- all of whom are
-    # unscoped everywhere else in this mechanism.
-    orphaned = subject_ids - live_ids
-    if not orphaned:
-        return
-    orphan_makerspace_ids = {
-        payment.makerspace_id
-        for payment in machine_payments
-        if payment.subject_id in orphaned
-    }
-    scopes = manage_scopes_for(actor, orphan_makerspace_ids)
-    if any(scopes.get(ms_id) is not EXEMPT for ms_id in orphan_makerspace_ids):
-        raise PermissionDenied("Payment action is not permitted.")
 
+def _record_settlement(payment, actor, settlement):
+    """Append the cash-book row for one settled charge.
 
-def _expire_checkout_best_effort(payment):
-    """Close a live online rail when staff settle a charge another way.
-
-    Without this a member can still pay a hosted link or confirm a native PaymentIntent
-    for a charge already marked offline or waived. Best-effort by contract: the
-    reconciliation that called this must succeed regardless of what the vendor says.
+    Amount and currency are taken from the PAYMENT, never from the caller: the receipt
+    describes the debt that was settled, and letting a client name its own figure would
+    let the books disagree with the ledger they are supposed to explain.
     """
-    if (
-        payment.online_rail == Payment.OnlineRail.NATIVE_PAYMENT_INTENT
-        and payment.stripe_payment_intent_id
-    ):
-        try:
-            source = source_for_payment(payment)
-            if source is None:
-                raise stripe_client.PaymentsUnavailable(
-                    "The payment's provider credentials are no longer configured."
-                )
-            if not stripe_client.cancel_payment_intent(
-                source, payment.stripe_payment_intent_id
-            ):
-                logger.warning(
-                    "payment_intent_cancellation_unconfirmed",
-                    extra={"payment_id": payment.pk},
-                )
-        except Exception:
-            logger.exception(
-                "payment_intent_cancellation_failed",
-                extra={"payment_id": payment.pk},
-            )
-        return
+    from apps.payments.models import ManualSettlement
 
-    order_id = payment.external_order_id or payment.stripe_checkout_session_id
-    if not order_id or payment.stripe_checkout_session_expired_at:
-        return
-    try:
-        source = source_for_payment(payment)
-        if source is None:
-            raise stripe_client.PaymentsUnavailable(
-                "The payment's provider credentials are no longer configured."
-            )
-        if payment.provider != payment.Provider.STRIPE:
-            from apps.payments.providers import get_provider
-
-            get_provider(payment.provider).expire_checkout(source, order_id)
-            payment.stripe_checkout_session_expired_at = timezone.now()
-        elif stripe_client.expire_checkout_session(source, order_id):
-            payment.stripe_checkout_session_expired_at = timezone.now()
-    except Exception:
-        logger.exception(
-            "payment_checkout_expiry_failed", extra={"payment_id": payment.pk}
-        )
+    return ManualSettlement.objects.create(
+        payment=payment,
+        method=settlement["method"],
+        reference=settlement.get("reference", ""),
+        received_at=settlement["received_at"],
+        amount=payment.amount,
+        currency=payment.currency,
+        recorded_by=actor,
+    )

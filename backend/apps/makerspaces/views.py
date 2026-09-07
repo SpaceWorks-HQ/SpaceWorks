@@ -53,6 +53,7 @@ TenantBootstrapSerializer = inline_serializer(
             },
         ),
         "modules": serializers.ListField(child=serializers.CharField()),
+        "edition": serializers.CharField(),
         "features": serializers.ListField(child=serializers.CharField()),
         "workflows": serializers.ListField(child=serializers.CharField()),
         "theme": serializers.JSONField(),

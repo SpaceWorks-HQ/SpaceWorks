@@ -15,6 +15,7 @@ from tests.return_helpers import (
     make_member,
     make_space,
     make_user,
+    settlement_payload,
 )
 
 pytestmark = pytest.mark.django_db
@@ -124,7 +125,7 @@ def test_subject_specific_authority_and_makerspace_mismatch():
     )
 
     assert authenticated_client(booking_manager).post(
-        action_url(space, booking, "mark-offline")
+        action_url(space, booking, "mark-offline"), settlement_payload(), format="json"
     ).status_code == 200
     assert authenticated_client(booking_manager).post(
         action_url(space, event, "waive")
@@ -146,7 +147,9 @@ def test_bulk_is_all_or_nothing_preserves_input_order_and_audits_each_change():
     bulk_url = f"{list_url(space)}/bulk/mark-offline"
 
     conflict = authenticated_client(manager).post(
-        bulk_url, {"ids": [first.id, terminal.id]}, format="json"
+        bulk_url,
+        {"ids": [first.id, terminal.id], **settlement_payload()},
+        format="json",
     )
     assert conflict.status_code == 409
     first.refresh_from_db()
@@ -154,7 +157,9 @@ def test_bulk_is_all_or_nothing_preserves_input_order_and_audits_each_change():
     assert AuditLog.objects.filter(target_id=str(first.id)).count() == 0
 
     response = authenticated_client(manager).post(
-        bulk_url, {"ids": [pending.id, first.id]}, format="json"
+        bulk_url,
+        {"ids": [pending.id, first.id], **settlement_payload()},
+        format="json",
     )
     assert response.status_code == 200
     assert [row["id"] for row in response.data] == [pending.id, first.id]
@@ -186,7 +191,7 @@ def test_checkout_expiry_failure_is_best_effort(monkeypatch):
     row = payment(space, manager, Payment.SubjectType.BOOKING, 40)
     Payment.objects.filter(pk=row.pk).update(stripe_checkout_session_id="cs_live")
     monkeypatch.setattr(
-        "apps.payments.reconciliation.stripe_client.expire_checkout_session",
+        "apps.payments.reconciliation_rail.stripe_client.expire_checkout_session",
         lambda *_args: (_ for _ in ()).throw(RuntimeError("Stripe down")),
     )
 

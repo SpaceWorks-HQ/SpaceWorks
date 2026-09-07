@@ -10,6 +10,13 @@ from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
 from apps.operations import ledger
 from apps.operations.report_exports import _csv_response, _xlsx_response
+from apps.operations.report_exports_provenance import (
+    LEDGER_REPORT_KEY,
+    LEDGER_REPORT_VERSION,
+    actor_label,
+    build_provenance,
+    export_filters,
+)
 from apps.operations.serializers import EmptySerializer, LedgerResponseSerializer
 from apps.operations.views_reports import (
     _makerspace_for_inventory_view,
@@ -160,10 +167,15 @@ def _ledger_payload(makerspace_id, request):
 
 def _ledger_export_response(makerspace_id, request, filename_base):
     fmt = _export_format(request)
-    rows = ledger.ledger_export_rows(makerspace_id, filters=_ledger_filters(request))
+    filters = _ledger_filters(request)
+    rows = ledger.ledger_export_rows(makerspace_id, filters=filters)
+    provenance = build_provenance(
+        LEDGER_REPORT_KEY, version=LEDGER_REPORT_VERSION, makerspace_id=makerspace_id,
+        generated_by=actor_label(request.user), filters=export_filters(extra=filters),
+    )
     if fmt == "xlsx":
-        return _xlsx_response(rows, f"{filename_base}.xlsx")
-    return _csv_response(rows, f"{filename_base}.csv")
+        return _xlsx_response(rows, f"{filename_base}.xlsx", provenance=provenance)
+    return _csv_response(rows, f"{filename_base}.csv", provenance=provenance)
 
 
 def _ledger_filters(request):

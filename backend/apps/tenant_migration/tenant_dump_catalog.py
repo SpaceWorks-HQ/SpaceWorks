@@ -44,7 +44,18 @@ class TenantDumpCatalogError(AssertionError):
 # so this was recomputed after the merge rather than taken from either side.
 # Re-blessed again after both evidence retention models gained a normal auto primary key
 # so that it can travel with a tenant at all.
-CATALOG_SCHEMA_SHA256 = "3822e7a1d25be00cb59304f0afa3d576f59c63aa065a7b91d991156b33bd4c70"
+# Re-blessed for the forward plan (2026-09-04): trigger-maintained `search_vector` columns on
+# Event/InventoryProduct/Machine (phase 1, DERIVED on import), MemberCard, CertificationType,
+# CertificationGrant, BookableSpace.machine_type and MemberProfile.show_certifications (phase 5);
+# again for phase 6: Refund, loan settings/deposit_amount, MembershipPlan/Term, InvitationRequest,
+# Makerspace.lapsed_members_cannot_borrow, ReportSchedule/ReportDelivery.
+# Re-blessed for the manual-settlement ledger: `payments.ManualSettlement` is the
+# append-only cash book recording how and when an offline charge was actually paid, so
+# it must travel with the payments it explains.
+# Re-blessed again for `TenantDumpCapture.money_fingerprint_sha256`, which binds a
+# capture to the tenant's unsettled money so publication can refuse a dump the source
+# has since moved past.
+CATALOG_SCHEMA_SHA256 = "5f48719d15dbf79c58c0d70de104e3107a9c15d4895bf9f6fbe1dceb55175c59"
 
 
 def catalog_models(apps_registry=apps):

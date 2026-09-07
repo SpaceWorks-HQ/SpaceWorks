@@ -152,15 +152,17 @@ def test_modules_are_opt_in_and_a_new_makerspace_gets_approved_defaults():
     # first two were previously ungated (webhook presence alone decided), which is why
     # makerspaces/0056 backfills them onto existing rows; `discord` is genuinely new and
     # stays opt-in. The final four keys are the other registry growth since the legacy
-    # baseline; only payments and updates remain default-enabled.
+    # baseline; only updates remains default-enabled.
     POST_LEGACY_KEYS = {
-        "notifications", "email", "slack", "mattermost", "discord",
+        "notifications", "email", "slack", "mattermost", "discord", "webhook",
         "payments", "member_accounts", "mobile", "updates",
     }
 
-    # Only payments and updates remain default-on. Member accounts and mobile are
-    # opt-in together because mobile depends on member accounts.
-    DEFAULT_ON_KEYS = {"payments", "updates"}
+    # Only updates remains default-on. Member accounts and mobile are opt-in together
+    # because mobile depends on member accounts. `payments` joined them when charge
+    # TRACKING moved out from under it: the module now buys the online rail alone, so a
+    # cash-taking space needs none of it and still keeps a full ledger of money owed.
+    DEFAULT_ON_KEYS = {"updates"}
 
     assert set(DEFAULT_ENABLED_MODULES) == module_registry.core_module_keys() | DEFAULT_ON_KEYS
     assert default_enabled_modules() == DEFAULT_ENABLED_MODULES
@@ -225,7 +227,7 @@ def test_registry_is_internally_consistent():
     # per-channel notification keys `slack`/`mattermost`/`discord`, plus the four
     # phase-3 keys placed in front of previously ungated substrate: `payments`,
     # `member_accounts`, `mobile` and `updates`.
-    assert len(module_registry.MODULES) == 32
+    assert len(module_registry.MODULES) == 33
     assert len(module_registry.BY_KEY) == len(module_registry.MODULES)
     for definition in module_registry.MODULES:
         assert definition.label and definition.description and definition.app_label

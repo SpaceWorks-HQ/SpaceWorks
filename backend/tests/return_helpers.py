@@ -25,6 +25,53 @@ def make_space(slug):
     return Makerspace.objects.create(name=slug, slug=slug)
 
 
+def enable_online_rail(makerspace, domain):
+    """Switch the ONLINE rail on for one domain, alongside charge tracking.
+
+    Charge tracking (`charges.*`) decides whether a debt is recorded; the payments
+    feature set decides whether a Stripe/Razorpay rail may be raised for it. A test that
+    exercises checkout, a payment intent, or provider provenance needs both, because the
+    member-facing checkout and mobile-intent endpoints now refuse to mint a provider
+    object for a charge whose space has no live rail.
+    """
+    features = set(makerspace.enabled_features or [])
+    features |= {
+        "payments.enabled",
+        f"payments.{domain}",
+        "charges.enabled",
+        f"charges.{domain}",
+    }
+    makerspace.enabled_features = sorted(features)
+    makerspace.save(update_fields=["enabled_features", "updated_at"])
+    return makerspace
+
+
+def settlement_details(**overrides):
+    """The receipt dict the reconciliation SERVICE requires (not the HTTP body).
+
+    `mark_offline`/`reconcile_payments` refuse a paid-offline transition without it, so a
+    settled charge always records how the money arrived.
+    """
+    from django.utils import timezone
+
+    details = {"method": "cash", "reference": "", "received_at": timezone.now()}
+    details.update(overrides)
+    return details
+
+
+def settlement_payload(**overrides):
+    """The receipt body every mark-offline endpoint now requires.
+
+    A charge marked paid offline must be able to say how and when the money arrived, so
+    method and received_at are mandatory at the API boundary.
+    """
+    from django.utils import timezone
+
+    payload = {"method": "cash", "reference": "", "received_at": timezone.now().isoformat()}
+    payload.update(overrides)
+    return {"settlement": payload}
+
+
 def make_member(
     username,
     makerspace,

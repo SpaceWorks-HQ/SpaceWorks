@@ -7,6 +7,8 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
 
+from apps.inventory.search import apply_q
+from apps.makerspaces.editions import require_public_surface
 from apps.apiclients.throttling import ClientTierRateThrottle
 from apps.machines.models import Machine
 from apps.machines.serializers_public_machines import PublicMachineSerializer
@@ -27,6 +29,10 @@ from apps.openapi import PUBLIC_API_AUTH_PARAMETERS
             location=OpenApiParameter.PATH,
             description='Public makerspace code or slug.',
         ),
+        OpenApiParameter(
+            name='q', type=str, location=OpenApiParameter.QUERY, required=False,
+            description='Full-text search over name, location, firmware version and notes; tolerates typos in the name.',
+        ),
     ],
     responses=PublicMachineSerializer(many=True),
 )
@@ -38,11 +44,12 @@ class PublicMachineListView(ListAPIView):
 
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs['makerspace_slug'])
+        require_public_surface('machines')
         if not makerspace.public_inventory_enabled or not module_enabled(
             makerspace, 'machines'
         ):
             raise Http404
-        return (
+        queryset = (
             Machine.objects.select_related('machine_type')
             .filter(
                 makerspace=makerspace,
@@ -58,3 +65,5 @@ class PublicMachineListView(ListAPIView):
             )
             .order_by('name', 'id')
         )
+        query = self.request.query_params.get('q', '')
+        return apply_q(queryset, query) if query.strip() else queryset

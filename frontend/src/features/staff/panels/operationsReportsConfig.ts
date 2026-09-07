@@ -26,6 +26,7 @@ export const reportDefinitions: ReportCatalogItem[] = [
   "payment-reconciliation", "loan-throughput", "inventory-control",
   "evidence-compliance", "import-quality", "procurement-performance",
   "communications-health", "community-engagement", "module-operational-health",
+  "certification-coverage",
 ].map((key) => ({
   key, title: key.replace(/-/g, " ").replace(/^./, (letter) => letter.toUpperCase()),
   fields: [], exportable: key !== "summary", summary: key === "summary",

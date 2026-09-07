@@ -195,6 +195,7 @@ ROW_POLICIES = {
     "integrations.RecipientMachineTypeScope": RowPolicy(RowDisposition.DROP, "A child of a dropped recipient cannot arrive live."),
     "integrations.RecipientMachineScope": RowPolicy(RowDisposition.DROP, "A child of a dropped recipient cannot arrive live."),
     "integrations.RecipientCategoryScope": RowPolicy(RowDisposition.DROP, "A child of a dropped recipient cannot arrive live."),
+    "operations.ReportSchedule": RowPolicy(RowDisposition.DROP, "A scheduled report delivery is a live disclosure rule the target must re-create."),
     "integrations.NotificationDestination": RowPolicy(
         RowDisposition.STAGE_INERT,
         "Imported Telegram rooms require target-authorized activation.",
@@ -239,6 +240,8 @@ FK_POLICIES = {
     ("machines.MachineConsumablePool", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("machines.MakerspaceMachineTypePricing", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("machines.ServiceQueue", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
+    ("machines.CertificationType", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
+    ("bookings.BookableSpace", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("procurement.ToBuyItem", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("integrations.MachineTypeEmailTemplate", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("integrations.DestinationMachineTypeScope", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),

@@ -122,6 +122,39 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
 - Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks
   active status.
 - **Every presigned upload lands on the staging key; the final object key is never client-writable.** A workflow promotes it exactly once, so an accepted evidence photo cannot be replaced through a still-valid presign. Before retention expiry, read paths — the evidence endpoint, the admin preview, and backup/tenant-migration object capture — therefore fall back to the staging key, or an uploaded-but-unconsumed photo reads as missing. A terminal expired state returns 410 and never consults storage.
+- **Money owed is tracked independently of the `payments` module.** `charge_tracking_enabled`
+  (`payments/availability.py`) decides whether a debt is RECORDED and has no module or credential
+  clause; `online_payments_enabled` still governs the Stripe/Razorpay rail only and keeps all four of
+  its clauses. The `charges.*` capability family carries tracking — `charges.enabled` is a standalone
+  master switch (off = the space charges for nothing) and each domain key keeps its real DOMAIN parent,
+  never a payments one. All six charge seams record first and add a rail second; the sixth is the
+  scheduled renewal in `makerspaces/membership_plan_services.py`, which gates independently.
+  **`payments` is now opt-in** and buys the online rail alone. A charge raised with no gateway is
+  stamped `provider=unclaimed` and claimed exactly once by the first checkout that reaches a provider
+  (DB-enforced). Marking one paid offline requires a `ManualSettlement` receipt — method, reference,
+  received date — written in the same transaction and append-only, with corrections as `amends` rows.
+- **The payment LEDGER is permanently core; only the RAIL is separable.** `apps.payments`
+  (Payment, ManualSettlement, reconciliation, member history, receipts, reports) can never be
+  tombstoned — a deployment that cannot read or settle money it is holding has lost data.
+  `apps.payments_rail` owns the removable half: checkout, the native payment sheet, Connect,
+  refunds, credential settings and every webhook. The `payments` MODULE key belongs to the rail,
+  so tombstoning the rail drops the key. `TOMBSTONED_APPS=payments` still works and is
+  translated to `payments_rail` (`separability.tombstones.RENAMED_LABELS`).
+- **Pending payments travel in a portable dump.** A single pending row used to refuse the whole
+  dump; that is gone, because money owed is now recorded by default and the refusal made a dump
+  impossible for any space keeping a ledger. Three things replace it: the preflight refuses a
+  pending row with a **live rail** (hosted session OR native intent), the projection clears every
+  provider handle on pending rows exactly as on terminal ones, and the capture records a
+  `money_fingerprint_sha256` that **publication revalidates** — refusing with `money_drift` if the
+  source settled or raised a debt after the freeze, since the artifact cannot be merged forward.
+- **The member dashboard is gated on the `membership` module** (off by default): request
+  history, returned-item history, membership fee plus outstanding-per-currency, and a notices
+  feed, all served by the one `membership`-gated activity endpoint. Its notices are **derived
+  from the member's own rows**, never from `notifications.Notification` — that table is
+  makerspace-wide with no recipient and one shared `read_at`. **Payment visibility is NOT behind
+  that gate**: `member_may_see_own_charges` admits a live, unrestricted account that owns a
+  charge here and holds no membership, so an account-only loan borrower can read their own debt;
+  a REVOKED member is still refused.
 - Evidence photo **rows** and QR scan records are **immutable**; audit logs are **append-only**. Evidence retention may delete every final and staging object version only after the configured window, but it does not update or delete the retained `EvidencePhoto` row.
 - Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos,
   requester history, or hidden counts. Public visibility is governed per-item by `is_public`,
@@ -150,12 +183,15 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   the original file as a **thin re-export barrel** (explicit `from .submodule import (...)`, never
   `import *`) so `from app.views import X` and `views.X` keep resolving; for `admin.py` the barrel must
   still import the admin submodules so the `@admin.register` side effects fire. **The ceiling is enforced
-  on what you touch, and it is NOT currently met repo-wide: 37 backend files exceed 300 lines** — largest
-  first, `config/settings.py` (929, the accepted exception — Django settings are conventionally a single
-  file), `admin_api/urls.py` (825), `makerspaces/models.py` (682), `accounts/rbac.py` (609),
-  `inventory/availability.py` (596), `admin_api/serializers_makerspaces.py` (561),
-  `makerspaces/module_registry.py` (503), `machines/role_scope.py` (489). Measured 2026-08-20; an earlier
-  version of this line claimed every file but `settings.py` was compliant, which was false by 36 files.
+  on what you touch, and it is nearly met repo-wide: five `backend/apps/` files (non-migration, non-test)
+  exceed 300 lines** — `machines/access.py` (367), `makerspaces/module_registry.py` (322),
+  `inventory/middleware.py` (308), `tenant_migration/tenant_dump_authority.py` (305),
+  `tenant_migration/source_gate_guards.py` (301) — plus `config/settings.py` (1146, the accepted
+  exception — Django settings are conventionally a single file). `backend/tests/` is not held to the
+  ceiling. Frontend: **zero** non-test, non-generated files exceed it — `8be90478` split all eleven,
+  so a frontend file over the ceiling is now new debt, not inherited. Measured 2026-09-06; every earlier
+  version of this line (37 files 2026-08-20, eleven frontend files 2026-09-03) was already stale by the
+  time it was read.
   **Split an over-ceiling file in its own commit before adding to it**, and when splitting one that other
   modules import from, check for guards pinned to its path: `tests/makerspaces/test_tenant_servability_guard.py`
   pins two function *bodies* to `accounts/rbac.py` by `(path, function)`, and
@@ -212,10 +248,41 @@ starting a build.** These are the rules you must not violate without having read
   container runs as the least-privilege `spaceworks_app` role, which has no CREATEDB, so pytest cannot
   build a test database as itself.
 
+  **CHECK WHICH TREE THE CONTAINER MOUNTS BEFORE BELIEVING ANY RESULT FROM IT.** There is more than
+  one clone of this repo on the dev machine, and `spaceworks-backend` has mounted
+  `~/Projects/SpaceInventory/SpaceWorks` while the session worked in `~/Projects/SpaceWorks/SpaceWorks`.
+  `dev-docker.sh exec` then tests *someone else's checkout* — on 2026-09-07 a whole afternoon of
+  "verification" ran against `b15c4e11`, a tree so old it had no `money_digest.py`, and reported
+  green for code it had never loaded. It also explains a flood of `relation ... does not exist` and
+  truncate-FK teardown errors: that tree predates dozens of migrations. Confirm first, every time:
+
   ```bash
-  ./scripts/dev-docker.sh exec -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
-    -T backend pytest tests/backup tests/tenant_migration -q
+  docker inspect spaceworks-backend --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'
   ```
+
+  **When it is the wrong tree — or the shared stack is busy — run a ONE-OFF container against your
+  own isolated infra.** `--entrypoint pytest` is required: the image entrypoint is a production
+  admission gate that demands `--role <role> <command>` plus a host restore-marker. Supply
+  `API_CLIENT_ENC_KEY` and `AUDIT_MAC_MASTER_KEY` too — both come from `backend/.env` on the host,
+  are **empty in the image**, and without them 19 `tests/tenant_migration` tests fail as
+  `ImproperlyConfigured` buried inside a `PairingError` from `deployment_keys.py`, which reads exactly
+  like a custody regression and is not one. Both are Fernet keys; generate throwaways per run. The
+  `db`/`redis`/`minio` network aliases exist in an isolated compose project too, so the image's baked
+  defaults resolve without further overrides.
+
+  ```bash
+  docker run --rm --network <project>_default --entrypoint pytest \
+    -v "$PWD/backend:/app" -v "$PWD:/workspace" -v "$PWD/scripts:/run/spaceworks-privileged-scripts" \
+    -w /app \
+    -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
+    -e SECRET_KEY=test-only \
+    -e API_CLIENT_ENC_KEY="$(python3 -c 'from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())')" \
+    -e AUDIT_MAC_MASTER_KEY="$(python3 -c 'from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())')" \
+    spaceworks-backend tests/backup tests/tenant_migration -q
+  ```
+
+  Verified this way on 2026-09-07 at `6629e60a`: **1559 passed, 0 failed** in ~59 minutes, which is
+  also the proof that the host's `PostgresClientUnavailable` failures above are purely environmental.
 - **Chain every new migration off the ACTUAL leaf** — `ls backend/apps/<app>/migrations/`, never the number
   a spec quotes.
 - **Commits sit local and unpushed on `dev`; pushing is the owner's call alone.** Ask
@@ -233,6 +300,7 @@ starting a build.** These are the rules you must not violate without having read
 ./scripts/dev-local.sh infra && ./scripts/dev-local.sh test    # host: faster pytest, most of the suite
 
 # In Docker, pytest needs the DB OWNER: the backend runs as `spaceworks_app`, which has no CREATEDB.
+# `tests/backup` and `tests/tenant_migration` additionally need the two Fernet keys above.
 ./scripts/dev-docker.sh exec -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
   -T backend pytest
 ```

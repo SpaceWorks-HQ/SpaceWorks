@@ -10,6 +10,15 @@ class Payment(models.Model):
         BOOKING = "booking", "Booking"
         EVENT_REGISTRATION = "event_registration", "Event registration"
         MAKERSPACE_MEMBERSHIP = "makerspace_membership", "Makerspace membership"
+        # subject_id is the `makerspaces.MembershipTerm` pk: the membership pk is already
+        # taken by the dues charge above, and one term gets exactly one renewal charge.
+        MEMBERSHIP_TERM = "membership_term", "Membership renewal"
+        # Loan charges (forward plan phase 6). subject_id is the HardwareRequest id, so
+        # the one-per-subject constraint gives one deposit and one late fee per loan.
+        LOAN_DEPOSIT = "loan_deposit", "Loan deposit"
+        LOAN_LATE_FEE = "loan_late_fee", "Loan late fee"
+
+    LOAN_SUBJECT_TYPES = ("loan_deposit", "loan_late_fee")
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -31,6 +40,13 @@ class Payment(models.Model):
 
         STRIPE = "stripe", "Stripe"
         RAZORPAY = "razorpay", "Razorpay"
+        # A debt raised while the space had no gateway configured. It is real money owed
+        # and fully reconcilable offline; it simply has no rail behind it yet. The first
+        # checkout that reaches a provider claims the row (services._claim_provider), and
+        # a DB trigger permits that transition exactly once. Without this state such a row
+        # would be stamped `stripe` and could never be claimed by a gateway configured
+        # later, because provider provenance is immutable.
+        UNCLAIMED = "unclaimed", "No online rail"
 
     class OnlineRail(models.TextChoices):
         CHECKOUT = 'checkout', 'Stripe Checkout'
@@ -170,6 +186,22 @@ class Payment(models.Model):
                     raise ValidationError(
                         {"subject_id": "Payment subject must belong to the payment makerspace."}
                     )
+        if self.subject_type in self.LOAN_SUBJECT_TYPES and self.subject_id:
+            from apps.hardware_requests.models import HardwareRequest
+
+            if not subject_identity_unchanged and not HardwareRequest.objects.filter(
+                pk=self.subject_id,
+                makerspace_id=self.makerspace_id,
+            ).exists():
+                raise ValidationError({"subject_id": "Payment subject must belong to the payment makerspace."})
+        if self.subject_type == self.SubjectType.MEMBERSHIP_TERM and self.subject_id:
+            from apps.makerspaces.models import MembershipTerm
+
+            if not subject_identity_unchanged and not MembershipTerm.objects.filter(
+                pk=self.subject_id,
+                membership__makerspace_id=self.makerspace_id,
+            ).exists():
+                raise ValidationError({"subject_id": "Payment subject must belong to the payment makerspace."})
         if self.subject_type == self.SubjectType.MAKERSPACE_MEMBERSHIP and self.subject_id:
             from apps.makerspaces.models import MakerspaceMembership
 
@@ -195,7 +227,18 @@ class Payment(models.Model):
                 original["status"] != self.status or original["amount"] != self.amount
             ):
                 raise ValidationError("Terminal payments are immutable.")
-            if original and any(
+            # A charge raised with no gateway configured carries `provider=unclaimed`:
+            # it has no provenance yet, so the first checkout that reaches a provider is
+            # allowed to stamp one, exactly once. Without this exemption the guard below
+            # rejected that stamp and an unclaimed debt could NEVER be claimed, even
+            # after valid credentials were added -- the database trigger permitting the
+            # transition was never reached.
+            claiming = (
+                original
+                and original["provider"] == self.Provider.UNCLAIMED
+                and self.provider != self.Provider.UNCLAIMED
+            )
+            if not claiming and original and any(
                 original[field] != getattr(self, field)
                 for field in ("provider", "stripe_provider", "stripe_connected_account_id", "stripe_application_fee_amount")
             ):

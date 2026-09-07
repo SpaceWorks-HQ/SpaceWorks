@@ -10,6 +10,7 @@ import { OperationsReportsMembers } from "./OperationsReportsMembers";
 import { OperationsReportsPayments } from "./OperationsReportsPayments";
 import { OperationsReportsPrinterService } from "./OperationsReportsPrinterService";
 import { OperationsReportsCoverage } from "./OperationsReportsCoverage";
+import { ReportSchedules } from "./ReportSchedules";
 import { Panel, type Makerspace, useStaffGet } from "./shared";
 import {
   loadSavedReportViews,
@@ -261,6 +262,8 @@ export function OperationsReports({
           </p>
         ) : null}
       </Panel>
+
+      {!aggregate && reportsEnabled ? <ReportSchedules makerspaceId={makerspace.id} reports={availableExports} /> : null}
 
       <OperationsReportsHardware analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} enabled={hardwareEnabled} aggregate={aggregate} makerspaceName={makerspaceName} />
       <OperationsReportsCoverage catalog={catalogEntries} analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} grain={grain} aggregate={aggregate} makerspaceName={makerspaceName} />

@@ -6,5 +6,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Playwright owns e2e/*.spec.ts (playwright.config.ts); vitest runs only the unit tests.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 });

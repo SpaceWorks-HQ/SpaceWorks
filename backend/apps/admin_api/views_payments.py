@@ -11,8 +11,10 @@ from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.machines import role_scope
 from apps.machines.models import MachineServiceRequest
 from apps.payments.models import Payment
+from apps.payments.reconciliation import reconcile_payments
 from apps.payments.serializers import StaffPaymentSerializer
-from apps.payments.services import mark_offline, waive
+from apps.payments.serializers_reconciliation import PaymentOfflineSerializer
+from apps.payments.services import mark_offline, waive  # noqa: F401
 
 
 def _manageable_payment(actor, pk):
@@ -34,14 +36,27 @@ class _PaymentActionView(APIView):
 
     def post(self, request, pk):
         payment = _manageable_payment(request.user, pk)
-        payment = mark_offline(payment, request.user) if self.operation == "offline" else waive(payment, request.user)
+        if self.operation == "offline":
+            # Same receipt contract as the generic reconciliation routes: a charge marked
+            # paid offline must always be able to say how and when the money arrived.
+            payload = PaymentOfflineSerializer(data=request.data)
+            payload.is_valid(raise_exception=True)
+            payment = reconcile_payments(
+                actor=request.user,
+                makerspace_id=payment.makerspace_id,
+                payment_ids=[payment.pk],
+                target_status=Payment.Status.PAID_OFFLINE,
+                settlement=payload.validated_data["settlement"],
+            )[0]
+        else:
+            payment = waive(payment, request.user)
         return Response(StaffPaymentSerializer(payment).data)
 
 
 class PaymentMarkOfflineView(_PaymentActionView):
     operation = "offline"
 
-    @extend_schema(tags=["Payments"], summary="Mark a machine-service payment paid offline", request=None, responses={200: StaffPaymentSerializer, 403: OpenApiResponse(ErrorSerializer), 404: OpenApiResponse(ErrorSerializer)})
+    @extend_schema(tags=["Payments"], summary="Mark a machine-service payment paid offline", request=PaymentOfflineSerializer, responses={200: StaffPaymentSerializer, 403: OpenApiResponse(ErrorSerializer), 404: OpenApiResponse(ErrorSerializer)})
     def post(self, request, pk):
         return super().post(request, pk)
 

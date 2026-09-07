@@ -10,6 +10,7 @@ from apps.data_export.datasets import DATASET_SPECS
 OBJECT_FIELD_NAMES = frozenset({
     "object_key", "image_key", "avatar_key", "cover_image_key", "copy_key",
     "logo_key",
+    "photo_object_key",
 })
 
 NON_OBJECT_KEY_FIELDS = frozenset({
@@ -28,6 +29,7 @@ NON_OBJECT_KEY_FIELDS = frozenset({
     ("operations.ReportMetricRollup", "dimension_key"),
     ("operations.ReportMetricRollup", "metric_key"),
     ("operations.ReportMetricRollup", "report_key"),
+    ("operations.ReportSchedule", "report_key"),
     ("backup.RestoreRollbackObject", "source_key"),
     # Run-owned promotion staging is retry coordination, not durable archive
     # content. The final object and artifact ledger are the restore authority.
@@ -182,4 +184,5 @@ def module_for_model(label):
         "makerspaces.MemberProfile": "membership",
         "makerspaces.MemberProject": "membership",
         "machines.ServiceRequestFile": "machine_service",
+        "operations.ReportDelivery": "reports",
     }.get(label, "")

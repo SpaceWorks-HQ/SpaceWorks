@@ -30,6 +30,16 @@ from apps.admin_api.views_roles import (
     RoleMachineScopeView,
 )
 from apps.admin_api.views_walk_in import WalkInMemberCreateView
+from apps.makerspaces.member_card_admin_views import (
+    MemberCardIssueView,
+    MemberCardListView,
+    MemberCardPrintView,
+    MemberCardReissueView,
+    MemberCardResolveView,
+    MemberCardRevokeView,
+    MemberCardSheetView,
+    MemberCardTemplateView,
+)
 from apps.admin_api.views_waiver_witness import AdminWitnessWaiverAcceptanceView
 
 
@@ -60,6 +70,14 @@ management_urlpatterns = [
         WalkInMemberCreateView.as_view(),
         name="admin-walk-in-member-create",
     ),
+    path("makerspaces/<int:makerspace_id>/member-cards", MemberCardListView.as_view(), name="admin-member-cards"),
+    path("makerspaces/<int:makerspace_id>/member-cards/<int:membership_id>/issue", MemberCardIssueView.as_view(), name="admin-member-card-issue"),
+    path("makerspaces/<int:makerspace_id>/member-cards.pdf", MemberCardSheetView.as_view(), name="admin-member-cards-sheet"),
+    path("makerspaces/<int:makerspace_id>/member-cards/resolve", MemberCardResolveView.as_view(), name="admin-member-card-resolve"),
+    path("makerspaces/<int:makerspace_id>/member-card-template", MemberCardTemplateView.as_view(), name="admin-member-card-template"),
+    path("member-cards/<int:pk>/reissue", MemberCardReissueView.as_view(), name="admin-member-card-reissue"),
+    path("member-cards/<int:pk>/revoke", MemberCardRevokeView.as_view(), name="admin-member-card-revoke"),
+    path("member-cards/<int:pk>/print.pdf", MemberCardPrintView.as_view(), name="admin-member-card-print"),
     path(
         "makerspaces/<int:makerspace_id>/member-claim-codes",
         MemberClaimCodeListCreateView.as_view(),

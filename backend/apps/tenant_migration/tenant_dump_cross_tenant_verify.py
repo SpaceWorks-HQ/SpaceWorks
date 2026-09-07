@@ -26,11 +26,17 @@ def verify_cross_tenant_projection(using, makerspace_id):
     for row in Payment._base_manager.using(using).values(
         "status", *PAYMENT_CLEARED_VALUES
     ):
-        if row["status"] not in TERMINAL_PAYMENT_STATUSES or any(
-            row[name] != value for name, value in PAYMENT_CLEARED_VALUES.items()
-        ):
+        # Pending rows travel now (D5). They are held to the SAME cleared-handle rule as
+        # terminal ones -- no order id, session, intent, checkout URL, connected account
+        # or routing -- which is what stops a target resuming the source's rail. The
+        # status set is no longer part of the assertion, only the projection is.
+        if any(row[name] != value for name, value in PAYMENT_CLEARED_VALUES.items()):
             raise TenantDumpVerificationError(
-                "A payment violates the terminal-history projection."
+                "A payment violates the provider-history projection."
+            )
+        if row["status"] not in TERMINAL_PAYMENT_STATUSES and row["status"] != "pending":
+            raise TenantDumpVerificationError(
+                f"A payment carries an unexpected status: {row['status']}."
             )
     _verify_transfers(using, int(makerspace_id))
     return True

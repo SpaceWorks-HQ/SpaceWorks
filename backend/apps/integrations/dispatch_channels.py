@@ -45,6 +45,12 @@ def _channel_configured(makerspace, channel, destination=None) -> bool:
                 resolve_bot_token(makerspace)
                 and resolve_chat_id(makerspace, destination)
             )
+        if channel == NonEmailNotificationChannel.WEBHOOK:
+            # Destination-only: there is no makerspace-wide signed endpoint, and a
+            # destination without a signing secret is not-configured, never unsigned.
+            return destination is not None and bool(
+                destination.get_webhook_url() and destination.get_signing_secret()
+            )
         if channel in (
             NonEmailNotificationChannel.SLACK,
             NonEmailNotificationChannel.MATTERMOST,
@@ -252,6 +258,10 @@ def _deliver_notification(log) -> NotificationDeliveryLog:
                 log.text_body,
                 destination=log.destination,
             )
+        elif log.channel == NonEmailNotificationChannel.WEBHOOK:
+            from apps.integrations.webhooks import send_signed_webhook
+
+            ok = send_signed_webhook(log)
         else:
             from apps.integrations.webhooks import send_webhook
 

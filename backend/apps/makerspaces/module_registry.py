@@ -181,13 +181,25 @@ MODULES = (
         "discord", "Discord", "Per-makerspace Discord incoming-webhook alerts.",
         "integrations", GUARD, group=GROUP_NOTIFICATIONS,
     ),
+    # Not a chat room: an HTTPS endpoint of the makerspace's own that receives every
+    # notification the matrix routes to it as signed JSON. Same destination model, same
+    # matrix, same retry and delivery log as the chat channels.
+    ModuleDefinition(
+        "webhook", "Signed webhooks",
+        "Per-makerspace signed JSON webhooks to your own systems.",
+        "integrations", GUARD, group=GROUP_NOTIFICATIONS,
+    ),
     # These keys were placed in front of substrate that had been unconditionally
     # present, so migration 0057 backfilled their original keys onto existing rows.
-    # Payments and updates remain default-enabled; member accounts and mobile are now
+    # Updates remains default-enabled; member accounts, mobile and now payments are
     # opt-in for newly created makerspaces.
+    # `payments` stopped being default-enabled when charge TRACKING moved out from under
+    # it (`charges.*`): the module now buys only the online rail, which a cash-taking
+    # space needs none of. Existing rows keep the key from migration 0057.
     ModuleDefinition(
-        "payments", "Payments", "Online payment for machine jobs, bookings, events and dues.",
-        "payments", GUARD, group=GROUP_PAYMENTS, default_enabled=True,
+        "payments", "Payments",
+        "Online card payment (Stripe/Razorpay). Money owed is tracked without it.",
+        "payments_rail", GUARD, group=GROUP_PAYMENTS,
     ),
     # Member-facing identity only. Staff authentication is core RBAC and is NEVER gated:
     # a space that could switch off its own staff logins could not be administered, the

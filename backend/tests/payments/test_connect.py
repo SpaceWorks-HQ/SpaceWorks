@@ -16,13 +16,25 @@ from apps.payments.models import (
 from apps.payments.services import create_checkout_url, create_payment
 from apps.payments.stripe_client import PaymentsUnavailable
 from tests.payments.test_machine_payments import service_request
-from tests.return_helpers import make_member, make_space
+from tests.return_helpers import (
+    enable_online_rail,
+    make_member,
+    make_space,
+    settlement_payload,
+)
 
 
 pytestmark = pytest.mark.django_db
 
 
-def test_create_payment_fails_closed_when_no_payment_source_resolves(monkeypatch):
+def test_create_payment_records_an_unclaimed_debt_when_no_payment_source_resolves(monkeypatch):
+    """No gateway is no longer a reason to lose the debt.
+
+    This used to fail closed and record nothing, which made money owed invisible for any
+    space without credentials -- no pending row, nothing to reconcile, nothing in reports.
+    Recording the charge and collecting it online are now separate concerns: the row is
+    raised as `unclaimed` and the first checkout that reaches a provider claims it.
+    """
     makerspace = make_space("connect-source-disappeared")
     actor = make_member("connect-source-disappeared-member", makerspace)
     subject = service_request(makerspace, actor)
@@ -31,18 +43,23 @@ def test_create_payment_fails_closed_when_no_payment_source_resolves(monkeypatch
         lambda _makerspace: None,
     )
 
-    with pytest.raises(PaymentsUnavailable):
-        create_payment(
-            makerspace=makerspace,
-            subject_type="machine_service_request",
-            subject_id=subject.id,
-            member=actor,
-            amount=Decimal("10.00"),
-            currency="usd",
-            created_by=actor,
-        )
+    payment = create_payment(
+        makerspace=makerspace,
+        subject_type="machine_service_request",
+        subject_id=subject.id,
+        member=actor,
+        amount=Decimal("10.00"),
+        currency="usd",
+        created_by=actor,
+    )
 
-    assert not Payment.objects.filter(
+    assert payment.status == Payment.Status.PENDING
+    assert payment.provider == Payment.Provider.UNCLAIMED
+    # No rail was reached, so nothing may look like a provider handle.
+    assert payment.stripe_connected_account_id is None
+    assert payment.stripe_application_fee_amount == 0
+    assert payment.checkout_url == ""
+    assert Payment.objects.filter(
         subject_type="machine_service_request", subject_id=subject.id
     ).exists()
 
@@ -131,7 +148,7 @@ def test_connect_callback_consumes_state_stores_account_and_rejects_replay(
     )
     raw_state = parse_qs(urlparse(started.data["authorize_url"]).query)["state"][0]
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code",
+        "apps.payments_rail.views_connect.exchange_oauth_code",
         lambda code: "acct_callback",
     )
     fetches = []
@@ -151,7 +168,7 @@ def test_connect_callback_consumes_state_stores_account_and_rejects_replay(
         }
 
     monkeypatch.setattr(
-        "apps.payments.views_connect.fetch_account",
+        "apps.payments_rail.views_connect.fetch_account",
         fetch_mapped_account,
     )
 
@@ -236,10 +253,10 @@ def test_connect_callback_replacement_revokes_previous_account(settings, monkeyp
     )
     raw_state = parse_qs(urlparse(started.data["authorize_url"]).query)["state"][0]
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code", lambda _code: "acct_new"
+        "apps.payments_rail.views_connect.exchange_oauth_code", lambda _code: "acct_new"
     )
     monkeypatch.setattr(
-        "apps.payments.views_connect.fetch_account",
+        "apps.payments_rail.views_connect.fetch_account",
         lambda account_id: {
             "id": account_id,
             "charges_enabled": True,
@@ -249,7 +266,7 @@ def test_connect_callback_replacement_revokes_previous_account(settings, monkeyp
     )
     revoked = []
     monkeypatch.setattr(
-        "apps.payments.views_connect.deauthorize_account", revoked.append
+        "apps.payments_rail.views_connect.deauthorize_account", revoked.append
     )
 
     response = APIClient().get(
@@ -298,11 +315,11 @@ def test_older_oauth_callback_cannot_overwrite_newer_onboarding(settings, monkey
     second_state = parse_qs(urlparse(second.data["authorize_url"]).query)["state"][0]
     exchanged = []
     monkeypatch.setattr(
-        "apps.payments.views_connect.exchange_oauth_code",
+        "apps.payments_rail.views_connect.exchange_oauth_code",
         lambda code: exchanged.append(code) or f"acct_{code}",
     )
     monkeypatch.setattr(
-        "apps.payments.views_connect.fetch_account",
+        "apps.payments_rail.views_connect.fetch_account",
         lambda account_id: {
             "id": account_id,
             "charges_enabled": True,
@@ -358,7 +375,7 @@ def test_connect_checkout_uses_direct_charge_and_snapshots_fee(settings, monkeyp
         created_by=actor,
     )
     monkeypatch.setattr(
-        "apps.payments.services.refresh_connected_account",
+        "apps.payments.services_checkout.refresh_connected_account",
         lambda _merchant: merchant,
     )
     calls = []
@@ -448,6 +465,7 @@ def test_raw_payment_fails_closed_after_provider_switch_to_connect(
     platform.stripe_connect_client_id = "ca_platform"
     platform.save()
     makerspace = make_space("raw-snapshot-provider-switch")
+    enable_online_rail(makerspace, "machines")
     merchant = MakerspacePaymentSettings.objects.create(
         makerspace=makerspace,
         connect_account_id="acct_rawswitch",
@@ -476,11 +494,11 @@ def test_raw_payment_fails_closed_after_provider_switch_to_connect(
     checkout_calls = []
     expiry_calls = []
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.create_checkout_session",
+        "apps.payments.services_checkout.stripe_client.create_checkout_session",
         lambda source, **params: checkout_calls.append((source, params)),
     )
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.expire_checkout_session",
+        "apps.payments.services_checkout.stripe_client.expire_checkout_session",
         lambda source, session_id: expiry_calls.append((source, session_id)),
     )
     client = APIClient()
@@ -500,6 +518,8 @@ def test_raw_payment_fails_closed_after_provider_switch_to_connect(
     )
     reconciled = client.post(
         f"/api/v1/admin/machine-service/payments/{payment.pk}/mark-offline",
+        settlement_payload(),
+        format="json",
         HTTP_HOST="localhost",
     )
 
@@ -519,6 +539,7 @@ def test_connect_payment_keeps_snapshot_after_provider_switch_to_raw(
     platform.stripe_connect_client_id = "ca_platform"
     platform.save()
     makerspace = make_space("connect-snapshot-provider-switch")
+    enable_online_rail(makerspace, "machines")
     merchant = MakerspacePaymentSettings.objects.create(
         makerspace=makerspace,
         connect_account_id="acct_connectswitch",
@@ -543,7 +564,7 @@ def test_connect_payment_keeps_snapshot_after_provider_switch_to_raw(
     merchant.set_stripe_webhook_secret("whsec_raw")
     merchant.save()
     monkeypatch.setattr(
-        "apps.payments.services.refresh_connected_account", lambda _merchant: merchant
+        "apps.payments.services_checkout.refresh_connected_account", lambda _merchant: merchant
     )
     checkout_sources = []
     expiry_sources = []
@@ -556,10 +577,10 @@ def test_connect_payment_keeps_snapshot_after_provider_switch_to_raw(
         }
 
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.create_checkout_session", create_session
+        "apps.payments.services_checkout.stripe_client.create_checkout_session", create_session
     )
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.expire_checkout_session",
+        "apps.payments.services_checkout.stripe_client.expire_checkout_session",
         lambda source, _session_id: expiry_sources.append(source),
     )
     client = APIClient()
@@ -571,6 +592,8 @@ def test_connect_payment_keeps_snapshot_after_provider_switch_to_raw(
     )
     reconciled = client.post(
         f"/api/v1/admin/machine-service/payments/{payment.pk}/mark-offline",
+        settlement_payload(),
+        format="json",
         HTTP_HOST="localhost",
     )
 
@@ -625,7 +648,7 @@ def test_connect_webhook_verifies_platform_secret_and_routes_snapshot(
         },
     }
     construct = Mock(return_value=event)
-    monkeypatch.setattr("apps.payments.views_connect.construct_event", construct)
+    monkeypatch.setattr("apps.payments_rail.views_connect.construct_event", construct)
 
     response = APIClient().generic(
         "POST",
@@ -691,7 +714,7 @@ def test_connect_expired_webhook_confirms_checkout_session_is_closed(
         "data": {"object": {"id": "cs_connect_expired"}},
     }
     monkeypatch.setattr(
-        "apps.payments.views_connect.construct_event", Mock(return_value=event)
+        "apps.payments_rail.views_connect.construct_event", Mock(return_value=event)
     )
 
     response = APIClient().generic(
@@ -712,15 +735,15 @@ def test_connect_expired_webhook_confirms_checkout_session_is_closed(
 
     created = []
     monkeypatch.setattr(
-        "apps.payments.services.member_payment_return_url",
+        "apps.payments.services_checkout.member_payment_return_url",
         lambda _makerspace: "https://space.example/member",
     )
     monkeypatch.setattr(
-        "apps.payments.services.refresh_connected_account",
+        "apps.payments.services_checkout.refresh_connected_account",
         lambda _merchant: merchant,
     )
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.create_checkout_session",
+        "apps.payments.services_checkout.stripe_client.create_checkout_session",
         lambda _source, **params: created.append(params)
         or {
             "id": "cs_connect_replacement",

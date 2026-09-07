@@ -13,6 +13,10 @@ from apps.operations.models_rollups import (  # noqa: F401,E402
     ReportMetricRollup,
     ReportRollupCursor,
 )
+from apps.operations.models_report_schedules import (  # noqa: F401,E402
+    ReportDelivery,
+    ReportSchedule,
+)
 
 
 class StockTransfer(models.Model):

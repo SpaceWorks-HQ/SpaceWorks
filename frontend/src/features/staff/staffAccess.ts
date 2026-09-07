@@ -1,5 +1,5 @@
 const ALL_TABS = [
-  "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "organized", "bookings", "members", "tobuy", "transfers",
+  "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "organized", "bookings", "members", "cards", "tobuy", "transfers",
   "stocktake", "containers", "ledger", "reports", "accountability", "warranty", "bulk", "qr", "scanner", "api", "settings", "emailtemplates", "users", "platform", "audit",
   "email-logs", "payments", "organizations", "organization-analytics", "modules", "exports", "backups", "migration",
 ] as const;
@@ -27,6 +27,7 @@ export const TAB_LABELS: Record<string, string> = {
   organized: "Organized events",
   bookings: "Bookings",
   members: "Members",
+  cards: "Member cards",
   tobuy: "To Buy",
   reports: "Reports",
   "organization-analytics": "Organization analytics",
@@ -53,7 +54,7 @@ export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
   { label: "Machines", tabs: ["machines"] },
   { label: "Events", tabs: ["events", "organized"] },
   { label: "Bookings", tabs: ["bookings"] },
-  { label: "Members", tabs: ["members"] },
+  { label: "Members", tabs: ["members", "cards"] },
   { label: "Insights", tabs: ["reports", "organization-analytics", "accountability", "warranty", "audit"] },
   { label: "Organizations", tabs: ["organizations"] },
   { label: "Admin", tabs: ["users", "settings", "emailtemplates", "email-logs", "api", "exports", "backups", "migration", "modules", "platform"] },
@@ -85,6 +86,11 @@ export function getStaffAccess(
   const canViewAudit = has("view_audit");
   const canManageQr = has("manage_qr");
   const canManageMakerspace = has("manage_makerspace");
+  // Mirrors the backend gate: the member-card endpoints check SCAN_MEMBER_CARDS /
+  // MANAGE_MEMBER_CARDS, never MANAGE_MAKERSPACE. Space Manager holds the manage action by
+  // default, but a front-desk custom role may hold only the scan action -- and a
+  // manage_makerspace role that was never granted either must not be shown a tab that 403s.
+  const canUseMemberCards = has("manage_member_cards") || has("scan_member_cards");
   const canIssueDirectLoan = has("issue_direct_loan");
   const canSeeHardware = isSuperadmin || ["accept_request", "reject_request", "assign_box", "issue_request", "issue_direct_loan", "return_request"].some((action) => actions.includes(action));
   const canUseToBuy = has("edit_inventory") || has("manage_printing") || has("manage_machines") || has("manage_makerspace");
@@ -149,6 +155,7 @@ export function getStaffAccess(
     if (tabName === "organizations") return !singleTenantLocked;
     if (tabName === "bookings") return canManageBookings;
     if (tabName === "members") return canManageMakerspace;
+    if (tabName === "cards") return canUseMemberCards;
     if (tabName === "payments") return canManageMakerspace;
     if (tabName === "exports") return canManageMakerspace;
     if (tabName === "backups") return canManageMakerspace;
@@ -168,6 +175,7 @@ export function getStaffAccess(
     canViewAudit,
     canManageQr,
     canManageMakerspace,
+    canUseMemberCards,
     canManageMachines,
     canManageEvents,
     canManageBookings,

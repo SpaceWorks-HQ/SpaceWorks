@@ -69,7 +69,7 @@ HTTP_ANONYMOUS_EXEMPTIONS = {
     "apps.accounts.views_session.LogoutView.post": "Global user session state.",
     "apps.accounts.views_social.SocialNonceView.post": "Global social-login nonce state.",
     "apps.accounts.views_social.SocialLoginView.post": "Global social identity and session state.",
-    "apps.payments.views_connect.StripeConnectWebhookView.post": "Platform Connect routing state.",
+    "apps.payments_rail.views_connect.StripeConnectWebhookView.post": "Platform Connect routing state.",
     "apps.integrations.views.TelegramWebhookView.post": (
         "Writes nothing at all: the callback route was removed when chat stopped being an "
         "action surface, and the view only acknowledges so an already-registered webhook "
@@ -177,8 +177,15 @@ TASK_INTERNAL_PARTICIPANTS = {
         "Each rollup finalisation uses the skip-and-count tenant boundary; the "
         "makerspace queryset is servable-filtered before iteration."
     ),
+    "apps.operations.tasks_report_schedules.run_report_schedules_task": (
+        "Each due schedule runs inside its own skip-and-count tenant boundary; the "
+        "due queryset is filtered to report-eligible (servable) makerspaces first."
+    ),
     "apps.makerspaces.tasks.refresh_github_contributions_task": (
         "Each profile refresh uses the skip-and-count tenant boundary."
+    ),
+    "apps.makerspaces.tasks_membership.run_membership_renewals_task": (
+        "Each term expiry and renewal charge uses the skip-and-count tenant boundary."
     ),
     "apps.apiclients.tasks.flush_api_client_usage_task": (
         "Writes only deployment-local last-seen telemetry on ApiClient rows; it moves no "
@@ -198,6 +205,10 @@ FANOUT_GATE_PARTICIPANTS = {
         "Overdue loan reminders."
     ),
     "apps.makerspaces.tasks.refresh_github_contributions_task": "GitHub profile refresh.",
+    "apps.makerspaces.membership_plan_services.run_membership_renewals": (
+        "Membership term expiry and renewal charges."
+    ),
+    "apps.operations.report_schedule_services.run_report_schedules": "Due scheduled report deliveries.",
 }
 
 
@@ -225,6 +236,9 @@ OBJECT_MUTATION_PARTICIPANTS = {
         "The fan-out service owns one tenant source-gate boundary at a time."
     ),
     "apps.events.services_images.remove_image": "Called by the tenant-resolved event image route.",
+    "apps.makerspaces.member_card_storage.presign_photo": "Called only by the tenant-resolved member-card photo route.",
+    "apps.makerspaces.member_card_storage.finalize_photo": "Called only by the tenant-resolved member-card photo route.",
+    "apps.makerspaces.member_card_storage._release": "Reached only through the member-card photo route, revoke and the membership purge.",
     "apps.events.services_images.update_image": "Called by the tenant-resolved event image route.",
     "apps.events.services_series_images.remove_image": "Called by the tenant-resolved event series image route.",
     "apps.events.services_series_images.update_image": "Called by the tenant-resolved event series image route.",
@@ -243,6 +257,10 @@ OBJECT_MUTATION_PARTICIPANTS = {
     "apps.maintenance.services_documents.delete_log_document": "Runs inside the model-resolved maintenance document route.",
     "apps.maintenance.services_documents.finalize_log_document": "Runs inside the model-resolved maintenance document route.",
     "apps.makerspaces.lifecycle_storage._delete_public_image_keys": "Tenant purge is an express source-gate exclusion.",
+    "apps.operations.report_delivery_storage.delete_report_object": (
+        "Reached only inside run_report_schedules' skip-and-count tenant boundary, the "
+        "tenant-resolved schedule delete route and the reports module purge."
+    ),
     "apps.makerspaces.profile_images._swap": "Runs inside the authenticated member profile image route.",
     "apps.tenant_migration.tenant_dump_cleanup.cleanup_refused_tenant_dump_artifacts": (
         "Deletes only private Lane D coordination artifacts after a refused run."

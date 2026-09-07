@@ -3,6 +3,7 @@ from unfold.admin import ModelAdmin
 
 from apps.makerspaces.models import (
     MakerspaceMembership,
+    MemberCard,
     MakerspaceWaiver,
     MemberProfile,
     MemberProject,
@@ -80,3 +81,23 @@ class MemberProjectAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return request.method in ("GET", "HEAD") and super().has_change_permission(request, obj)
+
+
+@admin.register(MemberCard)
+class MemberCardAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+    """Read-only: issue/reissue/revoke are staff-console actions routed through the
+    member-card services, and the photo is a private object with no admin preview."""
+
+    list_display = ("makerspace", "card_number", "membership", "issued_at", "revoked_at", "print_count")
+    list_filter = ("makerspace", ("revoked_at", admin.EmptyFieldListFilter))
+    readonly_fields = tuple(field.name for field in MemberCard._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return request.method in ("GET", "HEAD") and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+

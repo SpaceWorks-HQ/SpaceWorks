@@ -69,6 +69,28 @@ class CheckoutResult:
 
 
 @dataclass(frozen=True)
+class RefundRequest:
+    """Everything a provider needs to send money back on a captured charge."""
+
+    #: The provider's id for the captured payment (Stripe PaymentIntent, Razorpay payment).
+    payment_id: str
+    amount_minor: int
+    currency: str
+    #: Our Refund row id, echoed back so the webhook can bind the provider's refund id.
+    reference: str
+    idempotency_key: str
+    metadata: dict
+
+
+@dataclass(frozen=True)
+class RefundResult:
+    """The provider's synchronous answer. `status` is one of pending/succeeded/failed."""
+
+    refund_id: str
+    status: str
+
+
+@dataclass(frozen=True)
 class WebhookEvent:
     """A verified, provider-agnostic settlement notification."""
 
@@ -81,6 +103,11 @@ class WebhookEvent:
     payment_id: str = ""
     #: The `metadata`/`notes` echoed back from CheckoutRequest.
     metadata: dict | None = None
+    #: Refund notifications. Non-empty `refund_id` marks the event as a refund event;
+    #: `refund_status` is normalised to pending/succeeded/failed by the provider.
+    refund_id: str = ""
+    refund_status: str = ""
+    refund_amount_minor: int = 0
 
 
 class PaymentProvider(Protocol):
@@ -97,6 +124,14 @@ class PaymentProvider(Protocol):
         Called when staff reconcile a payment offline or waive it, so a member cannot
         pay a charge that has already been settled another way. Best-effort because the
         reconciliation itself must succeed regardless.
+        """
+        ...
+
+    def create_refund(self, source, request: RefundRequest) -> RefundResult:
+        """Send money back on a captured charge. Raises PaymentsUnavailable on failure.
+
+        The caller has already recorded a PENDING Refund row; this must return the
+        provider's refund id so a later webhook can settle that exact row.
         """
         ...
 

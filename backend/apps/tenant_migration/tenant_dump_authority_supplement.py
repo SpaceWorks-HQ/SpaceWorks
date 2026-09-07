@@ -53,4 +53,61 @@ SUPPLEMENTAL_AUTHORITY_ENTRIES = (
         D.RESET,
         "Provider handles and cross-tenant routing cannot authorize target operations.",
     ),
+    *_same(
+        "payments.ManualSettlement",
+        "method reference received_at amount currency",
+        D.PRESERVE,
+        "The cash book travels with the payments it explains: how and when money was "
+        "taken is the space's own record, not a provider handle.",
+    ),
+    *_same(
+        "payments.Refund",
+        "status amount currency provider reason",
+        D.PRESERVE,
+        "Refund history remains readable alongside the payment it corrects.",
+    ),
+    *_same(
+        "payments.Refund",
+        "external_refund_id",
+        D.RESET,
+        "Provider refund handles cannot authorize target operations.",
+    ),
+    *_same(
+        "makerspaces.MemberCard",
+        "printed_name photo_object_key photo_content_type photo_size_bytes photo_consent_at "
+        "photo_consent_version",
+        (D.PRESERVE, D.DROP),
+        "Full-user card identity travels; stub-linked identity content does not.",
+    ),
+    # Membership plans, terms and invitation requests (forward plan phase 6).
+    *_same(
+        "makerspaces.InvitationRequest",
+        "name email phone message",
+        (D.PRESERVE, D.DROP),
+        "A lead's contact details travel with a full tenant; stub-linked content does not.",
+    ),
+    *_same(
+        "makerspaces.InvitationRequest",
+        "status",
+        D.PRESERVE,
+        "Whether a lead was invited or declined is honest history, not authority.",
+    ),
+    *_same(
+        "makerspaces.MembershipPlan",
+        "is_active",
+        D.PRESERVE,
+        "Which plans a tenant still sells is its own pricing choice.",
+    ),
+    *_same(
+        "makerspaces.MembershipTerm",
+        "status",
+        D.PRESERVE,
+        "Term history stays readable; it never changes membership authority.",
+    ),
+    *_same(
+        "makerspaces.Makerspace",
+        "lapsed_members_cannot_borrow",
+        D.PRESERVE,
+        "A tenant's own borrowing rule for lapsed members, still bounded by target modules.",
+    ),
 )

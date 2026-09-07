@@ -62,6 +62,13 @@ SCHEDULED_TASKS = (
         "apps.makerspaces.tasks.refresh_github_contributions_task",
         24 * 60,
     ),
+    # Expires membership terms and raises the one renewal charge per term inside the
+    # window. Hourly is plenty: the window is seven days wide.
+    (
+        "membership-renewals",
+        "apps.makerspaces.tasks_membership.run_membership_renewals_task",
+        60,
+    ),
     # Same fixed-hour-versus-interval reasoning as above. Without this entry a beat-less
     # cloud deployment would retain expired export archives -- and the download bearer
     # tokens that reach them -- indefinitely.
@@ -74,6 +81,13 @@ SCHEDULED_TASKS = (
         "finalize-report-rollups",
         "apps.operations.tasks.finalize_report_rollups_task",
         24 * 60,
+    ),
+    # Due schedules are claimed with `skip_locked` and advance `next_run_at` before any
+    # work, so a 15-minute cadence is a latency bound, not a duplicate-delivery risk.
+    (
+        "report-schedules",
+        "apps.operations.tasks_report_schedules.run_report_schedules_task",
+        15,
     ),
     (
         "scheduled-deployment-backup",

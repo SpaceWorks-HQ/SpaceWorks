@@ -174,7 +174,7 @@ def test_the_real_creation_path_stamps_the_routing():
     event = make_event(host, is_public=False)
     event.payment_amount = Decimal("8.00")
     event.save(update_fields=["payment_amount"])
-    host.enabled_features = ["payments.enabled", "payments.events"]
+    host.enabled_features = ["payments.enabled", "payments.events", "charges.enabled", "charges.events"]
     host.save(update_fields=["enabled_features", "updated_at"])
     settings = configured_settings(host)
     settings.default_currency = "usd"
@@ -253,7 +253,7 @@ def test_a_waitlisted_registration_promoted_after_a_purge_is_still_payable():
     event.capacity = 1
     event.payment_amount = Decimal("8.00")
     event.save(update_fields=["capacity", "payment_amount"])
-    host.enabled_features = ["payments.enabled", "payments.events"]
+    host.enabled_features = ["payments.enabled", "payments.events", "charges.enabled", "charges.events"]
     host.save(update_fields=["enabled_features", "updated_at"])
     settings = configured_settings(host)
     settings.default_currency = "usd"

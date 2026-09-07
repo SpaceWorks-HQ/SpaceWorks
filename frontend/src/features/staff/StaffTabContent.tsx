@@ -18,6 +18,7 @@ const OrganizationAnalyticsPanel = lazy(() => import("./panels/OrganizationAnaly
 const OrganizationsPanel = lazy(() => import("./panels/OrganizationsPanel").then((m) => ({ default: m.OrganizationsPanel })));
 const BookingsPanel = lazy(() => import("./BookingsPanel").then((m) => ({ default: m.BookingsPanel })));
 const MembersPanel = lazy(() => import("./MembersPanel").then((m) => ({ default: m.MembersPanel })));
+const MemberCardsPanel = lazy(() => import("./panels/MemberCardsPanel").then((m) => ({ default: m.MemberCardsPanel })));
 const QrTools = lazy(() => import("./panels/QrTools").then((m) => ({ default: m.QrTools })));
 const RequestsPanel = lazy(() => import("./panels/RequestsPanel").then((m) => ({ default: m.RequestsPanel })));
 const Users = lazy(() => import("./panels/Users").then((m) => ({ default: m.Users })));
@@ -64,6 +65,7 @@ export function StaffTabContent({
   canUseToBuy,
   canManageQr,
   canManageMakerspace,
+  canUseMemberCards,
   canManageMachines,
   isMachineOnly,
   canConfigureMachineTypes,
@@ -89,6 +91,7 @@ export function StaffTabContent({
   canUseToBuy: boolean;
   canManageQr: boolean;
   canManageMakerspace: boolean;
+  canUseMemberCards: boolean;
   canManageMachines: boolean;
   isMachineOnly: boolean;
   canConfigureMachineTypes: boolean;
@@ -169,6 +172,9 @@ export function StaffTabContent({
           makerspaceId={activeMakerspace.id}
           membershipEnabled={(activeMakerspace.enabled_modules ?? []).includes("membership")}
         />
+      ) : null}
+      {activeTab === "cards" && canUseMemberCards ? (
+        <MemberCardsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} />
       ) : null}
       {activeTab === "payments" && canManageMakerspace ? <PaymentsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}
       {activeTab === "tobuy" ? (

@@ -7,8 +7,14 @@ from apps.makerspaces.views_memberships import (
     MemberWaiverAcceptView, MemberWaiverView, MyMembershipsView,
     PublicMembershipRequestView,
 )
+from apps.makerspaces.views_invitation_requests import PublicInvitationRequestView
 from apps.makerspaces.views_member_referrals import MemberReferralView
 from apps.makerspaces.member_activity_views import MemberActivityView
+from apps.makerspaces.member_card_views import (
+    MemberCardOwnView,
+    MemberCardPhotoView,
+    MemberCardPreviewView,
+)
 from apps.makerspaces.profile_image_views import MemberProfileImageView
 from apps.makerspaces.profile_views import (
     MemberDirectoryDetailView,
@@ -19,6 +25,7 @@ urlpatterns = [
     path("bootstrap", BootstrapView.as_view(), name="tenant-bootstrap"),
     path("config", PublicConfigView.as_view(), name="public-config"),
     path("public/<slug:makerspace_slug>/membership-requests", PublicMembershipRequestView.as_view(), name="public-membership-request"),
+    path("public/<slug:makerspace_slug>/invitation-requests", PublicInvitationRequestView.as_view(), name="public-invitation-request"),
     path("memberships/me", MyMembershipsView.as_view(), name="my-memberships"),
     path("memberships/invitations", InvitationDiscoveryView.as_view(), name="membership-invitations"),
     path("memberships/invitations/<int:pk>/claim", InvitationClaimView.as_view(), name="membership-invitation-claim"),
@@ -33,6 +40,9 @@ urlpatterns = [
     path("member/makerspaces/<int:makerspace_id>/referrals", MemberReferralView.as_view(), name="member-referrals"),
     path("member/makerspaces/<int:makerspace_id>/profile", MemberProfileView.as_view(), name="member-profile"),
     path("member/makerspaces/<int:makerspace_id>/profile/image", MemberProfileImageView.as_view(), name="member-profile-image"),
+    path("member/makerspaces/<int:makerspace_id>/member-card", MemberCardOwnView.as_view(), name="member-card"),
+    path("member/makerspaces/<int:makerspace_id>/member-card/photo", MemberCardPhotoView.as_view(), name="member-card-photo"),
+    path("member/makerspaces/<int:makerspace_id>/member-card/preview.pdf", MemberCardPreviewView.as_view(), name="member-card-preview"),
     path("member/makerspaces/<int:makerspace_id>/directory", MemberDirectoryView.as_view(), name="member-directory"),
     path(
         "member/makerspaces/<int:makerspace_id>/directory/<int:membership_id>",

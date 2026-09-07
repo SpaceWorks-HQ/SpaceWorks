@@ -21,6 +21,7 @@ class NotificationDestinationSerializer(serializers.ModelSerializer):
     # it can post into the room. `credential_set` is what the console renders instead, the
     # same contract as the makerspace `*_set` booleans it replaces.
     credential_set = serializers.SerializerMethodField()
+    signing_secret_set = serializers.SerializerMethodField()
     scope = serializers.SerializerMethodField()
 
     class Meta:
@@ -32,6 +33,7 @@ class NotificationDestinationSerializer(serializers.ModelSerializer):
             "telegram_chat_id",
             "is_active",
             "credential_set",
+            "signing_secret_set",
             "scope",
             "created_at",
             "updated_at",
@@ -40,6 +42,9 @@ class NotificationDestinationSerializer(serializers.ModelSerializer):
 
     def get_credential_set(self, obj):
         return bool(obj.webhook_url or obj.telegram_chat_id)
+
+    def get_signing_secret_set(self, obj):
+        return bool(obj.signing_secret)
 
     def get_scope(self, obj):
         return {
@@ -59,6 +64,11 @@ class NotificationDestinationWriteSerializer(serializers.Serializer):
     )
     telegram_chat_id = serializers.CharField(
         required=False, allow_blank=True, max_length=64
+    )
+    # `webhook` channel only. Write-only and optional on update, like the URL.
+    signing_secret = serializers.CharField(
+        required=False, allow_blank=True, write_only=True, min_length=16, max_length=512,
+        trim_whitespace=False,
     )
     is_active = serializers.BooleanField(required=False, default=True)
     scope = DestinationScopeSerializer(required=False)
@@ -97,6 +107,17 @@ class NotificationDestinationWriteSerializer(serializers.Serializer):
                     attrs["webhook_url"] = validate_webhook_url(webhook)
                 except serializers.ValidationError as exc:
                     raise serializers.ValidationError({"webhook_url": exc.detail}) from exc
+        secret = attrs.get("signing_secret") or ""
+        has_stored_secret = bool(existing.signing_secret) if existing else False
+        if channel == ChatNotificationChannel.WEBHOOK:
+            if not (secret or has_stored_secret):
+                raise serializers.ValidationError(
+                    {"signing_secret": "A signed webhook needs a signing secret (16+ characters)."}
+                )
+        elif secret:
+            raise serializers.ValidationError(
+                {"signing_secret": "Only signed-webhook destinations carry a signing secret."}
+            )
         if existing is not None and existing.channel != channel:
             # Changing a room's channel would leave a credential of the wrong shape and
             # silently repoint an operator's scope links at a different provider.

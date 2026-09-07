@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { expectNoA11yViolations } from "../../../test/axe";
 import { DashboardPanel } from "./DashboardPanel";
 
 const { staffRequest } = vi.hoisted(() => ({ staffRequest: vi.fn() }));
@@ -60,10 +61,11 @@ describe("DashboardPanel scope mode", () => {
   it("keeps the full dashboard tiles in full mode", async () => {
     staffRequest.mockResolvedValue({ scope_mode: "full", overdue_loans: 2 });
 
-    renderPanel(true);
+    const { container } = renderPanel(true);
 
     expect(await screen.findByText("Overdue loans")).toBeVisible();
     expect(screen.getByText("Pending payments")).toBeVisible();
     expect(screen.getByText("Maintenance overdue")).toBeVisible();
+    await expectNoA11yViolations(container);
   });
 });

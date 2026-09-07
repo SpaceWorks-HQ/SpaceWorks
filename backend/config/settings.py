@@ -7,6 +7,7 @@ import environ
 from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 
+from config.log_setup import build_logging
 from config.storage_validation import assert_distinct_storage_buckets
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -149,6 +150,8 @@ INSTALLED_APPS = [
     "apps.makerspaces",
     "apps.organizations",
     "apps.payments",
+    # The provider rail's surfaces, separable from the ledger above.
+    "apps.payments_rail",
     "apps.presence",
     "apps.encryption",
     "apps.apiclients",
@@ -193,6 +196,9 @@ MIDDLEWARE = [
     "apps.backup.middleware.DeploymentRecoveryGateMiddleware",
     # Second, so it still wraps every view that could log a calendar-feed bearer token.
     "apps.events.middleware.CalendarFeedLogRedactionMiddleware",
+    # Binds the per-request correlation id before any layer below can log. The two gates
+    # above refuse without logging through it; that is the accepted cost of their position.
+    "config.request_id.RequestIdMiddleware",
     "apps.tenant_migration.middleware.SourceMigrationGateMiddleware",
     "apps.makerspaces.middleware.TenantHostValidationMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -232,7 +238,12 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASES = {"default": env.db()}
-DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=0)
+# Persistent connections by default: gunicorn's worker processes otherwise open and close
+# a Postgres connection per request. Transaction-mode poolers (Supabase :6543, PgBouncer)
+# hand back a different server connection each time, so deployments on one set
+# CONN_MAX_AGE=0 explicitly -- .env.production.example and docs/deploy-production.md do.
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = env.bool("CONN_HEALTH_CHECKS", default=True)
 DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = env.bool(
     "DISABLE_SERVER_SIDE_CURSORS", default=False
 )
@@ -330,6 +341,10 @@ STORAGES = {
 }
 
 EVIDENCE_URL_TTL_SECONDS = env.int("EVIDENCE_URL_TTL_SECONDS", default=300)
+# Signed download links for scheduled report deliveries; the stored file is swept once
+# this window has passed. Longer than an evidence presign because the link lands in an
+# inbox or a chat room and is read later, but still bounded and never a public URL.
+REPORT_DELIVERY_URL_TTL_SECONDS = env.int("REPORT_DELIVERY_URL_TTL_SECONDS", default=6 * 60 * 60)
 EVIDENCE_MAX_BYTES = env.int("EVIDENCE_MAX_BYTES", default=10485760)
 EVIDENCE_ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"]
 EVIDENCE_OBJECT_RETENTION_DAYS = env.int(
@@ -601,6 +616,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.makerspaces.tasks.refresh_github_contributions_task",
         "schedule": crontab(hour=4, minute=15),
     },
+    "membership-renewals": {
+        "task": "apps.makerspaces.tasks_membership.run_membership_renewals_task",
+        "schedule": crontab(minute=30),
+    },
     "purge-expired-data-exports": {
         "task": "apps.data_export.tasks.purge_expired_exports_task",
         "schedule": crontab(hour=3, minute=45),
@@ -608,6 +627,10 @@ CELERY_BEAT_SCHEDULE = {
     "finalize-report-rollups": {
         "task": "apps.operations.tasks.finalize_report_rollups_task",
         "schedule": crontab(hour=1, minute=0),
+    },
+    "report-schedules": {
+        "task": "apps.operations.tasks_report_schedules.run_report_schedules_task",
+        "schedule": crontab(minute="*/15"),
     },
     "scheduled-deployment-backup": {
         "task": "apps.backup.tasks.scheduled_deployment_backup_task",
@@ -839,6 +862,9 @@ REST_FRAMEWORK = {
         "anonymous_request_email": env(
             "THROTTLE_ANONYMOUS_REQUEST_EMAIL",
             default="3/day",
+        ),
+        "public_invitation_request": env(
+            "THROTTLE_PUBLIC_INVITATION_REQUEST", default="10/hour"
         ),
         "print_request_submit": env("THROTTLE_PRINT_REQUEST_SUBMIT", default="10/min"),
         "public_tool_checkout": env("THROTTLE_PUBLIC_TOOL_CHECKOUT", default="10/min"),
@@ -1079,3 +1105,44 @@ SPECTACULAR_SETTINGS = {
         {"name": "Notifications", "description": "Persistent staff inbox notifications."},
     ],
 }
+
+# --- Observability -----------------------------------------------------------------------
+# JSON log lines in production (one object per line, request_id on every record); the plain
+# single-line format when DEBUG, because a person is reading it. LOG_JSON overrides either.
+LOG_LEVEL = env("LOG_LEVEL", default="INFO")
+LOGGING = build_logging(LOG_LEVEL, json_output=env.bool("LOG_JSON", default=not DEBUG))
+
+# Live-update stream (SSE over Redis pub/sub). Defaults to the Celery broker; empty means the
+# stream answers 503 and browsers fall back to polling. Bounded stream length so a thread is
+# never held forever -- the browser reconnects.
+LIVE_REDIS_URL = env("LIVE_REDIS_URL", default="")
+LIVE_MAX_STREAM_SECONDS = env.int("LIVE_MAX_STREAM_SECONDS", default=3600)
+
+# What this deployment is FOR (apps/makerspaces/editions.py): makerspace (default), events,
+# bookings or organization. Hides surfaces and public routes; never changes core modules.
+SPACEWORKS_EDITION = env("SPACEWORKS_EDITION", default="makerspace").strip().lower()
+if SPACEWORKS_EDITION not in ("makerspace", "events", "bookings", "organization"):
+    raise ImproperlyConfigured(
+        f"SPACEWORKS_EDITION={SPACEWORKS_EDITION!r} is not an edition "
+        "(makerspace, events, bookings, organization)."
+    )
+
+# Static bearer token for GET /api/v1/metrics/ (Prometheus text). Unset => the route is 404.
+METRICS_TOKEN = env("METRICS_TOKEN", default="")
+
+# Error tracking is opt-in and only imported when a DSN is configured, so the SDK is never
+# on the import path of a deployment that did not ask for it. PII stays off: scoped PII
+# fields are encrypted at rest and must not leave the box through an error report.
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration(), CeleryIntegration()],
+        send_default_pii=False,
+        traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
+        environment=env("SENTRY_ENVIRONMENT", default="production" if not DEBUG else "development"),
+    )

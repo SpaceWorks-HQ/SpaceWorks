@@ -12,6 +12,11 @@ from apps.operations import accountability, reports
 from apps.operations.org_report_strategies import STRATEGIES
 from apps.operations.report_registry import REPORT_DEFINITIONS
 from apps.operations.report_exports import _csv_response, _xlsx_cell, _xlsx_response
+from apps.operations.report_exports_provenance import (
+    actor_label,
+    build_provenance,
+    export_filters,
+)
 from apps.operations.schemas_reports import ANALYTICS_REPORT_RESPONSE
 from apps.operations.serializers import EmptySerializer, GenericObjectSerializer
 from apps.operations.serializers_reports import ReportErrorSerializer
@@ -183,13 +188,7 @@ class ReportExportView(APIView):
         require_action(request.user, definition.required_action, makerspace.id)
         require_module(makerspace, "reports")
         _require_source_modules(makerspace, definition.required_modules)
-        fmt = _export_format(request)
-        rows = reports.report_rows(
-            report_key, makerspace.id, date_range=_date_range(request),
-            report_filters=_report_filters(request, report_key),
-            grain=_grain_param(request, definition),
-        )
-        return _xlsx_response(rows, f"{report_key}.xlsx") if fmt == "xlsx" else _csv_response(rows, f"{report_key}.csv")
+        return _export_response(request, definition, makerspace.id)
 
 
 class AggregateReportExportView(APIView):
@@ -209,14 +208,32 @@ class AggregateReportExportView(APIView):
     )
     def get(self, request, report_key, *args, **kwargs):
         _require_superadmin(request.user)
-        reports.validate_report_key(report_key, for_export=True)
-        fmt = _export_format(request)
-        rows = reports.report_rows(
-            report_key, date_range=_date_range(request),
-            report_filters=_report_filters(request, report_key),
-            grain=_grain_param(request, reports.validate_report_key(report_key)),
-        )
-        return _xlsx_response(rows, f"{report_key}.xlsx") if fmt == "xlsx" else _csv_response(rows, f"{report_key}.csv")
+        definition = reports.validate_report_key(report_key, for_export=True)
+        return _export_response(request, definition, None)
+
+
+def _export_response(request, definition, makerspace_id):
+    """Build the file through the canonical row path and stamp its provenance.
+
+    Every input the builder saw is echoed into the provenance filters, so a reader of the
+    file can tell what subset it is without the URL that produced it.
+    """
+    fmt = _export_format(request)
+    date_range = _date_range(request)
+    report_filters = _report_filters(request, definition.key)
+    grain = _grain_param(request, definition)
+    rows = reports.report_rows(
+        definition.key, makerspace_id, date_range=date_range,
+        report_filters=report_filters, grain=grain,
+    )
+    provenance = build_provenance(
+        definition.key, version=definition.version, makerspace_id=makerspace_id,
+        generated_by=actor_label(request.user),
+        filters=export_filters(date_range=date_range, report_filters=report_filters, grain=grain),
+    )
+    if fmt == "xlsx":
+        return _xlsx_response(rows, f"{definition.key}.xlsx", provenance=provenance)
+    return _csv_response(rows, f"{definition.key}.csv", provenance=provenance)
 
 
 def report_data(makerspace_id, report_key):

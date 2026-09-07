@@ -92,7 +92,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_APP_USER:-spaceworks_app}:${POSTGRES_APP_PASSWORD:-spaceworks-app-dev}@db:5432/makerspace_manager}
       SPACEWORKS_DB_POINTER_GENERATION: ${SPACEWORKS_DB_POINTER_GENERATION:-1}
       MANAGED_POSTGRES: ${MANAGED_POSTGRES:-False}
-      CONN_MAX_AGE: ${CONN_MAX_AGE:-0}
+      CONN_MAX_AGE: ${CONN_MAX_AGE:-60}
       DISABLE_SERVER_SIDE_CURSORS: ${DISABLE_SERVER_SIDE_CURSORS:-False}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://localhost:5173}
       API_CLIENT_ENC_KEY: ${API_CLIENT_ENC_KEY:-}
@@ -170,6 +170,60 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      orchestration-ready:
+        condition: service_completed_successfully
+
+  # Server-Sent Events stream (/api/v1/live/). Its own process because SSE holds a connection
+  # open: thread workers, no request timeout, and NO --max-requests recycling, which would
+  # sever every open stream. Same image, same env, same fail-closed entrypoint role.
+  live:
+    build:
+      context: ./backend
+    container_name: spaceworks-live
+    environment: *backend-env
+    command: ["--role", "backend", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "-k", "gthread", "--threads", "32", "--timeout", "0"]
+    volumes:
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      orchestration-ready:
+        condition: service_completed_successfully
+
+  # The single-box shape (docker/compose.single.yml + `--profile single`): nginx, the built
+  # frontend, gunicorn, the SSE process, a worker, the scheduler loop and Redis in one
+  # container. Not started by a plain `up`; the overlay parks the multi-service processes.
+  app:
+    profiles: ["single"]
+    build:
+      context: .
+      dockerfile: Dockerfile.allinone
+    container_name: spaceworks-app
+    environment:
+      <<: *backend-env
+      TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-1}
+      TENANT_API_URL: ${TENANT_API_URL:-/api}
+      TENANT_TOKEN: ${TENANT_TOKEN:-}
+    ports:
+      - "${HTTP_PORT:-80}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/api/v1/health/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
+      - ./scripts:/run/spaceworks-privileged-scripts:ro
+      - allinone_state:/var/lib/spaceworks/redis
+    depends_on:
+      db:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
       orchestration-ready:
         condition: service_completed_successfully
 
@@ -305,3 +359,4 @@ volumes:
   makerspace_manager_pgdata:
   minio_data:
   celerybeat_data:
+  allinone_state:

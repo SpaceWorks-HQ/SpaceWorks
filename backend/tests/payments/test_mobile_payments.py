@@ -13,13 +13,15 @@ from apps.payments.services import PaymentRailConflict, create_checkout_url, cre
 from apps.payments.services_mobile import create_mobile_intent
 from tests.device_helpers import make_native_app_registration
 from tests.payments.test_machine_payments import service_request
-from tests.return_helpers import make_member, make_space
+from tests.return_helpers import enable_online_rail, make_member, make_space
 
 
 pytestmark = pytest.mark.django_db
 
 
 def configured_payment(makerspace, member):
+    # A native payment intent is an ONLINE rail, so the space must actually have one.
+    enable_online_rail(makerspace, "machines")
     payment_settings, _ = MakerspacePaymentSettings.objects.get_or_create(
         makerspace=makerspace
     )
@@ -161,7 +163,7 @@ def test_mobile_endpoint_sanitizes_provider_failure(monkeypatch):
     payment = configured_payment(makerspace, member)
     client = device_client(member, makerspace)
     monkeypatch.setattr(
-        "apps.payments.views_member_mobile.create_mobile_intent",
+        "apps.payments_rail.views_member_mobile.create_mobile_intent",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             RuntimeError("provider secret diagnostic")
         ),

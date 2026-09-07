@@ -29,7 +29,7 @@ pytestmark = pytest.mark.django_db
 def enable_payments(makerspace, domain, *, currency="usd"):
     # The A6 master switch is an additive AND, so a per-domain feature alone is
     # no longer enough to charge.
-    makerspace.enabled_features = ["payments.enabled", f"payments.{domain}"]
+    makerspace.enabled_features = ["payments.enabled", f"payments.{domain}", "charges.enabled", f"charges.{domain}"]
     makerspace.save(update_fields=["enabled_features", "updated_at"])
     settings = configured_settings(makerspace)
     settings.default_currency = currency
@@ -162,7 +162,15 @@ def test_membership_activation_and_legacy_reactivation_reuse_one_payment(monkeyp
     assert Payment.objects.get(pk=payment.pk).status == Payment.Status.PENDING
 
 
-def test_zero_feature_credentials_and_membership_module_disable_charging(monkeypatch):
+def test_zero_amount_and_membership_module_disable_charging(monkeypatch):
+    """What still suppresses a charge entirely, and what only suppresses the RAIL.
+
+    Rewritten with the charge-tracking split. A missing online feature or missing
+    credentials no longer destroys the debt -- that was the bug: a cash-only space lost
+    every charge. Those two cases now record a PENDING row with no checkout behind it.
+    Only a zero amount (nothing is owed) and a missing domain module (the space does not
+    run that domain at all) still mean no row exists.
+    """
     monkeypatch.setattr(booking_payments, "create_checkout", lambda _payment: None)
     actor_and_spaces = []
     for suffix in ("zero", "feature", "credentials"):
@@ -172,7 +180,7 @@ def test_zero_feature_credentials_and_membership_module_disable_charging(monkeyp
     zero, feature_off, credentials_off = actor_and_spaces
     enable_payments(zero[0], "bookings")
     configured_settings(feature_off[0])
-    credentials_off[0].enabled_features = ["payments.enabled", "payments.bookings"]
+    credentials_off[0].enabled_features = ["payments.enabled", "payments.bookings", "charges.enabled", "charges.bookings"]
     credentials_off[0].save(update_fields=["enabled_features", "updated_at"])
 
     for makerspace, actor in actor_and_spaces:
@@ -188,7 +196,18 @@ def test_zero_feature_credentials_and_membership_module_disable_charging(monkeyp
             member=actor,
             actor=actor,
         )
-        assert not Payment.objects.filter(subject_id=booking.pk).exists()
+        charge = Payment.objects.filter(subject_id=booking.pk).first()
+        if makerspace == zero[0]:
+            assert charge is None
+            continue
+        # The debt is on the books; only the rail is missing.
+        assert charge is not None
+        assert charge.status == Payment.Status.PENDING
+        assert charge.checkout_url == ""
+        assert charge.stripe_checkout_url == ""
+    # Nothing resolved for the credentials-off space, so its row has no vendor at all.
+    credentials_off_charge = Payment.objects.get(makerspace=credentials_off[0])
+    assert credentials_off_charge.provider == Payment.Provider.UNCLAIMED
 
     membership_space = make_space("payments-off-membership-module")
     membership_actor = make_member(

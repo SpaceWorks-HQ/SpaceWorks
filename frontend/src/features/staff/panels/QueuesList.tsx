@@ -29,7 +29,7 @@ export function RequestList({ rows, actions, canViewAudit = false }: { rows: Har
       });
     }
   };
-  if (!rows.length) return <p className="text-sm text-ink/60">No requests.</p>;
+  if (!rows.length) return <p className="text-sm text-muted">No requests.</p>;
   return (
     <div className="overflow-hidden rounded-md border border-line">
       {rows.map((row) => (
@@ -52,7 +52,7 @@ export function RequestList({ rows, actions, canViewAudit = false }: { rows: Har
           {row.requester_contact_email || row.requester_contact_phone ? (
             <p className="mt-1 text-xs text-muted">
               <span className="font-medium text-ink">Contact: </span>
-              {[row.requester_contact_email, row.requester_contact_phone].filter(Boolean).join(" Â· ")}
+              {[row.requester_contact_email, row.requester_contact_phone].filter(Boolean).join(" · ")}
             </p>
           ) : null}
           {row.status === "rejected" && row.rejection_reason ? (
@@ -62,13 +62,13 @@ export function RequestList({ rows, actions, canViewAudit = false }: { rows: Har
           ) : null}
           <p className="mt-1 text-xs text-muted">
             {row.return_due_at ? `Due ${new Date(row.return_due_at).toLocaleString()}` : "No return due time set"}
-            {row.return_reminder_sent_at ? ` Â· reminder sent ${new Date(row.return_reminder_sent_at).toLocaleString()}` : ""}
+            {row.return_reminder_sent_at ? ` · reminder sent ${new Date(row.return_reminder_sent_at).toLocaleString()}` : ""}
           </p>
-          <div className="mt-2 space-y-0.5 text-xs text-ink/60">
+          <div className="mt-2 space-y-0.5 text-xs text-muted">
             {row.items.map((item) => (
               <p key={item.id}>
                 {item.product_name} x{item.requested_quantity}
-                {item.storage_location ? <span className="text-muted"> Â· Shelf: {item.storage_location}</span> : null}
+                {item.storage_location ? <span className="text-muted"> · Shelf: {item.storage_location}</span> : null}
               </p>
             ))}
           </div>

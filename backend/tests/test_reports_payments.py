@@ -7,7 +7,13 @@ from django.utils import timezone
 from apps.accounts import rbac
 from apps.bookings.models import BookableSpace, Booking
 from apps.events.models import Event, EventRegistration
-from apps.makerspaces.models import MakerspaceMembership, MakerspaceRole
+from apps.hardware_requests.models import HardwareRequest
+from apps.makerspaces.models import (
+    MakerspaceMembership,
+    MakerspaceRole,
+    MembershipPlan,
+    MembershipTerm,
+)
 from apps.operations.reports_payments import build_payment_reconciliation
 from apps.payments.models import Payment
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user
@@ -39,6 +45,18 @@ def add_payment(space, actor, subject_type, subject_id, amount, currency="usd", 
     elif subject_type == Payment.SubjectType.MAKERSPACE_MEMBERSHIP:
         subject_id = MakerspaceMembership.objects.get(
             makerspace=space, user=actor
+        ).pk
+    elif subject_type == Payment.SubjectType.MEMBERSHIP_TERM:
+        plan = MembershipPlan.objects.create(
+            makerspace=space, name=f"Payment report plan {subject_id}", interval="monthly",
+        )
+        subject_id = MembershipTerm.objects.create(
+            membership=MakerspaceMembership.objects.get(makerspace=space, user=actor),
+            plan=plan, starts_at=now - timedelta(days=30), ends_at=now + timedelta(days=1),
+        ).pk
+    elif subject_type in Payment.LOAN_SUBJECT_TYPES:
+        subject_id = HardwareRequest.objects.create(
+            makerspace=space, requester=actor, requester_username=actor.username,
         ).pk
     row = Payment.objects.create(
         makerspace=space, subject_type=subject_type, subject_id=subject_id,

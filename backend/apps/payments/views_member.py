@@ -7,7 +7,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.hardware_requests.exceptions import ErrorSerializer
-from apps.payments.member_access import member_payment_actor, member_payment_memberships
+from apps.payments import stripe_client
+from apps.payments.member_access import (
+    member_may_see_own_charges,
+    member_payment_actor,
+    member_payment_memberships,
+)
+from apps.payments.availability import online_payments_enabled_for
 from apps.payments.member_scope import member_payment_queryset
 from apps.payments.models import Payment
 from apps.payments.serializers import (
@@ -90,8 +96,11 @@ class MemberPaymentHistoryView(APIView):
 
     @extend_schema(tags=["Payments"], summary="List the caller's payment history", request=None, responses={200: MemberPaymentSerializer(many=True), 403: OpenApiResponse(ErrorSerializer)})
     def get(self, request, makerspace_id):
-        if member_payment_actor(request.user, makerspace_id) is None:
-            return Response({"detail": "An active membership is required."}, status=403)
+        if not member_may_see_own_charges(request.user, makerspace_id):
+            return Response(
+                {"detail": "An active membership or an existing charge is required."},
+                status=403,
+            )
         rows = list(
             member_payment_queryset(request.user, makerspace_id).order_by("-created_at")
         )
@@ -99,41 +108,42 @@ class MemberPaymentHistoryView(APIView):
             MemberPaymentSerializer(
                 rows,
                 many=True,
-                context={"payment_subject_labels": resolve_subject_labels(rows)},
+                context={
+                    "payment_subject_labels": resolve_subject_labels(rows),
+                    **_member_payment_context(rows),
+                },
             ).data
         )
 
 
-class MemberPaymentCheckoutView(APIView):
-    permission_classes = [IsAuthenticated]
+def _member_payment_context(rows):
+    """Rail availability and receipts for a page of charges, resolved in bulk.
 
-    @extend_schema(
-        tags=["Payments"],
-        summary="Generate a Checkout link for the caller's pending payment",
-        request=None,
-        responses={200: CheckoutUrlSerializer, 404: OpenApiResponse(ErrorSerializer), 503: OpenApiResponse(ErrorSerializer)},
-    )
-    def post(self, request, makerspace_id, payment_id):
-        payment = member_payment_queryset(request.user, makerspace_id).filter(
-            pk=payment_id,
-            status=Payment.Status.PENDING,
-        ).first()
-        if payment is None:
-            raise NotFound()
-        if payment.stripe_checkout_url:
-            return Response({"checkout_url": payment.stripe_checkout_url})
-        try:
-            checkout_url = create_checkout_url(payment.pk, actor=request.user)
-        except PaymentRailConflict:
-            return Response(
-                {
-                    'detail': 'The payment already uses a different online payment rail.',
-                    'code': 'payment_rail_conflict',
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
-        except Exception:
-            return Response({"detail": "Payments are temporarily unavailable.", "code": "payments_unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        if not checkout_url:
-            raise NotFound()
-        return Response({"checkout_url": checkout_url})
+    Both are per-row questions with per-makerspace answers, so asking them inside the
+    serializer would re-read settings, credentials and the settlement table once per
+    charge. Every row in one member list belongs to one space, so the rail resolves once.
+    """
+    from apps.payments.models import ManualSettlement
+
+    if not rows:
+        return {"payment_rails": {}, "payment_settlements": {}}
+    settled_ids = [
+        row.pk for row in rows if row.status == Payment.Status.PAID_OFFLINE
+    ]
+    receipts = {}
+    if settled_ids:
+        for receipt in ManualSettlement.objects.filter(
+            payment_id__in=settled_ids, amended_by__isnull=True
+        ).order_by("payment_id", "-created_at", "-pk"):
+            receipts.setdefault(receipt.payment_id, receipt)
+    # Keyed by OWNING makerspace, not answered once for the page. A collaborative-event
+    # charge is owned by the host space and merely routed here through `via_makerspace`,
+    # and that host has its own modules, features and credentials -- so one scalar taken
+    # from the first row would hide a valid checkout, or advertise an impossible one, for
+    # every charge belonging to a different owner. Resolved once per distinct owner, so
+    # a page of charges from one space still costs one lookup.
+    rails = {}
+    for row in rows:
+        if (row.makerspace_id, row.subject_type) not in rails:
+            rails[(row.makerspace_id, row.subject_type)] = online_payments_enabled_for(row)
+    return {"payment_rails": rails, "payment_settlements": receipts}

@@ -48,6 +48,9 @@ EXCLUDED_ORGANIZATION_REPORT_KEYS = frozenset({
     # Active accounts are distinct-person metrics that may refer to the same person
     # in several owned makerspaces and therefore cannot be summed safely.
     "community-engagement",
+    # Certified-member counts are distinct-person metrics per makerspace; one member
+    # trained in two owned spaces would be double-counted by a naive sum.
+    "certification-coverage",
     # Enabled/available/rollup state is per makerspace; combining it would mask the
     # specific unhealthy or stale tenant that an operator must repair.
     "module-operational-health",

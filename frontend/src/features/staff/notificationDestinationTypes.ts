@@ -12,6 +12,7 @@ export type NotificationDestination = {
   is_active: boolean;
   /** Whether a credential is stored. The credential itself is never returned. */
   credential_set: boolean;
+  signing_secret_set: boolean;
   scope: DestinationScope;
   created_at: string;
   updated_at: string;

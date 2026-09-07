@@ -39,6 +39,7 @@ WEBHOOK_CHANNELS = (
     ChatNotificationChannel.SLACK,
     ChatNotificationChannel.MATTERMOST,
     ChatNotificationChannel.DISCORD,
+    ChatNotificationChannel.WEBHOOK,
 )
 
 
@@ -54,6 +55,9 @@ class NotificationDestination(models.Model):
     # a serializer -- the staff API exposes a `*_set` boolean instead.
     webhook_url = models.TextField(blank=True, default="")
     telegram_chat_id = models.CharField(max_length=64, blank=True, default="")
+    # Fernet ciphertext. Only the `webhook` channel carries one: the receiver verifies
+    # `X-SpaceWorks-Signature` with it. Never echoed; the API exposes `signing_secret_set`.
+    signing_secret = models.TextField(blank=True, default="")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -90,6 +94,12 @@ class NotificationDestination(models.Model):
 
     def get_webhook_url(self):
         return decrypt_value(self.webhook_url)
+
+    def set_signing_secret(self, raw):
+        self.signing_secret = encrypt_value(raw)
+
+    def get_signing_secret(self):
+        return decrypt_value(self.signing_secret) if self.signing_secret else ""
 
     def __str__(self):
         return f"{self.makerspace_id}:{self.channel}/{self.label}"

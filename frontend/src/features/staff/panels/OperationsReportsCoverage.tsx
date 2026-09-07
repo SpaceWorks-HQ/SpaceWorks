@@ -8,7 +8,7 @@ import { Panel, useStaffGet } from "./shared";
 const COVERAGE_KEYS = new Set([
   "loan-throughput", "inventory-control", "evidence-compliance", "import-quality",
   "procurement-performance", "communications-health", "community-engagement",
-  "module-operational-health",
+  "module-operational-health", "certification-coverage",
 ]);
 const CHART_FIELDS: Record<string, [string, string, string]> = {
   "loan-throughput": ["period", "request_count", "requests"],
@@ -19,6 +19,7 @@ const CHART_FIELDS: Record<string, [string, string, string]> = {
   "communications-health": ["channel", "delivery_count", "deliveries"],
   "community-engagement": ["module_key", "active_accounts", "accounts"],
   "module-operational-health": ["module_key", "activity_count", "actions"],
+  "certification-coverage": ["certification_type", "certified_members", "members"],
 };
 const STACKED_FIELDS: Record<string, [string, string, string, string]> = {
   "loan-throughput": ["period", "request_status", "request_count", "requests"],

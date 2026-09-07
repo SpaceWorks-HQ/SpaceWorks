@@ -22,6 +22,11 @@ USER_PROJECTIONS = {
 }
 
 ALWAYS_OMITTED = {
+    # Trigger-maintained full-text vectors: derived from exported columns and rebuilt by
+    # the search trigger on the target, so they never travel (apps/inventory/search.py).
+    ("inventory.InventoryProduct", "search_vector"): "Derived search vector, rebuilt by trigger.",
+    ("machines.Machine", "search_vector"): "Derived search vector, rebuilt by trigger.",
+    ("events.Event", "search_vector"): "Derived search vector, rebuilt by trigger.",
     ("apiclients.ApiClient", "client_id"): "A rebuild issues a fresh client identifier.",
     ("apiclients.ApiClient", "secret_encrypted"): "API client credential.",
     ("apiclients.ApiClient", "previous_secret_encrypted"): (
@@ -59,6 +64,7 @@ ALWAYS_OMITTED = {
     ),
     ("hardware_requests.HardwareRequest", "public_token"): "Source bearer/status token.",
     ("integrations.NotificationDestination", "webhook_url"): "Encrypted webhook credential.",
+    ("integrations.NotificationDestination", "signing_secret"): "Encrypted webhook signing secret.",
     ("machines.Machine", "camera_feed_url"): "May embed camera credentials.",
     ("machines.Machine", "legacy_print_printer_id"): "Retired cutover provenance.",
     ("machines.MachineConsumableAdjustment", "legacy_filament_adjustment_id"): "Retired cutover provenance.",
@@ -87,6 +93,7 @@ ALWAYS_OMITTED = {
     ("payments.MakerspacePaymentSettings", "razorpay_webhook_secret"): "Source payment credential.",
     ("payments.Payment", "external_order_id"): "Source provider identifier.",
     ("payments.Payment", "external_payment_id"): "Source provider identifier.",
+    ("payments.Refund", "external_refund_id"): "Source provider identifier.",
     ("payments.Payment", "checkout_url"): "Source checkout bearer URL.",
     ("payments.Payment", "stripe_connected_account_id"): "Source provider account binding.",
     ("payments.Payment", "stripe_checkout_session_id"): "Source provider session identifier.",

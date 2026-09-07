@@ -61,3 +61,8 @@ docs/roadmap.md
 .DS_Store
 .idea/
 .vscode/
+
+# End-to-end test artifacts (scripts/e2e-local.sh)
+frontend/e2e/.seed.json
+frontend/playwright-report/
+frontend/test-results/

@@ -6,6 +6,8 @@ from rest_framework.generics import RetrieveAPIView
 from rest_framework.permissions import AllowAny
 
 from apps.apiclients.throttling import ClientTierRateThrottle
+from apps.inventory.search import apply_q
+from apps.makerspaces.editions import public_surface_available
 from apps.inventory.serializers import (
     PublicCategorySerializer,
     PublicMakerspaceSerializer,
@@ -54,7 +56,7 @@ class PublicMakerspaceListView(ListAPIView):
             name="q",
             type=str,
             location=OpenApiParameter.QUERY,
-            description="Search public products by name or description.",
+            description="Full-text search over name, storage location, tracking mode and description; supports \"phrases\" and -exclusions, tolerates typos in the name.",
         ),
         OpenApiParameter(
             name="category",
@@ -80,9 +82,10 @@ class PublicInventoryListView(ListAPIView):
 
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs["makerspace_slug"])
-        if not makerspace.public_inventory_enabled or not module_enabled(
-            makerspace,
-            "public_inventory",
+        if (
+            not public_surface_available("public_inventory")
+            or not makerspace.public_inventory_enabled
+            or not module_enabled(makerspace, "public_inventory")
         ):
             raise Http404
 
@@ -95,9 +98,7 @@ class PublicInventoryListView(ListAPIView):
         )
         query = self.request.query_params.get("q", "").strip()
         if query:
-            queryset = queryset.filter(
-                Q(name__icontains=query) | Q(description__icontains=query)
-            )
+            queryset = apply_q(queryset, query)
 
         category_slug = self.request.query_params.get("category", "").strip()
         if category_slug:
@@ -140,9 +141,10 @@ class PublicCategoryListView(ListAPIView):
 
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs["makerspace_slug"])
-        if not makerspace.public_inventory_enabled or not module_enabled(
-            makerspace,
-            "public_inventory",
+        if (
+            not public_surface_available("public_inventory")
+            or not makerspace.public_inventory_enabled
+            or not module_enabled(makerspace, "public_inventory")
         ):
             raise Http404
         return (
@@ -171,9 +173,10 @@ class PublicInventoryDetailView(RetrieveAPIView):
 
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs["makerspace_slug"])
-        if not makerspace.public_inventory_enabled or not module_enabled(
-            makerspace,
-            "public_inventory",
+        if (
+            not public_surface_available("public_inventory")
+            or not makerspace.public_inventory_enabled
+            or not module_enabled(makerspace, "public_inventory")
         ):
             raise Http404
         return servable_queryset(

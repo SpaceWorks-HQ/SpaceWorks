@@ -119,6 +119,10 @@ def _check_live_checkouts(makerspace):
         | ~Q(checkout_url="")
         | Q(stripe_checkout_session_id__isnull=False)
         | ~Q(stripe_checkout_url="")
+        # A native PaymentIntent is a live rail exactly like a hosted page: the member
+        # can still confirm it in the app. Omitting it let a pending row with an open
+        # intent pass a check whose whole purpose is "nothing is in flight".
+        | Q(stripe_payment_intent_id__isnull=False)
     )
     live = Payment.objects.filter(
         makerspace=makerspace,
@@ -129,8 +133,11 @@ def _check_live_checkouts(makerspace):
     # Importing this row would mint a second payable checkout while the source link
     # remained live. The target cannot expire the old page because reconciliation
     # needs the omitted session/order id, so each deployment could see one settlement.
+    # This is now the gate that makes carrying pending charges safe at all: a pending
+    # row travels only when nothing is in flight at a provider, so the target cannot
+    # collect the same debt the source is still able to collect.
     if live.exists():
-        _fail("unresolved_live_checkout", "A pending payment has a live checkout session.")
+        _fail("unresolved_live_checkout", "A pending payment has a live payment rail.")
 
 
 def _fail(check, detail):

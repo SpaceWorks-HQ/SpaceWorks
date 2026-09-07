@@ -27,6 +27,9 @@ class ReportDefinition:
     chart_hint: str = "table"
     grains: tuple[str, ...] = ()
     section_modules: tuple[str, ...] = ()
+    # Bumped when the exported column set or its meaning changes, so a file's provenance
+    # row says which shape it carries. Independent of the deployment release.
+    version: int = 1
 
     def builder(self) -> Callable:
         return import_string(self.builder_path)

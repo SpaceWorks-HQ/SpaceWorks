@@ -1,12 +1,13 @@
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.inventory.search import apply_q
 from apps.apiclients.throttling import ClientTierRateThrottle
 from apps.events import services
 from apps.events.exceptions import DuplicateRegistration
@@ -56,6 +57,12 @@ class PublicEventListView(APIView):
         tags=['Public events'],
         auth=[],
         request=None,
+        parameters=[
+            OpenApiParameter(
+                name='q', type=str, location=OpenApiParameter.QUERY, required=False,
+                description='Full-text search over title, location and description; supports "phrases" and -exclusions, tolerates typos in the title.',
+            ),
+        ],
         responses={200: PublicEventSerializer(many=True), **PUBLIC_EVENT_ERRORS},
     )
     def get(self, request, makerspace_slug):
@@ -83,6 +90,9 @@ class PublicEventListView(APIView):
             )
             .order_by('starts_at', 'id')
         )
+        query = request.query_params.get('q', '')
+        if query.strip():
+            events = apply_q(events, query, label_field='title')
         return Response(PublicEventSerializer(events, many=True).data)
 
 

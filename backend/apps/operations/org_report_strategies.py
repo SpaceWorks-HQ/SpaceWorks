@@ -89,10 +89,21 @@ STRATEGIES = {
         text=(("machine_name", "carry"), ("machine_type", "carry"), ("is_active", "carry")),
     ),
     "payment-reconciliation": _strategy(
-        AggregationKind.GROUP_SUM, ("currency", "subject_type", "status"),
-        ("currency", "subject_type", "status", "payment_count", "amount_total", "outstanding_amount"),
-        ordering=("currency", "subject_type", "status"),
-        text=(("currency", "group and carry"), ("subject_type", "group and carry"), ("status", "group and carry")),
+        AggregationKind.GROUP_SUM,
+        ("currency", "subject_type", "status", "settlement_method"),
+        (
+            "currency", "subject_type", "status", "settlement_method",
+            "payment_count", "amount_total", "outstanding_amount",
+        ),
+        ordering=("currency", "subject_type", "status", "settlement_method"),
+        text=(
+            ("currency", "group and carry"),
+            ("subject_type", "group and carry"),
+            ("status", "group and carry"),
+            # Part of the grain, not a summable measure: two spaces both taking cash
+            # aggregate into one cash row, and cash never merges with a card total.
+            ("settlement_method", "group and carry"),
+        ),
     ),
     "most-lent": _strategy(
         AggregationKind.ROW_UNION, ("product_id",),

@@ -50,7 +50,7 @@ def test_a_machine_service_charge_snapshots_no_member_typed_text():
     while the PII contract was broken. Same trap `CLAUDE.md` records for event charging.
     """
     space = make_space("machine-label-pii")
-    space.enabled_features = ["payments.enabled", "payments.machines"]
+    space.enabled_features = ["payments.enabled", "payments.machines", "charges.enabled", "charges.machines"]
     space.save(update_fields=["enabled_features", "updated_at"])
     configured_settings(space)
     actor = make_member("machine-label-pii-user", space)

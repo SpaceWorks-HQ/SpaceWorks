@@ -194,6 +194,8 @@ def _delete_object_graph(makerspace):
         )
         AuditSigningKeyRotation.objects.filter(makerspace=makerspace).delete()
         AuditLog.objects.filter(makerspace=makerspace).delete()
+        # Manual settlements cascade with their payments (triggers are suspended for
+        # this transaction), so the cash book needs no separate pass.
         Payment.objects.filter(makerspace=makerspace).delete()
         ProcessedStripeEvent.objects.filter(makerspace=makerspace).delete()
         # An elsewhere-hosted registration can reference this space's waiver. Clear all

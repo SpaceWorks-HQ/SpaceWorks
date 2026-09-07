@@ -63,6 +63,10 @@ describe("ArchivedPayments", () => {
             subject_label: "Laser cutter booking",
             status: "pending",
             checkout_url: "",
+            // The space still has a live rail, so the regenerate action is honest here.
+            // Without a rail the row now offers "Pay at the space" instead of a button
+            // whose endpoint could not succeed.
+            online_payment_available: true,
             created_at: "2026-08-11T08:00:00Z",
           },
         ]);

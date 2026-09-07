@@ -344,6 +344,22 @@ per-makerspace breakdown is always present in the same response; (4) `ReportScop
 mode permitted to flatten, and only for that resolved set. Anything wider is still a regression. Deployment
 -wide aggregates are unchanged: they stay grouped by `makerspace_id`.
 
+
+**Report provenance and scheduled delivery (forward plan phase 6, 2026-09-04).** Every CSV/XLSX export
+leaves through `apps/operations/report_exports.py` with an `ExportProvenance`: CSV line 1 is a raw
+`# generated_at=… generated_by=… makerspace_id=<id|all> report_key=… report_version=… filters=<json>` row
+and XLSX carries a second `Provenance` sheet; the data columns stay exactly the registry fields, CSV is
+streamed and XLSX is written write-only, and `ReportDefinition.version` is bumped whenever a report's shape
+changes. A `ReportSchedule` runs only through `run_report_schedules` → the same `report_rows` builder as the
+manual export (`generated_by="schedule:<id>"`), inside a per-tenant `fanout_tenant_write`, after a
+`skip_locked` claim that advances `next_run_at` before any work (idempotent under a coarse cron); it is
+skipped and audited (`report_schedule.skipped`) when the makerspace is not report-eligible or the creator no
+longer holds the definition's `required_action`. Deliveries never carry bytes into chat: the file lives in
+the private bucket under `reports/<makerspace_id>/…`, recipients get a signed URL bounded by
+`REPORT_DELIVERY_URL_TTL_SECONDS` (default 6h — the one presign that deliberately outlives a quiesce drain,
+read-only), the object is swept after expiry, email delivery is link-only, and `ReportSchedule` is a Lane D
+DROP like every other live disclosure rule. `recipient_emails` is staff-entered contact data and is NOT in
+the encryption registry (no existing JSON-list email column to mirror) — an owner call if that should change.
 **Scoped PII encryption (Part H, `apps/encryption/`; dormant unless enabled).** Per-makerspace DEK via a
 key broker (local/AWS-KMS), AAD-authenticated envelope crypto, `ScopedPiiModelMixin` on the 6 PII-holding
 models with a save-boundary that single-INSERTs envelopes + dual-read cache. Blind-index search
@@ -353,6 +369,16 @@ search plaintext via ORM. Write-fence (`PiiGlobalWriteFence`/`PiiMakerspaceWrite
 during maintenance; mapped services acquire the fence **before** their domain row lock. Enabling is a
 staged dual-read rollout; `decrypt_scoped_pii` is the fenced rollback. **Encryption is never enabled
 before H3 (search) ships.**
+
+**`warranty.Warranty.vendor_contact` is NOT registered as PII — by decision, not omission (forward plan
+phase 6, owner decision 6, 2026-09-04).** It is a free-text vendor/business contact (a support desk, a
+reseller's sales line), and no vendor or business contact anywhere in `warranty` or `procurement` is
+classified as scoped PII; the registries are self-consistent on that reading. The alternative — a
+`procurement.Vendor` record with `ScopedPiiModelMixin` contact fields, a data migration moving each
+distinct `vendor_contact` value into an encrypted vendor row, and a sweep test over contact-like columns
+— is written up in `docs/plans/2026-09-03-forward-plan/phase-6-money-and-membership.md` ("Vendor record")
+and should be built only if the owner decides vendors can be named individuals. Until then, do not
+re-raise the question from a grep for "contact" columns; this entry is the answer.
 
 **Custom editable per-makerspace roles (Part L).** The 5 legacy roles are now editable protected default
 `Role` rows; authority is **action-based** via the assigned role (dual-read with legacy fallback:
@@ -521,6 +547,56 @@ and catastrophic for an existing one; migration `makerspaces/0050` is the one-ti
 reverse) that keeps every pre-existing space sending mail across the upgrade. Any future default-on module
 key needs the same treatment.
 
+**The member dashboard is membership-module-gated; money is not (2026-09-06, D8).**
+`member_activity_views` already calls `require_module(makerspace, "membership")`, so the
+dashboard simply does not exist for a space that runs no memberships — and every frontend query
+feeding it must include `membershipModuleOn` in its `enabled`, or it calls a gated endpoint and
+errors. `member_dashboard_service` adds loan history, request history (previously only ACTIVE
+self-checkout loans were visible, so a member could not see a request they submitted), dues, and
+notices. Notices are DERIVED from member-owned rows: `notifications.Notification` is
+makerspace-wide, has no recipient column and shares one `read_at`, so serving it would leak staff
+alerts and let one member's read mark speak for everyone. Payment/receipt visibility sits OUTSIDE
+the gate — `member_may_see_own_charges` admits an account with no membership that owns a charge
+here, because a loan deposit is raised against a BORROWER who needs an active account rather than
+a membership. It preserves every account-status clause and still refuses a revoked member, which
+is a deliberate pre-existing contract.
+
+**A pending payment no longer refuses a tenant dump (2026-09-06, owner decision D5).** Both
+refusals are gone — `tenant_dump_cross_tenant` and `_source_row_allowed`. What makes carrying an
+unsettled debt safe: (1) `preflight._check_live_checkouts` refuses any pending row with a live
+rail, and it now counts `stripe_payment_intent_id` as live, not just hosted sessions; (2) pending
+rows are held to the same `PAYMENT_CLEARED_VALUES` projection as terminal ones, so no order id,
+session, intent, checkout URL, connected account or routing survives to be resumed on the target;
+(3) `money_digest.money_fingerprint` is taken INSIDE the capture gate over pending payments plus
+the settlement chain, and `publish_tenant_dump` revalidates it under the custody lock, refusing
+with `money_drift` when the source has moved on. Terminal rows are deliberately excluded from the
+digest: they are immutable, so they cannot drift, and including them would make every ordinary
+settlement read as drift. A blank digest (captures predating the field) is not revalidated —
+blank means "not recorded", not "nothing owed". `provider` stays PRESERVE on pending rows: every
+actual handle is cleared, so it is inert, and a target whose vendor differs simply resolves no
+source and settles the charge offline.
+
+**The payment ledger cannot be tombstoned; the rail can (2026-09-06).** `apps.payments` holds
+the models and every ledger surface and is NOT in `SEPARABLE_APPS`; `apps.payments_rail` holds
+checkout, the native intent, Connect, refunds, credential settings and the webhooks, and is what
+a tombstone removes. Before the split, `TOMBSTONED_APPS=payments` withdrew the reconciliation
+console and the member's own payment history — which, once debts could be recorded with no
+gateway, meant such a deployment accrued money owed that nobody could read or settle. Existing
+deployments keep writing `payments` in their env: `RENAMED_LABELS` translates it, so upgrading
+does not fail `separability.E007`. The machine-service mark-offline/waive routes became
+unconditional for the same reason; only the credential routes moved to the rail gate.
+
+**Charge tracking is separate from the online rail (2026-09-06).** `charge_tracking_enabled` decides
+whether a debt is RECORDED; `online_payments_enabled` decides only whether a Stripe/Razorpay rail may be
+raised for it, and keeps all four of its clauses. The `charges.*` family carries tracking and is
+deliberately free of any `payments` dependency, so uninstalling the module cannot prune it; `payments`
+became **opt-in** at the same time. A charge raised with no gateway carries `provider=unclaimed` and is
+claimed exactly once by the first checkout that reaches a provider, enforced by the payment
+terminal-guard trigger. Settling one offline requires an append-only `ManualSettlement` receipt written
+in the same transaction as the status flip. NOTE: the line below calling `payments.enabled` standalone is
+stale — it is parented to the `payments` module, and the per-domain `payments.*` keys are parented to
+their own domain modules with `payments` in `requires_modules`.
+
 **A6 master switches are additive `AND`s, never replacements.** `payments.enabled`, `mobile.push` and
 `presence.geofence` are standalone (`parent_module=None`) features that sit **in front of** the readiness
 check each capability already had — `online_payments_enabled` still requires the per-domain
@@ -588,6 +664,21 @@ intent down **one** path in `membership_services.invite_membership`, discriminat
 role granting actions is a staff invitation and must keep working with the module off. Module gates are
 **additive `AND`s** — `refer_membership` still checks `referrals_enabled` and `can_refer`.
 
+**Membership plans, terms and invitation requests (forward plan phase 6, 2026-09-04).** Plans are optional
+and never an access state: a `MembershipTerm` expiring changes neither `MakerspaceMembership.status` nor
+`User.access_status`; the only effect is the per-makerspace opt-in `lapsed_members_cannot_borrow`, enforced
+solely by `request_access.require_current_term` AFTER the who-may-submit rule has admitted the member
+("active" = `status=active AND ends_at > now`, so it does not depend on the hourly sweep), and a member who
+has never held a term is untouched. One renewal charge per term, raised only by
+`membership_plan_services.run_membership_renewals` as `Payment(subject_type=membership_term,
+subject_id=term.pk)` inside the 7-day window and only when `online_payments_enabled(ms, "membership")` —
+the Payment unique constraint is the idempotency, a payment failure is logged and never touches the term,
+and settlement does not auto-open the next term (staff do). An `InvitationRequest` is a lead, not authority:
+name/email/phone are scoped source PII (encrypted at rest, purged with `membership`, `(PRESERVE, DROP)` in
+tenant dumps), the public endpoint answers the same 202 to real and honeypotted submissions, and "Invite"
+only ever calls `membership_services.invite_membership`, inheriting the role non-escalation and the
+community/staff discrimination of a hand-typed invitation.
+
 **Payments (Stripe, C.2/C.3; dormant until configured).** `apps/payments.Payment` is the **single payment
 authority** (one row per subject via unique `(makerspace, subject_type, subject_id)`; positive amount;
 statuses pending/paid_online/paid_offline/waived/canceled; terminal rows immutable — **enforced by a Postgres
@@ -623,6 +714,23 @@ in-flight checkout/webhook sessions. Booking, event-registration, membership-due
 charges all create the same immutable `Payment` subject rows. Reconciliation is makerspace-scoped through
 RBAC, reports/dashboard aggregates never flatten tenants, and offline/waive actions audit the actor and
 best-effort expire live online sessions.
+
+**Refunds and loan charges (forward plan phase 6, 2026-09-04; owner decision 7 defaulted to "charging
+allowed, off by default").** A `Payment` row never changes for a refund: refunds are `payments.Refund`
+ledger lines on a `paid_online` Payment, the sum of PENDING+SUCCEEDED refunds never exceeds
+`payment.amount` (enforced under the Payment row lock and in `Refund.clean()`), a settled refund is
+immutable, provider I/O happens outside every row lock, and webhooks (`charge.refunded`/`refund.*`,
+`refund.processed`) only ever settle a locally raised PENDING row through `_record_once` — a dashboard
+refund this deployment never raised is logged, never invented. Loan charges (`LOAN_DEPOSIT`,
+`LOAN_LATE_FEE`, one each per request by the subject uniqueness) are raised only by the workflow module,
+post-commit, through `apps/hardware_requests/loan_payments.py`, and never block a handover or return —
+except the one opt-in gate: with `loan_deposit_blocks_issue` on, `issue_request` refuses with
+`deposit_required` (409) **before** the QR/evidence Hard Rules, fails OPEN on payment-system errors, and
+the deposit it raised is the row the later issue accepts. A late fee is computed exactly once at close
+(`ceil(days past due + grace) × per_day`, capped when the cap is > 0) and never recomputed; an uncollected
+deposit is cancelled at close, a collected one is released only by a staff refund. `payments.loans` is an
+additive AND behind `payments.enabled`, the `payments` module and resolvable credentials; off means nothing
+is raised and lateness is only recorded.
 
 **Native clients use attested device grants, never browser-token shortcuts.** Device login starts with a
 short-lived attestation challenge and creates a revocable `DeviceGrant`; access tokens carry
@@ -1149,6 +1257,88 @@ loan shows the contact the borrower gave rather than the principal's internal `m
 the principal is refused at the write side by
 `accounts.principal_guards.refuse_anonymous_requester_access_mutation` — it would restrict every future
 account-less requester at once — and the read-side exclusion is the backstop for rows predating that guard.
+**Observability (forward plan phase 0, 2026-09-03).** Every request carries an `X-Request-ID`: honoured
+from the caller only when it matches `^[A-Za-z0-9_.:-]{1,64}$`, minted otherwise, bound in a
+`contextvars.ContextVar` by `config.request_id.RequestIdMiddleware` (third in `MIDDLEWARE`, after the
+recovery gate pinned first and the calendar-feed log redactor second) and echoed on the response. Log
+records carry it through `config.log_setup.RequestIdFilter`; Celery messages carry it in a
+`spaceworks_request_id` header (`config/celery_signals.py`). **The id never enters audit `meta`** — the
+row MAC covers `meta`, and correlation is done from the `audit_recorded` log line that `record()` emits
+with the row's `event_uuid`. `GET /api/v1/metrics/` (Prometheus text) fails closed: 404 when
+`METRICS_TOKEN` is unset, 401 on a wrong bearer, and it exposes counts and ids only, never tenant
+content. It is outside `HMAC_PROTECTED_PATH_PREFIXES`, so it must NOT be added to the API-client scope
+registry (an entry there would be stale). Any new `env(...)` read in `settings.py` must be listed in
+`apps/backup/settings_policy.py::ENV_SURFACE`, or the env-surface drift guard fails.
+
+**Search and live updates (forward plan phase 1, 2026-09-03).** `?q=` is one contract, implemented once in
+`apps/inventory/search.py::apply_q`: a `websearch`-syntax full-text match on a trigger-maintained
+`search_vector` column ORed with trigram similarity on the primary label, ordered by rank. The vectors on
+`inventory.InventoryProduct`, `machines.Machine` and `events.Event` are **derived** columns: filled by a
+Postgres trigger (never by `save()`), declared in all three registries (`data_export` classification +
+`ALWAYS_OMITTED`, `tenant_migration.OMITTED_FIELD_RECONSTRUCTIONS` DERIVED) and rebuilt on the target
+after a tenant move. **A trigger may only concatenate plain columns — scoped-PII fields are never
+indexed**, which is why `HardwareRequest` has no vector and its queue keeps the blind-index search, and
+why the member directory matches username/display name/headline/institution only. Live updates ride the
+audit log: `audit.services.record` schedules `operations.live.publish_audit_event` on commit, and the
+payload is `{kind, makerspace_id, target_type, target_id, actor_id, ts}` — never `meta`, never content.
+`GET /api/v1/live/` subscribes a session to its own user channel plus every makerspace
+`rbac.scope_by_makerspace` returns; it is served by the separate `live` compose service (thread workers,
+no timeout, no `--max-requests`) behind an nginx `location /api/v1/live/` that sits above `/api/` with
+buffering off; it answers 503 when the deployment has no Redis and browsers keep polling. Neither
+`/api/v1/metrics/` nor `/api/v1/live/` belongs in the API-client scope registry.
+
+**Browser and accessibility gates (forward plan phase 2, 2026-09-03).** The Hard Rules are pinned by
+`frontend/e2e/` against a real stack (`scripts/e2e-local.sh`, CI job `e2e`): a request is accepted,
+issued with a container code and a real presigned photo upload, and returned with container code, photo
+and remark, and the API's 400s for a missing photo, box or remark are asserted directly. The public
+catalogue spec asserts the seeded storage location, box label and box code never appear in the DOM. The
+accessibility floor is enforced, not documented: `frontend/src/test/axe.ts` in panel tests (jsdom, no
+colour contrast) and `e2e/a11y.spec.ts` in Chromium (WCAG 2.1 AA including contrast) — a violation is a
+red build, and there is no allow-list. `text-ink/<alpha>` for body copy is therefore off-limits; use the
+`muted` token, which is tuned to clear 4.5:1 on every surface it sits on.
+
+**Signed webhooks (forward plan phase 3, 2026-09-03).** `webhook` is a notification channel, not a second
+integration system: a `NotificationDestination` with `channel="webhook"` carries an encrypted endpoint URL
+**and** an encrypted `signing_secret`, is routed by the same feature × channel matrix, and is written to the
+same `NotificationDeliveryLog` with the same Celery retries. A destination without a signing secret is
+*not-configured* (terminal FAILED), never sent unsigned. The body is `webhooks.webhook_event_body(log)` —
+the notification's text, event, feature, ids and the matrix `payload` — i.e. exactly what a chat room
+would receive; nothing from audit `meta` and no contact fields travel. The signature is
+`t=<unix>,v1=<hex hmac-sha256(secret, "<t>." + body)>` over the exact bytes sent, mirroring the API-client
+HMAC discipline. Endpoint URLs pass `webhook_validation.validate_webhook_url` (https, no private or
+loopback ranges) at save time and are re-resolved and pinned at send time; a delivery error never stores
+the URL. Both secrets are `ALWAYS_OMITTED` from export and DERIVED-omitted from tenant migration. The
+superadmin "Re-queue failed deliveries" admin action is the dead-letter path and audits each row.
+
+**Editions and the single box (forward plan phase 4, 2026-09-03).** `SPACEWORKS_EDITION` is a
+**deployment**-level setting (`apps/makerspaces/editions.py`), never per makerspace, exactly like
+`member_accounts`/`updates` are read deployment-wide. An edition hides a fixed set of module keys:
+`platform.available_modules()` (and therefore every bootstrap `modules` list and staff `enabled_modules`
+payload) omits them, and the public loan/machine routes check `editions.public_surface_available(key)`
+and answer 404 when hidden. It does **not** change `core_module_keys()`, `module_enabled()` or any
+`require_module` gate: staff endpoints, workflows, migrations, purge plans and backups behave identically in
+every edition, so a hidden surface is recoverable and nothing that was recorded becomes unreachable to
+staff. `Event.makerspace` remains the tenancy anchor in all editions. The single-box image
+(`Dockerfile.allinone`) launches every Django process through `scripts/spaceworks_entrypoint.py` with its
+own `--role`, runs unprivileged, keeps `/control/` unproxied, and dies as a unit when any process dies
+(`docker/allinone/run.sh`); the install shape persists in `.spaceworks-layer`.
+
+**Member ID cards (forward plan phase 5, 2026-09-03).** `makerspaces.MemberCard` is `membership`-module
+behaviour with no module key: its QR is a core `boxes.QrCode` with `target_type=member_card`, so
+revocation, active-target uniqueness and the immutable `QrScanEvent` history are the ones every QR has.
+**Identity never travels through the inventory scanner**: `qr_target_payload` and `QrResolveView` raise
+404 for a member-card target; only `member_card_services.resolve` (action `scan_member_cards`) may resolve
+one, it records a `member_lookup` scan even when refused, and it refuses uniformly (a foreign tenant's
+card, a box QR and garbage all 404). Authority is by action, never role name: `manage_member_cards`
+implies `scan_member_cards`, is granted to the protected Space Manager default (migration 0069 backfills
+existing rows), and custom roles receive nothing until granted. `printed_name` is scoped source PII
+(`encryption/registry.py`); `photo_object_key` is a PRIVATE object (`backup/object_ownership_registry.py`)
+whose final key is never client-writable (staging presign → single promotion in
+`member_card_storage.finalize_photo`) and whose bytes need recorded consent. **Revoke redacts
+immediately** (photo bytes deleted, quota freed, name blanked); reissue rotates the QR and the old payload
+resolves as `revoked` forever; reprint never rotates. No rendered PDF is written to storage. The
+`membership` purge revokes the QRs and deletes the cards and photo bytes.
+
 ## Handover roles and the retired Guest Admin
 
 **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`); handover staff get a **custom
@@ -1723,6 +1913,23 @@ Load-bearing details that carried over unchanged:
     dependencies, so `makerspaces` left unpinned yields a historical `Makerspace` behind the real
     table; Django applies field defaults in Python rather than DDL, so the INSERT omits newer
     columns and Postgres rejects the NOT NULL. Rewind the full graph forward in `finally`.
+
+- **Certification gating (forward plan phase 5, 2026-09-04) is one function and fails CLOSED.**
+  `machines/certifications.py::require_certification` is the only place that decides "is this member
+  trained"; `service_workflow_actions.submit` and `services_bookings.create_booking` call it and let it
+  raise. It is a no-op while the `machines.certifications` feature is off or the `machines` module is
+  uninstalled (a bookings-only space is never gated by a module it lacks — `BookableSpace.machine_type`
+  is nullable and the import is lazy), and once on, no resolvable membership or no live grant is a
+  refusal, never a pass. Requirements live on the **machine type** (`CertificationType`, flags
+  `is_required_for_service` / `is_required_for_booking`), so adding a machine cannot un-gate it; a grant's
+  expiry is the **stored** `expires_at`, so tightening `validity_days` later cannot retroactively
+  invalidate correctly-issued training. Authority to define types, grant, revoke or **override** is
+  `access.can_create_machine` — machine-TYPE authority, never a per-machine link — and every honoured
+  override writes `certification.override` naming the type it skipped. Types are deactivated, never
+  deleted (grants are evidence); grants are revoked, never edited. Publication is consent, not
+  configuration: certifications reach the maker profile only through `MemberProfile.show_certifications`,
+  a separate opt-in from `is_visible`, and reach a printed card only when the template lists the
+  `certifications` field.
 
 ## Events program invariants (four phases, `f16896f`..`dab0354`)
 

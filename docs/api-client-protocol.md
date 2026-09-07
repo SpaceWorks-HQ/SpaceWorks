@@ -115,3 +115,40 @@ A misconfigured deployment fails at startup rather than at runtime: if
 `HMAC_PROTECTED_PATH_PREFIXES` is widened to a prefix whose routes are not registered,
 `manage.py check` reports it as an error instead of the deployment silently 401-ing that
 whole prefix.
+
+## Outbound webhooks
+
+The inbound protocol above lets your system call SpaceWorks. The `webhook` notification module is the
+other direction: SpaceWorks calls **your** HTTPS endpoint whenever the notification matrix routes an event
+to a signed-webhook destination.
+
+**Request.** `POST` with `Content-Type: application/json`, `User-Agent: SpaceWorks-Webhook/1`, and:
+
+| Header | Value |
+|---|---|
+| `X-SpaceWorks-Event` | the event key, e.g. `request.accepted` |
+| `X-SpaceWorks-Delivery` | the delivery id (stable across retries — use it to de-duplicate) |
+| `X-SpaceWorks-Signature` | `t=<unix seconds>,v1=<hex>` |
+
+**Body.** `{"id", "event", "feature", "makerspace_id", "text", "data", "created_at"}` — `text` is the
+same message a Slack or Telegram room would receive; `data` holds the ids the notification carried.
+
+**Verify.** Compute `HMAC-SHA256(secret, "<t>." + raw_body_bytes)` with the signing secret you entered
+when creating the destination, compare it to `v1` with a constant-time comparison, and reject if `t` is
+older than your tolerance (five minutes is reasonable):
+
+```python
+import hashlib, hmac, time
+
+def verify(headers, raw_body: bytes, secret: str, tolerance=300) -> bool:
+    parts = dict(item.split("=", 1) for item in headers["X-SpaceWorks-Signature"].split(","))
+    if abs(time.time() - int(parts["t"])) > tolerance:
+        return False
+    expected = hmac.new(secret.encode(), f"{parts['t']}.".encode() + raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, parts["v1"])
+```
+
+Respond with any 2xx. Anything else, or a timeout, is retried by the delivery worker; after the retries a
+superadmin can re-queue the failed delivery from `/control/`. Endpoints must be public HTTPS — private and
+loopback addresses are refused when the destination is saved and again at send time.
+

@@ -171,5 +171,6 @@ def test_member_activity_api_is_scoped_and_generic_exports_keep_the_registered_s
 
 def _header(response, fmt):
     if fmt == "csv":
-        return response.content.decode().splitlines()[0].split(",")
+        # Line 0 is the provenance row; the column header is line 1.
+        return response.content.decode().splitlines()[1].split(",")
     return [cell.value for cell in load_workbook(BytesIO(response.content)).active[1]]

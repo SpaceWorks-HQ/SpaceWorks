@@ -37,11 +37,13 @@ DISCRIMINATOR_REFERENCES = {
         "box": "boxes.Box",
         "product": "inventory.InventoryProduct",
         "asset": "inventory.InventoryAsset",
+        "member_card": "makerspaces.MemberCard",
     },
     ("hardware_requests.PublicToolLoan", "target_type", "target_id"): {
         "box": "boxes.Box",
         "product": "inventory.InventoryProduct",
         "asset": "inventory.InventoryAsset",
+        "member_card": "makerspaces.MemberCard",
         # Direct handouts point at the request created for that handover. This value
         # cannot share the QR discriminator map used by self-checkout loans.
         "direct": "hardware_requests.HardwareRequest",
@@ -53,6 +55,7 @@ DISCRIMINATOR_REFERENCES = {
         "box": "boxes.Box",
         "product": "inventory.InventoryProduct",
         "asset": "inventory.InventoryAsset",
+        "member_card": "makerspaces.MemberCard",
     },
 }
 
@@ -75,6 +78,9 @@ PAYMENT_SUBJECT_REFERENCES = {
     "booking": "bookings.Booking",
     "event_registration": "events.EventRegistration",
     "makerspace_membership": "makerspaces.MakerspaceMembership",
+    "membership_term": "makerspaces.MembershipTerm",
+    "loan_deposit": "hardware_requests.HardwareRequest",
+    "loan_late_fee": "hardware_requests.HardwareRequest",
 }
 
 NOTIFICATION_URL_ROUTES = (

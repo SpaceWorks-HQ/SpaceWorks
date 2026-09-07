@@ -10,7 +10,7 @@ from apps.audit.models import AuditLog
 from apps.payments.models import Payment, PlatformStripeConnectSettings
 from apps.payments.services import mark_offline
 from tests.payments.test_machine_payments import service_request
-from tests.return_helpers import make_member, make_space, make_user
+from tests.return_helpers import make_member, make_space, make_user, settlement_details
 
 
 pytestmark = pytest.mark.django_db
@@ -117,11 +117,11 @@ def test_failed_connect_expiry_keeps_platform_secret_rotation_and_clear_blocked(
     )
     payment = Payment.objects.get(stripe_provider=Payment.StripeProvider.CONNECT)
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.expire_checkout_session",
+        "apps.payments.services_checkout.stripe_client.expire_checkout_session",
         lambda *_args: False,
     )
 
-    mark_offline(payment, payment.member)
+    mark_offline(payment, payment.member, settlement_details())
     client = APIClient()
     client.force_authenticate(superadmin)
     response = client.patch(
@@ -143,11 +143,11 @@ def test_successful_connect_expiry_allows_platform_secret_rotation(
     platform, superadmin = pending_connect_settings("platform-expiry-succeeded")
     payment = Payment.objects.get(stripe_provider=Payment.StripeProvider.CONNECT)
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.expire_checkout_session",
+        "apps.payments.services_checkout.stripe_client.expire_checkout_session",
         lambda *_args: True,
     )
 
-    mark_offline(payment, payment.member)
+    mark_offline(payment, payment.member, settlement_details())
     client = APIClient()
     client.force_authenticate(superadmin)
     response = client.patch(

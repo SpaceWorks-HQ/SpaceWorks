@@ -23,6 +23,7 @@ FEATURE_EVENTS = {
     F.HARDWARE_REQUESTS: (
         "submitted", "accepted", "rejected", "issued", "partially_returned",
         "returned", "closed_with_issue", "return_reminder",
+        "deposit_raised", "late_fee_raised",
     ),
     F.PRINTING: (
         "submitted", "accepted", "started", "rejected", "completed", "failed",
@@ -52,12 +53,12 @@ FEATURE_EVENTS = {
 # Discord is listed explicitly rather than relying on default_state's False fallback, so the
 # table stays a complete picture of every channel a reader can toggle.
 DEFAULT_CHANNEL_STATE = {
-    F.HARDWARE_REQUESTS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
-    F.PRINTING: {C.EMAIL: True, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
-    F.EVENTS: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
-    F.BOOKINGS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
-    F.MAINTENANCE: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
-    F.MEMBERS: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
+    F.HARDWARE_REQUESTS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    F.PRINTING: {C.EMAIL: True, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    F.EVENTS: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    F.BOOKINGS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    F.MAINTENANCE: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    F.MEMBERS: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
 }
 
 

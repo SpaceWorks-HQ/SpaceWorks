@@ -12,6 +12,7 @@ from apps.makerspaces.models import MakerspaceMembership
 from apps.payments.models import MakerspacePaymentSettings, Payment
 from tests.payments.test_models import configured_settings
 from tests.return_helpers import (
+    enable_online_rail,
     authenticated_client,
     make_member,
     make_space,
@@ -95,11 +96,12 @@ def test_member_payment_history_survives_archival_without_leaking_other_rows():
 def test_web_checkout_tolerates_archival_for_an_active_member(monkeypatch):
     space = make_space("archived-payment-checkout")
     member = make_member("archived-payment-checkout-member", space)
+    enable_online_rail(space, "membership")
     configured_settings(space)
     payment = _membership_payment(space, member)
     _archive(space)
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.create_checkout_session",
+        "apps.payments.services_checkout.stripe_client.create_checkout_session",
         lambda *_args, **_kwargs: {
             "id": "cs_archived",
             "url": "https://checkout.stripe.test/cs_archived",
@@ -207,7 +209,7 @@ def test_revoked_membership_cannot_read_archived_payment_history():
     )
 
     assert response.status_code == 403
-    assert response.data == {"detail": "An active membership is required."}
+    assert response.data == {"detail": "An active membership or an existing charge is required."}
 
 
 @pytest.mark.parametrize(
@@ -228,4 +230,4 @@ def test_blocked_account_cannot_read_archived_payment_history(access_status):
     )
 
     assert response.status_code == 403
-    assert response.data == {"detail": "An active membership is required."}
+    assert response.data == {"detail": "An active membership or an existing charge is required."}

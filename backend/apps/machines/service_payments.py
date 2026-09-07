@@ -5,7 +5,7 @@ from decimal import Decimal, InvalidOperation
 from django.db import transaction
 
 from apps.machines.models import MakerspaceMachineTypePricing
-from apps.payments.availability import online_payments_enabled
+from apps.payments.availability import charge_tracking_enabled, online_payments_enabled
 from apps.payments.models import MakerspacePaymentSettings, Payment
 from apps.payments.services import create_checkout, create_payment
 
@@ -24,7 +24,7 @@ def create_for_completed_request(service_request, actor):
     try:
         with transaction.atomic():
             machine_type = service_request.assigned_machine.machine_type
-            if not online_payments_enabled(service_request.makerspace, "machines"):
+            if not charge_tracking_enabled(service_request.makerspace, "machines"):
                 return None
             pricing = MakerspaceMachineTypePricing.objects.filter(
                 makerspace=service_request.makerspace, machine_type=machine_type, payment_enabled=True
@@ -52,10 +52,11 @@ def create_for_completed_request(service_request, actor):
             )
     except Exception:
         return None
-    try:
-        create_checkout(payment)
-    except Exception:
-        pass
+    if online_payments_enabled(service_request.makerspace, "machines"):
+        try:
+            create_checkout(payment)
+        except Exception:
+            pass
     return payment
 
 

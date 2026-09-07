@@ -1,12 +1,13 @@
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.inventory.search import apply_q
 from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.admin_api.permissions import IsActiveStaff
@@ -149,6 +150,12 @@ class EventListCreateView(APIView):
         tags=['Admin events'],
         summary='List events in a makerspace',
         request=None,
+        parameters=[
+            OpenApiParameter(
+                name='q', type=str, location=OpenApiParameter.QUERY, required=False,
+                description='Full-text search over title, location and description.',
+            ),
+        ],
         responses={200: EventListResponseSerializer},
     )
     def get(self, request, makerspace_id, *args, **kwargs):
@@ -165,6 +172,9 @@ class EventListCreateView(APIView):
             .prefetch_related('organizers__organization')
             .order_by('starts_at', 'id')
         )
+        query = request.query_params.get('q', '')
+        if query.strip():
+            queryset = apply_q(queryset, query, label_field='title')
         paginator = _EventPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
         return _paginated_response(paginator, page, EventAdminSerializer)

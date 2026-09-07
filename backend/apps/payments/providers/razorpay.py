@@ -30,6 +30,8 @@ from apps.payments.providers.base import (
     CheckoutRequest,
     CheckoutResult,
     PaymentsUnavailable,
+    RefundRequest,
+    RefundResult,
     WebhookEvent,
     WebhookVerificationError,
 )
@@ -43,6 +45,14 @@ TIMEOUT_SECONDS = 15
 # an authorised-but-uncaptured payment is not settled, and treating it as paid would
 # mark a charge complete for money that can still fail to arrive.
 PAID_EVENTS = frozenset({"payment_link.paid", "order.paid", "payment.captured"})
+# Razorpay refund statuses, normalised to the three the Refund row knows. `created`
+# and `pending` both mean "accepted, money not yet back"; only `processed` is final.
+REFUND_STATUSES = {
+    "processed": "succeeded",
+    "pending": "pending",
+    "created": "pending",
+    "failed": "failed",
+}
 
 
 class RazorpayProvider:
@@ -121,6 +131,27 @@ class RazorpayProvider:
             # corrects a waiver or raises an explicit refund-required audit condition.
             logger.info("razorpay_link_cancel_failed", extra={"order_id": order_id})
 
+    def create_refund(self, source, request: RefundRequest) -> RefundResult:
+        if not request.payment_id:
+            raise PaymentsUnavailable("The payment has no Razorpay payment id to refund.")
+        result = self._request(
+            source,
+            "POST",
+            f"/payments/{request.payment_id}/refund",
+            {
+                "amount": request.amount_minor,
+                "receipt": request.reference[:40],
+                "notes": {key: str(value) for key, value in (request.metadata or {}).items()},
+            },
+        )
+        refund_id = result.get("id")
+        if not refund_id:
+            raise PaymentsUnavailable("Razorpay did not return a refund id.")
+        return RefundResult(
+            refund_id=refund_id,
+            status=REFUND_STATUSES.get(result.get("status") or "", "pending"),
+        )
+
     def verify_webhook(self, source, *, payload: bytes, headers) -> WebhookEvent:
         signature = headers.get("X-Razorpay-Signature") or headers.get(
             "HTTP_X_RAZORPAY_SIGNATURE", ""
@@ -145,6 +176,7 @@ class RazorpayProvider:
         link = (entities.get("payment_link") or {}).get("entity") or {}
         payment = (entities.get("payment") or {}).get("entity") or {}
         order = (entities.get("order") or {}).get("entity") or {}
+        refund = (entities.get("refund") or {}).get("entity") or {}
 
         # Razorpay does not send a top-level event id, so the delivery id header is the
         # idempotency anchor. Falling back to the entity id keeps the record unique per
@@ -153,12 +185,15 @@ class RazorpayProvider:
         event_id = (
             headers.get("X-Razorpay-Event-Id")
             or headers.get("HTTP_X_RAZORPAY_EVENT_ID")
-            or f"{event_type}:{link.get('id') or payment.get('id') or order.get('id') or ''}"
+            or f"{event_type}:{refund.get('id') or link.get('id') or payment.get('id') or order.get('id') or ''}"
         )
         return WebhookEvent(
             event_id=event_id,
             is_paid=event_type in PAID_EVENTS,
             order_id=link.get("id") or order.get("id") or payment.get("order_id") or "",
-            payment_id=payment.get("id") or "",
+            payment_id=payment.get("id") or refund.get("payment_id") or "",
             metadata=link.get("notes") or payment.get("notes") or order.get("notes") or {},
+            refund_id=refund.get("id") or "",
+            refund_status=REFUND_STATUSES.get(refund.get("status") or "", ""),
+            refund_amount_minor=int(refund.get("amount") or 0),
         )

@@ -198,7 +198,7 @@ urlpatterns = [
         ),
     ),
     *_separable(
-        "payments",
+        "payments_rail",
         path(
             "platform/payment-settings",
             PlatformStripeConnectSettingsView.as_view(),

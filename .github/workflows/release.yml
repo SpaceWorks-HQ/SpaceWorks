@@ -15,8 +15,17 @@ permissions:
   packages: write
 
 jobs:
+  # Images are never published from a red tree: the whole test workflow runs first and
+  # every job below waits on it.
+  tests:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/tests.yml
+    permissions:
+      contents: read
+
   prepare:
     if: github.ref == 'refs/heads/main'
+    needs: tests
     runs-on: ubuntu-latest
     outputs:
       base: ${{ steps.release.outputs.base }}
@@ -62,9 +71,16 @@ jobs:
       matrix:
         include:
           - context: backend
+            dockerfile: backend/Dockerfile
             image: spaceworks-backend
           - context: frontend
+            dockerfile: frontend/Dockerfile
             image: spaceworks-frontend
+          # The single-box image (Dockerfile.allinone) builds from the repo root because it
+          # needs both trees.
+          - context: .
+            dockerfile: Dockerfile.allinone
+            image: spaceworks-allinone
     steps:
       - uses: actions/checkout@v4
 
@@ -88,6 +104,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./${{ matrix.context }}
+          file: ./${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -118,6 +135,7 @@ jobs:
 
             - `ghcr.io/${{ needs.prepare.outputs.registry_owner }}/spaceworks-backend:${{ needs.prepare.outputs.version }}`
             - `ghcr.io/${{ needs.prepare.outputs.registry_owner }}/spaceworks-frontend:${{ needs.prepare.outputs.version }}`
+            - `ghcr.io/${{ needs.prepare.outputs.registry_owner }}/spaceworks-allinone:${{ needs.prepare.outputs.version }}` (single-box)
 
   promote-latest:
     needs:
@@ -165,7 +183,7 @@ jobs:
           SERIES: ${{ needs.prepare.outputs.series }}
         run: |
           set -euo pipefail
-          for package in spaceworks-backend spaceworks-frontend; do
+          for package in spaceworks-backend spaceworks-frontend spaceworks-allinone; do
             image="ghcr.io/${OWNER}/${package}"
             docker buildx imagetools create \
               --tag "${image}:${SERIES}" \
@@ -236,6 +254,7 @@ jobs:
             --owner "$OWNER" \
             --package spaceworks-backend \
             --package spaceworks-frontend \
+            --package spaceworks-allinone \
             --version "$VERSION" \
             --sha-tag "sha-${SHORT_SHA}" \
             --series "$SERIES" \

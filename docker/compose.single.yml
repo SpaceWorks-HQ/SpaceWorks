@@ -1,0 +1,25 @@
+# Single-box overlay: ONE application container (Dockerfile.allinone: nginx + frontend +
+# gunicorn + SSE + worker + scheduler + Redis) beside Postgres and MinIO.
+#
+#   scripts/spaceworks-compose.sh bundled up -d      with SPACEWORKS_COMPOSE_LAYER=single
+#   docker compose -f docker-compose.yml -f docker/compose.single.yml --profile single up -d
+#
+# The multi-service processes are parked behind a profile nobody activates, so this file
+# removes nothing from the base and adds nothing that the base does not already declare:
+# the `app` service itself lives in the base files under `profiles: ["single"]` so it can
+# share the backend environment anchor (anchors do not cross files).
+services:
+  backend:
+    profiles: ["multi"]
+  worker:
+    profiles: ["multi"]
+  beat:
+    profiles: ["multi"]
+  live:
+    profiles: ["multi"]
+  frontend:
+    profiles: ["multi"]
+  candidate-backend:
+    profiles: ["multi"]
+  # The base `redis` service stays up: `migrate` and the orchestration services inherit a Redis
+  # cache URL from the shared environment. The app container talks to its own Redis.

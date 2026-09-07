@@ -46,6 +46,15 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
   linked to any number of spaces, with a public profile and a cross-makerspace event catalogue. An
   organization grant confers **actions, never identity**.
 - **QR everywhere** — boxes, tools, and individual assets; immutable scan history.
+- **Live staff console and one search box** — queues, loans and check-ins update the moment a change
+  commits (Server-Sent Events over the deployment's Redis; falls back to polling without it), and every
+  inventory, machine and event list answers `?q=` with full-text search that tolerates typos.
+- **Editions and a single box** — an events-only or bookings-only installation hides the loan spine it
+  does not use (`SPACEWORKS_EDITION`), and the whole application can run as one container beside
+  Postgres and MinIO when a makerspace has one small server and nobody to operate a stack.
+- **Operable in production** — every request carries an `X-Request-ID` through JSON logs and Celery,
+  a token-protected Prometheus endpoint reports queue depth, delivery failures and storage, and CI runs
+  the whole suite before an image is published.
 - **Action-based staff console** — editable per-makerspace roles over a fixed action set, four seeded
   defaults, and a superadmin-only Django control plane.
 - **Reports & ledger** — what's out, who has it, overdue tracking, CSV/XLSX export, plus accessible
@@ -260,6 +269,7 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | | [`slack`](docs/MODULES.md#slack) | | | Slack alerts |
 | | [`mattermost`](docs/MODULES.md#mattermost) | | | Mattermost alerts |
 | | [`discord`](docs/MODULES.md#discord) | | | Discord alerts |
+| | [`webhook`](docs/MODULES.md#webhook) | | | Signed JSON webhooks to your own systems |
 | **Reports** | [`reports`](docs/MODULES.md#reports) | | | Analytics, the ledger and CSV/XLSX export |
 | **Payments** | [`payments`](docs/MODULES.md#payments) | | ● | Taking money online (Stripe or Razorpay) |
 | **Mobile apps** | [`mobile`](docs/MODULES.md#mobile) | | | Attested device sessions, native push, payment sheet |
@@ -286,8 +296,10 @@ Manager** in the console rather than a superadmin.
 | `payments.bookings` | `bookings` | | Charge for bookings |
 | `payments.events` | `events` | | Charge for event registration |
 | `payments.membership` | `membership` | | Charge membership dues |
+| `payments.loans` | `payments` | | Raise a deposit when a loan is issued and a capped late fee when it comes back late |
 | `mobile.push` | `mobile` | ● | Native push notifications |
 | `events.offline_checkin` | `events` | | Expiring on-device roster and event-scoped PIN check-in stations |
+| `machines.certifications` | `machines` | | Members need an unexpired certification per machine type to book a linked space or request work; overrides need machine-type authority and are audited |
 | `notifications.delegated_recipients` | `notifications` | | Machine-scoped maintainers manage maintenance recipients for their own machines (also needs `maintenance` and `machines`) |
 | `inventory.self_checkout` | — | ● | Member self-checkout and staff direct handouts |
 | `presence.geofence` | — | ● | Advisory location check at check-in (never blocks) |
@@ -309,7 +321,7 @@ Stripe or Razorpay credentials resolve. The same is true of push (needs FCM/APNs
 
 ### Notification channels are modules
 
-`email`, `telegram`, `slack`, `mattermost` and `discord` are each a module, so a space that lives in
+`email`, `telegram`, `slack`, `mattermost`, `discord` and `webhook` are each a module, so a space that lives in
 Discord ships no Slack surface at all. Turning a channel's module on never makes it start sending on
 its own — you still add the webhook or token, and you still enable the events you want in the
 per-feature × per-channel matrix. Turning it off stops delivery but **keeps the stored credential**,

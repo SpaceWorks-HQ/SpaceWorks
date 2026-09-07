@@ -78,6 +78,35 @@ MEMBER_CLAIM_ROUTES = {
         tenant=ID, audited=True, ownership=RowOwnership.LOCALLY_FILTERED
     ),
     **_options("member-profile-image"),
+    # Member ID cards (forward plan phase 5): same rule as the calendar-feed bearer token —
+    # a walk-in claim session never holds or edits a durable credential.
+    ("member-card", "GET"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    ("member-card", "HEAD"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    ("member-card", "PATCH"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    **_options("member-card"),
+    ("member-card-photo", "POST"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    ("member-card-photo", "PUT"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    ("member-card-photo", "DELETE"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    **_options("member-card-photo"),
+    ("member-card-preview", "GET"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    ("member-card-preview", "HEAD"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    **_options("member-card-preview"),
     ("member-directory", "GET"): ReadOnly(tenant=ID),
     ("member-directory", "HEAD"): ReadOnly(tenant=ID),
     **_options("member-directory"),

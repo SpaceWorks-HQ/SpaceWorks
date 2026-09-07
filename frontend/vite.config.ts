@@ -19,6 +19,19 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Two stable vendor chunks so an app deploy does not invalidate the framework bytes
+        // every browser already has cached. Page code splits per route in AppRoutes.tsx.
+        manualChunks(id: string) {
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) return "react";
+          if (id.includes("node_modules/@tanstack/")) return "tanstack";
+          return undefined;
+        },
+      },
+    },
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],

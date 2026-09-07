@@ -83,6 +83,9 @@ class NotificationDestinationListView(APIView):
             raw = (data.get("webhook_url") or "").strip()
             if raw:
                 destination.set_webhook_url(raw)
+            secret = data.get("signing_secret") or ""
+            if secret:
+                destination.set_signing_secret(secret)
             destination.save()
             try:
                 apply_scope(destination, data.get("scope"), makerspace)
@@ -137,6 +140,9 @@ class NotificationDestinationDetailView(APIView):
                 # Blank means "keep the stored credential": the caller cannot read it back,
                 # so requiring it on every edit would force a re-entry to rename a room.
                 destination.set_webhook_url(raw)
+            secret = data.get("signing_secret") or ""
+            if secret:
+                destination.set_signing_secret(secret)
             destination.save()
             try:
                 apply_scope(destination, data.get("scope"), makerspace)

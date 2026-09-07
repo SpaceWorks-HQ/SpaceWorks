@@ -6,12 +6,16 @@ import { StructuredApiError, staffRequest } from "../../lib/api";
 import {
   PAYMENT_STATUSES,
   PAYMENT_SUBJECTS,
+  formatMoney,
   invalidatePaymentViews,
   paymentListKey,
   paymentListPath,
   reconcilePayment,
   type PaymentRow,
+  type Settlement,
 } from "./paymentsApi";
+import { PaymentRefundDialog } from "./PaymentRefundDialog";
+import { SettlementDialog } from "./SettlementDialog";
 import { Panel } from "./panels/shared";
 
 type Action = "mark-offline" | "waive";
@@ -22,16 +26,22 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
   const [subject, setSubject] = useState("");
   const [selected, setSelected] = useState<number[]>([]);
   const [conflict, setConflict] = useState("");
+  const [refundRow, setRefundRow] = useState<PaymentRow | null>(null);
   const payments = useQuery({
     queryKey: paymentListKey(makerspaceId, status, subject),
     queryFn: () => staffRequest<PaymentRow[]>(paymentListPath(makerspaceId, status, subject)),
   });
+  // Marking paid offline is a two-step now: the API requires a receipt, so the click
+  // opens the form rather than firing the mutation.
+  const [settling, setSettling] = useState<{ ids: number[]; bulk: boolean } | null>(null);
   const mutation = useMutation({
-    mutationFn: ({ action, ids, bulk }: { action: Action; ids: number[]; bulk: boolean }) =>
-      reconcilePayment(makerspaceId, action, ids, bulk),
+    mutationFn: ({ action, ids, bulk, settlement }: {
+      action: Action; ids: number[]; bulk: boolean; settlement?: Settlement;
+    }) => reconcilePayment(makerspaceId, action, ids, bulk, settlement),
     onSuccess: () => {
       setConflict("");
       setSelected([]);
+      setSettling(null);
       invalidatePaymentViews(queryClient, makerspaceId);
     },
     onError: (error) => {
@@ -43,6 +53,10 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
   });
   const run = (action: Action, ids: number[], bulk: boolean) => {
     setConflict("");
+    if (action === "mark-offline") {
+      setSettling({ ids, bulk });
+      return;
+    }
     mutation.mutate({ action, ids, bulk });
   };
   const columns: DataTableColumn<PaymentRow>[] = [
@@ -50,6 +64,7 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
     { key: "subject_type", header: "Type", render: (row) => labelFor(PAYMENT_SUBJECTS, row.subject_type) },
     { key: "status", header: "Status", render: (row) => labelFor(PAYMENT_STATUSES, row.status) },
     { key: "amount", header: "Amount", render: (row) => formatMoney(row.amount, row.currency), className: "font-semibold" },
+    { key: "refunded_amount", header: "Refunded", render: (row) => Number(row.refunded_amount) > 0 ? formatMoney(row.refunded_amount, row.currency) : "—" },
     { key: "created_at", header: "Created", render: (row) => new Date(row.created_at).toLocaleString() },
     {
       key: "actions",
@@ -62,6 +77,11 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
           <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("waive", [row.id], false)}>
             Waive
           </button>
+          {row.status === "paid_online" ? (
+            <button className="desk-button" type="button" onClick={() => setRefundRow(row)}>
+              Refund
+            </button>
+          ) : null}
         </div>
       ),
     },
@@ -95,6 +115,21 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
           </>
         )}
       />
+      {settling ? (
+        <SettlementDialog
+          count={settling.ids.length}
+          pending={mutation.isPending}
+          onCancel={() => setSettling(null)}
+          onConfirm={(settlement) =>
+            mutation.mutate({
+              action: "mark-offline",
+              ids: settling.ids,
+              bulk: settling.bulk,
+              settlement,
+            })
+          }
+        />
+      ) : null}
       {conflict ? <p role="alert" className="my-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{conflict}</p> : null}
       {payments.error && !payments.data ? <p className="mb-3 text-sm text-danger">{payments.error.message}</p> : null}
       {mutation.error && !conflict ? <p role="alert" className="mb-3 text-sm text-danger">{mutation.error.message}</p> : null}
@@ -102,23 +137,23 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
         columns={columns}
         data={payments.data ?? []}
         loading={payments.isLoading}
-        skeletonCols={6}
+        skeletonCols={7}
         selectedIds={selected}
         onSelectionChange={(ids) => setSelected(ids.map(Number))}
         emptyTitle="No matching payments"
       />
+      {refundRow ? (
+        <PaymentRefundDialog
+          key={refundRow.id}
+          makerspaceId={makerspaceId}
+          payment={refundRow}
+          onClose={() => setRefundRow(null)}
+        />
+      ) : null}
     </Panel>
   );
 }
 
 function labelFor(options: readonly (readonly [string, string])[], value: string) {
   return options.find(([key]) => key === value)?.[1] ?? value.replace(/_/g, " ");
-}
-
-function formatMoney(amount: string, currency: string) {
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency: currency.toUpperCase() }).format(Number(amount));
-  } catch {
-    return `${currency.toUpperCase()} ${amount}`;
-  }
 }

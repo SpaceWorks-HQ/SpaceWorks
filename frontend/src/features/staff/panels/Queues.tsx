@@ -6,6 +6,7 @@ import { staffRequest } from "../../../lib/api";
 import { Pagination } from "../../../components/ui/Pagination";
 import { useDebouncedValue } from "../../../lib/useDebouncedValue";
 import { usePaginatedQuery } from "../../../lib/usePaginatedQuery";
+import { issueErrorMessage } from "../issueErrors";
 import { Panel, type Makerspace } from "./shared";
 import { RequestList } from "./QueuesList";
 import { actionInvalidationScope, invalidateRequestQueues } from "./QueuesInvalidation";
@@ -152,7 +153,7 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
       });
       closeModals();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Action failed.";
+      const message = issueErrorMessage(error);
       setModalError(boxAssigned ? `Box assigned, but issue failed: ${message} The request still needs the issue step; retry with the assigned box.` : message);
     }
   };

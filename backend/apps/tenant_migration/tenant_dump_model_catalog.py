@@ -8,7 +8,8 @@ from .tenant_dump_types import ModelDisposition, ModelRule, TableRule
 FIRST_PARTY_APP_LABELS = frozenset(
     """accounts admin_api apiclients audit backup bookings boxes data_export
     encryption events evidence hardware_requests integrations inventory machines
-    maintenance makerspaces notifications operations organizations payments presence
+    maintenance makerspaces notifications operations organizations payments payments_rail
+    presence
     printing procurement roadmap separability tenant_migration updates warranty""".split()
 )
 THIRD_PARTY_MODEL_APP_LABELS = frozenset(
@@ -38,7 +39,8 @@ PROJECTED_MODEL_LABELS = frozenset(
     integrations.DestinationMachineScope integrations.DestinationMachineTypeScope
     integrations.EmailTemplate integrations.MachineTypeEmailTemplate
     integrations.NotificationDestination inventory.Category inventory.InventoryAsset
-    inventory.InventoryProduct machines.Machine machines.MachineConsumable
+    inventory.InventoryProduct machines.CertificationGrant machines.CertificationType
+    machines.Machine machines.MachineConsumable
     machines.MachineConsumableAdjustment machines.MachineConsumablePool
     machines.MachineDocument machines.MachineErrorLog machines.MachineServiceRequest
     machines.MachineType machines.MachineUsageEntry
@@ -47,12 +49,15 @@ PROJECTED_MODEL_LABELS = frozenset(
     maintenance.MaintenanceLog maintenance.MaintenanceLogDocument
     maintenance.MaintenanceSchedule makerspaces.Makerspace
     makerspaces.MakerspaceMembership makerspaces.MakerspaceWaiver
-    makerspaces.MemberProfile makerspaces.MemberProject makerspaces.MembershipRequest
+    makerspaces.MemberCard makerspaces.MemberProfile makerspaces.MemberProject
+    makerspaces.MembershipRequest makerspaces.MembershipPlan makerspaces.MembershipTerm
+    makerspaces.InvitationRequest
     notifications.Notification operations.InventoryAdjustment operations.QrPrintBatch
     operations.QrPrintBatchItem operations.ReportMetricRollup operations.StockTransfer
     operations.StockTransferLine
     operations.StocktakeLedgerEntry operations.StocktakeLine operations.StocktakeSession
-    payments.MakerspacePaymentSettings payments.Payment presence.PresenceSession
+    payments.MakerspacePaymentSettings payments.ManualSettlement payments.Payment
+    payments.Refund presence.PresenceSession
     procurement.ToBuyItem procurement.ToBuyReceipt
     tenant_migration.ExternalTenantReference warranty.Warranty
     warranty.WarrantyDocument""".split()
@@ -67,6 +72,7 @@ EXPLICIT_DROP_MODEL_REASONS = {
     "integrations.EmailNotificationMute": "Source delivery suppression does not control target mail.",
     "integrations.NotificationPreference": "Target notification defaults are authoritative.",
     "integrations.NotificationRecipient": "Every explicit recipient is a live disclosure rule.",
+    "operations.ReportSchedule": "A scheduled report delivery is a live disclosure rule; the target re-creates it.",
     "integrations.RecipientCategoryScope": "The owning disclosure recipient is dropped.",
     "integrations.RecipientMachineScope": "The owning disclosure recipient is dropped.",
     "integrations.RecipientMachineTypeScope": "The owning disclosure recipient is dropped.",

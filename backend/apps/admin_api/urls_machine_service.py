@@ -75,11 +75,10 @@ urlpatterns = [
         MachineServiceCollectView.as_view(),
         name="admin-machine-service-request-collect",
     ),
-    *_separable(
-        "payments",
-        path("machine-service/payments/<int:pk>/mark-offline", PaymentMarkOfflineView.as_view(), name="admin-machine-service-payment-mark-offline"),
-        path("machine-service/payments/<int:pk>/waive", PaymentWaiveView.as_view(), name="admin-machine-service-payment-waive"),
-    ),
+    # Unconditional: these SETTLE a machine job's charge, they do not collect it through
+    # a provider. A deployment shipping no rail still has staff taking cash at the desk.
+    path("machine-service/payments/<int:pk>/mark-offline", PaymentMarkOfflineView.as_view(), name="admin-machine-service-payment-mark-offline"),
+    path("machine-service/payments/<int:pk>/waive", PaymentWaiveView.as_view(), name="admin-machine-service-payment-waive"),
     path(
         "machine-service/requests/<int:pk>/reprint",
         MachineServiceReprintView.as_view(),

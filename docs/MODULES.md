@@ -52,7 +52,7 @@ core modules cannot be uninstalled at all.
 **Events**: [events](#events) — **Bookings**: [bookings](#bookings) —
 **Membership**: [membership](#membership)
 **Notifications**: [notifications](#notifications) · [email](#email) · [telegram](#telegram) ·
-[slack](#slack) · [mattermost](#mattermost) · [discord](#discord) — **Reports**: [reports](#reports) —
+[slack](#slack) · [mattermost](#mattermost) · [discord](#discord) · [webhook](#webhook) — **Reports**: [reports](#reports) —
 **Payments**: [payments](#payments) — **Accounts**: [member_accounts](#member_accounts) —
 **Mobile apps**: [mobile](#mobile) — **Updates**: [updates](#updates)
 
@@ -235,13 +235,18 @@ thirteen modules under it are optional.
   colour can be shared across every printer of a type instead of being re-entered per machine. Each pool
   also carries a hex swatch for the staff console and its own public/private flag. A public pool appears
   in the public printing form as material and colour name only — never the hex value, the lot code or
-  the remaining grams — and only while it is active with stock left.
+  the remaining grams — and only while it is active with stock left. With the `machines.certifications`
+  feature switched on, a makerspace defines certification types per machine type and issues grants to
+  memberships; an uncertified member is refused when booking a linked space or requesting work, and an
+  override needs machine-type authority plus a recorded, audited reason. The `certification-coverage`
+  report shows trained members per type.
 - **Without it** — the whole machine side of the product disappears: no registry, no service queue
   (which needs machines to point at), no maintenance schedules, no per-machine consumables. A pure tool
   library runs exactly like this — see the `lending` profile.
 - **Data** — **not separately purgeable**, and the command says why: machine rows host warranty records,
   inventory-backed consumables and service history, so deleting them piecemeal would orphan other
-  modules. Purge `machine_service` first, then archive and purge the makerspace.
+  modules. Purge `machine_service` first, then archive and purge the makerspace. Certification grants
+  are training evidence: a type is deactivated, never deleted, and a grant is revoked, never edited.
 
 ### machine_service
 
@@ -321,6 +326,11 @@ Required by `printing`.
   the member directory and member activity.
 - **What it adds** — the join-request queue, member capabilities and memberships in the console, the
   opt-in maker profile and directory, and per-member activity history.
+  Plans and terms (monthly, yearly or custom-length, priced or free) can be attached to a membership;
+  a beat-less sweep raises one renewal charge per term before it ends when `payments.membership` is on,
+  and an optional per-makerspace rule can stop lapsed members from borrowing. Prospective members can
+  send an invitation request from the public site (throttled, honeypot-guarded, PII encrypted at rest);
+  staff invite or decline it from the same queue as join requests.
 - **Without it** — people can still exist as members and still borrow: staff create walk-in member
   records, and identity can come from `member_accounts` or an external OIDC provider. What goes is the
   *enrolment and community* layer — no join requests to approve, no waivers, no referrals, no profiles,
@@ -335,8 +345,16 @@ Required by `printing`.
   a stranger walk past the requirement you just switched on. Turning it back off does **not** re-open
   account-less requests — that is an explicit choice, made with
   `manage.py set_request_access --mode anyone`.
-- **Data** — purgeable: join requests and member profiles with their projects and imagery. Memberships,
-  waivers and acceptance evidence **stay** — they are core RBAC and liability state.
+- **Member ID cards live here.** A card is a revocable QR credential over one membership (`MemberCard`),
+  issued, reissued, revoked and printed by staff holding `manage_member_cards` (Space Managers by default)
+  and resolvable at a scanner only by `scan_member_cards` — never through the inventory scanner, so an
+  inventory-only role can never turn a QR into a person. The printed name is scoped PII, the photo is a
+  private object stored only with the member's recorded consent, and revoking a card deletes the photo
+  and blanks the name immediately while the redacted row, the revoked QR, the scans and the audit entries
+  stay. Cards print as one CR80 card or an A4/Letter sheet; nothing rendered is stored.
+- **Data** — purgeable: join requests, member profiles with their projects and imagery, and member cards
+  with their photos (their QR codes are revoked, never deleted). Memberships, waivers and acceptance
+  evidence **stay** — they are core RBAC and liability state.
 
 ---
 
@@ -417,6 +435,22 @@ stored credential**, so re-enabling needs no re-entry.
 - **Without it** — no Discord surface ships at all for this space.
 - **Data** — purgeable: Discord destinations and their stored webhooks (delivery logs survive).
 
+### webhook
+
+- **What it is** — per-makerspace **signed JSON webhooks** to systems of your own (an ERP, a Slack bot you
+  wrote, a spreadsheet bridge). Not a chat room, but it sits in the same matrix: a webhook destination
+  receives exactly the notification a room would, as JSON, signed with a per-destination secret.
+- **What it adds** — `webhook` as a destination channel in the notification matrix, with an HTTPS endpoint
+  and a signing secret per destination; `X-SpaceWorks-Signature: t=<unix>,v1=<hex>` is HMAC-SHA256 over
+  `"<t>.<body>"`, plus `X-SpaceWorks-Event` and `X-SpaceWorks-Delivery` headers. Retries and the durable
+  delivery log are the ones every non-email channel already has; a superadmin can re-queue failed
+  deliveries from `/control/`. Verification recipe: `docs/api-client-protocol.md` → "Outbound webhooks".
+- **Without it** — no signed-webhook surface ships for this space. The inbound API-client protocol is
+  unaffected; other systems poll instead of being told.
+- **Data** — purgeable: webhook destinations with their endpoint URLs and signing secrets (delivery logs
+  survive). Endpoint URLs are validated against private and loopback ranges when saved and re-resolved at
+  send time, like every other webhook channel.
+
 ---
 
 ## Reports
@@ -427,14 +461,18 @@ stored credential**, so re-enabling needs no re-entry.
 - **What it adds** — the `analytics` and `report_export` workflows: a server-provided report catalog,
   dashboards, accessible charts with table fallbacks, the ledger, problem reports and every registered
   report. The catalog covers every module either with a substantive report or an explicitly gated row in
-  a composite operational-health report.
-- **Without it** — no analytics screens and no exports from the console. It is a **standalone area
+  a composite operational-health report. Every CSV/XLSX export carries provenance (who generated it,
+  when, for which makerspace, which report version and filters) as the first CSV line or a `Provenance`
+  sheet, and staff can schedule a report to be delivered daily, weekly or monthly to a notification
+  destination or a list of email recipients as a short-lived signed download link.
+- **Without it** — no analytics screens, no exports and no scheduled deliveries from the console. It is a **standalone area
   rather than part of Inventory** on purpose: switching Inventory off would otherwise take the machine
   and event reports with it.
 - **Data** — closed historical buckets are stored as append-only, non-PII metric rollups; corrections add
   a revision rather than rewriting history. Automatic evidence retention must finalize its rollup fence
   first, so it cannot change historical figures. Whole-tenant purge removes the rollups through tenant
-  ownership, and an explicit source-module purge removes that module's derived rollups too.
+  ownership, and an explicit source-module purge removes that module's derived rollups too. Purging
+  `reports` deletes report schedules and their delivered files (private objects); the rollups stay.
 
 ---
 
@@ -442,12 +480,18 @@ stored credential**, so re-enabling needs no re-entry.
 
 ### payments
 
-**On by default.**
+**Opt-in.** It was on by default until charge *tracking* moved out from under it: a space that takes
+cash needs none of this module and still keeps a full ledger of what members owe.
 
-- **What it is** — taking money online, through Stripe or Razorpay behind one provider seam.
-- **What it adds** — the payment surfaces, charges, receipts, reconciliation and (with `mobile`) the
-  in-app payment sheet.
-- **Without it** — no online payment surfaces exist. Money is handled outside the system.
+- **What it is** — taking money **online**, through Stripe or Razorpay behind one provider seam.
+- **What it adds** — the online rail: checkout, Connect, webhooks, refunds (full or partial, through
+  the same provider seam, as ledger lines that never edit the charge) and (with `mobile`) the in-app
+  payment sheet. With `payments.loans` on, a loan deposit and a capped late fee can be collected
+  online too.
+- **Without it** — money owed is still tracked, listed and reported: the `charges.*` features raise
+  the charge, members see what they owe, and staff settle it in person and record how (cash, UPI,
+  bank transfer, card machine, cheque) in the append-only manual-settlement ledger. What disappears
+  is only the ability to pay by card online.
 - **Installed ≠ charging.** The module being on means the *surfaces* exist. No charge can be created
   until a Space Manager turns on a `payments.<area>` feature **and** valid credentials resolve.
 - **Data** — **payments are never purged by a module purge.** A charge is the record of money that really
@@ -501,8 +545,10 @@ in the console rather than a superadmin. A feature is inert while its parent mod
 | `payments.bookings` | `bookings` | | Charge for bookings | Bookings are free in-app |
 | `payments.events` | `events` | | Charge for event registration | Registration is free in-app |
 | `payments.membership` | `membership` | | Charge membership dues | Dues are collected out of band |
+| `payments.loans` | `payments` | | Raise a deposit when a loan is issued and a capped late fee when it comes back late | Lateness is recorded (due dates, reminders) but never charged |
 | `mobile.push` | `mobile` | ● | Native push notifications | Apps rely on in-app/inbox notifications |
 | `events.offline_checkin` | `events` | | Expiring on-device roster plus event-scoped PIN check-in stations | Check-in needs a live connection and an authenticated staff actor |
+| `machines.certifications` | `machines` | | Members need an unexpired certification per machine type to book a linked space or request work; overrides need machine-type authority and are audited | Training is tracked out of band; nothing gates a request or booking |
 | `notifications.delegated_recipients` | `notifications` | | Machine-scoped maintainers manage maintenance alert recipients for their own machines. Needs `maintenance` and `machines` too | Only makerspace-level staff manage recipients |
 | `inventory.self_checkout` | — | ● | Member self-checkout and staff direct handouts | Every handover goes through a staff-issued request |
 | `presence.geofence` | — | ● | Advisory location check at check-in | Check-in records no location. It is advisory either way — it never blocks |
@@ -510,6 +556,29 @@ in the console rather than a superadmin. A feature is inert while its parent mod
 The four `payments.<area>` switches are **off by default and stay inert until credentials resolve** —
 turning one on cannot start charging anyone by itself. `inventory.self_checkout` and `presence.geofence`
 belong to no module: they are standalone capabilities that apply whenever you enable them.
+
+## Editions
+
+A deployment has one **edition**, set by `SPACEWORKS_EDITION` (setup asks; default `makerspace`). It answers
+"what is this box for" one level above modules: the six core modules are the hardware loan spine and cannot
+be uninstalled, so an events-only or bookings-only installation would otherwise still show a catalogue, a
+borrow flow and a scanner it never uses. The edition **hides** those surfaces and makes their public routes
+answer 404; it does not delete tables, endpoints or data, and every staff endpoint keeps answering so data
+stays recoverable. Frontend bootstrap payloads carry `edition`, and edition-hidden module keys are already
+removed from the `modules` list they return, so the console's tabs and the public site's routes need no
+separate switch.
+
+| Edition | Hidden module keys | Public home |
+|---|---|---|
+| `makerspace` (default) | none | the catalogue |
+| `events` | `public_inventory request_workflow scanner asset_units containers bulk_import stock_transfers qr_print_batches guest_handover procurement stocktake machines machine_service printing maintenance bookings` | the events page |
+| `bookings` | the same set with `bookings` visible and `events` hidden | the bookings page |
+| `organization` | none — a labelling edition: one makerspace row is presented as "the organization" (`branding.display_name`) | the catalogue |
+
+`Event.makerspace` stays the tenancy anchor in every edition (locked 2026-08-19); an organization-first
+install is one `Makerspace` row with an organization label, never a re-anchoring. Turning an edition into a
+genuinely smaller schema (removing the loan apps) is the separate `TOMBSTONED_APPS` axis and a future
+"Option A"; see `docs/INVARIANTS.md` → Editions.
 
 ## Install profiles
 
@@ -523,7 +592,9 @@ modules.
 | `lending` | 17 | A tool library: the full lending lifecycle, no machines |
 | `recommended` | 20 | Core plus the inventory lifecycle, reports and machines (the default) |
 | `cloud` | 24 | A managed box: everything that runs on a single Django process, no worker or beat |
-| `everything` / `full` | 32 | All modules |
+| `everything` / `full` | 33 | All modules |
+| `events` | 12 | An events programme: events, notifications, email, member accounts, membership, payments, reports (core is present but hidden by the `events` edition) |
+| `bookings` | 12 | Bookable rooms and resources: bookings, notifications, email, member accounts, membership, payments, reports (core hidden by the `bookings` edition) |
 
 **Installing without a profile** gives you **8 modules**: the six core ones plus `payments` and
 `updates`. Member accounts and mobile apps are opt-in; installing `mobile` also installs its

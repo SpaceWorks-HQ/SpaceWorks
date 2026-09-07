@@ -117,12 +117,10 @@ def _project_authority(series, event):
                 "source_series_collaboration": source,
             },
         )
+    from apps.events.services_series_organizers import project_organizer
+
     for source in series.organizers.all():
-        EventOrganizer.objects.get_or_create(
-            event=event,
-            organization=source.organization,
-            defaults={"created_by": source.created_by, "source_series_organizer": source},
-        )
+        project_organizer(source, [event])
 
 
 def _materialize_locked(series, *, actor, now):

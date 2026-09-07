@@ -86,6 +86,18 @@ class BookableSpace(models.Model):
         validators=[MinValueValidator(1)],
     )
     is_active = models.BooleanField(default=True)
+    # Optional link to the kind of machine this space is booked to use, which is what
+    # lets certification gating apply to a booking. Deliberately nullable and only
+    # consulted when set: `bookings` must keep working with the `machines` module
+    # uninstalled, so this can never become a hard dependency. `related_name="+"` keeps
+    # `machines` free of a reverse accessor into an app it does not require.
+    machine_type = models.ForeignKey(
+        "machines.MachineType",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

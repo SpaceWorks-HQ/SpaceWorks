@@ -23,7 +23,7 @@ from apps.events.models import (
 from apps.hardware_requests.models import HardwareRequest
 from apps.integrations.admin_email_logs import EmailLogAdmin
 from apps.integrations.models import EmailLog
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.models import InvitationRequest, Makerspace, MemberCard
 from apps.machines.models import (
     Machine,
     MachineServiceRequest,
@@ -72,6 +72,8 @@ def _objects():
         "bookings.Booking": Booking.objects.create(space=bookable, name="Base", email=f"booking-{stamp}@example.test", phone="1", starts_at=now + timedelta(days=1), ends_at=now + timedelta(days=1, hours=1)),
         "machines.MachineServiceRequest": MachineServiceRequest.objects.create(bucket=service_bucket, requester=user, title="Sweep service"),
         "machines.MachineUsageEntry": MachineUsageEntry.objects.create(machine=machine, logged_by=user),
+        "makerspaces.MemberCard": MemberCard.objects.create(makerspace=space, card_number=1, printed_name="Base"),
+        "makerspaces.InvitationRequest": InvitationRequest.objects.create(makerspace=space, name="Base", email=f"invite-{stamp}@example.test", phone="1"),
         "integrations.EmailLog": EmailLog.objects.create(makerspace=space, to_email=f"mail-{stamp}@example.test", subject="Base", text_body="", html_body=""),
     }
 

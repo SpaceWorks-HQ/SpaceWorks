@@ -29,6 +29,7 @@ class NotificationChannel(models.TextChoices):
     SLACK = "slack", "Slack"
     MATTERMOST = "mattermost", "Mattermost"
     DISCORD = "discord", "Discord"
+    WEBHOOK = "webhook", "Signed webhook"
     NATIVE_PUSH = "native_push", "Native push"
 
 
@@ -37,6 +38,7 @@ class NonEmailNotificationChannel(models.TextChoices):
     SLACK = "slack", "Slack"
     MATTERMOST = "mattermost", "Mattermost"
     DISCORD = "discord", "Discord"
+    WEBHOOK = "webhook", "Signed webhook"
     NATIVE_PUSH = "native_push", "Native push"
 
 
@@ -51,6 +53,9 @@ class ChatNotificationChannel(models.TextChoices):
     SLACK = "slack", "Slack"
     MATTERMOST = "mattermost", "Mattermost"
     DISCORD = "discord", "Discord"
+    # Not a chat room: a machine endpoint that receives the SAME notification a room would,
+    # as JSON, signed with a per-destination secret (apps/integrations/webhooks.py).
+    WEBHOOK = "webhook", "Signed webhook"
 
 
 # Hard per-provider message ceilings, in characters. One table because the failure mode
@@ -62,6 +67,7 @@ MAX_MESSAGE_LENGTH = {
     "slack": 40000,  # incoming webhook `text`
     "mattermost": 16383,  # incoming webhook `text`
     "discord": 2000,  # webhook `content`
+    "webhook": 100000,  # our own JSON `text`; generous, but bounded like every channel
 }
 
 
@@ -97,4 +103,5 @@ CHANNEL_MODULE_KEYS = {
     "slack": "slack",
     "mattermost": "mattermost",
     "discord": "discord",
+    "webhook": "webhook",
 }

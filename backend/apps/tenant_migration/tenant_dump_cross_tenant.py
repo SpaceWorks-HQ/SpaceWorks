@@ -134,11 +134,17 @@ def inspect_cross_tenant_source(makerspace_id, *, using="default"):
     for row in Payment._base_manager.using(using).filter(
         makerspace_id=makerspace_id
     ).values("id", "status"):
+        # A pending charge no longer refuses the dump. It used to, from before money
+        # owed could be recorded without a gateway -- which made a dump nearly
+        # impossible for any space that tracks debts, and tracking is on by default now.
+        # Two things make it safe to carry: the preflight refuses any pending row with a
+        # LIVE rail, and projection strips every provider HANDLE off the row -- session,
+        # intent, order id, checkout URL, connected account, rail -- so the target cannot
+        # resume the source's. The `provider` label itself travels, so a charge raised
+        # under one vendor stays attributed to it. Drift between capture and cutover is
+        # caught by the capture's money fingerprint.
         if row["status"] == "pending":
-            raise TenantDumpDispositionRefused(
-                f"Pending Payment {row['id']} is an unresolved obligation.",
-                reason_code="pending_payment",
-            )
+            continue
         if row["status"] not in TERMINAL_PAYMENT_STATUSES:
             raise TenantDumpDispositionRefused(
                 f"Payment {row['id']} has an unclassified status.",

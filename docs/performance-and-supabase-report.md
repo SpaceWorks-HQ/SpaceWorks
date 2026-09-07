@@ -83,6 +83,37 @@ Email API free tier (or host SMTP)  → notifications
 ```
 **Final call:** fine for a demo or a very small makerspace with disciplined file cleanup; not a dependable "completely free" production deployment. The required code changes are: remove the purge superuser SQL (pick archive-only or trigger-relax), rework presigned uploads (POST→PUT or Supabase signed URLs), add a cron HTTP endpoint, and tighten upload caps + DB retention.
 
+
+## Status 2026-09-03 (phase 0 close-out)
+
+Re-measured on `dev` at `0039f2f9`. The report's `file:line` citations are from June and many files have
+since moved or been retired; each verdict below names where the code is today.
+
+| # | Finding | Verdict | Where / why |
+|---|---|---|---|
+| 1 | `HardwareRequest` composite indexes | **Done** | `hardware_requests/models.py` carries `hwreq_ms_status_{created,issued,updated,closed}_idx` |
+| 2 | `PrintPrinterSerializer` N+1 | **Superseded** | the printing kernel was tombstoned (`911f4589`); `serializers_printers.py` no longer exists |
+| 3 | `PrintRequest` indexes | **Superseded** | same; print jobs are `machine_service` requests |
+| 4 | Out-of-band work off the request thread | **Done for notifications**, open for exports | email + non-email channels run in `deliver_email_task` / `deliver_notification_task`; QR ZIP and XLSX exports remain synchronous → phase 6 (streamed exports) |
+| 5 | Ledger in-memory sort | **Done** | `operations/ledger_query*.py` filters and paginates in SQL |
+| 6 | Direct-loan `items` N+1 | **Done** | `direct_loan_views.py` uses `Prefetch("request__items", …)` |
+| 7 | Operations list indexes | **Done** | `operations/models.py` indexes on transfers, stocktake, print batches |
+| 8 | RBAC hidden/archived cache | **Declined for now** | `servability.unservable_makerspace_ids()` is two indexed queries; caching adds an invalidation surface for a cost not measured in production. Revisit with metrics from phase 0 |
+| 9 | `BoxSerializer.get_qr_code_id` N+1 | **Done** | `views_containers.py` annotates `_active_qr_code_id` |
+| 10 | `CONN_MAX_AGE` | **Done (this phase)** | default 60 + `CONN_HEALTH_CHECKS`; pooler deployments keep `0` |
+| 11 | `QrScanEvent` indexes | **Done** | `qrscan_ms_qrcode_created_idx`, `qrscan_ms_context_idx` |
+| 12 | `_summary` per-metric queries | **Superseded** | reports moved to the report registry (`operations/report_registry.py`) |
+| 13 | Filament reports loop | **Superseded** | printing retired |
+| 14 | Exports materialize everything | **Open → phase 6** | streamed CSV, write-only XLSX |
+| 15 | Public print submit S3 HEAD in txn | **Superseded** | public printing intake replaced by machine-service intake |
+| 16 | `procurement` unpaginated list | **Open → phase 1** | `procurement/views_items.py` still `pagination_class = None`; `select_related` is in place. Pagination changes the response shape, so it lands with the frontend list work |
+| 17 | `require_module` double fetch | **Declined** | one indexed PK lookup; callers may pass the object |
+| 18 | `staff_origin_scope` Python scan | **Open, low** | `makerspaces/origin_scope.py` still iterates servable makerspaces per request; bounded by makerspace count |
+| 19 | Middleware re-resolves client | **Done** | `inventory/middleware.py` attaches `request.api_client` |
+
+Guard added: `tests/perf/test_list_query_budgets.py` puts a fixed query ceiling on the hot list endpoints
+so an N+1 regression fails CI instead of slowing a queue.
+
 ---
 
 ## Source agents

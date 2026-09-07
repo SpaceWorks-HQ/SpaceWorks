@@ -205,6 +205,10 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
         field="object_key",
         generator=_maintenance_document_key,
     ),
+    ("makerspaces.MemberCard", "field:membership"): _policy(
+        REMAP,
+        "One card per membership: the remapped membership reference keeps the pair unique.",
+    ),
     ("makerspaces.Makerspace", "field:anonymous_requester"): _policy(
         NULL,
         "The anonymous-request principal is a per-deployment system row, not a person: "
@@ -253,6 +257,19 @@ DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
         "payment_external_payment_once_per_provider",
     ): _policy(
         NULL, "The omitted external_payment_id makes this target constraint inert."
+    ),
+    (
+        "payments.Refund",
+        "refund_external_once_per_provider",
+    ): _policy(
+        NULL, "The omitted external_refund_id makes this target constraint inert."
+    ),
+    # `amends` is a OneToOne, so it is deployment-globally unique: only one correction
+    # may replace a given receipt, which is what stops an amendment chain branching.
+    # REMAP, not PRESERVE: it is a reference to another settlement row, so it follows
+    # that row's imported identity. There is nothing to regenerate on a collision.
+    ("payments.ManualSettlement", "field:amends"): _policy(
+        REMAP, "The one-to-one amendment reference is remapped to the imported receipt."
     ),
     ("procurement.ToBuyReceipt", "field:object_key"): _policy(
         PRESERVE,

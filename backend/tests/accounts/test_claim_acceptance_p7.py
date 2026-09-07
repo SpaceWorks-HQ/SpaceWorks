@@ -16,6 +16,7 @@ from apps.inventory.models import InventoryProduct
 from apps.machines.models import Machine, MachineServiceRequest, MachineType
 from apps.payments.models import MakerspacePaymentSettings, Payment
 from apps.presence.models import PresenceSession
+from tests.return_helpers import enable_online_rail
 from tests.accounts.claim_helpers_p7 import redeemed_claim, start_claim_presence
 
 pytestmark = pytest.mark.django_db
@@ -224,6 +225,9 @@ def test_claim_submits_machine_service_and_reads_it_in_member_activity():
 
 def test_claim_reaches_member_area_and_checks_out_a_locally_owned_charge(monkeypatch):
     harness = redeemed_claim("accept-payment")
+    # Checking out needs a live rail, not just credentials: the member checkout endpoint
+    # now refuses to mint a link for a charge whose space has no online payment enabled.
+    enable_online_rail(harness.space, "membership")
     settings = MakerspacePaymentSettings(makerspace=harness.space)
     settings.set_stripe_secret_key("sk_test_claim")
     settings.set_stripe_webhook_secret("whsec_claim")
@@ -238,7 +242,7 @@ def test_claim_reaches_member_area_and_checks_out_a_locally_owned_charge(monkeyp
         created_by=harness.staff,
     )
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.create_checkout_session",
+        "apps.payments.services_checkout.stripe_client.create_checkout_session",
         lambda *_args, **_kwargs: {
             "id": "cs_claim_acceptance",
             "url": "https://checkout.stripe.test/claim",

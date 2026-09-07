@@ -201,7 +201,17 @@ def claim_invitation(user, request_id):
                                 request=request, source="claim")
 
 
-def approve_request(actor, request, assigned_role):
+def approve_request(actor, request, assigned_role, plan=None):
+    """Activate the membership; with a `plan`, open its first term in the same call."""
+    membership = _approve_request(actor, request, assigned_role)
+    if plan is not None:
+        from apps.makerspaces.membership_plan_services import create_term
+
+        create_term(actor, membership, plan)
+    return membership
+
+
+def _approve_request(actor, request, assigned_role):
     request = MembershipRequest.objects.select_related("makerspace", "user").get(pk=request.pk)
     with transaction.atomic():
         makerspace = Makerspace.objects.select_for_update().get(pk=request.makerspace_id)

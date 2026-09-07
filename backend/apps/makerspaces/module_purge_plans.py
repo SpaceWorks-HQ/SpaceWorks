@@ -36,6 +36,8 @@ from apps.makerspaces.module_purge_collectors import (
     maintenance_private_key_sizes,
     maintenance_private_keys,
     membership_delete,
+    membership_private_key_sizes,
+    membership_private_keys,
     membership_public_image_keys,
     notifications_delete,
     procurement_delete,
@@ -45,6 +47,11 @@ from apps.makerspaces.module_purge_collectors import (
     stock_transfers_delete,
     stocktake_delete,
     telegram_destinations_delete,
+    webhook_destinations_delete,
+)
+from apps.makerspaces.module_purge_collectors_reports import (
+    reports_delete,
+    reports_private_keys,
 )
 
 
@@ -127,9 +134,13 @@ PLANS = (
     # always the exception; they are now simply the rule.
     ModulePurgePlan(
         "membership",
-        "Join requests and member profiles with their projects and imagery. "
-        "Memberships, waivers and acceptance evidence stay as core RBAC/liability state.",
+        "Join requests, invitation requests, membership plans and terms, and member "
+        "profiles with their projects and imagery. Memberships, waivers and acceptance "
+        "evidence stay as core RBAC/liability state.",
         membership_delete,
+        pii_labels=("makerspaces.MemberCard", "makerspaces.InvitationRequest"),
+        private_keys=membership_private_keys,
+        private_key_sizes=membership_private_key_sizes,
         public_image_keys=membership_public_image_keys,
     ),
     ModulePurgePlan(
@@ -158,6 +169,20 @@ PLANS = (
     ),
     ModulePurgePlan(
         "discord", "Discord destinations and their stored webhooks.", discord_destinations_delete
+    ),
+    ModulePurgePlan(
+        "webhook",
+        "Signed-webhook destinations, their endpoint URLs and signing secrets.",
+        webhook_destinations_delete,
+    ),
+    # Metric rollups stay: they are append-only rows behind the evidence retention fence,
+    # so removing them is a retention decision, not part of switching reporting off.
+    ModulePurgePlan(
+        "reports",
+        "Scheduled report deliveries: schedules, delivery history and the delivered files. "
+        "Metric rollups stay (retention fence).",
+        reports_delete,
+        private_keys=reports_private_keys,
     ),
     ModulePurgePlan("stocktake", "Stocktake sessions, lines and ledger entries.", stocktake_delete),
     ModulePurgePlan("stock_transfers", "Stock transfers and their lines.", stock_transfers_delete),

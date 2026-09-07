@@ -13,9 +13,20 @@ from apps.payments.providers.base import (
     CheckoutRequest,
     CheckoutResult,
     PaymentsUnavailable,
+    RefundRequest,
+    RefundResult,
     WebhookEvent,
     WebhookVerificationError,
 )
+
+# Stripe refund statuses, normalised to the three the Refund row knows.
+REFUND_STATUSES = {
+    "succeeded": "succeeded",
+    "pending": "pending",
+    "requires_action": "pending",
+    "failed": "failed",
+    "canceled": "failed",
+}
 
 
 def _value(value, key):
@@ -60,6 +71,29 @@ class StripeProvider:
         if not order_id:
             return
         stripe_client.expire_checkout_session(source, order_id)
+
+    def create_refund(self, source, request: RefundRequest) -> RefundResult:
+        if not request.payment_id:
+            raise PaymentsUnavailable("The payment has no Stripe PaymentIntent to refund.")
+        try:
+            refund = stripe_client.create_refund(
+                source,
+                idempotency_key=request.idempotency_key,
+                payment_intent=request.payment_id,
+                amount=request.amount_minor,
+                metadata={key: str(value) for key, value in (request.metadata or {}).items()},
+            )
+        except PaymentsUnavailable:
+            raise
+        except Exception as exc:
+            raise PaymentsUnavailable("Stripe rejected the refund.") from exc
+        refund_id = _value(refund, "id")
+        if not refund_id:
+            raise PaymentsUnavailable("Stripe did not return a refund id.")
+        return RefundResult(
+            refund_id=refund_id,
+            status=REFUND_STATUSES.get(_value(refund, "status") or "", "pending"),
+        )
 
     def verify_webhook(self, source, *, payload: bytes, headers) -> WebhookEvent:
         signature = headers.get("Stripe-Signature") or headers.get("HTTP_STRIPE_SIGNATURE", "")

@@ -4,13 +4,14 @@ from django.db import transaction
 from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.inventory.search import apply_q
 from apps.admin_api.machine_access import resolve_machine
 from apps.admin_api.permissions import IsActiveStaff
 from apps.audit import services as audit
@@ -48,6 +49,12 @@ class MachineListCreateView(APIView):
         tags=['Admin machines'],
         summary='List machines in a makerspace',
         request=None,
+        parameters=[
+            OpenApiParameter(
+                name='q', type=str, location=OpenApiParameter.QUERY, required=False,
+                description='Full-text search over name, location, firmware version and notes.',
+            ),
+        ],
         responses={200: MachineListResponseSerializer},
     )
     def get(self, request, makerspace_id, *args, **kwargs):
@@ -70,6 +77,9 @@ class MachineListCreateView(APIView):
             # by name alone is still unstable wherever two machines share one.
             .order_by('machine_type__name', 'name', 'pk'),
         )
+        query = request.query_params.get('q', '')
+        if query.strip():
+            queryset = apply_q(queryset, query)
         paginator = _MachinePagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
         capabilities = access.capabilities_for_machines(request.user, page)

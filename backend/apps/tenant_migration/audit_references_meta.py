@@ -4,6 +4,10 @@ from .audit_references_targets import (
     AuditReference,
     AuditReferenceDisposition,
 )
+from .audit_references_meta_membership import MEMBERSHIP_AUDIT_EDGES
+from .audit_references_meta_payments import PAYMENT_AUDIT_EDGES
+from .audit_references_meta_phase5 import PHASE5_AUDIT_EDGES
+from .audit_references_meta_reports import REPORT_SCHEDULE_AUDIT_EDGES
 from .audit_references_meta_source_local import SOURCE_LOCAL_AUDIT_EDGES
 
 _SOURCE_LOCAL_EDGES = SOURCE_LOCAL_AUDIT_EDGES
@@ -263,3 +267,7 @@ AUDIT_META_REFERENCES.update(
 AUDIT_META_REFERENCES.update(
     _reference(S, "boxes.QrScanEvent", ("qr.scanned", "scan_id"))
 )
+AUDIT_META_REFERENCES.update(PHASE5_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(MEMBERSHIP_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(PAYMENT_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(REPORT_SCHEDULE_AUDIT_EDGES)

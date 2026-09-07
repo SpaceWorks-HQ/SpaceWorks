@@ -6,6 +6,70 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-09-04 — forward plan phase 6: money and membership depth.** Refunds as immutable ledger lines
+  over `paid_online` charges, settled through the provider seam and its webhooks; `payments.loans` raises a
+  deposit on issue and a capped late fee once at close, from the workflow module, never blocking unless the
+  opt-in gate is on; membership plans and terms with a beat-less renewal charge and an optional
+  lapsed-members-cannot-borrow rule; public invitation requests (throttled, honeypot, PII-encrypted) that
+  become staff invitations; provenance on every CSV/XLSX export and scheduled deliveries as signed links.
+  Owner decisions 6 and 7 were taken by their plan defaults (vendor contact not PII; charging allowed, off
+  by default). Work paused after this phase by owner instruction; phases 7–11 remain plans.
+- **2026-09-04 — forward plan phase 5: member ID cards and certification gating.** Member cards
+  (`makerspaces.MemberCard`) are membership-module behaviour over a core QR target type: issued, reissued
+  (rotating the QR; the old payload scans as revoked forever), revoked (redacting name and photo at once)
+  and printed as one CR80 card or an A4/Letter sheet by staff holding `manage_member_cards`, and resolved
+  only through a dedicated `scan_member_cards` path — the inventory scanner refuses to turn a QR into a
+  person. Members set their printed name, upload a private photo behind an explicit consent, and preview
+  a watermarked card. Certification types per machine type and grants per membership gate machine-service
+  requests and bookings of linked spaces behind the `machines.certifications` feature switch; an override
+  needs machine-type authority and a recorded reason. Held certifications print as an optional card field,
+  reach the maker profile only after a separate opt-in, and roll up in the `certification-coverage` report.
+- **2026-09-03 — forward plan phase 4: editions and the single-box install.** A deployment-level
+  `SPACEWORKS_EDITION` hides the loan and machine surfaces on an events-only or bookings-only box (or
+  events on a bookings box) by removing their keys from every module list clients receive and answering
+  404 on their public routes, while every capability, staff endpoint, migration and backup stays
+  identical — Option B from the vertical-deployments plan, built where Option A would need it. `events`
+  and `bookings` install profiles, an edition-aware public home, and an `organization` labelling edition
+  that keeps `Event.makerspace` as the anchor. The single-box image runs nginx, the frontend, gunicorn,
+  the live stream, a worker, the scheduler loop and Redis in one unprivileged container beside Postgres
+  and MinIO; the installer asks for the shape and persists it in `.spaceworks-layer`.
+- **2026-09-03 — forward plan phase 3: outbound signed webhooks.** A `webhook` notification channel
+  module: a destination carries an encrypted endpoint URL and signing secret, the feature × channel matrix
+  routes to it like any room, and each notification arrives as JSON with an HMAC-SHA256 signature over the
+  exact body plus event and delivery headers — through the existing delivery log, retries, SSRF validation
+  and pinned HTTPS. Superadmins can re-queue failed deliveries. The verification recipe is in
+  `docs/api-client-protocol.md`. The generated Python client was deferred.
+- **2026-09-03 — forward plan phase 2: the Hard Rules pinned in a real browser.** A Playwright suite
+  (`frontend/e2e/`, `scripts/e2e-local.sh`, CI job `e2e`) seeds a disposable makerspace and walks a
+  request from accept to issue (container code + real presigned photo upload) to return (container code,
+  photo, remark), asserts the console's refusal copy and the API's 400s when any of those is missing,
+  proves the public catalogue never leaks the storage location or box code, and runs axe (WCAG 2.1 AA,
+  contrast included) on the catalogue, login and requests console. Writing it found and fixed two
+  defects — the SSE endpoint answered 406 to `Accept: text/event-stream`, and the frontend's API base
+  URL bypassed the Vite proxy — plus a real contrast failure in the request queue.
+- **2026-09-03 — forward plan phase 1: live updates, one search contract, frontend delivery.** Every
+  committed audit row now publishes a PII-free hint over Redis pub/sub, and the staff console holds one
+  Server-Sent Events stream (`/api/v1/live/`, its own `live` gunicorn service so worker recycling never
+  severs it) that invalidates the matching TanStack queries — queues update without polling, and a box
+  without Redis simply keeps polling. `?q=` became one contract: trigger-maintained Postgres search
+  vectors on products, machines and events with websearch syntax plus trigram typo tolerance, declared
+  as derived columns in all three export/migration registries; the member directory searches identity
+  fields only and requester PII stays out of every index. Public routes are lazy chunks with stable
+  react/tanstack vendor chunks, and the eleven frontend files over the 300-line ceiling were split with
+  no behaviour change (`lib/api.ts` is now a barrel over `lib/api/`).
+- **2026-09-03 — forward plan phase 0: CI that runs the suite, observability, performance close-out.**
+  `.github/workflows/tests.yml` runs the host-topology backend suite, the pg-client-16 backup and
+  tenant-migration suites, the frontend typecheck/tests/build and the CLAUDE.md/AGENTS.md drift check on
+  every pull request; the release workflow now depends on it, so an image is never published from a red
+  tree. Requests carry an `X-Request-ID` bound in a contextvar, stamped on every log line (JSON in
+  production), propagated into Celery, and correlated with audit rows through an `audit_recorded` log line
+  rather than by writing into attested `meta`. `GET /api/v1/metrics/` serves Prometheus text behind
+  `METRICS_TOKEN`; `SENTRY_DSN` opts into error tracking with PII off. `CONN_MAX_AGE` defaults to 60 with
+  health checks (pooler deployments keep 0). The June performance audit was re-measured item by item and
+  closed in its report; `tests/perf/` puts a query ceiling on the hot list endpoints. The superadmin
+  series-organizer admin, which wrote occurrence organizers straight to the ORM, now routes through a
+  series-level service with the module lock and authority check. The stale file-ceiling sentence in
+  `CLAUDE.md` was corrected (five `apps/` files over 300 lines, not 37).
 - **2026-09-03 — 0.8.2: GitHub Release history became permanent.** The release workflow had kept only
   the current and immediately previous release, deleting every older release **and its Git tag** on each
   run, which is why the Releases page never showed history. Neither is deleted any more. Container

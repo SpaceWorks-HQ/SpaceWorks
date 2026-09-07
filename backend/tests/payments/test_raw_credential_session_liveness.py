@@ -1,3 +1,4 @@
+from tests.return_helpers import settlement_details
 import pytest
 from rest_framework.test import APIClient
 
@@ -21,10 +22,14 @@ def test_raw_rotation_blocks_terminal_session_when_remote_closure_is_unconfirmed
         stripe_checkout_url="https://checkout.stripe.test/raw-abandoned"
     )
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.expire_checkout_session",
+        "apps.payments.services_checkout.stripe_client.expire_checkout_session",
         lambda *_args: False,
     )
-    reconcile(payment, manager)
+    # `mark_offline` requires the receipt; `waive` takes none, since no money moved.
+    if reconcile is mark_offline:
+        reconcile(payment, manager, settlement_details())
+    else:
+        reconcile(payment, manager)
     payment.refresh_from_db()
     assert payment.status in {Payment.Status.PAID_OFFLINE, Payment.Status.WAIVED}
     assert payment.stripe_checkout_session_expired_at is None
@@ -52,10 +57,10 @@ def test_raw_rotation_persists_authoritatively_closed_terminal_session(monkeypat
     )
     payment = Payment.objects.get(makerspace=makerspace)
     monkeypatch.setattr(
-        "apps.payments.services.stripe_client.expire_checkout_session",
+        "apps.payments.services_checkout.stripe_client.expire_checkout_session",
         lambda *_args: False,
     )
-    mark_offline(payment, manager)
+    mark_offline(payment, manager, settlement_details())
     monkeypatch.setattr(
         "apps.payments.stripe_client.checkout_session_is_closed",
         lambda *_args: True,

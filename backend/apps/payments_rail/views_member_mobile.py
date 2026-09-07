@@ -8,6 +8,7 @@ from apps.accounts.views_device import IsDeviceAccessToken
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.origin_scope import require_native_selected_makerspace
 from apps.payments import stripe_client
+from apps.payments.availability import online_payments_enabled_for
 from apps.payments.member_scope import member_payment_queryset
 from apps.payments.models import Payment
 from apps.payments.serializers_mobile import MobilePaymentIntentResponseSerializer
@@ -42,6 +43,18 @@ class MemberMobilePaymentIntentView(APIView):
         ).first()
         if payment is None:
             raise NotFound()
+        # Same rule as the web checkout: a debt with no live rail behind it is settled at
+        # the desk, not by minting a native intent the space cannot capture.
+        if not online_payments_enabled_for(payment):
+            # Same reason as the web surface: the structured 503 handler below wraps only
+            # the intent call, so raising here would surface as a 500.
+            return Response(
+                {
+                    'detail': 'Online payment is not available for this charge.',
+                    'code': 'payments_unavailable',
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         try:
             payload = create_mobile_intent(payment.pk, actor=request.user)
         except Payment.DoesNotExist as exc:

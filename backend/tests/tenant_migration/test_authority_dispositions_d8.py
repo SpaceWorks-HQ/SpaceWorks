@@ -108,11 +108,23 @@ EXPECTED = dict(
         ),
         *_fields(
             "makerspaces.MemberProfile",
-            "is_visible show_attended_events headline institution bio avatar_key "
+            "is_visible show_attended_events show_certifications headline institution bio avatar_key "
             "interests languages education github_username github_contributions "
             "github_synced_at",
             (D.PRESERVE, D.DROP),
         ),
+        *_fields(
+            "makerspaces.MemberCard",
+            "printed_name photo_object_key photo_content_type photo_size_bytes photo_consent_at "
+            "photo_consent_version",
+            (D.PRESERVE, D.DROP),
+        ),
+        # Membership plans, terms and invitation requests (forward plan phase 6).
+        *_fields("makerspaces.InvitationRequest", "name email phone message", (D.PRESERVE, D.DROP)),
+        *_fields("makerspaces.InvitationRequest", "status", D.PRESERVE),
+        *_fields("makerspaces.MembershipPlan", "is_active", D.PRESERVE),
+        *_fields("makerspaces.MembershipTerm", "status", D.PRESERVE),
+        *_fields("makerspaces.Makerspace", "lapsed_members_cannot_borrow", D.PRESERVE),
         *_fields(
             "makerspaces.MemberProject",
             "id profile title description image_key links position created_at updated_at",
@@ -185,6 +197,17 @@ EXPECTED = dict(
             "online_rail stripe_checkout_session_id stripe_checkout_url "
             "stripe_checkout_session_expired_at stripe_payment_intent_id",
             D.RESET,
+        ),
+        *_fields(
+            "payments.Refund",
+            "status amount currency provider reason",
+            D.PRESERVE,
+        ),
+        *_fields("payments.Refund", "external_refund_id", D.RESET),
+        *_fields(
+            "payments.ManualSettlement",
+            "method reference received_at amount currency",
+            D.PRESERVE,
         ),
         *_fields("audit.AuditLog", "event_uuid row_mac", D.RESET),
     ]

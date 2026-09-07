@@ -41,6 +41,12 @@ class MemberProfile(models.Model):
         default=False,
         help_text="Whether to publish recently attended events on this member profile.",
     )
+    # Same consent rule: certifications are staff-derived training records, not text the
+    # member typed, so publishing them on a visible profile needs its own opt-in.
+    show_certifications = models.BooleanField(
+        default=False,
+        help_text="Whether to publish held certifications on this member profile.",
+    )
     headline = models.CharField(max_length=200, blank=True, default="")
     institution = models.CharField(max_length=200, blank=True, default="")
     bio = models.TextField(blank=True, default="")

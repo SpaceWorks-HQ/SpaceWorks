@@ -67,6 +67,57 @@ analytics/ledger/exports, Users CRUD, and the FabLab modules). The detailed PRDs
 **internal planning docs kept local only** (gitignored); "PRD §N" references point to those. Google Sheets
 OAuth publishing, native apps, and physical label-printer control remain out of scope.
 
+## Observability (phase 0 of the 2026-09-03 forward plan)
+
+Every request carries an `X-Request-ID` (honoured from a proxy when it is short plain ASCII, minted
+otherwise), bound in `config/request_id.py` and echoed on the response. Log lines are JSON in production
+(`config/log_setup.py`; `LOG_JSON` overrides), each stamped with that id, and Celery messages carry it into
+the worker (`config/celery_signals.py`). Audit rows are correlated **through the log line**
+(`audit_recorded` with the row's `event_uuid`), not by writing the id into `meta`, so the attested record
+is unchanged. `GET /api/v1/metrics/` serves Prometheus text behind `METRICS_TOKEN` (404 when unset);
+`SENTRY_DSN` opts into error tracking with PII off. CI: `.github/workflows/tests.yml` runs both test
+topologies, the frontend build and the CLAUDE.md/AGENTS.md drift check, and the release workflow depends on
+it. The forward plan itself is local-only under `docs/plans/2026-09-03-forward-plan/`.
+
+**Search and live updates (phase 1).** Every inventory, machine and event list accepts `?q=` (full-text with
+phrase and exclusion syntax, typo-tolerant on the name) through `apps/inventory/search.py`; the member
+directory matches identity fields only. The staff console holds one Server-Sent Events stream
+(`/api/v1/live/`, `frontend/src/lib/live.ts`) and invalidates the matching TanStack queries when an audit
+row commits, so queues update without polling; the stream runs on the dedicated `live` compose service and
+falls back to polling (503) on a deployment without Redis. Public routes are lazy chunks and the eleven
+over-ceiling frontend files were split.
+
+**Browser and accessibility gates (phase 2).** `frontend/e2e/` (Playwright) drives the loan spine through a
+real browser and object storage — `scripts/e2e-local.sh` locally, the `e2e` job in CI — and axe runs in
+both jsdom panel tests and Chromium. `manage.py seed_e2e` seeds a disposable makerspace per run.
+
+**Signed webhooks (phase 3).** `webhook` is a notification channel module: a destination with an HTTPS
+endpoint and a signing secret receives every matrix-routed notification as signed JSON
+(`docs/api-client-protocol.md` → "Outbound webhooks"), through the same delivery log and retries as the
+chat channels; failed deliveries can be re-queued from `/control/`.
+
+**Editions and the single box (phase 4).** `SPACEWORKS_EDITION` (`makerspace`, `events`, `bookings`,
+`organization`) hides the loan or events surfaces and 404s their public routes without changing any
+capability (`docs/MODULES.md` → Editions); `events` and `bookings` install profiles match. The single-box
+shape (`Dockerfile.allinone`, `docker/compose.single.yml`, `.spaceworks-layer`) runs everything but
+Postgres and MinIO in one container; setup asks for both the edition and the shape.
+
+**Member ID cards and certification gating (phase 5).** A member card is a revocable QR credential over one
+membership, printed as a CR80 card or a sheet, resolvable only by staff holding `scan_member_cards`, with a
+consent-gated private photo that is deleted the moment the card is revoked (`docs/INVARIANTS.md` → Member ID
+cards). `machines.certifications` (a Space-Manager feature switch) requires an unexpired certification per
+machine type before a member may book a linked space or request work; an override needs machine-type
+authority and a recorded reason. Held certifications print as an optional card field, appear on the maker
+profile only after a separate opt-in, and roll up in the `certification-coverage` report row.
+
+**Money and membership depth (phase 6).** Refunds (full or partial, Stripe and Razorpay, as immutable
+`payments.Refund` ledger lines), the `payments.loans` feature (deposit raised on issue, capped late fee
+raised once at close, optional deposit-blocks-issue gate), membership plans and terms with a beat-less
+renewal charge and an optional lapsed-members-cannot-borrow rule, public invitation requests (throttled,
+honeypot, PII-encrypted) feeding the existing invitation path, provenance on every report export and
+scheduled report delivery to a destination or email list as a signed link. `Warranty.vendor_contact` stays
+non-PII by decision 6 (`docs/INVARIANTS.md`). Phases 7–11 are planned and PAUSED by owner instruction.
+
 Stack (in use):
 
 - **Backend:** Django 6 + Django REST Framework (`backend/`). Requires Python 3.12+.

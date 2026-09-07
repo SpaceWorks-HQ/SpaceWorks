@@ -14,6 +14,11 @@ class InvitationSerializer(RoleIdSerializer):
     invite_email = serializers.EmailField(max_length=254)
 
 
+class ApproveRequestSerializer(RoleIdSerializer):
+    # Optional: approving with a plan opens the membership's first term in the same call.
+    plan_id = serializers.IntegerField(required=False, allow_null=True)
+
+
 class RevokeSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True)
 

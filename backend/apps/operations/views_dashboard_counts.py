@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -33,6 +33,13 @@ class DashboardSerializer(serializers.Serializer):
     warranty_expiring = serializers.IntegerField(required=False, default=0)
     maintenance_overdue = serializers.IntegerField(required=False, default=0)
     pending_payments = serializers.IntegerField(required=False, default=0)
+    # Declared so the schema and the generated TypeScript carry it: the endpoint emits
+    # this map and an undeclared field is invisible to typed frontend consumers. Amounts
+    # are strings keyed by currency code -- never one combined number, since adding INR
+    # to USD would be meaningless money.
+    outstanding_by_currency = serializers.DictField(
+        child=serializers.CharField(), required=False, default=dict
+    )
 
 
 def build_dashboard(
@@ -222,9 +229,19 @@ def build_dashboard(
 
     if include_pending_payments and not restricted:
         try:
-            counts["pending_payments"] = Payment.objects.filter(
+            pending = Payment.objects.filter(
                 makerspace=makerspace, status=Payment.Status.PENDING
-            ).count()
+            )
+            counts["pending_payments"] = pending.count()
+            # How much, not just how many. Grouped BY CURRENCY and never summed across
+            # them: a space taking both INR and USD has two outstanding figures, and one
+            # combined number would be meaningless money.
+            counts["outstanding_by_currency"] = {
+                row["currency"]: str(row["total"])
+                for row in pending.values("currency")
+                .annotate(total=Sum("amount"))
+                .order_by("currency")
+            }
         except Exception:
             pass
     elif not restricted:

@@ -1,0 +1,83 @@
+# The single-box image: nginx + the built frontend + gunicorn + the live SSE process + a
+# Celery worker + the scheduler loop, in ONE container, supervised by docker/allinone/run.sh.
+#
+# It is the same backend image plus nginx and the frontend build, so every fail-closed
+# rule the multi-service stack enforces still holds: each process goes through
+# scripts/spaceworks_entrypoint.py with its own --role, the host marker is read the same
+# way, and the container runs unprivileged. What it removes is the number of things an
+# operator has to run: `app`, Postgres and MinIO (and Redis inside `app`).
+#
+#   docker build -f Dockerfile.allinone -t spaceworks-allinone .
+#   docker compose -f docker-compose.yml -f docker/compose.single.yml --profile single up -d
+
+FROM node:22-alpine AS frontend
+WORKDIR /app
+COPY frontend/package*.json ./
+RUN npm ci
+ARG VITE_API_URL=/api
+ARG VITE_TENANT_TOKEN=
+ARG VITE_PUBLIC_API_KEY=
+ARG VITE_PUBLIC_CLIENT_ID=
+ENV VITE_API_URL=$VITE_API_URL VITE_TENANT_TOKEN=$VITE_TENANT_TOKEN \
+    VITE_PUBLIC_API_KEY=$VITE_PUBLIC_API_KEY VITE_PUBLIC_CLIENT_ID=$VITE_PUBLIC_CLIENT_ID
+COPY frontend/ .
+RUN npm run build
+
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+ARG POSTGRESQL_CLIENT_MAJOR=17
+ARG POSTGRESQL_LOCAL_SERVER_MAJOR=16
+# Same two Postgres client majors as backend/Dockerfile (see the reasoning there), plus
+# nginx and redis-server so the box needs no separate cache/broker container.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg age nginx redis-server \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+      | gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+      > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+      "postgresql-client-$POSTGRESQL_CLIENT_MAJOR" \
+      "postgresql-client-$POSTGRESQL_LOCAL_SERVER_MAJOR" \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --system --gid 10001 app \
+    && useradd --system --create-home --uid 10001 --gid app app
+
+WORKDIR /app
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY --chown=app:app backend/ .
+
+ARG BUILD_GIT_SHA=unknown
+ARG BUILD_GIT_DESCRIBE=unknown
+RUN BUILD_GIT_SHA="$BUILD_GIT_SHA" BUILD_GIT_DESCRIBE="$BUILD_GIT_DESCRIBE" \
+    python /app/scripts/write_build_info.py \
+    && chown app:app /app/BUILD_INFO.json
+
+# nginx runs unprivileged too: it listens on 8080 (not 80), keeps its pid and temp files
+# under /var/lib/spaceworks/nginx, and serves the SPA from /srv/www. The frontend's
+# runtime config writer is reused so TENANT_API_URL / TENANT_TOKEN behave as in the
+# multi-service image.
+COPY --from=frontend /app/dist /srv/www
+COPY frontend/docker-entrypoint.d/30-write-config.sh /app/allinone/write-config.sh
+COPY docker/allinone/nginx.conf /app/allinone/nginx.conf
+COPY docker/allinone/run.sh /app/allinone/run.sh
+RUN sed -i 's/\r$//' /app/allinone/write-config.sh /app/allinone/run.sh \
+    && chmod +x /app/allinone/write-config.sh /app/allinone/run.sh \
+    && mkdir -p /app/staticfiles /var/lib/celery /var/lib/spaceworks/ops /var/lib/spaceworks/nginx \
+       /var/lib/spaceworks/redis /run/spaceworks-host \
+    && chown -R app:app /app/staticfiles /var/lib/celery /var/lib/spaceworks /srv/www
+
+USER app
+
+EXPOSE 8080
+
+# Every process inside is launched through the fail-closed entrypoint by run.sh.
+ENTRYPOINT ["/app/allinone/run.sh"]
