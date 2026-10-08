@@ -14,19 +14,25 @@ Branch `lane/11` off `dev` `b7c2ee93`. Plan: main checkout
   refusals, receipt key reservation, audit provenance, OpenAPI + api.ts.
 - `8eb51692` step 5: cleanup sweep, state machine, reconciliation, task/beat/runner, gate policy.
 - `904396d6` docs wording (CLAUDE/AGENTS byte-identical, INVARIANTS, README, ...).
-- step 6 regression tests (this commit): public self-checkout PROTECT, backup/tenant CLEANING,
-  portable audit provenance, registry pins, scheduler, managed limits, lifecycle purge receipts.
+- `77693a58` step 6 regression tests; `d5cae275` dynamic seven-consumer proof, check/PATCH tests.
 
-## Next
-- Run the step-6 focused batch (run3 died with ENOMEM while Docker was under load), fix reds.
-- Then broader suites (tests/backup, tests/tenant_migration, hardware_requests flows) if time.
+## Not done
+- `docs/plans/.../phase-2-browser-and-a11y-gates.md` and `ev_evidence_retention.md` notices:
+  gitignored, outside this worktree, writes refused by the harness.
+- Full serial suite and full `tests/backup` + `tests/tenant_migration` (time).
 
-## Tests actually run
-- run1 (12 files): 420 passed, 4 failed -> all 4 fixed (expected-dict, credential screen,
-  task registry timing, in_atomic_block test).
-- run2 (tests/evidence, test_evidence, registry guards, source-gate guards, scheduled tasks,
-  reference registry, portable audit refs): 269 passed, 0 failed.
-- frontend: `npx tsc -b` clean; `vitest run src/features/staff` 197 passed; full `npm test`
-  278 passed, 1-2 failed in `src/features/members/MemberAreaArchivedLink.test.tsx` (not touched
-  by this lane; still investigating whether pre-existing).
-- run3 (step-6 batch): aborted — OSError ENOMEM during collection (environment).
+## Tests actually run (all `./scripts/dev.sh test ... -p no:randomly`)
+- run1 (12 files): 420 passed, 4 failed -> all 4 fixed.
+- run2 (evidence, test_evidence, registry/source-gate guards, scheduler, reference registry,
+  portable audit refs): 269 passed, 0 failed.
+- run3: aborted by environment (OSError ENOMEM at collection).
+- run4 (step-6 batch, 12 paths): 178 passed, 0 failed.
+- run5 (17 paths: consumers, Lane D catalog/projection/d8, env drift, travel guard, events
+  programme registry + round trips, report rollups, module registry, test_evidence): 463 passed.
+- run6 (tests/evidence, tests/data_export, tests/hardware_requests, tests/operations, handout/
+  asset/monitoring files): see final report.
+- frontend: `npx tsc -b` clean; `npm run build` ok; `vitest run src/features/staff` 197 passed;
+  full `npm test` 278 passed / 1-2 failed in `MemberAreaArchivedLink.test.tsx` under load — the
+  file passes 2/2 when run alone; not touched by this lane (flaky timing).
+- `manage.py check` ok (only the pre-existing audit.W001); `makemigrations --check` no changes;
+  `git diff --check` clean; `diff CLAUDE.md AGENTS.md` empty.
