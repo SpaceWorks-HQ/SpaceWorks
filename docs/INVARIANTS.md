@@ -535,11 +535,13 @@ transitively `retry_email_log()`, whose existing FAILED/SENDING whitelist alread
 A blocked message becomes a **terminal `EmailLog.Status.SKIPPED`** row — recorded, not dropped, so the
 operator can see what the toggle suppressed — and `SKIPPED` is neither a delivery nor a failure:
 `notify._dispatch_email_delivery` counts it as neither, because `notify_return_due` returns
-`bool(delivered_counts)` and a skip must not read as a reminder that went out. Three messages are
+`bool(delivered_counts)` and a skip must not read as a reminder that went out. Five messages are
 **exempt, matched on stream AND event** (an event name alone is not unique across streams):
 `("account","password_reset")`, `("account","email_verification")` — missing the second leaves a new
-account unable to verify and therefore unable to join — and `("hardware","return_reminder")`, a
-duty-of-care message in the accountability flow. **Platform mail (`makerspace=None`) is never gated**:
+account unable to verify and therefore unable to join — `("hardware","return_reminder")`, a
+duty-of-care message in the accountability flow, and the two backup custody alarms
+`("backup","archive_custody_alarm")` / `("backup","tenant_exit_custody_alarm")`
+(`integrations/dispatch.EMAIL_MODULE_EXEMPT`; this line said "three" until 2026-10-09). **Platform mail (`makerspace=None`) is never gated**:
 no tenant owns it, and the platform-level `integrations.email.email_enabled()` behind `/api/v1/config`
 is *deliverability*, not tenant enablement — conflating them hides forgot-password from the login screen.
 Because modules are opt-in, a newly registered key is off by default, which is right for a new makerspace
@@ -1043,7 +1045,10 @@ enabling a key cannot make an unconfigured channel send, and disabling it stops 
 - **The notification matrix OMITS a channel whose module is uninstalled** rather than rendering it
   disabled (`views_notification_rules._response_data` filters both `channels` and `preferences`).
   A tickable column would accept the tick, store the preference, and then SKIP every send — the
-  same reasoning as pruning a tombstoned sidebar entry instead of permission-hiding it.
+  same reasoning as pruning a tombstoned sidebar entry instead of permission-hiding it. **The write
+  paths agree** (2026-10-09): the matrix PATCH refuses to switch such a channel ON (400; OFF stays
+  allowed), and a `ReportSchedule` refuses a destination on an uninstalled channel and a report
+  whose source module is off — the same 400s the destination API and the manual export give.
 - **Discord is not Slack-shaped.** `webhooks.py` maps channel → body key because Discord names the
   field `content` and ignores `text` (400, nothing delivered), and trims to its hard 2000-character
   limit, which rejects rather than clips. `native_push` has **no** module key — it is governed by

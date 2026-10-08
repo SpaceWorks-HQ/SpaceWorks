@@ -97,6 +97,11 @@ class ReportScheduleSerializer(serializers.ModelSerializer):
         # One message for both "not yours" and "not a room": no cross-tenant id probing.
         if destination.makerspace_id != makerspace.id or destination.channel not in ChatNotificationChannel.values:
             raise serializers.ValidationError("Unknown destination.")
+        # Same refusal as creating a room on that channel: every run would only SKIP.
+        from apps.integrations.dispatch_channels import channel_module_blocks
+
+        if channel_module_blocks(makerspace, destination.channel):
+            raise serializers.ValidationError(f"The {destination.channel} module is not installed.")
         return destination
 
     def validate(self, attrs):
@@ -105,6 +110,12 @@ class ReportScheduleSerializer(serializers.ModelSerializer):
         definition = REPORT_REGISTRY[report_key]
         if not definition.exportable:
             raise serializers.ValidationError({"report_key": "Report is not exportable."})
+        # The manual export refuses a report whose source module is off; a schedule for it
+        # could only ever skip, so it is refused with the same 400 naming the module.
+        from apps.makerspaces.guards import require_module
+
+        for module in definition.required_modules:
+            require_module(self.context["makerspace"], module)
         grain = attrs.get("grain", getattr(current, "grain", "day"))
         allowed = definition.grains or ("day",)
         if grain not in allowed:
