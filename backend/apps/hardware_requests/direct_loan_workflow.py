@@ -5,6 +5,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.audit import services as audit
+from apps.boxes.access import inventory_qr_codes
 from apps.boxes.models import Box, QrCode, QrScanEvent
 from apps.evidence.models import EvidencePhoto
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
@@ -198,7 +199,8 @@ def _locked_qrs_for_payloads(makerspace, payloads):
     unique_payloads = set(payloads)
     qrs_by_payload = {
         qr.payload: qr
-        for qr in QrCode.objects.select_for_update()
+        # Member-card QRs read as unknown payloads (`boxes.access.inventory_qr_codes`).
+        for qr in inventory_qr_codes(QrCode.objects.select_for_update())
         .filter(
             payload__in=unique_payloads,
             makerspace=makerspace,

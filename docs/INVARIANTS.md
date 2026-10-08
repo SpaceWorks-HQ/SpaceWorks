@@ -1329,7 +1329,13 @@ revocation, active-target uniqueness and the immutable `QrScanEvent` history are
 **Identity never travels through the inventory scanner**: `qr_target_payload` and `QrResolveView` raise
 404 for a member-card target; only `member_card_services.resolve` (action `scan_member_cards`) may resolve
 one, it records a `member_lookup` scan even when refused, and it refuses uniformly (a foreign tenant's
-card, a box QR and garbage all 404). Authority is by action, never role name: `manage_member_cards`
+card, a box QR and garbage all 404). **No inventory path may load a member-card QR at
+all** (2026-10-09): `boxes.access.inventory_qr_codes()` excludes the target type and backs
+`qr_for_action`/`locked_qr_for_action` (scan, print, revoke, rebind, stocktake scan) and the
+self-checkout and direct-handout lookups, and `_checkout_target` has an explicit BOX branch.
+Before that a card's `target_id` — a MemberCard pk — fell through to the box branch and
+checked out whichever public box shared the number, and a `manage_qr` holder could revoke
+or rebind a card without `manage_member_cards`. Authority is by action, never role name: `manage_member_cards`
 implies `scan_member_cards`, is granted to the protected Space Manager default (migration 0069 backfills
 existing rows), and custom roles receive nothing until granted. `printed_name` is scoped source PII
 (`encryption/registry.py`); `photo_object_key` is a PRIVATE object (`backup/object_ownership_registry.py`)
