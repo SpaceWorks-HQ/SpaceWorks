@@ -1,7 +1,7 @@
 """Seed one disposable makerspace for the Playwright suite (frontend/e2e/).
 
 Every run creates a FRESH makerspace with a unique slug and writes its identifiers to a JSON
-file the specs read, because the loan spine is built on immutable rows (scan events, evidence
+file the specs read, because the loan spine is built on immutable rows (scan events, attached evidence
 rows, audit entries) that cannot be deleted to "reset" an existing one. Old e2e makerspaces
 simply accumulate in a development database; CI databases are ephemeral.
 

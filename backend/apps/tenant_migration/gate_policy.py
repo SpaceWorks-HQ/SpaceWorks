@@ -166,6 +166,10 @@ TASK_INTERNAL_PARTICIPANTS = {
     "apps.hardware_requests.tasks.send_return_reminders_task": (
         "Each reminder lifecycle uses the skip-and-count tenant boundary."
     ),
+    "apps.evidence.tasks.cleanup_abandoned_evidence_uploads_task": (
+        "New cleanup uses the skip-and-count tenant boundary; receipt reconciliation is "
+        "declared deployment coordination."
+    ),
     "apps.evidence.tasks.sweep_evidence_retention_task": (
         "Each evidence expiry uses the skip-and-count tenant boundary."
     ),
@@ -198,6 +202,9 @@ TASK_INTERNAL_PARTICIPANTS = {
 # a time. The AST guard requires every owner to use the shared skip-and-count boundary.
 FANOUT_GATE_PARTICIPANTS = {
     "apps.data_export.tasks.purge_expired_exports_task": "Expired export cleanup.",
+    "apps.evidence.abandoned_upload_cleanup.sweep_abandoned_evidence_uploads": (
+        "Abandoned evidence-upload cleanup."
+    ),
     "apps.evidence.services_retention.sweep_evidence_retention": (
         "Evidence object expiry."
     ),
@@ -232,6 +239,13 @@ OBJECT_MUTATION_PARTICIPANTS = {
         "The export task resolves and holds the tenant gate for this lifecycle."
     ),
     "apps.evidence.finalization.finalize_upload": "Reached only through the already-declared handover, return and direct-loan entry points.",
+    "apps.evidence.abandoned_upload_cleanup._sweep_makerspace": (
+        "The fan-out service owns one tenant source-gate boundary at a time."
+    ),
+    "apps.evidence.abandoned_upload_reconciliation._reconcile_receipt": (
+        "Deployment coordination: deletes only receipt-named keys and updates receipt "
+        "scheduling, so it must keep running after MIGRATED_OUT and tenant purge."
+    ),
     "apps.evidence.services_retention._sweep_makerspace": (
         "The fan-out service owns one tenant source-gate boundary at a time."
     ),
