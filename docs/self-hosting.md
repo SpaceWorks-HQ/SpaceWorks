@@ -301,6 +301,10 @@ If an instance flips from managed → self-host after deploy, run
 
 ## Environment reference
 
+The variables a self-hosted deployment usually decides are below. **The complete list —
+every variable the backend reads, with its default — is
+[environment-reference.md](environment-reference.md).**
+
 | Variable | Required | Purpose |
 |---|---|---|
 | `POSTGRES_PASSWORD` | yes | Maintenance/owner database password; never used by application processes |
