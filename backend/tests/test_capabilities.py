@@ -5,6 +5,18 @@ from apps.makerspaces.capabilities import default_enabled_features, validate_cap
 from apps.makerspaces.module_registry import core_module_keys
 
 
+def test_kiosk_feature_is_standalone_default_off_and_advertises_two_workflows():
+    from apps.makerspaces.capabilities import FEATURE_DEFINITIONS, FEATURES
+    from apps.makerspaces.platform import FEATURE_WORKFLOWS
+
+    definition = FEATURES["inventory.kiosk"]
+    assert definition.parent_module is None
+    assert definition.default_enabled is False
+    assert "inventory.kiosk" not in default_enabled_features()
+    assert len(FEATURE_DEFINITIONS) == 19
+    assert FEATURE_WORKFLOWS["inventory.kiosk"] == ["kiosk", "kiosk_scanner"]
+
+
 def test_feature_registry_rejects_unknown_duplicate_and_missing_dependencies():
     with pytest.raises(ValidationError):
         validate_capabilities(["public_inventory"], ["inventory.unknown"])

@@ -18,6 +18,7 @@ MODULE_WORKFLOWS = module_workflows()
 
 FEATURE_WORKFLOWS = {
     "inventory.self_checkout": ["self_checkout", "self_return"],
+    "inventory.kiosk": ["kiosk", "kiosk_scanner"],
 }
 
 

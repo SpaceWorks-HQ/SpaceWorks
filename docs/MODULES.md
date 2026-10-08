@@ -552,6 +552,7 @@ in the console rather than a superadmin. A feature is inert while its parent mod
 | `notifications.delegated_recipients` | `notifications` | | Machine-scoped maintainers manage maintenance alert recipients for their own machines. Needs `maintenance` and `machines` too | Only makerspace-level staff manage recipients |
 | `inventory.self_checkout` | — | ● | Member self-checkout and staff direct handouts | Every handover goes through a staff-issued request |
 | `presence.geofence` | — | ● | Advisory location check at check-in | Check-in records no location. It is advisory either way — it never blocks |
+| `inventory.kiosk` | — | | Scanner and handover Stations at `/m/<slug>/kiosk/<station>`: a Station PIN opens the channel, and a signed-in staff operator lease attributes every online handover to a real person | No Station sessions, operator leases, work packages or kiosk commands; the public desk at `/kiosk/<slug>` is unaffected |
 
 The four `payments.<area>` switches are **off by default and stay inert until credentials resolve** —
 turning one on cannot start charging anyone by itself. `inventory.self_checkout` and `presence.geofence`

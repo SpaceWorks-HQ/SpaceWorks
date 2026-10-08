@@ -303,6 +303,7 @@ Manager** in the console rather than a superadmin.
 | `notifications.delegated_recipients` | `notifications` | | Machine-scoped maintainers manage maintenance recipients for their own machines (also needs `maintenance` and `machines`) |
 | `inventory.self_checkout` | — | ● | Member self-checkout and staff direct handouts |
 | `presence.geofence` | — | ● | Advisory location check at check-in (never blocks) |
+| `inventory.kiosk` | — | | Scanner and handover Stations whose online handovers are attributed to a signed-in staff operator |
 
 The four `payments.<area>` switches are **off by default and stay inert until you add credentials** —
 turning one on cannot start charging anyone by itself. `inventory.self_checkout` and
