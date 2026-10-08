@@ -12,6 +12,7 @@ convenience.
 
 from pathlib import Path
 import re
+import shutil
 import subprocess
 
 import pytest
@@ -20,9 +21,25 @@ from apps.backup.producer_capability import PRIVILEGED_SCRIPT_NAMES
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+# `dev.sh test` mounts the repository root into the backend image, so `install.sh` is
+# present there, but the image ships no git (and a worktree's `.git` pointer names a host
+# path). The modes can only be read where git can read this checkout; CI's host job runs it.
+def _git_reads_checkout():
+    if shutil.which("git") is None:
+        return False
+    probe = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "--is-inside-work-tree"],
+        capture_output=True,
+        text=True,
+    )
+    return probe.returncode == 0
+
+
 pytestmark = pytest.mark.skipif(
-    not (ROOT / "install.sh").exists(),
-    reason="host-only: the repository root is not in the backend image",
+    not (ROOT / "install.sh").exists() or not _git_reads_checkout(),
+    reason="host-only: needs the repository root and a git that can read it",
 )
 
 # `exec "$ROOT/scripts/x.sh"` and friends: a direct execution, not `bash <script>`.
