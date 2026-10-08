@@ -14,7 +14,7 @@ import time
 from django.conf import settings
 from django.http import JsonResponse, StreamingHttpResponse
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.views import APIView
@@ -42,18 +42,36 @@ def subscribed_channels(user):
 
 
 def _event_stream(pubsub, deadline):
-    yield "retry: 5000\n\n"
-    last_beat = time.monotonic()
-    while time.monotonic() < deadline:
-        message = pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-        if message and message.get("type") == "message":
-            data = message["data"]
-            if isinstance(data, bytes):
-                data = data.decode("utf-8", "replace")
-            yield f"event: change\ndata: {data}\n\n"
-        if time.monotonic() - last_beat >= HEARTBEAT_SECONDS:
-            yield ": keep-alive\n\n"
-            last_beat = time.monotonic()
+    """Yield SSE frames until the deadline, a Redis failure or the client going away.
+
+    A Redis outage mid-stream ends the stream *cleanly*: the generator returns, the
+    response completes, and the browser reconnects after the advertised retry -- getting
+    a 503 (and falling back to polling) if Redis is still down. Raising out of the
+    generator instead aborts the chunked response mid-body. The pubsub connection is
+    closed on every exit, including the client disconnecting (GeneratorExit).
+    """
+    try:
+        yield "retry: 5000\n\n"
+        last_beat = time.monotonic()
+        while time.monotonic() < deadline:
+            try:
+                message = pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            except Exception:
+                logger.warning("live_stream_redis_lost")
+                return
+            if message and message.get("type") == "message":
+                data = message["data"]
+                if isinstance(data, bytes):
+                    data = data.decode("utf-8", "replace")
+                yield f"event: change\ndata: {data}\n\n"
+            if time.monotonic() - last_beat >= HEARTBEAT_SECONDS:
+                yield ": keep-alive\n\n"
+                last_beat = time.monotonic()
+    finally:
+        try:
+            pubsub.close()
+        except Exception:
+            logger.warning("live_stream_close_failed")
 
 
 class EventStreamRenderer(BaseRenderer):
@@ -91,7 +109,13 @@ class LiveStreamView(APIView):
             "deployment has no Redis."
         ),
         request=None,
-        responses={(200, "text/event-stream"): OpenApiTypes.STR, 503: None},
+        responses={
+            (200, "text/event-stream"): OpenApiTypes.STR,
+            401: OpenApiResponse(description="Not signed in."),
+            503: OpenApiResponse(
+                description="No usable Redis (unset, misconfigured or unreachable); poll instead."
+            ),
+        },
     )
     def get(self, request, *args, **kwargs):
         client = live.redis_client()

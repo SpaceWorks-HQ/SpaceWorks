@@ -48,7 +48,14 @@ def redis_client():
         import redis
     except ImportError:  # pragma: no cover - redis is a hard requirement in practice
         return None
-    return redis.Redis.from_url(url, socket_timeout=1, socket_connect_timeout=1)
+    try:
+        return redis.Redis.from_url(url, socket_timeout=1, socket_connect_timeout=1)
+    except Exception:
+        # A malformed URL (bad scheme, bad port) raises here, before any connection is
+        # attempted. Treat it exactly like "no Redis": the stream answers 503 and the
+        # console keeps polling, instead of a 500 from the view and from every publish.
+        logger.warning("live_redis_url_invalid")
+        return None
 
 
 def _payload(kind, makerspace_id, target_type, target_id, actor_id):
