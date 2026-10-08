@@ -30,6 +30,13 @@ class ReportDefinition:
     # Bumped when the exported column set or its meaning changes, so a file's provenance
     # row says which shape it carries. Independent of the deployment release.
     version: int = 1
+    # Phase-10 reachability capabilities. A report can be export-only (`previewable`),
+    # restricted to some formats, kept out of scheduled email/chat delivery, and kept off
+    # every deployment-wide aggregate surface, independently of each other.
+    allowed_formats: tuple[str, ...] = ("csv", "xlsx")
+    schedulable: bool = True
+    previewable: bool = True
+    deployment_aggregate: bool = True
 
     def builder(self) -> Callable:
         return import_string(self.builder_path)

@@ -105,6 +105,12 @@ class ReportScheduleSerializer(serializers.ModelSerializer):
         definition = REPORT_REGISTRY[report_key]
         if not definition.exportable:
             raise serializers.ValidationError({"report_key": "Report is not exportable."})
+        if not definition.schedulable:
+            # Email/chat delivery would broaden custody of this report's data.
+            raise serializers.ValidationError({"report_key": "Report cannot be scheduled."})
+        fmt = attrs.get("format", getattr(current, "format", "csv"))
+        if fmt not in definition.allowed_formats:
+            raise serializers.ValidationError({"format": "Format not allowed for this report."})
         grain = attrs.get("grain", getattr(current, "grain", "day"))
         allowed = definition.grains or ("day",)
         if grain not in allowed:

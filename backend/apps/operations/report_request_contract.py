@@ -8,6 +8,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter
 from rest_framework.exceptions import ValidationError
 
+from apps.operations.serializers_reports_audit import AuditReportFilterSerializer
 from apps.operations.serializers_reports_payments import PaymentReportFilterSerializer
 from apps.payments.models import Payment
 
@@ -28,17 +29,25 @@ PREVIEW_PARAMETERS = [
 ]
 
 
-def _export_format(request):
+def _export_format(request, definition=None):
     fmt = (request.query_params.get("format") or "csv").strip().lower()
-    if fmt not in {"csv", "xlsx"}:
-        raise ValidationError({"format": "Use csv or xlsx."})
+    allowed = definition.allowed_formats if definition is not None else ("csv", "xlsx")
+    if fmt not in allowed:
+        raise ValidationError({"format": f"Use {' or '.join(allowed)}."})
     return fmt
 
 
+FILTER_SERIALIZERS = {
+    "payment-reconciliation": PaymentReportFilterSerializer,
+    "audit-trail": AuditReportFilterSerializer,
+}
+
+
 def _report_filters(request, report_key):
-    if report_key != "payment-reconciliation":
+    serializer_class = FILTER_SERIALIZERS.get(report_key)
+    if serializer_class is None:
         return {}
-    serializer = PaymentReportFilterSerializer(data=request.query_params)
+    serializer = serializer_class(data=request.query_params)
     serializer.is_valid(raise_exception=True)
     return serializer.validated_data
 

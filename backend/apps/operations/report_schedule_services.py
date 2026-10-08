@@ -114,8 +114,10 @@ def _claim(schedule_id, now, force):
 
 
 def _skip_reason(schedule, definition):
-    if definition is None or not definition.exportable:
+    if definition is None or not definition.exportable or not definition.schedulable:
         return "report_unavailable"
+    if schedule.format not in definition.allowed_formats:
+        return "format_not_allowed"
     if not module_enabled(schedule.makerspace, "reports"):
         return "module_disabled:reports"
     for module in definition.required_modules:
