@@ -180,6 +180,11 @@ class Command(BaseCommand):
         from apps.operations.models_scheduling import PeriodicTaskRun
 
         only = options.get("task")
+        known = [name for name, _path, _interval in SCHEDULED_TASKS]
+        if only and only not in known:
+            # A typo here used to exit 0 having run nothing, which a cron entry reports
+            # as success forever. Tombstoned apps' tasks are already absent from the list.
+            raise CommandError(f"Unknown task {only!r}. Known tasks: {', '.join(known)}.")
         if (options["dry_run"] or options["batch_size"] is not None) and only != "evidence-object-expiry":
             raise CommandError(
                 "--dry-run and --batch-size require --task evidence-object-expiry."
