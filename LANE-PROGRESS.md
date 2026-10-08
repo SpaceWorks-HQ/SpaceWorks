@@ -30,7 +30,8 @@ Branch `lane/11` off `dev` `b7c2ee93`. Plan: main checkout
 - run5 (17 paths: consumers, Lane D catalog/projection/d8, env drift, travel guard, events
   programme registry + round trips, report rollups, module registry, test_evidence): 463 passed.
 - run6 (tests/evidence, tests/data_export, tests/hardware_requests, tests/operations, handout/
-  asset/monitoring files): see final report.
+  asset/monitoring files): 678 passed, 0 failed.
+- run7 (`tests/backup tests/tenant_migration`, full): started 04:33 IST — result in final report.
 - frontend: `npx tsc -b` clean; `npm run build` ok; `vitest run src/features/staff` 197 passed;
   full `npm test` 278 passed / 1-2 failed in `MemberAreaArchivedLink.test.tsx` under load — the
   file passes 2/2 when run alone; not touched by this lane (flaky timing).
