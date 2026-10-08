@@ -6,6 +6,13 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-10-09 — backup completeness (lane `backup`).** Offsite/online destinations: platform-held
+  S3-compatible targets with encrypted credentials, a verified upload journal (read-back against the
+  artifact ledger), bounded-backoff retry that never fails a backup, per-destination retention keeping
+  the newest copy, create-only rehydration into the primary and `fetch_offsite_archive` for a fresh host.
+  The makerspace-facing surfaces moved behind a default-on `backup` module (compromise and deployment
+  surfaces never gated). Fixed retention-purge starvation and a crashing rollback-copy sweep.
+
 - **2026-09-04 — forward plan phase 6: money and membership depth.** Refunds as immutable ledger lines
   over `paid_online` charges, settled through the provider seam and its webhooks; `payments.loans` raises a
   deposit on issue and a capped late fee once at close, from the workflow module, never blocking unless the

@@ -2084,6 +2084,32 @@ Load-bearing details that carried over unchanged:
 
 ## Backup, restore and tenant migration (Phase 5A/5B and Lane D D1-D4/D6 built)
 
+### Offsite destinations and the `backup` module (lane backup, 2026-10-09)
+
+- **An offsite copy is `bytes_verified`, never "restorable".** `offsite_push` streams the primary
+  ciphertext to each active `BackupDestination`, re-hashes it on the way, then streams the remote
+  object back and compares size + SHA-256 with the artifact ledger (or the archive row when no ledger
+  exists). HEAD/ETag are not proofs. The platform cannot open a sealed slice or a tenant archive, so no
+  surface may describe a verified copy as restorable.
+- **A destination outage never fails a backup.** The push runs after the build has released
+  `deployment_operation_lock`, holds no row lock during I/O, touches no `BackupRun`/`BackupArchive`
+  state, and backs a journal row off `5 min × 2^attempts` capped at 6 h.
+- **Pushed:** every deployment archive and every run-produced tenant archive. **Not pushed:** ad hoc
+  Space-Manager archives. Destinations are platform-held only (a tenant cannot register its own).
+- **Retention never removes the newest verified copy** per destination (and per tenant), whatever its
+  age. Retiring a destination wipes its credentials and keeps the journal.
+- **Credentials** are Fernet under `API_CLIENT_ENC_KEY` via `makerspaces.secrets`, write-only in API and
+  `/control/`, never in audit meta or logs. `fetch_offsite_archive` reads them from a mode-0600 file,
+  never argv/env, and its output still goes through `import-backup.sh`'s signature preflight.
+- **Rehydration is create-only.** A verified copy is fetched and checked locally, then written to the
+  archive's own locator with `If-None-Match: *`; it never overwrites a present primary object.
+- **The `backup` module gates tenant surfaces only.** Recipient compromise and every deployment surface
+  are never gated. `backup` cannot be uninstalled while superadmin access is off, and superadmin access
+  cannot be switched off while `backup` is uninstalled. Its purge deletes only ad hoc tenant archives.
+- **Known defect, not fixed:** `storage_promotion.create_final_from_staging` passes a non-seekable
+  `StreamingBody` to `put_object`; against real MinIO with botocore 1.43 that raises
+  `io.UnsupportedOperation` (outside the caught exception types). Existing tests mock the call.
+
 ### The SHAPE a projected model must have (catalog-driven, 2026-09-03)
 
 Being classified is not the same as being importable. Two shapes break a tenant move
