@@ -13,23 +13,30 @@ when the lane is squashed.
 - split `aa571ab0` `/control/` lifecycle actions moved to `admin_lifecycle_actions.py`.
 - C `4decd5d7`+`ba32982b` `/control/` domain edits through `apply_domain_change`; domain-change and
   `/control/` create/edit audits (G4, G5).
+- F `b59e6d46` `recompute_storage` counts member-card photos, event-series images, certificates;
+  public directory exclusion tests; stale INVARIANTS paragraph fixed (G10, G13).
+- E `eb769267` image routes document 403/404; envelope OpenAPI pin test (G9).
+- G11 `4c87125a` managed `assets` quota test.
 
 ## In flight
 
-- F: `recompute_storage` completeness (member-card photos, event-series images, certificates).
+- Final broad verification run (see below).
 
-## Next
+## Not built (owner decisions, `00-audit.md` §11)
 
-- E: logo/cover OpenAPI 403/404 + envelope OpenAPI pin test.
-- F: public directory exclusion tests; INVARIANTS stale MaintenanceLogDocument sentence.
+Key rotation; ORG-only hide self-lockout; last-Space-Manager guard; tenant usage page; console
+surface for account-less requests; limit-key vocabulary.
 
 ## Tests actually run
 
-- A: new tests 22 passed on the branch; on base `b7c2ee93` the 6 new hidden/unservable tests FAIL
-  (regression proof), 16 pass.
-- B+D: settings contract + test_notification_secrets, test_audit, test_apiclients, test_admin_api:
-  80 passed. On base the 9 new contract tests FAIL, 4 pin-only tests pass.
-- C: 12 files (contract, control admin, frontend_domain, domain_verification, saas_hosting,
-  makerspace_lifecycle, archive_impact, archive_request_admin, admin_custom_views,
-  admin_hidden_scope, capabilities, request_access): 155 passed, 0 failed.
-- Frontend: `npx tsc -b` clean after the regenerated client.
+- A: new tests 22 passed; on base `b7c2ee93` the 6 new tests FAIL (regression proof).
+- B+D: contract + notification_secrets, audit, apiclients, admin_api: 80 passed. On base the 9 new
+  contract tests FAIL.
+- C: 12 files, 155 passed, 0 failed.
+- F: reconciler gaps 4 passed; directory + limits enforcement + events image + public inventory:
+  63 passed before the fixture fix, reconciler file re-run 4 passed.
+- E: OpenAPI pin + public images: 22 passed.
+- G11: 2 passed.
+- Frontend: `tsc -b` clean, `npm test` 64 files / 277 tests passed, `npm run build` ok.
+- `manage.py check` (1 environmental AUDIT_MAC warning), `makemigrations --check` no changes,
+  `diff CLAUDE.md AGENTS.md` empty, `git diff --check` clean.
