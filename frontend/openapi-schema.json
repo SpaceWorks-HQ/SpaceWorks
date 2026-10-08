@@ -8028,6 +8028,26 @@
                         },
                         "description": ""
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Missing or invalid settlement receipt."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
                     "403": {
                         "content": {
                             "application/json": {
@@ -8036,7 +8056,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Permission denied."
                     },
                     "404": {
                         "content": {
@@ -8046,7 +8066,17 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Payment not found or out of machine scope."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "`payment_terminal`: already reconciled."
                     }
                 }
             }
@@ -8084,6 +8114,16 @@
                         },
                         "description": ""
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
                     "403": {
                         "content": {
                             "application/json": {
@@ -8092,7 +8132,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Permission denied."
                     },
                     "404": {
                         "content": {
@@ -8102,7 +8142,17 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Payment not found or out of machine scope."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "`payment_terminal`: already reconciled."
                     }
                 }
             }
@@ -18759,7 +18809,15 @@
                         "description": ""
                     },
                     "400": {
-                        "description": "Invalid payment settings."
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        },
+                        "description": "Field errors, including a credential change blocked by a live session."
                     },
                     "403": {
                         "content": {
@@ -18926,6 +18984,16 @@
                         },
                         "description": "Invalid payment request."
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
                     "403": {
                         "content": {
                             "application/json": {
@@ -19031,6 +19099,16 @@
                         },
                         "description": "Invalid payment request."
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
                     "403": {
                         "content": {
                             "application/json": {
@@ -19134,6 +19212,16 @@
                             }
                         },
                         "description": "Invalid payment request."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
                     },
                     "403": {
                         "content": {
@@ -19324,6 +19412,16 @@
                         },
                         "description": "Invalid payment request."
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
                     "403": {
                         "content": {
                             "application/json": {
@@ -19423,6 +19521,16 @@
                         },
                         "description": "Invalid payment request."
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
                     "403": {
                         "content": {
                             "application/json": {
@@ -19521,6 +19629,16 @@
                             }
                         },
                         "description": "Invalid payment request."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
                     },
                     "403": {
                         "content": {
@@ -28417,6 +28535,36 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentSettingsError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentSettingsError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin only."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentSettingsError"
+                                }
+                            }
+                        },
+                        "description": "Stripe Connect is dormant on a self-hosted deployment."
                     }
                 }
             },
@@ -28460,6 +28608,47 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        },
+                        "description": "Field errors, including a credential change blocked by a live Connect session."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentSettingsError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentSettingsError"
+                                }
+                            }
+                        },
+                        "description": "Superadmin only."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentSettingsError"
+                                }
+                            }
+                        },
+                        "description": "Stripe Connect is dormant on a self-hosted deployment."
                     }
                 }
             }
@@ -38038,6 +38227,16 @@
                         },
                         "description": ""
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
                     "403": {
                         "content": {
                             "application/json": {
@@ -38046,7 +38245,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "No active membership and no charge here."
                     }
                 }
             }
@@ -38092,6 +38291,16 @@
                         },
                         "description": ""
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -38100,7 +38309,17 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "No pending charge of yours here."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "`payment_rail_conflict`: the charge uses the native rail."
                     },
                     "503": {
                         "content": {
@@ -38110,7 +38329,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "`payments_unavailable`: no live online rail for this charge."
                     }
                 }
             }
@@ -53745,7 +53964,8 @@
                                 "$ref": "#/components/schemas/MakerspaceArchiveRequestStatusEnum"
                             }
                         ],
-                        "readOnly": true
+                        "readOnly": true,
+                        "default": "pending"
                     }
                 },
                 "required": [
@@ -53898,7 +54118,7 @@
                 "description": "The receipt required to mark a charge paid offline.\n\nMethod and received date are REQUIRED: the point of the ledger is that a settled\ncharge can always say how and when the money arrived, and an optional field would\nquietly reproduce the bare boolean it replaces. `reference` stays optional because\ncash genuinely has none.",
                 "properties": {
                     "method": {
-                        "$ref": "#/components/schemas/ManualSettlementMethodEnum"
+                        "$ref": "#/components/schemas/Method2edEnum"
                     },
                     "reference": {
                         "type": "string",
@@ -53914,18 +54134,6 @@
                     "method",
                     "received_at"
                 ]
-            },
-            "ManualSettlementMethodEnum": {
-                "enum": [
-                    "cash",
-                    "upi",
-                    "bank_transfer",
-                    "card_machine",
-                    "cheque",
-                    "other"
-                ],
-                "type": "string",
-                "description": "* `cash` - Cash\n* `upi` - UPI\n* `bank_transfer` - Bank transfer\n* `card_machine` - Card machine\n* `cheque` - Cheque\n* `other` - Other"
             },
             "Measurement883Enum": {
                 "enum": [
@@ -54834,6 +55042,18 @@
                         "nullable": true,
                         "readOnly": true
                     },
+                    "refunded_amount": {
+                        "type": "number",
+                        "format": "double",
+                        "readOnly": true
+                    },
+                    "refunds": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MemberRefund"
+                        },
+                        "readOnly": true
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -54847,6 +55067,8 @@
                     "currency",
                     "id",
                     "online_payment_available",
+                    "refunded_amount",
+                    "refunds",
                     "settlement",
                     "subject_label",
                     "subject_type"
@@ -54943,6 +55165,38 @@
                     "started_at",
                     "status",
                     "title"
+                ]
+            },
+            "MemberRefund": {
+                "type": "object",
+                "description": "Money sent back on the member's own charge. Never names the staff member.",
+                "properties": {
+                    "amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "settled_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "amount",
+                    "currency",
+                    "reason",
+                    "settled_at",
+                    "status"
                 ]
             },
             "MemberRequestHistory": {
@@ -55529,6 +55783,18 @@
                 ],
                 "type": "string",
                 "description": "* `active` - Active\n* `expired` - Expired\n* `cancelled` - Cancelled"
+            },
+            "Method2edEnum": {
+                "enum": [
+                    "cash",
+                    "upi",
+                    "bank_transfer",
+                    "card_machine",
+                    "cheque",
+                    "other"
+                ],
+                "type": "string",
+                "description": "* `cash` - Cash\n* `upi` - UPI\n* `bank_transfer` - Bank transfer\n* `card_machine` - Card machine\n* `cheque` - Cheque\n* `other` - Other"
             },
             "MigrationExportCreate": {
                 "type": "object",
@@ -60241,6 +60507,15 @@
                         },
                         "readOnly": true
                     },
+                    "settlement": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/StaffSettlement"
+                            }
+                        ],
+                        "nullable": true,
+                        "readOnly": true
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -60259,6 +60534,7 @@
                     "id",
                     "refunded_amount",
                     "refunds",
+                    "settlement",
                     "status",
                     "subject_id",
                     "subject_label",
@@ -66281,6 +66557,50 @@
                     "currency",
                     "id",
                     "status"
+                ]
+            },
+            "StaffSettlement": {
+                "type": "object",
+                "description": "The receipt that currently stands for a charge settled at the desk.\n\n`corrected` says an earlier receipt was replaced through amend-settlement; the chain\nitself stays in the ledger and the audit log.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "method": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Method2edEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "reference": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "received_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "recorded_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "corrected": {
+                        "type": "boolean",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "corrected",
+                    "id",
+                    "method",
+                    "received_at",
+                    "recorded_at",
+                    "reference"
                 ]
             },
             "StageEnum": {

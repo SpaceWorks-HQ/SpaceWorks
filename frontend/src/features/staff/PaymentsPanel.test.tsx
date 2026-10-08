@@ -135,4 +135,47 @@ describe("PaymentsPanel", () => {
 
     finishRefetch?.([payment]);
   });
+
+  it("offers every payment subject the ledger records, renewal and loan charges included", async () => {
+    renderPanel();
+    await waitForPayment();
+
+    const subjectFilter = screen.getByRole("combobox", { name: "Subject" });
+    expect(subjectFilter).toHaveTextContent("Membership renewal");
+    expect(subjectFilter).toHaveTextContent("Loan deposit");
+    expect(subjectFilter).toHaveTextContent("Late return fee");
+  });
+
+  it("shows a settled row's receipt and lets staff correct it instead of settling again", async () => {
+    const settled: PaymentRow = {
+      ...payment,
+      status: "paid_offline",
+      settlement: {
+        id: 3, method: "upi", reference: "UPI-9", received_at: "2026-07-20T10:00:00Z",
+        recorded_at: "2026-07-20T10:05:00Z", corrected: false,
+      },
+    };
+    staffRequest.mockImplementation(async (_path: string, options?: RequestInit) =>
+      options?.method === "POST" ? settled : [settled]);
+    renderPanel();
+    await waitForPayment();
+
+    expect(screen.getByText("UPI · UPI-9")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Waive" })).toBeNull();
+    // Only the bulk toolbar could still offer it; the row itself never does.
+    expect(screen.queryAllByRole("button", { name: "Mark offline" })).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Correct receipt" }));
+    expect(screen.getByRole("heading", { name: "Correct the receipt" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm payment" }));
+
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(
+      "/admin/makerspace/7/payments/41/amend-settlement",
+      expect.objectContaining({ method: "POST" }),
+    ));
+    const call = staffRequest.mock.calls.find(
+      ([path]) => path === "/admin/makerspace/7/payments/41/amend-settlement",
+    )!;
+    expect(JSON.parse((call[1] as { body: string }).body).settlement.method).toBe("cash");
+  });
 });

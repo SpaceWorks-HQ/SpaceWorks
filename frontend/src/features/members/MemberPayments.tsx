@@ -59,6 +59,18 @@ export function MemberPaymentRows({
               </span>
             </>
           ) : null}
+          {/* Money sent back on this charge. Pending refunds are shown too, so a payer
+              who was told a refund is on its way can see it is recorded. */}
+          {(payment.refunds ?? []).filter((refund) => refund.status !== "failed").map((refund, index) => (
+            <span key={index} className="text-muted">
+              {" · "}
+              {refund.status === "succeeded" ? "Refunded" : "Refund pending"}{" "}
+              <span className="font-mono">
+                {refund.amount} {(refund.currency ?? "").toUpperCase()}
+              </span>
+              {refund.reason ? ` (${refund.reason})` : null}
+            </span>
+          ))}
         </li>
       ))}
     </ul>

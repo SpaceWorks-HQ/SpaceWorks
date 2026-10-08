@@ -14,9 +14,12 @@ export function SettlementDialog({
   pending,
   onCancel,
   onConfirm,
+  title,
 }: {
   count: number;
   pending: boolean;
+  /** Overrides the heading, e.g. when correcting an existing receipt. */
+  title?: string;
   onCancel: () => void;
   onConfirm: (settlement: Settlement) => void;
 }) {
@@ -32,7 +35,7 @@ export function SettlementDialog({
   return (
     <div className="desk-panel mt-3 p-4" role="group" aria-label="Record how the money was received">
       <h3 className="title-panel">
-        Record payment{count > 1 ? ` for ${count} charges` : ""}
+        {title ?? `Record payment${count > 1 ? ` for ${count} charges` : ""}`}
       </h3>
       <p className="mt-1 text-sm text-muted">
         How and when the money arrived. This is kept as a permanent receipt.

@@ -6,11 +6,13 @@ import { StructuredApiError, staffRequest } from "../../lib/api";
 import {
   PAYMENT_STATUSES,
   PAYMENT_SUBJECTS,
+  amendSettlement,
   formatMoney,
   invalidatePaymentViews,
   paymentListKey,
   paymentListPath,
   reconcilePayment,
+  settlementLabel,
   type PaymentRow,
   type Settlement,
 } from "./paymentsApi";
@@ -34,6 +36,16 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
   // Marking paid offline is a two-step now: the API requires a receipt, so the click
   // opens the form rather than firing the mutation.
   const [settling, setSettling] = useState<{ ids: number[]; bulk: boolean } | null>(null);
+  // A receipt correction appends a new receipt; the payment itself stays settled.
+  const [amending, setAmending] = useState<PaymentRow | null>(null);
+  const amend = useMutation({
+    mutationFn: ({ id, settlement }: { id: number; settlement: Settlement }) =>
+      amendSettlement(makerspaceId, id, settlement),
+    onSuccess: () => {
+      setAmending(null);
+      invalidatePaymentViews(queryClient, makerspaceId);
+    },
+  });
   const mutation = useMutation({
     mutationFn: ({ action, ids, bulk, settlement }: {
       action: Action; ids: number[]; bulk: boolean; settlement?: Settlement;
@@ -65,18 +77,36 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
     { key: "status", header: "Status", render: (row) => labelFor(PAYMENT_STATUSES, row.status) },
     { key: "amount", header: "Amount", render: (row) => formatMoney(row.amount, row.currency), className: "font-semibold" },
     { key: "refunded_amount", header: "Refunded", render: (row) => Number(row.refunded_amount) > 0 ? formatMoney(row.refunded_amount, row.currency) : "—" },
+    {
+      key: "settlement",
+      header: "Received",
+      render: (row) => row.settlement
+        ? `${settlementLabel(row.settlement)}${row.settlement.corrected ? " (corrected)" : ""}`
+        : "—",
+    },
     { key: "created_at", header: "Created", render: (row) => new Date(row.created_at).toLocaleString() },
     {
       key: "actions",
       header: "Actions",
       render: (row) => (
         <div className="flex flex-wrap gap-2">
-          <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("mark-offline", [row.id], false)}>
-            Mark offline
-          </button>
-          <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("waive", [row.id], false)}>
-            Waive
-          </button>
+          {/* Only a pending charge can be settled or waived; offering it on a settled row
+              could only ever answer 409. */}
+          {row.status === "pending" ? (
+            <>
+              <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("mark-offline", [row.id], false)}>
+                Mark offline
+              </button>
+              <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("waive", [row.id], false)}>
+                Waive
+              </button>
+            </>
+          ) : null}
+          {row.status === "paid_offline" && row.settlement ? (
+            <button className="desk-button" type="button" disabled={amend.isPending} onClick={() => setAmending(row)}>
+              Correct receipt
+            </button>
+          ) : null}
           {row.status === "paid_online" ? (
             <button className="desk-button" type="button" onClick={() => setRefundRow(row)}>
               Refund
@@ -130,6 +160,16 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
           }
         />
       ) : null}
+      {amending ? (
+        <SettlementDialog
+          count={1}
+          pending={amend.isPending}
+          title="Correct the receipt"
+          onCancel={() => { setAmending(null); amend.reset(); }}
+          onConfirm={(settlement) => amend.mutate({ id: amending.id, settlement })}
+        />
+      ) : null}
+      {amend.error ? <p role="alert" className="mb-3 text-sm text-danger">{amend.error.message}</p> : null}
       {conflict ? <p role="alert" className="my-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{conflict}</p> : null}
       {payments.error && !payments.data ? <p className="mb-3 text-sm text-danger">{payments.error.message}</p> : null}
       {mutation.error && !conflict ? <p role="alert" className="mb-3 text-sm text-danger">{mutation.error.message}</p> : null}
@@ -137,7 +177,7 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
         columns={columns}
         data={payments.data ?? []}
         loading={payments.isLoading}
-        skeletonCols={7}
+        skeletonCols={8}
         selectedIds={selected}
         onSelectionChange={(ids) => setSelected(ids.map(Number))}
         emptyTitle="No matching payments"
