@@ -15,7 +15,9 @@ def send_apns(settings_row, token, environment, title, body, data):
             {"iss": settings_row.apns_team_id, "iat": int(time.time())},
             private_key, algorithm="ES256", headers={"kid": settings_row.apns_key_id},
         )
-    except (ValueError, TypeError) as exc:
+    # PyJWT reports an unusable key as InvalidKeyError, which is not a ValueError: without
+    # it a bad .p8 escaped as an unclassified exception instead of a configuration error.
+    except (ValueError, TypeError, jwt.PyJWTError) as exc:
         raise PushProviderError("APNs configuration is unavailable.") from exc
     host = "api.sandbox.push.apple.com" if environment == "development" else "api.push.apple.com"
     try:

@@ -19,14 +19,16 @@ def send_fcm(settings_row, token, title, body, data):
         )}
         if not all(required.values()) or not str(required["token_uri"]).startswith("https://"):
             raise ValueError
-    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        now = int(time.time())
+        # Inside the try: a service account whose private_key is not a usable RSA key is a
+        # configuration error, not an unclassified exception out of the sender.
+        assertion = jwt.encode({
+            "iss": required["client_email"],
+            "scope": "https://www.googleapis.com/auth/firebase.messaging",
+            "aud": required["token_uri"], "iat": now, "exp": now + 300,
+        }, required["private_key"], algorithm="RS256")
+    except (ValueError, TypeError, jwt.PyJWTError) as exc:
         raise PushProviderError("FCM configuration is unavailable.") from exc
-    now = int(time.time())
-    assertion = jwt.encode({
-        "iss": required["client_email"],
-        "scope": "https://www.googleapis.com/auth/firebase.messaging",
-        "aud": required["token_uri"], "iat": now, "exp": now + 300,
-    }, required["private_key"], algorithm="RS256")
     try:
         oauth = requests.post(required["token_uri"], data={
             "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",

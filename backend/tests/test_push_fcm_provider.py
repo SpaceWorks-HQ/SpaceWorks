@@ -152,8 +152,13 @@ def test_a_send_timeout_is_a_provider_error(monkeypatch, pem):
 
 @pytest.mark.parametrize(
     "overrides",
-    [{"client_email": ""}, {"project_id": None}, {"token_uri": "http://insecure.example/token"}],
-    ids=["no-email", "no-project", "plain-http-token-uri"],
+    [
+        {"client_email": ""},
+        {"project_id": None},
+        {"token_uri": "http://insecure.example/token"},
+        {"private_key": "-----BEGIN PRIVATE KEY-----\nnot a key\n-----END PRIVATE KEY-----"},
+    ],
+    ids=["no-email", "no-project", "plain-http-token-uri", "unusable-private-key"],
 )
 def test_an_incomplete_service_account_is_a_configuration_error(monkeypatch, pem, overrides):
     _google(monkeypatch, _Response(200, {"access_token": "t"}), _Response(200, {}))
