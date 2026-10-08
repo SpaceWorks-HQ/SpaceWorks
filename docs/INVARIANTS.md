@@ -1318,7 +1318,13 @@ superadmin "Re-queue failed deliveries" admin action is the dead-letter path and
 `member_accounts`/`updates` are read deployment-wide. An edition hides a fixed set of module keys:
 `platform.available_modules()` (and therefore every bootstrap `modules` list and staff `enabled_modules`
 payload) omits them, and the public loan/machine routes check `editions.public_surface_available(key)`
-and answer 404 when hidden. It does **not** change `core_module_keys()`, `module_enabled()` or any
+and answer 404 when hidden — **every** public route of a hidden module, not only its
+catalogue: the public tool routes (`request_workflow`), public booking, machine-service
+submit, every printer route including the token status lookup, and the per-member event
+ICS feed all check it (2026-10-09; each had gated only on its module or feature, which an
+edition deliberately leaves alone, so an events-only box still lent tools and took
+bookings). Prefer `guards.require_module_for_servable`, which does the edition check and
+the module check together. It does **not** change `core_module_keys()`, `module_enabled()` or any
 `require_module` gate: staff endpoints, workflows, migrations, purge plans and backups behave identically in
 every edition, so a hidden surface is recoverable and nothing that was recorded becomes unreachable to
 staff. `Event.makerspace` remains the tenancy anchor in all editions. The single-box image

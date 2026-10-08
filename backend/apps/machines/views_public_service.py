@@ -16,7 +16,7 @@ from apps.machines.public_service_serializers import (
     PublicMachineServiceSubmitResponseSerializer,
     PublicMachineServiceSubmitSerializer,
 )
-from apps.makerspaces.guards import require_module
+from apps.makerspaces.guards import require_module_for_servable
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.platform import module_enabled
 from apps.presence.guard import require_active_account, require_active_member_presence
@@ -62,7 +62,7 @@ class PublicMachineServiceSubmitView(APIView):
     )
     def post(self, request, makerspace_slug):
         makerspace = get_public_makerspace(makerspace_slug)
-        require_module(makerspace, "machine_service")
+        require_module_for_servable(makerspace, "machine_service")
         require_public_machine_requester(request.user, makerspace)
         if _honeypot_filled(request.data):
             decoy = SimpleNamespace(
