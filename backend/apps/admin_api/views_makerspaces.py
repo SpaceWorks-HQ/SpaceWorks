@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.admin_api.permissions import IsActiveStaff
+from apps.admin_api import settings_audit
 from apps.admin_api.serializers_makerspaces import (
     MakerspaceSerializer,
     MakerspaceSwitcherSerializer,
@@ -23,7 +24,34 @@ from apps.makerspaces.origin_scope import origin_scoped_makerspace_id
 from apps.makerspaces.servability import servable_queryset
 
 
-@extend_schema(tags=["Admin makerspaces"], summary="List or create makerspaces")
+_INVALID = OpenApiResponse(description="Field validation errors, keyed by field.")
+_NOT_FOUND = OpenApiResponse(
+    description=(
+        "Makerspace not found, archived, not active, hidden from superadmins, or outside "
+        "the actor's scope for this method."
+    )
+)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Admin makerspaces"],
+        summary="List makerspaces the actor has a staff surface in",
+        responses={
+            200: MakerspaceSerializer(many=True),
+            403: OpenApiResponse(description="Not an active staff account."),
+        },
+    ),
+    post=extend_schema(
+        tags=["Admin makerspaces"],
+        summary="Create a makerspace (superadmin only)",
+        responses={
+            201: MakerspaceSerializer,
+            400: _INVALID,
+            403: OpenApiResponse(description="Only a superadmin can create a makerspace."),
+        },
+    ),
+)
 class MakerspaceListCreateView(generics.ListCreateAPIView):
     serializer_class = MakerspaceSerializer
     permission_classes = [IsActiveStaff]
@@ -88,7 +116,27 @@ class MakerspaceListCreateView(generics.ListCreateAPIView):
         )
 
 
-@extend_schema(tags=["Admin makerspaces"], summary="Retrieve or update a makerspace")
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Admin makerspaces"],
+        summary="Retrieve a makerspace's settings",
+        responses={200: MakerspaceSerializer, 404: _NOT_FOUND},
+    ),
+    patch=extend_schema(
+        tags=["Admin makerspaces"],
+        summary="Update a makerspace's settings",
+        description=(
+            "Needs manage_makerspace. `enabled_modules` is superadmin-owned and edited only "
+            "in /control/ or the module console: a body carrying it is refused with 403."
+        ),
+        responses={
+            200: MakerspaceSerializer,
+            400: _INVALID,
+            403: OpenApiResponse(description="The body carries `enabled_modules`."),
+            404: _NOT_FOUND,
+        },
+    ),
+)
 class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = MakerspaceSerializer
     permission_classes = [IsActiveStaff]
@@ -118,6 +166,8 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
             serializer.instance = Makerspace.objects.select_for_update().get(
                 pk=serializer.instance.pk
             )
+            requested = set(serializer.validated_data)
+            before = settings_audit.snapshot(serializer.instance, requested)
             previous_features = list(serializer.instance.enabled_features)
             previous_geofence = {
                 "enabled": serializer.instance.geofence_enabled,
@@ -132,6 +182,9 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
                 "makerspace.updated",
                 makerspace=instance,
                 target=instance,
+                meta={
+                    "fields": settings_audit.changed_fields(before, instance, requested)
+                },
             )
             if previous_features != instance.enabled_features:
                 audit.record(
@@ -158,7 +211,18 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
                 )
 
 
-@extend_schema(tags=["Admin makerspaces"], summary="Retrieve or update return policy")
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Admin makerspaces"],
+        summary="Retrieve the return policy",
+        responses={200: ReturnPolicySerializer, 404: _NOT_FOUND},
+    ),
+    patch=extend_schema(
+        tags=["Admin makerspaces"],
+        summary="Update the return policy",
+        responses={200: ReturnPolicySerializer, 400: _INVALID, 404: _NOT_FOUND},
+    ),
+)
 class ReturnPolicyView(generics.RetrieveUpdateAPIView):
     serializer_class = ReturnPolicySerializer
     permission_classes = [IsActiveStaff]
@@ -170,7 +234,7 @@ class ReturnPolicyView(generics.RetrieveUpdateAPIView):
             rbac.scope_by_action(
                 self.request.user,
                 rbac.Action.MANAGE_MAKERSPACE,
-                Makerspace.objects.all(),
+                servable_queryset(),
                 field="id",
             ),
             pk=makerspace_id,

@@ -3030,6 +3030,7 @@ export type Makerspace = {
   "membership_policy"?: MembershipPolicyEnum;
   "membership_dues_amount"?: string;
   "referrals_enabled"?: boolean;
+  "lapsed_members_cannot_borrow"?: boolean;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
   "archive_custody_state": ArchiveCustodyStateEnum | null;
@@ -3052,7 +3053,7 @@ export type Makerspace = {
   "is_platform_subdomain": boolean;
   "hidden_from_central_directory"?: boolean;
   "public_api_key": string;
-  "cors_allowed_origins"?: unknown;
+  "cors_allowed_origins": unknown;
   "enabled_modules": Array<string>;
   "unavailable_apps": Array<string>;
   "resource_limit_overrides"?: unknown;
@@ -4448,6 +4449,7 @@ export type PatchedMakerspace = {
   "membership_policy"?: MembershipPolicyEnum;
   "membership_dues_amount"?: string;
   "referrals_enabled"?: boolean;
+  "lapsed_members_cannot_borrow"?: boolean;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
   "archive_custody_state"?: ArchiveCustodyStateEnum | null;
