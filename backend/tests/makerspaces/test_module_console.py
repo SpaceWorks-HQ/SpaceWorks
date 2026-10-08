@@ -68,6 +68,44 @@ def test_an_archived_makerspace_is_not_addressable(client, space, superadmin):
     assert auth(client, superadmin).get(groups_url(space)).status_code == 404
 
 
+def _hide_from_superadmin(space):
+    # A hidden space keeps a local manager (the person who switched access off); the
+    # flag is written directly because the activation workflow is not under test here.
+    manager = make_user("modules-hidden-manager", access_status=User.AccessStatus.ACTIVE)
+    space.memberships.create(user=manager, role="space_manager")
+    Makerspace.objects.filter(pk=space.pk).update(superadmin_access_enabled=False)
+
+
+@pytest.mark.parametrize("route", ["admin-module-install", "admin-module-uninstall"])
+def test_a_hidden_makerspace_cannot_be_reshaped_by_a_superadmin(client, space, superadmin, route):
+    # Superadmin access switched off is a HARD block: object lookups answer 404. The
+    # module console resolved the space by servability alone and was the one surface
+    # that still let a superadmin install or remove capabilities on a hidden space.
+    apply_profile(space, EVERYTHING)
+    _hide_from_superadmin(space)
+    before = sorted(Makerspace.objects.get(pk=space.pk).enabled_modules)
+
+    response = auth(client, superadmin).post(
+        reverse(route, args=[space.id]), {"key": "bookings"}, format="json"
+    )
+
+    assert response.status_code == 404
+    assert sorted(Makerspace.objects.get(pk=space.pk).enabled_modules) == before
+
+
+def test_a_hidden_makerspace_is_not_listed_by_the_module_console(client, space, superadmin):
+    _hide_from_superadmin(space)
+
+    assert auth(client, superadmin).get(groups_url(space)).status_code == 404
+
+
+def test_hiding_another_space_leaves_the_console_working_for_visible_ones(client, space, superadmin):
+    other = Makerspace.objects.create(name="Hidden", slug="console-hidden")
+    _hide_from_superadmin(other)
+
+    assert auth(client, superadmin).get(groups_url(space)).status_code == 200
+
+
 # --- what the operator is told ----------------------------------------------
 
 

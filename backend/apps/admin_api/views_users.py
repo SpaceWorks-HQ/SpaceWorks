@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.http import Http404
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
@@ -140,6 +140,19 @@ class MembershipRevokeView(APIView):
 
     permission_classes = [IsActiveStaff]
 
+    @extend_schema(
+        tags=["Admin users"],
+        summary="Revoke a makerspace staff membership",
+        responses={
+            204: OpenApiResponse(description="Membership revoked."),
+            403: OpenApiResponse(
+                description="A Space Manager membership can only be revoked by a superadmin."
+            ),
+            404: OpenApiResponse(
+                description="Membership not found or outside the actor's makerspace scope."
+            ),
+        },
+    )
     def delete(self, request, pk):
         actor = request.user
         is_superadmin = actor.is_superuser or actor.role == User.Role.SUPERADMIN
@@ -156,9 +169,13 @@ class MembershipRevokeView(APIView):
             if membership is None:
                 raise Http404
             if is_superadmin:
+                # The superadmin branch bypasses `rbac.can`, so it must restate both halves
+                # of the envelope that `can` enforces for everyone else: a hard-hidden space
+                # and an unservable one (archived, importing, aborted, not restored) are
+                # invisible here -- archival is reversible only in /control/.
                 if rbac._id_in(
                     membership.makerspace_id, rbac.superadmin_hidden_makerspace_ids()
-                ):
+                ) or not is_servable(membership.makerspace):
                     raise Http404
             else:
                 if not rbac.can(
