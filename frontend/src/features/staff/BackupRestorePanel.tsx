@@ -16,11 +16,11 @@ import {
 } from "./backupApi";
 import { Panel } from "./panels/shared";
 
-export function BackupRestorePanel({ makerspaceId, isSuperadmin }: { makerspaceId: number; isSuperadmin: boolean }) {
+export function BackupRestorePanel({ makerspaceId, isSuperadmin, tenantBackupsEnabled = true }: { makerspaceId: number; isSuperadmin: boolean; tenantBackupsEnabled?: boolean }) {
   const client = useQueryClient();
   const tenantKey = ["tenant-backups", makerspaceId];
   const deploymentKey = ["deployment-backups"];
-  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => listTenantBackups(makerspaceId), refetchInterval: pollArchives });
+  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => listTenantBackups(makerspaceId), enabled: tenantBackupsEnabled, refetchInterval: pollArchives });
   const deployment = useQuery({ queryKey: deploymentKey, queryFn: listDeploymentBackups, enabled: isSuperadmin, refetchInterval: pollArchives });
   const settings = useQuery({ queryKey: ["backup-settings"], queryFn: getBackupSettings, enabled: isSuperadmin });
   const restores = useQuery({ queryKey: ["restore-operations"], queryFn: listRestores, enabled: isSuperadmin, refetchInterval: 3000 });
@@ -35,11 +35,15 @@ export function BackupRestorePanel({ makerspaceId, isSuperadmin }: { makerspaceI
 
   return (
     <div className="grid gap-5">
-      <Panel title="Makerspace backups">
-        <ArchiveDisclosure deployment={false} />
-        <ActionButton label="Create makerspace archive" pending={createTenant.isPending} onClick={() => createTenant.mutate()} />
-        <ArchiveRows rows={tenant.data ?? []} onDownload={(id) => download.mutate(id)} />
-      </Panel>
+      {tenantBackupsEnabled ? (
+        <Panel title="Makerspace backups">
+          <ArchiveDisclosure deployment={false} />
+          <ActionButton label="Create makerspace archive" pending={createTenant.isPending} onClick={() => createTenant.mutate()} />
+          <ArchiveRows rows={tenant.data ?? []} onDownload={(id) => download.mutate(id)} />
+        </Panel>
+      ) : (
+        <p className="text-sm text-muted">The backup module is not installed for this makerspace; the deployment's own backups still cover it.</p>
+      )}
       {isSuperadmin ? (
         <Panel title="Deployment backup and restore">
           <div className="grid gap-4">
