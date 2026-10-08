@@ -301,6 +301,7 @@ supported installation without them.
 | Payments (default-on) | Stripe/Razorpay checkout, charges, receipts and reconciliation | Money is handled outside SpaceWorks |
 | Member accounts (default-on) | Self-sign-up, member area, password, Google/Apple and phone login | Staff sign-in and external OIDC remain; members become staff-created walk-ins |
 | Mobile apps (default-on) | Attested device sessions, native push and PaymentSheet support | The web app works, but native clients cannot hold a session for the space |
+| Connected devices | Printers and label printers enrolled with an Ed25519 key; signed heartbeats and key rotation/revocation | No device enrollment or device-signed requests |
 | Updates (default-on) | In-app version checks and controlled software updates | Updates must be run through host tooling or an external deployment pipeline |
 
 Two dependency rules also come directly from the registry: Printing requires Machine service, and Mobile

@@ -182,6 +182,12 @@ TARGET_FIELD_PROJECTION = {
     ),
 }
 
+from .target_projection_devices import DEVICE_FIELD_RESETS  # noqa: E402
+
+TARGET_FIELD_PROJECTION.update({
+    edge: TargetField(value, reason=reason) for edge, (value, reason) in DEVICE_FIELD_RESETS.items()
+})
+
 
 ROW_POLICIES = {
     "machines.MachineOperator": RowPolicy(

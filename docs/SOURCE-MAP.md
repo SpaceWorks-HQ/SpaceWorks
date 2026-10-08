@@ -96,6 +96,15 @@
   PostgreSQL role boundary. `cloud_environment.py` captures host-rendered Cloud Compose interpolation into
   durable static configuration without consulting later ambient shells; only the root-only
   `scripts/init-cloud-environment.py` renderer invokes Compose.
+- `backend/apps/devices/` — device identity (phase 7a, separable, module `devices`). `models_identity.py`
+  (Device, DeviceEnrollment, DeviceRequestNonce) and `models_events.py` (append-only DeviceEvent, DB
+  trigger in `0001`); `protocol.py` owns the v1 canonical bytes and published vectors;
+  `authentication.py` (DeviceAuthentication -> `DevicePrincipal`, never a User) and
+  `route_registry.py` + `checks.py` (the exact `/api/v1/device/` route/action registry and its system
+  check); `services_locks.py` is the Makerspace -> Device -> Enrollment lock order every mutation takes;
+  `services_enrollment.py` (PoP enroll/rotate/reactivate), `services_identity.py` (create/PATCH/revoke),
+  `services_requests.py` (atomic nonce claim, heartbeat), `services_events.py` (DeviceEvent + typed
+  `devices.*` audit).
 - `backend/apps/data_export/` — Space-Manager data export (Phase 4). Per-fidelity (`REDACTED`/`PORTABLE`)
   disposition registry over models, fields, datasets, traversals and the global-user reference closure, with
   **drift guards that refuse an unclassified model or field**. `classification.py` and `references.py`

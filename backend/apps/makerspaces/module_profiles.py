@@ -62,6 +62,10 @@ _WORKSHOP_EXTRAS = frozenset({
 # Django process with no worker, no beat and no MinIO: everything here is either
 # request-driven or reachable from `run_scheduled_tasks`. `full` is every module, which
 # is what a local server with the whole stack can carry.
+#
+# `devices` (enrolled printers/label printers) is deliberately reached ONLY through
+# `full`/`everything`: it is a trust boundary for physical hardware on the space's own
+# network, so no curated profile may switch it on without the operator choosing it.
 _CLOUD_EXTRAS = frozenset({
     "guest_handover", "containers", "stock_transfers", "stocktake", "reports",
     "asset_units", "bulk_import", "qr_print_batches",

@@ -10,6 +10,9 @@ JSON_REFERENCE_FIELDS = frozenset(
         ("makerspaces.MakerspaceMembership", "verified_actor_snapshot"),
         ("makerspaces.MakerspaceMembership", "activated_actor_snapshot"),
         ("makerspaces.MakerspaceMembership", "revoked_actor_snapshot"),
+        # Allowlisted scalars only (devices.services_events.ALLOWED_DETAIL_KEYS); no
+        # live reference of any kind.
+        ("devices.DeviceEvent", "details"),
         ("bookings.BookableSpace", "custom_form"),
         ("bookings.Booking", "custom_answers"),
         ("events.Event", "custom_form"),

@@ -25,7 +25,8 @@ ACTION_MODULES = {
     "procurement": "procurement", "machine": "machines", "service": "machine_service",
     "event": "events", "booking": "bookings", "maintenance": "maintenance",
     "membership": "membership", "notification": "notifications", "email": "email",
-    "payment": "payments", "device": "mobile", "report": "reports",
+    "payment": "payments", "device": "mobile", "devices": "devices",
+    "report": "reports",
 }
 
 

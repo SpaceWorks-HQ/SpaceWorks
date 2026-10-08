@@ -176,6 +176,8 @@ INSTALLED_APPS = [
     "apps.maintenance",
     "apps.roadmap",
     "apps.tenant_migration",
+    # Enrolled printers/label printers (phase 7a); separable.
+    "apps.devices",
     # Must stay LAST. Django calls ready() in this order, so being last is what
     # guarantees every other app has registered before finalize() freezes the
     # separability registries.
@@ -706,6 +708,11 @@ HMAC_CLIENT_ID = env("HMAC_CLIENT_ID", default="")
 HMAC_SECRET = env("HMAC_SECRET", default="")
 HMAC_MAX_CLOCK_SKEW_SECONDS = env.int("HMAC_MAX_CLOCK_SKEW_SECONDS", default=300)
 APICLIENT_REQUIRE_NONCE = env.bool("APICLIENT_REQUIRE_NONCE", default=False)
+# Enrolled devices (apps.devices, protocol v1). The nonce TTL must cover the whole
+# accepted timestamp window (2 x skew) -- devices.E003 refuses startup otherwise.
+DEVICE_SIGNATURE_MAX_SKEW_SECONDS = env.int("DEVICE_SIGNATURE_MAX_SKEW_SECONDS", default=300)
+DEVICE_ENROLLMENT_TTL_SECONDS = env.int("DEVICE_ENROLLMENT_TTL_SECONDS", default=900)
+DEVICE_NONCE_TTL_SECONDS = env.int("DEVICE_NONCE_TTL_SECONDS", default=86400)
 HMAC_PROTECTED_PATH_PREFIXES = env.list(
     "HMAC_PROTECTED_PATH_PREFIXES",
     default=["/api/public/", "/api/v1/public/"],

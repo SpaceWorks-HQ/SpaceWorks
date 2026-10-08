@@ -1459,12 +1459,45 @@ not module keys** (one app can own several keys — `printing`/`machines`/`machi
   has no urlconf to import.
 - **The tombstone suite is a separate pytest run** (`tests/tombstone/`), because import-time surfaces
   cannot be re-derived in-process and the all-active suite asserts the opposite for the same objects:
-  `TOMBSTONED_APPS=bookings,events,maintenance,notifications,payments,presence,procurement,tenant_migration,updates,warranty
-  pytest tests/tombstone` — the conftest demands the **whole ten-app profile** and names the exact
+  `TOMBSTONED_APPS=bookings,devices,events,maintenance,notifications,payments,presence,procurement,tenant_migration,updates,warranty
+  pytest tests/tombstone` — the conftest demands the **whole eleven-app profile** (`devices` joined in
+  phase 7a; `payments` is accepted for `payments_rail`) and names the exact
   string it wants, so a single app (this line said `procurement` alone until 2026-08-11) is a hard
   `UsageError`, not a partial run. A whole-tree run skips the directory; an
   explicit run without the profile is a hard `UsageError`, never a green no-op. `TOMBSTONE_PROFILE_APPS`
   in its conftest must stay in step with `SEPARABLE_APPS`.
+
+**Device identity (forward plan phase 7a, `apps/devices/`, module `devices`).**
+- **A device is NOT an actor.** `AuditLog.actor`, `EvidencePhoto.uploaded_by` and every scan actor stay
+  `accounts.User` FKs. Device-originated audit rows carry `actor=None` plus typed metadata
+  (`device_id`, `device_name`, `device_key_version`, `operation_id`, `outcome`, `enrollment_id`) and a
+  matching append-only `DeviceEvent` (ORM guard + `devices_event_append_only` trigger honouring only the
+  purge GUC). `DevicePrincipal` never reaches `accounts.rbac`.
+- **One lock order, makerspace first.** Every device mutation runs `services_locks.lock_tenant()` inside
+  its transaction — the tenant source gate (`assert_write_allowed`), `require_module_locked(..., "devices")`
+  (the row lock uninstall/purge take) and a locked `is_servable` re-check, because `module_enabled` answers
+  capability for archived tenants — then locks Device, then DeviceEnrollment.
+- **Replay authority is a DB INSERT, after signature verification.** `DeviceRequestNonce` is unique on
+  `(device, key_version, nonce_digest)`; an invalid signature, a closed gate or a module-off tenant claims
+  nothing. `DEVICE_NONCE_TTL_SECONDS` must be >= 2 x `DEVICE_SIGNATURE_MAX_SKEW_SECONDS` (`devices.E003`).
+  The signed target is the exact raw request target (`RAW_URI`/`REQUEST_URI`/ASGI `raw_path`); with none
+  available authentication fails closed — never a normalized fallback.
+- **The `/api/v1/device/` surface is covered exactly by `devices/route_registry.py`**, keyed by (qualified
+  URL name, method) with a closed auth mode (`ENROLLMENT_TOKEN` | `DEVICE_SIGNATURE`); `devices.E001`
+  refuses missing/stale/method-drifted entries or a view whose authenticators disagree with its mode, and
+  `DeviceRoutePermission` default-denies. It is NOT the API-client HMAC registry and must never be merged
+  into it. `source_gate_http_guards` admits the singleton `DeviceAuthentication` only while its
+  `authenticate` assigns `request.selected_makerspace_id` before `_assert_source_gate(request)`.
+- **No device authority travels or survives a restore.** Exports omit DeviceEnrollment/DeviceRequestNonce
+  and the device key/fingerprint; imports reserve fresh UUIDs, reset Device to pending (keeping the
+  monotonic `key_version`) and keep the five `DeviceEvent.*_snapshot` columns byte-for-byte as
+  source-local history (`tenant_migration/references_devices.py` guards them out of every remap path).
+  `backup.recovery.enter_quarantine()` resets every Device to pending, clears key material, bumps
+  `key_version`, revokes open enrollments and deletes nonces, so a pre-backup signature fails even after
+  acknowledgement. A remapped UUID audit reference is written to JSONB as a string
+  (`semantic_remap._json_pk`).
+- `MANAGE_DEVICES` is a Space Manager default (`makerspaces/0073` backfill) and is **never
+  organization-grantable**; Inventory/Machine Managers do not get it.
 
 ## Machine scoping — `MANAGE_MACHINES` is per role, and fails CLOSED
 

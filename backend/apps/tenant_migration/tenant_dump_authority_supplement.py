@@ -2,6 +2,7 @@
 
 from .tenant_dump_types import AuthorityDisposition as D
 from .tenant_dump_types import authority
+from .tenant_dump_authority_devices import DEVICE_AUTHORITY_ENTRIES
 
 
 def _same(label, names, disposition, reason):
@@ -110,4 +111,5 @@ SUPPLEMENTAL_AUTHORITY_ENTRIES = (
         D.PRESERVE,
         "A tenant's own borrowing rule for lapsed members, still bounded by target modules.",
     ),
+    *DEVICE_AUTHORITY_ENTRIES,
 )

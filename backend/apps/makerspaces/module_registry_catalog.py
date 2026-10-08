@@ -8,6 +8,7 @@ this tuple at import time, so a bad entry still fails the process at startup.
 from apps.makerspaces.module_registry_definitions import (
     FEATURE_PARENT,
     GROUP_BOOKINGS,
+    GROUP_DEVICES,
     GROUP_EVENTS,
     GROUP_INVENTORY,
     GROUP_MACHINES,
@@ -207,6 +208,14 @@ MODULES = (
         "Attested device sessions, native push and the in-app payment sheet.",
         "accounts", GUARD, group=GROUP_MOBILE,
         requires_modules=("member_accounts",),
+    ),
+    # Opt-in and dependency-free: device identity is a trust boundary that printer and
+    # label adapters build on, so it must not force `machines` onto a label-only space.
+    # Each later adapter guards its own module instead of widening this tuple.
+    ModuleDefinition(
+        "devices", "Connected devices",
+        "Enrolled printers and label printers that authenticate with an Ed25519 key.",
+        "devices", GUARD, group=GROUP_DEVICES,
     ),
     ModuleDefinition(
         "updates", "Updates", "In-app platform release checks and controlled updates.",

@@ -4,6 +4,7 @@ from .audit_references_targets import (
     AuditReference,
     AuditReferenceDisposition,
 )
+from .audit_references_meta_devices import DEVICE_AUDIT_EDGES
 from .audit_references_meta_membership import MEMBERSHIP_AUDIT_EDGES
 from .audit_references_meta_payments import PAYMENT_AUDIT_EDGES
 from .audit_references_meta_phase5 import PHASE5_AUDIT_EDGES
@@ -271,3 +272,4 @@ AUDIT_META_REFERENCES.update(PHASE5_AUDIT_EDGES)
 AUDIT_META_REFERENCES.update(MEMBERSHIP_AUDIT_EDGES)
 AUDIT_META_REFERENCES.update(PAYMENT_AUDIT_EDGES)
 AUDIT_META_REFERENCES.update(REPORT_SCHEDULE_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(DEVICE_AUDIT_EDGES)

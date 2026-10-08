@@ -29,6 +29,8 @@ _LOAN_AND_MACHINE_KEYS = frozenset({
     "public_inventory", "request_workflow", "scanner", "asset_units", "containers",
     "bulk_import", "stock_transfers", "qr_print_batches", "guest_handover", "procurement",
     "stocktake", "machines", "machine_service", "printing", "maintenance",
+    # Enrolled printers/label printers serve the machine and QR-label spine.
+    "devices",
 })
 
 

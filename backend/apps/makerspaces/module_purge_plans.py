@@ -49,6 +49,7 @@ from apps.makerspaces.module_purge_collectors import (
     telegram_destinations_delete,
     webhook_destinations_delete,
 )
+from apps.makerspaces.module_purge_collectors_devices import devices_delete
 from apps.makerspaces.module_purge_collectors_reports import (
     reports_delete,
     reports_private_keys,
@@ -187,6 +188,11 @@ PLANS = (
     ModulePurgePlan("stocktake", "Stocktake sessions, lines and ledger entries.", stocktake_delete),
     ModulePurgePlan("stock_transfers", "Stock transfers and their lines.", stock_transfers_delete),
     ModulePurgePlan("qr_print_batches", "QR print batches and their items.", qr_print_batches_delete),
+    ModulePurgePlan(
+        "devices",
+        "Enrolled devices, their enrollments, replay nonces and device event history.",
+        devices_delete,
+    ),
 )
 
 BY_KEY = {plan.key: plan for plan in PLANS}

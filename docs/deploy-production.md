@@ -150,6 +150,11 @@ It intentionally does not run migrations because runtime `DATABASE_URL` points a
 the transaction pooler. A VPS using `docker-compose.prod.yml` is the alternative
 deployment path.
 
+Enrolled devices (module `devices`) need no extra configuration: `DEVICE_SIGNATURE_MAX_SKEW_SECONDS`
+(300), `DEVICE_NONCE_TTL_SECONDS` (86400, at least twice the skew) and `DEVICE_ENROLLMENT_TTL_SECONDS`
+(900) default sensibly. Devices sign the exact request target, so any proxy in front of gunicorn must
+forward the path and query string unmodified ([device-protocol.md](device-protocol.md)).
+
 ## 5. Run one-off setup
 
 Run migrations against the direct/session URL on port 5432, not the runtime

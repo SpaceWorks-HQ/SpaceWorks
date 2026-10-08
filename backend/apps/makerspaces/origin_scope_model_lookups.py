@@ -130,6 +130,11 @@ BASE_MODEL_LOOKUPS = {
     'admin-machine-service-request-reprint': ('machines.MachineServiceRequest', 'makerspace_id'),
     'admin-machine-service-payment-mark-offline': ('payments.Payment', 'makerspace_id'),
     'admin-machine-service-payment-waive': ('payments.Payment', 'makerspace_id'),
+    'admin-device-detail': ('devices.Device', 'makerspace_id'),
+    'admin-device-enrollment-create': ('devices.Device', 'makerspace_id'),
+    'admin-device-revoke': ('devices.Device', 'makerspace_id'),
+    'device-enrollment-challenge': ('devices.DeviceEnrollment', 'makerspace_id'),
+    'device-enrollment-complete': ('devices.DeviceEnrollment', 'makerspace_id'),
 }
 
 TARGET_SET_LOOKUPS = {

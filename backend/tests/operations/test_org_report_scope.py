@@ -65,9 +65,12 @@ def resolved_ids(actor, organization, definition=DEFAULT_REPORT):
     ).makerspace_ids
 
 
-def test_organization_grantable_vocabulary_excludes_only_manage_machines():
+def test_organization_grantable_vocabulary_excludes_only_tenant_local_authority():
+    # MANAGE_MACHINES (machine scoping) and MANAGE_DEVICES (physical device keys) are
+    # both granted inside one makerspace only.
     assert rbac.ORGANIZATION_GRANTABLE_ACTIONS == (
-        rbac.ROLE_GRANTABLE_ACTIONS - {rbac.Action.MANAGE_MACHINES}
+        rbac.ROLE_GRANTABLE_ACTIONS
+        - {rbac.Action.MANAGE_MACHINES, rbac.Action.MANAGE_DEVICES}
     )
 
 

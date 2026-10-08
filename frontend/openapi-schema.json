@@ -2278,6 +2278,371 @@
                 }
             }
         },
+        "/api/v1/admin/devices/{id}": {
+            "get": {
+                "operationId": "api_v1_admin_devices_retrieve",
+                "summary": "Retrieve a device",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Devices"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Device"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Invalid request or module disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "423": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Tenant frozen for migration."
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "api_v1_admin_devices_partial_update",
+                "summary": "Rename a device or change its offline threshold",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Devices"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedDeviceUpdate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedDeviceUpdate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedDeviceUpdate"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Device"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Invalid request or module disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "423": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Tenant frozen for migration."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/devices/{id}/enrollments": {
+            "post": {
+                "operationId": "api_v1_admin_devices_enrollments_create",
+                "summary": "Issue a new enrollment (enroll, rotate or reactivate by device status)",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Devices"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EnrollmentGrant"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Invalid request or module disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "423": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Tenant frozen for migration."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/devices/{id}/revoke": {
+            "post": {
+                "operationId": "api_v1_admin_devices_revoke_create",
+                "summary": "Revoke a device immediately",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Devices"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Device"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Invalid request or module disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "423": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Tenant frozen for migration."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/direct-loans/{id}/return": {
             "post": {
                 "operationId": "api_v1_admin_direct_loans_return_create",
@@ -15770,6 +16135,205 @@
                     },
                     "404": {
                         "description": "Export job not found in this makerspace."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/devices": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_devices_list",
+                "summary": "List a makerspace's devices",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "tags": [
+                    "Devices"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedDeviceList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Invalid request or module disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "423": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Tenant frozen for migration."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspace_devices_create",
+                "summary": "Create a pending device and its first enrollment",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Devices"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeviceCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeviceCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeviceCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceCreated"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Invalid request or module disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Authentication required."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Permission denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "423": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Tenant frozen for migration."
                     }
                 }
             }
@@ -35733,6 +36297,316 @@
                 }
             }
         },
+        "/api/v1/device/enrollments/{id}/challenge": {
+            "post": {
+                "operationId": "api_v1_device_enrollments_challenge_create",
+                "summary": "Request a proof-of-possession challenge for a candidate key",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Device protocol"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChallengeRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChallengeRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChallengeRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChallengeResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Malformed key, challenge or signature, or module disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Not authenticated."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Enrollment credentials or proof of possession rejected."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "The key is already bound to another device, or rotation reused the key."
+                    },
+                    "410": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "The enrollment was used, revoked or has expired."
+                    },
+                    "423": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Tenant frozen for migration."
+                    }
+                }
+            }
+        },
+        "/api/v1/device/enrollments/{id}/complete": {
+            "post": {
+                "operationId": "api_v1_device_enrollments_complete_create",
+                "summary": "Complete enrollment by signing the challenge with the candidate key",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Device protocol"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompleteRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompleteRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompleteRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceIdentity"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Malformed key, challenge or signature, or module disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Not authenticated."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Enrollment credentials or proof of possession rejected."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "The key is already bound to another device, or rotation reused the key."
+                    },
+                    "410": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "The enrollment was used, revoked or has expired."
+                    },
+                    "423": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Tenant frozen for migration."
+                    }
+                }
+            }
+        },
+        "/api/v1/device/heartbeat": {
+            "post": {
+                "operationId": "api_v1_device_heartbeat_create",
+                "summary": "Report that a device is alive (signed device request)",
+                "tags": [
+                    "Device protocol"
+                ],
+                "security": [
+                    {
+                        "DeviceSignature": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceIdentity"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Module disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Missing, malformed, stale, replayed or invalid signature."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Device not allowed on this route, revoked or tenant unavailable."
+                    },
+                    "423": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceError"
+                                }
+                            }
+                        },
+                        "description": "Tenant frozen for migration."
+                    }
+                }
+            }
+        },
         "/api/v1/event-checkin-stations/{public_token}/roster/": {
             "get": {
                 "operationId": "api_v1_event_checkin_stations_roster_retrieve",
@@ -46053,6 +46927,39 @@
                     "updated_at"
                 ]
             },
+            "ChallengeRequest": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "maxLength": 256
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "maxLength": 64
+                    }
+                },
+                "required": [
+                    "public_key",
+                    "token"
+                ]
+            },
+            "ChallengeResponse": {
+                "type": "object",
+                "properties": {
+                    "challenge": {
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "challenge",
+                    "expires_at"
+                ]
+            },
             "ChangePassword": {
                 "type": "object",
                 "properties": {
@@ -46456,6 +47363,33 @@
                         "default": false
                     }
                 }
+            },
+            "CompleteRequest": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "maxLength": 256
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "challenge": {
+                        "type": "string",
+                        "maxLength": 64
+                    },
+                    "signature": {
+                        "type": "string",
+                        "maxLength": 128
+                    }
+                },
+                "required": [
+                    "challenge",
+                    "public_key",
+                    "signature",
+                    "token"
+                ]
             },
             "ConditionEnum": {
                 "enum": [
@@ -47055,6 +47989,115 @@
                     }
                 }
             },
+            "Device": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "makerspace": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "kind": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/KindE45Enum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/DeviceStatusEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "key_fingerprint": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "key_version": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "last_seen_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "offline_threshold_seconds": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "offline_since": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "offline_notified_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "revoked_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "revoked_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "created_by",
+                    "id",
+                    "key_fingerprint",
+                    "key_version",
+                    "kind",
+                    "last_seen_at",
+                    "makerspace",
+                    "name",
+                    "offline_notified_at",
+                    "offline_since",
+                    "offline_threshold_seconds",
+                    "public_key",
+                    "revoked_at",
+                    "revoked_by",
+                    "status"
+                ]
+            },
             "DeviceChallengeResponse": {
                 "type": "object",
                 "properties": {
@@ -47069,6 +48112,54 @@
                 "required": [
                     "challenge",
                     "expires_in"
+                ]
+            },
+            "DeviceCreate": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "$ref": "#/components/schemas/KindE45Enum"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "offline_threshold_seconds": {
+                        "type": "integer",
+                        "maximum": 604800,
+                        "minimum": 1,
+                        "default": 300
+                    }
+                },
+                "required": [
+                    "kind",
+                    "name"
+                ]
+            },
+            "DeviceCreated": {
+                "type": "object",
+                "properties": {
+                    "device": {
+                        "$ref": "#/components/schemas/Device"
+                    },
+                    "enrollment": {
+                        "$ref": "#/components/schemas/EnrollmentGrant"
+                    }
+                },
+                "required": [
+                    "device",
+                    "enrollment"
+                ]
+            },
+            "DeviceError": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
                 ]
             },
             "DeviceGrant": {
@@ -47216,6 +48307,15 @@
                     "device_grant",
                     "refresh"
                 ]
+            },
+            "DeviceStatusEnum": {
+                "enum": [
+                    "pending",
+                    "active",
+                    "revoked"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending enrollment\n* `active` - Active\n* `revoked` - Revoked"
             },
             "DeviceTokenResponse": {
                 "type": "object",
@@ -47976,6 +49076,37 @@
                 ],
                 "type": "string",
                 "description": "* `superseded` - Superseded\n* `membership_revoked` - Membership revoked\n* `claim_revoked` - Claim revoked\n* `user_ended` - User ended"
+            },
+            "EnrollmentGrant": {
+                "type": "object",
+                "description": "Returned exactly once: the raw token is never stored and cannot be re-read.",
+                "properties": {
+                    "enrollment_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "device_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "purpose": {
+                        "$ref": "#/components/schemas/PurposeEnum"
+                    },
+                    "token": {
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "device_id",
+                    "enrollment_id",
+                    "expires_at",
+                    "purpose",
+                    "token"
+                ]
             },
             "EnvironmentEnum": {
                 "enum": [
@@ -51227,6 +52358,15 @@
                 "type": "string",
                 "description": "* `rollback_in_place` - Rollback in place\n* `disaster` - Disaster or cross-server"
             },
+            "KindE45Enum": {
+                "enum": [
+                    "printer",
+                    "label_printer",
+                    "generic"
+                ],
+                "type": "string",
+                "description": "* `printer` - Printer\n* `label_printer` - Label printer\n* `generic` - Generic"
+            },
             "KindE56Enum": {
                 "enum": [
                     "role",
@@ -53745,7 +54885,8 @@
                                 "$ref": "#/components/schemas/MakerspaceArchiveRequestStatusEnum"
                             }
                         ],
-                        "readOnly": true
+                        "readOnly": true,
+                        "default": "pending"
                     }
                 },
                 "required": [
@@ -57588,6 +58729,37 @@
                     }
                 }
             },
+            "PaginatedDeviceList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=2"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Device"
+                        }
+                    }
+                }
+            },
             "PaginatedDirectLoanList": {
                 "type": "object",
                 "required": [
@@ -58647,6 +59819,20 @@
                         "type": "string",
                         "format": "date-time",
                         "readOnly": true
+                    }
+                }
+            },
+            "PatchedDeviceUpdate": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "offline_threshold_seconds": {
+                        "type": "integer",
+                        "maximum": 604800,
+                        "minimum": 1
                     }
                 }
             },
@@ -63282,6 +64468,15 @@
                     "payload",
                     "remark"
                 ]
+            },
+            "PurposeEnum": {
+                "enum": [
+                    "enroll",
+                    "rotate",
+                    "reactivate"
+                ],
+                "type": "string",
+                "description": "* `enroll` - Enroll\n* `rotate` - Rotate\n* `reactivate` - Reactivate"
             },
             "PushDevice": {
                 "type": "object",
@@ -68285,6 +69480,12 @@
             }
         },
         "securitySchemes": {
+            "DeviceSignature": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Device-Signature",
+                "description": "Ed25519 signature (protocol v1) over the length-framed request message; requires X-Device-Id, X-Device-Key-Version, X-Device-Signature-Version, X-Device-Timestamp and X-Device-Nonce. See docs/device-protocol.md."
+            },
             "EventStationCookie": {
                 "type": "apiKey",
                 "in": "cookie",

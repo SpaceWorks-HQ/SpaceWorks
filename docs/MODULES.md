@@ -54,7 +54,8 @@ core modules cannot be uninstalled at all.
 **Notifications**: [notifications](#notifications) · [email](#email) · [telegram](#telegram) ·
 [slack](#slack) · [mattermost](#mattermost) · [discord](#discord) · [webhook](#webhook) — **Reports**: [reports](#reports) —
 **Payments**: [payments](#payments) — **Accounts**: [member_accounts](#member_accounts) —
-**Mobile apps**: [mobile](#mobile) — **Updates**: [updates](#updates)
+**Mobile apps**: [mobile](#mobile) — **Connected devices**: [devices](#devices) —
+**Updates**: [updates](#updates)
 
 ---
 
@@ -515,6 +516,28 @@ Requires `member_accounts`.
 
 ---
 
+## Connected devices
+
+### devices
+
+Opt-in, no dependencies; installed only by the `full`/`everything` profiles.
+
+- **What it is** — device identity for printers and label printers on the space's own network. A
+  device is **not** a staff account: it holds an Ed25519 key, proves possession of it once at
+  enrollment, and then signs every request (protocol in `docs/device-protocol.md`).
+- **What it adds** — the staff device list (`MANAGE_DEVICES`, Space Managers by default): create a
+  device and its one-time enrollment, rename it, set its offline threshold, rotate its key, revoke it.
+  Devices call the token-authenticated enrollment challenge/complete routes and the signed heartbeat.
+  Every change leaves an append-only device event plus a `devices.*` audit row.
+- **Without it** — the staff list answers 400 naming `devices`, and every enrollment and signed
+  device request is refused before it can claim a nonce or write a row. Enrolled devices keep their
+  rows but cannot authenticate until it is re-installed.
+- **Data** — `purge_module_data devices` deletes replay nonces and enrollments first, then the device
+  event history and the devices themselves. A tenant export carries devices and their history but never
+  their keys, enrollments or nonces, so a moved or restored device must enroll again.
+
+---
+
 ## Updates
 
 ### updates
@@ -592,7 +615,7 @@ modules.
 | `lending` | 17 | A tool library: the full lending lifecycle, no machines |
 | `recommended` | 20 | Core plus the inventory lifecycle, reports and machines (the default) |
 | `cloud` | 24 | A managed box: everything that runs on a single Django process, no worker or beat |
-| `everything` / `full` | 33 | All modules |
+| `everything` / `full` | 34 | All modules |
 | `events` | 12 | An events programme: events, notifications, email, member accounts, membership, payments, reports (core is present but hidden by the `events` edition) |
 | `bookings` | 12 | Bookable rooms and resources: bookings, notifications, email, member accounts, membership, payments, reports (core hidden by the `bookings` edition) |
 
@@ -626,5 +649,6 @@ command tells you which. [`machines`](#machines) is the notable second case.
 Uninstalling switches a module off for one makerspace; the code still ships. A deployment that will never
 use an area can drop the app itself with `TOMBSTONED_APPS`, and `suggest_tombstones` reads the installed
 modules and names the apps that are safe to remove. The separable apps are `warranty`, `presence`,
-`payments`, `updates`, `events`, `bookings`, `maintenance` and `procurement`. That is a different axis
+`payments`, `updates`, `events`, `bookings`, `maintenance`, `procurement`, `notifications`,
+`tenant_migration` and `devices`. That is a different axis
 from modules — see **Separability and tombstoning** in `docs/INVARIANTS.md`.

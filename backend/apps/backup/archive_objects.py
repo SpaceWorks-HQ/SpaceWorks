@@ -18,6 +18,8 @@ NON_OBJECT_KEY_FIELDS = frozenset({
     ("accounts.PlatformSocialAuthSettings", "apple_private_key"),
     ("audit.AuditMacKey", "wrapped_key"),
     ("audit.AuditSigningKey", "public_key"),
+    # Base64 of a device's raw Ed25519 public key; a credential, not an object pointer.
+    ("devices.Device", "public_key"),
     ("audit.AuditSigningKey", "wrapped_private_key"),
     ("audit.AuditSigningKeyRotation", "new_key"),
     ("audit.AuditSigningKeyRotation", "old_key"),

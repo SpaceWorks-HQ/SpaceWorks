@@ -131,6 +131,10 @@ def _telegram(space, client):
     )
 
 
+def _devices(space, client):
+    return client.get(reverse("devices:admin-device-list", args=[space.pk]))
+
+
 # A None value is intentional: it keeps an unverified surface visible as a per-module
 # skip instead of silently pretending the registry entry has a contract probe.
 PROBES = {
@@ -138,6 +142,7 @@ PROBES = {
     "bookings": _bookings,
     "bulk_import": _inventory_probe("bulk_import"),
     "containers": _inventory_probe("containers"),
+    "devices": _devices,
     "discord": None,
     "email": None,
     "events": _events,

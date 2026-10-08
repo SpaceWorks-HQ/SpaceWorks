@@ -82,6 +82,14 @@ HTTP_ANONYMOUS_PARTICIPANTS = {
     "apps.hardware_requests.cron_views.ReturnReminderCronView.post": (
         "The fan-out reminder service takes the skip-and-count gate once per request."
     ),
+    # Token-authenticated device enrollment: each view resolves the enrollment's
+    # makerspace, takes the late gate for it, and the locked service re-asserts it.
+    "apps.devices.views_enrollment.DeviceEnrollmentChallengeView.post": (
+        "Resolves the enrollment's makerspace and asserts its source gate before mutating."
+    ),
+    "apps.devices.views_enrollment.DeviceEnrollmentCompleteView.post": (
+        "Resolves the enrollment's makerspace and asserts its source gate before mutating."
+    ),
 }
 
 

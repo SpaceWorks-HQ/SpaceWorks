@@ -125,6 +125,14 @@ EXPECTED = dict(
         *_fields("makerspaces.MembershipPlan", "is_active", D.PRESERVE),
         *_fields("makerspaces.MembershipTerm", "status", D.PRESERVE),
         *_fields("makerspaces.Makerspace", "lapsed_members_cannot_borrow", D.PRESERVE),
+        # Device identity travels; its live authority resets (forward plan phase 7a).
+        *_fields(
+            "devices.Device",
+            "status public_key key_fingerprint last_seen_at offline_since offline_notified_at "
+            "revoked_at revoked_by",
+            D.RESET,
+        ),
+        *_fields("devices.Device", "key_version", D.PRESERVE),
         *_fields(
             "makerspaces.MemberProject",
             "id profile title description image_key links position created_at updated_at",
