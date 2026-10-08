@@ -19,8 +19,9 @@
   hide/archive exclusion).
 - `backend/apps/makerspaces/` — `Makerspace` model (tenant root; unique `slug`; `frontend_domain`, module
   flags, `resource_limit_overrides`, `archived_at`, `superadmin_access_enabled`), bootstrap views, dynamic
-  CORS, module guards, `module_registry.py` (canonical module definitions — all module lists derive from
-  it), `platform.py` (origin helpers), `limits.py` (fair-use quotas), `lifecycle.py` (archive/purge barrel
+  CORS, module guards, `module_registry.py` (canonical module registry — all module lists derive from
+  it; the `ModuleDefinition` tuple itself lives in `module_registry_catalog.py`, the import-time checks in
+  `module_registry_validation.py`, so add a module to the catalogue), `platform.py` (origin helpers), `limits.py` (fair-use quotas), `lifecycle.py` (archive/purge barrel
   over `lifecycle_archive.py`, `lifecycle_purge.py` and `lifecycle_storage.py`),
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
 - `backend/apps/organizations/` — `Organization` (platform entity, creatable before any makerspace, NOT a
@@ -97,7 +98,10 @@
   `scripts/init-cloud-environment.py` renderer invokes Compose.
 - `backend/apps/data_export/` — Space-Manager data export (Phase 4). Per-fidelity (`REDACTED`/`PORTABLE`)
   disposition registry over models, fields, datasets, traversals and the global-user reference closure, with
-  **drift guards that refuse an unclassified model or field**. Its `guards._equal(subject, declared,
+  **drift guards that refuse an unclassified model or field**. `classification.py` and `references.py`
+  are thin barrels: the exported field lists live in `classification_domain.py`, the global/omitted
+  model reasons in `classification_platform.py`, and the declared `accounts.User` edges in
+  `references_core.py` — classify a new model there. Its `guards._equal(subject, declared,
   actual)` is called with the *scanned* set passed as `declared`, so `extra=` in a failure means **scanned
   but not registered** — read the signature before deciding which side to fix.
 - `backend/apps/tenant_migration/` — per-makerspace migration, managed → self-host (Phase 5B), in
@@ -105,7 +109,8 @@
   `task_gate.py` (the write-drain lock protocol and its AST coverage guards in `source_gate_guards.py`);
   `archive_envelope.py` + `object_export.py` (streamed into `age`); `admission.py` (the source-superadmin
   closure approval); `materialization.py` + `raw_repository.py` + `row_planning.py`/`row_dispositions.py`
-  (one-shot insertion); `target_projection.py` + `unique_values.py` + `closure_references.py`;
+  (one-shot insertion); `target_projection.py` + `unique_values.py` (barrel: the rules dict is
+  `unique_values_core.py`, the disposition/policy types `unique_values_policy.py`) + `closure_references.py`;
   `tenant_dump_model_catalog.py` + `tenant_dump_field_snapshot.py` +
   `tenant_dump_authority.py`/`tenant_dump_catalog.py` (Lane D's deny-by-default source catalog), and
   `tenant_dump_source_projection.py` (single-makerspace raw rows plus decision-22 grant closure);
