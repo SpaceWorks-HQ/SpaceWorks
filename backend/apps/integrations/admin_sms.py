@@ -4,6 +4,7 @@ from unfold.admin import ModelAdmin
 
 from apps.integrations.models_sms import DailyOtpSmsCounter, PlatformSmsSettings
 from config.admin_access import SuperuserOnlyModelAdmin
+from config.admin_audit import AuditedControlChangeMixin
 
 
 class PlatformSmsSettingsForm(forms.ModelForm):
@@ -47,7 +48,8 @@ class PlatformSmsSettingsForm(forms.ModelForm):
 
 
 @admin.register(PlatformSmsSettings)
-class PlatformSmsSettingsAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+class PlatformSmsSettingsAdmin(AuditedControlChangeMixin, SuperuserOnlyModelAdmin, ModelAdmin):
+    audit_action = "platform.sms_settings_updated"
     form = PlatformSmsSettingsForm
     fieldsets = (
         (

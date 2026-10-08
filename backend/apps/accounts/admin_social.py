@@ -9,17 +9,10 @@ from apps.accounts.login_methods import (
 from apps.accounts.models_login_methods import PlatformLoginMethods
 from apps.accounts.models_oidc import OidcProvider
 from apps.accounts.models_oidc_browser import OidcBrowserAttempt
-from apps.accounts.models_social import (
-    PlatformSocialAuthSettings,
-    SocialIdentity,
-    SocialProvider,
-)
-from apps.accounts.social_lockout import (
-    GOOGLE_FIELDS,
-    provider_configured,
-    users_locked_out_by_disabling,
-)
+from apps.accounts.models_social import PlatformSocialAuthSettings, SocialIdentity
+from apps.accounts.social_lockout import GOOGLE_FIELDS, disabling_lockout_message
 from config.admin_access import SuperuserOnlyModelAdmin
+from config.admin_audit import AuditedControlChangeMixin
 
 
 class PlatformSocialAuthSettingsForm(forms.ModelForm):
@@ -46,19 +39,9 @@ class PlatformSocialAuthSettingsForm(forms.ModelForm):
                 for field in (*GOOGLE_FIELDS, "apple_service_id", "apple_native_app_ids")
             }
         )
-        for provider in (SocialProvider.GOOGLE, SocialProvider.APPLE):
-            if not provider_configured(stored, provider):
-                continue
-            if provider_configured(incoming, provider):
-                continue
-            stranded = users_locked_out_by_disabling(provider)
-            if stranded:
-                raise forms.ValidationError(
-                    f"Disabling {provider.label} would lock out {len(stranded)} "
-                    f"account(s) whose only credential is {provider.label} — they have "
-                    "no usable password, so a password reset cannot recover them. Set a "
-                    "password for those accounts (or link another provider) first."
-                )
+        message = disabling_lockout_message(stored, incoming)
+        if message:
+            raise forms.ValidationError(message)
         return cleaned
 
     def save(self, commit=True):
@@ -74,7 +57,8 @@ class PlatformSocialAuthSettingsForm(forms.ModelForm):
 
 
 @admin.register(PlatformSocialAuthSettings)
-class PlatformSocialAuthSettingsAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+class PlatformSocialAuthSettingsAdmin(AuditedControlChangeMixin, SuperuserOnlyModelAdmin, ModelAdmin):
+    audit_action = "platform.social_auth_settings_updated"
     form = PlatformSocialAuthSettingsForm
 
     def has_add_permission(self, request):
@@ -126,7 +110,8 @@ class PlatformLoginMethodsForm(forms.ModelForm):
 
 
 @admin.register(PlatformLoginMethods)
-class PlatformLoginMethodsAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+class PlatformLoginMethodsAdmin(AuditedControlChangeMixin, SuperuserOnlyModelAdmin, ModelAdmin):
+    audit_action = "platform.login_methods_updated"
     """Which ways in this deployment offers. Platform-scoped, never a tenant feature."""
 
     form = PlatformLoginMethodsForm
@@ -164,7 +149,8 @@ class SocialIdentityAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
 
 
 @admin.register(OidcProvider)
-class OidcProviderAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
+class OidcProviderAdmin(AuditedControlChangeMixin, SuperuserOnlyModelAdmin, ModelAdmin):
+    audit_action = "platform.oidc_provider_saved"
     """Deployment-configured OpenID Connect providers.
 
     Superadmin-only and platform-scoped, like the built-in providers and for the same

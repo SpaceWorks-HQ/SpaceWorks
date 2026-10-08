@@ -2,11 +2,13 @@ from django.contrib import admin
 
 from apps.separability.tombstones import app_is_tombstoned
 from config.admin_access import SuperuserOnlyModelAdmin
+from config.admin_audit import AuditedControlChangeMixin
 
 from apps.updates.models import PlatformUpdateSettings
 
 
-class PlatformUpdateSettingsAdmin(SuperuserOnlyModelAdmin, admin.ModelAdmin):
+class PlatformUpdateSettingsAdmin(AuditedControlChangeMixin, SuperuserOnlyModelAdmin, admin.ModelAdmin):
+    audit_action = "platform.update_settings_updated"
     list_display = (
         "automatic_updates_enabled",
         "status",
