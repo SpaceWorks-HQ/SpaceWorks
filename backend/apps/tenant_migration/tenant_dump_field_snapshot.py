@@ -37,6 +37,8 @@ FIRST_PARTY_FIELD_NAMES = {
     'makerspaces.InvitationRequest': frozenset('created_at email handled_at handled_by id makerspace message name phone status'.split()),
     'makerspaces.Station': frozenset('created_at created_by id kind makerspace name updated_at'.split()),
     'makerspaces.StationCredential': frozenset('created_at disabled_at id is_enabled pin_ciphertext pin_digest public_token rotated_at station updated_at version'.split()),
+    'makerspaces.StationOperatorLease': frozenset('actor allowed_actions expires_at id issued_at makerspace revoked_at station station_session_id station_version'.split()),
+    'makerspaces.StationSessionRevocation': frozenset('created_at expires_at session_id station'.split()),
     'makerspaces.MakerspaceArchiveRequest': frozenset('id makerspace reason requested_at requested_by resolution_note resolved_at resolved_by status'.split()),
     'makerspaces.ImportedUserReconciliation': frozenset('created_at id makerspace source_user_id source_username target_user'.split()),
     'makerspaces.PendingImportedMembership': frozenset('accepted_waiver activated_actor_snapshot activated_at adopted_at adopted_membership archived_role_label can_refer can_verify created_at email id makerspace receives_notifications revocation_reason revoked_actor_snapshot revoked_at source_membership_id status unresolved_reason verified_actor_snapshot verified_at waiver_accepted_at waiver_version_accepted witnessed_actor_snapshot witnessed_at witnessed_waiver witnessed_waiver_version'.split()),

@@ -69,6 +69,12 @@ SCHEDULED_TASKS = (
         "apps.makerspaces.tasks_membership.run_membership_renewals_task",
         60,
     ),
+    # Phase 9b: expired kiosk operator leases and session revocations. Daily.
+    (
+        "purge-expired-kiosk-operator-leases",
+        "apps.makerspaces.tasks_station.purge_expired_operator_leases_task",
+        24 * 60,
+    ),
     # Same fixed-hour-versus-interval reasoning as above. Without this entry a beat-less
     # cloud deployment would retain expired export archives -- and the download bearer
     # tokens that reach them -- indefinitely.

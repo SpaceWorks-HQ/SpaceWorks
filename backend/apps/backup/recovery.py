@@ -89,8 +89,10 @@ def enter_quarantine(restore, reason):
     from apps.accounts.models_social import SocialLoginNonce
     from apps.apiclients.models import ApiClient
     from apps.makerspaces.models import Makerspace, generate_publishable_key
+    from apps.makerspaces.models_station_leases import StationOperatorLease
 
     ApiClient.objects.filter(is_active=True).update(is_active=False)
+    StationOperatorLease.objects.filter(revoked_at__isnull=True).update(revoked_at=now)
     DeviceGrant.objects.update(status=DeviceGrant.Status.REVOKED, revoked_at=now)
     DeviceRefreshFamily.objects.filter(revoked_at__isnull=True).update(revoked_at=now)
     DeviceRefreshToken.objects.filter(blacklisted_at__isnull=True).update(blacklisted_at=now)

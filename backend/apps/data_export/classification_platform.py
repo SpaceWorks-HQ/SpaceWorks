@@ -18,6 +18,12 @@ OMITTED_MODELS = {
     "makerspaces.StationCredential": (
         "Live Station authentication authority; a portable tenant must rotate a new PIN."
     ),
+    "makerspaces.StationOperatorLease": (
+        "Transient kiosk operator authority bound to one live Station session."
+    ),
+    "makerspaces.StationSessionRevocation": (
+        "Deny-only transient record of ended kiosk Station sessions."
+    ),
     "events.MemberCalendarFeed": (
         "Deployment-local bearer credential over member registration history; restored tenants must reissue it."
     ),

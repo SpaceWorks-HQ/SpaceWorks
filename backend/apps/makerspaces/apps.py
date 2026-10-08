@@ -10,6 +10,7 @@ class MakerspacesConfig(AppConfig):
         from django.db import transaction
         from django.utils import timezone
 
+        from apps.makerspaces import checks_station  # noqa: F401
         from apps.makerspaces import domain_verification
         from apps.makerspaces.cors import register_signal
         from apps.makerspaces.hosting import invalidate

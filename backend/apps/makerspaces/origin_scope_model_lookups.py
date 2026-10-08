@@ -1,6 +1,9 @@
 """Static model-backed origin scopes, split from request resolution logic."""
 
 BASE_MODEL_LOOKUPS = {
+    'admin-kiosk-station-detail': ('makerspaces.Station', 'makerspace_id'),
+    'admin-kiosk-station-rotate': ('makerspaces.Station', 'makerspace_id'),
+    'admin-kiosk-station-reveal': ('makerspaces.Station', 'makerspace_id'),
     'admin-membership-request-approve': ('makerspaces.MembershipRequest', 'makerspace_id'),
     'admin-membership-request-revoke': ('makerspaces.MembershipRequest', 'makerspace_id'),
     'admin-membership-revoke-m2': ('makerspaces.MakerspaceMembership', 'makerspace_id'),

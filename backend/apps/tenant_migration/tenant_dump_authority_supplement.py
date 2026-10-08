@@ -25,6 +25,19 @@ SUPPLEMENTAL_AUTHORITY_ENTRIES = (
         "Live Station credentials never travel in a portable tenant archive.",
     ),
     *_same(
+        "makerspaces.StationOperatorLease",
+        "id makerspace station actor station_session_id station_version allowed_actions "
+        "issued_at expires_at revoked_at",
+        D.DROP,
+        "Kiosk operator leases are live session authority and never travel.",
+    ),
+    *_same(
+        "makerspaces.StationSessionRevocation",
+        "session_id station expires_at created_at",
+        D.DROP,
+        "Session revocations only deny source-local sessions that cannot travel.",
+    ),
+    *_same(
         "bookings.Booking",
         "public_token",
         D.RESET,

@@ -23,6 +23,7 @@ MAKERSPACE_KWARG_ROUTES = {
     'admin-notification-recipients': 'makerspace_id',
     'admin-notification-rules': 'makerspace_id',
     'admin-machine-service-request-list-create': 'makerspace_id',
+    'admin-kiosk-station-list-create': 'makerspace_id',
 }
 # These routes have no tenant-bearing path segment by design: each is a listing whose
 # queryset is explicitly narrowed by the named makerspace query parameter.

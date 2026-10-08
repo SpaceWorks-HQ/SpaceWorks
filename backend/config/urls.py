@@ -153,6 +153,8 @@ urlpatterns = [
     *separable("events", "api/v1/member/", "apps.events.urls_member"),
     *separable("events", "api/v1/", "apps.events.urls_station"),
     *separable("bookings", "api/v1/admin/", "apps.bookings.urls_admin"),
+    # Phase 9b kiosk Stations: admin lifecycle plus the Station-token session/lease.
+    path("api/v1/", include("apps.makerspaces.station_urls")),
     path("api/v1/admin/", include("apps.boxes.urls")),
     path("api/v1/admin/", include("apps.evidence.urls")),
     path("api/v1/", include("apps.operations.urls")),

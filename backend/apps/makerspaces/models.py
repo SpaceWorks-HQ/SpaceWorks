@@ -97,3 +97,7 @@ from apps.makerspaces.models_stations import (  # noqa: E402,F401
     Station,
     StationCredential,
 )
+from apps.makerspaces.models_station_leases import (  # noqa: E402,F401
+    StationOperatorLease,
+    StationSessionRevocation,
+)

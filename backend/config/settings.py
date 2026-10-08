@@ -620,6 +620,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.makerspaces.tasks_membership.run_membership_renewals_task",
         "schedule": crontab(minute=30),
     },
+    "purge-expired-kiosk-operator-leases": {
+        "task": "apps.makerspaces.tasks_station.purge_expired_operator_leases_task",
+        "schedule": crontab(hour=3, minute=25),
+    },
     "purge-expired-data-exports": {
         "task": "apps.data_export.tasks.purge_expired_exports_task",
         "schedule": crontab(hour=3, minute=45),
@@ -698,6 +702,7 @@ CORS_ALLOW_HEADERS = (
     "x-timestamp",
     "x-refresh-csrf",
     "x-station-csrf",
+    "x-kiosk-operator-lease",
     "x-publishable-key",
 )
 CORS_ALLOW_CREDENTIALS = True
@@ -720,6 +725,19 @@ API_CLIENT_ENC_KEY = env("API_CLIENT_ENC_KEY", default="")
 # is encrypted with API_CLIENT_ENC_KEY only because staff reveal is an explicit product
 # requirement; the slow hash plus this independent pepper remains the verifier.
 EVENT_STATION_PIN_PEPPER = env("EVENT_STATION_PIN_PEPPER", default="")
+# Phase 9b kiosk Stations. The session is the shared channel; the operator lease
+# attributes work to a signed-in User and may never outlive the session (checked in
+# apps.makerspaces.checks_station). Kiosk PINs reuse EVENT_STATION_PIN_PEPPER under a
+# distinct namespace rather than adding a second deployment secret.
+KIOSK_STATION_SESSION_TTL_SECONDS = env.int(
+    "KIOSK_STATION_SESSION_TTL_SECONDS", default=12 * 60 * 60
+)
+KIOSK_OPERATOR_LEASE_TTL_SECONDS = env.int(
+    "KIOSK_OPERATOR_LEASE_TTL_SECONDS", default=8 * 60 * 60
+)
+KIOSK_OPERATOR_LEASE_RETENTION_SECONDS = env.int(
+    "KIOSK_OPERATOR_LEASE_RETENTION_SECONDS", default=7 * 24 * 60 * 60
+)
 EVENT_CHECKIN_WINDOW_BEFORE_HOURS = env.int(
     "EVENT_CHECKIN_WINDOW_BEFORE_HOURS", default=24
 )
@@ -897,6 +915,20 @@ REST_FRAMEWORK = {
         "event_station_reveal": env(
             "THROTTLE_EVENT_STATION_REVEAL", default="5/hour"
         ),
+        "kiosk_station_pin_token": env(
+            "THROTTLE_KIOSK_STATION_PIN_TOKEN", default="10/hour"
+        ),
+        "kiosk_station_pin_ip": env(
+            "THROTTLE_KIOSK_STATION_PIN_IP", default="30/hour"
+        ),
+        "kiosk_station_session": env(
+            "THROTTLE_KIOSK_STATION_SESSION", default="120/hour"
+        ),
+        "kiosk_operator_lease": env(
+            "THROTTLE_KIOSK_OPERATOR_LEASE", default="30/hour"
+        ),
+        # Fixed, not env-tunable: the plan pins reveal at exactly 5/hour.
+        "kiosk_station_reveal": "5/hour",
         "event_calendar_feed_token": env(
             "THROTTLE_EVENT_CALENDAR_FEED_TOKEN", default="120/hour"
         ),

@@ -187,6 +187,9 @@ TASK_INTERNAL_PARTICIPANTS = {
     "apps.makerspaces.tasks_membership.run_membership_renewals_task": (
         "Each term expiry and renewal charge uses the skip-and-count tenant boundary."
     ),
+    "apps.makerspaces.tasks_station.purge_expired_operator_leases_task": (
+        "Each tenant's expired kiosk leases use the skip-and-count tenant boundary."
+    ),
     "apps.apiclients.tasks.flush_api_client_usage_task": (
         "Writes only deployment-local last-seen telemetry on ApiClient rows; it moves no "
         "tenant data and so needs no per-tenant gate."
@@ -209,6 +212,9 @@ FANOUT_GATE_PARTICIPANTS = {
         "Membership term expiry and renewal charges."
     ),
     "apps.operations.report_schedule_services.run_report_schedules": "Due scheduled report deliveries.",
+    "apps.makerspaces.station_lease_cleanup.purge_expired_operator_leases": (
+        "Expired kiosk operator lease cleanup."
+    ),
 }
 
 
