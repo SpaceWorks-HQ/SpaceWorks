@@ -85,6 +85,25 @@ def domain_change_cooldown_active(makerspace, normalized_domain) -> bool:
     )
 
 
+def apply_domain_change(makerspace, frontend_domain) -> None:
+    """The one status transition for a changed ``frontend_domain`` (unsaved).
+
+    VERIFIED is the trust gate for CORS, staff origins, Host validation and on-demand
+    TLS, so a new host must never inherit the old host's VERIFIED. Self-host trusts a
+    superadmin-set domain at once; managed hosting sends it back to PENDING until the TXT
+    challenge passes. Every writer -- the staff serializer and the /control/ form --
+    calls this rather than restating it; the caller owns the authority check.
+    """
+    now = timezone.now()
+    makerspace.frontend_domain_changed_at = now
+    if is_self_host() and frontend_domain:
+        makerspace.frontend_domain_status = Makerspace.DomainStatus.VERIFIED
+        makerspace.domain_verified_at = now
+    else:
+        makerspace.frontend_domain_status = Makerspace.DomainStatus.PENDING
+        makerspace.domain_verified_at = None
+
+
 def _is_platform_managed(domain) -> bool:
     suffix = str(settings.PLATFORM_DOMAIN_SUFFIX or "").strip().lower()
     canonical = canonical_host(domain or "")

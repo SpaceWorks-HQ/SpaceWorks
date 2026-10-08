@@ -19,6 +19,7 @@ from apps.admin_api.views_makerspace_images import (
     MakerspaceLogoImageView,
 )
 from apps.audit import services as audit
+from apps.makerspaces.domain_audit import record_domain_change
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.origin_scope import origin_scoped_makerspace_id
 from apps.makerspaces.servability import servable_queryset
@@ -169,6 +170,7 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
             requested = set(serializer.validated_data)
             before = settings_audit.snapshot(serializer.instance, requested)
             previous_features = list(serializer.instance.enabled_features)
+            previous_domain = serializer.instance.frontend_domain
             previous_geofence = {
                 "enabled": serializer.instance.geofence_enabled,
                 "configured": serializer.instance.geofence_effective,
@@ -186,6 +188,8 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
                     "fields": settings_audit.changed_fields(before, instance, requested)
                 },
             )
+            if previous_domain != instance.frontend_domain:
+                record_domain_change(self.request.user, instance, previous_domain)
             if previous_features != instance.enabled_features:
                 audit.record(
                     self.request.user,

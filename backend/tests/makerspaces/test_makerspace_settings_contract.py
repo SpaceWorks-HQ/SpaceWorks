@@ -183,3 +183,30 @@ def test_return_policy_hides_another_makerspace():
     foreign_manager = make_member("contract-return-foreign", other)
 
     assert authenticated_client(foreign_manager).get(return_policy(lab)).status_code == 404
+
+
+# --- a domain change through the staff API has its own audit entry ---------------------
+
+
+def test_staff_domain_change_records_before_after_and_the_new_status(settings):
+    settings.PLATFORM_DOMAIN_SUFFIX = ".space-works.tech"
+    lab = space(
+        "contract-domain",
+        frontend_domain="before.example.org",
+        frontend_domain_status=Makerspace.DomainStatus.VERIFIED,
+    )
+    manager = make_member("contract-domain-manager", lab)
+
+    # Managed hosting validates Host; `localhost` is an INFRA_HOSTS default.
+    response = authenticated_client(manager).patch(
+        detail(lab), {"frontend_domain": "after.example.org"}, format="json",
+        HTTP_HOST="localhost",
+    )
+
+    assert response.status_code == 200, response.data
+    entry = AuditLog.objects.get(action="makerspace.domain_changed", makerspace=lab)
+    assert entry.meta == {
+        "before": "before.example.org",
+        "after": "after.example.org",
+        "status": Makerspace.DomainStatus.PENDING,
+    }

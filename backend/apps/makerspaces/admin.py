@@ -10,7 +10,13 @@ from apps.makerspaces.admin_imports import (  # noqa: F401
     ImportedUserReconciliationAdmin,
     PendingImportedMembershipAdmin,
 )
-from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from apps.makerspaces.domain_audit import record_control_save, record_domain_change
+from apps.makerspaces.domain_verification import apply_domain_change
+from apps.makerspaces.models import (
+    Makerspace,
+    MakerspaceMembership,
+    normalize_frontend_domain,
+)
 from config.admin_access import SuperuserOnlyModelAdmin
 
 
@@ -118,11 +124,26 @@ class MakerspaceAdmin(
         custody state, which makes readiness UNDERCOUNT below-floor spaces and the API
         return null until some later recipient mutation happens to create it.
         """
+        previous_domain = None
+        domain_changed = False
+        if change and "frontend_domain" in form.changed_data:
+            previous_domain = (
+                type(obj).objects.only("frontend_domain").get(pk=obj.pk).frontend_domain
+            )
+            new_domain = normalize_frontend_domain(obj.frontend_domain)
+            domain_changed = new_domain != previous_domain
+            if domain_changed:
+                # A superadmin edit is still a domain change: the new host must not
+                # inherit the old host's VERIFIED trust on managed hosting.
+                apply_domain_change(obj, new_domain)
         super().save_model(request, obj, form, change)
         if not change:
             from apps.backup.custody import initialize_custody_state
 
             initialize_custody_state(obj.pk)
+        record_control_save(request.user, obj, form.changed_data, created=not change)
+        if domain_changed:
+            record_domain_change(request.user, obj, previous_domain)
 
     def has_change_permission(self, request, obj=None):
         if obj is not None and not obj.superadmin_access_enabled:
