@@ -15438,6 +15438,12 @@
                     "400": {
                         "description": "Invalid image upload request."
                     },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
+                    },
                     "503": {
                         "description": "Public image storage is unavailable."
                     }
@@ -15498,6 +15504,12 @@
                     "400": {
                         "description": "Invalid image object key or size."
                     },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
+                    },
                     "503": {
                         "description": "Public image storage is unavailable."
                     }
@@ -15534,6 +15546,12 @@
                             }
                         },
                         "description": ""
+                    },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
                     }
                 }
             }
@@ -17383,6 +17401,12 @@
                     "400": {
                         "description": "Invalid image upload request."
                     },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
+                    },
                     "503": {
                         "description": "Public image storage is unavailable."
                     }
@@ -17443,6 +17467,12 @@
                     "400": {
                         "description": "Invalid image object key or size."
                     },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
+                    },
                     "503": {
                         "description": "Public image storage is unavailable."
                     }
@@ -17479,6 +17509,12 @@
                             }
                         },
                         "description": ""
+                    },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
                     }
                 }
             }
