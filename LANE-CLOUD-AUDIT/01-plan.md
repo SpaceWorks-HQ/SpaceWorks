@@ -173,3 +173,27 @@ Everything in audit §18. In addition:
 - The OIDC unlink route.
 - Push false-SENT labelling.
 - `platform_email_configured` treating an unreadable password as configured.
+
+## Outcome (2026-10-09, end of lane)
+
+G1–G10 are built, each with its own tests (see `LANE-PROGRESS.md` for commits and runs).
+
+After the plan, these were also built:
+
+- **Twilio, FCM, JWKS and DNS failure matrices.** Two JWKS 500s were fixed along the way: an
+  array body, and a mid-body read failure.
+- **`platform_email_configured`** now treats an unreadable password as unconfigured.
+- **OIDC unlink** works.
+- **Archived-domain TLS/host tests** were added.
+- **Probe 503 tests** were added.
+- **A read-only `PeriodicTaskRun` page** was added to `/control/`.
+- **Connect webhook signature tests** were added.
+
+Still not built:
+
+- **Push false-SENT labelling.** Changing it alters delivery counts, so it needs an owner
+  decision.
+- **APNs provider tests.** The sender uses an httpx HTTP/2 client and was not reached.
+- **A behavioural test for `update.sh`.**
+- **CI for the tombstone suite.**
+- **Everything in audit §18.**
