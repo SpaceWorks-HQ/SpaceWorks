@@ -56,22 +56,16 @@ def create_final_from_staging(staging_key, final_key):
     """Stream staging into a destination protected by `If-None-Match: *`."""
     from apps.backup import storage
 
-    from apps.backup.offsite_client import primary_streaming_client
-
     source = None
     try:
-        # A StreamingBody is not seekable. botocore >= 1.36 computes flexible request
-        # checksums by seeking the body, which raised io.UnsupportedOperation here --
-        # outside the caught exception types -- so promotion of every real deployment
-        # archive failed. Checksums only when required, and an explicit length.
-        s3 = primary_streaming_client()
-        response = s3.get_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=staging_key)
-        source = response["Body"]
+        s3 = storage.client()
+        source = s3.get_object(
+            Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=staging_key
+        )["Body"]
         s3.put_object(
             Bucket=settings.AWS_STORAGE_BUCKET_NAME,
             Key=final_key,
             Body=source,
-            ContentLength=response["ContentLength"],
             ContentType="application/octet-stream",
             IfNoneMatch="*",
         )
@@ -87,7 +81,7 @@ def create_final_from_staging(staging_key, final_key):
         raise storage.BackupStorageError(
             "The backup staging object could not be promoted."
         ) from exc
-    except (BotoCoreError, OSError, KeyError) as exc:
+    except BotoCoreError as exc:
         raise storage.BackupStorageError(
             "The backup staging object could not be promoted."
         ) from exc

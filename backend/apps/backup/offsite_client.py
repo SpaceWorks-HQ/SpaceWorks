@@ -67,20 +67,6 @@ def client_for(
     )
 
 
-def primary_streaming_client():
-    """The primary bucket's credentials with the streaming-safe client settings."""
-    from django.conf import settings
-
-    return client_for(
-        endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-        region=settings.AWS_S3_REGION_NAME,
-        addressing_style=settings.AWS_S3_ADDRESSING_STYLE,
-        access_key_id=settings.AWS_ACCESS_KEY_ID,
-        secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        signature_version=settings.AWS_S3_SIGNATURE_VERSION or "s3v4",
-    )
-
-
 def remote_locator(destination, archive_id, scope):
     prefix = destination.prefix.strip("/")
     name = f"spaceworks-backups/{scope}/{archive_id}.tar.age"
