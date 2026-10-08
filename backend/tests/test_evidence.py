@@ -127,6 +127,7 @@ def test_admin_member_can_request_upload_url(monkeypatch):
     assert response.data["upload_url"] == "http://minio/evidence"
     assert response.data["fields"] == {"key": "k", "Content-Type": "image/png"}
     photo = EvidencePhoto.objects.get()
+    assert photo.consumption_state == EvidencePhoto.ConsumptionState.UNCONSUMED
     assert photo.makerspace == makerspace
     assert photo.object_key == response.data["object_key"]
     assert photo.content_type == "image/png"

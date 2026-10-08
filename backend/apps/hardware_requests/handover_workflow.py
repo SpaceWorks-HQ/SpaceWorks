@@ -7,6 +7,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.boxes.models import Box, BoxScan
 from apps.evidence import storage
+from apps.evidence.consumption import mark_consumed
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.evidence.models import EvidencePhoto
 from apps.hardware_requests import loan_payments, notifications
@@ -130,6 +131,7 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
         # request/evidence row locks never span S3 I/O. Quota remains charged at the
         # consuming workflow boundary and only for PUT-backed managed storage.
         charge_storage_once(evidence, finalized.size)
+        mark_consumed(evidence)
         if not locked.assigned_box_id or not BoxScan.objects.filter(
             request=locked,
             box_id=locked.assigned_box_id,

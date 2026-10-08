@@ -61,6 +61,9 @@ EXPECTED_TARGET_VALUES = {
     ("makerspaces.MembershipRequest", "auto_activate_on_claim"): False,
     ("machines.MachineType", "managing_action"): "",
     ("integrations.NotificationDestination", "is_active"): False,
+    ("evidence.EvidenceRetentionPolicy", "abandoned_upload_cleanup_enabled"): False,
+    ("evidence.EvidenceRetentionPolicy", "abandoned_upload_retention_days"): None,
+    ("evidence.EvidencePhoto", "consumption_state"): "legacy_unknown",
 }
 
 

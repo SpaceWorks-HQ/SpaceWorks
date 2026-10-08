@@ -58,6 +58,9 @@ def object_closure():
     """Compatibility closure for non-compound makerspace archives."""
     result = {"private": {}, "public_image": {}}
     for model in apps.get_models():
+        # Receipt keys are deletion locators for objects that must NOT exist.
+        if model._meta.label == "evidence.EvidenceAbandonedUploadReceipt":
+            continue
         collect_model_objects(model._default_manager.all(), model, result)
     return result
 
@@ -114,7 +117,7 @@ def _collect_evidence_objects(queryset, result, fixed_makerspace_id):
     )
     for row in rows:
         status = row["object_retention_state__status"]
-        if status == "expiring":
+        if status in {"expiring", "cleaning"}:
             raise storage.BackupStorageError(
                 "Evidence expiry is in progress; retry the archive after it completes."
             )

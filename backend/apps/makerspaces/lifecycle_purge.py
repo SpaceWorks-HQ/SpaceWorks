@@ -66,7 +66,8 @@ def _delete_object_graph(makerspace):
         AuditSigningKeyRotationEvent,
     )
     from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
-    from apps.evidence.models import EvidencePhoto, EvidenceRetentionPolicy
+    from apps.evidence.models import EvidenceObjectRetentionState, EvidencePhoto
+    from apps.evidence.models import EvidenceRetentionPolicy, EvidenceUploadFinalization
     from apps.events.models import (
         Event,
         EventAttendanceCertificate,
@@ -139,6 +140,10 @@ def _delete_object_graph(makerspace):
         RequesterAccountability.objects.filter(makerspace=makerspace).delete()
         ReturnEvent.objects.filter(makerspace=makerspace).delete()
         HardwareRequest.objects.filter(makerspace=makerspace).delete()
+        # Both photo sidecars are PROTECT: delete them explicitly first. FK-free
+        # abandoned-upload receipts are deliberately left to keep reconciling.
+        EvidenceUploadFinalization.objects.filter(evidence__makerspace=makerspace).delete()
+        EvidenceObjectRetentionState.objects.filter(evidence__makerspace=makerspace).delete()
         EvidencePhoto.objects.filter(makerspace=makerspace).delete()
         EvidenceRetentionPolicy.objects.filter(makerspace=makerspace).delete()
         QrCode.objects.filter(makerspace=makerspace).delete()

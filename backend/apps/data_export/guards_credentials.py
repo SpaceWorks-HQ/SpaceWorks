@@ -11,6 +11,9 @@ CREDENTIAL_NAME = re.compile(
 )
 REVIEWED_NON_CREDENTIAL = {
     ("makerspaces.MembershipRequest", "state"): "Durable request workflow state.",
+    ("evidence.EvidencePhoto", "consumption_state"): (
+        "Workflow-consumption provenance; target import resets it to legacy_unknown."
+    ),
     (
         "tenant_migration.ExternalTenantReference",
         "source_archive_digest",

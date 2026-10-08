@@ -210,6 +210,13 @@ EXPECTED = dict(
             D.PRESERVE,
         ),
         *_fields("audit.AuditLog", "event_uuid row_mac", D.RESET),
+        # Phase 11: source cleanup policy and consumption proof never travel live.
+        *_fields(
+            "evidence.EvidenceRetentionPolicy",
+            "abandoned_upload_cleanup_enabled abandoned_upload_retention_days",
+            D.RESET,
+        ),
+        *_fields("evidence.EvidencePhoto", "consumption_state", D.RESET),
     ]
 )
 

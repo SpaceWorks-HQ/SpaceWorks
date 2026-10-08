@@ -8,6 +8,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.boxes.models import Box, QrCode, QrScanEvent
 from apps.evidence.models import EvidencePhoto
+from apps.evidence.consumption import mark_consumed
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.hardware_requests.models import (
     HardwareRequest,
@@ -67,6 +68,7 @@ def checkout_tool(makerspace, requester, payload, *, evidence_id, remark=""):
         due_at = timezone.now() + timedelta(days=(makerspace.default_loan_days or 7))
         _lock_unused_evidence(evidence, issue=True)
         charge_storage_once(evidence, finalized.size)
+        mark_consumed(evidence)
         qr = _locked_qr(makerspace, payload)
         if qr_has_active_loan(makerspace, qr):
             raise InvalidTransition("This QR code is already checked out.")
@@ -143,6 +145,7 @@ def return_tool(
             raise RequestValidationError("Makerspace is not available.")
         _lock_unused_evidence(evidence, issue=False)
         charge_storage_once(evidence, finalized.size)
+        mark_consumed(evidence)
         qr = _locked_qr(makerspace, payload)
         loan = (
             PublicToolLoan.objects.select_for_update()
