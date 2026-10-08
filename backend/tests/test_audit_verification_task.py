@@ -199,3 +199,29 @@ def test_a_stripped_mac_on_a_sealed_row_is_invalid():
     result = local_phase(makerspace.pk, rows)
     assert result.counts["mac_invalid_count"] == 1
     assert result.first_audit_log_id == rows[0].pk
+
+
+
+def test_each_attempt_gets_a_fresh_budget_capped_per_attempt(monkeypatch, settings):
+    """3 attempts x 2,760 counted reads = at most 8,280 per run, never more per attempt."""
+    from apps.audit import verification_execution as execution
+
+    budgets = []
+    real = execution.AnchorReadBudget
+
+    def tracking(limit):
+        budget = real(limit)
+        budgets.append(budget)
+        return budget
+
+    monkeypatch.setattr(execution, "AnchorReadBudget", tracking)
+    makerspace = space("vtask-fresh-budget")
+    _use_sink(monkeypatch, settings, FailingSink(AnchorTransportError("down"), _sealed(makerspace)))
+    run = _run(makerspace)
+    for _ in range(2):
+        with pytest.raises(RetryAttempt):
+            execute_attempt(run.pk)
+    execute_attempt(run.pk)
+    assert len(budgets) == 3 and len({id(budget) for budget in budgets}) == 3
+    assert all(budget.limit == runs.MAX_ANCHOR_READS == 2_760 for budget in budgets)
+    assert sum(budget.limit for budget in budgets) == 8_280

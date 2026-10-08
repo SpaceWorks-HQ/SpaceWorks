@@ -801,3 +801,24 @@ def test_archived_makerspace_rejects_staff_creation(settings):
         format="json",
     )
     assert create_resp.status_code == 400
+
+
+@pytest.mark.django_db(transaction=True)
+def test_purge_removes_audit_verification_runs_events_first(monkeypatch):
+    from apps.audit.models import AuditVerificationRun, AuditVerificationRunEvent
+
+    actor = make_superadmin("lifecycle-vrun-super")
+    doomed = make_space("lifecycle-vrun-doomed")
+    survivor = make_space("lifecycle-vrun-survivor")
+    monkeypatch.setattr(lifecycle, "_delete_storage_keys", lambda keys: None)
+    for space in (doomed, survivor):
+        run = AuditVerificationRun.objects.create(
+            makerspace=space, requested_by=actor, snapshot_max_id=1, filter_fingerprint="f" * 64,
+        )
+        AuditVerificationRunEvent.objects.create(run=run, state="QUEUED", attempt=0)
+
+    lifecycle.purge(archive_space(doomed, actor), actor)
+
+    assert not AuditVerificationRun.objects.filter(makerspace_id=doomed.id).exists()
+    assert not AuditVerificationRunEvent.objects.filter(run__makerspace_id=doomed.id).exists()
+    assert AuditVerificationRunEvent.objects.filter(run__makerspace=survivor).count() == 1

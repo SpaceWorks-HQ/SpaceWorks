@@ -167,3 +167,20 @@ def test_post_is_throttled(settings):
         from rest_framework.settings import api_settings
 
         ScopedRateThrottle.THROTTLE_RATES = api_settings.DEFAULT_THROTTLE_RATES
+
+
+
+def test_expanded_leaf_bound_refuses_one_row_inside_a_huge_batch(monkeypatch, settings):
+    from tests.audit_batch_helpers import MemoryAnchorSink, activate_and_seal
+
+    settings.AUDIT_ATTESTATION_DEPLOYMENT_ID = "test-deployment-p10-api"
+    makerspace = space("vapi-leaves")
+    client = client_for(member_with(makerspace, "vapi-lv", MakerspaceMembership.Role.SPACE_MANAGER))
+    for _ in range(3):
+        audit.record(None, "audit.page", makerspace=makerspace, target=makerspace)
+    activate_and_seal(makerspace.pk, MemoryAnchorSink())
+    monkeypatch.setattr(runs, "MAX_EXPANDED_LEAVES", 1)
+    # A narrow selection, but its whole batch membership is what verification must load.
+    response = _post(client, makerspace, {"action": "audit.page"})
+    assert response.status_code == 400
+    assert response.data["code"] == "audit_verification_scope_too_large"
