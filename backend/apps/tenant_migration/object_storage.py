@@ -107,12 +107,26 @@ def object_exists(bucket_kind, object_key):
         ) from exc
 
 
+def _receipt_reserved(bucket_kind, key):
+    """A cleaned upload's receipt owns its private key forever, even while absent."""
+    if bucket_kind != "private":
+        return False
+    from apps.evidence.models import EvidenceAbandonedUploadReceipt
+
+    return EvidenceAbandonedUploadReceipt.objects.filter(object_key=key).exists()
+
+
+def _occupied(bucket_kind, key):
+    return _receipt_reserved(bucket_kind, key) or object_exists(bucket_kind, key)
+
+
 def choose_target_key(bucket_kind, source_key, job_id):
-    if not object_exists(bucket_kind, source_key):
+    # The evidence INSERT triggers' shared advisory lock is the concurrent backstop.
+    if not _occupied(bucket_kind, source_key):
         return source_key, False
     for _attempt in range(16):
         candidate = f"migrated-objects/{job_id}/{uuid.uuid4().hex}"
-        if not object_exists(bucket_kind, candidate):
+        if not _occupied(bucket_kind, candidate):
             return candidate, True
     raise TenantObjectStorageError("Could not allocate a collision-safe target key.")
 

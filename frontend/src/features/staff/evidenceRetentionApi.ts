@@ -8,6 +8,11 @@ export type EvidenceRetentionPolicy = {
   override_days: number | null;
   effective_days: number;
   object_expiry_enabled: boolean;
+  abandoned_upload_cleanup_enabled: boolean;
+  abandoned_upload_platform_default_days: number;
+  abandoned_upload_override_days: number | null;
+  abandoned_upload_effective_days: number;
+  abandoned_upload_global_enabled: boolean;
 };
 
 export type EvidenceRetentionPreview = {
@@ -17,7 +22,19 @@ export type EvidenceRetentionPreview = {
   object_candidates: number;
   candidate_bytes: number;
   has_more: boolean;
+  abandoned_upload_cutoff: string | null;
+  abandoned_upload_candidates: number;
+  abandoned_upload_candidate_bytes: number;
+  abandoned_upload_has_more: boolean;
+  late_write_receipts: number;
+  late_write_receipts_due: number;
 };
+
+export type EvidenceRetentionPatch = Partial<{
+  object_retention_days: number | null;
+  abandoned_upload_cleanup_enabled: boolean;
+  abandoned_upload_retention_days: number | null;
+}>;
 
 const pathFor = (makerspaceId: number) =>
   `/admin/makerspaces/${makerspaceId}/evidence-retention`;
@@ -53,10 +70,11 @@ export function useEvidenceRetentionPreview(
 export function useUpdateEvidenceRetention(makerspaceId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (objectRetentionDays: number | null) =>
+    // A true partial PATCH: send only the keys being changed.
+    mutationFn: (changes: EvidenceRetentionPatch) =>
       staffRequest<EvidenceRetentionPolicy>(pathFor(makerspaceId), {
         method: "PATCH",
-        body: JSON.stringify({ object_retention_days: objectRetentionDays }),
+        body: JSON.stringify(changes),
       }),
     onSuccess: async () => {
       await Promise.all([

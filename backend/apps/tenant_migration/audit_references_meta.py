@@ -55,6 +55,10 @@ AUDIT_META_REFERENCES = {
         ("problem_report.triaged", "evidence_id"),
         ("request.issued", "evidence_id"),
     ),
+    # The cleanup audit names a photo that no longer exists: inert source provenance.
+    **_reference(
+        S, "evidence.EvidencePhoto", ("evidence.abandoned_upload_deleted", "evidence_id"),
+    ),
     **_reference(R, "hardware_requests.ReturnEvent", ("evidence.attached", "return_event_id")),
     **_reference(
         R,

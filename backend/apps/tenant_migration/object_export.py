@@ -51,6 +51,10 @@ def capture_tenant_objects(root, makerspace, storage_modes):
                 raise SourceMigrationObjectError(
                     source_key, "is currently being expired; retry after the sweep"
                 )
+            if retention and retention["status"] == EvidenceObjectRetentionState.Status.CLEANING:
+                raise SourceMigrationObjectError(
+                    source_key, "is being cleaned as an abandoned upload; retry after the sweep"
+                )
             if retention and retention["status"] == EvidenceObjectRetentionState.Status.EXPIRED:
                 try:
                     storage.assert_object_absent(bucket, source_key)

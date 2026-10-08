@@ -17,6 +17,7 @@ from apps.accounts.models import User
 from apps.audit import services as audit
 from apps.evidence.models import EvidenceObjectRetentionState, EvidencePhoto
 from apps.evidence.serializers import (
+    EvidenceCleaningResponseSerializer,
     EvidenceGetResponseSerializer,
     EvidenceExpiredResponseSerializer,
     EvidenceUrlRequestSerializer,
@@ -89,6 +90,7 @@ class EvidenceUploadUrlView(StaffAPIView):
                 content_type=content_type,
                 size_bytes=size_bytes,
                 uploaded_by=request.user,
+                consumption_state=EvidencePhoto.ConsumptionState.UNCONSUMED,
             )
             audit.record(
                 request.user,
@@ -135,7 +137,13 @@ class EvidenceDetailView(generics.RetrieveAPIView):
         responses={
             200: EvidenceGetResponseSerializer,
             404: OpenApiResponse(description="Evidence was not found."),
-            409: OpenApiResponse(description="Evidence object has not been uploaded."),
+            409: OpenApiResponse(
+                EvidenceCleaningResponseSerializer,
+                description=(
+                    "Evidence object has not been uploaded, or an abandoned upload "
+                    "is being cleaned (code evidence_cleanup_in_progress)."
+                ),
+            ),
             410: EvidenceExpiredResponseSerializer,
             503: OpenApiResponse(description="Evidence storage is unavailable."),
         },
@@ -146,8 +154,25 @@ class EvidenceDetailView(generics.RetrieveAPIView):
 
         retention_state = EvidenceObjectRetentionState.objects.filter(
             evidence=photo,
-            status=EvidenceObjectRetentionState.Status.EXPIRED,
+            status__in=(
+                EvidenceObjectRetentionState.Status.EXPIRED,
+                EvidenceObjectRetentionState.Status.CLEANING,
+            ),
         ).first()
+        if (
+            retention_state is not None
+            and retention_state.status == EvidenceObjectRetentionState.Status.CLEANING
+        ):
+            # Never presign or fall back to staging for an upload being cleaned.
+            return Response(
+                EvidenceCleaningResponseSerializer(
+                    {
+                        "code": "evidence_cleanup_in_progress",
+                        "detail": "This never-used upload is being cleaned up.",
+                    }
+                ).data,
+                status=status.HTTP_409_CONFLICT,
+            )
         if retention_state is not None:
             return Response(
                 EvidenceExpiredResponseSerializer(

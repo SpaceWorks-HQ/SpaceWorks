@@ -91,6 +91,11 @@ def test_manager_can_set_preview_and_clear_object_retention(settings):
         "override_days": 60,
         "effective_days": 60,
         "object_expiry_enabled": False,
+        "abandoned_upload_cleanup_enabled": False,
+        "abandoned_upload_platform_default_days": 7,
+        "abandoned_upload_override_days": None,
+        "abandoned_upload_effective_days": 7,
+        "abandoned_upload_global_enabled": False,
     }
 
     response = client_for(manager).post(
