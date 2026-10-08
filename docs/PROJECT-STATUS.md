@@ -87,6 +87,14 @@ row commits, so queues update without polling; the stream runs on the dedicated 
 falls back to polling (503) on a deployment without Redis. Public routes are lazy chunks and the eleven
 over-ceiling frontend files were split.
 
+**Audit explorer (phase 10).** `/api/v1/admin/audit-logs` keeps its URL, pagination and fields but now
+returns catalogue-projected `meta` (unknown or dynamically built actions expose `{}`) plus `action_label`,
+`actor_display`, `meta_redacted` and `target_link` (always null), with validated `actor`/`start`/`end`
+filters. The request timeline adds `kind=audit` rows and `evidence_retention`. Staff can request an
+asynchronous, throttled, bounded integrity verification of a filtered range
+(`/api/v1/admin/makerspace/<id>/audit-verifications`), reported as orthogonal MAC / batch / chain / anchor
+coverage; the `audit-trail` report is a CSV-only, export-only, unschedulable, tenant-only download.
+
 **Browser and accessibility gates (phase 2).** `frontend/e2e/` (Playwright) drives the loan spine through a
 real browser and object storage — `scripts/dev.sh e2e` locally, the `e2e` job in CI — and axe runs in
 both jsdom panel tests and Chromium. `manage.py seed_e2e` seeds a disposable makerspace per run.

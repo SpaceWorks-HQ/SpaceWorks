@@ -1339,6 +1339,46 @@ immediately** (photo bytes deleted, quota freed, name blanked); reissue rotates 
 resolves as `revoked` forever; reprint never rotates. No rendered PDF is written to storage. The
 `membership` purge revokes the QRs and deletes the cards and photo bytes.
 
+### Audit presentation and staff verification (phase 10)
+
+- **One projector, fail closed.** Staff never see `AuditLog.meta` raw. `apps/audit/presentation.project` is
+  the only path from a row to a reader, shared by `/admin/audit-logs`, the request timeline and the
+  `audit-trail` CSV; it rebuilds only the catalogue's exact LEAF paths (scalars or flat scalar lists) and
+  flags `meta_redacted` whenever anything was withheld. An action absent from the catalogue is labelled
+  "Unrecognized audit action" with `{}`. Do not add a serializer or export helper that returns `row.meta`.
+- **The catalogue is exact against the tree.** `presentation_guards.presentation_catalog_errors()` must be
+  empty: every literal `audit.record` action has one entry; permitted paths are discovered literal leaves;
+  `request_reference_paths` must be declared `HardwareRequest` REMAP references. A new emitter therefore
+  fails the build until its metadata is reviewed — add the entry, never weaken the guard.
+- **Dynamic emitters are denied, line-free.** Actions built at runtime (`a if x else b`, a parameter, an
+  f-string) and literal actions whose `meta` is non-literal always project `{}`, even when another emitter
+  writes the same string literally, because a row cannot say which site wrote it. The policy is held exact
+  by `presentation_discovery` (exact constants, non-literal-meta actions, and reviewed namespace prefixes
+  per wrapper FILE — never line numbers, which every unrelated edit would move).
+- **Verification claims are orthogonal.** MAC (`mac_valid | unattested | invalid | unavailable`), batch
+  membership, scope chain and external anchor are separate counts/statuses over SELECTED ROWS; they overlap
+  and are never summed. "All entries fully verified" requires every dimension, including a configured
+  anchor; anything weaker is "coverage is incomplete". A blank anchor backend is `not_configured`, not a
+  failure.
+- **Anchor failures are classified at the sink.** Sinks raise `AnchorTransportError` (timeout, 408/425/429,
+  5xx, connection/S3 throttling), `AnchorConfigurationError` (settings, 401/403/other 4xx, credentials) or
+  `AnchorInvalidEvidence` / `AnchorConflict` (malformed or disagreeing evidence, scope-head 404) — never a
+  plain `AnchorError`. Only `AnchorTransportError` may produce the internal `anchor_transport` cause, and
+  only that cause (or a database error) may append `RETRYING`. `AnchorReadBudgetExceeded` is deliberately
+  not an `AnchorError`.
+- **Runs are immutable and bounded.** `AuditVerificationRun` + append-only `AuditVerificationRunEvent`,
+  guarded by ORM and Postgres triggers (state order `QUEUED -> RUNNING(n) -> {terminal | RETRYING(n) ->
+  RUNNING(n+1)}`, at most 3 attempts). One active run per makerspace, fingerprint dedupe before snapshot,
+  10,000 selected rows, 50,000 expanded leaves, 2,500 chain batches, 256 rotations and 2,760 counted sink
+  reads per attempt — preflighted at admission and rechecked in the task. Runs are `OmittedModel`s (a target
+  deployment must not inherit a source's verification), purged events-first, and only a superuser sees the
+  closed `failure_code` and diagnostic coordinates.
+- **Report reachability is per definition.** `allowed_formats`, `schedulable`, `previewable` and
+  `deployment_aggregate` on `ReportDefinition` are enforced server-side (preview, export, schedule create/
+  update, the runner's `_skip_reason`, every deployment-wide catalogue/analytics/export view). `audit-trail`
+  is CSV-only, export-only, unschedulable, excluded from organization and deployment aggregation, and its
+  builder refuses `makerspace_id=None`.
+
 ## Handover roles and the retired Guest Admin
 
 **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`); handover staff get a **custom
