@@ -10,15 +10,29 @@ from apps.backup.tenant_exit_custody_alarms import (
 )
 
 
+from apps.backup.tasks_offsite import (  # noqa: E402,F401  (task registration)
+    dispatch_offsite_push,
+    push_offsite_backups_task,
+    rehydrate_backup_archive_task,
+)
+
+
 @shared_task(bind=True, max_retries=0)
 def run_backup_archive_task(self, archive_id):
     archive = run_archive(archive_id)
-    return bool(archive and archive.status == BackupArchive.Status.AVAILABLE)
+    available = bool(archive and archive.status == BackupArchive.Status.AVAILABLE)
+    if available and archive.scope == BackupArchive.Scope.DEPLOYMENT:
+        # After the build released the deployment operation lock: the offsite push
+        # must never hold it, and its failure must never fail this task.
+        dispatch_offsite_push()
+    return available
 
 
 @shared_task(bind=True, max_retries=0)
 def scheduled_deployment_backup_task(self):
     run = schedule_deployment_backup()
+    if run is not None:
+        dispatch_offsite_push()
     return bool(run and run.status == BackupRun.Status.COMPLETE)
 
 

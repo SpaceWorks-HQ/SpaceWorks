@@ -110,6 +110,11 @@ SCHEDULED_TASKS = (
         5,
     ),
     (
+        "push-offsite-backups",
+        "apps.backup.tasks.push_offsite_backups_task",
+        5,
+    ),
+    (
         "purge-expired-backup-archives",
         "apps.backup.tasks.purge_expired_backup_archives_task",
         24 * 60,
