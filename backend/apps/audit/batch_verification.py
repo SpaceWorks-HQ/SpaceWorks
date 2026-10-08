@@ -46,12 +46,21 @@ class AuditIntegrityFailure:
     makerspace_id: int | None = None
     batch_seq: int | None = None
     audit_log_id: int | None = None
+    # Closed internal cause for anchor-read failures: "anchor_transport" (retryable) or
+    # "verification_unavailable" (configuration/key; never retried). Never shown to staff.
+    cause: str | None = None
 
 
-def ordered_batch_rows(batch):
-    leaves = list(
-        batch.leaves.select_related("audit_log").order_by("leaf_position")
-    )
+def ordered_batch_rows(batch, leaves=None):
+    """The batch's rows in leaf order.
+
+    ``leaves`` (with ``audit_log`` loaded) is AUTHORITATIVE when given -- even an empty
+    sequence -- so a bulk verifier can preload every membership in one query and is never
+    silently pushed back onto a per-batch relation query. ``None`` keeps the old path.
+    """
+    if leaves is None:
+        leaves = batch.leaves.select_related("audit_log").order_by("leaf_position")
+    leaves = sorted(leaves, key=lambda leaf: leaf.leaf_position)
     expected_positions = list(range(len(leaves)))
     if [leaf.leaf_position for leaf in leaves] != expected_positions:
         raise ValueError("leaf positions are not contiguous from zero")
@@ -63,9 +72,9 @@ def ordered_batch_rows(batch):
     return rows
 
 
-def verify_batch_local(batch, key=None):
+def verify_batch_local(batch, key=None, *, leaves=None):
     try:
-        rows = ordered_batch_rows(batch)
+        rows = ordered_batch_rows(batch, leaves)
         calculated_root = merkle_root(hashes_for_rows(rows))
     except (ValueError, TypeError) as exc:
         return AuditIntegrityFailure(

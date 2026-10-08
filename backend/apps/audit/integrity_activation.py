@@ -11,6 +11,7 @@ from apps.audit.signing import (
 )
 from apps.ed25519 import Ed25519Error, encode_key, verify_bytes
 
+from .integrity_anchor_errors import anchor_read_failure
 from .integrity_rows import _verify_genesis_membership
 
 
@@ -93,9 +94,7 @@ def _verify_activation(key, sink):
     try:
         external = sink.fetch(identity)
     except AnchorError as exc:
-        return AuditIntegrityFailure(
-            AuditFailureClass.ANCHOR_UNAVAILABLE, str(exc), key.makerspace_id
-        )
+        return anchor_read_failure(exc, key.makerspace_id)
     if external is None:
         return AuditIntegrityFailure(
             AuditFailureClass.ANCHOR_MISSING,

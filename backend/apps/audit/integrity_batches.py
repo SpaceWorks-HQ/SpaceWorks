@@ -13,8 +13,11 @@ from apps.audit.batches import AuditBatchError, batch_envelope
 from apps.audit.models import AuditBatch, AuditSigningKey
 from apps.audit.signing import deployment_identity
 
+from .integrity_anchor_errors import anchor_read_failure
 
-def _verify_batches(makerspace_id, sink):
+
+def _verify_batches(makerspace_id, sink, *, leaves_by_batch=None):
+    """``leaves_by_batch`` (batch pk -> preloaded leaves) makes membership authoritative."""
     expected_seq = 1
     previous_root = None
     keys = {
@@ -41,7 +44,11 @@ def _verify_batches(makerspace_id, sink):
                 makerspace_id,
                 batch.batch_seq,
             )
-        failure = verify_batch_local(batch, key)
+        failure = verify_batch_local(
+            batch,
+            key,
+            leaves=None if leaves_by_batch is None else leaves_by_batch.get(batch.pk, ()),
+        )
         if failure:
             return failure
         try:
@@ -62,12 +69,7 @@ def _verify_batches(makerspace_id, sink):
         try:
             external = sink.fetch(identity)
         except AnchorError as exc:
-            return AuditIntegrityFailure(
-                AuditFailureClass.ANCHOR_UNAVAILABLE,
-                str(exc),
-                makerspace_id,
-                batch.batch_seq,
-            )
+            return anchor_read_failure(exc, makerspace_id, batch.batch_seq)
         if external is None or not anchors_match(external, envelope):
             failure_class = (
                 AuditFailureClass.ANCHOR_MISSING
@@ -98,12 +100,12 @@ def _verify_batches(makerspace_id, sink):
         orphan = sink.fetch(
             (deployment_identity(), scope_label, active_key.fingerprint, expected_seq)
         )
-    except AnchorError:
-        return AuditIntegrityFailure(
-            AuditFailureClass.ANCHOR_UNAVAILABLE,
-            "The anchor could not be read, so the local tail cannot be trusted.",
+    except AnchorError as exc:
+        return anchor_read_failure(
+            exc,
             makerspace_id,
             expected_seq,
+            detail="The anchor could not be read, so the local tail cannot be trusted.",
         )
     if orphan is not None:
         return AuditIntegrityFailure(
@@ -119,12 +121,7 @@ def _verify_batches(makerspace_id, sink):
             deployment_identity(), scope_label
         )
     except AnchorError as exc:
-        return AuditIntegrityFailure(
-            AuditFailureClass.ANCHOR_UNAVAILABLE,
-            str(exc),
-            makerspace_id,
-            local_seq,
-        )
+        return anchor_read_failure(exc, makerspace_id, local_seq)
     if (
         external_seq != local_seq
         or external_signer != active_key.fingerprint
