@@ -1,0 +1,57 @@
+"""Presentation entries: Machine, service, maintenance, warranty and procurement audit actions.
+
+Generated from the audit AST discovery, then reviewed. Every literal action has one
+entry; ``permitted`` lists only reviewed non-personal LEAF paths (no names, free
+text, secrets, object keys or before/after payloads)."""
+
+from .presentation_catalog_types import P
+
+ENTRIES = (
+    P("certification.granted", "Certification granted",
+      ("certification_type_id", "expires_at", "membership_id")),
+    P("certification.override", "Certification override", ("certification_type_id",)),
+    P("certification.revoked", "Certification revoked",
+      ("certification_type_id", "membership_id")),
+    P("certification_type.created", "Certification type created", ("machine_type_id",)),
+    P("certification_type.deactivated", "Certification type deactivated"),
+    P("certification_type.updated", "Certification type updated", ("fields",)),
+    P("machine.created", "Machine created"),
+    P("machine.publicity_changed", "Machine publicity changed"),
+    P("machine.status_changed", "Machine status changed"),
+    P("machine.typed_usage_logged", "Machine typed usage logged"),
+    P("machine.updated", "Machine updated"),
+    P("machine_service.consumption_recorded", "Machine service consumption recorded"),
+    P("machine_service.file_attached", "Machine service file attached"),
+    P("machine_service.file_deleted", "Machine service file deleted"),
+    P("machine_service.file_staged", "Machine service file staged"),
+    P("machine_type.created", "Machine type created"),
+    P("machine_type.updated", "Machine type updated"),
+    P("machine_type_pricing.set", "Machine type pricing set"),
+    P("machine_type_pricing.updated", "Machine type pricing updated"),
+    P("maintenance.document_added", "Maintenance document added",
+      ("log_id", "machine_id", "size_bytes")),
+    P("maintenance.document_deleted", "Maintenance document deleted",
+      ("document_id", "log_id", "machine_id", "size_bytes")),
+    P("maintenance.logged", "Maintenance logged"),
+    P("maintenance.schedule_completed", "Maintenance schedule completed",
+      ("interval_days", "log_id", "new_next_due", "old_next_due")),
+    P("maintenance.schedule_created", "Maintenance schedule created",
+      ("interval_days", "machine_id")),
+    P("maintenance.schedule_deactivated", "Maintenance schedule deactivated", ("machine_id",)),
+    P("maintenance.schedule_updated", "Maintenance schedule updated", ("changed_fields",)),
+    P("procurement.item_added", "Procurement item added"),
+    P("procurement.item_removed", "Procurement item removed"),
+    P("procurement.item_updated", "Procurement item updated"),
+    P("procurement.low_stock_flagged", "Procurement low stock flagged",
+      ("pool_id", "remaining", "threshold", "to_buy_item_id")),
+    P("procurement.moved_to_inventory", "Procurement moved to inventory",
+      ("item_id", "mode", "product_id", "quantity")),
+    P("procurement.moved_to_printing", "Procurement moved to printing",
+      ("item_id", "kernel", "result_id")),
+    P("procurement.receipt_added", "Procurement receipt added"),
+    P("procurement.receipt_removed", "Procurement receipt removed"),
+    P("warranty.created", "Warranty created"),
+    P("warranty.document_added", "Warranty document added"),
+    P("warranty.document_removed", "Warranty document removed"),
+    P("warranty.updated", "Warranty updated"),
+)
