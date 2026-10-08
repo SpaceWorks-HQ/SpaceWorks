@@ -1,6 +1,6 @@
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.accounts import rbac
 from apps.accounts.models import User
@@ -29,7 +29,10 @@ class ApiKeyRequestListCreateView(generics.ListCreateAPIView):
         )
         makerspace_id = self.request.query_params.get("makerspace")
         if makerspace_id:
-            queryset = queryset.filter(makerspace_id=makerspace_id)
+            # A non-integer value used to reach the ORM and 500 on the int coercion.
+            if not makerspace_id.isdigit():
+                raise ValidationError({"makerspace": "Must be a makerspace id."})
+            queryset = queryset.filter(makerspace_id=int(makerspace_id))
         return queryset
 
     def perform_create(self, serializer):

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.http import Http404
+from django.utils.crypto import constant_time_compare
 from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import serializers
 from rest_framework.permissions import AllowAny
@@ -41,9 +42,10 @@ class ReturnReminderCronView(APIView):
         if not secret:
             raise Http404()
         provided = request.headers.get("X-Cron-Secret", "")
-        import secrets as _secrets
-
-        if not _secrets.compare_digest(provided, secret):
+        # constant_time_compare encodes both sides, so a non-ASCII header is a plain
+        # mismatch (403) rather than the TypeError -> 500 that compare_digest(str, str)
+        # raises on any character outside ASCII.
+        if not constant_time_compare(provided, secret):
             return Response(status=403)
         result = run_return_reminders()
         return Response(result, status=200)

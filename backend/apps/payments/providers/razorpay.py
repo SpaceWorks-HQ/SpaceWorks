@@ -164,7 +164,9 @@ class RazorpayProvider:
         expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
         # compare_digest, not ==: a short-circuiting comparison leaks the correct prefix
         # through timing, which is enough to forge a signature given enough attempts.
-        if not hmac.compare_digest(expected, signature):
+        # Compared as bytes: on str arguments compare_digest raises TypeError for any
+        # non-ASCII header character, turning a forged signature into a 500 (and a retry).
+        if not hmac.compare_digest(expected.encode(), signature.encode("utf-8", "replace")):
             raise WebhookVerificationError("Razorpay signature mismatch.")
         try:
             body = json.loads(payload.decode() or "{}")

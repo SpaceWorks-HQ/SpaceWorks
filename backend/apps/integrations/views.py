@@ -1,8 +1,8 @@
-import hmac
 import logging
 
 from django.conf import settings
 from django.shortcuts import get_object_or_404
+from django.utils.crypto import constant_time_compare
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -127,4 +127,6 @@ def _webhook_secret_ok(request):
     if not secret:
         return False
     provided = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-    return hmac.compare_digest(provided, secret)
+    # Not hmac.compare_digest: on str arguments it raises TypeError for any non-ASCII
+    # character, so a stranger's header could turn this 403 into a 500.
+    return constant_time_compare(provided, secret)
