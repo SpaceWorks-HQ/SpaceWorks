@@ -114,6 +114,22 @@ def redact(card):
 @transaction.atomic
 def revoke_card(actor, card, *, reason="revoked"):
     _require(actor, rbac.Action.MANAGE_MEMBER_CARDS, card.makerspace_id)
+    return _revoke(actor, card, reason=reason)
+
+
+def revoke_for_membership(actor, membership):
+    """Revoke every live card of a membership that has just been revoked.
+
+    Called from `revoke_membership`, which is core RBAC and runs whether or not the
+    `membership` module is installed, so this carries no module gate and no card action:
+    the authority to revoke the MEMBERSHIP is the authority here. A revoked member's card
+    must not stay a live credential with their name and face on it.
+    """
+    for card in MemberCard.objects.filter(membership=membership, revoked_at__isnull=True):
+        _revoke(actor, card, reason="membership_revoked")
+
+
+def _revoke(actor, card, *, reason):
     card = MemberCard.objects.select_for_update().get(pk=card.pk)
     if card.revoked_at is not None:
         return card

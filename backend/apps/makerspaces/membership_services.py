@@ -129,6 +129,12 @@ def invite_membership(actor, makerspace, invite_email, assigned_role):
         if _is_community_invitation(role):
             require_module(makerspace, "membership")
         user = User.objects.filter(email__iexact=email).first()
+        # The rule `refer_membership` already had. Approving an invitation for someone who is
+        # already a member would silently rewrite their role; that is `change_role`'s job.
+        if user and MakerspaceMembership.objects.filter(
+            makerspace=makerspace, user=user, status="active"
+        ).exists():
+            raise ValidationError({"detail": "This person is already an active member."})
         try:
             request = MembershipRequest.objects.create(
                 makerspace=makerspace, user=user, invite_email=email,

@@ -37,6 +37,14 @@ def revoke_membership(actor, membership, reason=""):
             from apps.makerspaces.membership_payments import cancel_for_membership
 
             cancel_for_membership(membership, actor)
+            # Everything else the membership carried that acts on its behalf goes with it:
+            # the ID card (a live credential bearing their name and face) and any term with
+            # its pending renewal charge.
+            from apps.makerspaces.member_card_services import revoke_for_membership
+            from apps.makerspaces.membership_plan_services import cancel_terms_for_membership
+
+            revoke_for_membership(actor, membership)
+            cancel_terms_for_membership(actor, membership)
         from apps.presence.services import end_sessions_for_membership
         end_sessions_for_membership(actor, membership)
         MembershipRequest.objects.filter(makerspace=makerspace, user=membership.user,

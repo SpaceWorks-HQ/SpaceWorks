@@ -1352,7 +1352,13 @@ whose final key is never client-writable (staging presign → single promotion i
 `member_card_storage.finalize_photo`) and whose bytes need recorded consent. **Revoke redacts
 immediately** (photo bytes deleted, quota freed, name blanked); reissue rotates the QR and the old payload
 resolves as `revoked` forever; reprint never rotates. No rendered PDF is written to storage. The
-`membership` purge revokes the QRs and deletes the cards and photo bytes.
+`membership` purge revokes the QRs and deletes the cards and photo bytes. **Revoking the MEMBERSHIP
+revokes its card** (`member_card_services.revoke_for_membership`, reason `membership_revoked`, same
+redaction), with no module gate and no card action — `revoke_membership` is core RBAC and the authority to
+revoke the membership is the authority here; until 2026-10-09 a revoked member's card stayed a live
+credential bearing their name and photo. The same revocation cancels every ACTIVE `MembershipTerm` and its
+pending renewal charge (`membership_plan_services.cancel_terms_for_membership`), as it already cancelled
+the dues charge. An invitation for someone who is already an active member is refused, as a referral was.
 
 ## Handover roles and the retired Guest Admin
 
