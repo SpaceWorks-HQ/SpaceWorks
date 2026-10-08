@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.payments.models import ManualSettlement, Payment, Refund
@@ -16,10 +17,30 @@ class RefundSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class StaffSettlementSerializer(serializers.ModelSerializer):
+    """The receipt that currently stands for a charge settled at the desk.
+
+    `corrected` says an earlier receipt was replaced through amend-settlement; the chain
+    itself stays in the ledger and the audit log.
+    """
+
+    recorded_at = serializers.DateTimeField(source="created_at", read_only=True)
+    corrected = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ManualSettlement
+        fields = ("id", "method", "reference", "received_at", "recorded_at", "corrected")
+        read_only_fields = fields
+
+    def get_corrected(self, receipt) -> bool:
+        return receipt.amends_id is not None
+
+
 class PaymentReconciliationSerializer(serializers.ModelSerializer):
     subject_label = serializers.SerializerMethodField()
     refunded_amount = serializers.SerializerMethodField()
     refunds = RefundSerializer(many=True, read_only=True)
+    settlement = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -33,10 +54,23 @@ class PaymentReconciliationSerializer(serializers.ModelSerializer):
             "currency",
             "refunded_amount",
             "refunds",
+            "settlement",
             "created_at",
             "updated_at",
         )
         read_only_fields = fields
+
+    @extend_schema_field(StaffSettlementSerializer(allow_null=True))
+    def get_settlement(self, payment):
+        if payment.status != Payment.Status.PAID_OFFLINE:
+            return None
+        receipts = self.context.get("payment_settlements")
+        receipt = (
+            receipts.get(payment.pk)
+            if receipts is not None
+            else ManualSettlement.effective_for(payment)
+        )
+        return StaffSettlementSerializer(receipt).data if receipt is not None else None
 
     def get_subject_label(self, payment) -> str:
         return subject_label(

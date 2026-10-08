@@ -30,7 +30,13 @@ class MemberPaymentCheckoutView(APIView):
         tags=["Payments"],
         summary="Generate a Checkout link for the caller's pending payment",
         request=None,
-        responses={200: CheckoutUrlSerializer, 404: OpenApiResponse(ErrorSerializer), 503: OpenApiResponse(ErrorSerializer)},
+        responses={
+            200: CheckoutUrlSerializer,
+            401: OpenApiResponse(ErrorSerializer, description="Authentication required."),
+            404: OpenApiResponse(ErrorSerializer, description="No pending charge of yours here."),
+            409: OpenApiResponse(ErrorSerializer, description="`payment_rail_conflict`: the charge uses the native rail."),
+            503: OpenApiResponse(ErrorSerializer, description="`payments_unavailable`: no live online rail for this charge."),
+        },
     )
     def post(self, request, makerspace_id, payment_id):
         payment = member_payment_queryset(request.user, makerspace_id).filter(

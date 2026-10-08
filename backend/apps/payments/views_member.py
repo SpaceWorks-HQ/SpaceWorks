@@ -94,7 +94,16 @@ class ArchivedPaymentDiscoveryView(APIView):
 class MemberPaymentHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Payments"], summary="List the caller's payment history", request=None, responses={200: MemberPaymentSerializer(many=True), 403: OpenApiResponse(ErrorSerializer)})
+    @extend_schema(
+        tags=["Payments"],
+        summary="List the caller's payment history",
+        request=None,
+        responses={
+            200: MemberPaymentSerializer(many=True),
+            401: OpenApiResponse(ErrorSerializer, description="Authentication required."),
+            403: OpenApiResponse(ErrorSerializer, description="No active membership and no charge here."),
+        },
+    )
     def get(self, request, makerspace_id):
         if not member_may_see_own_charges(request.user, makerspace_id):
             return Response(
@@ -102,7 +111,9 @@ class MemberPaymentHistoryView(APIView):
                 status=403,
             )
         rows = list(
-            member_payment_queryset(request.user, makerspace_id).order_by("-created_at")
+            member_payment_queryset(request.user, makerspace_id)
+            .prefetch_related("refunds")
+            .order_by("-created_at")
         )
         return Response(
             MemberPaymentSerializer(
@@ -127,15 +138,7 @@ def _member_payment_context(rows):
 
     if not rows:
         return {"payment_rails": {}, "payment_settlements": {}}
-    settled_ids = [
-        row.pk for row in rows if row.status == Payment.Status.PAID_OFFLINE
-    ]
-    receipts = {}
-    if settled_ids:
-        for receipt in ManualSettlement.objects.filter(
-            payment_id__in=settled_ids, amended_by__isnull=True
-        ).order_by("payment_id", "-created_at", "-pk"):
-            receipts.setdefault(receipt.payment_id, receipt)
+    receipts = ManualSettlement.effective_for_many(rows)
     # Keyed by OWNING makerspace, not answered once for the page. A collaborative-event
     # charge is owned by the host space and merely routed here through `via_makerspace`,
     # and that host has its own modules, features and credentials -- so one scalar taken

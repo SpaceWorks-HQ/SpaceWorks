@@ -86,6 +86,18 @@ class ManualSettlement(models.Model):
             .first()
         )
 
+    @classmethod
+    def effective_for_many(cls, payments):
+        """{payment_id: effective receipt} for the offline-settled rows of a page, in one query."""
+        ids = [row.pk for row in payments if row.status == Payment.Status.PAID_OFFLINE]
+        receipts = {}
+        if ids:
+            for receipt in cls.objects.filter(
+                payment_id__in=ids, amended_by__isnull=True
+            ).order_by("payment_id", "-created_at", "-pk"):
+                receipts.setdefault(receipt.payment_id, receipt)
+        return receipts
+
     def clean(self):
         self.currency = (self.currency or "").lower()
         currency_validator(self.currency)

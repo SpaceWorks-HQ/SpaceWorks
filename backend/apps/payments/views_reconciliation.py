@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from apps.admin_api.permissions import IsActiveStaff
 from apps.accounts import rbac
 from apps.hardware_requests.exceptions import ErrorSerializer
-from apps.payments.models import Payment
+from apps.payments.models import ManualSettlement, Payment
 from apps.payments.reconciliation import (
     amend_settlement,
     list_payments,
@@ -25,6 +25,7 @@ from apps.payments.subjects import resolve_subject_labels
 
 ERRORS = {
     400: OpenApiResponse(ErrorSerializer, description="Invalid payment request."),
+    401: OpenApiResponse(ErrorSerializer, description="Authentication required."),
     403: OpenApiResponse(ErrorSerializer, description="Permission denied."),
     404: OpenApiResponse(ErrorSerializer, description="Payment or makerspace not found."),
     409: OpenApiResponse(ErrorSerializer, description="Payment is already terminal."),
@@ -63,7 +64,11 @@ class PaymentListView(APIView):
                 **filters.validated_data,
             )
         )
-        context = {"payment_subject_labels": resolve_subject_labels(rows)}
+        context = {
+            "payment_subject_labels": resolve_subject_labels(rows),
+            # One query for the page, not one per settled row.
+            "payment_settlements": ManualSettlement.effective_for_many(rows),
+        }
         return Response(
             PaymentReconciliationSerializer(rows, many=True, context=context).data
         )

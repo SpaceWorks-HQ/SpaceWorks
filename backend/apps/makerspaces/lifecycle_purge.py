@@ -92,7 +92,7 @@ def _delete_object_graph(makerspace):
     from apps.organizations.models import OrganizationMakerspace
     from apps.machines.models import Machine, MachineType, MakerspaceMachineTypePricing
     from apps.machines.service_lifecycle import delete_for_makerspace
-    from apps.payments.models import Payment, ProcessedStripeEvent
+    from apps.payments.models import Payment, ProcessedStripeEvent, Refund
     from apps.tenant_migration.models import ExternalTenantReference, TenantImportJob
 
     with connection.cursor() as cursor:
@@ -195,7 +195,10 @@ def _delete_object_graph(makerspace):
         AuditSigningKeyRotation.objects.filter(makerspace=makerspace).delete()
         AuditLog.objects.filter(makerspace=makerspace).delete()
         # Manual settlements cascade with their payments (triggers are suspended for
-        # this transaction), so the cash book needs no separate pass.
+        # this transaction), so the cash book needs no separate pass. Refunds do NOT:
+        # `Refund.payment` is PROTECT, so they go first or any space that ever refunded
+        # a charge raises ProtectedError here and can never be purged.
+        Refund.objects.filter(payment__makerspace=makerspace).delete()
         Payment.objects.filter(makerspace=makerspace).delete()
         ProcessedStripeEvent.objects.filter(makerspace=makerspace).delete()
         # An elsewhere-hosted registration can reference this space's waiver. Clear all
