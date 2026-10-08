@@ -732,6 +732,32 @@ deposit is cancelled at close, a collected one is released only by a staff refun
 additive AND behind `payments.enabled`, the `payments` module and resolvable credentials; off means nothing
 is raised and lateness is only recorded.
 
+**Payments completeness pass (2026-10-09, lane `payments`).** Five rules the audit found broken or
+unpinned; each now has a test under `tests/payments/`:
+- **A closed hosted checkout is forgotten in BOTH column pairs.** A checkout is recorded in the
+  Stripe-shaped columns and the generic `external_order_id`/`checkout_url`; the expiry webhook and
+  credential rotation cleared only the first pair, so `create_checkout_url` handed back the dead
+  link forever. `payments/checkout_expiry.forget_closed_checkout` is the one place that clears a
+  closed page, and `live_checkout_url` is the one reader (member list, checkout endpoint, service):
+  a link counts only while `stripe_checkout_session_expired_at` is null. `stripe_payment_intent_id`
+  is never cleared there — it is the refund anchor.
+- **The native PaymentSheet is Stripe-only and checks the vendor BEFORE any provider call.** A
+  Razorpay source carries the Razorpay key secret in `secret_key`; without the check it was sent to
+  Stripe as an API key.
+- **Provider amounts use the currency's ISO 4217 exponent** (`payments/money.to_minor_units`): zero
+  for JPY/KRW and the rest of Stripe's zero-decimal list, three for BHD/JOD/KWD/OMR/TND. Checkout,
+  the provider seam, native intents, refunds, the Connect fee and refund-webhook matching all use it;
+  `int(amount * 100)` anywhere in a money path is a bug.
+- **Purges delete `Refund` rows before `Payment`.** `Refund.payment` is PROTECT, so both the
+  makerspace purge and `machines.service_lifecycle.delete_for_makerspace` raised ProtectedError for
+  any space that had ever refunded. Manual settlements still cascade.
+- **Receipts reach both sides.** The staff reconciliation row carries the standing manual receipt
+  (`settlement`, with `corrected` when amended) and the console corrects it through
+  amend-settlement; the member row carries `refunded_amount` and `refunds` (never `created_by`).
+  `StaffPaymentSerializer` deliberately drops the refund fields so the machine-service queue does
+  not grow a query per row. The machine-service waive route now answers 409 on a terminal charge,
+  like every other reconciliation route, instead of a silent 200.
+
 **Native clients use attested device grants, never browser-token shortcuts.** Device login starts with a
 short-lived attestation challenge and creates a revocable `DeviceGrant`; access tokens carry
 `device_grant_id`, refresh tokens rotate in a grant family, and replay revokes that family. Native
