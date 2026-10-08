@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.payments import stripe_client
 from apps.payments.availability import online_payments_enabled_for
+from apps.payments.checkout_expiry import live_checkout_url
 from apps.payments.member_scope import member_payment_queryset
 from apps.payments.models import Payment
 from apps.payments.serializers import CheckoutUrlSerializer
@@ -38,8 +39,9 @@ class MemberPaymentCheckoutView(APIView):
         ).first()
         if payment is None:
             raise NotFound()
-        if payment.stripe_checkout_url:
-            return Response({"checkout_url": payment.stripe_checkout_url})
+        # Either rail's live page; an expired one falls through and is regenerated.
+        if live := live_checkout_url(payment):
+            return Response({"checkout_url": live})
         # A charge can exist with no rail behind it (cash-only space, or the rail switched
         # off after the debt was raised). Refuse rather than mint a link the space cannot
         # honour; the member settles this one at the desk.

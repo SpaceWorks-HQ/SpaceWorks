@@ -35,7 +35,11 @@ class MemberPaymentSerializer(serializers.ModelSerializer):
         return subject_label(payment, labels)
 
     def get_checkout_url(self, payment) -> str:
-        return payment.stripe_checkout_url if payment.status == Payment.Status.PENDING else ""
+        # Either rail: a Razorpay link lives only in the generic column, and reading the
+        # Stripe one alone hid every live Razorpay link from the member who owed it.
+        from apps.payments.checkout_expiry import live_checkout_url
+
+        return live_checkout_url(payment)
 
     def get_online_payment_available(self, payment) -> bool:
         """Whether offering to pay online is honest for this charge.

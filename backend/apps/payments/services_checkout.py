@@ -15,6 +15,7 @@ from django.db import transaction
 
 from apps.makerspaces.platform import member_payment_return_url
 from apps.payments import stripe_client
+from apps.payments.checkout_expiry import live_checkout_url
 from apps.payments.connect import refresh_connected_account, restrict_account_status
 from apps.payments.models import (
     MakerspacePaymentSettings,
@@ -140,8 +141,10 @@ def _create_checkout_url_atomic(payment_id, *, actor=None):
         # Generic column first: a Razorpay row never fills the Stripe one, and without
         # this the service would mint a fresh payment link on every call -- several live
         # links for one charge, any of which a member could pay.
-        if payment.checkout_url or payment.stripe_checkout_url:
-            return payment.checkout_url or payment.stripe_checkout_url
+        # Only a page nobody has confirmed closed: a legacy row whose expiry cleared just
+        # the Stripe columns must mint a new link rather than hand back the dead one.
+        if live := live_checkout_url(payment):
+            return live
         if payment.online_rail is None:
             payment.online_rail = Payment.OnlineRail.CHECKOUT
         if payment.provider == Payment.Provider.UNCLAIMED:
@@ -256,8 +259,13 @@ def _create_checkout_via_provider(payment, source, label, member_url):
     )
     payment.external_order_id = result.order_id
     payment.checkout_url = result.checkout_url
+    # A fresh page is live again, exactly as the Stripe branch resets it.
+    payment.stripe_checkout_session_expired_at = None
     payment.save(
-        update_fields=["external_order_id", "checkout_url", "online_rail", "updated_at"]
+        update_fields=[
+            "external_order_id", "checkout_url", "stripe_checkout_session_expired_at",
+            "online_rail", "updated_at",
+        ]
     )
     return result.checkout_url
 
