@@ -327,8 +327,10 @@ Required by `printing`.
 - **What it adds** — the join-request queue, member capabilities and memberships in the console, the
   opt-in maker profile and directory, and per-member activity history.
   Plans and terms (monthly, yearly or custom-length, priced or free) can be attached to a membership;
-  a beat-less sweep raises one renewal charge per term before it ends when `payments.membership` is on,
-  and an optional per-makerspace rule can stop lapsed members from borrowing. Prospective members can
+  a beat-less sweep raises one renewal charge per term before it ends when `charges.membership` is on
+  (and attaches an online checkout when `payments.membership` is), and an optional per-makerspace rule
+  stops lapsed members from borrowing — by request, by self-checkout or by a staff handout; returning a
+  tool is never refused. Prospective members can
   send an invitation request from the public site (throttled, honeypot-guarded, PII encrypted at rest);
   staff invite or decline it from the same queue as join requests.
 - **Without it** — people can still exist as members and still borrow: staff create walk-in member

@@ -22,6 +22,7 @@ from apps.hardware_requests.workflow_errors import (
     RequestValidationError,
 )
 from apps.inventory.models import InventoryAsset, InventoryProduct, TrackingMode
+from apps.makerspaces.request_access import require_current_term
 from apps.presence.guard import require_active_member_presence
 
 
@@ -36,7 +37,7 @@ def issue_direct_loan(
     items,
     container_id=None,
 ):
-    require_active_member_presence(borrower, makerspace)
+    require_current_term(makerspace, require_active_member_presence(borrower, makerspace).membership)
     evidence = EvidencePhoto.objects.filter(
         pk=evidence_id,
         makerspace=makerspace,

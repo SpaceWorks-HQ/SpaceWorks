@@ -669,9 +669,16 @@ and never an access state: a `MembershipTerm` expiring changes neither `Makerspa
 `User.access_status`; the only effect is the per-makerspace opt-in `lapsed_members_cannot_borrow`, enforced
 solely by `request_access.require_current_term` AFTER the who-may-submit rule has admitted the member
 ("active" = `status=active AND ends_at > now`, so it does not depend on the hourly sweep), and a member who
-has never held a term is untouched. One renewal charge per term, raised only by
+has never held a term is untouched. **It is called on every path that HANDS a member a tool** — request
+submission, self-checkout and its issue-evidence presign, and staff direct handout — and on no path that
+takes one back: a lapsed member can always return. (It had one call site, request submission, until
+2026-10-09: a lapsed member could still self-check-out or be handed a tool at the desk, and the switch was
+missing from the settings serializer, so the console toggle never rendered.) It is inert while the
+`membership` module is off, since plans are that module's. Bookings, events and machine service are not
+borrowing and are not covered. One renewal charge per term, raised only by
 `membership_plan_services.run_membership_renewals` as `Payment(subject_type=membership_term,
-subject_id=term.pk)` inside the 7-day window and only when `online_payments_enabled(ms, "membership")` —
+subject_id=term.pk)` inside the 7-day window and only when `charge_tracking_enabled(ms, "membership")` —
+the debt is recorded first and a checkout is attached second, only when `online_payments_enabled` — and
 the Payment unique constraint is the idempotency, a payment failure is logged and never touches the term,
 and settlement does not auto-open the next term (staff do). An `InvitationRequest` is a lead, not authority:
 name/email/phone are scoped source PII (encrypted at rest, purged with `membership`, `(PRESERVE, DROP)` in

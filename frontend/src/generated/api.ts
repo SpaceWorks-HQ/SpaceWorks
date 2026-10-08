@@ -3030,6 +3030,7 @@ export type Makerspace = {
   "membership_policy"?: MembershipPolicyEnum;
   "membership_dues_amount"?: string;
   "referrals_enabled"?: boolean;
+  "lapsed_members_cannot_borrow"?: boolean;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
   "archive_custody_state": ArchiveCustodyStateEnum | null;
@@ -4448,6 +4449,7 @@ export type PatchedMakerspace = {
   "membership_policy"?: MembershipPolicyEnum;
   "membership_dues_amount"?: string;
   "referrals_enabled"?: boolean;
+  "lapsed_members_cannot_borrow"?: boolean;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
   "archive_custody_state"?: ArchiveCustodyStateEnum | null;

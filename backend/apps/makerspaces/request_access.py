@@ -85,12 +85,22 @@ def require_current_term(makerspace, membership):
     every term has expired or been cancelled is refused -- and refused with the same
     exception a non-member gets, because that is what the operator asked for. No new
     access state: `MakerspaceMembership.status` and `User.access_status` stay as they are.
+
+    Every way a member TAKES a tool calls this: request submission, self-checkout (and
+    its issue-evidence presign) and staff direct handout. Returning never does -- a lapsed
+    member must always be able to give a tool back. Bookings, events and machine service
+    are not borrowing and are not covered. Plans belong to the `membership` module, so the
+    rule is inert while that module is off, whatever the stored flag says.
     """
     if membership is None or not makerspace.lapsed_members_cannot_borrow:
         return
     from django.utils import timezone
 
     from apps.makerspaces.models import MembershipTerm
+    from apps.makerspaces.platform import module_enabled
+
+    if not module_enabled(makerspace, MEMBERSHIP_MODULE):
+        return
 
     terms = MembershipTerm.objects.filter(membership=membership)
     if not terms.exists() or terms.filter(

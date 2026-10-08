@@ -53441,6 +53441,9 @@
                     "referrals_enabled": {
                         "type": "boolean"
                     },
+                    "lapsed_members_cannot_borrow": {
+                        "type": "boolean"
+                    },
                     "filament_low_stock_threshold_grams": {
                         "type": "string",
                         "format": "decimal",
@@ -53745,7 +53748,8 @@
                                 "$ref": "#/components/schemas/MakerspaceArchiveRequestStatusEnum"
                             }
                         ],
-                        "readOnly": true
+                        "readOnly": true,
+                        "default": "pending"
                     }
                 },
                 "required": [
@@ -59190,6 +59194,9 @@
                         "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
                     },
                     "referrals_enabled": {
+                        "type": "boolean"
+                    },
+                    "lapsed_members_cannot_borrow": {
                         "type": "boolean"
                     },
                     "filament_low_stock_threshold_grams": {
