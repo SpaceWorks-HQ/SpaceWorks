@@ -21,6 +21,7 @@ from apps.integrations.models import (
     NotificationPreference,
 )
 from apps.makerspaces.servability import servable_queryset
+from apps.openapi_errors import errors
 
 
 @extend_schema(tags=["Makerspaces"], summary="List or update makerspace notification rules")
@@ -135,7 +136,9 @@ class NotificationRulesView(APIView):
             return f"Event '{event}' is not mutable for stream '{stream}' and audience '{audience}'."
         return None
 
-    @extend_schema(responses={200: NotificationRulesResponseSerializer})
+    @extend_schema(
+        responses={200: NotificationRulesResponseSerializer, **errors(401, 403, 404)}
+    )
     def get(self, request, makerspace_id, *args, **kwargs):
         makerspace = self._makerspace(request, makerspace_id)
         return Response(self._response_data(makerspace), status=status.HTTP_200_OK)

@@ -18,6 +18,7 @@ from apps.integrations.serializers import (
 from apps.integrations.telegram import TelegramDeliveryError, send_message
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.guards import require_module
+from apps.openapi_errors import errors
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,13 @@ class TelegramWebhookView(APIView):
         ),
         auth=[],
         request=TelegramWebhookSerializer,
-        responses={200: OpenApiResponse(description="Acknowledged; no action taken.")},
+        responses={
+            200: OpenApiResponse(description="Acknowledged; no action taken."),
+            **errors(
+                400, 403, 429,
+                e403="TELEGRAM_WEBHOOK_SECRET is unset, or the secret-token header is wrong.",
+            ),
+        },
     )
     def post(self, request, *args, **kwargs):
         if not _webhook_secret_ok(request):
@@ -72,7 +79,13 @@ class TelegramTestAlertView(APIView):
         tags=["Telegram"],
         summary="Send Telegram test alert",
         request=TelegramTestAlertSerializer,
-        responses={200: OpenApiResponse(description="Delivery attempt result.")},
+        responses={
+            200: OpenApiResponse(
+                description="Delivery attempt result; `delivered: false` with a reason when "
+                "Telegram is unconfigured or rejects the message."
+            ),
+            **errors(400, 401, 403, 404),
+        },
     )
     def post(self, request, *args, **kwargs):
         serializer = TelegramTestAlertSerializer(data=request.data)

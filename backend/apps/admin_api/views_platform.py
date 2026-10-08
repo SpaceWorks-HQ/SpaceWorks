@@ -1,10 +1,11 @@
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics, serializers
 
 from apps.admin_api.permissions import IsActiveSuperAdmin
 from apps.audit import services as audit
 from apps.integrations.models import PlatformEmailSettings
 from apps.integrations.smtp_validation import validate_smtp_settings
+from apps.openapi_errors import errors
 
 
 class PlatformEmailSettingsSerializer(serializers.ModelSerializer):
@@ -48,6 +49,10 @@ class PlatformEmailSettingsSerializer(serializers.ModelSerializer):
         return instance
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: PlatformEmailSettingsSerializer, **errors(401, 403)}),
+    patch=extend_schema(responses={200: PlatformEmailSettingsSerializer, **errors(400, 401, 403)}),
+)
 @extend_schema(
     tags=["Platform"],
     summary="Retrieve or update platform email settings",

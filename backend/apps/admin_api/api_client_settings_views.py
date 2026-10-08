@@ -1,5 +1,5 @@
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics
 
 from apps.accounts import rbac
@@ -7,8 +7,13 @@ from apps.admin_api.api_client_serializers import ApiIntegrationSettingsSerializ
 from apps.admin_api.permissions import IsActiveStaff, require_action
 from apps.audit import services as audit
 from apps.makerspaces.models import Makerspace
+from apps.openapi_errors import errors
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: ApiIntegrationSettingsSerializer, **errors(401, 403, 404)}),
+    patch=extend_schema(responses={200: ApiIntegrationSettingsSerializer, **errors(400, 401, 403, 404)}),
+)
 @extend_schema(tags=["API clients"], summary="Retrieve or update API integration settings")
 class ApiIntegrationSettingsView(generics.RetrieveUpdateAPIView):
     serializer_class = ApiIntegrationSettingsSerializer

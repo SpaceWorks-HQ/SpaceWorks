@@ -24,6 +24,7 @@ from apps.makerspaces.module_install import (
 )
 from apps.makerspaces.module_profiles import PROFILES
 from apps.makerspaces.servability import servable_queryset
+from apps.openapi_errors import errors
 
 class ModuleActionSerializer(serializers.Serializer):
     """The one field either mutation takes.
@@ -47,7 +48,10 @@ class ModuleGroupListView(APIView):
     @extend_schema(
         tags=["Platform"],
         summary="List module groups and their install state for a makerspace",
-        responses={200: OpenApiResponse(description="Grouped module status.")},
+        responses={
+            200: OpenApiResponse(description="Grouped module status."),
+            **errors(401, 403, 404),
+        },
     )
     def get(self, request, makerspace_id):
         makerspace = _makerspace(makerspace_id)
