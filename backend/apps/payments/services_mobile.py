@@ -56,7 +56,10 @@ def create_mobile_intent(payment_id, *, actor):
         if payment.provider == Payment.Provider.UNCLAIMED:
             _claim_provider(payment)
         source = source_for_payment(payment)
-        if source is None or not source.publishable_key:
+        # The native PaymentSheet is Stripe-only. A Razorpay source carries the Razorpay
+        # key secret in `secret_key`, so without the vendor check below this sent that
+        # secret to Stripe as an API key. Raising here also rolls back the claim above.
+        if source is None or source.vendor != Payment.Provider.STRIPE or not source.publishable_key:
             raise stripe_client.PaymentsUnavailable(
                 'Mobile payments are not configured.'
             )
