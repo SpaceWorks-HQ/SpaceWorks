@@ -194,6 +194,8 @@ def test_staff_domain_change_records_before_after_and_the_new_status(settings):
         "contract-domain",
         frontend_domain="before.example.org",
         frontend_domain_status=Makerspace.DomainStatus.VERIFIED,
+        # Managed hosting grants custom domains per space.
+        resource_limit_overrides={"custom_domain": True},
     )
     manager = make_member("contract-domain-manager", lab)
 
