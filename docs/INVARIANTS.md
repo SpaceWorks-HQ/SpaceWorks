@@ -552,8 +552,11 @@ key needs the same treatment.
 dashboard simply does not exist for a space that runs no memberships — and every frontend query
 feeding it must include `membershipModuleOn` in its `enabled`, or it calls a gated endpoint and
 errors. `member_dashboard_service` adds loan history, request history (previously only ACTIVE
-self-checkout loans were visible, so a member could not see a request they submitted), dues, and
-notices. Notices are DERIVED from member-owned rows: `notifications.Notification` is
+self-checkout loans were visible, so a member could not see a request they submitted), dues, the
+member's own plan term (`membership_term`, 2026-10-09 — current-else-latest, `current` computed with
+`require_current_term`'s own predicate, `blocks_borrowing` when none is current and the space refuses
+lapsed members) and notices (`term_lapsed`, `term_ending_soon` within 7 days). Notices are DERIVED from
+member-owned rows: `notifications.Notification` is
 makerspace-wide, has no recipient column and shares one `read_at`, so serving it would leak staff
 alerts and let one member's read mark speak for everyone. Payment/receipt visibility sits OUTSIDE
 the gate — `member_may_see_own_charges` admits an account with no membership that owns a charge

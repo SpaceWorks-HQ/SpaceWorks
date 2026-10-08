@@ -90,6 +90,16 @@ class MemberDuesSerializer(serializers.Serializer):
     )
 
 
+class MemberTermSerializer(serializers.Serializer):
+    plan_name = serializers.CharField()
+    starts_at = serializers.DateTimeField()
+    ends_at = serializers.DateTimeField()
+    current = serializers.BooleanField()
+    # True only when no term is current AND the space has switched on
+    # `lapsed_members_cannot_borrow` -- the member's own explanation for a refusal.
+    blocks_borrowing = serializers.BooleanField()
+
+
 class MemberNoticeSerializer(serializers.Serializer):
     """A fact about the reader, derived from their own rows.
 
@@ -115,4 +125,6 @@ class MemberActivitySerializer(serializers.Serializer):
     loan_history = MemberLoanHistorySerializer(many=True, required=False)
     request_history = MemberRequestHistorySerializer(many=True, required=False)
     membership_dues = MemberDuesSerializer(required=False)
+    # The member's current (else latest) plan term; null when they have never held one.
+    membership_term = MemberTermSerializer(required=False, allow_null=True)
     notices = MemberNoticeSerializer(many=True, required=False)

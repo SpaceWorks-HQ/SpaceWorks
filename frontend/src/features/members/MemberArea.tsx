@@ -9,7 +9,7 @@ import { InvitationRequestForm } from "./InvitationRequestForm";
 import { JoinMembershipCta } from "./JoinMembershipCta";
 import { presenceStartLocation } from "./geolocation";
 import { MemberActivityPanel, type MemberActivity } from "./MemberActivity";
-import { MemberDues, MemberHistory, MemberNotices } from "./MemberDashboardSections";
+import { MemberDues, MemberHistory, MemberNotices, MemberTerm } from "./MemberDashboardSections";
 import { PartnerEvents } from "./PartnerEvents";
 import { MemberDirectory } from "./MemberDirectory";
 import { MemberCardPanel } from "./MemberCardPanel";
@@ -105,10 +105,11 @@ export function MemberArea() {
       {/* Notices first: they are the reason to open a dashboard at all. */}
       {activity.data ? <MemberNotices notices={activity.data.notices} /> : null}
       {activity.data ? <MemberActivityPanel activity={activity.data} makerspaceId={makerspaceId} makerspaceSlug={resolvedSlug} /> : null}
+      {activity.data ? <MemberTerm term={activity.data.membership_term} /> : null}
       {activity.data ? <MemberDues dues={activity.data.membership_dues} /> : null}
       {activity.data ? <MemberHistory loans={activity.data.loan_history} requests={activity.data.request_history} /> : null}
       {membership?.membership_status === "active" ? <PartnerEvents makerspaceId={makerspaceId} slug={resolvedSlug} /> : null}
-      {membership.membership_status === "active" && makerspaceId >= 0 ? <><MemberProfilePanel makerspaceId={makerspaceId} />{membershipModuleOn ? <MemberCardPanel makerspaceId={makerspaceId} /> : null}<MemberDirectory makerspaceId={makerspaceId} /></> : null}</> : null}
+      {membership.membership_status === "active" && makerspaceId >= 0 && membershipModuleOn ? <><MemberProfilePanel makerspaceId={makerspaceId} /><MemberCardPanel makerspaceId={makerspaceId} /><MemberDirectory makerspaceId={makerspaceId} /></> : null}</> : null}
     {/* OUTSIDE the membership branch. A loan deposit is raised against a borrower, who
         needs an active account rather than a membership -- nesting this meant the person
         who owed the money was the one person who could not see it. */}

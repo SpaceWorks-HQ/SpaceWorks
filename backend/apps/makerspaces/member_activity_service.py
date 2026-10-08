@@ -78,6 +78,7 @@ def member_activity(membership):
     payload["loan_history"] = dashboard.loan_history(makerspace.id, member)
     payload["request_history"] = dashboard.request_history(makerspace.id, member)
     payload["membership_dues"] = dashboard.membership_dues(membership)
+    payload["membership_term"] = dashboard.membership_term(membership)
     payload["notices"] = dashboard.notices(membership, payload)
     return payload
 

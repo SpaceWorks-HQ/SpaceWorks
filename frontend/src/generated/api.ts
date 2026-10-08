@@ -3158,6 +3158,7 @@ export type MemberActivity = {
   "loan_history"?: Array<MemberLoanHistory>;
   "request_history"?: Array<MemberRequestHistory>;
   "membership_dues"?: MemberDues;
+  "membership_term"?: MemberTerm | null;
   "notices"?: Array<MemberNotice>;
 };
 
@@ -3521,6 +3522,14 @@ export type MemberSignUp = {
   "phone"?: string;
   "password": string;
   "website"?: string;
+};
+
+export type MemberTerm = {
+  "plan_name": string;
+  "starts_at": string;
+  "ends_at": string;
+  "current": boolean;
+  "blocks_borrowing": boolean;
 };
 
 export type MemberVerificationAck = {

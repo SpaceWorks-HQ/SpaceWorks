@@ -26,6 +26,24 @@ export function MemberNotices({ notices }: { notices: MemberActivity["notices"] 
   );
 }
 
+/** The member's own plan term. Hidden when they never held one: plans are optional. */
+export function MemberTerm({ term }: { term: MemberActivity["membership_term"] }) {
+  if (!term) return null;
+  const ends = new Date(term.ends_at).toLocaleDateString();
+  return (
+    <section className="desk-panel p-5">
+      <h2 className="title-panel">Membership plan</h2>
+      <p className="mt-2 text-sm text-ink">{term.plan_name}</p>
+      <p className="mt-1 text-sm text-muted">
+        {term.current ? `Current until ${ends}` : `Ended ${ends}`}
+      </p>
+      {term.blocks_borrowing ? (
+        <p className="mt-1 text-sm text-danger">Borrowing is paused until your membership is renewed.</p>
+      ) : null}
+    </section>
+  );
+}
+
 export function MemberDues({ dues }: { dues: MemberActivity["membership_dues"] }) {
   if (!dues) return null;
   // `null` is "we could not read the ledger", not "nothing is owed". Kept apart all the

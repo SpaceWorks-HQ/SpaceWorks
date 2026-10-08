@@ -52,6 +52,15 @@ export type MemberActivity = {
   loan_history?: MemberLoanHistoryRow[];
   request_history?: MemberRequestHistoryRow[];
   membership_dues?: MemberDuesSummary;
+  // The member's current (else latest) plan term; null when they never held one.
+  membership_term?: MemberTermSummary | null;
+};
+
+export type MemberTermSummary = {
+  plan_name: string; starts_at: string; ends_at: string;
+  // `current` uses the borrowing rule's own predicate; `blocks_borrowing` is true only when
+  // no term is current AND the space refuses lapsed members.
+  current: boolean; blocks_borrowing: boolean;
 };
 
 /** The member's own check-in QR, fetched rather than linked.
