@@ -1,13 +1,19 @@
 import { useState } from "react";
 
-import { Field, Skeleton } from "../../../components/ui";
+import { Skeleton } from "../../../components/ui";
+import { AuditLogFilters, auditFilterParams, emptyAuditFilters, type AuditFilters } from "./AuditLogFilters";
+import { AuditVerificationStatus } from "./AuditVerificationStatus";
 import { Panel, useStaffGet } from "./shared";
 
 type AuditLogEntry = {
   id: number;
   action: string;
+  action_label: string;
+  actor_display: string | null;
   target_type: string;
   target_id: string | number | null;
+  meta: Record<string, unknown>;
+  meta_redacted: boolean;
   created_at: string;
 };
 
@@ -19,42 +25,35 @@ type AuditLogResponse = {
 };
 
 export function AuditLog() {
-  const [targetType, setTargetType] = useState("");
-  const [targetId, setTargetId] = useState("");
+  const [filters, setFilters] = useState<AuditFilters>(emptyAuditFilters);
   const [page, setPage] = useState(1);
-  const params = new URLSearchParams();
-  if (targetType) params.set("target_type", targetType);
-  if (targetId) params.set("target_id", targetId);
+  const filterParams = auditFilterParams(filters);
+  const params = new URLSearchParams(filterParams);
   params.set("page", String(page));
   const query = params.toString();
-  const logs = useStaffGet<AuditLogResponse>(
-    ["audit", query],
-    `/admin/audit-logs?${query}`,
-  );
+  const logs = useStaffGet<AuditLogResponse>(["audit", query], `/admin/audit-logs?${query}`);
 
-  const updateTargetType = (value: string) => {
-    setTargetType(value);
-    setPage(1);
-  };
-  const updateTargetId = (value: string) => {
-    setTargetId(value);
+  // Any filter change resets to the first page; the old page may not exist any more.
+  const updateFilters = (next: AuditFilters) => {
+    setFilters(next);
     setPage(1);
   };
 
   return (
     <Panel title="Audit logs">
-      <div className="mb-3 grid gap-2 sm:grid-cols-2">
-        <Field label="Target type"><input className="desk-input" placeholder="e.g. inventory.inventoryproduct" value={targetType} onChange={(e) => updateTargetType(e.target.value)} /></Field>
-        <Field label="Target ID"><input className="desk-input" value={targetId} onChange={(e) => updateTargetId(e.target.value)} /></Field>
-      </div>
+      <AuditLogFilters filters={filters} onChange={updateFilters} />
+      <AuditVerificationStatus makerspaceId={filters.makerspace} params={filterParams} />
       <div className="grid gap-2 text-sm">
         {logs.error ? <p className="text-sm text-danger">{logs.error.message}</p> : null}
         {logs.isLoading ? <AuditLogSkeleton /> : null}
         {logs.data?.results?.map((log) => (
           <div key={log.id} className="rounded-md border border-line bg-surface p-2">
-            <span className="font-semibold">{log.action}</span>
+            <span className="font-semibold">{log.action_label}</span>
+            <span className="ml-2 font-mono text-xs text-muted">{log.action}</span>
+            {log.actor_display ? <span className="ml-2 text-muted">by {log.actor_display}</span> : null}
             <span className="ml-2 text-muted">{log.target_type}:{log.target_id}</span>
             <span className="ml-2 font-mono text-muted">{formatLocalDateTime(log.created_at)}</span>
+            <MetaLine meta={log.meta} redacted={log.meta_redacted} />
           </div>
         ))}
       </div>
@@ -70,6 +69,18 @@ export function AuditLog() {
         </button>
       </div>
     </Panel>
+  );
+}
+
+// Only the server's projected metadata is ever rendered; there is no raw-meta field.
+function MetaLine({ meta, redacted }: { meta: Record<string, unknown>; redacted: boolean }) {
+  const entries = Object.entries(meta ?? {});
+  if (!entries.length && !redacted) return null;
+  return (
+    <p className="mt-1 text-xs text-muted">
+      {entries.map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : String(value)}`).join(" · ")}
+      {redacted ? <span className="ml-1 italic">(some details withheld)</span> : null}
+    </p>
   );
 }
 

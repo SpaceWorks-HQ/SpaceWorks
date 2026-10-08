@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { downloadStaffFile } from "../../../lib/api";
 import { ReportSchedules } from "./ReportSchedules";
 import { Panel } from "./shared";
-import type { ReportCatalog, ReportKey } from "./operationsReportsConfig";
+import { reportFormats, type ReportCatalog, type ReportKey } from "./operationsReportsConfig";
 
 type ReportEntry = ReportCatalog["results"][number];
 
@@ -47,12 +47,11 @@ export function OperationsReportExports({
             <div key={definition.key} className={`rounded-md border p-3 ${selectedReport === definition.key ? "border-accent bg-accent/10" : "border-line bg-bg"}`}>
               <h3 className="title-section">{definition.title}</h3>
               <div className="mt-3 flex gap-2">
-                <button className="desk-button-ghost" type="button" disabled={exportReport.isPending} onClick={() => { onSelect(definition.key); exportReport.mutate({ report: definition.key, format: "csv" }); }}>
-                  CSV
-                </button>
-                <button className="desk-button-ghost" type="button" disabled={exportReport.isPending} onClick={() => { onSelect(definition.key); exportReport.mutate({ report: definition.key, format: "xlsx" }); }}>
-                  XLSX
-                </button>
+                {reportFormats(definition).map((format) => (
+                  <button key={format} className="desk-button-ghost" type="button" disabled={exportReport.isPending} onClick={() => { onSelect(definition.key); exportReport.mutate({ report: definition.key, format }); }}>
+                    {format.toUpperCase()}
+                  </button>
+                ))}
               </div>
             </div>
           ))}
@@ -64,7 +63,11 @@ export function OperationsReportExports({
         ) : null}
       </Panel>
 
-      {!aggregate && reportsEnabled ? <ReportSchedules makerspaceId={makerspaceId} reports={reports} /> : null}
+      {/* Only schedulable definitions reach schedules: email/chat delivery of e.g. the
+          audit trail would broaden custody of accountability data. */}
+      {!aggregate && reportsEnabled ? (
+        <ReportSchedules makerspaceId={makerspaceId} reports={reports.filter((report) => report.schedulable !== false)} />
+      ) : null}
     </>
   );
 }

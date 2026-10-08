@@ -9,6 +9,8 @@ type TimelineEvent = {
   actor: Actor | null;
   detail: Record<string, unknown>;
   evidence_id: number | null;
+  // `null` means only "no retention-state row" -- never proof the photo bytes exist.
+  evidence_retention?: { state: "expiring" | "expired"; object_expired_at: string | null } | null;
 };
 type RequestTimelineResponse = { request_id: number; limit: number; truncated: boolean; events: TimelineEvent[] };
 type AssetGroup = { asset_id: number | null; asset_tag: string; serial_number: string; status: string; events: TimelineEvent[] };
@@ -99,10 +101,13 @@ function EventList({ events, truncated }: { events: TimelineEvent[]; truncated: 
     <ul className="eyebrow mt-2 grid gap-1">
       {events.map((event, index) => (
         <li key={`${event.kind}-${String(event.detail.id ?? index)}-${event.at}`} className="rounded-md border border-line bg-surface px-2 py-1">
-          <span className="font-medium text-ink">{humanize(event.kind)}</span> on {formatDate(event.at)}
+          <span className="font-medium text-ink">
+            {event.kind === "audit" ? String(event.detail.action_label ?? "Audit entry") : humanize(event.kind)}
+          </span> on {formatDate(event.at)}
           {event.actor ? ` by ${formatActor(event.actor)}` : ""}
           {event.evidence_id ? ` | evidence #${event.evidence_id}` : ""}
-          <DetailText detail={event.detail} />
+          {event.evidence_retention ? ` (photo ${retentionLabel(event.evidence_retention)})` : ""}
+          {event.kind === "audit" ? <AuditDetail detail={event.detail} /> : <DetailText detail={event.detail} />}
         </li>
       ))}
       {truncated ? <li className="text-muted">History truncated at the requested limit.</li> : null}
@@ -116,6 +121,19 @@ function DetailText({ detail }: { detail: Record<string, unknown> }) {
     .filter((value) => value !== undefined && value !== null && value !== "")
     .map(String);
   return parts.length ? <span> | {parts.join(" | ")}</span> : null;
+}
+
+function AuditDetail({ detail }: { detail: Record<string, unknown> }) {
+  const meta = (detail.meta ?? {}) as Record<string, unknown>;
+  const parts = Object.entries(meta).map(([key, value]) => `${key}: ${String(value)}`);
+  if (detail.meta_redacted) parts.push("some details withheld");
+  return parts.length ? <span> | {parts.join(" | ")}</span> : null;
+}
+
+function retentionLabel(retention: NonNullable<TimelineEvent["evidence_retention"]>) {
+  return retention.state === "expired"
+    ? `bytes expired${retention.object_expired_at ? ` ${formatDate(retention.object_expired_at)}` : ""}`
+    : "scheduled to expire";
 }
 
 function formatActor(actor: Actor) {

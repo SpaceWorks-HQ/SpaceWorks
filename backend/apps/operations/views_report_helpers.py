@@ -9,7 +9,7 @@ from apps.accounts import rbac
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
 from apps.operations import reports
-from apps.operations.report_registry import REPORT_DEFINITIONS
+from apps.operations.report_registry import REPORT_DEFINITIONS, REPORT_REGISTRY
 
 
 def _require_source_modules(makerspace, modules):
@@ -50,6 +50,27 @@ def _makerspace_for_inventory_view(user, makerspace_id):
     )
     queryset = rbac.hide_from_superadmin(user, queryset, field="id")
     return get_object_or_404(queryset, pk=makerspace_id)
+
+
+def _makerspace_for_report_view(user, makerspace_id, report_key):
+    """Inventory scope UNION the requested report's own action scope.
+
+    Resolving through inventory alone locked out a VIEW_AUDIT-only reader (custom role or
+    organization grant) of the audit report. The union keeps the pinned matrix: an
+    inventory-visible actor without the report action still resolves and gets 403 from
+    the explicit check; an actor with neither still gets 404; and an unknown key adds
+    nothing, so it cannot help an actor with no inventory scope enumerate a makerspace.
+    The registry lookup never invokes a builder.
+    """
+    spaces = Makerspace.objects.all()
+    queryset = rbac.scope_by_action(user, rbac.Action.VIEW_INVENTORY, spaces, field="id")
+    definition = REPORT_REGISTRY.get(report_key)
+    if definition is not None:
+        queryset = queryset | rbac.scope_by_action(
+            user, definition.required_action, spaces, field="id"
+        )
+    queryset = rbac.hide_from_superadmin(user, queryset, field="id")
+    return get_object_or_404(queryset.distinct(), pk=makerspace_id)
 
 
 def _makerspace_for_catalog(user, makerspace_id):

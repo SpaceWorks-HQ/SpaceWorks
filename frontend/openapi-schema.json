@@ -1197,20 +1197,40 @@
         "/api/v1/admin/audit-logs": {
             "get": {
                 "operationId": "api_v1_admin_audit_logs_list",
+                "description": "Tenant- and VIEW_AUDIT-scoped audit rows, newest first, 24 per page. `meta` is the presentation-catalogue projection, never the raw stored metadata; unknown or dynamically built actions expose `{}`. `start` is inclusive, `end` exclusive, and a start/end range may span at most 366 days. A valid but out-of-scope makerspace yields an empty page.",
                 "summary": "List audit log entries",
                 "parameters": [
                     {
                         "in": "query",
                         "name": "action",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "maxLength": 128,
+                            "minLength": 1
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "actor",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "end",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
                         }
                     },
                     {
                         "in": "query",
                         "name": "makerspace",
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "minimum": 1
                         }
                     },
                     {
@@ -1224,16 +1244,28 @@
                     },
                     {
                         "in": "query",
+                        "name": "start",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "target_id",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "maxLength": 100,
+                            "minLength": 1
                         }
                     },
                     {
                         "in": "query",
                         "name": "target_type",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "maxLength": 200,
+                            "minLength": 1
                         }
                     }
                 ],
@@ -1255,6 +1287,9 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid filter."
                     }
                 }
             }
@@ -14967,6 +15002,213 @@
                 }
             }
         },
+        "/api/v1/admin/makerspace/{makerspace_id}/audit-verifications": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_audit_verifications_list",
+                "summary": "List audit verification runs for one makerspace",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Audit verification"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/VerificationRun"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuditVerificationError"
+                                }
+                            }
+                        },
+                        "description": "Invalid filters, `narrow_audit_range` or `audit_verification_scope_too_large`."
+                    },
+                    "401": {
+                        "description": "Not authenticated."
+                    },
+                    "403": {
+                        "description": "Not active staff."
+                    },
+                    "404": {
+                        "description": "Makerspace or run not in the caller's VIEW_AUDIT scope."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspace_audit_verifications_create",
+                "description": "Always asynchronous: 202 with the new or deduplicated run (`deduplicated`), then poll `status_url`. One active run per makerspace (409 `audit_verification_busy`); at most 10,000 selected rows and bounded expanded work (400); throttled per user (429).",
+                "summary": "Request asynchronous verification of the filtered audit rows",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Audit verification"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VerificationRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VerificationRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VerificationRequest"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VerificationAccepted"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuditVerificationError"
+                                }
+                            }
+                        },
+                        "description": "`audit_verification_busy`."
+                    },
+                    "429": {
+                        "description": "Throttled."
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuditVerificationError"
+                                }
+                            }
+                        },
+                        "description": "Invalid filters, `narrow_audit_range` or `audit_verification_scope_too_large`."
+                    },
+                    "401": {
+                        "description": "Not authenticated."
+                    },
+                    "403": {
+                        "description": "Not active staff."
+                    },
+                    "404": {
+                        "description": "Makerspace or run not in the caller's VIEW_AUDIT scope."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/audit-verifications/{run_id}": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_audit_verifications_retrieve",
+                "summary": "Read one audit verification run's latest state and coverage",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "run_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Audit verification"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VerificationRun"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuditVerificationError"
+                                }
+                            }
+                        },
+                        "description": "Invalid filters, `narrow_audit_range` or `audit_verification_scope_too_large`."
+                    },
+                    "401": {
+                        "description": "Not authenticated."
+                    },
+                    "403": {
+                        "description": "Not active staff."
+                    },
+                    "404": {
+                        "description": "Makerspace or run not in the caller's VIEW_AUDIT scope."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/makerspace/{makerspace_id}/backups": {
             "get": {
                 "operationId": "api_v1_admin_makerspace_backups_list",
@@ -20040,6 +20282,7 @@
                             "type": "string",
                             "enum": [
                                 "active-loans",
+                                "audit-trail",
                                 "booking-utilization",
                                 "certification-coverage",
                                 "communications-health",
@@ -31697,6 +31940,7 @@
         "/api/v1/admin/requests/{id}/timeline": {
             "get": {
                 "operationId": "api_v1_admin_requests_timeline_retrieve",
+                "description": "Scans, evidence, asset outcomes, accountability, problem reports and related audit rows (`kind=audit`; metadata is the presentation-catalogue projection), ordered by (at, kind, source id). Events with an `evidence_id` carry `evidence_retention` (`null` = no retention-state row, not proof the bytes exist). No object key or signed URL is ever returned; photo bytes stay behind the UPLOAD_EVIDENCE-gated evidence endpoint.",
                 "summary": "Read-only immutable timeline for one hardware request",
                 "parameters": [
                     {
@@ -43680,6 +43924,14 @@
                     "tracking_mode"
                 ]
             },
+            "AllowedFormatsEnum": {
+                "enum": [
+                    "csv",
+                    "xlsx"
+                ],
+                "type": "string",
+                "description": "* `csv` - csv\n* `xlsx` - xlsx"
+            },
             "AnalyticsReportResponse": {
                 "oneOf": [
                     {
@@ -43772,6 +44024,17 @@
                     "missing_quantity",
                     "products"
                 ]
+            },
+            "AnchorStatusEnum": {
+                "enum": [
+                    "pending",
+                    "not_configured",
+                    "externally_anchored",
+                    "invalid",
+                    "unavailable"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `not_configured` - Not configured\n* `externally_anchored` - Externally anchored\n* `invalid` - Invalid\n* `unavailable` - Unavailable"
             },
             "ApiClient": {
                 "type": "object",
@@ -44641,33 +44904,102 @@
                     },
                     "actor": {
                         "type": "integer",
+                        "readOnly": true,
                         "nullable": true
                     },
                     "action": {
                         "type": "string",
-                        "maxLength": 100
+                        "readOnly": true
                     },
                     "makerspace": {
                         "type": "integer",
+                        "readOnly": true,
                         "nullable": true
                     },
                     "target_type": {
                         "type": "string",
-                        "maxLength": 200
+                        "readOnly": true
                     },
                     "target_id": {
                         "type": "string",
-                        "maxLength": 100
+                        "readOnly": true
                     },
-                    "meta": {},
+                    "meta": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true
+                    },
                     "created_at": {
                         "type": "string",
-                        "format": "date-time"
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "action_label": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "actor_display": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "meta_redacted": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "target_link": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AuditTargetLink"
+                            }
+                        ],
+                        "nullable": true,
+                        "readOnly": true
                     }
                 },
                 "required": [
                     "action",
-                    "id"
+                    "action_label",
+                    "actor",
+                    "actor_display",
+                    "created_at",
+                    "id",
+                    "makerspace",
+                    "meta",
+                    "meta_redacted",
+                    "target_id",
+                    "target_link",
+                    "target_type"
+                ]
+            },
+            "AuditTargetLink": {
+                "type": "object",
+                "properties": {
+                    "label": {
+                        "type": "string"
+                    },
+                    "path": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "label",
+                    "path"
+                ]
+            },
+            "AuditVerificationError": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "detail"
                 ]
             },
             "AuthMembership": {
@@ -46052,6 +46384,16 @@
                     "name",
                     "updated_at"
                 ]
+            },
+            "ChainStatusEnum": {
+                "enum": [
+                    "pending",
+                    "locally_verified",
+                    "invalid",
+                    "unavailable"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `locally_verified` - Locally verified\n* `invalid` - Invalid\n* `unavailable` - Unavailable"
             },
             "ChangePassword": {
                 "type": "object",
@@ -49290,6 +49632,24 @@
                     "url"
                 ]
             },
+            "EvidenceRetention": {
+                "type": "object",
+                "description": "Retention coordination only: ``null`` on the event means no state row exists,\nwhich is NOT a claim that the bytes are available.",
+                "properties": {
+                    "state": {
+                        "$ref": "#/components/schemas/EvidenceRetentionStateEnum"
+                    },
+                    "object_expired_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "object_expired_at",
+                    "state"
+                ]
+            },
             "EvidenceRetentionPolicy": {
                 "type": "object",
                 "properties": {
@@ -49361,6 +49721,14 @@
                     "object_candidates",
                     "policy_days"
                 ]
+            },
+            "EvidenceRetentionStateEnum": {
+                "enum": [
+                    "expiring",
+                    "expired"
+                ],
+                "type": "string",
+                "description": "* `expiring` - expiring\n* `expired` - expired"
             },
             "EvidenceUrlRequest": {
                 "type": "object",
@@ -53745,7 +54113,8 @@
                                 "$ref": "#/components/schemas/MakerspaceArchiveRequestStatusEnum"
                             }
                         ],
-                        "readOnly": true
+                        "readOnly": true,
+                        "default": "pending"
                     }
                 },
                 "required": [
@@ -64452,17 +64821,32 @@
                     },
                     "aggregate_supported": {
                         "type": "boolean"
+                    },
+                    "allowed_formats": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AllowedFormatsEnum"
+                        }
+                    },
+                    "schedulable": {
+                        "type": "boolean"
+                    },
+                    "previewable": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
                     "aggregate_supported",
+                    "allowed_formats",
                     "available",
                     "chart_hint",
                     "exportable",
                     "fields",
                     "grains",
                     "key",
+                    "previewable",
                     "required_modules",
+                    "schedulable",
                     "summary",
                     "title",
                     "unavailable_reason"
@@ -64564,10 +64948,11 @@
                     "communications-health",
                     "community-engagement",
                     "certification-coverage",
-                    "module-operational-health"
+                    "module-operational-health",
+                    "audit-trail"
                 ],
                 "type": "string",
-                "description": "* `summary` - summary\n* `taken-items` - taken-items\n* `active-loans` - active-loans\n* `returns` - returns\n* `damaged-missing` - damaged-missing\n* `damaged-lost` - damaged-lost\n* `qr-scans` - qr-scans\n* `most-lent` - most-lent\n* `top-borrowers` - top-borrowers\n* `recently-added` - recently-added\n* `machine-usage` - machine-usage\n* `event-attendance` - event-attendance\n* `booking-utilization` - booking-utilization\n* `maintenance-activity` - maintenance-activity\n* `member-activity` - member-activity\n* `machine-service` - machine-service\n* `printer-service` - printer-service\n* `fablab-health` - fablab-health\n* `payment-reconciliation` - payment-reconciliation\n* `loan-throughput` - loan-throughput\n* `inventory-control` - inventory-control\n* `evidence-compliance` - evidence-compliance\n* `import-quality` - import-quality\n* `procurement-performance` - procurement-performance\n* `communications-health` - communications-health\n* `community-engagement` - community-engagement\n* `certification-coverage` - certification-coverage\n* `module-operational-health` - module-operational-health"
+                "description": "* `summary` - summary\n* `taken-items` - taken-items\n* `active-loans` - active-loans\n* `returns` - returns\n* `damaged-missing` - damaged-missing\n* `damaged-lost` - damaged-lost\n* `qr-scans` - qr-scans\n* `most-lent` - most-lent\n* `top-borrowers` - top-borrowers\n* `recently-added` - recently-added\n* `machine-usage` - machine-usage\n* `event-attendance` - event-attendance\n* `booking-utilization` - booking-utilization\n* `maintenance-activity` - maintenance-activity\n* `member-activity` - member-activity\n* `machine-service` - machine-service\n* `printer-service` - printer-service\n* `fablab-health` - fablab-health\n* `payment-reconciliation` - payment-reconciliation\n* `loan-throughput` - loan-throughput\n* `inventory-control` - inventory-control\n* `evidence-compliance` - evidence-compliance\n* `import-quality` - import-quality\n* `procurement-performance` - procurement-performance\n* `communications-health` - communications-health\n* `community-engagement` - community-engagement\n* `certification-coverage` - certification-coverage\n* `module-operational-health` - module-operational-health\n* `audit-trail` - audit-trail"
             },
             "ReportSchedule": {
                 "type": "object",
@@ -67232,7 +67617,8 @@
                 "type": "object",
                 "properties": {
                     "kind": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Event kind. `audit` events carry `detail.action`, `detail.action_label`, projected `detail.meta`, `detail.meta_redacted` and `detail.target_link`."
                     },
                     "at": {
                         "type": "string",
@@ -67252,6 +67638,14 @@
                     },
                     "evidence_id": {
                         "type": "integer",
+                        "nullable": true
+                    },
+                    "evidence_retention": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/EvidenceRetention"
+                            }
+                        ],
                         "nullable": true
                     }
                 },
@@ -67894,6 +68288,124 @@
                 "type": "string",
                 "description": "* `superadmin` - Super Admin\n* `space_manager` - Space Manager\n* `requester` - Requester"
             },
+            "VerificationAccepted": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "state": {
+                        "type": "string"
+                    },
+                    "deduplicated": {
+                        "type": "boolean"
+                    },
+                    "status_url": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "deduplicated",
+                    "id",
+                    "state",
+                    "status_url"
+                ]
+            },
+            "VerificationCoverage": {
+                "type": "object",
+                "properties": {
+                    "attempt": {
+                        "type": "integer"
+                    },
+                    "chain_status": {
+                        "$ref": "#/components/schemas/ChainStatusEnum"
+                    },
+                    "anchor_status": {
+                        "$ref": "#/components/schemas/AnchorStatusEnum"
+                    },
+                    "row_count": {
+                        "type": "integer"
+                    },
+                    "mac_valid_count": {
+                        "type": "integer"
+                    },
+                    "unattested_count": {
+                        "type": "integer"
+                    },
+                    "mac_invalid_count": {
+                        "type": "integer"
+                    },
+                    "mac_unavailable_count": {
+                        "type": "integer"
+                    },
+                    "unbatched_count": {
+                        "type": "integer"
+                    },
+                    "local_batch_verified_count": {
+                        "type": "integer"
+                    },
+                    "batch_invalid_count": {
+                        "type": "integer"
+                    },
+                    "batch_unavailable_count": {
+                        "type": "integer"
+                    },
+                    "externally_anchored_count": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "anchor_status",
+                    "attempt",
+                    "batch_invalid_count",
+                    "batch_unavailable_count",
+                    "chain_status",
+                    "externally_anchored_count",
+                    "local_batch_verified_count",
+                    "mac_invalid_count",
+                    "mac_unavailable_count",
+                    "mac_valid_count",
+                    "row_count",
+                    "unattested_count",
+                    "unbatched_count"
+                ]
+            },
+            "VerificationFilters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string"
+                    },
+                    "target_type": {
+                        "type": "string"
+                    },
+                    "target_id": {
+                        "type": "string"
+                    },
+                    "actor": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "start": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "end": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "action",
+                    "actor",
+                    "end",
+                    "start",
+                    "target_id",
+                    "target_type"
+                ]
+            },
             "VerificationReport": {
                 "type": "object",
                 "properties": {
@@ -67935,6 +68447,112 @@
                     "resolved",
                     "target_makerspace_id"
                 ]
+            },
+            "VerificationRequest": {
+                "type": "object",
+                "description": "The audit-list filters, minus ``makerspace`` (it comes from the path).",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "maxLength": 128
+                    },
+                    "target_type": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "target_id": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "actor": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "start": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "end": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "VerificationRun": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "makerspace": {
+                        "type": "integer"
+                    },
+                    "state": {
+                        "$ref": "#/components/schemas/VerificationRunStateEnum"
+                    },
+                    "terminal": {
+                        "type": "boolean"
+                    },
+                    "snapshot_max_id": {
+                        "type": "integer"
+                    },
+                    "filters": {
+                        "$ref": "#/components/schemas/VerificationFilters"
+                    },
+                    "coverage": {
+                        "$ref": "#/components/schemas/VerificationCoverage"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "status_url": {
+                        "type": "string"
+                    },
+                    "failure_code": {
+                        "type": "string",
+                        "description": "Superuser only: closed operational failure code."
+                    },
+                    "first_audit_log_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Superuser only diagnostic."
+                    },
+                    "first_batch_seq": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Superuser only diagnostic."
+                    }
+                },
+                "required": [
+                    "coverage",
+                    "created_at",
+                    "filters",
+                    "id",
+                    "makerspace",
+                    "snapshot_max_id",
+                    "state",
+                    "status_url",
+                    "terminal",
+                    "updated_at"
+                ]
+            },
+            "VerificationRunStateEnum": {
+                "enum": [
+                    "QUEUED",
+                    "RUNNING",
+                    "RETRYING",
+                    "SUCCEEDED",
+                    "INCOMPLETE",
+                    "FAILED",
+                    "TIMED_OUT"
+                ],
+                "type": "string",
+                "description": "* `QUEUED` - Queued\n* `RUNNING` - Running\n* `RETRYING` - Retrying\n* `SUCCEEDED` - Succeeded\n* `INCOMPLETE` - Incomplete\n* `FAILED` - Failed\n* `TIMED_OUT` - Timed out"
             },
             "WaiverAcceptResponse": {
                 "type": "object",

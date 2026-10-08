@@ -9,7 +9,11 @@ from apps.makerspaces.guards import require_module
 from apps.makerspaces.platform import module_enabled
 from apps.operations import accountability, reports
 from apps.operations.org_report_strategies import STRATEGIES
-from apps.operations.report_registry import REPORT_DEFINITIONS
+from apps.operations.report_registry import (
+    DEPLOYMENT_AGGREGATE_REPORT_DEFINITIONS,
+    DEPLOYMENT_AGGREGATE_REPORT_KEYS,
+    REPORT_DEFINITIONS,
+)
 from apps.operations.report_exports import _csv_response, _xlsx_cell, _xlsx_response
 from apps.operations.report_exports_provenance import (
     actor_label,
@@ -33,6 +37,7 @@ from apps.operations.views_report_helpers import (
     _limit_param,
     _makerspace_for_catalog,
     _makerspace_for_inventory_view,
+    _makerspace_for_report_view,
     _page_params,
     _require_source_modules,
     _require_superadmin,
@@ -66,8 +71,10 @@ class AnalyticsView(APIView):
         # own action would turn "you may not run this report" into a 404 instead of a
         # 403, which is the contract pinned by
         # test_report_rbac_status_codes_match_inventory_first_resolution.
-        makerspace = _makerspace_for_inventory_view(request.user, makerspace_id)
+        makerspace = _makerspace_for_report_view(request.user, makerspace_id, report_key)
         definition = reports.validate_report_key(report_key)
+        if not definition.previewable:
+            raise reports.ReportNotFound()
         require_action(request.user, definition.required_action, makerspace.id)
         require_module(makerspace, "reports")
         _require_source_modules(makerspace, definition.required_modules)
@@ -113,7 +120,7 @@ class AggregateReportCatalogView(APIView):
         _require_superadmin(request.user)
         return Response({"results": [
             _catalog_entry(definition, available=None, reason=None)
-            for definition in REPORT_DEFINITIONS
+            for definition in DEPLOYMENT_AGGREGATE_REPORT_DEFINITIONS
         ]})
 
 
@@ -139,18 +146,21 @@ class AggregateAnalyticsView(APIView):
     @extend_schema(
         tags=["Analytics"], summary="Get aggregate analytics report", request=None,
         parameters=[
-            OpenApiParameter("report_key", OpenApiTypes.STR, OpenApiParameter.PATH, enum=reports.REPORT_KEYS),
+            OpenApiParameter(
+                "report_key", OpenApiTypes.STR, OpenApiParameter.PATH,
+                enum=DEPLOYMENT_AGGREGATE_REPORT_KEYS,
+            ),
             *PREVIEW_PARAMETERS,
         ],
         responses={200: ANALYTICS_REPORT_RESPONSE, **ERROR_RESPONSES},
     )
     def get(self, request, report_key="summary", *args, **kwargs):
         _require_superadmin(request.user)
-        reports.validate_report_key(report_key)
+        definition = reports.validate_report_key(report_key, deployment_aggregate=True)
         return Response(reports.report_data(
             report_key, limit=_limit_param(request), date_range=_date_range(request),
             report_filters=_report_filters(request, report_key),
-            grain=_grain_param(request, reports.validate_report_key(report_key)),
+            grain=_grain_param(request, definition),
         ))
 
 
@@ -174,7 +184,7 @@ class ReportExportView(APIView):
         # own action would turn "you may not run this report" into a 404 instead of a
         # 403, which is the contract pinned by
         # test_report_rbac_status_codes_match_inventory_first_resolution.
-        makerspace = _makerspace_for_inventory_view(request.user, makerspace_id)
+        makerspace = _makerspace_for_report_view(request.user, makerspace_id, report_key)
         definition = reports.validate_report_key(report_key, for_export=True)
         require_action(request.user, definition.required_action, makerspace.id)
         require_module(makerspace, "reports")
@@ -189,7 +199,7 @@ class AggregateReportExportView(APIView):
     @extend_schema(
         tags=["Reports"], summary="Export aggregate report", request=None,
         parameters=[
-            OpenApiParameter("report_key", OpenApiTypes.STR, OpenApiParameter.PATH, enum=reports.REPORT_KEYS),
+            OpenApiParameter("report_key", OpenApiTypes.STR, OpenApiParameter.PATH, enum=DEPLOYMENT_AGGREGATE_REPORT_KEYS),
             OpenApiParameter("format", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["csv", "xlsx"]),
             *DATE_RANGE_PARAMETERS,
             *PAYMENT_FILTER_PARAMETERS,
@@ -199,7 +209,9 @@ class AggregateReportExportView(APIView):
     )
     def get(self, request, report_key, *args, **kwargs):
         _require_superadmin(request.user)
-        definition = reports.validate_report_key(report_key, for_export=True)
+        definition = reports.validate_report_key(
+            report_key, for_export=True, deployment_aggregate=True
+        )
         return _export_response(request, definition, None)
 
 
@@ -209,7 +221,7 @@ def _export_response(request, definition, makerspace_id):
     Every input the builder saw is echoed into the provenance filters, so a reader of the
     file can tell what subset it is without the URL that produced it.
     """
-    fmt = _export_format(request)
+    fmt = _export_format(request, definition)
     date_range = _date_range(request)
     report_filters = _report_filters(request, definition.key)
     grain = _grain_param(request, definition)
@@ -243,4 +255,6 @@ def _catalog_entry(definition, *, available, reason):
         "available": available, "unavailable_reason": reason,
         "grains": list(definition.grains or ("day",)), "chart_hint": definition.chart_hint,
         "aggregate_supported": definition.key in STRATEGIES,
+        "allowed_formats": list(definition.allowed_formats),
+        "schedulable": definition.schedulable, "previewable": definition.previewable,
     }
