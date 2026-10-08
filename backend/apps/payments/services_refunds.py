@@ -21,6 +21,7 @@ from rest_framework.exceptions import APIException
 
 from apps.audit import services as audit
 from apps.payments.models import Payment, Refund
+from apps.payments.money import to_minor_units
 from apps.payments.providers import PaymentsUnavailable, RefundRequest, get_provider
 from apps.payments.resolution import source_for_payment
 
@@ -102,7 +103,7 @@ def _send_to_provider(refund):
             RefundRequest(
                 payment_id=provider_payment_id or "",
                 # Integer minor units; a float here reconciles as a real money difference.
-                amount_minor=int(refund.amount * 100),
+                amount_minor=to_minor_units(refund.amount, refund.currency),
                 currency=refund.currency,
                 reference=str(refund.pk),
                 idempotency_key=f"payment-refund-{refund.pk}",

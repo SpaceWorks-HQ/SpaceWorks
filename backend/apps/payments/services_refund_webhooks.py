@@ -12,6 +12,7 @@ import logging
 from django.db import IntegrityError, transaction
 
 from apps.payments.models import Payment, ProcessedStripeEvent, Refund
+from apps.payments.money import to_minor_units
 from apps.payments.services_refunds import settle_refund
 
 logger = logging.getLogger(__name__)
@@ -137,6 +138,9 @@ def _match_refund(payment, external_id, amount_minor):
         return bound
     unbound = rows.filter(external_refund_id__isnull=True, status=Refund.Status.PENDING)
     if amount_minor:
-        unbound = [row for row in unbound.order_by("created_at", "pk") if int(row.amount * 100) == amount_minor]
+        unbound = [
+            row for row in unbound.order_by("created_at", "pk")
+            if to_minor_units(row.amount, row.currency) == amount_minor
+        ]
         return unbound[0] if unbound else None
     return unbound.order_by("created_at", "pk").first()

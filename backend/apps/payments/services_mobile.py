@@ -3,6 +3,7 @@ from django.db import transaction
 from apps.audit import services as audit
 from apps.payments import stripe_client
 from apps.payments.connect import refresh_connected_account
+from apps.payments.money import to_minor_units
 from apps.payments.models import (
     MakerspacePaymentSettings,
     Payment,
@@ -134,7 +135,7 @@ def _validate_connect_source(payment, merchant):
 
 def _intent_params(payment):
     params = {
-        'amount': int(payment.amount * 100),
+        'amount': to_minor_units(payment.amount, payment.currency),
         'currency': payment.currency,
         'automatic_payment_methods': {'enabled': True},
         'metadata': {

@@ -47,7 +47,7 @@ def create_payment(
         vendor = source.vendor
         provider = source.provider
         connected_account_id = source.connected_account_id
-        fee_amount = _application_fee_amount(amount, source.application_fee_bps)
+        fee_amount = _application_fee_amount(amount, source.application_fee_bps, currency)
     payment = Payment.objects.create(
         makerspace=makerspace,
         subject_type=subject_type,

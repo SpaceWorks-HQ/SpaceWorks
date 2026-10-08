@@ -16,6 +16,7 @@ from django.db import transaction
 from apps.makerspaces.platform import member_payment_return_url
 from apps.payments import stripe_client
 from apps.payments.checkout_expiry import live_checkout_url
+from apps.payments.money import to_minor_units
 from apps.payments.connect import refresh_connected_account, restrict_account_status
 from apps.payments.models import (
     MakerspacePaymentSettings,
@@ -65,7 +66,7 @@ def _claim_provider(payment):
     payment.stripe_provider = source.provider
     payment.stripe_connected_account_id = source.connected_account_id
     payment.stripe_application_fee_amount = _application_fee_amount(
-        payment.amount, source.application_fee_bps
+        payment.amount, source.application_fee_bps, payment.currency
     )
     payment.save(
         update_fields=[
@@ -196,7 +197,7 @@ def _create_checkout_url_atomic(payment_id, *, actor=None):
             "success_url": f"{member_url}?checkout=success",
             "cancel_url": f"{member_url}?checkout=cancelled",
             "metadata": {"payment_id": str(payment.pk), "makerspace_id": str(payment.makerspace_id)},
-            "line_items": [{"price_data": {"currency": payment.currency, "unit_amount": int(payment.amount * 100), "product_data": {"name": label}}, "quantity": 1}],
+            "line_items": [{"price_data": {"currency": payment.currency, "unit_amount": to_minor_units(payment.amount, payment.currency), "product_data": {"name": label}}, "quantity": 1}],
         }
         if payment.stripe_application_fee_amount:
             checkout_params["payment_intent_data"] = {
@@ -247,7 +248,7 @@ def _create_checkout_via_provider(payment, source, label, member_url):
         CheckoutRequest(
             # Integer minor units. A float here is a rounding bug that reconciles as a
             # real money difference.
-            amount_minor=int(payment.amount * 100),
+            amount_minor=to_minor_units(payment.amount, payment.currency),
             currency=payment.currency,
             description=label,
             reference=str(payment.pk),
@@ -274,8 +275,8 @@ def _value(value, key):
     return value.get(key) if isinstance(value, dict) else getattr(value, key, None)
 
 
-def _application_fee_amount(amount, basis_points):
-    minor_units = (Decimal(amount) * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+def _application_fee_amount(amount, basis_points, currency):
+    minor_units = Decimal(to_minor_units(amount, currency))
     return int(
         (minor_units * Decimal(basis_points) / Decimal(10000)).quantize(
             Decimal("1"), rounding=ROUND_HALF_UP
