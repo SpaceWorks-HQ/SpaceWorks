@@ -17,7 +17,7 @@ SpaceWorks makes traceability part of the workflow rather than an optional note:
 - A reviewed hardware request cannot be issued until staff scan a box QR code and attach an issue photo.
 - Member self-checkout and staff direct handout require an eligible tool plus uploaded issue evidence.
 - A return requires a return photo and a written remark.
-- Issue and return photos, QR scan records and audit history are immutable or append-only.
+- Attached issue and return photos, QR scan records and audit history are immutable or append-only; abandoned upload slots are not handover evidence.
 - Lost or damaged items can close a request with an issue and connect the incident to the member's access status.
 - The same controlled workflow handles decisions made in the staff console or from Telegram, so chat does not create a second, less accountable route around the rules.
 
@@ -254,7 +254,7 @@ accurate record over a cosmetically empty database.
 - Keep evidence in private object storage and serve it only through short-lived signed URLs to active,
   authorized staff.
 - Keep integration secrets encrypted at rest and write-only in staff-facing APIs.
-- Make evidence and QR scan records immutable and the audit log append-only, including database-level
+- Make attached evidence and QR scan records immutable and the audit log append-only, including database-level
   protection for audit rows.
 - Rate-limit login and public request submission, lock out repeated admin-login failures, and use a hidden honeypot field against automated public submissions.
 - Apply production security headers and an always-on Content Security Policy; run dependency auditing in

@@ -71,8 +71,10 @@ channel only. Two architectural rules are load-bearing and easy to violate if yo
   inventory reservation/issue/return.
 - **Inventory Availability** — quantity math + asset status for QR-tracked tools.
 - **QR Code & Box** — generates/resolves/revokes QR codes, assigns boxes to requests, tracks scan history.
-- **Evidence Photo** — immutable issue/return photo metadata linked to actor + request + QR scans; private
-  object bytes may expire under the evidence-retention policy and are never public.
+- **Evidence Photo** — issue/return photo metadata, immutable once attached, linked to actor + request + QR
+  scans; private object bytes may expire under the evidence-retention policy and are never public. Attached
+  rows are never deleted; only a post-marker presign proven `unconsumed` may be removed by the separate,
+  default-off abandoned-upload cleanup (**Abandoned-upload cleanup** in `docs/INVARIANTS.md`).
 - **Check-In API Client** — **RETIRED** (`73a480c`, Part M7). `apps/checkin/` no longer exists and there is
   no `CHECKIN_MODE` setting. Requester identity now comes from authenticated member accounts, so there is no
   external verify dependency left to fail safe on.
@@ -156,6 +158,7 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   charge here and holds no membership, so an account-only loan borrower can read their own debt;
   a REVOKED member is still refused.
 - Evidence photo **rows** and QR scan records are **immutable**; audit logs are **append-only**. Evidence retention may delete every final and staging object version only after the configured window, but it does not update or delete the retained `EvidencePhoto` row.
+- **Attached evidence is never deleted.** The only photo UPDATE is the one-way `consumption_state → consumed` mark (`evidence/consumption.py`) every consuming workflow makes in its attachment transaction; legacy and imported rows are `legacy_unknown` and never eligible. Abandoned-upload cleanup (deployment switch **and** tenant opt-in, both default off) may delete only an old `unconsumed` presign with no inbound FK and no consumption audit, through an exact-ID GUC the trigger re-checks against a permanent, FK-free `EvidenceAbandonedUploadReceipt`. Receipts can never be deleted, reserve their object key against tenant-import reuse, and keep re-deleting both keys every 360 minutes (720 after a failure) across source `MIGRATED_OUT` and tenant purge. The staging/final-key rule above is unchanged.
 - Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos,
   requester history, or hidden counts. Public visibility is governed per-item by `is_public`,
   `show_public_count`, and `public_availability_mode` (`exact_count | status_only | hidden`).

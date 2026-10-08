@@ -110,16 +110,19 @@ thirteen modules under it are optional.
 
 **Core — cannot be uninstalled.**
 
-- **What it is** — immutable issue and return evidence photos in a private bucket.
+- **What it is** — immutable issue and return evidence photos (once attached) in a private bucket.
 - **What it adds** — the `evidence_uploads` workflow: presigned upload, and the photo attached to every
   issue and return.
 - **Without it** — not an option: hardware cannot be issued without an issue photo, nor returned without
   a return photo and a remark. That is the accountability rule the product is built around.
-- **Data** — core; not separately purgeable. Evidence rows are immutable and only ever removed when the
+- **Data** — core; not separately purgeable. Attached evidence rows are immutable and only ever removed when the
   whole makerspace is purged. The *object bytes* are a separate question: an optional per-makerspace
   retention policy deletes the stored image once its window passes, keeping the immutable row, the
   remarks, the QR scans and the audit trail. An expired photo then reads as a truthful expired state
   (410) rather than a broken link, so the accountability record survives the picture.
+  Separately, a default-off abandoned-upload cleanup (deployment switch plus per-space opt-in) may
+  delete an old upload slot that no workflow ever consumed; it never touches attached evidence or rows
+  recorded before the feature, and it leaves a permanent receipt that keeps re-deleting a late upload.
 
 ### qr_management
 

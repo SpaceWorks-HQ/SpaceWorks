@@ -47,7 +47,7 @@
 - `backend/apps/audit/` — append-only `AuditLog` + `audit.record(...)` (Postgres-trigger immutable), with
   signing/batch models in `models_signing.py`, verification phases behind the `integrity.py` barrel, and
   object-store/HTTP collector protocols behind the `anchors.py` barrel.
-- `backend/apps/evidence/` — immutable evidence photos, S3 storage helpers, signed upload/view URLs gated by
+- `backend/apps/evidence/` — evidence photos (immutable once attached), S3 storage helpers, signed upload/view URLs gated by
   per-makerspace `UPLOAD_EVIDENCE` + active status.
   `retention_models.py` owns the optional per-makerspace `EvidenceRetentionPolicy` override and per-photo
   `EvidenceObjectRetentionState`, re-exported by
@@ -57,7 +57,16 @@
   and each tenant source gate, removes both final and staging bytes, credits confirmed storage and audits a
   terminal expired state without mutating the `EvidencePhoto` row. `sweep_evidence_retention()` is the
   single sweep entry point, `tasks.py` is its Celery/scheduled-task adapter, and `views_retention.py` exposes
-  the policy and preview API.
+  the policy and preview API. Mechanism A (object expiry) always retains the row.
+  Abandoned-upload cleanup is separate: `consumption.py` owns the only permitted photo UPDATE (the
+  one-way `consumption_state` → `consumed` mark every consuming workflow makes inside its attachment
+  transaction); `abandoned_upload_candidates.py` is the single predicate (`unconsumed`, strictly old,
+  no inbound FK, no consumption audit, no live coordination claim) shared by preview, discovery and
+  rechecks; `abandoned_upload_cleanup.py` is the gated fan-out sweep (report fence first) and
+  `abandoned_upload_state.py` its claim/complete/release state machine, which deletes a proven
+  never-consumed presign row under the exact-ID GUC and writes the permanent FK-free
+  `EvidenceAbandonedUploadReceipt`; `abandoned_upload_reconciliation.py` re-deletes receipt keys forever
+  as deployment coordination (360-minute success / 720-minute failure cadence).
 - `backend/apps/boxes/` — `QrCode`/`Box` payloads, immutable `BoxScan`/`QrScanEvent`, `qr_render.py`
   (namespaced standalone SVG shared by QR-print + batch ZIP), QR rebind. Camera scanner at
   `frontend/src/components/ui/QrScanner.tsx` (native `BarcodeDetector` + `zxing-wasm` fallback).

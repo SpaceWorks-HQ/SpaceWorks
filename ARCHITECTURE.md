@@ -191,9 +191,12 @@ M/N additions visible without treating migration names as runtime behavior.
   and QrScanEvent reject model update/delete and migrations add database immutability triggers
   (`backend/apps/boxes/models.py:69-110`, `backend/apps/boxes/models.py:160-213`).
 - **Evidence** creates presigned staged objects, finalizes and validates them under workflow row
-  locks, then retains immutable `EvidencePhoto` records. Model guards and DB triggers defend
-  immutability (`backend/apps/evidence/models.py:5-34`,
-  `backend/apps/hardware_requests/handover_workflow.py:102-184`).
+  locks, then retains immutable `EvidencePhoto` records once attached. Model guards and DB triggers
+  defend immutability (`backend/apps/evidence/models.py`,
+  `backend/apps/hardware_requests/handover_workflow.py`). The only row-deletion exception is the
+  default-off abandoned-upload cleanup: it may delete a post-migration presign proven `unconsumed`
+  (never an attached photo) under an exact-ID GUC, a permanent FK-free receipt and trigger-side
+  checks of all six inbound relationships and every consumption audit.
 - **Audit** is a cross-domain append-only event log. `audit.services.record()` is the common
   writer, and migrations enforce append-only and purge-aware delete triggers
   (`backend/apps/audit/services.py:6-25`, `backend/apps/audit/migrations/0002_auditlog_append_only_triggers.py`).
@@ -297,7 +300,8 @@ and per-makerspace write fences fail protected writes closed during sensitive op
 - **Tenant:** staff reads are RBAC/action scoped and origin scoped; hidden/archived makerspaces
   are excluded even from global superadmin scope unless the explicit-membership exception applies.
 - **Traceability:** issues need box scan + issue photo; returns need return photo + remark;
-  audit/scan/evidence records are immutable outside the narrowly scoped purge path.
+  audit/scan/attached-evidence records are immutable outside the narrowly scoped purge path; only a
+  never-consumed presign may be removed by the exact-row abandoned-upload cleanup.
 - **Storage:** keys are generated under makerspace-owned prefixes (for example evidence uses
   `evidence_object_key(makerspace_id, type)`), validated/finalized from staging, and owner-checked
   before use (`backend/apps/evidence/storage.py:53-173`). Public images use the distinct public

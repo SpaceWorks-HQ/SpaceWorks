@@ -6,6 +6,16 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-10-09 — forward plan phase 11: abandoned evidence-upload cleanup.** A durable, Postgres-guarded
+  `EvidencePhoto.consumption_state` (legacy rows and imports are permanently ineligible) proves which
+  presign rows no workflow ever consumed; a default-off deployment switch plus tenant opt-in lets a
+  fenced, bounded sweep delete only those, after strict two-key object deletion, under an exact-ID GUC
+  the trigger re-checks against all six now-`PROTECT` relationships, every consumption audit and a
+  permanent FK-free receipt. Receipts reserve their key against tenant import and are reconciled forever
+  (360/720-minute cadence) across cutover and purge. The policy moved to `MANAGE_MAKERSPACE` and
+  Makerspace settings. The historical phase-9 statement below that every `EvidencePhoto` row is retained
+  stays true of what shipped then; attached evidence rows are still never deleted.
+
 - **2026-09-04 — forward plan phase 6: money and membership depth.** Refunds as immutable ledger lines
   over `paid_online` charges, settled through the provider seam and its webhooks; `payments.loans` raises a
   deposit on issue and a capped late fee once at close, from the workflow module, never blocking unless the

@@ -56,7 +56,7 @@ MODULES = (
         "integrations", GUARD, group=GROUP_NOTIFICATIONS, frontend_workflows=("telegram_alerts",),
     ),
     ModuleDefinition(
-        "evidence_uploads", "Evidence uploads", "Immutable issue and return evidence photos.",
+        "evidence_uploads", "Evidence uploads", "Issue and return evidence photos, immutable once attached; never-used uploads are policy-cleanable.",
         "evidence", GUARD, group=GROUP_INVENTORY, is_core=True, frontend_workflows=("evidence_uploads",),
     ),
     ModuleDefinition(
