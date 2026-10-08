@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
 
-import { downloadStaffFile } from "../../../lib/api";
 import { BarChart, DataState, ReportTable, StatCards } from "./OperationsReportsParts";
 import { OperationsReportsFablab } from "./OperationsReportsFablab";
 import { OperationsReportsHardware } from "./OperationsReportsHardware";
@@ -10,7 +8,7 @@ import { OperationsReportsMembers } from "./OperationsReportsMembers";
 import { OperationsReportsPayments } from "./OperationsReportsPayments";
 import { OperationsReportsPrinterService } from "./OperationsReportsPrinterService";
 import { OperationsReportsCoverage } from "./OperationsReportsCoverage";
-import { ReportSchedules } from "./ReportSchedules";
+import { OperationsReportExports } from "./OperationsReportExports";
 import { Panel, type Makerspace, useStaffGet } from "./shared";
 import {
   loadSavedReportViews,
@@ -107,14 +105,6 @@ export function OperationsReports({
   const removeSavedView = (id: string) => {
     setSavedViews((existing) => existing.filter((view) => view.id !== id));
   };
-
-  const exportReport = useMutation({
-    mutationFn: ({ report, format }: { report: string; format: "csv" | "xlsx" }) =>
-      downloadStaffFile(
-        `${reportsBase}/${report}/export?format=${format}${dateSuffix}&grain=${encodeURIComponent(grain)}`,
-        `${aggregate ? "all-makerspaces-" : ""}${report}.${format}`,
-      ),
-  });
 
   return (
     <div className="space-y-4">
@@ -240,30 +230,17 @@ export function OperationsReports({
 
       {!printingOnly ? (
       <>
-      <Panel title="Exports">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {availableExports.map((definition) => (
-            <div key={definition.key} className={`rounded-md border p-3 ${selectedReport === definition.key ? "border-accent bg-accent/10" : "border-line bg-bg"}`}>
-              <h3 className="title-section">{definition.title}</h3>
-              <div className="mt-3 flex gap-2">
-                <button className="desk-button-ghost" type="button" disabled={exportReport.isPending} onClick={() => { setSelectedReport(definition.key); exportReport.mutate({ report: definition.key, format: "csv" }); }}>
-                  CSV
-                </button>
-                <button className="desk-button-ghost" type="button" disabled={exportReport.isPending} onClick={() => { setSelectedReport(definition.key); exportReport.mutate({ report: definition.key, format: "xlsx" }); }}>
-                  XLSX
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        {exportReport.error ? (
-          <p className="mt-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-            {exportReport.error instanceof Error ? exportReport.error.message : "Could not export report."}
-          </p>
-        ) : null}
-      </Panel>
-
-      {!aggregate && reportsEnabled ? <ReportSchedules makerspaceId={makerspace.id} reports={availableExports} /> : null}
+      <OperationsReportExports
+        reports={availableExports}
+        selectedReport={selectedReport}
+        onSelect={setSelectedReport}
+        reportsBase={reportsBase}
+        dateSuffix={dateSuffix}
+        grain={grain}
+        aggregate={aggregate}
+        makerspaceId={makerspace.id}
+        reportsEnabled={reportsEnabled}
+      />
 
       <OperationsReportsHardware analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} enabled={hardwareEnabled} aggregate={aggregate} makerspaceName={makerspaceName} />
       <OperationsReportsCoverage catalog={catalogEntries} analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} grain={grain} aggregate={aggregate} makerspaceName={makerspaceName} />

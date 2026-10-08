@@ -1,6 +1,5 @@
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -21,8 +20,14 @@ from apps.operations.schemas_reports import ANALYTICS_REPORT_RESPONSE
 from apps.operations.serializers import EmptySerializer, GenericObjectSerializer
 from apps.operations.serializers_reports import ReportErrorSerializer
 from apps.operations.serializers_report_catalog import ReportCatalogSerializer
-from apps.operations.serializers_reports_payments import PaymentReportFilterSerializer
-from apps.payments.models import Payment
+from apps.operations.report_request_contract import (
+    DATE_RANGE_PARAMETERS,
+    PAYMENT_FILTER_PARAMETERS,
+    PREVIEW_PARAMETERS,
+    _export_format,
+    _grain_param,
+    _report_filters,
+)
 from apps.operations.views_report_helpers import (
     _date_range,
     _limit_param,
@@ -34,20 +39,6 @@ from apps.operations.views_report_helpers import (
 )
 
 
-DATE_RANGE_PARAMETERS = [
-    OpenApiParameter("start", OpenApiTypes.DATE, OpenApiParameter.QUERY),
-    OpenApiParameter("end", OpenApiTypes.DATE, OpenApiParameter.QUERY),
-]
-PAYMENT_FILTER_PARAMETERS = [
-    OpenApiParameter("status", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=Payment.Status.values),
-    OpenApiParameter("subject_type", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=Payment.SubjectType.values),
-]
-PREVIEW_PARAMETERS = [
-    OpenApiParameter("limit", OpenApiTypes.INT, OpenApiParameter.QUERY),
-    *DATE_RANGE_PARAMETERS,
-    *PAYMENT_FILTER_PARAMETERS,
-    OpenApiParameter("grain", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["day", "month"]),
-]
 ERROR_RESPONSES = {
     400: OpenApiResponse(ReportErrorSerializer, description="Invalid report request."),
     401: OpenApiResponse(ReportErrorSerializer, description="Authentication required."),
@@ -242,29 +233,6 @@ def report_data(makerspace_id, report_key):
 
 def report_rows(makerspace_id, report_key):
     return reports.report_rows(report_key, makerspace_id)
-
-
-def _export_format(request):
-    fmt = (request.query_params.get("format") or "csv").strip().lower()
-    if fmt not in {"csv", "xlsx"}:
-        raise ValidationError({"format": "Use csv or xlsx."})
-    return fmt
-
-
-def _report_filters(request, report_key):
-    if report_key != "payment-reconciliation":
-        return {}
-    serializer = PaymentReportFilterSerializer(data=request.query_params)
-    serializer.is_valid(raise_exception=True)
-    return serializer.validated_data
-
-
-def _grain_param(request, definition):
-    value = (request.query_params.get("grain") or "day").strip().lower()
-    allowed = definition.grains or ("day",)
-    if value not in allowed:
-        raise ValidationError({"grain": f"Use one of: {', '.join(allowed)}."})
-    return value
 
 
 def _catalog_entry(definition, *, available, reason):
