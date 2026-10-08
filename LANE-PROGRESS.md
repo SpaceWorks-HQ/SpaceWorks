@@ -31,7 +31,9 @@ Branch `lane/11` off `dev` `b7c2ee93`. Plan: main checkout
   programme registry + round trips, report rollups, module registry, test_evidence): 463 passed.
 - run6 (tests/evidence, tests/data_export, tests/hardware_requests, tests/operations, handout/
   asset/monitoring files): 678 passed, 0 failed.
-- run7 (`tests/backup tests/tenant_migration`, full): started 04:33 IST — result in final report.
+- run7 (`tests/backup tests/tenant_migration`): ~26% (all passing, 2 xfail) when the Docker
+  container died at 04:45 ("error waiting for container: unexpected EOF", exit 125) — environment.
+- run8 (`tests/tenant_migration` alone): started 04:55 IST — result in final report.
 - frontend: `npx tsc -b` clean; `npm run build` ok; `vitest run src/features/staff` 197 passed;
   full `npm test` 278 passed / 1-2 failed in `MemberAreaArchivedLink.test.tsx` under load — the
   file passes 2/2 when run alone; not touched by this lane (flaky timing).
