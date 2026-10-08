@@ -5,7 +5,7 @@
 > `AGENTS.md`-style twin — both names of that document point at this one path, so edit it in place.
 >
 > Read it before starting a build on this program: it carries the current program state, the Codex
-> gates, the worktree/test-harness conventions and the three ways to run the stack locally. The
+> gates, the worktree/test-harness conventions and the dev stack and isolated test runner. The
 > non-negotiable one-liners are quoted in `CLAUDE.md`; everything else — the *why*, and every trap
 > that has already cost a session — is here.
 
@@ -82,37 +82,35 @@ plus their prior verdict returned both approvals in minutes.
   misleading "workspace/tests/ is read-only" error and no files written. Keep the index clean during
   implementation; only `git add` right before the Stage-4 `codex review` (so it sees new untracked files),
   then `git reset` before the next Codex build.
-- **Test harness.** Local `spaceworks-db` (:5433), `spaceworks-redis` (:6379), `spaceworks-minio` (:9200)
-  must be running — `./scripts/dev-local.sh infra` starts exactly those. Run tests with
-  `./scripts/dev-local.sh test` (or `DATABASE_URL=…@localhost:5433/makerspace_manager pytest`, or the
-  worktree's dedicated DB). **Never run two `pytest` procs against one DB** (TRUNCATE-FK teardown races +
-  false concurrency failures) and **never run the full suite concurrently with `codex review`** (it runs its
-  own pytest). If a background full-suite is killed by the environment, run it as **foreground chunks**
-  (`pytest tests/<subdirs>`, `tests/test_[a-l]*.py`, `tests/test_[m-z]*.py`). **The baseline is ZERO reds** —
+- **Test harness.** Run `./scripts/dev.sh test [pytest args]`: every invocation creates a unique
+  network and disposable Postgres 16 (tmpfs), Redis and MinIO, with no host ports or shared ops mounts.
+  The current repository is mounted at `/workspace`, with pytest in `/workspace/backend`; explicit
+  test environment values override any mounted `backend/.env`, and two Fernet keys are generated
+  inside `spaceworks-backend`. Build that image with `./scripts/dev.sh up --build` first.
+  Cleanup removes all run-labelled containers and the network, including on interruption.
+  **Never run two `pytest` procs against one DB** (TRUNCATE-FK teardown races + false concurrency
+  failures) and **never run the full suite concurrently with `codex review`** (it runs its own pytest).
+  If a background full-suite is killed by the environment, run it as **foreground chunks**
+  (`./scripts/dev.sh test tests/<subdirs>`, `tests/test_[a-l]*.py`, `tests/test_[m-z]*.py`).
+  **The baseline is ZERO reds** —
   the seven long-standing failures were fixed on 2026-08-12, so any red is a NEW regression, not background
   noise. This bullet once exempted `test_machine_image_presign_finalize_delete_and_audit` as a permitted
   MinIO-host-port failure; that test no longer exists in the tree and the exemption went with it. Do not
   reintroduce a "known failures" allowance without naming the test and the date it was granted.
-- **Local dev topology (Arch host) — three ways to run, one set of port remaps.** Host ports are remapped in
-  the gitignored, machine-specific `docker-compose.override.yml`: Postgres :5433, Redis :6379, MinIO
-  :9200/:9201 (:9100 is taken by a Dart dev tool on this machine). Secrets always come from `backend/.env`.
-  1. **Everything in Docker with live reload — the default.** `./scripts/dev-docker.sh up -d --build`.
-     `docker-compose.dev.yml` (committed) layers onto the base file: `./backend` and `./frontend` are
-     bind-mounted, Django runs under autoreloading `runserver` with `DEBUG=True`, and the frontend is the
-     Vite dev server with HMR instead of nginx. Frontend :5000, backend + `/control/` + `/docs/` on :8000.
-     No host virtualenv, no host `npm install`.
-  2. **Everything in Docker, production-shaped.** `docker compose up -d --build` — gunicorn + nginx serving
-     the baked `dist`, i.e. what a makerspace operator actually runs. Frontend :8080, backend :8002. Code
-     changes need a rebuild.
-  3. **Infrastructure only in Docker, app on the host — fallback.** `./scripts/dev-local.sh` (gitignored,
-     machine-specific) exports host-facing rewrites of the container hostnames. Kept because host `pytest`
-     and one-off `manage.py` runs are faster than `exec`-ing into a container.
+- **Local dev topology — everything in Docker with live reload.** `./scripts/dev.sh up --build`.
+  The gitignored, machine-specific `docker-compose.override.yml` supplies local port remaps; the
+  committed dev layer bind-mounts `./backend` and `./frontend`, runs Django with autoreload and
+  `DEBUG=True`, and serves Vite with HMR. Frontend :5000; backend, `/control/` and `/docs/` :8000.
+  Secrets come from Compose interpolation (`.env` or exported variables). No host virtualenv is needed.
+  The infrastructure-only / host backend / host frontend topology has been removed.
+  Production-shaped Docker still uses `docker compose up -d --build` (gunicorn + nginx serving the
+  baked `dist`); code changes there need a rebuild.
 
-  **`scripts/dev-docker.sh` exists because passing any `-f` to `docker compose` disables the automatic merge
+  **`scripts/dev.sh` exists because passing any `-f` to `docker compose` disables the automatic merge
   of `docker-compose.override.yml`.** It spells the chain out as base → override → dev, in that order: the
   override supplies the infrastructure port remaps, and the dev layer must come last so its app-service
-  commands, ports and bind mounts win. Every argument is forwarded verbatim, so it is a drop-in prefix for
-  any compose subcommand. Three traps this topology already hit:
+  commands, ports and bind mounts win. Other than `up`, `down`, `test` and `e2e`, every argument is
+  forwarded verbatim to Compose. Three traps this topology already hit:
   - **The base file hands `backend`'s environment to `migrate`/`worker`/`beat` through a YAML anchor**, so a
     patch to `backend` alone never reaches them — the override applies the MinIO host-port rewrite to all
     four (the Celery worker builds public image URLs into outbound mail).
@@ -134,29 +132,29 @@ plus their prior verdict returned both approvals in minutes.
 
 ## Local development
 
-The topology bullet above explains *why* there are three ways to run this and what each one is for; this
-section is the commands. Keep them adjacent — they were 1,400 lines apart once, which is how the two
-accounts drifted.
+The topology bullet above explains the dev stack and isolated test runner; this section is the commands.
 
-The default path needs nothing installed on the host but Docker. Migrations run automatically as a
-`depends_on: service_completed_successfully` step, so `up` is the whole story:
+The dev stack and pytest runner need Docker and Bash on the host; e2e also needs Node/npm and Playwright.
+Migrations run automatically as a `depends_on: service_completed_successfully` step, so `up` is the
+whole story:
 
 ```bash
 # Everything — db, redis, minio, Django, Celery worker/beat, Vite — with live reload.
-./scripts/dev-docker.sh up -d --build     # first run; drop --build afterwards
-./scripts/dev-docker.sh run --rm --no-deps backend --role management python manage.py seed_demo   # first run only
-./scripts/dev-docker.sh logs -f backend
-./scripts/dev-docker.sh restart worker beat   # Celery has no autoreload
-./scripts/dev-docker.sh down
+./scripts/dev.sh up --build     # first run; drop --build afterwards
+./scripts/dev.sh run --rm --no-deps backend --role management python manage.py seed_demo   # first run only
+./scripts/dev.sh logs -f backend
+./scripts/dev.sh restart worker beat   # Celery has no autoreload
+./scripts/dev.sh down
 
 # After changing package.json, recreate the node_modules volume:
-./scripts/dev-docker.sh up -d --build -V frontend
+./scripts/dev.sh up --build -V frontend
 
-# Tests. The DATABASE_URL override is REQUIRED: the backend container runs as the
-# least-privilege `spaceworks_app` role, which has no CREATEDB, so pytest cannot build
-# its test database as itself (every django_db test errors in setup without this).
-./scripts/dev-docker.sh exec -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
-  -T backend pytest
+# Tests use their own database owner, generated keys and disposable infrastructure.
+./scripts/dev.sh test
+./scripts/dev.sh test tests/backup tests/tenant_migration
+
+# Playwright uses the running dev stack (install frontend deps and Chromium first).
+./scripts/dev.sh e2e
 ```
 
 `tests/backup` and `tests/tenant_migration` are **Docker-only in practice**: they need a PostgreSQL
@@ -166,17 +164,11 @@ host they all refuse with `PostgresClientUnavailable` — the environment, not a
 image installs client 16 *and* 17 on purpose (`pg_dump` must be >= every supported source server;
 `pg_restore` must be <= the target, because 17+ emits a `transaction_timeout` GUC that 16 rejects).
 
-Host fallback (faster `pytest` / one-off `manage.py`; needs `backend/.venv` + `npm install`):
-
-```bash
-./scripts/dev-local.sh infra          # db, redis, minio only
-./scripts/dev-local.sh migrate
-./scripts/dev-local.sh backend        # http://localhost:8000
-./scripts/dev-local.sh frontend       # http://localhost:5000
-./scripts/dev-local.sh test
-```
-
-**Never run both at once** — they bind the same host ports (:8000, :5000) and the same database.
+After `up`, the dev stack has seven long-running containers (db, redis, minio, backend, worker,
+beat, frontend). `up` retires any running `spaceworks-live`, waits for orchestration-init, migrate,
+orchestration-ready and createbuckets, and removes those four containers only after successful exits.
+A failure keeps the containers and prints a `dev.sh logs <svc>` hint. A later `up` recreates them;
+`restart` affects long-running services only. `down` keeps volumes unless you pass `-v`.
 
 - Public inventory page: `http://localhost:5000/m/makerspace`
 - API: `http://localhost:8000/api` — Swagger UI at `/docs/`, ReDoc at `/redoc/`, schema at `/schema/`.
@@ -186,21 +178,27 @@ Host fallback (faster `pytest` / one-off `manage.py`; needs `backend/.venv` + `n
 `docker-compose.yml` and `docker-compose.prod.yml` run a second backend process, `live`
 (`spaceworks-live`), that serves only `/api/v1/live/`: gunicorn `-k gthread --timeout 0` and **no**
 `--max-requests`, because recycling a worker severs every open stream. `frontend/nginx.conf` routes
-`/api/v1/live/` to it above the `/api/` block with buffering off. The host-run fallback (mode 3) has no
-`live` process; the Vite proxy sends `/api/v1/live/` to the single runserver, which works for development
+`/api/v1/live/` to it above the `/api/` block with buffering off. The dev layer puts `live` behind the
+`prod-only` profile; the Vite proxy sends `/api/v1/live/` to the single runserver, which works for development
 but holds a runserver thread per open tab. `LIVE_REDIS_URL` defaults to the Celery broker; empty (or the
 eager, broker-less local flow) makes the endpoint answer 503 and the console keeps polling.
 
 ## End-to-end tests (Playwright)
 
 `frontend/e2e/` drives a REAL stack — never mocks — and pins the Hard Rules through a browser and a real
-presigned upload to object storage. `./scripts/e2e-local.sh` is the one recipe for a laptop and CI: it
-migrates, runs `manage.py seed_e2e --reset` (the `e2e-space` makerspace only; refuses unless `DEBUG` or
-`E2E_SEED_ALLOWED=1`), starts Django on :8100 and Vite on :5100 (so it can run beside a dev stack on
-8000/5000), and runs `npx playwright test`. Same infrastructure overrides as `dev-local.sh test`
-(`PG_PORT`, `MINIO_PORT`, `DATABASE_URL`); `PYTHON=python` when there is no `backend/.venv` (CI).
-`E2E_KEEP=1` leaves the servers up for debugging. The seed constants live in
-`frontend/e2e/helpers.ts` and `backend/apps/operations/management/commands/seed_e2e.py` — change one,
-change the other. Unit-level accessibility checks use `frontend/src/test/axe.ts` (jsdom cannot compute
-colour contrast; `e2e/a11y.spec.ts` covers that in Chromium).
+presigned upload to object storage. `./scripts/dev.sh up --build`, then `./scripts/dev.sh e2e`
+is the recipe for a laptop and CI. Install host frontend dependencies with `cd frontend && npm ci`
+and Chromium with `npx playwright install --with-deps chromium` first. The script polls the running
+Django :8000 health endpoint and Vite :5000 for up to 60 seconds, runs `seed_e2e --write-json` in
+backend, copies the seed JSON to `frontend/e2e/.seed.json`, and passes its native host path to
+Playwright. The dev-only login throttle defaults to 200/min because the suite signs in repeatedly
+from one IP. Seeding refuses unless `DEBUG` or `E2E_SEED_ALLOWED=1`.
 
+Each seed run creates a fresh random `e2e-<token>` tenant with users and immutable workflow records;
+those tenants accumulate in the persistent dev database, isolated from other data. `dev.sh down -v`
+wipes that database when wanted; CI starts fresh on each runner. Seed identifiers are loaded by
+`frontend/e2e/helpers.ts` from the output of
+`backend/apps/operations/management/commands/seed_e2e.py`.
+
+Unit-level accessibility checks use `frontend/src/test/axe.ts` (jsdom cannot compute
+colour contrast; `e2e/a11y.spec.ts` covers that in Chromium).

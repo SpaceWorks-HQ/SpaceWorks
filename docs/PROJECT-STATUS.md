@@ -88,7 +88,7 @@ falls back to polling (503) on a deployment without Redis. Public routes are laz
 over-ceiling frontend files were split.
 
 **Browser and accessibility gates (phase 2).** `frontend/e2e/` (Playwright) drives the loan spine through a
-real browser and object storage — `scripts/e2e-local.sh` locally, the `e2e` job in CI — and axe runs in
+real browser and object storage — `scripts/dev.sh e2e` locally, the `e2e` job in CI — and axe runs in
 both jsdom panel tests and Chromium. `manage.py seed_e2e` seeds a disposable makerspace per run.
 
 **Signed webhooks (phase 3).** `webhook` is a notification channel module: a destination with an HTTPS

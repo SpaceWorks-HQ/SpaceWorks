@@ -1,9 +1,8 @@
 name: Tests
 
 # The suite that every pull request must pass, and that the release workflow depends on.
-# Environment parity with scripts/dev-local.sh is deliberate: the host topology there is
-# what developers run, and a CI job that reproduced a different one would report reds
-# nobody can see locally (docs/DEV-WORKFLOW.md, "Docker vs host test split").
+# Backend jobs keep explicit Postgres/Redis/MinIO environments; the e2e job uses
+# scripts/dev.sh up and e2e, the same dev-stack recipe developers run locally.
 on:
   pull_request:
     branches: [dev, main]
@@ -47,8 +46,8 @@ jobs:
       - run: npm run build
 
   backend-host:
-    # Mirrors `./scripts/dev-local.sh test`: Postgres, Redis and MinIO as services, the
-    # Django test process on the runner. tests/backup and tests/tenant_migration are
+    # Postgres, Redis and MinIO as services, with the Django test process on the
+    # runner. Local suites use `./scripts/dev.sh test`; tests/backup and tests/tenant_migration are
     # excluded here and run in the job below with a version-matched Postgres client.
     name: Backend suite (host topology)
     runs-on: ubuntu-latest
@@ -204,33 +203,13 @@ jobs:
         run: pytest -q -p no:cacheprovider tests/backup tests/tenant_migration
 
   e2e:
-    # Playwright against a real stack in the host topology (Django runserver + Vite + the
-    # same Postgres/Redis/MinIO services), driven by scripts/e2e-local.sh so CI and a laptop
-    # run the identical recipe. Pins the Hard Rules through a real browser and a real
-    # presigned upload to object storage.
+    # Playwright against the real dev Compose stack, driven by scripts/dev.sh so
+    # CI and a laptop run the identical recipe. Pins the Hard Rules through a real
+    # browser and a real presigned upload to object storage.
     name: End-to-end (Playwright)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: makerspace
-          POSTGRES_PASSWORD: makerspace
-          POSTGRES_DB: makerspace_manager
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U makerspace"
-          --health-interval 5s --health-timeout 5s --health-retries 20
-      redis:
-        image: redis:7-alpine
-        ports: ["6379:6379"]
     env:
-      PYTHON: python
-      PG_PORT: "5432"
-      MINIO_PORT: "9200"
-      DATABASE_URL: postgres://makerspace:makerspace@localhost:5432/makerspace_manager
-      CELERY_BROKER_URL: redis://localhost:6379/0
       SECRET_KEY: ci-only-secret-key-not-for-production
       DEBUG: "True"
       ALLOWED_HOSTS: localhost,127.0.0.1
@@ -238,28 +217,6 @@ jobs:
       CI: "true"
     steps:
       - uses: actions/checkout@v4
-      - name: Start MinIO and create buckets
-        run: |
-          set -euo pipefail
-          docker run -d --name minio -p 9200:9000 minio/minio:latest server /data
-          for _ in $(seq 1 30); do
-            curl -sf http://localhost:9200/minio/health/live && break
-            sleep 1
-          done
-          docker run --rm --network host --entrypoint sh minio/mc:latest -c '
-            mc alias set local http://localhost:9200 minioadmin minioadmin &&
-            mc mb --ignore-existing local/evidence &&
-            mc version enable local/evidence &&
-            mc anonymous set none local/evidence &&
-            mc mb --ignore-existing local/public-images &&
-            mc version enable local/public-images &&
-            mc anonymous set download local/public-images'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - run: pip install -r backend/requirements.txt
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -269,8 +226,17 @@ jobs:
         working-directory: frontend
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - name: Seed, start the stack, run Playwright
-        run: ./scripts/e2e-local.sh
+      - name: Generate dev keys and use the runner UID/GID
+        run: |
+          set -euo pipefail
+          echo "API_CLIENT_ENC_KEY=$(openssl rand -base64 32 | tr '+/' '-_')" >> "$GITHUB_ENV"
+          echo "AUDIT_MAC_MASTER_KEY=$(openssl rand -base64 32 | tr '+/' '-_')" >> "$GITHUB_ENV"
+          echo "DEV_UID=$(id -u)" >> "$GITHUB_ENV"
+          echo "DEV_GID=$(id -g)" >> "$GITHUB_ENV"
+      - name: Build and start the dev stack
+        run: ./scripts/dev.sh up --build
+      - name: Seed and run Playwright against the dev stack
+        run: ./scripts/dev.sh e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

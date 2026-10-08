@@ -1,6 +1,6 @@
 # Live-reload development layer — the whole stack in Docker, nothing on the host.
 #
-#   ./scripts/dev-docker.sh up -d --build
+#   ./scripts/dev.sh up --build
 #
 # The base docker-compose.yml stays production-shaped (gunicorn + nginx serving a
 # baked dist) because that is what a makerspace operator actually runs. This file
@@ -9,10 +9,15 @@
 # and the frontend runs the Vite dev server with HMR instead of nginx. No host
 # virtualenv and no host `npm install` are required.
 #
-# Use scripts/dev-docker.sh rather than calling `docker compose -f ...` by hand:
+# Use scripts/dev.sh rather than calling `docker compose -f ...` by hand:
 # passing any -f disables the automatic merge of docker-compose.override.yml, and
 # that override is where machine-specific infrastructure port remaps live.
 services:
+  # Vite proxies all /api to backend in dev; only production nginx routes
+  # /api/v1/live/ to the separate live service.
+  live:
+    profiles: ["prod-only"]
+
   backend:
     # runserver instead of gunicorn: it autoreloads on save, and with DEBUG on it
     # serves the /control/ + /docs/ assets straight from the staticfiles finders,
@@ -26,6 +31,8 @@ services:
     user: "${DEV_UID:-1000}:${DEV_GID:-1000}"
     environment:
       DEBUG: "True"
+      # Playwright signs in many times from one IP; keep this higher limit dev-only.
+      THROTTLE_LOGIN: ${THROTTLE_LOGIN:-200/min}
       # Vite proxies with changeOrigin, so Django can see `Host: backend`.
       ALLOWED_HOSTS: localhost,127.0.0.1,backend
       # The browser Origin is the Vite dev server. It must be allowed or the
@@ -50,7 +57,7 @@ services:
   # These three inherit `DEBUG: ${DEBUG:-False}` from the base &backend-env anchor -- only
   # `backend` above overrides DEBUG to True. Since the trusted-proxy guard landed in settings.py
   # ("TRUSTED_PROXY_COUNT must be explicitly set when DEBUG is False"), that made every one of
-  # them crash on boot and took `dev-docker.sh up --build` with them. Declared here rather than
+  # them crash on boot and took `dev.sh up --build` with them. Declared here rather than
   # defaulted in the base anchor on purpose: the guard exists so a PRODUCTION topology has to be
   # stated explicitly, and a base-level default would silently satisfy it. None of these three
   # serves HTTP, and dev is direct access, so 0 is the honest value.
@@ -61,7 +68,7 @@ services:
       - ./backend:/app
 
   # Celery has no autoreload: restart these two after changing task code
-  # (`./scripts/dev-docker.sh restart worker beat`).
+  # (`./scripts/dev.sh restart worker beat`).
   worker:
     environment:
       TRUSTED_PROXY_COUNT: "0"
@@ -102,7 +109,7 @@ services:
       - ./frontend:/app
       # Anonymous volume so the image's node_modules survives the bind mount
       # above (which would otherwise shadow it with the host tree). After
-      # changing package.json, recreate it: `dev-docker.sh up -d --build -V frontend`.
+      # changing package.json, recreate it: `dev.sh up --build -V frontend`.
       - /app/node_modules
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/ >/dev/null"]

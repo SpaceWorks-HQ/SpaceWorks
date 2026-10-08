@@ -17,8 +17,8 @@ Guidance for Claude Code (claude.ai/code) when working with code in this reposit
 > - **`docs/INVARIANTS.md`** — the long-form load-bearing "do not regress" rules, read **per area, on
 >   demand**. The "Invariants" section below is the index of which section to open.
 > - **`docs/SOURCE-MAP.md`** — what each backend app and frontend directory owns.
-> - **`docs/DEV-WORKFLOW.md`** — program state, the Codex gates, worktrees, the test harness and the three
->   local run topologies. Read it **before starting a build**.
+> - **`docs/DEV-WORKFLOW.md`** — program state, the Codex gates, worktrees, the test harness and the dev stack
+>   and isolated test runner. Read it **before starting a build**.
 > - **`docs/PROJECT-STATUS.md`** — what exists today: control plane, security posture, installer, releases.
 > - **`docs/PROJECT-HISTORY.md`** — the condensed changelog.
 >
@@ -224,9 +224,9 @@ The goal is not just to ship code, but to understand why each production-quality
 
 ## Working in this repo — the standing rules
 
-**The full account — program state, the Codex gates, worktrees, the test harness, the three local run
-topologies and every trap that has already cost a session — is in `docs/DEV-WORKFLOW.md`. Read it before
-starting a build.** These are the rules you must not violate without having read it:
+**The full account — program state, the Codex gates, worktrees, the dev stack, the isolated test runner
+and every trap that has already cost a session — is in `docs/DEV-WORKFLOW.md`. Read it before starting
+a build.** These are the rules you must not violate without having read it:
 
 - **The Codex gates are LIVE** (Stages 1/2/4 of `~/.claude/CLAUDE.md`), but **re-check `codex doctor`**
   rather than trusting any written claim — that one line has gone stale silently for weeks before.
@@ -236,53 +236,34 @@ starting a build.** These are the rules you must not violate without having read
 - **Never `git add`/stage before a Codex workspace-write run** — a non-empty index makes `apply_patch`
   silently fail with a misleading "read-only" error and no files written.
 - **The test baseline is ZERO reds** — any failure is a NEW regression, not background noise. Run
-  `./scripts/dev-local.sh test` with `spaceworks-db` (:5433), `spaceworks-redis` (:6379) and
-  `spaceworks-minio` (:9200) up. **Never run two `pytest` procs against one DB**, and never run the full
-  suite concurrently with `codex review` (it runs its own).
+  `./scripts/dev.sh test`; each invocation provisions its own disposable Postgres, Redis and MinIO.
+  **Never run two `pytest` procs against one DB**, and never run the full suite concurrently with
+  `codex review` (it runs its own).
 - **`tests/backup` and `tests/tenant_migration` need a pg client whose MAJOR equals the server's (16),
   and the host may not have one.** `postgres_client.client_binary` resolves
   `/usr/lib/postgresql/{major}/bin` (Debian/PGDG) or `/usr/pgsql-{major}/bin` (RHEL) and otherwise
   fails closed — so on Arch, where neither path exists and `/usr/bin/pg_dump` is whatever `pacman`
   ships, every one of those tests refuses with `PostgresClientUnavailable`. That is the environment,
-  **not a regression**. Run them in Docker instead, and note the DATABASE_URL override: the backend
-  container runs as the least-privilege `spaceworks_app` role, which has no CREATEDB, so pytest cannot
-  build a test database as itself.
+  **not a regression**. Use the isolated Docker test runner, which supplies the database owner and
+  version-matched client rather than the dev backend's least-privilege `spaceworks_app` role.
 
-  **CHECK WHICH TREE THE CONTAINER MOUNTS BEFORE BELIEVING ANY RESULT FROM IT.** There is more than
-  one clone of this repo on the dev machine, and `spaceworks-backend` has mounted
-  `~/Projects/SpaceInventory/SpaceWorks` while the session worked in `~/Projects/SpaceWorks/SpaceWorks`.
-  `dev-docker.sh exec` then tests *someone else's checkout* — on 2026-09-07 a whole afternoon of
-  "verification" ran against `b15c4e11`, a tree so old it had no `money_digest.py`, and reported
-  green for code it had never loaded. It also explains a flood of `relation ... does not exist` and
-  truncate-FK teardown errors: that tree predates dozens of migrations. Confirm first, every time:
+  **CHECK WHICH TREE THE CONTAINER MOUNTS BEFORE BELIEVING ANY RESULT FROM IT.** Multiple clones
+  exist; `dev.sh exec` can inspect someone else's checkout if the shared backend mounts the wrong tree.
+  Confirm its mount before using it:
 
   ```bash
   docker inspect spaceworks-backend --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'
   ```
 
-  **When it is the wrong tree — or the shared stack is busy — run a ONE-OFF container against your
-  own isolated infra.** `--entrypoint pytest` is required: the image entrypoint is a production
-  admission gate that demands `--role <role> <command>` plus a host restore-marker. Supply
-  `API_CLIENT_ENC_KEY` and `AUDIT_MAC_MASTER_KEY` too — both come from `backend/.env` on the host,
-  are **empty in the image**, and without them 19 `tests/tenant_migration` tests fail as
-  `ImproperlyConfigured` buried inside a `PairingError` from `deployment_keys.py`, which reads exactly
-  like a custody regression and is not one. Both are Fernet keys; generate throwaways per run. The
-  `db`/`redis`/`minio` network aliases exist in an isolated compose project too, so the image's baked
-  defaults resolve without further overrides.
-
   ```bash
-  docker run --rm --network <project>_default --entrypoint pytest \
-    -v "$PWD/backend:/app" -v "$PWD:/workspace" -v "$PWD/scripts:/run/spaceworks-privileged-scripts" \
-    -w /app \
-    -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
-    -e SECRET_KEY=test-only \
-    -e API_CLIENT_ENC_KEY="$(python3 -c 'from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())')" \
-    -e AUDIT_MAC_MASTER_KEY="$(python3 -c 'from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())')" \
-    spaceworks-backend tests/backup tests/tenant_migration -q
+  ./scripts/dev.sh test tests/backup tests/tenant_migration
   ```
 
-  Verified this way on 2026-09-07 at `6629e60a`: **1559 passed, 0 failed** in ~59 minutes, which is
-  also the proof that the host's `PostgresClientUnavailable` failures above are purely environmental.
+  This mounts the current repository into a one-off pytest container, generates both Fernet keys,
+  and provisions and cleans up isolated Postgres 16, Redis and MinIO without using the shared stack.
+
+  A historical isolated run on 2026-09-07 at `6629e60a` had **1559 passed, 0 failed** in ~59 minutes,
+  proving that the host's `PostgresClientUnavailable` failures above are purely environmental.
 - **Chain every new migration off the ACTUAL leaf** — `ls backend/apps/<app>/migrations/`, never the number
   a spec quotes.
 - **Commits sit local and unpushed on `dev`; pushing is the owner's call alone.** Ask
@@ -292,17 +273,13 @@ starting a build.** These are the rules you must not violate without having read
   Prepare the merge, verify it is clean, report exactly what would land, then STOP and hand it over:
   the owner runs the `git merge` and the `git push`. This is stricter than the push rule above and
   overrides the global config's Stage-5 "merge it into `dev`" step, which no longer applies here.
-- **Never run the Docker and host stacks at once** — they bind the same ports (:8000, :5000) and the same
-  database.
+- **Use one dev stack** on :8000/:5000; `dev.sh test` creates separate disposable infrastructure
+  without publishing host ports.
 
 ```bash
-./scripts/dev-docker.sh up -d --build                          # default: all in Docker, live reload
-./scripts/dev-local.sh infra && ./scripts/dev-local.sh test    # host: faster pytest, most of the suite
-
-# In Docker, pytest needs the DB OWNER: the backend runs as `spaceworks_app`, which has no CREATEDB.
-# `tests/backup` and `tests/tenant_migration` additionally need the two Fernet keys above.
-./scripts/dev-docker.sh exec -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
-  -T backend pytest
+./scripts/dev.sh up --build       # all in Docker, live reload
+./scripts/dev.sh test             # isolated pytest; default args: -q
+./scripts/dev.sh e2e              # Playwright against the running dev stack
 ```
 
 Public inventory page: `http://localhost:5000/m/makerspace`. API: `http://localhost:8000/api` — Swagger UI

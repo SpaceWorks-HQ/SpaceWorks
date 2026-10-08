@@ -1288,7 +1288,7 @@ buffering off; it answers 503 when the deployment has no Redis and browsers keep
 `/api/v1/metrics/` nor `/api/v1/live/` belongs in the API-client scope registry.
 
 **Browser and accessibility gates (forward plan phase 2, 2026-09-03).** The Hard Rules are pinned by
-`frontend/e2e/` against a real stack (`scripts/e2e-local.sh`, CI job `e2e`): a request is accepted,
+`frontend/e2e/` against a real stack (`scripts/dev.sh e2e`, CI job `e2e`): a request is accepted,
 issued with a container code and a real presigned photo upload, and returned with container code, photo
 and remark, and the API's 400s for a missing photo, box or remark are asserted directly. The public
 catalogue spec asserts the seeded storage location, box label and box code never appear in the DOM. The

@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 
 declare const process: { env: Record<string, string | undefined> };
 
 // The seed command (backend/apps/operations/management/commands/seed_e2e.py) creates a FRESH
-// makerspace per run and writes its identifiers to e2e/.seed.json (scripts/e2e-local.sh passes
-// --write-json). The constants below are the fallbacks and the fixed strings the seed uses.
+// makerspace per run; scripts/dev.sh e2e passes --write-json in the backend container and
+// copies its identifiers to e2e/.seed.json. The constants below are the seed's fallbacks.
 export const API_URL = process.env.E2E_API_URL ?? "http://localhost:8100";
 
 type SeedFile = {
@@ -24,7 +25,7 @@ type SeedFile = {
 };
 
 function loadSeed(): SeedFile | null {
-  const candidate = process.env.E2E_SEED_FILE ?? new URL("./.seed.json", import.meta.url).pathname;
+  const candidate = process.env.E2E_SEED_FILE ?? fileURLToPath(new URL("./.seed.json", import.meta.url));
   try {
     return JSON.parse(readFileSync(candidate, "utf8")) as SeedFile;
   } catch {
@@ -93,4 +94,4 @@ export async function openRequestsTab(page: Page) {
   await expect(page.getByText("Pending review")).toBeVisible({ timeout: 15_000 });
 }
 
-export const EVIDENCE_FIXTURE = new URL("./fixtures/evidence.jpg", import.meta.url).pathname;
+export const EVIDENCE_FIXTURE = fileURLToPath(new URL("./fixtures/evidence.jpg", import.meta.url));

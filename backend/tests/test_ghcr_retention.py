@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "ghcr-retention.py"
 
 # Host-only, like test_env_surface_drift.py and test_privileged_script_modes.py: the
-# backend image contains only `backend/`, so under `dev-docker.sh exec backend pytest`
+# backend image contains only `backend/`, so under `dev.sh exec backend pytest`
 # this file sits at /app/tests/ and `parents[2]` is `/`. Without this guard the fixture
 # would look for /scripts/ghcr-retention.py and redden the whole Docker suite. The script
 # under test is release CI tooling that never ships inside the image, so there is nothing
