@@ -6,6 +6,8 @@ from rest_framework.exceptions import ValidationError
 
 from apps.machines.models import Machine, MachineConsumablePool, MachineType
 from apps.machines.printer_capabilities import PRINTER_SLUG
+from apps.makerspaces import limits
+from apps.makerspaces.guards import require_module_locked
 
 
 def move_received_printing(makerspace, actor, *, target, data, machine_type=None):
@@ -29,6 +31,12 @@ def _create_printer(makerspace, actor, data, machine_type):
             {"machine_type": "This item cannot create a machine of another type."}
         )
     status = {"maintenance": Machine.Status.MAINTENANCE, "offline": Machine.Status.OFFLINE}.get(data.get("status"), Machine.Status.IDLE)
+    # A received printer is a new MACHINE, so it takes the same two gates every other
+    # machine creator takes, inside the caller's transaction: the `machines` module under
+    # the makerspace row lock (race-safe against an uninstall) and the machine quota.
+    # `printing` alone was checked, and it does not require `machines`.
+    makerspace = require_module_locked(makerspace, "machines")
+    limits.check_quota(makerspace, "machines", adding=1)
     return Machine.objects.create(makerspace=makerspace, machine_type=printer_type, name=name, notes=str(data.get("notes") or ""), status=status, is_active=data.get("is_active", True), type_payload={"model": model}, created_by=actor)
 
 
