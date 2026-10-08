@@ -176,3 +176,54 @@ def test_a_failed_task_is_still_due_next_run():
     )
     assert row.is_due(timezone.now(), 60) is True
     assert module.SCHEDULED_TASKS
+
+
+def test_abandoned_upload_cleanup_runs_every_six_hours_in_both_schedulers():
+    from django.conf import settings
+
+    task = "apps.evidence.tasks.cleanup_abandoned_evidence_uploads_task"
+    entry = settings.CELERY_BEAT_SCHEDULE["evidence-abandoned-upload-cleanup"]
+
+    assert entry["task"] == task
+    assert entry["schedule"]._orig_hour == "*/6"
+    assert ("evidence-abandoned-upload-cleanup", task, 360) in SCHEDULED_TASKS
+
+
+def test_abandoned_upload_dry_run_reaches_the_beatless_task_without_advancing(monkeypatch):
+    import apps.operations.management.commands.run_scheduled_tasks as module
+
+    calls = []
+    monkeypatch.setattr(
+        module, "_import_task", lambda _path: lambda **kwargs: calls.append(kwargs)
+    )
+    old_run = timezone.now() - timedelta(days=1)
+    PeriodicTaskRun.objects.create(name="evidence-abandoned-upload-cleanup", last_run_at=old_run)
+    call_command(
+        "run_scheduled_tasks",
+        "--task", "evidence-abandoned-upload-cleanup",
+        "--dry-run", "--batch-size", "5",
+        stdout=StringIO(),
+    )
+    assert calls == [{"dry_run": True, "batch_size": 5}]
+    assert PeriodicTaskRun.objects.get(
+        name="evidence-abandoned-upload-cleanup"
+    ).last_run_at == old_run
+
+
+def test_abandoned_upload_task_reconciles_receipts_before_new_cleanup(monkeypatch):
+    from apps.evidence import tasks
+
+    order = []
+    monkeypatch.setattr(
+        tasks, "reconcile_receipts", lambda **kw: order.append(("reconcile", kw)) or {}
+    )
+    monkeypatch.setattr(
+        tasks,
+        "sweep_abandoned_evidence_uploads",
+        lambda **kw: order.append(("cleanup", kw)) or {},
+    )
+    tasks.cleanup_abandoned_evidence_uploads_task(dry_run=True, batch_size=3)
+    assert order == [
+        ("reconcile", {"dry_run": True, "batch_size": 3}),
+        ("cleanup", {"dry_run": True, "batch_size": 3}),
+    ]

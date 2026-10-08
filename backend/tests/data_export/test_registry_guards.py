@@ -250,3 +250,19 @@ def test_global_user_projection_is_a_literal_non_growing_set():
             for column in _dataset(fidelity, "global/users.csv").columns
         }
         assert actual == expected
+
+
+def test_phase11_consumption_state_exports_and_the_receipt_is_omitted_coordination():
+    from apps.data_export.classification_domain import EXPORTED_MODEL_FIELDS
+    from apps.data_export.models import MODELS
+    from apps.data_export.types import OmittedModel
+    from apps.tenant_migration.tenant_dump_model_catalog import PROJECTED_MODEL_LABELS
+
+    assert "consumption_state" in EXPORTED_MODEL_FIELDS["evidence.EvidencePhoto"].split()
+    assert {
+        "abandoned_upload_cleanup_enabled", "abandoned_upload_retention_days",
+    } <= set(EXPORTED_MODEL_FIELDS["evidence.EvidenceRetentionPolicy"].split())
+    label = "evidence.EvidenceAbandonedUploadReceipt"
+    assert isinstance(MODELS[label], OmittedModel)
+    assert label not in {dataset.model for dataset in DATASETS.values()}
+    assert label not in PROJECTED_MODEL_LABELS

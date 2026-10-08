@@ -801,3 +801,56 @@ def test_archived_makerspace_rejects_staff_creation(settings):
         format="json",
     )
     assert create_resp.status_code == 400
+
+
+def test_purge_deletes_protect_sidecars_keeps_receipts_and_collects_both_receipt_keys(monkeypatch):
+    from django.db import connection, transaction
+
+    from apps.evidence import storage
+    from apps.evidence.abandoned_upload_reconciliation import reconcile_receipts
+    from apps.evidence.models import (
+        EvidenceAbandonedUploadReceipt,
+        EvidenceObjectRetentionState,
+        EvidenceUploadFinalization,
+    )
+
+    actor = make_superadmin("lifecycle-receipt-super")
+    makerspace = make_space("lifecycle-receipt")
+    uploader = make_user("lifecycle-receipt-uploader")
+    kept = EvidencePhoto.objects.create(
+        makerspace=makerspace, evidence_type="issue", object_key="evidence/purge/kept",
+        uploaded_by=uploader,
+    )
+    EvidenceUploadFinalization.objects.create(evidence=kept, status="finalized")
+    EvidenceObjectRetentionState.objects.create(
+        evidence=kept, status="expired", object_expired_at=timezone.now()
+    )
+    cleaned = EvidencePhoto.objects.create(
+        makerspace=makerspace, evidence_type="issue", object_key="evidence/purge/cleaned",
+        uploaded_by=uploader, consumption_state=EvidencePhoto.ConsumptionState.UNCONSUMED,
+    )
+    with transaction.atomic():
+        EvidenceAbandonedUploadReceipt.objects.create(
+            source_makerspace_id_snapshot=makerspace.pk, evidence_id_snapshot=cleaned.pk,
+            object_key=cleaned.object_key, next_reconcile_at=timezone.now(),
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL app.evidence_abandoned_delete_id = %s", [str(cleaned.pk)])
+        EvidencePhoto.objects.filter(pk=cleaned.pk).delete()
+    deleted_keys = []
+    monkeypatch.setattr(lifecycle, "_delete_storage_keys", deleted_keys.extend)
+    space_id = makerspace.pk
+
+    lifecycle.purge(archive_space(makerspace, actor), actor)
+
+    assert not Makerspace.objects.filter(pk=space_id).exists()
+    assert not EvidenceUploadFinalization.objects.filter(evidence_id=kept.pk).exists()
+    assert not EvidenceObjectRetentionState.objects.filter(evidence_id=kept.pk).exists()
+    assert {"evidence/purge/cleaned", "staging/evidence/purge/cleaned"} <= set(deleted_keys)
+    receipt = EvidenceAbandonedUploadReceipt.objects.get(source_makerspace_id_snapshot=space_id)
+
+    # A late write after purge is still repaired by deployment-level reconciliation.
+    reconciled = []
+    monkeypatch.setattr(storage, "delete_object_strict", lambda key: reconciled.append(key) or "deleted")
+    assert reconcile_receipts()["receipts_reconciled"] == 1
+    assert reconciled == [receipt.object_key, f"staging/{receipt.object_key}"]

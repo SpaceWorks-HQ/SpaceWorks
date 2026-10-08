@@ -224,3 +224,16 @@ def test_manifest_cannot_change_after_capture(tmp_path):
 
     with pytest.raises(BackupBuildError, match="immutable capture ledger"):
         plan.verify_component(MAIN_COMPONENT, manifest)
+
+
+def test_abandoned_upload_receipt_key_is_coordination_only_never_archive_content():
+    from apps.backup.archive_objects import NON_OBJECT_KEY_FIELDS, object_closure
+    from apps.backup.object_ownership_registry import FIELD_OBJECT_RULES
+
+    rule = next(
+        item for item in FIELD_OBJECT_RULES
+        if item.model_label == "evidence.EvidenceAbandonedUploadReceipt"
+    )
+    assert (rule.field_name, rule.policy) == ("object_key", ReferencePolicy.COORDINATION_ONLY)
+    assert ("evidence.EvidenceAbandonedUploadReceipt", "object_key") not in NON_OBJECT_KEY_FIELDS
+    assert all("receipt" not in key for key in object_closure()["private"])

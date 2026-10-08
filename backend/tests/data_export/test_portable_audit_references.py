@@ -133,6 +133,64 @@ def test_workflow_dictionary_key_ids_follow_the_declared_pk_map():
     assert "source:" not in row["meta"]
 
 
+def _deleted_presign(makerspace, actor, *, with_cleanup_audit):
+    from django.db import connection, transaction
+
+    from apps.evidence.models import EvidenceAbandonedUploadReceipt, EvidencePhoto
+
+    photo = EvidencePhoto.objects.create(
+        makerspace=makerspace, evidence_type="issue",
+        object_key=f"evidence/{makerspace.pk}/issue/cleaned", uploaded_by=actor,
+        consumption_state="unconsumed",
+    )
+    issued = audit.record(actor, "evidence.upload_url_issued", makerspace=makerspace, target=photo)
+    with transaction.atomic():
+        EvidenceAbandonedUploadReceipt.objects.create(
+            source_makerspace_id_snapshot=makerspace.pk, evidence_id_snapshot=photo.pk,
+            object_key=photo.object_key, next_reconcile_at=timezone.now(),
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL app.evidence_abandoned_delete_id = %s", [str(photo.pk)])
+        EvidencePhoto.objects.filter(pk=photo.pk).delete()
+    if with_cleanup_audit:
+        audit.record(
+            None, "evidence.abandoned_upload_deleted", makerspace=makerspace,
+            target=makerspace, meta={"evidence_id": photo.pk, "sweep_run_id": "run"},
+        )
+    return photo.pk, issued
+
+
+def test_cleanup_proven_missing_evidence_target_becomes_inert_provenance():
+    actor = make_user("audit-cleaned-evidence")
+    makerspace = make_space("audit-cleaned-evidence")
+    photo_id, issued = _deleted_presign(makerspace, actor, with_cleanup_audit=True)
+
+    files, _archive_bytes, _manifest = archive_files(make_job(makerspace, actor))
+
+    rows = {item["id"]: item for item in csv_rows(files, "audit/audit_log.csv")}
+    assert (rows[str(issued.pk)]["target_type"], rows[str(issued.pk)]["target_id"]) == ("", "")
+    provenance = [
+        item for item in _provenance(files) if item["source_object_id"] == str(issued.pk)
+    ]
+    assert provenance and provenance[0]["kind"] == "audit_cleaned_abandoned_upload_target"
+    assert provenance[0]["detail"]["source_target_id"] == str(photo_id)
+    cleanup = next(
+        item for item in rows.values() if item["meta"] and "sweep_run_id" in item["meta"]
+    )
+    assert json.loads(cleanup["meta"])["evidence_id"] == f"source:{photo_id}"
+
+
+def test_missing_evidence_target_without_cleanup_proof_fails_closed():
+    from apps.data_export.errors import ExportIntegrityError
+
+    actor = make_user("audit-unproved-evidence")
+    makerspace = make_space("audit-unproved-evidence")
+    _deleted_presign(makerspace, actor, with_cleanup_audit=False)
+
+    with pytest.raises(ExportIntegrityError, match="without a cleanup record"):
+        archive_files(make_job(makerspace, actor))
+
+
 def test_undeclared_id_bearing_meta_is_source_namespaced_at_export():
     actor = make_user("audit-safe-default")
     makerspace = make_space("audit-safe-default")

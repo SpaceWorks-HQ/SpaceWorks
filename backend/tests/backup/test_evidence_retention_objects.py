@@ -77,6 +77,48 @@ def test_expiring_evidence_refuses_backup_capture():
         )
 
 
+def test_cleaning_evidence_refuses_both_capture_paths():
+    from apps.backup.object_reference_capture import build_object_ownership_plan
+    from apps.backup.recipient_selection import BackupBuildError
+
+    photo = make_photo(EvidenceObjectRetentionState.Status.CLEANING)
+
+    with pytest.raises(storage.BackupStorageError, match="in progress"):
+        archive_objects.collect_model_objects(
+            EvidencePhoto.objects.filter(pk=photo.pk),
+            EvidencePhoto,
+            {"private": {}, "public_image": {}},
+        )
+    with pytest.raises(BackupBuildError, match="cleanup is in progress"):
+        build_object_ownership_plan([photo.makerspace_id])
+
+
+def test_cleaned_abandoned_upload_contributes_no_member_or_tombstone():
+    from django.db import connection, transaction
+
+    from apps.evidence.models import EvidenceAbandonedUploadReceipt
+
+    photo = make_photo(EvidenceObjectRetentionState.Status.EXPIRED)
+    EvidenceObjectRetentionState.objects.filter(evidence=photo).delete()
+    unconsumed = EvidencePhoto.objects.create(
+        makerspace=photo.makerspace, evidence_type="issue", object_key="evidence/gone/k",
+        uploaded_by=photo.uploaded_by, consumption_state="unconsumed",
+    )
+    with transaction.atomic():
+        EvidenceAbandonedUploadReceipt.objects.create(
+            source_makerspace_id_snapshot=photo.makerspace_id,
+            evidence_id_snapshot=unconsumed.pk, object_key=unconsumed.object_key,
+            next_reconcile_at=timezone.now(),
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL app.evidence_abandoned_delete_id = %s", [str(unconsumed.pk)])
+        EvidencePhoto.objects.filter(pk=unconsumed.pk).delete()
+
+    closure = archive_objects.object_closure()["private"]
+    assert "evidence/gone/k" not in closure
+    assert photo.object_key in closure and "retention_state" not in closure[photo.object_key]
+
+
 def test_intentional_absence_requires_version_listing(monkeypatch):
     class Client:
         def list_object_versions(self, **_kwargs):

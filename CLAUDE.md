@@ -189,7 +189,7 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   on what you touch, and it is nearly met repo-wide: four `backend/apps/` files (non-migration, non-test)
   exceed 300 lines** — `machines/access.py` (367), `inventory/middleware.py` (308),
   `tenant_migration/tenant_dump_authority.py` (305), `tenant_migration/source_gate_guards.py` (301) —
-  plus `config/settings.py` (1148, the accepted exception — Django settings are conventionally a single
+  plus `config/settings.py` (1161, the accepted exception — Django settings are conventionally a single
   file). `backend/tests/` is not held to the ceiling. Frontend: **zero** non-test, non-generated files
   exceed it — `8be90478` split all eleven, so a frontend file over the ceiling is now new debt, not
   inherited. Measured 2026-10-09, when `makerspaces/module_registry.py`, `tenant_migration/unique_values.py`,

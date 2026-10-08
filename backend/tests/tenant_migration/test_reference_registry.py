@@ -128,3 +128,21 @@ def test_ast_discovery_reports_dynamic_actions_and_non_literal_meta():
     unresolved = discover_audit_meta_references().unresolvable
     assert any(item.reason == "dynamic action" for item in unresolved)
     assert any(item.reason == "non-literal meta" for item in unresolved)
+
+
+def test_phase11_cleanup_audit_ids_are_source_local_and_surviving_targets_remap():
+    from apps.tenant_migration.audit_references_targets import (
+        AUDIT_TARGET_DISPOSITIONS,
+        CLEANED_EVIDENCE_AUDIT_TARGET,
+        AuditReferenceDisposition,
+    )
+    from apps.tenant_migration.references import AUDIT_META_REFERENCES
+
+    S = AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT
+    meta = AUDIT_META_REFERENCES[("evidence.abandoned_upload_deleted", "evidence_id")]
+    assert meta.disposition is S
+    assert AUDIT_META_REFERENCES[("evidence.abandoned_upload_deleted", "sweep_run_id")].disposition is S
+    assert CLEANED_EVIDENCE_AUDIT_TARGET.disposition is S
+    assert AUDIT_TARGET_DISPOSITIONS["evidence.evidencephoto"].disposition is (
+        AuditReferenceDisposition.REMAP
+    )
