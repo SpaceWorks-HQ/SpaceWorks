@@ -43362,12 +43362,33 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Verified event acknowledged."
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WebhookResponse"
+                                }
+                            }
+                        },
+                        "description": "Verified event acknowledged (acted on or deliberately ignored)."
                     },
                     "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WebhookResponse"
+                                }
+                            }
+                        },
                         "description": "Invalid signature, payload, or configuration."
                     },
                     "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WebhookResponse"
+                                }
+                            }
+                        },
                         "description": "Makerspace was not found."
                     }
                 }
@@ -43393,12 +43414,33 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Verified event acknowledged."
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WebhookResponse"
+                                }
+                            }
+                        },
+                        "description": "Verified event acknowledged (acted on or deliberately ignored)."
                     },
                     "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WebhookResponse"
+                                }
+                            }
+                        },
                         "description": "Invalid signature, payload, or configuration."
                     },
                     "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WebhookResponse"
+                                }
+                            }
+                        },
                         "description": "Makerspace was not found."
                     }
                 }
@@ -43413,13 +43455,34 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Verified event acknowledged."
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WebhookResponse"
+                                }
+                            }
+                        },
+                        "description": "Verified event acknowledged (acted on or deliberately ignored)."
                     },
                     "400": {
-                        "description": "Invalid signature or configuration."
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WebhookResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid signature, payload, or configuration."
                     },
                     "404": {
-                        "description": "Stripe Connect is dormant."
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WebhookResponse"
+                                }
+                            }
+                        },
+                        "description": "Makerspace was not found."
                     }
                 }
             }
@@ -68578,6 +68641,18 @@
                         "maxLength": 200
                     }
                 }
+            },
+            "WebhookResponse": {
+                "type": "object",
+                "description": "Every provider webhook answers `{\"detail\": ...}`, acknowledged or refused.",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
             },
             "WitnessWaiverResponse": {
                 "type": "object",

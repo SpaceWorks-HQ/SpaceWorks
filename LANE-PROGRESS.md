@@ -15,10 +15,12 @@ Branch `lane/payments` off `dev` @ b7c2ee93. Owner checkpoint: stop new work 06:
 - G8 frontend (0821b49a): receipts column, Correct receipt, pending-only actions, subject filter,
   member refunds; OpenAPI + api.ts regenerated.
 - G5 follow-up: `machines/service_lifecycle.delete_for_makerspace` also deleted Payments with
-  PROTECTed refunds — fixed (uncommitted until its test run returns).
+  PROTECTed refunds — fixed (23c1ea28).
+- Razorpay sync refund test (4c8e6155); Connect refund webhook test + webhook response schemas
+  (last commit).
 
 ## In flight
-- Final test sweep.
+- nothing; final report.
 
 ## Tests actually run (all via ./scripts/dev.sh test, isolated infra)
 - baseline: tests/payments tests/modules/test_offstate_money.py tests/member_activity → 222 passed.
@@ -28,3 +30,13 @@ Branch `lane/payments` off `dev` @ b7c2ee93. Owner checkpoint: stop new work 06:
 - WIP group (purge/receipts/ms-routes/reconciliation/borrower/purged-machine/lifecycle/perf) →
   29 passed, 1 failed (purge-with-refund: second PROTECT path in machines.service_lifecycle → fixed).
 - frontend: `npx tsc -b` clean; vitest payments + members → 41 passed.
+- purge-with-refund + lifecycle + machine_service_models → 21 passed (after the second fix).
+- tombstone profile (`TOMBSTONED_APPS=…payments_rail…`) tests/tombstone → 176 passed.
+- frontend `npm test` → 65 files / 281 passed; `npm run build` ok.
+- final sweep A: tests/payments tests/member_activity tests/modules/test_offstate_money.py tests/separability → 307 passed.
+- final sweep B: money_drift_d5, source_preflight, cross_tenant_d6, terminal_payments_d8, loan_payments,
+  membership_plans, module_purge, reports_payments, collaborative_payments_p14, perf_query_counts,
+  machine_service_api, capabilities, data_export registry guards, machine_scope_surfaces → 137 passed.
+- razorpay sync refund → 2 passed.
+- after webhook schemas: connect refund webhook + decryption fail-safe + models + connect + razorpay
+  + archived space payments → 54 passed; tombstone profile again → 176 passed.

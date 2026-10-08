@@ -107,6 +107,12 @@ def _effective_settlement(payment):
     return ManualSettlement.effective_for(payment)
 
 
+class WebhookResponseSerializer(serializers.Serializer):
+    """Every provider webhook answers `{"detail": ...}`, acknowledged or refused."""
+
+    detail = serializers.CharField()
+
+
 class CheckoutUrlSerializer(serializers.Serializer):
     checkout_url = serializers.URLField()
 

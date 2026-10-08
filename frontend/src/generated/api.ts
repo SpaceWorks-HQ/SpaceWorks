@@ -6753,6 +6753,10 @@ export type WarrantyUpsert = {
   "vendor_contact"?: string;
 };
 
+export type WebhookResponse = {
+  "detail": string;
+};
+
 export type WitnessWaiverResponse = {
   "membership_id": number;
   "waiver_id": number;
