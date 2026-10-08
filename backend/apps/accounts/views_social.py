@@ -270,7 +270,7 @@ class SocialProviderDetailView(APIView):
 
     @extend_schema(tags=["Social auth"], request=None, responses={204: None, 404: OpenApiResponse(ErrorSerializer), 409: OpenApiResponse(ErrorSerializer)})
     def delete(self, request, provider):
-        if provider not in SocialProvider.values:
+        if provider not in SocialProvider.values and not slug_from_provider_key(provider):
             return _error("identity_not_found", 404)
         try:
             unlink_social_identity(request.user, provider)
