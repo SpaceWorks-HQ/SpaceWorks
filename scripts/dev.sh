@@ -101,6 +101,8 @@ test_suite() {
     -e STORAGE_PRESIGN_METHOD=post -e EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
     -e "API_CLIENT_ENC_KEY=$api_key" -e "AUDIT_MAC_MASTER_KEY=$audit_key"
   )
+  # tests/tombstone only runs under an exported TOMBSTONED_APPS profile, so pass it through.
+  [[ -z "${TOMBSTONED_APPS:-}" ]] || TEST_ENV+=(-e "TOMBSTONED_APPS=$TOMBSTONED_APPS")
   (($#)) || set -- -q
   docker run --rm --network "$RUN" --label "spaceworks.test=$RUN" --entrypoint pytest \
     -v "$HOST_ROOT:/workspace" -w /workspace/backend \
