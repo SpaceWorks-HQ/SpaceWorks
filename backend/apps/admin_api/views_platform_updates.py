@@ -95,10 +95,13 @@ class PlatformUpdateRequestView(APIView):
     def post(self, request):
         _require_updates_module()
         instance = services.queue_update()
+        # queue_update leaves a RUNNING update alone; the audit row must say the request
+        # changed nothing rather than read as a second queued update.
         audit.record(
             request.user,
             "platform.update_requested",
             target=instance,
+            meta={"noop": instance.status == PlatformUpdateSettings.Status.RUNNING},
         )
         return Response(
             PlatformUpdateSettingsSerializer(instance).data,

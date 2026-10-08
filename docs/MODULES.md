@@ -522,7 +522,7 @@ Requires `member_accounts`.
 **On by default.**
 
 - **What it is** — in-app release control: check for a new version, and apply it from the console.
-- **What it adds** — the superadmin update surface and `UpdateState` (current / available / target
+- **What it adds** — the superadmin update surface and `PlatformUpdateSettings` (current / available / target
   version).
 - **Without it** — the box is updated by whatever tooling you already use (`git pull` + `docker compose
   up -d --build`, Ansible, your own pipeline). This is a **deployment-level** key like

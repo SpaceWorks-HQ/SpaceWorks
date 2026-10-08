@@ -109,6 +109,11 @@ cleanup() {
       "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]]; then
       say "Update failed; rolling application containers back to $previous_version."
       export MAKERSPACE_IMAGE_TAG="$previous_version"
+      # The marker pins every later wrapper call (scripts/spaceworks-compose.sh), so it must
+      # name the release the containers are being returned to. Left on the new tag, the next
+      # plain `up -d` would start the release that just failed, outside this script's gates.
+      printf '%s\n' "$previous_version" > "$VERSION_FILE" || \
+        say "WARNING: could not reset $VERSION_FILE to $previous_version."
       "${COMPOSE[@]}" pull migrate backend worker beat frontend || \
         say "Could not refresh previous images; trying the host's cached copies."
       if "${COMPOSE[@]}" up -d && wait_for_backend; then
@@ -140,7 +145,10 @@ if [[ "$MODULE_ONLY" == 1 ]]; then
   exit 0
 fi
 
+# Bounded: an unanswered GitHub API call must fail this run (cron logs it and retries next
+# week) instead of holding the update lock forever.
 release_json="$(curl --fail --silent --show-error --location \
+  --connect-timeout 10 --max-time 30 --retry 2 --retry-delay 5 \
   --header 'Accept: application/vnd.github+json' \
   --header 'User-Agent: spaceworks-self-host-updater' \
   "$RELEASE_API")"
