@@ -29,9 +29,12 @@ the main checkout's docs/plans).
   batch: 138 passed.
 - `dev.sh test` verification API/task + reports (new + existing report suites) + presentation: 123 passed.
 - Frontend: `npx tsc -b` clean; `npm test` 67 files / 285 tests passed; `npm run build` OK.
-- In flight at time of writing: broad backend batch (data_export, operations, makerspaces, separability,
-  modules, all audit suites, admin/lifecycle) and `tests/tenant_migration`; plus the last added tests
-  (rotation, purge, budget, leaf bound). See final report for their counts.
+- `dev.sh test` last-added tests (rotation, purge, budget, leaf bound) + lifecycle: 40 passed.
+- `dev.sh test tests/tenant_migration`: 823 passed, 2 xfailed.
+- Broad batch (data_export, operations, makerspaces, ...): reached 51% all green, then the Docker VM ran
+  out of memory (`Errno 12 Cannot allocate memory`, many lanes' stacks at once) and the run died; the
+  same incident turned a concurrent `tests/backup` run into 398 identical OSError errors (345 passed,
+  27 xfailed, 0 failed). Both were re-queued sequentially — see the final report for the rerun counts.
 
 ## Not done / next
 - `tests/backup` and the full repository suite were not run (time).
