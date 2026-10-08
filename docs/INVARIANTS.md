@@ -669,7 +669,10 @@ and never an access state: a `MembershipTerm` expiring changes neither `Makerspa
 `User.access_status`; the only effect is the per-makerspace opt-in `lapsed_members_cannot_borrow`, enforced
 solely by `request_access.require_current_term` AFTER the who-may-submit rule has admitted the member
 ("active" = `status=active AND ends_at > now`, so it does not depend on the hourly sweep), and a member who
-has never held a term is untouched. One renewal charge per term, raised only by
+has never held a term is untouched. It guards **every borrow path** — the reviewed-request submit, member
+self-checkout and staff direct handout (the rule is about the borrower, not about who hands the tool over)
+— and never a return; with `membership` uninstalled it is inert (2026-10-09; before that a member refused
+at the request form could still self-checkout). One renewal charge per term, raised only by
 `membership_plan_services.run_membership_renewals` as `Payment(subject_type=membership_term,
 subject_id=term.pk)` inside the 7-day window and only when `online_payments_enabled(ms, "membership")` —
 the Payment unique constraint is the idempotency, a payment failure is logged and never touches the term,

@@ -21,6 +21,7 @@ from apps.evidence.serializers import EvidenceUrlResponseSerializer
 from apps.evidence.storage import StorageUnavailable, evidence_object_key, presigned_upload
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.guards import require_feature
+from apps.makerspaces.request_access import require_current_term
 from apps.presence.guard import require_active_member_presence
 from apps.openapi import (
     PUBLIC_API_AUTH_PARAMETERS,
@@ -99,7 +100,11 @@ class PublicToolCheckoutView(APIView):
     def post(self, request, makerspace_slug, *args, **kwargs):
         makerspace = get_public_makerspace(makerspace_slug)
         require_feature(makerspace, "inventory.self_checkout")
-        require_active_member_presence(request.user, makerspace)
+        # Checking out is borrowing, so the optional lapsed-term rule applies exactly as
+        # it does to a reviewed request. Returning a tool is never gated by it.
+        require_current_term(
+            makerspace, require_active_member_presence(request.user, makerspace).membership
+        )
         serializer = PublicToolCheckoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         loan = self_checkout_workflow.checkout_tool(
