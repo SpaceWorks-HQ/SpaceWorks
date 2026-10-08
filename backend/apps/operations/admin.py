@@ -25,6 +25,7 @@ from config.admin_access import SuperuserOnlyModelAdmin
 
 # Imported for its `@admin.register` side effect (the split pattern from CLAUDE.md).
 from apps.operations import admin_report_schedules  # noqa: F401,E402
+from apps.operations import admin_scheduling  # noqa: F401,E402
 
 
 class StockTransferLineInline(TabularInline):

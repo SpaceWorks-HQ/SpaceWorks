@@ -55,6 +55,8 @@ GLOBAL_ADMIN_MODELS = {
     # before a makerspace is selected, so an OIDC provider cannot belong to one.
     "accounts.oidcprovider",
     "auth.group",
+    # Deployment-wide scheduler bookkeeping: one row per task name, no tenant.
+    "operations.periodictaskrun",
     "axes.accessattempt",
     "axes.accessfailurelog",
     "axes.accesslog",
