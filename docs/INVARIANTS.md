@@ -1975,6 +1975,12 @@ Load-bearing details that carried over unchanged:
   **neither** the host's module **nor** archival: a module toggle must never hide a receipt or block a
   pending charge, and the separability contract keeps historical payment subjects usable when
   tombstoned.
+- **Cancelling an event (or its series) cancels its PENDING registration charges** (2026-10-09):
+  `services_lifecycle.cancel` schedules `cancel_for_registration` after commit for every pending
+  one, so provider-session expiry never runs under the event lock. Settled charges stay — a refund is
+  a staff decision. **Known open hole (owner decision):** re-registering after a cancellation revives
+  the same row and pk, so the terminal CANCELED charge is found again and `payment_one_per_subject`
+  forbids a fresh one — a paid event becomes free for that member.
 - **PAYMENT ROUTING LIVES ON `Payment.via_makerspace`, NOT ON THE REGISTRATION'S PROVENANCE.**
   One column cannot serve both: `module_purge_collectors.events_delete` must clear
   `registered_via_makerspace` (destroying activity history is what a purge is *for*), and keying
