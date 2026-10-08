@@ -79,6 +79,8 @@ FIRST_PARTY_FIELD_NAMES = {
     'audit.AuditSigningKeyRotationEvent': frozenset('created_at id rotation state'.split()),
     'audit.AuditBatch': frozenset('batch_seq created_at id leaf_count makerspace merkle_root prev_batch_root signature signer_fingerprint'.split()),
     'audit.AuditBatchLeaf': frozenset('audit_log batch id leaf_position'.split()),
+    'audit.AuditVerificationRun': frozenset('action_filter actor_filter created_at end_at filter_fingerprint id makerspace requested_by snapshot_max_id start_at target_id_filter target_type_filter'.split()),
+    'audit.AuditVerificationRunEvent': frozenset('anchor_status attempt batch_invalid_count batch_unavailable_count chain_status created_at externally_anchored_count failure_code first_audit_log_id first_batch_seq id local_batch_verified_count mac_invalid_count mac_unavailable_count mac_valid_count row_count run state unattested_count unbatched_count'.split()),
     'evidence.EvidencePhoto': frozenset('content_type created_at evidence_type id makerspace object_key size_bytes uploaded_by'.split()),
     'evidence.EvidenceObjectRetentionState': frozenset('claim_token claimed_at evidence expired_size_bytes id last_error object_expired_at status updated_at'.split()),
     'evidence.EvidenceRetentionPolicy': frozenset('id makerspace object_retention_days updated_at'.split()),

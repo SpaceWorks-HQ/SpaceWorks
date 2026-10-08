@@ -45,6 +45,14 @@ from apps.admin_api.views_user_access import (
     RestrictUserView,
 )
 from apps.admin_api.services_staff import _global_role_for_membership
+from apps.audit.views_verification import (
+    AuditVerificationDetailView,
+    AuditVerificationListCreateView,
+)
+from apps.audit.views_verification import (
+    AuditVerificationDetailView,
+    AuditVerificationListCreateView,
+)
 from apps.admin_api.views_users import (
     AuditLogListView,
     AuditLogPagination,
@@ -55,6 +63,10 @@ from apps.admin_api.views_users import (
 
 __all__ = [
     "AuditLogListView",
+    "AuditVerificationDetailView",
+    "AuditVerificationListCreateView",
+    "AuditVerificationDetailView",
+    "AuditVerificationListCreateView",
     "AuditLogPagination",
     "AssetQrHistoryView",
     "BulkImportApplyView",

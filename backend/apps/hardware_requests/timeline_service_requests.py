@@ -6,6 +6,10 @@ from apps.hardware_requests.models import (
     RequesterAccountability,
     ReturnEvent,
 )
+from apps.hardware_requests.timeline_service_audit import (
+    attach_evidence_retention,
+    audit_events,
+)
 
 DEFAULT_LIMIT = 200
 MAX_LIMIT = 500
@@ -21,6 +25,7 @@ _KIND_ORDER = {
     "accountability": 90,
     "problem_report": 100,
     "direct_loan": 110,
+    "audit": 120,
 }
 
 
@@ -64,6 +69,8 @@ def build_request_timeline(hardware_request, *, limit=DEFAULT_LIMIT):
     events.extend(_asset_link_events(items))
     events.extend(_accountability_events(hardware_request.pk))
     events.extend(_problem_report_events(hardware_request))
+    events.extend(audit_events(hardware_request, _event))
+    attach_evidence_retention(events)
     return _response("request_id", hardware_request.pk, events, limit)
 
 

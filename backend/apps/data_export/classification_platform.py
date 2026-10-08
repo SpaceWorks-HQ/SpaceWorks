@@ -58,6 +58,13 @@ OMITTED_MODELS = {
     "audit.AuditSigningKeyRotationEvent": (
         "Deployment-local omitted audit signing-key lifecycle integrity material."
     ),
+    "audit.AuditVerificationRun": (
+        "Source-deployment verification request: its truth is tied to this deployment's "
+        "keys, anchors and audit row ids, so a target must not inherit it."
+    ),
+    "audit.AuditVerificationRunEvent": (
+        "Source-deployment verification status and aggregate results."
+    ),
     "encryption.MakerspaceEncryptionKey": "Encryption key material never enters a manager export.",
     "encryption.PiiBlindIndex": "Deployment-local derived identity index.",
     "encryption.PiiGlobalWriteFence": "Platform coordination state.",

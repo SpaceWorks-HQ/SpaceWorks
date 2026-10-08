@@ -16,8 +16,10 @@ from apps.audit.signing import deployment_identity
 from .integrity_anchor_errors import anchor_read_failure
 
 
-def _verify_batches(makerspace_id, sink, *, leaves_by_batch=None):
-    """``leaves_by_batch`` (batch pk -> preloaded leaves) makes membership authoritative."""
+def _verify_batches(makerspace_id, sink, *, local_verifier=None):
+    """``local_verifier(batch, key)`` replaces the per-batch relation-query membership
+    check, so a bulk caller can answer from one preloaded leaf load (or skip batches it
+    already verified) while continuity, anchors and the deleted tail stay authoritative."""
     expected_seq = 1
     previous_root = None
     keys = {
@@ -44,11 +46,7 @@ def _verify_batches(makerspace_id, sink, *, leaves_by_batch=None):
                 makerspace_id,
                 batch.batch_seq,
             )
-        failure = verify_batch_local(
-            batch,
-            key,
-            leaves=None if leaves_by_batch is None else leaves_by_batch.get(batch.pk, ()),
-        )
+        failure = (local_verifier or verify_batch_local)(batch, key)
         if failure:
             return failure
         try:

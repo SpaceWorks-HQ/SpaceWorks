@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.http import Http404
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
@@ -11,8 +11,12 @@ from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.admin_api.permissions import IsActiveStaff
 from apps.admin_api.services_staff import attach_staff_membership
-from apps.admin_api.serializers_users import (
+from apps.admin_api.serializers_audit import (
+    AuditLogFilterSerializer,
     AuditLogSerializer,
+    apply_audit_filters,
+)
+from apps.admin_api.serializers_users import (
     StaffCreateSerializer,
     StaffMembershipSerializer,
 )
@@ -189,37 +193,32 @@ class AuditLogPagination(PageNumberPagination):
     page_size = 24
 
 
-@extend_schema(tags=["Admin users"], summary="List audit log entries", parameters=[
-    OpenApiParameter("makerspace", int, OpenApiParameter.QUERY), OpenApiParameter("action", str, OpenApiParameter.QUERY),
-    OpenApiParameter("target_type", str, OpenApiParameter.QUERY), OpenApiParameter("target_id", str, OpenApiParameter.QUERY),
-])
+@extend_schema(
+    tags=["Admin users"],
+    summary="List audit log entries",
+    description=(
+        "Tenant- and VIEW_AUDIT-scoped audit rows, newest first, 24 per page. `meta` is the "
+        "presentation-catalogue projection, never the raw stored metadata; unknown or "
+        "dynamically built actions expose `{}`. `start` is inclusive, `end` exclusive, and "
+        "a start/end range may span at most 366 days. A valid but out-of-scope makerspace "
+        "yields an empty page."
+    ),
+    parameters=[AuditLogFilterSerializer],
+    responses={200: AuditLogSerializer(many=True), 400: OpenApiResponse(description="Invalid filter.")},
+)
 class AuditLogListView(generics.ListAPIView):
     serializer_class = AuditLogSerializer
     permission_classes = [IsActiveStaff]
     pagination_class = AuditLogPagination
 
     def get_queryset(self):
-        queryset = AuditLog.objects.select_related("actor", "makerspace").order_by("-created_at")
+        filters = AuditLogFilterSerializer(data=self.request.query_params)
+        filters.is_valid(raise_exception=True)
+        queryset = AuditLog.objects.select_related("actor").order_by("-created_at", "-pk")
+        # Tenant/action scope, hidden and archived spaces are applied BEFORE user filters.
         queryset = rbac.scope_by_action(self.request.user, rbac.Action.VIEW_AUDIT, queryset)
         queryset = rbac.hide_from_superadmin(self.request.user, queryset, field="makerspace_id")
         archived = rbac.archived_makerspace_ids()
         if archived:
             queryset = queryset.exclude(makerspace_id__in=archived)
-        makerspace_id = self.request.query_params.get("makerspace")
-        action = self.request.query_params.get("action")
-        target_type, target_id = (
-            self.request.query_params.get("target_type"),
-            self.request.query_params.get("target_id"),
-        )
-        filters = {}
-        if makerspace_id:
-            filters["makerspace_id"] = makerspace_id
-        if action:
-            filters["action"] = action
-        if target_type:
-            filters["target_type"] = target_type
-        if target_id:
-            filters["target_id"] = target_id
-        if filters:
-            queryset = queryset.filter(**filters)
-        return queryset
+        return apply_audit_filters(queryset, filters.validated_data)

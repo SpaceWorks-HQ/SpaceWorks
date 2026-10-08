@@ -41,6 +41,14 @@ describe("keyMatchesKind", () => {
     expect(keyMatchesKind(["machines", 3], "machine_service.completed")).toBe(true);
     expect(keyMatchesKind(["pending-requests", 3], "machine_service.completed")).toBe(false);
   });
+  it("invalidates audit-explorer keys for every kind without losing domain hints", () => {
+    expect(keyMatchesKind(["audit", { page: 1 }], "request.accepted")).toBe(true);
+    expect(keyMatchesKind(["audit", { page: 1 }], "machine_service.completed")).toBe(true);
+    expect(keyMatchesKind(["audit-verification", 4], "audit.verification_finished")).toBe(true);
+    expect(keyMatchesKind(["audit", 1], "totally.new")).toBe(true);
+    expect(keyMatchesKind(["pending-requests", 3], "request.accepted")).toBe(true);
+    expect(keyMatchesKind(["machines", 3], "request.accepted")).toBe(false);
+  });
   it("invalidates everything for an unknown kind", () => {
     expect(keyMatchesKind(["anything"], "totally.new")).toBe(true);
   });

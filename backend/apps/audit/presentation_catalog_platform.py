@@ -11,6 +11,8 @@ ENTRIES = (
     P("audit.signing_key_rotation_completed", "Audit signing key rotation completed"),
     P("audit.signing_key_rotation_failed", "Audit signing key rotation failed"),
     P("audit.signing_key_rotation_started", "Audit signing key rotation started"),
+    P("audit.verification_finished", "Audit verification finished", ("status",)),
+    P("audit.verification_requested", "Audit verification requested"),
     P("backup.activation_state_repaired", "Backup activation state repaired",
       ("activation_after", "activation_before", "flag_enabled")),
     P("backup.archive_completed", "Backup archive completed",

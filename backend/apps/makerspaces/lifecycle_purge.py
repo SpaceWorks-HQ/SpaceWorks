@@ -64,6 +64,8 @@ def _delete_object_graph(makerspace):
         AuditSigningKey,
         AuditSigningKeyRotation,
         AuditSigningKeyRotationEvent,
+        AuditVerificationRun,
+        AuditVerificationRunEvent,
     )
     from apps.boxes.models import Box, BoxScan, QrCode, QrScanEvent
     from apps.evidence.models import EvidencePhoto, EvidenceRetentionPolicy
@@ -183,6 +185,10 @@ def _delete_object_graph(makerspace):
         # AuditBatchLeaf.audit_log PROTECTs the audit rows deleted just below, and the
         # batch FK PROTECTs the makerspace itself, so both must go first. Attestation is
         # deployment-local state about rows that are being destroyed anyway.
+        # Verification runs PROTECT the makerspace and their events CASCADE from the run;
+        # delete events first so the order is explicit rather than cascade-implied.
+        AuditVerificationRunEvent.objects.filter(run__makerspace=makerspace).delete()
+        AuditVerificationRun.objects.filter(makerspace=makerspace).delete()
         AuditBatchLeaf.objects.filter(batch__makerspace=makerspace).delete()
         AuditBatch.objects.filter(makerspace=makerspace).delete()
         AuditSigningKeyRotationEvent.objects.filter(

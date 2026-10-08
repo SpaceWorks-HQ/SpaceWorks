@@ -34,6 +34,14 @@ class RequestTimelineView(APIView):
     @extend_schema(
         tags=["Admin requests"],
         summary="Read-only immutable timeline for one hardware request",
+        description=(
+            "Scans, evidence, asset outcomes, accountability, problem reports and related "
+            "audit rows (`kind=audit`; metadata is the presentation-catalogue projection), "
+            "ordered by (at, kind, source id). Events with an `evidence_id` carry "
+            "`evidence_retention` (`null` = no retention-state row, not proof the bytes "
+            "exist). No object key or signed URL is ever returned; photo bytes stay behind "
+            "the UPLOAD_EVIDENCE-gated evidence endpoint."
+        ),
         parameters=[LIMIT_PARAMETER],
         responses={200: RequestTimelineResponseSerializer, **ACTION_ERROR_RESPONSES},
     )

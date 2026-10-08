@@ -37,8 +37,12 @@ const KIND_KEY_HINTS: Array<[RegExp, string[]]> = [
   [/^(payment|charge|refund)/, ["payment", "charge", "refund", "receipt"]],
 ];
 
+// Every live hint is published by `audit.services.record` with the audit action itself as
+// `kind`, so every valid event is also a new audit row: audit-explorer queries go stale on
+// any kind, in addition to the domain keys the kind names. There is no `audit.appended`.
 export function keyMatchesKind(queryKey: readonly unknown[], kind: string): boolean {
   const flat = JSON.stringify(queryKey).toLowerCase();
+  if (flat.includes("audit")) return true;
   for (const [pattern, hints] of KIND_KEY_HINTS) {
     if (pattern.test(kind)) return hints.some((hint) => flat.includes(hint));
   }

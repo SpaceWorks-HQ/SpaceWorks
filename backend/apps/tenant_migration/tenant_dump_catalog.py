@@ -55,7 +55,8 @@ class TenantDumpCatalogError(AssertionError):
 # Re-blessed again for `TenantDumpCapture.money_fingerprint_sha256`, which binds a
 # capture to the tenant's unsettled money so publication can refuse a dump the source
 # has since moved past.
-CATALOG_SCHEMA_SHA256 = "5f48719d15dbf79c58c0d70de104e3107a9c15d4895bf9f6fbe1dceb55175c59"
+# Re-blessed for phase 10's two omitted (DROP) audit verification-run models.
+CATALOG_SCHEMA_SHA256 = "7b51875ef928b5064d5c6155f85989e387b2c6f5c9fb546e0d9efbd36593386f"
 
 
 def catalog_models(apps_registry=apps):
