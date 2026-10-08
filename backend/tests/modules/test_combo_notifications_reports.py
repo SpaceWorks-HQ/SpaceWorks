@@ -139,3 +139,37 @@ def test_every_gated_report_refuses_with_its_source_module_off(report_key, modul
 
     assert response.status_code == 400, (report_key, response.status_code)
     assert f"{module} is disabled" in str(response.data)
+
+
+def test_outbound_channels_still_fan_out_with_the_inbox_module_off(monkeypatch):
+    """N3: `notifications` is the in-app inbox only; installed channels still deliver."""
+    from apps.integrations import notify
+    from tests.test_notification_fanout import enabled_channel, payload, successful_sinks
+
+    space = make_space("combo-inbox-off")
+    disable_module(space, "notifications")
+    space.refresh_from_db()
+    assert "notifications" not in space.enabled_modules
+    emails, channels = [], []
+    enabled_channel(monkeypatch, "slack")
+    successful_sinks(monkeypatch, emails, channels)
+
+    result = notify.notify_lifecycle(
+        space, feature="printing", event="submitted", build=payload, sync=True
+    )
+
+    assert [call["channel"] for call in channels] == ["slack"]
+    assert result.delivered_counts == {"slack": 1}
+
+
+def test_payment_reconciliation_report_answers_with_payments_uninstalled():
+    """N16: the ledger is core, so its report carries no `payments` module gate."""
+    space = make_space("combo-ledger-report")
+    manager = make_member("combo-ledger-report-mgr", space)
+    disable_module(space, "payments")
+
+    response = authenticated_client(manager).get(
+        reverse("analytics-generic", args=[space.id, "payment-reconciliation"])
+    )
+
+    assert response.status_code == 200, response.data
