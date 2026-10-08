@@ -6,17 +6,27 @@ hands out free storage; a file missing from the purge's key collection simply ou
 row that could identify it, with nothing raised at any point.
 """
 
+from datetime import time, timedelta
 from io import StringIO
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.utils import timezone
 
 from apps.admin_api.models import BulkImportJob
+from apps.events.models import (
+    Event,
+    EventAttendanceCertificate,
+    EventFeedbackResponse,
+    EventFeedbackSurvey,
+    EventRegistration,
+    EventSeries,
+)
 from apps.machines.models import Machine, MachineType
 from apps.maintenance.models import MaintenanceLog, MaintenanceLogDocument
 from apps.makerspaces import lifecycle
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.models import Makerspace, MemberCard
 
 pytestmark = pytest.mark.django_db
 
@@ -61,6 +71,77 @@ def test_recompute_storage_counts_maintenance_documents(monkeypatch):
     # recorded `size_bytes` is the fallback -- the same contract as evidence rows.
     monkeypatch.setattr(
         "apps.maintenance.storage.object_size", lambda key: None
+    )
+    Makerspace.objects.filter(pk=makerspace.pk).update(storage_bytes_used=999)
+
+    call_command("recompute_storage", makerspace.slug, stdout=StringIO())
+
+    makerspace.refresh_from_db()
+    assert makerspace.storage_bytes_used == 100
+
+
+def _make_certificate(makerspace, *, size):
+    now = timezone.now()
+    event = Event.objects.create(
+        makerspace=makerspace, title="Recon event", starts_at=now, ends_at=now + timedelta(hours=1)
+    )
+    registration = EventRegistration.objects.create(
+        event=event, name="Recon", email="recon-cert@example.test", phone="1"
+    )
+    survey = EventFeedbackSurvey.objects.create(
+        event=event,
+        title="Recon survey",
+        questions=[{"id": "q1", "label": "Rating", "type": "number", "options": [], "required": True}],
+    )
+    response = EventFeedbackResponse.objects.create(
+        survey=survey, registration=registration, answers_snapshot="{}", certificate_requested=True
+    )
+    return EventAttendanceCertificate.objects.create(
+        response=response,
+        registration=registration,
+        revision=1,
+        recipient_name="Recon",
+        event_title="Recon event",
+        event_starts_at=now,
+        event_ends_at=now + timedelta(hours=1),
+        issuer_name="Recon",
+        object_key=f"certificates/recon-{makerspace.id}.pdf",
+        size_bytes=size,
+    )
+
+
+def test_recompute_storage_counts_member_card_photos_series_images_and_certificates(monkeypatch):
+    """All three are charged by `add_storage` on finalize and collected by the purges,
+    but the reconciler omitted them (found by the 2026-10-09 makerspace audit), so a
+    recompute silently lowered the recorded usage of any space holding one."""
+    makerspace = make_space("recon-cards-series-certs")
+    MemberCard.objects.create(
+        makerspace=makerspace,
+        card_number=1,
+        photo_object_key=f"member-cards/{makerspace.id}/photo.jpg",
+        photo_content_type="image/jpeg",
+        photo_size_bytes=30,
+        photo_consent_at=timezone.now(),
+        photo_consent_version="v1",
+    )
+    _make_certificate(makerspace, size=50)
+    series_key = f"event-series/{makerspace.id}/banner.png"
+    EventSeries.objects.create(
+        makerspace=makerspace,
+        title="Recon series",
+        recurrence_timezone="UTC",
+        dtstart_local_date=timezone.now().date() + timedelta(days=1),
+        dtstart_local_time=time(18, 0),
+        recurrence_rule="FREQ=WEEKLY;COUNT=2",
+        duration_minutes=60,
+        image_key=series_key,
+    )
+    # Private objects: no HEAD answer, so the recorded size is the fallback. Public
+    # images carry no recorded size, so the HEAD is the only source.
+    monkeypatch.setattr("apps.evidence.storage.object_size", lambda key: None)
+    monkeypatch.setattr(
+        "apps.inventory.public_image_storage.object_size",
+        lambda key: 20 if key == series_key else None,
     )
     Makerspace.objects.filter(pk=makerspace.pk).update(storage_bytes_used=999)
 
