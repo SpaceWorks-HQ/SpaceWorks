@@ -182,4 +182,8 @@ def construct_event(payload, sig_header, webhook_secret):
         )
         if signature_errors and isinstance(exc, signature_errors):
             raise StripeWebhookSignatureError("Invalid Stripe webhook signature.") from exc
+        if isinstance(exc, TypeError):
+            # The SDK compares signatures with compare_digest on str, which raises TypeError
+            # for a non-ASCII header: a forged signature, so reject it as one, not as a 500.
+            raise StripeWebhookSignatureError("Invalid Stripe webhook signature.") from exc
         raise
