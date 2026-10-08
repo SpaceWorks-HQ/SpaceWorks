@@ -28,6 +28,13 @@
   `StationCredential` envelope; `station_credentials.py`, `station_sessions.py`, `station_security.py` and
   `station_throttles.py` own reusable rotation/reveal/disable, signing, PIN/origin and throttle mechanics
   without importing event policy.
+  Phase 9b kiosk Stations: `models_station_leases.py` (`StationOperatorLease`, `StationSessionRevocation`),
+  `kiosk_station_services.py` (scanner/handover lifecycle + PIN session), `station_operator_leases.py`
+  (lease issue/resolve/narrow/revoke), `station_views_admin.py`/`station_views_public.py`/`station_urls.py`
+  (routes), `station_lease_cleanup.py` + `tasks_station.py` (daily cleanup), `checks_station.py` (timing).
+  The handover side owns `hardware_requests/kiosk_command_policy.py` (the literal operation table),
+  `kiosk_online_commands.py` (work package + dispatch into existing workflows) and `kiosk_views.py`;
+  `evidence/services_upload.py` is the shared row+staging-presign service.
 - `backend/apps/organizations/` — `Organization` (platform entity, creatable before any makerspace, NOT a
   module_registry key), its opt-in public profile and cross-makerspace event catalogue,
   `OrganizationMakerspace` (the many-to-many link, at most one `owner` per space),

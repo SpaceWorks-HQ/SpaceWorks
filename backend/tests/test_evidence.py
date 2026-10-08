@@ -71,7 +71,7 @@ def make_photo(makerspace, uploaded_by, object_key="evidence/original.png"):
 
 def mock_upload(monkeypatch):
     monkeypatch.setattr(
-        "apps.evidence.views.presigned_upload",
+        "apps.evidence.services_upload.presigned_upload",
         lambda object_key, content_type: {
             "url": "http://minio/evidence",
             "fields": {"key": "k", "Content-Type": "image/png"},
@@ -284,7 +284,7 @@ def test_staff_user_without_membership_cannot_request_upload_url(monkeypatch):
 
 def test_upload_url_with_missing_makerspace_returns_404(monkeypatch):
     monkeypatch.setattr(
-        "apps.evidence.views.presigned_upload",
+        "apps.evidence.services_upload.presigned_upload",
         lambda object_key, content_type: pytest.fail("storage should not be called"),
     )
     missing_id = Makerspace.objects.order_by("-id").first()
@@ -326,7 +326,7 @@ def test_upload_storage_unavailable_returns_503_without_creating_rows(monkeypatc
     makerspace = make_space("upload-storage-down")
     user = make_member("upload-storage-down-user", makerspace)
     monkeypatch.setattr(
-        "apps.evidence.views.presigned_upload",
+        "apps.evidence.services_upload.presigned_upload",
         lambda object_key, content_type: (_ for _ in ()).throw(StorageUnavailable()),
     )
     evidence_count = EvidencePhoto.objects.count()

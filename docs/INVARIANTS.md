@@ -1958,6 +1958,24 @@ Load-bearing details that carried over unchanged:
   requires a usable-password step-up and keeps the existing audit actions. Roster and synchronization stay
   event services, and station attendance remains anonymous (`actor=None`, source `venue_station`), distinct
   from authenticated staff offline check-in.
+- **A kiosk Station PIN opens a channel; it never authorizes a handover (phase 9b, `inventory.kiosk`).**
+  Scanner/handover Stations are managed under `MANAGE_MAKERSPACE` (`station_views_admin.py`; the event kind
+  is refused). The PIN (`spaceworks:kiosk-station-pin:v1:<station_id>:<version>:<pin>` under the existing
+  `EVENT_STATION_PIN_PEPPER`) buys only the `sw_kiosk_station` cookie, path
+  `/api/v1/kiosk-stations/<token>/`, which is session-bound bearer material, never device-bound. Every
+  cookie-accepting route runs the exact Origin/Referer + `X-Station-CSRF` check and the
+  `StationSessionRevocation` lookup; session DELETE records the revocation before clearing the cookie, so a
+  copied cookie is dead for the rest of its signed life. Rotation and disable revoke every lease.
+- **Kiosk work is attributed to a real User through a `StationOperatorLease`.** A lease needs a normal login
+  AND the Station cookie; it stores `station-kind allow-list ∩ rbac.effective_actions ∩ live capability
+  conjunctions` (local membership or organization grant -- never a second membership-only gate), is clamped
+  to the session expiry, and holds no bearer token. Every work/evidence/command call re-checks the signed
+  token, row, Station/session/version, active user, live RBAC, source gate and the literal operation in
+  `hardware_requests/kiosk_command_policy.py`; the stored snapshot only narrows. The Station is never an
+  audit actor: existing services write their normal rows with the User, plus one companion
+  `kiosk.online_command_executed` row carrying station/session/version/lease identity. Capability off
+  answers 400, missing authority 403, `inventory.kiosk` off refuses the session uniformly. Deployment
+  quarantine revokes every lease; leases and revocations are omitted from tenant archives.
 - **Registering for an event does NOT require a `PresenceSession`; check-in does.**
   `require_active_member` (identity + membership + waiver) was split out of
   `require_active_member_presence`, and **only** `PublicEventRegistrationView` switched wholesale. The

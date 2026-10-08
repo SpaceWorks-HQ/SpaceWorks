@@ -1,5 +1,11 @@
 from django.urls import path
 
+from apps.hardware_requests.kiosk_views import (
+    KioskEvidencePrepareView,
+    KioskOnlineCommandView,
+    KioskWorkPackageView,
+)
+
 from apps.makerspaces.station_views_admin import (
     KioskStationDetailView,
     KioskStationListCreateView,
@@ -42,5 +48,20 @@ urlpatterns = [
         "kiosk-stations/<uuid:public_token>/operator-lease/",
         KioskOperatorLeaseView.as_view(),
         name="kiosk-station-operator-lease",
+    ),
+    path(
+        "kiosk-stations/<uuid:public_token>/work-package/",
+        KioskWorkPackageView.as_view(),
+        name="kiosk-station-work-package",
+    ),
+    path(
+        "kiosk-stations/<uuid:public_token>/evidence/prepare/",
+        KioskEvidencePrepareView.as_view(),
+        name="kiosk-station-evidence-prepare",
+    ),
+    path(
+        "kiosk-stations/<uuid:public_token>/commands/online/",
+        KioskOnlineCommandView.as_view(),
+        name="kiosk-station-command-online",
     ),
 ]
