@@ -66,7 +66,17 @@ def platform_email_configured() -> bool:
     from apps.integrations.models import PlatformEmailSettings
 
     cfg = PlatformEmailSettings.load()
-    return bool((cfg.smtp_host or "").strip())
+    if not (cfg.smtp_host or "").strip():
+        return False
+    # A host whose stored password no longer decrypts (API_CLIENT_ENC_KEY changed) cannot
+    # send anything. Reporting it configured kept "Forgot password?" on the login screen
+    # and let a superadmin hide a space on the strength of a recovery path that is dead.
+    try:
+        cfg.get_smtp_password()
+    except Exception:
+        logger.warning("platform_smtp_password_unreadable")
+        return False
+    return True
 
 
 def _is_smtp_backend() -> bool:

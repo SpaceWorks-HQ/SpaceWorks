@@ -2,6 +2,7 @@ import json
 
 import jwt
 import requests
+import urllib3
 from django.conf import settings
 from django.core.cache import cache
 
@@ -77,10 +78,22 @@ def _fetch_jwks(provider, url, *, refresh):
         if len(body) > settings.SOCIAL_AUTH_JWKS_MAX_BYTES:
             raise SocialProviderUnavailable("Identity provider is unavailable.")
         data = json.loads(body)
+        # A JSON array or scalar body used to reach `.get` and escape as AttributeError
+        # (a 500) instead of "provider unavailable" (a 503).
+        if not isinstance(data, dict):
+            raise ValueError
         keys = data.get("keys")
         if not isinstance(keys, list) or len(keys) > 16:
             raise ValueError
-    except (requests.RequestException, ValueError, TypeError, json.JSONDecodeError) as exc:
+    except (
+        requests.RequestException,
+        # `response.raw.read` is urllib3, below requests' exception wrapping: a read
+        # timeout or truncated body mid-stream raises urllib3's own errors (or OSError).
+        urllib3.exceptions.HTTPError,
+        OSError,
+        ValueError,
+        TypeError,
+    ) as exc:
         raise SocialProviderUnavailable("Identity provider is unavailable.") from exc
     cache.set(cache_key, keys, settings.SOCIAL_AUTH_JWKS_CACHE_SECONDS)
     return keys
