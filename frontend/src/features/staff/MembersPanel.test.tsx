@@ -67,3 +67,76 @@ describe("MembersPanel waiver controls", () => {
     ));
   });
 });
+
+const pendingRequests = {
+  count: 2,
+  next: null,
+  previous: null,
+  results: [
+    { id: 41, kind: "request", state: "requested", invite_email: "joiner@example.test", user: { id: 5, username: "joiner" }, assigned_role: null, decision_note: "", created_at: "2026-10-01T00:00:00Z", decided_at: null },
+    { id: 42, kind: "invite", state: "invited", invite_email: "staff@example.test", user: null, assigned_role: { id: 2, name: "Inventory Manager" }, decision_note: "", created_at: "2026-10-01T00:00:00Z", decided_at: null },
+  ],
+};
+
+function renderWith(membershipEnabled: boolean) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MembersPanel makerspaceId={3} membershipEnabled={membershipEnabled} />
+    </QueryClientProvider>,
+  );
+}
+
+describe("MembersPanel request queue", () => {
+  beforeEach(() => {
+    staffRequest.mockReset();
+    staffRequest.mockImplementation((url: string) => {
+      if (url.startsWith("/admin/memberships?")) return Promise.resolve(roster);
+      if (url.startsWith("/admin/membership-requests?")) return Promise.resolve(pendingRequests);
+      if (url.includes("invitation-requests") || url.includes("membership-plans")) return Promise.resolve([]);
+      if (url.includes("presence-sessions")) return Promise.resolve([]);
+      if (url.endsWith("/roles")) return Promise.resolve([{ id: 1, name: "Member" }, { id: 2, name: "Inventory Manager" }]);
+      return Promise.resolve({});
+    });
+  });
+
+  it("approves with the role the dropdown shows, without the dropdown being touched", async () => {
+    renderWith(true);
+
+    fireEvent.click(await screen.findByText("Approve"));
+
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(
+      "/admin/membership-requests/41/approve",
+      { method: "POST", body: JSON.stringify({ role_id: 1 }) },
+    ));
+  });
+
+  it("invites with the shown role, and posts a changed one", async () => {
+    renderWith(true);
+    fireEvent.change(await screen.findByLabelText("Invite email"), { target: { value: "new@example.test" } });
+    fireEvent.click(screen.getByText("Invite"));
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(
+      "/admin/makerspace/3/membership-invitations",
+      { method: "POST", body: JSON.stringify({ invite_email: "new@example.test", role_id: 1 }) },
+    ));
+
+    fireEvent.change(screen.getByLabelText("Invite role"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Invite email"), { target: { value: "other@example.test" } });
+    fireEvent.click(screen.getByText("Invite"));
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(
+      "/admin/makerspace/3/membership-invitations",
+      { method: "POST", body: JSON.stringify({ invite_email: "other@example.test", role_id: 2 }) },
+    ));
+  });
+
+  it("lists invitations with the module off and lets staff cancel one", async () => {
+    renderWith(false);
+
+    fireEvent.click(await screen.findByText("Cancel invitation"));
+
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(
+      "/admin/membership-requests/42/revoke",
+      { method: "POST", body: JSON.stringify({}) },
+    ));
+  });
+});
