@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import type { ApiPath } from "../../generated/api";
 import { Badge, Metric } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
+import { type ChatDestinationsHealth, IntegrationHealthRooms } from "./IntegrationHealthRooms";
 import type { Makerspace } from "./StaffPanels";
 import { staffTabPath } from "./staffTabs";
 
@@ -36,6 +37,7 @@ type IntegrationHealth = {
   };
   smtp: SectionHealth & { configured?: boolean };
   telegram: SectionHealth & { configured?: boolean };
+  chat_destinations?: ChatDestinationsHealth;
   worker: SectionHealth & {
     broker_configured?: boolean;
     eager?: boolean;
@@ -115,6 +117,15 @@ export function IntegrationHealthPanel({ makerspace }: { makerspace: Makerspace 
 
           <HealthBlock title="Telegram" status={data.telegram.status} detail={data.telegram.detail}>
             <ConfiguredBadge configured={data.telegram.configured} />
+          </HealthBlock>
+
+          <HealthBlock
+            title="Chat and webhook rooms"
+            status={data.chat_destinations?.status}
+            detail={data.chat_destinations?.detail}
+            wide
+          >
+            <IntegrationHealthRooms section={data.chat_destinations} formatTime={relativeTime} />
           </HealthBlock>
 
           <HealthBlock title="Worker" status={data.worker.status} detail={data.worker.detail} wide>
