@@ -1,7 +1,7 @@
 # SpaceWorks modules — what each one is, and what happens without it
 
-Space Works ships **32 modules**: 6 **core** ones that cannot be switched off, 2 that are **on by
-default**, and the rest opt-in. This page is the per-module reference the README links into — one entry
+Space Works ships **33 modules**: 6 **core** ones that cannot be switched off, 1 that is **on by
+default** (`updates`), and the rest opt-in. This page is the per-module reference the README links into — one entry
 per key, saying what it is, what it puts on screen, what disappears if you do not install it, and what
 happens to its data.
 
@@ -288,6 +288,9 @@ Required by `printing`.
 
 ### events
 
+**Requires `membership`** (installing `events` pulls it in): registration needs an active member and
+records the host waiver on the membership.
+
 - **What it is** — event scheduling and registration: one-off events or recurring series, registration
   with optional approval and waitlists, QR check-in at the door, post-event feedback and attendance
   certificates, and cross-makerspace collaborative events.
@@ -297,7 +300,11 @@ Required by `printing`.
   organization-hosted events, collaborators and host waivers, and attended events on the maker profile.
 - **Without it** — the space runs no events in-app: no public listing, no registrations, no check-in, no
   feedback or certificates, no calendar feeds, and no attended-event history on member profiles.
-  `payments.events` and `events.offline_checkin` become inert.
+  `charges.events`, `payments.events` and `events.offline_checkin` become inert.
+- **Combined with money** — a paid event (`payment_amount` > 0) records the debt when a registration
+  becomes REGISTERED (at sign-up, on approval with room, or on waitlist promotion — never while pending
+  or waitlisted), under `charges.events`; `payments.events` only adds the card rail. Cancelling the
+  event cancels every still-pending registration charge; settled ones stay for a staff refund.
 - **Data** — purgeable: events and series, registrations (they hold PII and are handled as such),
   check-in history, station credentials, feedback surveys and responses, attendance certificates and the
   stored PDFs they name, calendar feeds, and collaboration records. Payment routing on a registration is
@@ -309,11 +316,17 @@ Required by `printing`.
 
 ### bookings
 
+**Requires `membership`** (installing `bookings` pulls it in): public self-booking needs an active
+member with an open presence session.
+
 - **What it is** — bookable resources and the bookings against them, including public self-booking.
 - **What it adds** — bookable spaces, booking rules, the admin booking screens, the public booking page,
   and bookings in member activity.
-- **Without it** — nothing in the system reserves a resource for a time slot; `payments.bookings`
-  becomes inert.
+- **Without it** — nothing in the system reserves a resource for a time slot; `charges.bookings` and
+  `payments.bookings` become inert.
+- **Combined with other modules** — a priced space records the debt only once a booking is CONFIRMED
+  (instantly, or on approval); a space linked to a machine type is gated by `machines.certifications`
+  while `machines` is installed, and books ungated once it is not.
 - **Data** — purgeable: bookable spaces and their bookings (bookings hold PII).
 
 ---
@@ -321,6 +334,8 @@ Required by `printing`.
 ## Membership
 
 ### membership
+
+Required by `events` and `bookings`.
 
 - **What it is** — the community layer: join requests, waivers, referrals, verification, maker profiles,
   the member directory and member activity.
@@ -540,12 +555,18 @@ in the console rather than a superadmin. A feature is inert while its parent mod
 
 | Feature | Inside | Default | What it does | Without it |
 |---|---|:--:|---|---|
+| `charges.enabled` | — | ● | Master switch for recording money owed | The space charges for nothing: no debt is recorded in any area |
+| `charges.machines` | `machines` (needs `machine_service`) | ● | Record a charge when a priced machine job completes | Machine jobs are free |
+| `charges.bookings` | `bookings` | ● | Record a charge when a paid booking is confirmed | Bookings are free |
+| `charges.events` | `events` | ● | Record a charge when a registration for a paid event is confirmed | Registration is free |
+| `charges.membership` | `membership` | ● | Record dues and renewal charges | Dues are not recorded |
+| `charges.loans` | `request_workflow` | ● | Record loan deposits and late fees (amounts are set in payment settings) | Lateness is recorded but never charged |
 | `payments.enabled` | `payments` | ● | Master switch for all online payments | Every `payments.<area>` switch below is inert |
-| `payments.machines` | `machines` | | Charge for machine jobs | Machine jobs are free in-app |
-| `payments.bookings` | `bookings` | | Charge for bookings | Bookings are free in-app |
-| `payments.events` | `events` | | Charge for event registration | Registration is free in-app |
-| `payments.membership` | `membership` | | Charge membership dues | Dues are collected out of band |
-| `payments.loans` | `payments` | | Raise a deposit when a loan is issued and a capped late fee when it comes back late | Lateness is recorded (due dates, reminders) but never charged |
+| `payments.machines` | `machines` | | Card rail for machine-job charges | Charges are still recorded and settled offline |
+| `payments.bookings` | `bookings` | | Card rail for booking charges | Charges are still recorded and settled offline |
+| `payments.events` | `events` | | Card rail for event charges | Charges are still recorded and settled offline |
+| `payments.membership` | `membership` | | Card rail for dues | Dues are still recorded and settled offline |
+| `payments.loans` | `payments` | | Card rail for loan deposits and late fees | Loan charges are still recorded and settled offline |
 | `mobile.push` | `mobile` | ● | Native push notifications | Apps rely on in-app/inbox notifications |
 | `events.offline_checkin` | `events` | | Expiring on-device roster plus event-scoped PIN check-in stations | Check-in needs a live connection and an authenticated staff actor |
 | `machines.certifications` | `machines` | | Members need an unexpired certification per machine type to book a linked space or request work; overrides need machine-type authority and are audited | Training is tracked out of band; nothing gates a request or booking |
@@ -553,8 +574,10 @@ in the console rather than a superadmin. A feature is inert while its parent mod
 | `inventory.self_checkout` | — | ● | Member self-checkout and staff direct handouts | Every handover goes through a staff-issued request |
 | `presence.geofence` | — | ● | Advisory location check at check-in | Check-in records no location. It is advisory either way — it never blocks |
 
-The four `payments.<area>` switches are **off by default and stay inert until credentials resolve** —
-turning one on cannot start charging anyone by itself. `inventory.self_checkout` and `presence.geofence`
+The `payments.<area>` switches are **off by default and stay inert until credentials resolve** —
+turning one on cannot start charging anyone by itself. They only put a card rail behind a debt the
+matching `charges.<area>` switch records: with `charges.<area>` off, turning `payments.<area>` on records
+nothing and offers nothing (the two are deliberately independent switches, the A6 rule). `inventory.self_checkout` and `presence.geofence`
 belong to no module: they are standalone capabilities that apply whenever you enable them.
 
 ## Editions
@@ -593,11 +616,11 @@ modules.
 | `recommended` | 20 | Core plus the inventory lifecycle, reports and machines (the default) |
 | `cloud` | 24 | A managed box: everything that runs on a single Django process, no worker or beat |
 | `everything` / `full` | 33 | All modules |
-| `events` | 12 | An events programme: events, notifications, email, member accounts, membership, payments, reports (core is present but hidden by the `events` edition) |
-| `bookings` | 12 | Bookable rooms and resources: bookings, notifications, email, member accounts, membership, payments, reports (core hidden by the `bookings` edition) |
+| `events` | 13 | An events programme: events, notifications, email, member accounts, membership, payments, reports (core is present but hidden by the `events` edition) |
+| `bookings` | 13 | Bookable rooms and resources: bookings, notifications, email, member accounts, membership, payments, reports (core hidden by the `bookings` edition) |
 
-**Installing without a profile** gives you **8 modules**: the six core ones plus `payments` and
-`updates`. Member accounts and mobile apps are opt-in; installing `mobile` also installs its
+**Installing without a profile** gives you **7 modules**: the six core ones plus `updates`
+(`payments` became opt-in when charge tracking moved out from under it). Member accounts and mobile apps are opt-in; installing `mobile` also installs its
 `member_accounts` dependency.
 
 ## Deleting a module's data

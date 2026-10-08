@@ -389,7 +389,7 @@ route through it. `/auth/me` + `/auth/login` carry typed effective `actions` per
 membership/role-assignment APIs enforce non-escalation (can't grant a role you don't hold; can't touch a
 MANAGE_MAKERSPACE target/role) with makerspace-first lock ordering.
 
-**`apps/makerspaces/module_registry.py` is the single source of truth for module keys.** All 32
+**`apps/makerspaces/module_registry.py` is the single source of truth for module keys.** All 33
 `ModuleDefinition`s live there (`key`, `label`, `description`, `app_label`, `enforcement`, `group`,
 `requires_modules`, `default_enabled`, `is_core`, `frontend_exposed`, `frontend_workflows`), and the
 lists that used to be hand-kept in parallel now **derive** from it: `models.DEFAULT_ENABLED_MODULES`,
@@ -406,19 +406,21 @@ issue photo to issue hardware. `tests/makerspaces/test_module_registry.py` is th
 AST-parses `apps/` and fails if a registered module has no real guard call site, if a guarded key is
 unregistered, if the derived lists change, or if a migration-referenced callable stops resolving.
 
-**Modules are OPT-IN.** `DEFAULT_ENABLED_MODULES` resolves to **10 keys** — the 6 core ones plus
-`accounts`, `payments`, `mobile` and `updates`, which carry `default_enabled=True` because each was
-introduced as a *key over behaviour that already existed*, and an opt-in default would have switched
-that behaviour off for every deployment on upgrade (the `0050`/`0051` backfill reasoning, expressed
-in the registry instead of a migration). Everything else is off, and a new makerspace installs core
-plus whatever profile the operator chose (`minimal` 6 / `workshop` 14 / `lending` 17 /
-`recommended` 20 / `cloud` 24 / `everything` = `full` 32).
+**Modules are OPT-IN.** `DEFAULT_ENABLED_MODULES` resolves to **7 keys** — the 6 core ones plus
+`updates`, which carries `default_enabled=True` because it was introduced as a *key over behaviour
+that already existed*, and an opt-in default would have switched that behaviour off for every
+deployment on upgrade (the `0050`/`0051` backfill reasoning, expressed in the registry instead of a
+migration). `member_accounts`, `mobile` and `payments` once carried it too and are now opt-in for new
+makerspaces (existing rows kept them through `0057`). Everything else is off, and a new makerspace
+installs core plus whatever profile the operator chose (`minimal` 6 / `workshop` 14 / `lending` 17 /
+`recommended` 20 / `cloud` 24 / `events` 13 / `bookings` 13 / `everything` = `full` 33 — pinned by
+`tests/modules/test_combo_profiles.py`).
 `ModuleDefinition.default_enabled` defaults to **False** and core must not set it (core is on by
-definition; two sources for one fact is the drift the registry exists to remove) — so the four
-above are the only registry entries that set it, and `default_enabled_module_keys()` is the one
-place to ask rather than counting by hand. (This paragraph read "core only (6 keys)" until those
-four keys landed; it is the kind of count that goes stale silently, which is why the README table
-is generated from the registry rather than written out.) **Existing makerspaces
+definition; two sources for one fact is the drift the registry exists to remove) — so `updates` is
+the only registry entry that sets it, and `default_enabled_module_keys()` is the one place to ask
+rather than counting by hand. (This paragraph read "core only (6 keys)", then "10 keys"; it is the
+kind of count that goes stale silently, which is why the README table is generated from the registry
+rather than written out.) **Existing makerspaces
 are untouched** — a default change never rewrites stored JSON rows, and `_canonical_modules` preserves
 unknown keys. Because almost every backend test exercises a module's behaviour rather than the install
 default, `tests/conftest.py` has an autouse fixture that patches **only the `enabled_modules` field
@@ -1958,7 +1960,10 @@ Load-bearing details that carried over unchanged:
   `require_active_member_presence`, and **only** `PublicEventRegistrationView` switched wholesale. The
   hardware and facility invocations — self-checkout ×3, direct handout, public booking, and the two
   machine-service surfaces — still require a session, because "is this member here right now" is the
-  whole question. Request submission also keeps that guard while `membership` is enabled; with
+  whole question (the two machine-service surfaces only while `membership` is installed: without it
+  they take the identity-only guard, `machines/views_public_service.require_public_machine_requester`).
+  "Check-in does" means the staff-scanned event QR check-in is the presence evidence, not that it
+  looks up a `PresenceSession`. Request submission also keeps that guard while `membership` is enabled; with
   `membership` off it uses the separate identity-only guard because a request is only a proposal and
   staff acceptance is the control. There is no waiver check on that branch because waiver acceptance
   can only be recorded on a membership row. Signing up for an event is planning to attend; presence is
