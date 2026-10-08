@@ -355,7 +355,7 @@ Required by `printing`.
   inventory-only role can never turn a QR into a person. The printed name is scoped PII, the photo is a
   private object stored only with the member's recorded consent, and revoking a card deletes the photo
   and blanks the name immediately while the redacted row, the revoked QR, the scans and the audit entries
-  stay. Cards print as one CR80 card or an A4/Letter sheet; nothing rendered is stored.
+  stay; a fresh card can then be issued. Revoking the membership revokes its card too. Cards print as one CR80 card or an A4/Letter sheet; nothing rendered is stored.
 - **Data** — purgeable: join requests, member profiles with their projects and imagery, and member cards
   with their photos (their QR codes are revoked, never deleted). Memberships, waivers and acceptance
   evidence **stay** — they are core RBAC and liability state.

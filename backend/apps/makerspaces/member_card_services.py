@@ -49,7 +49,9 @@ def issue_card(actor, membership, *, printed_name=""):
     membership = MakerspaceMembership.objects.select_for_update().get(pk=membership.pk)
     if membership.status != "active":
         raise PermissionDenied("Only an active membership can hold a card.")
-    if MemberCard.objects.filter(membership=membership).exists():
+    # Only a LIVE card blocks a new one: after a revocation the member gets a fresh card
+    # (new number, new QR), and the revoked one stays as the redacted record.
+    if MemberCard.objects.filter(membership=membership, revoked_at__isnull=True).exists():
         raise PermissionDenied("This membership already holds a card; reissue it instead.")
     card = MemberCard.objects.create(
         makerspace_id=membership.makerspace_id,

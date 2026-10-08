@@ -1358,7 +1358,12 @@ redaction), with no module gate and no card action — `revoke_membership` is co
 revoke the membership is the authority here; until 2026-10-09 a revoked member's card stayed a live
 credential bearing their name and photo. The same revocation cancels every ACTIVE `MembershipTerm` and its
 pending renewal charge (`membership_plan_services.cancel_terms_for_membership`), as it already cancelled
-the dues charge. An invitation for someone who is already an active member is refused, as a referral was.
+the dues charge. An invitation for someone who is already an active member is refused, as a referral was. **One LIVE
+card per membership, not one card ever** (`makerspaces/0073`: `MemberCard.membership` became a
+ForeignKey with the partial `uniq_live_member_card_per_membership`): a revoked card stays as the redacted
+record behind its revoked QR and a fresh card (new number, new QR) can be issued — as a OneToOne the first
+revocation stranded the member, since issue refused an existing row and reissue refused a revoked one. The
+tenant-migration uniqueness policy moved from `field:membership` to that constraint name.
 
 ## Handover roles and the retired Guest Admin
 
