@@ -1093,6 +1093,9 @@ SPECTACULAR_SETTINGS = {
     # context and the file does not exist inside the container.
     "VERSION": "0.8.2",
     "ENUM_NAME_OVERRIDES": {
+        # Phase 9b: the kiosk evidence-prepare route shares these choices; pin the
+        # existing component name so the generated client type does not rename.
+        "EvidenceUrlRequestEvidenceTypeEnum": [("issue", "Issue"), ("return", "Return")],
         "QrPrintBatchStatusEnum": [
             ("draft", "Draft"),
             ("printed", "Printed"),

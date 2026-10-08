@@ -12,6 +12,7 @@ import { MakerspaceFeatureSettings } from "./MakerspaceFeatureSettings";
 import { MakerspaceGeofenceSettings } from "./MakerspaceGeofenceSettings";
 import { MakerspaceGeneralSettings } from "./MakerspaceGeneralSettings";
 import { IntegrationHealthPanel } from "./IntegrationHealthPanel";
+import { KioskStationSettings } from "./KioskStationSettings";
 import { MakerspaceLocationSettings } from "./MakerspaceLocationSettings";
 import { MakerspaceMembershipSettings } from "./MakerspaceMembershipSettings";
 import { MakerspacePaymentSettings } from "./MakerspacePaymentSettings";
@@ -114,6 +115,9 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMak
           loading={settings.isLoading}
         />
         <MakerspacePaymentSettings makerspace={settings.data ?? makerspace} />
+        {canManageMakerspace && (settings.data?.enabled_features ?? []).includes("inventory.kiosk") ? (
+          <KioskStationSettings makerspace={makerspace} />
+        ) : null}
         <MakerspaceGeofenceSettings makerspace={makerspace} settings={settings.data} loading={settings.isLoading} />
         <IntegrationHealthPanel makerspace={makerspace} />
         <div className="min-w-0 rounded-md border border-line bg-bg p-4">

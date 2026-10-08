@@ -7435,6 +7435,408 @@
                 }
             }
         },
+        "/api/v1/admin/kiosk-stations/{id}/": {
+            "get": {
+                "operationId": "api_v1_admin_kiosk_stations_retrieve",
+                "summary": "Read one kiosk Station without its PIN",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin kiosk stations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KioskStation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace access or step-up denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Station not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rotate the PIN instead of revealing."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Credential secrets are unavailable."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "api_v1_admin_kiosk_stations_destroy",
+                "summary": "Disable a kiosk Station and revoke its leases",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin kiosk stations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KioskStation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace access or step-up denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Station not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rotate the PIN instead of revealing."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Credential secrets are unavailable."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/kiosk-stations/{id}/reveal/": {
+            "post": {
+                "operationId": "api_v1_admin_kiosk_stations_reveal_create",
+                "summary": "Reveal a kiosk Station PIN after password step-up",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin kiosk stations"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskStationReveal"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskStationReveal"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskStationReveal"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KioskStationRevealResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace access or step-up denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Station not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rotate the PIN instead of revealing."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Credential secrets are unavailable."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/kiosk-stations/{id}/rotate/": {
+            "post": {
+                "operationId": "api_v1_admin_kiosk_stations_rotate_create",
+                "summary": "Rotate a kiosk Station PIN (re-enables it)",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin kiosk stations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KioskStationSecret"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace access or step-up denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Station not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rotate the PIN instead of revealing."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Credential secrets are unavailable."
+                    }
+                }
+            }
+        },
         "/api/v1/admin/ledger": {
             "get": {
                 "operationId": "api_v1_admin_ledger_retrieve",
@@ -17107,6 +17509,219 @@
                 "responses": {
                     "200": {
                         "description": "Import preview with row errors."
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/makerspace/{makerspace_id}/kiosk-stations/": {
+            "get": {
+                "operationId": "api_v1_admin_makerspace_kiosk_stations_list",
+                "summary": "List kiosk Stations",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin kiosk stations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/KioskStation"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace access or step-up denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Station not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rotate the PIN instead of revealing."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Credential secrets are unavailable."
+                    }
+                }
+            },
+            "post": {
+                "operationId": "api_v1_admin_makerspace_kiosk_stations_create",
+                "summary": "Create a kiosk Station and its first PIN",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "makerspace_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin kiosk stations"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskStationCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskStationCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskStationCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KioskStationSecret"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Feature disabled or invalid request."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Makerspace access or step-up denied."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Station not found."
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Rotate the PIN instead of revealing."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Credential secrets are unavailable."
                     }
                 }
             }
@@ -36546,6 +37161,628 @@
                 }
             }
         },
+        "/api/v1/kiosk-stations/{public_token}/commands/online/": {
+            "post": {
+                "operationId": "api_v1_kiosk_stations_commands_online_create",
+                "summary": "Run one online kiosk command through the workflow",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Kiosk-Operator-Lease",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Signed operator lease returned by the operator-lease route.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Kiosk stations"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskOnlineCommand"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskOnlineCommand"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskOnlineCommand"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KioskOnlineCommandResult"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid payload or capability disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Operator is not signed in."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station session, lease or authority."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Target not found in this makerspace."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Storage unavailable."
+                    }
+                }
+            }
+        },
+        "/api/v1/kiosk-stations/{public_token}/evidence/prepare/": {
+            "post": {
+                "operationId": "api_v1_kiosk_stations_evidence_prepare_create",
+                "summary": "Presign a direct-to-staging evidence upload",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Kiosk-Operator-Lease",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Signed operator lease returned by the operator-lease route.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Kiosk stations"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskEvidencePrepare"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskEvidencePrepare"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskEvidencePrepare"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EvidenceUrlResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid payload or capability disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Operator is not signed in."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station session, lease or authority."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Target not found in this makerspace."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Storage unavailable."
+                    }
+                }
+            }
+        },
+        "/api/v1/kiosk-stations/{public_token}/operator-lease/": {
+            "post": {
+                "operationId": "api_v1_kiosk_stations_operator_lease_create",
+                "summary": "Issue a human operator lease on this Station session",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Kiosk stations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KioskOperatorLease"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station credential, session, origin, feature or lease."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station credential, session, origin, feature or lease."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station credential, session, origin, feature or lease."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "api_v1_kiosk_stations_operator_lease_destroy",
+                "summary": "Revoke the caller's operator lease (operator sign-out)",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Kiosk-Operator-Lease",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Signed operator lease returned by the operator-lease route.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Kiosk stations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station credential, session, origin, feature or lease."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station credential, session, origin, feature or lease."
+                    }
+                }
+            }
+        },
+        "/api/v1/kiosk-stations/{public_token}/session/": {
+            "post": {
+                "operationId": "api_v1_kiosk_stations_session_create",
+                "summary": "Exchange a kiosk Station PIN for a Station session",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Kiosk stations"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskStationPin"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskStationPin"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskStationPin"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KioskStationBootstrap"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station credential, session, origin, feature or lease."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station credential, session, origin, feature or lease."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station credential, session, origin, feature or lease."
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "api_v1_kiosk_stations_session_destroy",
+                "summary": "End the Station session and revoke its operator leases",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Kiosk stations"
+                ],
+                "security": [
+                    {
+                        "KioskStationCookie": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station credential, session, origin, feature or lease."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station credential, session, origin, feature or lease."
+                    }
+                }
+            }
+        },
+        "/api/v1/kiosk-stations/{public_token}/work-package/": {
+            "post": {
+                "operationId": "api_v1_kiosk_stations_work_package_create",
+                "summary": "Load the minimal work package for one handover",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Kiosk-Operator-Lease",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Signed operator lease returned by the operator-lease route.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "public_token",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Kiosk stations"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskWorkPackageRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskWorkPackageRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/KioskWorkPackageRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KioskWorkPackage"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid payload or capability disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Operator is not signed in."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Invalid Station session, lease or authority."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Target not found in this makerspace."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HardwareRequestError"
+                                }
+                            }
+                        },
+                        "description": "Request rate limit exceeded."
+                    }
+                }
+            }
+        },
         "/api/v1/live/": {
             "get": {
                 "operationId": "api_v1_live_retrieve",
@@ -51237,6 +52474,415 @@
                 "type": "string",
                 "description": "* `role` - Role\n* `requester` - Requester\n* `members` - All members\n* `user` - Named user"
             },
+            "KioskEvidencePrepare": {
+                "type": "object",
+                "properties": {
+                    "evidence_type": {
+                        "$ref": "#/components/schemas/EvidenceUrlRequestEvidenceTypeEnum"
+                    },
+                    "content_type": {
+                        "type": "string"
+                    },
+                    "size_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "content_type",
+                    "evidence_type"
+                ]
+            },
+            "KioskOnlineCommand": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "$ref": "#/components/schemas/VersionEnum"
+                    },
+                    "kind": {
+                        "$ref": "#/components/schemas/KioskOnlineCommandKindEnum"
+                    },
+                    "payload": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    }
+                },
+                "required": [
+                    "kind",
+                    "payload",
+                    "version"
+                ]
+            },
+            "KioskOnlineCommandKindEnum": {
+                "enum": [
+                    "assign_box",
+                    "direct_handout",
+                    "direct_return",
+                    "resolve_qr",
+                    "reviewed_issue",
+                    "reviewed_return"
+                ],
+                "type": "string",
+                "description": "* `assign_box` - assign_box\n* `direct_handout` - direct_handout\n* `direct_return` - direct_return\n* `resolve_qr` - resolve_qr\n* `reviewed_issue` - reviewed_issue\n* `reviewed_return` - reviewed_return"
+            },
+            "KioskOnlineCommandResult": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string"
+                    },
+                    "result": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    }
+                },
+                "required": [
+                    "kind",
+                    "result"
+                ]
+            },
+            "KioskOperatorLease": {
+                "type": "object",
+                "properties": {
+                    "lease_token": {
+                        "type": "string"
+                    },
+                    "lease_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "allowed_actions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "permitted_operations": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "allowed_actions",
+                    "expires_at",
+                    "lease_id",
+                    "lease_token",
+                    "permitted_operations"
+                ]
+            },
+            "KioskStation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "public_token": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "version": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "station_url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "rotated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "enabled",
+                    "id",
+                    "kind",
+                    "name",
+                    "public_token",
+                    "rotated_at",
+                    "station_url",
+                    "version"
+                ]
+            },
+            "KioskStationBootstrap": {
+                "type": "object",
+                "properties": {
+                    "station": {
+                        "$ref": "#/components/schemas/_StationRef"
+                    },
+                    "makerspace": {
+                        "$ref": "#/components/schemas/_MakerspaceRef"
+                    },
+                    "session_expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "permitted_operations": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "makerspace",
+                    "permitted_operations",
+                    "session_expires_at",
+                    "station"
+                ]
+            },
+            "KioskStationCreate": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "kind": {
+                        "$ref": "#/components/schemas/KioskStationCreateKindEnum"
+                    }
+                },
+                "required": [
+                    "kind",
+                    "name"
+                ]
+            },
+            "KioskStationCreateKindEnum": {
+                "enum": [
+                    "scanner",
+                    "handover"
+                ],
+                "type": "string",
+                "description": "* `scanner` - Scanner\n* `handover` - Handover"
+            },
+            "KioskStationPin": {
+                "type": "object",
+                "properties": {
+                    "pin": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "pattern": "^\\d{8}$"
+                    },
+                    "makerspace_slug": {
+                        "type": "string",
+                        "maxLength": 80,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    }
+                },
+                "required": [
+                    "pin"
+                ]
+            },
+            "KioskStationReveal": {
+                "type": "object",
+                "properties": {
+                    "current_password": {
+                        "type": "string",
+                        "writeOnly": true
+                    }
+                },
+                "required": [
+                    "current_password"
+                ]
+            },
+            "KioskStationRevealResponse": {
+                "type": "object",
+                "properties": {
+                    "pin": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "pin",
+                    "version"
+                ]
+            },
+            "KioskStationSecret": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "public_token": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "version": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "station_url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "rotated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "pin": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "enabled",
+                    "id",
+                    "kind",
+                    "name",
+                    "pin",
+                    "public_token",
+                    "rotated_at",
+                    "station_url",
+                    "version"
+                ]
+            },
+            "KioskWorkLine": {
+                "type": "object",
+                "properties": {
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "integer"
+                    },
+                    "returned": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "item_id",
+                    "label",
+                    "quantity",
+                    "returned"
+                ]
+            },
+            "KioskWorkPackage": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "display_label": {
+                        "type": "string"
+                    },
+                    "person_display": {
+                        "type": "string"
+                    },
+                    "box": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/KioskWorkLine"
+                        }
+                    },
+                    "return_resolutions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "command_age_limit_seconds": {
+                        "type": "integer"
+                    },
+                    "evidence_max_bytes": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "box",
+                    "command_age_limit_seconds",
+                    "display_label",
+                    "evidence_max_bytes",
+                    "expires_at",
+                    "id",
+                    "kind",
+                    "lines",
+                    "person_display",
+                    "return_resolutions",
+                    "status"
+                ]
+            },
+            "KioskWorkPackageRequest": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "$ref": "#/components/schemas/KioskWorkPackageRequestKindEnum"
+                    },
+                    "id": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind"
+                ]
+            },
+            "KioskWorkPackageRequestKindEnum": {
+                "enum": [
+                    "reviewed_request",
+                    "direct_loan"
+                ],
+                "type": "string",
+                "description": "* `reviewed_request` - reviewed_request\n* `direct_loan` - direct_loan"
+            },
             "LedgerResponse": {
                 "type": "object",
                 "properties": {
@@ -53745,7 +55391,8 @@
                                 "$ref": "#/components/schemas/MakerspaceArchiveRequestStatusEnum"
                             }
                         ],
-                        "readOnly": true
+                        "readOnly": true,
+                        "default": "pending"
                     }
                 },
                 "required": [
@@ -67936,6 +69583,13 @@
                     "target_makerspace_id"
                 ]
             },
+            "VersionEnum": {
+                "enum": [
+                    1
+                ],
+                "type": "integer",
+                "description": "* `1` - 1"
+            },
             "WaiverAcceptResponse": {
                 "type": "object",
                 "properties": {
@@ -68281,6 +69935,44 @@
                     "waiver_id",
                     "waiver_version",
                     "witnessed_at"
+                ]
+            },
+            "_MakerspaceRef": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "slug"
+                ]
+            },
+            "_StationRef": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind",
+                    "name"
                 ]
             }
         },

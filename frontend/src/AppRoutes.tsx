@@ -24,6 +24,7 @@ const PublicOrganizationPage = lazy(() => import("./features/organizations/Publi
 const OrganizationInvitationRedeemPage = lazy(() => import("./features/organizations/OrganizationInvitationRedeemPage").then((m) => ({ default: m.OrganizationInvitationRedeemPage })));
 const ResetPasswordPage = lazy(() => import("./features/staff/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })));
 const EventCheckInStationPage = lazy(() => import("./features/events/EventCheckInStationPage").then((m) => ({ default: m.EventCheckInStationPage })));
+const KioskStationPage = lazy(() => import("./features/kiosk/KioskStationPage").then((m) => ({ default: m.KioskStationPage })));
 const PublicStatsPage = lazy(() => import("./features/stats/PublicStatsPage").then((m) => ({ default: m.PublicStatsPage })));
 
 function NotFoundPage() {
@@ -72,6 +73,7 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
       <Route path="/admin/*" element={<StaffApp />} />
       <Route path="/guest-admin/*" element={<StaffApp guestOnly />} />
       <Route path="/scanner" element={<ScannerPage />} />
+      <Route path="/kiosk/:stationToken" element={<KioskStationPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>;
   } else {
@@ -91,6 +93,7 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
       <Route path="/m/:slug/member" element={<MemberArea />} />
       <Route path="/member" element={<MemberArea />} />
       <Route path="/m/:slug/stats" element={<PublicStatsPage />} />
+      <Route path="/m/:slug/kiosk/:stationToken" element={<KioskStationPage />} />
       <Route path="/kiosk/:slug" element={<KioskPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/admin/*" element={<StaffApp />} />

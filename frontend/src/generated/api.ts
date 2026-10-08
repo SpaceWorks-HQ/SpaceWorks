@@ -14,6 +14,7 @@ export const openApiTags = [
   "Admin events",
   "Admin hosting",
   "Admin inventory",
+  "Admin kiosk stations",
   "Admin machine service",
   "Admin machines",
   "Admin maintenance",
@@ -44,6 +45,7 @@ export const openApiTags = [
   "Health",
   "Integration health",
   "Internal",
+  "Kiosk stations",
   "Ledger",
   "Makerspaces",
   "Member activity",
@@ -159,6 +161,9 @@ export const openApiPaths = [
   "/api/v1/admin/inventory/{product_pk}/assets",
   "/api/v1/admin/invitation-requests/{id}/decline",
   "/api/v1/admin/invitation-requests/{id}/invite",
+  "/api/v1/admin/kiosk-stations/{id}/",
+  "/api/v1/admin/kiosk-stations/{id}/reveal/",
+  "/api/v1/admin/kiosk-stations/{id}/rotate/",
   "/api/v1/admin/ledger",
   "/api/v1/admin/ledger/export",
   "/api/v1/admin/machine-service-report",
@@ -262,6 +267,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/inventory/import/jobs",
   "/api/v1/admin/makerspace/{makerspace_id}/inventory/import/jobs/{job_id}",
   "/api/v1/admin/makerspace/{makerspace_id}/inventory/import/preview",
+  "/api/v1/admin/makerspace/{makerspace_id}/kiosk-stations/",
   "/api/v1/admin/makerspace/{makerspace_id}/ledger",
   "/api/v1/admin/makerspace/{makerspace_id}/ledger/export",
   "/api/v1/admin/makerspace/{makerspace_id}/logo",
@@ -484,6 +490,11 @@ export const openApiPaths = [
   "/api/v1/integrations/telegram/webhook",
   "/api/v1/internal/cron/return-reminders",
   "/api/v1/internal/tls-check",
+  "/api/v1/kiosk-stations/{public_token}/commands/online/",
+  "/api/v1/kiosk-stations/{public_token}/evidence/prepare/",
+  "/api/v1/kiosk-stations/{public_token}/operator-lease/",
+  "/api/v1/kiosk-stations/{public_token}/session/",
+  "/api/v1/kiosk-stations/{public_token}/work-package/",
   "/api/v1/live/",
   "/api/v1/member/archived-payments",
   "/api/v1/member/makerspaces/{makerspace_id}/activity",
@@ -569,6 +580,18 @@ export type ApiPath = (typeof openApiPaths)[number];
 
 // Schema types generated from the same OpenAPI contract as the route constants.
 // Use these at API boundaries so console code cannot silently drift from DRF serializers.
+export type _MakerspaceRef = {
+  "id": number;
+  "slug": string;
+  "name": string;
+};
+
+export type _StationRef = {
+  "id": number;
+  "name": string;
+  "kind": string;
+};
+
 export type AcceptQuantity = {
   "item_id": number;
   "quantity": number;
@@ -2516,6 +2539,118 @@ export type Kind3bfEnum = "dev_room" | "bench" | "meeting" | "other";
 export type KindB02Enum = "rollback_in_place" | "disaster";
 
 export type KindE56Enum = "role" | "requester" | "members" | "user";
+
+export type KioskEvidencePrepare = {
+  "evidence_type": EvidenceUrlRequestEvidenceTypeEnum;
+  "content_type": string;
+  "size_bytes"?: number | null;
+};
+
+export type KioskOnlineCommand = {
+  "version": VersionEnum;
+  "kind": KioskOnlineCommandKindEnum;
+  "payload": {
+  [key: string]: unknown;
+};
+};
+
+export type KioskOnlineCommandKindEnum = "assign_box" | "direct_handout" | "direct_return" | "resolve_qr" | "reviewed_issue" | "reviewed_return";
+
+export type KioskOnlineCommandResult = {
+  "kind": string;
+  "result": {
+  [key: string]: unknown;
+};
+};
+
+export type KioskOperatorLease = {
+  "lease_token": string;
+  "lease_id": string;
+  "expires_at": string;
+  "allowed_actions": Array<string>;
+  "permitted_operations": Array<string>;
+};
+
+export type KioskStation = {
+  "id": number;
+  "name": string;
+  "kind": string;
+  "enabled": boolean;
+  "public_token": string | null;
+  "version": number | null;
+  "station_url": string | null;
+  "rotated_at": string | null;
+  "created_at": string;
+};
+
+export type KioskStationBootstrap = {
+  "station": _StationRef;
+  "makerspace": _MakerspaceRef;
+  "session_expires_at": string;
+  "permitted_operations": Array<string>;
+};
+
+export type KioskStationCreate = {
+  "name": string;
+  "kind": KioskStationCreateKindEnum;
+};
+
+export type KioskStationCreateKindEnum = "scanner" | "handover";
+
+export type KioskStationPin = {
+  "pin": string;
+  "makerspace_slug"?: string;
+};
+
+export type KioskStationReveal = {
+  "current_password": string;
+};
+
+export type KioskStationRevealResponse = {
+  "pin": string;
+  "version": number;
+};
+
+export type KioskStationSecret = {
+  "id": number;
+  "name": string;
+  "kind": string;
+  "enabled": boolean;
+  "public_token": string | null;
+  "version": number | null;
+  "station_url": string | null;
+  "rotated_at": string | null;
+  "created_at": string;
+  "pin": string;
+};
+
+export type KioskWorkLine = {
+  "item_id": number;
+  "label": string;
+  "quantity": number;
+  "returned": number;
+};
+
+export type KioskWorkPackage = {
+  "kind": string;
+  "id": number;
+  "status": string;
+  "display_label": string;
+  "person_display": string;
+  "box": string | null;
+  "lines": Array<KioskWorkLine>;
+  "return_resolutions": Array<string>;
+  "expires_at": string;
+  "command_age_limit_seconds": number;
+  "evidence_max_bytes": number;
+};
+
+export type KioskWorkPackageRequest = {
+  "kind": KioskWorkPackageRequestKindEnum;
+  "id": number;
+};
+
+export type KioskWorkPackageRequestKindEnum = "reviewed_request" | "direct_loan";
 
 export type LedgerResponse = {
   "count": number;
@@ -6649,6 +6784,8 @@ export type VerificationReport = {
   "identities_created": number;
   "external_references_created": number;
 };
+
+export type VersionEnum = 1;
 
 export type WaiverAcceptResponse = {
   "accepted": boolean;
