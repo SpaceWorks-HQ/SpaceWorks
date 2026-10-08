@@ -151,6 +151,39 @@ def test_problem_report_evidence_is_finalized_in_post_mode(monkeypatch, settings
 
     assert response.status_code == 200
     finalize.assert_called_once_with(evidence, settings.EVIDENCE_MAX_BYTES)
+    evidence.refresh_from_db()
+    assert evidence.consumption_state == EvidencePhoto.ConsumptionState.CONSUMED
+
+
+def test_no_issue_triage_with_evidence_still_marks_it_consumed(monkeypatch, settings):
+    """The FK-less no_issue branch is protected by the marker, not only by audit meta."""
+    settings.STORAGE_PRESIGN_METHOD = "post"
+    makerspace = make_space("problem-no-issue-evidence")
+    manager = make_member("problem-no-issue-evidence-manager", makerspace)
+    product = make_product(makerspace, total_quantity=1, available_quantity=1)
+    report, _item = _returned_report(makerspace, product)
+    evidence = EvidencePhoto.objects.create(
+        makerspace=makerspace,
+        evidence_type=EvidencePhoto.EvidenceType.RETURN,
+        object_key=f"evidence/{makerspace.id}/return/no-issue",
+        uploaded_by=manager,
+        consumption_state=EvidencePhoto.ConsumptionState.UNCONSUMED,
+    )
+    monkeypatch.setattr(
+        "apps.evidence.storage.finalize_upload",
+        Mock(return_value=EvidenceValidationResult(size=5, content_type="image/png")),
+    )
+
+    response = authenticated_client(manager).post(
+        _triage_url(makerspace, report),
+        {"outcome": "no_issue", "resolutions": [], "note": "Fine.", "evidence_id": evidence.id},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    evidence.refresh_from_db()
+    assert evidence.consumption_state == EvidencePhoto.ConsumptionState.CONSUMED
+    assert not RequesterAccountability.objects.exists()
 
 
 def test_no_issue_triage_moves_no_stock_and_creates_no_accountability():

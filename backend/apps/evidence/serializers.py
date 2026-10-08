@@ -95,4 +95,3 @@ class EvidenceRetentionPreviewResponseSerializer(serializers.Serializer):
     abandoned_upload_has_more = serializers.BooleanField()
     late_write_receipts = serializers.IntegerField()
     late_write_receipts_due = serializers.IntegerField()
-

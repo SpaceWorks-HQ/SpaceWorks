@@ -261,6 +261,14 @@ def test_admin_direct_manual_handout_and_return_logs_product(monkeypatch, settin
         call.args[1] == settings.EVIDENCE_MAX_BYTES
         for call in finalize.call_args_list
     )
+    # Direct-loan issue and return both mark their evidence durably consumed.
+    from apps.evidence.models import EvidencePhoto
+
+    assert set(
+        EvidencePhoto.objects.filter(
+            pk__in=[request.issue_evidence_id, evidence.id]
+        ).values_list("consumption_state", flat=True)
+    ) == {EvidencePhoto.ConsumptionState.CONSUMED}
 
     logs = client.get(
         "/api/v1/admin/audit-logs",

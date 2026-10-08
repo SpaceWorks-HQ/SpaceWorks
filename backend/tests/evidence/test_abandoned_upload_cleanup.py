@@ -405,3 +405,45 @@ def test_protected_sidecars_block_the_collector_even_with_the_exact_guc():
         cursor.execute("SET LOCAL app.evidence_abandoned_delete_id = %s", [str(target.pk)])
         EvidencePhoto.objects.filter(pk=target.pk).delete()
     assert EvidenceUploadFinalization.objects.filter(evidence=target).exists()
+
+
+def test_system_check_requires_cleanup_age_strictly_beyond_presign_ttl(settings):
+    from apps.evidence.checks import check_evidence_retention_settings
+
+    settings.EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS = 7
+    assert not check_evidence_retention_settings(None)
+    settings.EVIDENCE_URL_TTL_SECONDS = 7 * 86400
+    assert [e.id for e in check_evidence_retention_settings(None)] == ["evidence.E005"]
+    settings.EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS = 0
+    assert [e.id for e in check_evidence_retention_settings(None)] == ["evidence.E004"]
+
+
+def test_patch_is_partial_and_validates_age_against_the_current_ttl(settings):
+    from rest_framework.test import APIClient
+
+    from apps.makerspaces.models import MakerspaceMembership
+
+    makerspace = space("abandon-patch", opt_in=False)
+    manager = get_user_model().objects.create_user(
+        username="abandon-patch-mgr", email="apm@e.test",
+        role=User.Role.SPACE_MANAGER, access_status=User.AccessStatus.ACTIVE,
+    )
+    MakerspaceMembership.objects.create(
+        makerspace=makerspace, user=manager, role=MakerspaceMembership.Role.SPACE_MANAGER
+    )
+    client = APIClient()
+    client.force_authenticate(manager)
+    url = f"/api/v1/admin/makerspaces/{makerspace.pk}/evidence-retention"
+
+    assert client.patch(url, {}, format="json").status_code == 400
+    response = client.patch(url, {"abandoned_upload_cleanup_enabled": True}, format="json")
+    assert response.status_code == 200 and response.data["abandoned_upload_cleanup_enabled"]
+    client.patch(url, {"object_retention_days": 90}, format="json")
+    response = client.patch(url, {"object_retention_days": None}, format="json")
+    assert response.data["abandoned_upload_cleanup_enabled"] is True  # preserved
+    settings.EVIDENCE_URL_TTL_SECONDS = 3 * 86400
+    assert client.patch(
+        url, {"abandoned_upload_retention_days": 2}, format="json"
+    ).status_code == 400
+    client.patch(url, {"abandoned_upload_cleanup_enabled": False}, format="json")
+    assert not EvidenceRetentionPolicy.objects.filter(makerspace=makerspace).exists()

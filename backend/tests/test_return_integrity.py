@@ -82,6 +82,9 @@ def test_reusing_return_evidence_on_second_return_returns_400(monkeypatch):
     assert second.status_code == 400
     assert second.data["code"] == "return_validation_error"
     assert second.data["detail"] == "Evidence already used."
+    # The reviewed-return transaction durably marked the photo consumed.
+    evidence.refresh_from_db()
+    assert evidence.consumption_state == "consumed"
 
 
 def test_return_items_raises_insufficient_stock_when_issued_too_low():
