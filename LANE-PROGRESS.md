@@ -37,6 +37,8 @@ Branch `lane/11` off `dev` `b7c2ee93`. Plan: main checkout
   walks for the remaining 322 tests (2 "failed" + 320 errors, all the same ENOMEM) — environment:
   the shared 8 GB Docker VM was running ~52 containers for the parallel lanes.
 - run9 (12 tenant_migration files): ENOMEM at collection.
+- run10 (6 tenant_migration files): Docker engine returned 500 on `_ping` (05:06) — not run.
+  OUTSTANDING: a clean `tests/backup tests/tenant_migration` run and the full serial suite.
 - frontend: `npx tsc -b` clean; `npm run build` ok; `vitest run src/features/staff` 197 passed;
   full `npm test` 278 passed / 1-2 failed in `MemberAreaArchivedLink.test.tsx` under load — the
   file passes 2/2 when run alone; not touched by this lane (flaky timing).
