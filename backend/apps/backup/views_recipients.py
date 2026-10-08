@@ -19,7 +19,9 @@ from apps.backup.serializers_recipients import (
     ArchiveRecipientSerializer,
     ArchiveRecipientVerifySerializer,
 )
+from apps.backup.module_gate import BACKUP_MODULE_KEY
 from apps.backup.throttles import ArchiveRecipientVerificationThrottle
+from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
 
 
@@ -49,13 +51,16 @@ LIFECYCLE_RESPONSES = {
 }
 
 
-def _makerspace(request, makerspace_id):
+def _makerspace(request, makerspace_id, *, module_gated=True):
     require_action(request.user, rbac.Action.MANAGE_MAKERSPACE, makerspace_id)
-    return get_object_or_404(Makerspace, pk=makerspace_id)
+    makerspace = get_object_or_404(Makerspace, pk=makerspace_id)
+    if module_gated:
+        require_module(makerspace, BACKUP_MODULE_KEY)
+    return makerspace
 
 
-def _recipient(request, makerspace_id, pk):
-    _makerspace(request, makerspace_id)
+def _recipient(request, makerspace_id, pk, *, module_gated=True):
+    _makerspace(request, makerspace_id, module_gated=module_gated)
     return get_object_or_404(
         MakerspaceArchiveRecipient.objects.filter(makerspace_id=makerspace_id),
         pk=pk,
@@ -241,9 +246,10 @@ class ArchiveRecipientReissueView(APIView):
 class ArchiveRecipientLifecycleView(APIView):
     permission_classes = [IsActiveStaff]
     operation = None
+    module_gated = True
 
     def post(self, request, makerspace_id, pk):
-        recipient = _recipient(request, makerspace_id, pk)
+        recipient = _recipient(request, makerspace_id, pk, module_gated=self.module_gated)
         try:
             recipient = self.operation(recipient=recipient, actor=request.user)
         except DjangoValidationError as exc:
@@ -275,6 +281,9 @@ class ArchiveRecipientRevokeView(ArchiveRecipientLifecycleView):
 )
 class ArchiveRecipientCompromiseView(ArchiveRecipientLifecycleView):
     operation = staticmethod(recipients.compromise_recipient)
+    # Never module-gated: marking a leaked key compromised is security response, and
+    # that must work even after the tenant switched the `backup` module off.
+    module_gated = False
 
 
 @extend_schema_view(

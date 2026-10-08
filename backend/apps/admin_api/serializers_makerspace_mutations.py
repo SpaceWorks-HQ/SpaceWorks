@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from apps.accounts.models import User
 from apps.backup.activation import (
+    ActivationModuleRequiredError,
     ActivationRecipientFloorError,
     set_superadmin_access,
 )
@@ -101,6 +102,10 @@ class MakerspaceMutationMixin:
                 except ActivationRecipientFloorError as exc:
                     raise serializers.ValidationError(
                         {"superadmin_access_enabled": _DISABLE_ACCESS_SEQUENCE}
+                    ) from exc
+                except ActivationModuleRequiredError as exc:
+                    raise serializers.ValidationError(
+                        {"superadmin_access_enabled": str(exc)}
                     ) from exc
             return locked
 

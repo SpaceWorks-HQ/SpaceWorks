@@ -191,11 +191,11 @@ recommended state corresponds to this profile table; management commands can als
 | Profile | Modules | For |
 |---|---|---|
 | `minimal` | 6 | Core only; nothing published publicly |
-| `workshop` | 14 | A machine shop: machines, service queue, maintenance |
-| `lending` | 17 | A tool library: the full lending lifecycle, no machines |
-| `recommended` | 20 | Core plus the inventory lifecycle, reports and machines |
-| `cloud` | 24 | A managed box: everything a hosted deployment runs |
-| `everything` / `full` | 32 | All modules |
+| `workshop` | 15 | A machine shop: machines, service queue, maintenance |
+| `lending` | 18 | A tool library: the full lending lifecycle, no machines |
+| `recommended` | 21 | Core plus the inventory lifecycle, reports and machines |
+| `cloud` | 25 | A managed box: everything a hosted deployment runs |
+| `everything` / `full` | 34 | All modules |
 
 **Change it later.** Uninstalling clears the capability and hides the surfaces; **your data is always
 retained** and reinstalling brings it back:
@@ -273,6 +273,7 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | **Reports** | [`reports`](docs/MODULES.md#reports) | | | Analytics, the ledger and CSV/XLSX export |
 | **Payments** | [`payments`](docs/MODULES.md#payments) | | ● | Taking money online (Stripe or Razorpay) |
 | **Mobile apps** | [`mobile`](docs/MODULES.md#mobile) | | | Attested device sessions, native push, payment sheet |
+| **Backup & custody** | [`backup`](docs/MODULES.md#backup) | | ● | Makerspace archives, archive-recipient keys and custody status |
 | **Updates** | [`updates`](docs/MODULES.md#updates) | | ● | In-app release control |
 
 `mobile` requires `member_accounts`; `printing` requires `machine_service`. Installing one pulls in
@@ -311,7 +312,7 @@ enable them.
 
 ### What you get if you choose nothing
 
-Installing without a profile gives you **8 modules**: the six core ones plus `payments` and `updates`.
+Installing without a profile gives you **8 modules**: the six core ones plus `updates` and `backup`.
 Member accounts and mobile apps are opt-in; mobile pulls in `member_accounts` when installed.
 
 Everything money-related is still dormant: `payments` being installed means the *surfaces* exist,

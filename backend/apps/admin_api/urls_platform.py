@@ -21,6 +21,7 @@ from apps.backup.views_archives import (
     DeploymentArchiveListCreateView,
     MakerspaceArchiveListCreateView,
 )
+from apps.backup.views_custody import MakerspaceBackupCustodyView
 from apps.backup.views_offsite import (
     BackupArchiveRehydrateView,
     BackupDestinationDetailView,
@@ -91,6 +92,7 @@ urlpatterns = [
     path("platform/backup-destinations/<int:destination_id>/test", BackupDestinationProbeView.as_view(), name="admin-backup-destination-probe"),
     path("platform/backup-destinations/<int:destination_id>/uploads", BackupDestinationUploadListView.as_view(), name="admin-backup-destination-uploads"),
     path("platform/backups/<uuid:archive_id>/rehydrate", BackupArchiveRehydrateView.as_view(), name="admin-backup-archive-rehydrate"),
+    path("makerspace/<int:makerspace_id>/backup-custody", MakerspaceBackupCustodyView.as_view(), name="admin-makerspace-backup-custody"),
     path(
         "makerspace/<int:makerspace_id>/backups",
         MakerspaceArchiveListCreateView.as_view(),
