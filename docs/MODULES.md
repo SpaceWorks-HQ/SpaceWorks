@@ -335,8 +335,10 @@ Required by `printing`.
   staff invite or decline it from the same queue as join requests.
 - **Without it** — people can still exist as members and still borrow: staff create walk-in member
   records, and identity can come from `member_accounts` or an external OIDC provider. What goes is the
-  *enrolment and community* layer — no join requests to approve, no waivers, no referrals, no profiles,
-  no directory. `payments.membership` becomes inert.
+  *enrolment and community* layer — no join requests to approve, no referrals, no profiles, no
+  directory, no member cards, no plans. Waivers stay (they are liability evidence, so publishing,
+  accepting and witnessing one is core), and so do STAFF invitations, end to end: issue, claim,
+  approve, decline. `payments.membership` and `charges.membership` become inert.
 - **Deliberately does not require `member_accounts`.** Identity can come from external OIDC or a staff-created
   person record, so the two are independent switches.
 - **It decides who may submit a borrow request, and installing it closes account-less requests.** With this

@@ -192,6 +192,11 @@ def claim_invitation(user, request_id):
         raise ValidationError({"detail": "Invitation is not claimable."})
     if not user.email or request.invite_email != normalized_email(user.email):
         raise PermissionDenied()
+    from apps.makerspaces.membership_gating import require_module_for_request
+
+    # A community invitation or a referral is the module's own path (A7); a staff
+    # invitation keeps working with the module off.
+    require_module_for_request(request.makerspace, request)
     if request.auto_activate_on_claim:
         if not _eligible_user(user):
             raise ValidationError({"detail": "An active account with a verified email is required."})
@@ -202,12 +207,17 @@ def claim_invitation(user, request_id):
 
 
 def approve_request(actor, request, assigned_role, plan=None):
-    """Activate the membership; with a `plan`, open its first term in the same call."""
-    membership = _approve_request(actor, request, assigned_role)
-    if plan is not None:
-        from apps.makerspaces.membership_plan_services import create_term
+    """Activate the membership; with a `plan`, open its first term in the SAME transaction.
 
-        create_term(actor, membership, plan)
+    One transaction, so a refused term (an inactive or foreign plan) also refuses the
+    approval instead of leaving an active member the 400 told staff was not created.
+    """
+    with transaction.atomic():
+        membership = _approve_request(actor, request, assigned_role)
+        if plan is not None:
+            from apps.makerspaces.membership_plan_services import create_term
+
+            create_term(actor, membership, plan)
     return membership
 
 

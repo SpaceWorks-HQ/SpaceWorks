@@ -657,12 +657,20 @@ them.
 **The `membership` module gates the community feature, not RBAC (A7).** `MakerspaceMembership` is core
 RBAC state, so gating it wholesale would lock a makerspace out of its own staff administration.
 **Never gated:** membership list/create, role assignment, revoke, capabilities, staff roster,
-`memberships/me`. **Gated by `membership`:** public join request, request queue/approve/revoke,
-verify/unverify, member waiver + accept, member activity, referrals. Invitations run staff and community
-intent down **one** path in `membership_services.invite_membership`, discriminated by the assigned role's
-`granted_actions` — a role granting no actions is a community invitation (gated) however it is named; a
-role granting actions is a staff invitation and must keep working with the module off. Module gates are
-**additive `AND`s** — `refer_membership` still checks `referrals_enabled` and `can_refer`.
+`memberships/me`, and waivers (member read + accept, staff publish + witness — liability evidence, made
+core by `cd2936d1`). **Gated by `membership`:** public join request, community requests in the queue and
+the approve/decline on them, verify/unverify, member activity, referrals, profiles/directory, member cards,
+plans and terms. Invitations run staff and community intent down **one** path in
+`membership_services.invite_membership`, discriminated by the assigned role's `granted_actions` — a role
+granting no actions is a community invitation (gated) however it is named; a role granting actions is a
+staff invitation and must keep working with the module off. **That discrimination holds at every later
+step, in `membership_gating.py`** (2026-10-09): with the module off the queue lists only staff invitations,
+approving or declining one works (approving it INTO a role with no actions mints a community member and is
+gated, and so is attaching a plan), and claiming a community invitation or a referral is refused — and
+omitted from discovery — even when it was issued while the module was on. Before that, a staff invitation
+issued module-off could never be listed, approved or declined, and a referral stayed claimable after the
+module was switched off. Module gates are **additive `AND`s** — `refer_membership` still checks
+`referrals_enabled` and `can_refer`.
 
 **Membership plans, terms and invitation requests (forward plan phase 6, 2026-09-04).** Plans are optional
 and never an access state: a `MembershipTerm` expiring changes neither `MakerspaceMembership.status` nor
