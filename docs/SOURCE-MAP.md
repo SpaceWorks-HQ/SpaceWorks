@@ -36,6 +36,12 @@ Queries use `accounts/rbac.py:scope_for_scheduled_work`; see
   over `lifecycle_archive.py`, `lifecycle_purge.py` and `lifecycle_storage.py`),
   `models_makerspace_validation.py` owns model clean checks; `theme_validation.py` validates
   the closed theme JSON for control forms and API writes.
+  `profile_validation.py` validates IANA timezone, ISO country and opening-hours JSON;
+  `opening_hours_schema.py` documents the shared hours schema. `local_time.py` owns
+  `local_now`, `to_local`, `local_day_bounds`, `is_open` and `next_open_interval`
+  (aware inputs, UTC half-open bounds; fold/gap policy in its docstring).
+  `admin_api/views_makerspace_profile.py` serves audited, MANAGE_MAKERSPACE-scoped
+  `/admin/makerspace/<id>/profile`; currency uses `MakerspacePaymentSettings.default_currency`.
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
   `models_stations.py` owns shared inert `Station` metadata plus the complete live
   `StationCredential` envelope; `station_credentials.py`, `station_sessions.py`, `station_security.py` and

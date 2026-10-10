@@ -14,6 +14,10 @@ def _same(label, names, disposition, reason):
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
     *_same(
+        "makerspaces.Makerspace", "timezone country opening_hours", D.PRESERVE,
+        "The tenant location and advisory wall-clock schedule travel unchanged.",
+    ),
+    *_same(
         "hardware_requests.ReplayCommand",
         "id makerspace station actor operator_lease_id station_session_id station_version "
         "client_command_id payload_fingerprint operation_kind operation_version aggregate_id "

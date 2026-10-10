@@ -5,6 +5,8 @@ export type TenantBootstrap = {
     slug: string;
     public_code: string;
     location: string;
+    timezone?: string;
+    opening_hours?: import("../../features/staff/makerspaceProfileForm").OpeningHours;
     map_url?: string;
     logo_url?: string | null;
     cover_image_url?: string | null;

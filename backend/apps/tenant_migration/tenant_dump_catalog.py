@@ -58,8 +58,9 @@ class TenantDumpCatalogError(AssertionError):
 # Re-blessed on integration: phases 11 and 10, the backup lane, Wave-0 offline refunds,
 # the 7a-7d devices chain and the 9a-9e kiosk chain all changed the catalog; recomputed
 # from the merged snapshot.
-# Recompute after merging lane/w1-events and lane/w1-sweeper (F1 adds
-# source-local ReminderSchedule, DROP); the coordinator pins the merged digest.
+# Recompute after merging lane/w1-events, lane/w1-sweeper and lane/w1-profile:
+# reminder schedules and timezone/country/opening_hours change the merged catalog.
+# The coordinator pins the merged digest.
 CATALOG_SCHEMA_SHA256 = "RECOMPUTE"
 
 

@@ -58,6 +58,9 @@ Continued from [SOURCE-MAP.md](SOURCE-MAP.md); paths are relative to the reposit
   `staffAccess.ts` `TAB_GROUPS`, which does sidebar grouping AND permission derivation (**not**
   `StaffApp.tsx`; module gating and routing are the separate `staffTabs.ts`); capabilities from
   action-based `staffAccess.ts`; payment reconciliation and platform credential panels.
+  `MakerspaceProfileSettings.tsx` loads/saves the location and hours profile;
+  `MakerspaceHoursEditor.tsx` and `makerspaceProfileForm.ts` own the weekly/exception
+  draft. Profile and payment editors refresh each other's shared currency query.
   `frontend/src/features/auth/` + `members/MemberAuthPanel.tsx` — provider-config-driven social/member auth.
   `frontend/src/features/printing|bookings|forms|...` — feature slices. `frontend/src/lib/`,
   `components/ui/`, `types/`, `generated/api.ts`.
