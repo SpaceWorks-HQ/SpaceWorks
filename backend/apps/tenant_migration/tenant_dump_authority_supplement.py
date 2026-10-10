@@ -62,7 +62,7 @@ SUPPLEMENTAL_AUTHORITY_ENTRIES = (
     ),
     *_same(
         "payments.Refund",
-        "status amount currency provider reason",
+        "status amount currency provider reason method reference refunded_at",
         D.PRESERVE,
         "Refund history remains readable alongside the payment it corrects.",
     ),

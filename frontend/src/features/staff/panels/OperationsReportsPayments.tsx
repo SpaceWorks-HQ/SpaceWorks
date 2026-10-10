@@ -10,6 +10,7 @@ type PaymentReportRow = {
   payment_count: number;
   amount_total: string;
   outstanding_amount: string;
+  refunded_amount: string;
 };
 
 type PaymentReport = { typed_rows: PaymentReportRow[] };
@@ -78,6 +79,7 @@ function PaymentTable({ rows }: { rows: PaymentReportRow[] }) {
           <th scope="col" className="px-3 py-2">Status</th><th scope="col" className="px-3 py-2">Method</th>
           <th scope="col" className="px-3 py-2">Payments</th>
           <th scope="col" className="px-3 py-2">Total</th><th scope="col" className="px-3 py-2">Outstanding</th>
+          <th scope="col" className="px-3 py-2">Refunded</th>
         </tr></thead>
         <tbody>{rows.map((row, index) => (
           <tr className="border-t border-line" key={`${row.currency}-${row.subject_type}-${row.status}-${row.settlement_method}-${index}`}>
@@ -88,6 +90,7 @@ function PaymentTable({ rows }: { rows: PaymentReportRow[] }) {
             <td className="px-3 py-2 font-mono">{row.payment_count}</td>
             <td className="px-3 py-2 font-mono">{money(row.amount_total, row.currency)}</td>
             <td className="px-3 py-2 font-mono font-semibold">{money(row.outstanding_amount, row.currency)}</td>
+            <td className="px-3 py-2 font-mono">{money(row.refunded_amount, row.currency)}</td>
           </tr>
         ))}</tbody>
       </table>

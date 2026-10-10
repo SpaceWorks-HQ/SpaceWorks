@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from apps.payments.models import Payment
 from apps.payments.subjects import subject_label
+from apps.payments.serializers_reconciliation import refunded_total
 
 
 class MemberSettlementSerializer(serializers.Serializer):
@@ -48,10 +49,7 @@ class MemberPaymentSerializer(serializers.ModelSerializer):
         )
 
     def get_refunded_amount(self, payment) -> Decimal:
-        return sum(
-            (row.amount for row in payment.refunds.all() if row.status == "succeeded"),
-            Decimal("0.00"),
-        )
+        return refunded_total(payment)
 
     @extend_schema_field(MemberRefundSerializer(many=True))
     def get_refunds(self, payment):

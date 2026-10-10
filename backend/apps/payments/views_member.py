@@ -23,6 +23,7 @@ from apps.payments.serializers import (
 )
 from apps.payments.services import PaymentRailConflict, create_checkout_url
 from apps.payments.subjects import resolve_subject_labels
+from apps.payments.reconciliation import with_refunds
 
 
 class ArchivedPaymentDiscoveryView(APIView):
@@ -111,9 +112,7 @@ class MemberPaymentHistoryView(APIView):
                 status=403,
             )
         rows = list(
-            member_payment_queryset(request.user, makerspace_id)
-            .prefetch_related("refunds")
-            .order_by("-created_at")
+            with_refunds(member_payment_queryset(request.user, makerspace_id)).order_by("-created_at")
         )
         return Response(
             MemberPaymentSerializer(

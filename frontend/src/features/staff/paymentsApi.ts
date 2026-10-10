@@ -34,6 +34,10 @@ export type RefundRow = {
   reason: string;
   created_at: string;
   settled_at: string | null;
+  provider?: "stripe" | "razorpay" | "manual";
+  method?: string;
+  reference?: string;
+  refunded_at?: string | null;
 };
 
 export type PaymentRow = {
@@ -139,6 +143,17 @@ export function refundPayment(
   });
 }
 
+export type RefundReceipt = { method: string; reference: string; refunded_at: string };
+
+export function recordOfflineRefund(
+  makerspaceId: number, paymentId: number,
+  body: { amount: string; reason: string; receipt: RefundReceipt },
+) {
+  return staffRequest<PaymentRow>(`/admin/makerspace/${makerspaceId}/payments/${paymentId}/refund-offline`, {
+    method: "POST", body: JSON.stringify(body),
+  });
+}
+
 /** Amount still refundable: the payment minus every pending or succeeded refund. */
 export function remainingRefundable(row: Pick<PaymentRow, "amount" | "refunds">) {
   const counted = (row.refunds ?? [])
@@ -150,7 +165,8 @@ export function remainingRefundable(row: Pick<PaymentRow, "amount" | "refunds">)
 // One readable sentence per backend code (`services_refunds.RefundNotAllowed` and
 // `RefundProviderFailure`); anything else falls back to the API's own detail text.
 const REFUND_ERRORS: Record<string, string> = {
-  refund_not_online: "Only payments settled online can be refunded through the provider. Offline and waived charges are corrected in the till.",
+  refund_not_online: "Only payments settled online can be refunded through the provider. Use Record refund for an offline payment.",
+  refund_not_offline: "Only payments settled offline can have an offline refund recorded.",
   refund_exceeds_balance: "That amount is more than the remaining refundable balance of this payment.",
   refund_amount_invalid: "Enter a refund amount greater than zero, with at most two decimals.",
   refund_provider_failed: "The payment provider rejected the refund. No money was sent back; the failed attempt is recorded on the payment.",

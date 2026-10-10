@@ -1,9 +1,10 @@
 """Refunds: a separate ledger line, because a terminal Payment row may never change.
 
-A refund is money going back on a charge that was really collected online. The Payment
+A refund is money going back on a charge that was collected online or offline. The Payment
 row is immutable once terminal (Postgres trigger), so refund state lives here and only
 here: one row per refund attempt, PENDING until the provider confirms, then SUCCEEDED or
-FAILED, never edited afterwards. Partial refunds are several rows; the invariant that
+FAILED. Manual refunds are immediately SUCCEEDED with an append-only receipt protected
+by a Postgres trigger. Partial refunds are several rows; the invariant that
 their (pending + succeeded) sum never exceeds the charge is enforced by the service
 under the Payment row lock and re-checked in `clean()` as a last line of defence.
 """
@@ -16,9 +17,15 @@ from django.db.models import Sum
 
 from apps.payments.models_payment import Payment
 from apps.payments.models_settings import currency_validator
+from apps.payments.models_settlement import ManualSettlement
 
 
 class Refund(models.Model):
+    class Provider(models.TextChoices):
+        STRIPE = "stripe", "Stripe"
+        RAZORPAY = "razorpay", "Razorpay"
+        MANUAL = "manual", "Manual"
+
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         SUCCEEDED = "succeeded", "Succeeded"
@@ -32,7 +39,11 @@ class Refund(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, validators=[currency_validator])
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
-    provider = models.CharField(max_length=16, choices=Payment.Provider.choices)
+    provider = models.CharField(max_length=16, choices=Provider.choices)
+    method = models.CharField(max_length=16, choices=ManualSettlement.Method.choices, blank=True, default="")
+    # Financial slip/reference only, never a member's contact details or free-text PII.
+    reference = models.CharField(max_length=64, blank=True, default="")
+    refunded_at = models.DateTimeField(null=True, blank=True)
     external_refund_id = models.CharField(max_length=255, null=True, blank=True)
     # Staff-authored, short, shown on the receipt. Financial metadata: never a person's
     # contact details or free-form PII -- the same rule as `Payment.subject_label`.
@@ -46,6 +57,15 @@ class Refund(models.Model):
     class Meta:
         ordering = ["-created_at", "-pk"]
         constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(provider="manual", status="succeeded", refunded_at__isnull=False,
+                             settled_at__isnull=False, external_refund_id__isnull=True,
+                             method__in=ManualSettlement.Method.values)
+                    | (~models.Q(provider="manual") & models.Q(method="", reference="", refunded_at__isnull=True))
+                ),
+                name="refund_manual_receipt_required",
+            ),
             models.CheckConstraint(condition=models.Q(amount__gt=0), name="refund_amount_positive"),
             # Scoped by provider for the same reason as Payment's external ids: two
             # vendors are free to mint the same opaque id.
@@ -72,8 +92,17 @@ class Refund(models.Model):
         currency_validator(self.currency)
         if self.amount is None or self.amount <= 0:
             raise ValidationError({"amount": "Refund amount must be positive."})
+        if self.provider == self.Provider.MANUAL:
+            if not self.refunded_at or not self.settled_at or self.method not in ManualSettlement.Method.values:
+                raise ValidationError("A manual refund needs method and refund date.")
+            if self.status != self.Status.SUCCEEDED or self.external_refund_id is not None:
+                raise ValidationError("A manual refund records money already returned.")
         if self.status in self.COUNTED_STATUSES and self.payment_id:
-            payment = Payment.objects.filter(pk=self.payment_id).only("amount").first()
+            payment = Payment.objects.filter(pk=self.payment_id).only("amount", "currency", "status").first()
+            if payment and self.currency != payment.currency:
+                raise ValidationError({"currency": "A refund must match the payment currency."})
+            if payment and self.provider == self.Provider.MANUAL and payment.status != Payment.Status.PAID_OFFLINE:
+                raise ValidationError("Only offline-settled payments accept manual refunds.")
             if payment is not None and (
                 self.counted_total(payment, exclude_pk=self.pk) + self.amount > payment.amount
             ):
@@ -82,8 +111,10 @@ class Refund(models.Model):
     def save(self, *args, **kwargs):
         if self.pk:
             original = (
-                type(self).objects.filter(pk=self.pk).values("status", "amount", "payment_id").first()
+                type(self).objects.filter(pk=self.pk).values("status", "amount", "payment_id", "provider").first()
             )
+            if original and original["provider"] == self.Provider.MANUAL:
+                raise ValidationError("Manual refunds are append-only.")
             if original and original["status"] != self.Status.PENDING and (
                 original["status"] != self.status or original["amount"] != self.amount
             ):
@@ -92,3 +123,8 @@ class Refund(models.Model):
                 raise ValidationError("A refund cannot move between payments.")
         self.full_clean()
         return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.provider == self.Provider.MANUAL:
+            raise ValidationError("Manual refunds are append-only.")
+        return super().delete(*args, **kwargs)

@@ -8,6 +8,8 @@ import {
   refundErrorMessage,
   refundPayment,
   remainingRefundable,
+  recordOfflineRefund,
+  SETTLEMENT_METHODS,
   type PaymentRow,
 } from "./paymentsApi";
 
@@ -35,18 +37,34 @@ export function PaymentRefundDialog({
 }) {
   const queryClient = useQueryClient();
   const remaining = remainingRefundable(payment);
+  const offline = payment.status === "paid_offline";
   const [amount, setAmount] = useState(remaining.toFixed(2));
   const [reason, setReason] = useState("");
+  const [method, setMethod] = useState<string>("cash");
+  const [reference, setReference] = useState("");
+  const [refundedAt, setRefundedAt] = useState(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  });
   const [validationError, setValidationError] = useState<string | null>(null);
   const mutation = useMutation({
-    mutationFn: () => refundPayment(makerspaceId, payment.id, { amount: amount.trim(), reason: reason.trim() }),
+    mutationFn: () => offline
+      ? recordOfflineRefund(makerspaceId, payment.id, {
+        amount: amount.trim(), reason: reason.trim(),
+        receipt: { method, reference: reference.trim(), refunded_at: new Date(refundedAt).toISOString() },
+      })
+      : refundPayment(makerspaceId, payment.id, { amount: amount.trim(), reason: reason.trim() }),
     onSuccess: () => {
       invalidatePaymentViews(queryClient, makerspaceId);
       onClose();
     },
   });
   const submit = () => {
-    const problem = validateRefundAmount(amount, remaining);
+    const date = new Date(refundedAt).getTime();
+    const problem = validateRefundAmount(amount, remaining) ?? (offline &&
+      (!Number.isFinite(date) || date > Date.now() + 5 * 60_000)
+      ? "Enter the date and time the money was returned, without a future date." : null);
     setValidationError(problem);
     if (!problem) mutation.mutate();
   };
@@ -68,7 +86,7 @@ export function PaymentRefundDialog({
             form="payment-refund-form"
             disabled={mutation.isPending || remaining <= 0}
           >
-            {mutation.isPending ? "Refunding…" : "Send refund"}
+            {mutation.isPending ? "Refunding…" : offline ? "Record refund" : "Send refund"}
           </button>
         </div>
       )}
@@ -85,6 +103,22 @@ export function PaymentRefundDialog({
           submit();
         }}
       >
+        {offline ? (
+          <>
+            <p className="text-sm text-muted">Record money already returned, including a deposit release. This creates a permanent receipt.</p>
+            <Field label="Refund method">
+              <select className="desk-input" value={method} onChange={(event) => setMethod(event.target.value)}>
+                {SETTLEMENT_METHODS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </Field>
+            <Field label="Refund reference (optional)">
+              <input className="desk-input" maxLength={64} value={reference} onChange={(event) => setReference(event.target.value)} />
+            </Field>
+            <Field label="Returned at">
+              <input className="desk-input" type="datetime-local" required value={refundedAt} onChange={(event) => { setRefundedAt(event.target.value); setValidationError(null); }} />
+            </Field>
+          </>
+        ) : null}
         <Field label="Refund amount" error={validationError ?? undefined}>
           <input
             className="desk-input"
@@ -131,6 +165,9 @@ function RefundList({ refunds }: { refunds: PaymentRow["refunds"] }) {
             <span className="text-xs text-muted">
               {new Date(refund.created_at).toLocaleString()}
               {refund.reason ? ` · ${refund.reason}` : ""}
+              {refund.method ? ` · ${refund.method.replace(/_/g, " ")}` : ""}
+              {refund.reference ? ` · ${refund.reference}` : ""}
+              {refund.refunded_at ? ` · returned ${new Date(refund.refunded_at).toLocaleString()}` : ""}
             </span>
           </li>
         ))}

@@ -9,7 +9,7 @@ from .audit_references_targets import AuditReference, AuditReferenceDisposition
 
 R = AuditReferenceDisposition.REMAP
 
-_REFUND_ACTIONS = ("payment.refund_requested", "payment.refunded", "payment.refund_failed")
+_REFUND_ACTIONS = ("payment.refund_requested", "payment.refunded", "payment.refund_failed", "payment.refund_recorded")
 _LOAN_ACTIONS = ("loan.deposit_raised", "loan.late_fee_raised")
 
 

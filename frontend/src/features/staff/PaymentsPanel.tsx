@@ -107,7 +107,7 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
               Correct receipt
             </button>
           ) : null}
-          {row.status === "paid_online" ? (
+          {row.status === "paid_online" || row.status === "paid_offline" ? (
             <button className="desk-button" type="button" onClick={() => setRefundRow(row)}>
               Refund
             </button>

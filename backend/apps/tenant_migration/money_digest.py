@@ -17,8 +17,8 @@ against the live source. A mismatch is not repairable by merging: the artifact w
 derived from the frozen image, so the only honest answer is to recapture. That is what
 `assert_money_unchanged` refuses with.
 
-Deliberately narrow: terminal payments are immutable, so they cannot drift, and
-including them would make every ordinary settlement look like a drift.
+Terminal payments themselves are immutable and excluded. Their refund lines can still
+grow or settle, so those lines participate alongside the settlement receipts.
 """
 
 import hashlib
@@ -35,6 +35,7 @@ def money_fingerprint(makerspace_id, *, using="default"):
 
     Payment = apps.get_model("payments.Payment")
     ManualSettlement = apps.get_model("payments.ManualSettlement")
+    Refund = apps.get_model("payments.Refund")
 
     # The live-rail columns are here for a case that is easy to miss. A pending row can
     # already carry a provider while holding no handle -- a checkout whose creation
@@ -80,6 +81,14 @@ def money_fingerprint(makerspace_id, *, using="default"):
             {key: str(value) for key, value in row.items()} for row in settlements
         ],
     }
+    # Terminal payments stay still while their refund ledger can grow. Returning a
+    # captured cash deposit at the source must refuse publication of the stale dump.
+    # Omit the empty key to preserve fingerprints from captures with no refunds.
+    refunds = list(Refund.objects.using(using).filter(payment__makerspace_id=makerspace_id)
+                   .order_by("pk").values("id", "payment_id", "amount", "currency", "status",
+                                           "provider", "method", "reference", "refunded_at", "settled_at"))
+    if refunds:
+        payload["refunds"] = [{key: str(value) for key, value in row.items()} for row in refunds]
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
@@ -91,8 +100,8 @@ class MoneyDriftRefused(Exception):
         self.expected = expected
         self.actual = actual
         super().__init__(
-            "Source money state changed after capture: a pending charge was settled, "
-            "raised, amended, or given a live payment rail. The artifact was derived "
+            "Source money state changed after capture: a charge was settled, raised, "
+            "refunded, amended, or given a live payment rail. The artifact was derived "
             "from the frozen image and cannot be merged forward -- recapture the tenant."
         )
 

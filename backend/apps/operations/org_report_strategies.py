@@ -93,7 +93,7 @@ STRATEGIES = {
         ("currency", "subject_type", "status", "settlement_method"),
         (
             "currency", "subject_type", "status", "settlement_method",
-            "payment_count", "amount_total", "outstanding_amount",
+            "payment_count", "amount_total", "outstanding_amount", "refunded_amount",
         ),
         ordering=("currency", "subject_type", "status", "settlement_method"),
         text=(

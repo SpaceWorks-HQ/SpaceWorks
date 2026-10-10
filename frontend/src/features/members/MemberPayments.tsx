@@ -1,6 +1,7 @@
-import type { MemberPayment } from "../../generated/api";
+import type { MemberPayment as GeneratedMemberPayment } from "../../generated/api";
 
-export type { MemberPayment };
+// Additive API field until the coordinator regenerates the OpenAPI client.
+export type MemberPayment = GeneratedMemberPayment & { refunded_amount?: string | number };
 
 export function MemberPaymentRows({
   payments,

@@ -24,7 +24,7 @@ def aggregate_rows(report_key, rows_by_space, *, limit):
         # null method -- silently undoing the split the report exists for.
         return _group_sum(
             rows, ("currency", "subject_type", "status", "settlement_method"),
-            ("payment_count", "amount_total", "outstanding_amount"), limit,
+            ("payment_count", "amount_total", "outstanding_amount", "refunded_amount"), limit,
         )
     if report_key == "event-attendance":
         return _event_total(rows)
