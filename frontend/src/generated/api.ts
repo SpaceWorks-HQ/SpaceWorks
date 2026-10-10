@@ -2024,6 +2024,11 @@ export type EvidenceRetentionPolicy = {
   "override_days": number | null;
   "effective_days": number;
   "object_expiry_enabled": boolean;
+  "abandoned_upload_cleanup_enabled": boolean;
+  "abandoned_upload_platform_default_days": number;
+  "abandoned_upload_override_days": number | null;
+  "abandoned_upload_effective_days": number;
+  "abandoned_upload_global_enabled": boolean;
 };
 
 export type EvidenceRetentionPreviewRequest = {
@@ -2037,6 +2042,12 @@ export type EvidenceRetentionPreviewResponse = {
   "object_candidates": number;
   "candidate_bytes": number;
   "has_more": boolean;
+  "abandoned_upload_cutoff": string | null;
+  "abandoned_upload_candidates": number;
+  "abandoned_upload_candidate_bytes": number;
+  "abandoned_upload_has_more": boolean;
+  "late_write_receipts": number;
+  "late_write_receipts_due": number;
 };
 
 export type EvidenceUrlRequest = {
@@ -4350,6 +4361,8 @@ export type PatchedEventWrite = {
 
 export type PatchedEvidenceRetentionPatch = {
   "object_retention_days"?: number | null;
+  "abandoned_upload_cleanup_enabled"?: boolean;
+  "abandoned_upload_retention_days"?: number | null;
 };
 
 export type PatchedInventoryAssetAdminUpdate = {

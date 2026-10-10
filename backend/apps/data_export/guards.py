@@ -1,6 +1,5 @@
 """Executable drift guards for the declarative export contract."""
 
-import re
 from collections import Counter, defaultdict
 
 from django.apps import apps
@@ -30,21 +29,7 @@ from .types import (
     Redacted,
 )
 
-CREDENTIAL_NAME = re.compile(
-    r"password|secret|token|credential|webhook_url|digest|verifier|state|api_key",
-    re.IGNORECASE,
-)
-REVIEWED_NON_CREDENTIAL = {
-    ("makerspaces.MembershipRequest", "state"): "Durable request workflow state.",
-    (
-        "tenant_migration.ExternalTenantReference",
-        "source_archive_digest",
-    ): "Archive integrity identifier, not an authentication credential.",
-    (
-        "apiclients.ApiClient",
-        "previous_secret_valid_until",
-    ): "Expiry timestamp for the rotation grace window; the secret itself is omitted.",
-}
+from .guards_credentials import CREDENTIAL_NAME, REVIEWED_NON_CREDENTIAL
 
 
 class RegistryError(AssertionError):

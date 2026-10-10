@@ -56,6 +56,14 @@ def audit_target_dispositions(models=MODELS):
 
 
 AUDIT_TARGET_DISPOSITIONS = audit_target_dispositions()
+# Conditional, not static: a surviving EvidencePhoto target stays REMAP. Only a missing
+# target that a same-tenant `evidence.abandoned_upload_deleted` audit proves was cleaned
+# is exported as inert source provenance (apps.data_export.deleted_audit_targets).
+CLEANED_EVIDENCE_AUDIT_TARGET = AuditReference(
+    AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT,
+    "evidence.EvidencePhoto",
+    "audit_cleaned_abandoned_upload_target",
+)
 UNRECOGNISED_AUDIT_TARGET = AuditReference(
     AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT,
     None,

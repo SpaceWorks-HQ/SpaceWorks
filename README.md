@@ -71,7 +71,7 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
 - **Maker profiles** — an opt-in per-makerspace profile with projects, interests, education and an
   optional GitHub contribution count, plus a member directory that lists only the people who chose to
   be listed.
-- **Traceable by design** — append-only audit log; immutable evidence photo records and scan history.
+- **Traceable by design** — append-only audit log; attached evidence photo metadata and scan history are immutable. Unused upload slots that no handover ever consumed may be cleaned up under a separate default-off policy — they never formed part of the trail.
   Photo *bytes* can expire under a per-makerspace retention policy, while the photo metadata, remarks,
   scans and audit trail are kept — so the accountability record outlives the image itself, and an
   expired photo reads as a truthful expired state rather than a missing one.

@@ -16,6 +16,9 @@ from apps.operations.models import ReportMetricRollup, ReportRollupCursor
 
 SOURCE_MODULE = "evidence_uploads"
 REPORT_KEY = "evidence-compliance"
+# Each finalisation re-derives this many days below the watermark, so a row deleted
+# inside the window would silently append a lower revision to a historical bucket.
+REFINALIZE_LOOKBACK = timedelta(days=7)
 METRICS = (
     "created_count", "attached_count", "unattached_count", "object_live_count",
     "object_expired_count", "metadata_retained_count", "bytes",
@@ -63,7 +66,7 @@ def _rollup_start(makerspace, cursor, through, requested):
     earliest = _day_start(earliest)
     if cursor.rolled_through is None:
         return earliest
-    return max(earliest, min(cursor.rolled_through - timedelta(days=7), through))
+    return max(earliest, min(cursor.rolled_through - REFINALIZE_LOOKBACK, through))
 
 
 def _finalize_bucket(makerspace, start, end, actor):

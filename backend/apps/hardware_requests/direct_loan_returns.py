@@ -5,6 +5,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.boxes.models import QrCode, QrScanEvent
 from apps.evidence import storage
+from apps.evidence.consumption import mark_consumed
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.evidence.models import EvidencePhoto
 from apps.hardware_requests.direct_loan_audit import record_item_logs
@@ -66,6 +67,7 @@ def return_direct_loan(
         ):
             raise ReturnValidationError("Evidence already used.")
         charge_storage_once(evidence, finalized.size)
+        mark_consumed(evidence)
         return_qr = _return_scan_qr(locked, qr_payload)
         outstanding = [
             item

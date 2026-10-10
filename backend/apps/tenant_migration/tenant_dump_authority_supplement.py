@@ -104,6 +104,20 @@ SUPPLEMENTAL_AUTHORITY_ENTRIES = (
         D.PRESERVE,
         "Term history stays readable; it never changes membership authority.",
     ),
+    # Abandoned-upload cleanup (forward plan phase 11): source policy and source
+    # consumption proof never authorize an irreversible deletion on the target.
+    *_same(
+        "evidence.EvidenceRetentionPolicy",
+        "abandoned_upload_cleanup_enabled abandoned_upload_retention_days",
+        D.RESET,
+        "Irreversible abandoned-upload cleanup is target-owned policy.",
+    ),
+    *_same(
+        "evidence.EvidencePhoto",
+        "consumption_state",
+        D.RESET,
+        "Imported photos are legacy-unknown: a source marker is not target cleanup proof.",
+    ),
     *_same(
         "makerspaces.Makerspace",
         "lapsed_members_cannot_borrow",

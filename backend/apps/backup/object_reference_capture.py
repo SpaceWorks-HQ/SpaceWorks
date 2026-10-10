@@ -64,9 +64,9 @@ def build_object_ownership_plan(sovereign_makerspace_ids):
                 component = None
             coordination_id = row.get(rule.coordination_path) if rule.coordination_path else None
             retention_state = row.get("object_retention_state__status") or "live"
-            if retention_state == "expiring":
+            if retention_state in {"expiring", "cleaning"}:
                 raise BackupBuildError(
-                    "Evidence expiry is in progress; retry archive capture later."
+                    "Evidence expiry or cleanup is in progress; retry archive capture later."
                 )
             expired_at = row.get("object_retention_state__object_expired_at")
             if retention_state == "expired" and expired_at is None:

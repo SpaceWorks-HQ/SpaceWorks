@@ -60,6 +60,7 @@ SOURCE_LOCAL_AUDIT_EDGES = frozenset(
         ("data_export.download_url_issued", "export_id"),
         ("data_export.downloaded", "export_id"),
     ("evidence.object_expired", "sweep_run_id"),
+        ("evidence.abandoned_upload_deleted", "sweep_run_id"),
         ("tenant_migration.import_created", "import_id"),
         ("tenant_migration.import_read", "import_id"),
         ("tenant_migration.import_run_requested", "import_id"),

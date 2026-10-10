@@ -65,6 +65,7 @@ class PublicToolEvidenceUploadUrlView(APIView):
             content_type=data["content_type"],
             size_bytes=data.get("size_bytes"),
             uploaded_by=request.user,
+            consumption_state=EvidencePhoto.ConsumptionState.UNCONSUMED,
         )
         audit.record(
             request.user,

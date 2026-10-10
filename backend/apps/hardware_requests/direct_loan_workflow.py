@@ -8,6 +8,7 @@ from apps.audit import services as audit
 from apps.boxes.access import inventory_qr_codes
 from apps.boxes.models import Box, QrCode, QrScanEvent
 from apps.evidence.models import EvidencePhoto
+from apps.evidence.consumption import mark_consumed
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.hardware_requests.models import HardwareRequest, PublicToolLoan
 from apps.hardware_requests.direct_loan_audit import record_item_logs
@@ -59,6 +60,7 @@ def issue_direct_loan(
         if HardwareRequest.objects.filter(issue_evidence=evidence).exists():
             raise RequestValidationError("Evidence already used.")
         charge_storage_once(evidence, finalized.size)
+        mark_consumed(evidence)
         container = None
         if container_id is not None:
             container = (

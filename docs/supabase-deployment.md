@@ -31,9 +31,12 @@ stack is unaffected unless you set them.
    In managed mode purge instead sets the transaction-scoped `app.allow_immutable_delete`
    GUC that the append-only/immutability triggers honor for DELETE only (UPDATE stays
    blocked; FK triggers stay on and Django deletes the graph in dependency order).
-5. **500 MB cap:** audit logs, QR/box scan events, evidence rows, and print/stock history grow
-   unbounded. Add a retention/export policy before relying on the free DB. (Pruning those
-   immutable tables also requires managed mode's GUC.)
+5. **500 MB cap:** audit logs, QR/box scan events, attached evidence rows, and print/stock
+   history grow unbounded. Add a retention/export policy before relying on the free DB. The
+   only built-in row cleanup removes `unconsumed` evidence presigns through an exact-row
+   GUC plus a matching receipt; those FK-free receipts survive tenant cutover and purge,
+   reserve their object key and keep reconciling late uploads. The whole-purge
+   `app.allow_immutable_delete` GUC is separate.
 
 ## 2. Object storage (Supabase Storage)
 

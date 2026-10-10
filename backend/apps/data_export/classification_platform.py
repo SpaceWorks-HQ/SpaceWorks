@@ -63,6 +63,10 @@ OMITTED_MODELS = {
     "encryption.PiiGlobalWriteFence": "Platform coordination state.",
     "encryption.PiiMakerspaceWriteFence": "Deployment coordination state.",
     "encryption.SearchKeyGeneration": "Deployment-local cryptographic state.",
+    "evidence.EvidenceAbandonedUploadReceipt": (
+        "Deployment coordination: permanent late-write reconciliation and key "
+        "reservation for a cleaned never-consumed upload; never handover evidence."
+    ),
     "evidence.EvidenceUploadFinalization": (
         "Upload promotion coordination state; the evidence row and its object carry "
         "everything that outlives one upload."

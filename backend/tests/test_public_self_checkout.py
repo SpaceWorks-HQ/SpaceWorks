@@ -336,6 +336,60 @@ def test_public_checkout_and_return_move_inventory_and_record_scans(
         call.args[1] == settings.EVIDENCE_MAX_BYTES
         for call in finalize.call_args_list
     )
+    # Both self-checkout transactions durably mark their evidence consumed.
+    assert set(
+        EvidencePhoto.objects.filter(
+            pk__in=[request.issue_evidence_id, loan.return_evidence_id]
+        ).values_list("consumption_state", flat=True)
+    ) == {EvidencePhoto.ConsumptionState.CONSUMED}
+
+
+@override_settings(API_CLIENT_AUTH_REQUIRED=False)
+def test_return_evidence_link_is_protected_even_under_the_exact_cleanup_guc(
+    monkeypatch, settings
+):
+    from django.db import Error, connection, transaction
+    from django.db.models.deletion import ProtectedError
+    from django.utils import timezone
+
+    from apps.evidence.models import EvidenceAbandonedUploadReceipt
+
+    settings.STORAGE_PRESIGN_METHOD = "post"
+    monkeypatch.setattr(
+        "apps.evidence.storage.finalize_upload",
+        lambda evidence, max_bytes: EvidenceValidationResult(size=1, content_type="image/png"),
+    )
+    makerspace = make_space("checkout-protect")
+    user = eligible_member(makerspace)
+    qr = make_qr(makerspace, make_product(makerspace, public_self_checkout_enabled=True))
+    assert member_client(user).post(
+        checkout_url(makerspace), checkout_payload(makerspace, user, qr.payload), format="json"
+    ).status_code == 201
+    loan = PublicToolLoan.objects.get()
+    photo = EvidencePhoto.objects.create(
+        makerspace=makerspace, evidence_type=EvidencePhoto.EvidenceType.RETURN,
+        object_key="evidence/protect/k", uploaded_by=user,
+        consumption_state=EvidencePhoto.ConsumptionState.UNCONSUMED,
+    )
+    EvidenceAbandonedUploadReceipt.objects.create(
+        source_makerspace_id_snapshot=makerspace.pk, evidence_id_snapshot=photo.pk,
+        object_key=photo.object_key, next_reconcile_at=timezone.now(),
+    )
+    PublicToolLoan.objects.filter(pk=loan.pk).update(return_evidence=photo)
+
+    def with_guc(action):
+        with transaction.atomic(), connection.cursor() as cursor:
+            cursor.execute("SET LOCAL app.evidence_abandoned_delete_id = %s", [str(photo.pk)])
+            action(cursor)
+
+    with pytest.raises(ProtectedError):
+        with_guc(lambda _cursor: EvidencePhoto.objects.filter(pk=photo.pk).delete())
+    with pytest.raises(Error):
+        with_guc(lambda cursor: cursor.execute(
+            "DELETE FROM evidence_evidencephoto WHERE id=%s", [photo.pk]
+        ))
+    loan.refresh_from_db()
+    assert loan.return_evidence_id == photo.pk
 
 
 @override_settings(API_CLIENT_AUTH_REQUIRED=False)

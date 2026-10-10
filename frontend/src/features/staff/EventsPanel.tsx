@@ -3,7 +3,6 @@ import { useState, type FormEvent } from "react";
 import { EmptyState, Skeleton, StatusBadge } from "../../components/ui";
 import { StructuredApiError } from "../../lib/api";
 import { CollaborationInbox } from "./CollaborationInbox";
-import { EvidenceRetentionPanel } from "./EvidenceRetentionPanel";
 import { EventDrawer } from "./EventDrawer";
 import { EventSeriesDrawer } from "./EventSeriesDrawer";
 import { EventSeriesCollaborationInbox } from "./EventSeriesCollaborationInbox";
@@ -62,7 +61,6 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
 
   return <Panel title="Events">
     <p className="mb-4 text-sm text-muted">Create events, review applications, and record attendance.</p>
-    <EvidenceRetentionPanel makerspaceId={makerspaceId} />
     <CollaborationInbox makerspaceId={makerspaceId} />
     <EventSeriesCollaborationInbox makerspaceId={makerspaceId} />
     <div className="mb-3 flex gap-2" role="group" aria-label="Event type"><button className={creationMode === "single" ? "desk-button-primary" : "desk-button"} type="button" onClick={() => setCreationMode("single")}>One-time event</button><button className={creationMode === "series" ? "desk-button-primary" : "desk-button"} type="button" onClick={() => setCreationMode("series")}>Recurring series</button></div>

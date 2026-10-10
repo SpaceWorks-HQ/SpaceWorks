@@ -53,6 +53,11 @@ SCHEDULED_TASKS = (
         "apps.evidence.tasks.sweep_evidence_retention_task",
         360,
     ),
+    (
+        "evidence-abandoned-upload-cleanup",
+        "apps.evidence.tasks.cleanup_abandoned_evidence_uploads_task",
+        360,
+    ),
     ("extend-event-series", "apps.events.tasks.extend_event_series_task", 60),
     ("purge-auth-challenges", "apps.accounts.tasks.purge_auth_challenges_task", 24 * 60),
     # Beat runs this at a fixed hour; the beat-less runner has no wall-clock schedule, so
@@ -140,6 +145,8 @@ SCHEDULED_TASKS = (
         5,
     ),
 )
+# The only tasks that accept --dry-run/--batch-size.
+EVIDENCE_OPTION_TASKS = frozenset({"evidence-object-expiry", "evidence-abandoned-upload-cleanup"})
 if "tenant_migration" in settings.TOMBSTONED_APPS:
     SCHEDULED_TASKS = tuple(
         task for task in SCHEDULED_TASKS if ".tenant_migration." not in task[1]
@@ -168,7 +175,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Preview evidence expiry without deleting objects.",
+            help="Preview an evidence task without deleting rows or objects.",
         )
         parser.add_argument(
             "--batch-size",
@@ -180,9 +187,10 @@ class Command(BaseCommand):
         from apps.operations.models_scheduling import PeriodicTaskRun
 
         only = options.get("task")
-        if (options["dry_run"] or options["batch_size"] is not None) and only != "evidence-object-expiry":
+        if (options["dry_run"] or options["batch_size"] is not None) and only not in EVIDENCE_OPTION_TASKS:
             raise CommandError(
-                "--dry-run and --batch-size require --task evidence-object-expiry."
+                "--dry-run and --batch-size require --task evidence-object-expiry or "
+                "evidence-abandoned-upload-cleanup."
             )
         now = timezone.now()
         for name, dotted_path, interval_minutes in SCHEDULED_TASKS:
@@ -208,7 +216,7 @@ class Command(BaseCommand):
                 # same thing, and with a broker configured this command should still
                 # do the work rather than queue it behind a worker that may not exist.
                 task_options = {}
-                if name == "evidence-object-expiry":
+                if name in EVIDENCE_OPTION_TASKS:
                     task_options = {
                         "dry_run": options["dry_run"],
                         "batch_size": options["batch_size"],

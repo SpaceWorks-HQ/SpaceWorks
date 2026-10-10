@@ -41,7 +41,12 @@ class EvidencePhotoAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     @staticmethod
     def _expired_label(obj):
         state = getattr(obj, "object_retention_state", None)
-        if state is None or state.status != EvidenceObjectRetentionState.Status.EXPIRED:
+        if state is None:
+            return None
+        if state.status == EvidenceObjectRetentionState.Status.CLEANING:
+            # Never presign or fall back to staging while abandoned-upload cleanup runs.
+            return "Abandoned-upload cleanup in progress"
+        if state.status != EvidenceObjectRetentionState.Status.EXPIRED:
             return None
         return f"Expired at {state.object_expired_at:%Y-%m-%d %H:%M:%S %Z}"
 
@@ -77,8 +82,8 @@ class EvidencePhotoAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     def thumb(self, obj):
         if not obj or not getattr(obj, "object_key", ""):
             return "—"
-        if self._expired_label(obj):
-            return "Expired"
+        if label := self._expired_label(obj):
+            return "Cleaning" if label.startswith("Abandoned") else "Expired"
         try:
             url = presigned_get_url(obj.object_key)
         except Exception:

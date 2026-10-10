@@ -34,6 +34,24 @@ def test_real_application_tree_has_total_source_gate_coverage():
     assert coverage["fanouts"]
 
 
+def test_abandoned_upload_cleanup_is_gated_but_reconciliation_is_coordination():
+    from apps.tenant_migration.gate_policy import (
+        FANOUT_GATE_PARTICIPANTS,
+        OBJECT_MUTATION_PARTICIPANTS,
+        TASK_INTERNAL_PARTICIPANTS,
+    )
+
+    coverage = validate_source_gate_coverage()
+    assert "apps.evidence.tasks.cleanup_abandoned_evidence_uploads_task" in TASK_INTERNAL_PARTICIPANTS
+    sweep = "apps.evidence.abandoned_upload_cleanup.sweep_abandoned_evidence_uploads"
+    assert sweep in FANOUT_GATE_PARTICIPANTS and sweep in coverage["fanouts"]
+    assert "apps.evidence.abandoned_upload_cleanup._sweep_makerspace" in OBJECT_MUTATION_PARTICIPANTS
+    worker = "apps.evidence.abandoned_upload_reconciliation._reconcile_receipt"
+    assert "MIGRATED_OUT" in OBJECT_MUTATION_PARTICIPANTS[worker]
+    # Reconciliation must never take a tenant gate: it outlives the tenant.
+    assert not any("reconciliation" in name for name in coverage["fanouts"])
+
+
 def test_task_guard_rejects_deliberate_nonparticipant(tmp_path):
     _write(
         tmp_path,

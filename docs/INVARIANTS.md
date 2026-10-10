@@ -61,6 +61,13 @@ one `transaction.atomic()` suspends immutability triggers **transaction-scoped**
 - **Every append-only/immutability trigger is purge-aware**: DELETE allowed only under GUC
   `current_setting('app.allow_immutable_delete', true)='on'`; UPDATE always blocked (audit/0003 style).
   A new PROTECT-FK + immutable model must add itself to the purge graph **and** the drift-guard.
+- **The evidence-photo guard has exactly one other DELETE path** (phase 11): abandoned-upload
+  cleanup's transaction-local `app.evidence_abandoned_delete_id = '<exact photo id>'`. It is a
+  transaction flag, not a role. The trigger honours it only for that `OLD.id`, only for an
+  `unconsumed` row with its exact `EvidenceAbandonedUploadReceipt`, and only when all six inbound FK
+  tables and every workflow-consumption audit are absent. Purge deletes the two now-`PROTECT` photo
+  sidecars (`EvidenceUploadFinalization`, `EvidenceObjectRetentionState`) explicitly before the
+  photos and never deletes receipts: they are FK-free, have **no** purge hatch, and keep reconciling.
 
 **Archiving a makerspace must never strand its members' money (phase 1 of the five open items).**
 `Payment.makerspace` outlives archival and `member_payment_queryset` deliberately never filtered
@@ -324,6 +331,60 @@ intentional-absence tombstone: both final and staging keys must be absent, while
 state remain in the database image. Live missing evidence is still an error. An archive captured before
 expiry can contain and later resurrect the old photo bytes, so this mechanism bounds the live store; it
 is not legal erasure from historical archives.
+
+**Abandoned-upload cleanup deletes only proven never-consumed presigns; attached evidence is never
+deleted (phase 11).** `EvidencePhoto` rows are created at presign time, so a cancelled form leaves an
+unattached row. Absence of relationships is not proof: the positive proof is
+`EvidencePhoto.consumption_state='unconsumed'`, which only the two production presign views write.
+Every pre-migration, imported or directly-inserted row is `legacy_unknown` (Django `default` and
+Postgres `db_default`) and is permanently ineligible; tenant import (portable and Lane D) resets the
+field to `legacy_unknown` and resets the two tenant cleanup policy fields to off/null, so a source
+archive never carries cleanup authority. `apps/evidence/consumption.py::mark_consumed` is the only
+permitted photo UPDATE — one-way `legacy_unknown|unconsumed → consumed` with every other column
+unchanged, enforced by the trigger — and all seven consuming transactions call it after
+`lock_evidence_for_attachment` (reviewed issue/return, direct-loan issue/return, self-checkout
+issue/return, problem-report triage including `no_issue`). A new consuming workflow, inbound FK or
+consumption audit must be added to `abandoned_upload_candidates.py`, the 0007-style trigger and the
+tests in the same change.
+- **All six inbound relationships are `PROTECT`.** `EvidenceUploadFinalization.evidence` and
+  `EvidenceObjectRetentionState.evidence` moved from `CASCADE`, `PublicToolLoan.return_evidence` from
+  `SET_NULL`, because Django's collector clears/deletes those before a parent-delete trigger runs.
+  Cleanup deletes the two sidecars explicitly; any domain link makes the collector raise.
+- **Both switches are independent and default off:** `EVIDENCE_ABANDONED_UPLOAD_CLEANUP_ENABLED` and the
+  per-tenant `abandoned_upload_cleanup_enabled`; age `EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS=7`
+  (tenant 1–3650), checked strictly longer than `EVIDENCE_URL_TTL_SECONDS` at system check and PATCH,
+  and recomputed at sweep time as `max(days, TTL + 1 s)`. Policy is `MANAGE_MAKERSPACE`, not
+  `MANAGE_EVENTS`; PATCH is partial and the policy row exists only while non-default.
+- **Order is mandatory:** fan-out source-gate boundary → `satisfy_retention_fence` (first durable
+  per-tenant operation) → candidates strictly below `min(age cutoff, rolled_through −
+  REFINALIZE_LOOKBACK)` (the rollup re-derives seven days below its watermark, so deleting inside
+  that window would append a lower revision to a historical bucket) → locked `CLEANING` claim (blocks
+  attachment; never steals `EXPIRING`; `EXPIRED` keeps its expiry metadata so quota is not credited
+  twice) → strict two-key deletion outside the DB → one final transaction: quota once (Mechanism A's
+  charged rule), exact receipt, sidecar deletes, exact-ID GUC parent delete, one
+  `evidence.abandoned_upload_deleted` audit targeting the **makerspace**. Mechanism A never claims
+  `CLEANING`; backup, object capture and tenant export refuse it like `EXPIRING`; the detail API answers
+  409 `evidence_cleanup_in_progress` without storage; `recompute_storage` leaves the tenant unchanged.
+- **The receipt is permanent deletion authority and a key reservation.** `EvidenceAbandonedUploadReceipt`
+  is FK-free (raw source makerspace/evidence ID snapshots), unique on both the pair and `object_key`,
+  rejects every DELETE (no purge hatch) and every UPDATE except `next_reconcile_at`,
+  `last_reconciled_at`, `last_error`, `updated_at` — at the ORM (`reconcile_update`) and in Postgres.
+  Receipt and photo INSERTs share an advisory lock on the exact key: a receipt may only name its exact
+  live `unconsumed` candidate, and a photo INSERT on a receipt key is rejected. `choose_target_key`
+  treats receipt keys as occupied even when storage reports them absent. The receipt is omitted
+  coordination in data export (retained global in the Lane E readable main), `DROP` in Lane D, and its
+  key is `COORDINATION_ONLY` — never archive content.
+- **Late-write reconciliation is deployment coordination, not tenant mutation.** An upload admitted
+  before URL expiry can finish after cleanup; every scheduled run first strict-deletes both keys of a
+  bounded due batch ordered `(next_reconcile_at, pk)`: success +360 min, failure +720 min (two sweeps,
+  so failures cannot starve the batch). It ignores both switches, servability, source-gate state
+  (`MIGRATED_OUT`) and whether the makerspace still exists; non-`NORMAL` recovery is its only fence. It
+  never changes quota or audits. Purge collects both receipt keys into its immediate deletion closure.
+- **Portable history:** a missing EvidencePhoto audit target is exported as blank target plus
+  source-local provenance only when a same-tenant cleanup audit proves that exact ID was cleaned
+  (`data_export/deleted_audit_targets.py`); an unproved missing target fails the export. The static
+  EvidencePhoto target disposition stays `REMAP` for surviving photos. Cleanup is live-store
+  minimisation only; older archives may restore a cleaned row and bytes.
 
 **Reports/analytics extend one registry** (never a parallel system). `apps/operations/report_registry.py`
 holds canonical `ReportDefinition`s (module-gated, `report_scope.eligible_makerspaces` excludes archived
@@ -2203,7 +2264,9 @@ component then proves reference/manifest equality, binds immutable captured size
 re-reads every packaged byte against them before the readable main can be projected. The only no-byte
 member is an evidence-retention tombstone backed by a terminal `EvidenceObjectRetentionState`: it remains
 part of exact reference/manifest equality, records the expiry timestamp and prior size, and is rejected if
-either final or staging bytes (including historical versions) still exist.
+either final or staging bytes (including historical versions) still exist. Only
+surviving Mechanism-A rows get such tombstones: an abandoned upload deleted by cleanup has no row, member
+or tombstone, a `cleaning` row refuses capture, and the cleanup receipt key is `COORDINATION_ONLY`.
 
 `MakerspaceEncryptionKey` is tenant-owned for Lane E projection even though manager data export omits it.
 Its source-broker row must not survive in the readable main. Inside the same immutable snapshot, W8 freezes
@@ -2530,6 +2593,9 @@ opaque member path plus original key, version ID, size, content type and SHA-256
 Terminal evidence expiry instead carries a typed tombstone with no member path or bytes, an empty digest,
 the terminal timestamp and the recorded expired size; import allocates/remaps a collision-safe final key
 but creates no staged or promoted object journal row.
+A photo deleted by abandoned-upload cleanup (phase 11) is simply absent: it contributes no row, no member
+and no tombstone; a `cleaning` row refuses export like `expiring`, and import regenerates any private
+key an `EvidenceAbandonedUploadReceipt` reserves even when storage reports it absent.
 
 **Lane D D3 freezes custody and source bytes as one immutable capture lineage.** The request transaction
 reuses `backup/custody.py::with_makerspace_custody_lock`: makerspace first, every archive-recipient row in

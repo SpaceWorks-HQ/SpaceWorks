@@ -18,6 +18,11 @@ const policy = {
   override_days: null,
   effective_days: 365,
   object_expiry_enabled: false,
+  abandoned_upload_cleanup_enabled: false,
+  abandoned_upload_platform_default_days: 7,
+  abandoned_upload_override_days: null,
+  abandoned_upload_effective_days: 7,
+  abandoned_upload_global_enabled: false,
 };
 
 function renderPanel() {
@@ -30,6 +35,12 @@ function renderPanel() {
         object_candidates: 4,
         candidate_bytes: 2_097_152,
         has_more: false,
+        abandoned_upload_cutoff: "2026-08-26T10:00:00Z",
+        abandoned_upload_candidates: 3,
+        abandoned_upload_candidate_bytes: 0,
+        abandoned_upload_has_more: false,
+        late_write_receipts: 2,
+        late_write_receipts_due: 1,
       };
     }
     if (init?.method === "PATCH") {
@@ -56,7 +67,8 @@ describe("EvidenceRetentionPanel", () => {
 
     expect(await screen.findByText(/Inherited platform default: 365 days/i)).toBeVisible();
     expect(screen.getByText(/Automatic expiry is disabled/i)).toBeVisible();
-    expect(screen.getByText(/Photo metadata and audit history remain immutable/i)).toBeVisible();
+    expect(screen.getAllByText(/Attached evidence rows are immutable and are never deleted/i)[0]).toBeVisible();
+    expect(screen.queryByText(/Photo metadata and audit history remain immutable/i)).toBeNull();
     expect(await screen.findByText(/4 photo objects \(2 MB\)/i)).toBeVisible();
   });
 
@@ -69,6 +81,34 @@ describe("EvidenceRetentionPanel", () => {
     await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(
       "/admin/makerspaces/7/evidence-retention",
       { method: "PATCH", body: JSON.stringify({ object_retention_days: 90 }) },
+    ));
+  });
+});
+
+describe("EvidenceRetentionPanel abandoned uploads", () => {
+  it("shows the separate default-off cleanup, its global state and the receipt backlog", async () => {
+    renderPanel();
+
+    expect(await screen.findByText(/switched off for this deployment/i)).toBeVisible();
+    expect(screen.getByRole("checkbox", { name: /never-used uploads/i })).not.toBeChecked();
+    expect(screen.getByText(/legacy\) are\s+never eligible/i)).toBeVisible();
+    expect(await screen.findByText(/3 never-used uploads are eligible/i)).toBeVisible();
+    expect(screen.getByText(/Late-write receipts: 2 \(1 due\)/i)).toBeVisible();
+  });
+
+  it("sends exact partial payloads for opt-in and age", async () => {
+    renderPanel();
+    fireEvent.click(await screen.findByRole("checkbox", { name: /never-used uploads/i }));
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(
+      "/admin/makerspaces/7/evidence-retention",
+      { method: "PATCH", body: JSON.stringify({ abandoned_upload_cleanup_enabled: true }) },
+    ));
+    const input = screen.getByRole("spinbutton", { name: /Abandoned upload age/i });
+    fireEvent.change(input, { target: { value: "14" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save age" }));
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(
+      "/admin/makerspaces/7/evidence-retention",
+      { method: "PATCH", body: JSON.stringify({ abandoned_upload_retention_days: 14 }) },
     ));
   });
 });

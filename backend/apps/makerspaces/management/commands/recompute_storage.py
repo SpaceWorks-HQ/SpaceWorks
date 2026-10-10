@@ -43,6 +43,15 @@ class Command(BaseCommand):
             if not makerspaces.exists():
                 raise CommandError(f"Makerspace {selector!r} was not found.")
         for makerspace in makerspaces.order_by("pk"):
+            if EvidenceObjectRetentionState.objects.filter(
+                evidence__makerspace=makerspace,
+                status=EvidenceObjectRetentionState.Status.CLEANING,
+            ).exists():
+                # Bytes may be half-deleted; the cleanup completion settles quota once.
+                self.stdout.write(self.style.WARNING(
+                    f"{makerspace.slug}: usage left unchanged while abandoned-upload cleanup is in progress."
+                ))
+                continue
             try:
                 values = {
                     "evidence": self._sum(

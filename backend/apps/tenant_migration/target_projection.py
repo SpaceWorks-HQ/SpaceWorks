@@ -180,6 +180,15 @@ TARGET_FIELD_PROJECTION = {
         False, condition=("channel", "telegram"),
         reason="Imported Telegram rooms stay inert until a target operator activates them."
     ),
+    ("evidence.EvidenceRetentionPolicy", "abandoned_upload_cleanup_enabled"): TargetField(
+        False, reason="Irreversible abandoned-upload cleanup is a target opt-in."
+    ),
+    ("evidence.EvidenceRetentionPolicy", "abandoned_upload_retention_days"): TargetField(
+        None, reason="The target chooses its own abandoned-upload age."
+    ),
+    ("evidence.EvidencePhoto", "consumption_state"): TargetField(
+        "legacy_unknown", reason="A source consumption marker is never target cleanup proof."
+    ),
 }
 
 

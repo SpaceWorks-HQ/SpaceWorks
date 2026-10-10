@@ -77,7 +77,7 @@ def charge_storage_once(evidence, size):
 
 
 def _claim(evidence_id):
-    """Claim promotion while briefly locking the immutable evidence row."""
+    """Claim promotion while briefly locking the evidence row (immutable identity/content)."""
     with transaction.atomic():
         EvidencePhoto.objects.select_for_update().get(pk=evidence_id)
         state, _ = EvidenceUploadFinalization.objects.select_for_update().get_or_create(

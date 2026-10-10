@@ -354,6 +354,14 @@ EVIDENCE_OBJECT_EXPIRY_ENABLED = env.bool(
     "EVIDENCE_OBJECT_EXPIRY_ENABLED", default=False
 )
 EVIDENCE_RETENTION_BATCH_SIZE = env.int("EVIDENCE_RETENTION_BATCH_SIZE", default=100)
+# Abandoned-upload cleanup DELETES rows (only post-marker presigns proven unconsumed);
+# independent of object expiry and default off. Existing receipts still reconcile.
+EVIDENCE_ABANDONED_UPLOAD_CLEANUP_ENABLED = env.bool(
+    "EVIDENCE_ABANDONED_UPLOAD_CLEANUP_ENABLED", default=False
+)
+EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS = env.int(
+    "EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS", default=7
+)
 WARRANTY_DOC_MAX_BYTES = env.int("WARRANTY_DOC_MAX_BYTES", default=10485760)
 WARRANTY_DOC_ALLOWED_MIME = env.list(
     "WARRANTY_DOC_ALLOWED_MIME",
@@ -598,6 +606,11 @@ CELERY_BEAT_SCHEDULE = {
     "evidence-object-expiry": {
         "task": "apps.evidence.tasks.sweep_evidence_retention_task",
         "schedule": crontab(minute=10, hour="*/6"),
+    },
+    # Every 360 minutes: reconcile due late-write receipts first, then new cleanup.
+    "evidence-abandoned-upload-cleanup": {
+        "task": "apps.evidence.tasks.cleanup_abandoned_evidence_uploads_task",
+        "schedule": crontab(minute=40, hour="*/6"),
     },
     "extend-event-series": {
         "task": "apps.events.tasks.extend_event_series_task",

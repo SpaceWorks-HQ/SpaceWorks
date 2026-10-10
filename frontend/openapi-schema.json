@@ -22663,7 +22663,7 @@
         "/api/v1/admin/makerspaces/{makerspace_id}/evidence-retention": {
             "get": {
                 "operationId": "api_v1_admin_makerspaces_evidence_retention_retrieve",
-                "summary": "Get a makerspace evidence object-retention policy",
+                "summary": "Get a makerspace evidence retention and abandoned-upload policy",
                 "parameters": [
                     {
                         "in": "path",
@@ -22697,7 +22697,7 @@
                         "description": "Authentication is required."
                     },
                     "403": {
-                        "description": "Active manage-events permission is required."
+                        "description": "Active manage-makerspace permission is required."
                     },
                     "404": {
                         "description": "Makerspace was not found in the actor's scope."
@@ -22709,7 +22709,7 @@
             },
             "patch": {
                 "operationId": "api_v1_admin_makerspaces_evidence_retention_partial_update",
-                "summary": "Set or clear a makerspace evidence object-retention override",
+                "summary": "Partially update the evidence retention and abandoned-upload policy",
                 "parameters": [
                     {
                         "in": "path",
@@ -22765,7 +22765,7 @@
                         "description": "Authentication is required."
                     },
                     "403": {
-                        "description": "Active manage-events permission is required."
+                        "description": "Active manage-makerspace permission is required."
                     },
                     "404": {
                         "description": "Makerspace was not found in the actor's scope."
@@ -22779,7 +22779,7 @@
         "/api/v1/admin/makerspaces/{makerspace_id}/evidence-retention/preview": {
             "post": {
                 "operationId": "api_v1_admin_makerspaces_evidence_retention_preview_create",
-                "summary": "Preview evidence objects eligible for expiry",
+                "summary": "Preview evidence object expiry and abandoned-upload cleanup",
                 "parameters": [
                     {
                         "in": "path",
@@ -22835,7 +22835,7 @@
                         "description": "Authentication is required."
                     },
                     "403": {
-                        "description": "Active manage-events permission is required."
+                        "description": "Active manage-makerspace permission is required."
                     },
                     "404": {
                         "description": "Makerspace was not found in the actor's scope."
@@ -49308,9 +49308,30 @@
                     },
                     "object_expiry_enabled": {
                         "type": "boolean"
+                    },
+                    "abandoned_upload_cleanup_enabled": {
+                        "type": "boolean"
+                    },
+                    "abandoned_upload_platform_default_days": {
+                        "type": "integer"
+                    },
+                    "abandoned_upload_override_days": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "abandoned_upload_effective_days": {
+                        "type": "integer"
+                    },
+                    "abandoned_upload_global_enabled": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
+                    "abandoned_upload_cleanup_enabled",
+                    "abandoned_upload_effective_days",
+                    "abandoned_upload_global_enabled",
+                    "abandoned_upload_override_days",
+                    "abandoned_upload_platform_default_days",
                     "effective_days",
                     "makerspace_id",
                     "object_expiry_enabled",
@@ -49351,13 +49372,39 @@
                     },
                     "has_more": {
                         "type": "boolean"
+                    },
+                    "abandoned_upload_cutoff": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "abandoned_upload_candidates": {
+                        "type": "integer"
+                    },
+                    "abandoned_upload_candidate_bytes": {
+                        "type": "integer"
+                    },
+                    "abandoned_upload_has_more": {
+                        "type": "boolean"
+                    },
+                    "late_write_receipts": {
+                        "type": "integer"
+                    },
+                    "late_write_receipts_due": {
+                        "type": "integer"
                     }
                 },
                 "required": [
+                    "abandoned_upload_candidate_bytes",
+                    "abandoned_upload_candidates",
+                    "abandoned_upload_cutoff",
+                    "abandoned_upload_has_more",
                     "as_of",
                     "candidate_bytes",
                     "cutoff",
                     "has_more",
+                    "late_write_receipts",
+                    "late_write_receipts_due",
                     "object_candidates",
                     "policy_days"
                 ]
@@ -53745,7 +53792,8 @@
                                 "$ref": "#/components/schemas/MakerspaceArchiveRequestStatusEnum"
                             }
                         ],
-                        "readOnly": true
+                        "readOnly": true,
+                        "default": "pending"
                     }
                 },
                 "required": [
@@ -58825,11 +58873,21 @@
             },
             "PatchedEvidenceRetentionPatch": {
                 "type": "object",
+                "description": "True partial update: supply any subset; an empty body is rejected.",
                 "properties": {
                     "object_retention_days": {
                         "type": "integer",
                         "maximum": 3650,
                         "minimum": 30,
+                        "nullable": true
+                    },
+                    "abandoned_upload_cleanup_enabled": {
+                        "type": "boolean"
+                    },
+                    "abandoned_upload_retention_days": {
+                        "type": "integer",
+                        "maximum": 3650,
+                        "minimum": 1,
                         "nullable": true
                     }
                 }

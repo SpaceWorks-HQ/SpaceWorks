@@ -394,6 +394,8 @@ def test_issue_happy_path(monkeypatch, settings, django_capture_on_commit_callba
     delta = hardware_request.return_due_at - hardware_request.issued_at
     assert 6 <= delta.days <= 7
     assert hardware_request.issue_evidence == evidence
+    evidence.refresh_from_db()
+    assert evidence.consumption_state == "consumed"
     product.refresh_from_db()
     assert product.reserved_quantity == 0
     assert product.issued_quantity == 2

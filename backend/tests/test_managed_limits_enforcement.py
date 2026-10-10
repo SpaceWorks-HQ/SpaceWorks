@@ -279,6 +279,35 @@ def test_recompute_storage_sums_authoritative_evidence_sizes():
     assert makerspace.storage_bytes_used == 100
 
 
+def test_recompute_storage_leaves_usage_unchanged_while_cleanup_is_in_progress():
+    from apps.evidence.models import EvidenceObjectRetentionState
+
+    makerspace = make_space("limits-storage-cleaning")
+    uploader = make_user("limits-storage-cleaning-uploader", access_status="active")
+    photo = EvidencePhoto.objects.create(
+        makerspace=makerspace,
+        evidence_type=EvidencePhoto.EvidenceType.ISSUE,
+        object_key=f"evidence/{makerspace.id}/cleaning.jpg",
+        size_bytes=40,
+        uploaded_by=uploader,
+    )
+    state = EvidenceObjectRetentionState.objects.create(
+        evidence=photo, status=EvidenceObjectRetentionState.Status.CLEANING
+    )
+    Makerspace.objects.filter(pk=makerspace.pk).update(storage_bytes_used=999)
+
+    out = StringIO()
+    call_command("recompute_storage", makerspace.slug, stdout=out)
+    makerspace.refresh_from_db()
+    assert makerspace.storage_bytes_used == 999
+    assert "cleanup is in progress" in out.getvalue()
+
+    state.delete()
+    call_command("recompute_storage", makerspace.slug, stdout=StringIO())
+    makerspace.refresh_from_db()
+    assert makerspace.storage_bytes_used == 40
+
+
 @override_settings(PLATFORM_DOMAIN_SUFFIX=".space-works.tech", INFRA_HOSTS={"testserver"})
 def test_managed_tenant_custom_domain_blocked_without_grant():
     makerspace = make_space("limits-custom-domain-blocked")

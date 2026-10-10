@@ -20,6 +20,7 @@ import { MakerspaceSubdomainSettings } from "./MakerspaceSubdomainSettings";
 import { MakerspaceWebhookSettings } from "./MakerspaceWebhookSettings";
 import { MakerspaceArchiveRequestPanel } from "./MakerspaceArchiveRequestPanel";
 import { NotificationDestinations } from "./NotificationDestinations";
+import { EvidenceRetentionPanel } from "./EvidenceRetentionPanel";
 import { NotificationMuteMatrix } from "./NotificationMuteMatrix";
 import { NotificationRecipientPicker } from "./NotificationRecipientPicker";
 import { Panel, type Makerspace, useStaffGet } from "./StaffPanels";
@@ -226,6 +227,7 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMak
           settings={settings.data}
           loading={settings.isLoading}
         />
+        {canManageMakerspace ? <EvidenceRetentionPanel makerspaceId={makerspace.id} /> : null}
         <MakerspaceArchiveRequestPanel
           makerspaceId={makerspace.id}
           canManageMakerspace={canManageMakerspace}
