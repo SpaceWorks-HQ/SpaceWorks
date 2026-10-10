@@ -1,5 +1,6 @@
 """Machine-service charging boundary; payment failures never affect fulfilment."""
 
+import logging
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
@@ -8,6 +9,8 @@ from apps.machines.models import MakerspaceMachineTypePricing
 from apps.payments.availability import charge_tracking_enabled, online_payments_enabled
 from apps.payments.models import MakerspacePaymentSettings, Payment
 from apps.payments.services import create_checkout, create_payment
+
+logger = logging.getLogger(__name__)
 
 
 def effective_quantity(service_request, machine_type):
@@ -42,7 +45,10 @@ def create_for_completed_request(service_request, actor):
                 member=service_request.member or service_request.requester,
                 amount=amount,
                 currency=currency,
-                created_by=actor,
+                # A device-applied completion has no human actor (a device is never an
+                # actor), but the ledger needs a real User: attribute the charge to the
+                # staff member who accepted the job into the queue.
+                created_by=actor or service_request.accepted_by or service_request.handled_by,
                 # NO subject_label. `title` is free text a public member types, so it can
                 # contain their name, email or phone -- and a snapshot outlives the
                 # `machine_service` purge that exists to destroy exactly that. Leaving it
@@ -51,6 +57,11 @@ def create_for_completed_request(service_request, actor):
                 # The other three subjects snapshot staff-authored or literal text instead.
             )
     except Exception:
+        # Fulfilment must not fail on a charge error, but a debt that silently vanishes
+        # is lost money: always leave a trace.
+        logger.exception(
+            "machine_service_charge_not_recorded", extra={"service_request_id": service_request.pk}
+        )
         return None
     if online_payments_enabled(service_request.makerspace, "machines"):
         try:

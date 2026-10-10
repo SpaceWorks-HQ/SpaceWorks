@@ -38,7 +38,6 @@ AUDIT_META_REFERENCES = {
         R, "hardware_requests.HardwareRequest",
         ("asset.issued", "request_id"), ("box.scanned", "request_id"),
         ("evidence.attached", "request_id"),
-        ("machine_service.consumption_recorded", "request_id"),
         ("problem_report.triaged", "request_id"),
         ("public_tool.problem_reported", "request_id"),
     ),
@@ -131,6 +130,9 @@ AUDIT_META_REFERENCES = {
     **_reference(R, "machines.MachineUsageEntry", ("machine.typed_usage_logged", "usage_entry_id")),
     **_reference(
         R, "machines.MachineServiceRequest",
+        # consumption_recorded records the MachineServiceRequest pk; it was once mapped
+        # to HardwareRequest, which crashed an import or rebound it to an unrelated loan.
+        ("machine_service.consumption_recorded", "request_id"),
         ("machine_service.file_attached", "request_id"),
         ("machine_service.file_staged", "request_id"),
     ),

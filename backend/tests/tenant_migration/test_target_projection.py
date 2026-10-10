@@ -68,6 +68,13 @@ EXPECTED_TARGET_VALUES = {
     ("devices.Device", "offline_notified_at"): None,
     ("devices.Device", "revoked_at"): None,
     ("devices.Device", "revoked_by"): None,
+    # Phase 7b: imported printer delivery is inert until re-created on the target.
+    ("devices.DeviceCommand", "status"): "cancelled",
+    ("devices.DeviceCommand", "lease_token_digest"): None,
+    ("devices.DeviceCommand", "lease_expires_at"): None,
+    ("devices.PrinterDeviceBinding", "enabled"): False,
+    ("devices.PrinterDeviceBinding", "auto_apply_terminal"): False,
+    ("devices.PrinterJob", "state"): "needs_review",
 }
 
 

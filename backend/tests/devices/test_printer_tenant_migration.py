@@ -80,25 +80,26 @@ def test_portable_printer_history_imports_with_no_remote_authority_and_no_workfl
             graph = case.source_data
             result = materialize_tenant(case.root, case.job, case.carried,
                 target_identity={"name": "Moved printers", "slug": "moved-printers"}, batch_size=2)
-    binding = PrinterDeviceBinding.objects.get(makerspace_id=result.target_makerspace_id)
-    jobs = PrinterJob.objects.filter(makerspace_id=result.target_makerspace_id)
-    job = jobs.get(external_job_id="source-print")
-    command = job.command
-    assert not binding.enabled and not binding.auto_apply_terminal
-    assert command.status == "cancelled" and command.lease_token_digest is None and command.lease_expires_at is None
-    assert job.pk != graph["job"].pk and job.state == "applied" and job.failure_reason == "Fault"
-    assert job.machine_id != graph["machine"].pk and job.machine_id_snapshot == graph["machine"].pk
-    assert job.service_request_id != graph["request"].pk and job.service_request_id_snapshot == graph["request"].pk
-    assert Device.objects.get(pk=job.device_id).status == "pending"
-    assert all(row.status == "cancelled" and row.lease_token_digest is None and row.lease_expires_at is None
-               for row in DeviceCommand.objects.filter(makerspace_id=result.target_makerspace_id))
-    pending = jobs.get(external_job_id="source-pending")
-    assert pending.state == "needs_review" and pending.reported_at is None
-    consumption = PrinterJobConsumption.objects.get(job=job)
-    assert consumption.machine_consumable_id != graph["stock"].pk
-    assert consumption.machine_consumable_id_snapshot == graph["stock"].pk and consumption.quantity == 2
-    assert consumption.machine_consumable.remaining == 98
-    from apps.audit.models import AuditLog
-    # Exactly one source outcome travels; import never invokes the adapter/workflow again.
-    assert AuditLog.objects.filter(makerspace_id=result.target_makerspace_id, action="devices.printer_result_applied").count() == 1
-    assert AuditLog.objects.get(makerspace_id=result.target_makerspace_id, action="devices.printer_result_claimed").meta["printer_job_id"] == str(job.pk)
+        # Reads stay inside enabled_encryption(): the PII mapper needs the key context.
+        binding = PrinterDeviceBinding.objects.get(makerspace_id=result.target_makerspace_id)
+        jobs = PrinterJob.objects.filter(makerspace_id=result.target_makerspace_id)
+        job = jobs.get(external_job_id="source-print")
+        command = job.command
+        assert not binding.enabled and not binding.auto_apply_terminal
+        assert command.status == "cancelled" and command.lease_token_digest is None and command.lease_expires_at is None
+        assert job.pk != graph["job"].pk and job.state == "applied" and job.failure_reason == "Fault"
+        assert job.machine_id != graph["machine"].pk and job.machine_id_snapshot == graph["machine"].pk
+        assert job.service_request_id != graph["request"].pk and job.service_request_id_snapshot == graph["request"].pk
+        assert Device.objects.get(pk=job.device_id).status == "pending"
+        assert all(row.status == "cancelled" and row.lease_token_digest is None and row.lease_expires_at is None
+                   for row in DeviceCommand.objects.filter(makerspace_id=result.target_makerspace_id))
+        pending = jobs.get(external_job_id="source-pending")
+        assert pending.state == "needs_review" and pending.reported_at is None
+        consumption = PrinterJobConsumption.objects.get(job=job)
+        assert consumption.machine_consumable_id != graph["stock"].pk
+        assert consumption.machine_consumable_id_snapshot == graph["stock"].pk and consumption.quantity == 2
+        assert consumption.machine_consumable.remaining == 98
+        from apps.audit.models import AuditLog
+        # Exactly one source outcome travels; import never invokes the adapter/workflow again.
+        assert AuditLog.objects.filter(makerspace_id=result.target_makerspace_id, action="devices.printer_result_applied").count() == 1
+        assert AuditLog.objects.get(makerspace_id=result.target_makerspace_id, action="devices.printer_result_claimed").meta["printer_job_id"] == str(job.pk)
