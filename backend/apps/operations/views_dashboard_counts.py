@@ -129,41 +129,44 @@ def build_dashboard(
             ).count()
         except Exception:
             pass
-    try:
-        from apps.machines.models import MachineServiceRequest, MachineType
+    # Print tiles are `printing` data: a space without the module shows zeros, exactly as
+    # the maintenance tile below does without `maintenance`.
+    if module_enabled(makerspace, "printing"):
+        try:
+            from apps.machines.models import MachineServiceRequest, MachineType
 
-        printer_type_id = MachineType.objects.filter(
-            makerspace__isnull=True, slug=PRINTER_SLUG
-        ).values_list("id", flat=True).first()
-        if printer_type_id is not None:
-            printer_q = Q(pk__in=[])
-            for path in role_scope.SERVICE_REQUEST_TYPE_PATHS:
-                printer_q |= Q(**{path: printer_type_id})
-            printers = MachineServiceRequest.objects.filter(
-                makerspace=makerspace
-            ).filter(printer_q)
-            prints = printers.filter(
-                role_scope.scope_q_for(
-                    machine_scope,
-                    machine_id_paths=role_scope.SERVICE_REQUEST_MACHINE_PATHS,
-                    type_id_paths=role_scope.SERVICE_REQUEST_TYPE_PATHS,
+            printer_type_id = MachineType.objects.filter(
+                makerspace__isnull=True, slug=PRINTER_SLUG
+            ).values_list("id", flat=True).first()
+            if printer_type_id is not None:
+                printer_q = Q(pk__in=[])
+                for path in role_scope.SERVICE_REQUEST_TYPE_PATHS:
+                    printer_q |= Q(**{path: printer_type_id})
+                printers = MachineServiceRequest.objects.filter(
+                    makerspace=makerspace
+                ).filter(printer_q)
+                prints = printers.filter(
+                    role_scope.scope_q_for(
+                        machine_scope,
+                        machine_id_paths=role_scope.SERVICE_REQUEST_MACHINE_PATHS,
+                        type_id_paths=role_scope.SERVICE_REQUEST_TYPE_PATHS,
+                    )
+                ).distinct()
+                counts["pending_prints"] = prints.filter(status=MachineServiceRequest.Status.PENDING).count()
+                counts["active_prints"] = prints.filter(status=MachineServiceRequest.Status.IN_PROGRESS).count()
+                # Awaiting collection follows COLLECTION authority, which is cumulative and
+                # wider than machine scope: a role holding scoped MANAGE_MACHINES plus a
+                # DIRECT collect grant can hand over any completed job, so counting only its
+                # own machines made the tile disagree with the Handover queue it links to --
+                # a job actionable there and invisible here. Built as a separate queryset
+                # rather than OR-ing the scope clause, because `scope_q_for` returns an empty
+                # `Q()` for an exempt actor and `Q() | X` collapses to `X`.
+                awaiting = (printers if direct_collect else prints).filter(
+                    status=MachineServiceRequest.Status.COMPLETED
                 )
-            ).distinct()
-            counts["pending_prints"] = prints.filter(status=MachineServiceRequest.Status.PENDING).count()
-            counts["active_prints"] = prints.filter(status=MachineServiceRequest.Status.IN_PROGRESS).count()
-            # Awaiting collection follows COLLECTION authority, which is cumulative and
-            # wider than machine scope: a role holding scoped MANAGE_MACHINES plus a
-            # DIRECT collect grant can hand over any completed job, so counting only its
-            # own machines made the tile disagree with the Handover queue it links to --
-            # a job actionable there and invisible here. Built as a separate queryset
-            # rather than OR-ing the scope clause, because `scope_q_for` returns an empty
-            # `Q()` for an exempt actor and `Q() | X` collapses to `X`.
-            awaiting = (printers if direct_collect else prints).filter(
-                status=MachineServiceRequest.Status.COMPLETED
-            )
-            counts["prints_awaiting_collection"] = awaiting.distinct().count()
-    except Exception:
-        pass
+                counts["prints_awaiting_collection"] = awaiting.distinct().count()
+        except Exception:
+            pass
     if not restricted:
         try:
             counts["failed_emails"] = EmailLog.objects.filter(

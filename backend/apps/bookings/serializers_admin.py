@@ -44,6 +44,10 @@ class BookableSpaceWriteSerializer(serializers.Serializer):
         default=0,
         required=False,
     )
+    # The machine type this space is booked to use; with `machines.certifications` on,
+    # members then need that type's certification to book it. Settable only while
+    # `machines` is installed; null clears it.
+    machine_type = serializers.IntegerField(allow_null=True, min_value=1, required=False)
 
     def validate(self, attrs):
         availability = attrs.get(
@@ -88,6 +92,7 @@ class BookableSpaceAdminSerializer(serializers.ModelSerializer):
             'custom_form',
             'requester_notifications_enabled',
             'payment_amount',
+            'machine_type',
             'effective_requester_notifications_enabled',
             'is_active',
             'created_by_id',

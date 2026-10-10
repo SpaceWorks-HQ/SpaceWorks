@@ -172,6 +172,14 @@ class NotificationRulesView(APIView):
         for preference in preference_changes:
             key = (preference["feature"], preference["channel"])
             desired_preferences[key] = preference["enabled"]
+        # GET omits a channel whose module is uninstalled, so switching one ON must be
+        # unreachable here too (switching OFF is harmless and stays allowed).
+        for (_feature, channel), enabled in desired_preferences.items():
+            if enabled and channel_module_blocks(makerspace, channel):
+                return Response(
+                    {"detail": f"The {channel} module is not installed."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         applied = []
         with transaction.atomic():

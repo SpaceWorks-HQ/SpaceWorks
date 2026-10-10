@@ -85,8 +85,17 @@ def require_current_term(makerspace, membership):
     every term has expired or been cancelled is refused -- and refused with the same
     exception a non-member gets, because that is what the operator asked for. No new
     access state: `MakerspaceMembership.status` and `User.access_status` stay as they are.
+
+    Every BORROW path calls it -- the reviewed-request submit, member self-checkout and
+    staff direct handout -- never a return. Plans and terms are `membership`-module
+    state, so with the module uninstalled the rule is inert rather than enforced from a
+    flag nobody can see or edit.
     """
-    if membership is None or not makerspace.lapsed_members_cannot_borrow:
+    if (
+        membership is None
+        or not makerspace.lapsed_members_cannot_borrow
+        or not membership_installed(makerspace.enabled_modules)
+    ):
         return
     from django.utils import timezone
 

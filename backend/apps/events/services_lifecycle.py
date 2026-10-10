@@ -97,7 +97,44 @@ def cancel(event, *, actor, notify=True):
     )
     if notify:
         services.notify_event_lifecycle(locked, "cancelled")
+    _cancel_open_charges_after_commit(locked, actor)
     return services._refresh(locked)
+
+
+def _cancel_open_charges_after_commit(event, actor):
+    """An event that will not happen must not keep billing its attendees.
+
+    Only PENDING charges are cancelled -- a settled one is money that really arrived and
+    stays on the ledger for a staff refund. Post-commit and one at a time, because
+    cancelling expires any live provider checkout, and provider I/O must never run while
+    the event row lock is held. `cancel_for_registration` swallows its own failures, so
+    a provider outage never undoes the cancellation.
+    """
+    from apps.events.models import EventRegistration
+    from apps.events.service_payments import cancel_for_registration
+    from apps.payments.models import Payment
+
+    registration_ids = list(
+        EventRegistration.objects.filter(event=event).values_list("pk", flat=True)
+    )
+    pending = set(
+        Payment.objects.filter(
+            makerspace=event.makerspace,
+            subject_type=Payment.SubjectType.EVENT_REGISTRATION,
+            subject_id__in=registration_ids,
+            status=Payment.Status.PENDING,
+        ).values_list("subject_id", flat=True)
+    )
+
+    def cancel_all():
+        for registration in EventRegistration.objects.filter(pk__in=pending).select_related(
+            "event__makerspace"
+        ):
+            with transaction.atomic():
+                cancel_for_registration(registration, actor)
+
+    if pending:
+        transaction.on_commit(cancel_all)
 
 
 @transaction.atomic

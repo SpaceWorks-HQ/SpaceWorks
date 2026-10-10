@@ -389,7 +389,7 @@ route through it. `/auth/me` + `/auth/login` carry typed effective `actions` per
 membership/role-assignment APIs enforce non-escalation (can't grant a role you don't hold; can't touch a
 MANAGE_MAKERSPACE target/role) with makerspace-first lock ordering.
 
-**`apps/makerspaces/module_registry.py` is the single source of truth for module keys.** All 32
+**`apps/makerspaces/module_registry.py` is the single source of truth for module keys.** All 33
 `ModuleDefinition`s live there (`key`, `label`, `description`, `app_label`, `enforcement`, `group`,
 `requires_modules`, `default_enabled`, `is_core`, `frontend_exposed`, `frontend_workflows`), and the
 lists that used to be hand-kept in parallel now **derive** from it: `models.DEFAULT_ENABLED_MODULES`,
@@ -406,19 +406,21 @@ issue photo to issue hardware. `tests/makerspaces/test_module_registry.py` is th
 AST-parses `apps/` and fails if a registered module has no real guard call site, if a guarded key is
 unregistered, if the derived lists change, or if a migration-referenced callable stops resolving.
 
-**Modules are OPT-IN.** `DEFAULT_ENABLED_MODULES` resolves to **10 keys** — the 6 core ones plus
-`accounts`, `payments`, `mobile` and `updates`, which carry `default_enabled=True` because each was
-introduced as a *key over behaviour that already existed*, and an opt-in default would have switched
-that behaviour off for every deployment on upgrade (the `0050`/`0051` backfill reasoning, expressed
-in the registry instead of a migration). Everything else is off, and a new makerspace installs core
-plus whatever profile the operator chose (`minimal` 6 / `workshop` 14 / `lending` 17 /
-`recommended` 20 / `cloud` 24 / `everything` = `full` 32).
+**Modules are OPT-IN.** `DEFAULT_ENABLED_MODULES` resolves to **7 keys** — the 6 core ones plus
+`updates`, which carries `default_enabled=True` because it was introduced as a *key over behaviour
+that already existed*, and an opt-in default would have switched that behaviour off for every
+deployment on upgrade (the `0050`/`0051` backfill reasoning, expressed in the registry instead of a
+migration). `member_accounts`, `mobile` and `payments` once carried it too and are now opt-in for new
+makerspaces (existing rows kept them through `0057`). Everything else is off, and a new makerspace
+installs core plus whatever profile the operator chose (`minimal` 6 / `workshop` 14 / `lending` 17 /
+`recommended` 20 / `cloud` 24 / `events` 13 / `bookings` 13 / `everything` = `full` 33 — pinned by
+`tests/modules/test_combo_profiles.py`).
 `ModuleDefinition.default_enabled` defaults to **False** and core must not set it (core is on by
-definition; two sources for one fact is the drift the registry exists to remove) — so the four
-above are the only registry entries that set it, and `default_enabled_module_keys()` is the one
-place to ask rather than counting by hand. (This paragraph read "core only (6 keys)" until those
-four keys landed; it is the kind of count that goes stale silently, which is why the README table
-is generated from the registry rather than written out.) **Existing makerspaces
+definition; two sources for one fact is the drift the registry exists to remove) — so `updates` is
+the only registry entry that sets it, and `default_enabled_module_keys()` is the one place to ask
+rather than counting by hand. (This paragraph read "core only (6 keys)", then "10 keys"; it is the
+kind of count that goes stale silently, which is why the README table is generated from the registry
+rather than written out.) **Existing makerspaces
 are untouched** — a default change never rewrites stored JSON rows, and `_canonical_modules` preserves
 unknown keys. Because almost every backend test exercises a module's behaviour rather than the install
 default, `tests/conftest.py` has an autouse fixture that patches **only the `enabled_modules` field
@@ -535,11 +537,13 @@ transitively `retry_email_log()`, whose existing FAILED/SENDING whitelist alread
 A blocked message becomes a **terminal `EmailLog.Status.SKIPPED`** row — recorded, not dropped, so the
 operator can see what the toggle suppressed — and `SKIPPED` is neither a delivery nor a failure:
 `notify._dispatch_email_delivery` counts it as neither, because `notify_return_due` returns
-`bool(delivered_counts)` and a skip must not read as a reminder that went out. Three messages are
+`bool(delivered_counts)` and a skip must not read as a reminder that went out. Five messages are
 **exempt, matched on stream AND event** (an event name alone is not unique across streams):
 `("account","password_reset")`, `("account","email_verification")` — missing the second leaves a new
-account unable to verify and therefore unable to join — and `("hardware","return_reminder")`, a
-duty-of-care message in the accountability flow. **Platform mail (`makerspace=None`) is never gated**:
+account unable to verify and therefore unable to join — `("hardware","return_reminder")`, a
+duty-of-care message in the accountability flow, and the two backup custody alarms
+`("backup","archive_custody_alarm")` / `("backup","tenant_exit_custody_alarm")`
+(`integrations/dispatch.EMAIL_MODULE_EXEMPT`; this line said "three" until 2026-10-09). **Platform mail (`makerspace=None`) is never gated**:
 no tenant owns it, and the platform-level `integrations.email.email_enabled()` behind `/api/v1/config`
 is *deliverability*, not tenant enablement — conflating them hides forgot-password from the login screen.
 Because modules are opt-in, a newly registered key is off by default, which is right for a new makerspace
@@ -669,7 +673,10 @@ and never an access state: a `MembershipTerm` expiring changes neither `Makerspa
 `User.access_status`; the only effect is the per-makerspace opt-in `lapsed_members_cannot_borrow`, enforced
 solely by `request_access.require_current_term` AFTER the who-may-submit rule has admitted the member
 ("active" = `status=active AND ends_at > now`, so it does not depend on the hourly sweep), and a member who
-has never held a term is untouched. One renewal charge per term, raised only by
+has never held a term is untouched. It guards **every borrow path** — the reviewed-request submit, member
+self-checkout and staff direct handout (the rule is about the borrower, not about who hands the tool over)
+— and never a return; with `membership` uninstalled it is inert (2026-10-09; before that a member refused
+at the request form could still self-checkout). One renewal charge per term, raised only by
 `membership_plan_services.run_membership_renewals` as `Payment(subject_type=membership_term,
 subject_id=term.pk)` inside the 7-day window and only when `online_payments_enabled(ms, "membership")` —
 the Payment unique constraint is the idempotency, a payment failure is logged and never touches the term,
@@ -1040,7 +1047,10 @@ enabling a key cannot make an unconfigured channel send, and disabling it stops 
 - **The notification matrix OMITS a channel whose module is uninstalled** rather than rendering it
   disabled (`views_notification_rules._response_data` filters both `channels` and `preferences`).
   A tickable column would accept the tick, store the preference, and then SKIP every send — the
-  same reasoning as pruning a tombstoned sidebar entry instead of permission-hiding it.
+  same reasoning as pruning a tombstoned sidebar entry instead of permission-hiding it. **The write
+  paths agree** (2026-10-09): the matrix PATCH refuses to switch such a channel ON (400; OFF stays
+  allowed), and a `ReportSchedule` refuses a destination on an uninstalled channel and a report
+  whose source module is off — the same 400s the destination API and the manual export give.
 - **Discord is not Slack-shaped.** `webhooks.py` maps channel → body key because Discord names the
   field `content` and ignores `text` (400, nothing delivered), and trims to its hard 2000-character
   limit, which rejects rather than clips. `native_push` has **no** module key — it is governed by
@@ -1315,7 +1325,13 @@ superadmin "Re-queue failed deliveries" admin action is the dead-letter path and
 `member_accounts`/`updates` are read deployment-wide. An edition hides a fixed set of module keys:
 `platform.available_modules()` (and therefore every bootstrap `modules` list and staff `enabled_modules`
 payload) omits them, and the public loan/machine routes check `editions.public_surface_available(key)`
-and answer 404 when hidden. It does **not** change `core_module_keys()`, `module_enabled()` or any
+and answer 404 when hidden — **every** public route of a hidden module, not only its
+catalogue: the public tool routes (`request_workflow`), public booking, machine-service
+submit, every printer route including the token status lookup, and the per-member event
+ICS feed all check it (2026-10-09; each had gated only on its module or feature, which an
+edition deliberately leaves alone, so an events-only box still lent tools and took
+bookings). Prefer `guards.require_module_for_servable`, which does the edition check and
+the module check together. It does **not** change `core_module_keys()`, `module_enabled()` or any
 `require_module` gate: staff endpoints, workflows, migrations, purge plans and backups behave identically in
 every edition, so a hidden surface is recoverable and nothing that was recorded becomes unreachable to
 staff. `Event.makerspace` remains the tenancy anchor in all editions. The single-box image
@@ -1329,7 +1345,13 @@ revocation, active-target uniqueness and the immutable `QrScanEvent` history are
 **Identity never travels through the inventory scanner**: `qr_target_payload` and `QrResolveView` raise
 404 for a member-card target; only `member_card_services.resolve` (action `scan_member_cards`) may resolve
 one, it records a `member_lookup` scan even when refused, and it refuses uniformly (a foreign tenant's
-card, a box QR and garbage all 404). Authority is by action, never role name: `manage_member_cards`
+card, a box QR and garbage all 404). **No inventory path may load a member-card QR at
+all** (2026-10-09): `boxes.access.inventory_qr_codes()` excludes the target type and backs
+`qr_for_action`/`locked_qr_for_action` (scan, print, revoke, rebind, stocktake scan) and the
+self-checkout and direct-handout lookups, and `_checkout_target` has an explicit BOX branch.
+Before that a card's `target_id` — a MemberCard pk — fell through to the box branch and
+checked out whichever public box shared the number, and a `manage_qr` holder could revoke
+or rebind a card without `manage_member_cards`. Authority is by action, never role name: `manage_member_cards`
 implies `scan_member_cards`, is granted to the protected Space Manager default (migration 0069 backfills
 existing rows), and custom roles receive nothing until granted. `printed_name` is scoped source PII
 (`encryption/registry.py`); `photo_object_key` is a PRIVATE object (`backup/object_ownership_registry.py`)
@@ -1938,7 +1960,10 @@ Load-bearing details that carried over unchanged:
   `require_active_member_presence`, and **only** `PublicEventRegistrationView` switched wholesale. The
   hardware and facility invocations — self-checkout ×3, direct handout, public booking, and the two
   machine-service surfaces — still require a session, because "is this member here right now" is the
-  whole question. Request submission also keeps that guard while `membership` is enabled; with
+  whole question (the two machine-service surfaces only while `membership` is installed: without it
+  they take the identity-only guard, `machines/views_public_service.require_public_machine_requester`).
+  "Check-in does" means the staff-scanned event QR check-in is the presence evidence, not that it
+  looks up a `PresenceSession`. Request submission also keeps that guard while `membership` is enabled; with
   `membership` off it uses the separate identity-only guard because a request is only a proposal and
   staff acceptance is the control. There is no waiver check on that branch because waiver acceptance
   can only be recorded on a membership row. Signing up for an event is planning to attend; presence is
@@ -1960,6 +1985,12 @@ Load-bearing details that carried over unchanged:
   **neither** the host's module **nor** archival: a module toggle must never hide a receipt or block a
   pending charge, and the separability contract keeps historical payment subjects usable when
   tombstoned.
+- **Cancelling an event (or its series) cancels its PENDING registration charges** (2026-10-09):
+  `services_lifecycle.cancel` schedules `cancel_for_registration` after commit for every pending
+  one, so provider-session expiry never runs under the event lock. Settled charges stay — a refund is
+  a staff decision. **Known open hole (owner decision):** re-registering after a cancellation revives
+  the same row and pk, so the terminal CANCELED charge is found again and `payment_one_per_subject`
+  forbids a fresh one — a paid event becomes free for that member.
 - **PAYMENT ROUTING LIVES ON `Payment.via_makerspace`, NOT ON THE REGISTRATION'S PROVENANCE.**
   One column cannot serve both: `module_purge_collectors.events_delete` must clear
   `registered_via_makerspace` (destroying activity history is what a purge is *for*), and keying

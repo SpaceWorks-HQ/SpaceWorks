@@ -16,7 +16,7 @@ from apps.bookings.serializers_public import (
     PublicSpaceAvailabilitySerializer,
 )
 from apps.hardware_requests.exceptions import ErrorSerializer
-from apps.makerspaces.guards import require_module
+from apps.makerspaces.guards import require_module_for_servable
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.presence.guard import require_active_member_presence
 
@@ -61,7 +61,7 @@ class PublicBookableSpaceListView(APIView):
     )
     def get(self, request, makerspace_slug):
         makerspace = get_public_makerspace(makerspace_slug)
-        require_module(makerspace, 'bookings')
+        require_module_for_servable(makerspace, 'bookings')
         spaces = _public_spaces(makerspace).order_by('name', 'id')
         return Response(PublicBookableSpaceSerializer(spaces, many=True).data)
 
@@ -84,7 +84,7 @@ class PublicSpaceAvailabilityView(APIView):
     )
     def get(self, request, makerspace_slug, public_token):
         makerspace = get_public_makerspace(makerspace_slug)
-        require_module(makerspace, 'bookings')
+        require_module_for_servable(makerspace, 'bookings')
         space = get_object_or_404(
             _public_spaces(makerspace),
             public_token=public_token,
@@ -137,7 +137,7 @@ class PublicBookingSubmissionView(APIView):
     )
     def post(self, request, makerspace_slug, public_token):
         makerspace = get_public_makerspace(makerspace_slug)
-        require_module(makerspace, 'bookings')
+        require_module_for_servable(makerspace, 'bookings')
         space = get_object_or_404(
             _public_spaces(makerspace),
             public_token=public_token,
