@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { BulkActionToolbar, DataTable, type DataTableColumn } from "../../components/ui";
@@ -18,6 +18,10 @@ import {
 } from "./paymentsApi";
 import { PaymentRefundDialog } from "./PaymentRefundDialog";
 import { SettlementDialog } from "./SettlementDialog";
+import { useUrlListState } from "../../lib/useUrlListState";
+import type { Paginated } from "../../lib/usePaginatedQuery";
+import { Pagination } from "../../components/ui/Pagination";
+import { ListViewControls } from "./ListViewControls";
 import { Panel } from "./panels/shared";
 import { paymentAccess } from "./paymentAccess";
 
@@ -29,15 +33,19 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
   const forRecording = !isSuperadmin && !actorActions.includes("view_finance");
   const access = (row: PaymentRow) => paymentAccess(actorActions, isSuperadmin, row);
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState("pending");
-  const [subject, setSubject] = useState("");
+  const list = useUrlListState({ status: "pending", subject_type: "", ordering: "-created_at", page: "1" });
+  const status = list.values.status;
+  const subject = list.values.subject_type;
+  const setStatus = (value: string) => list.setFilter("status", value);
+  const setSubject = (value: string) => list.setFilter("subject_type", value);
   const [selected, setSelected] = useState<number[]>([]);
   const [conflict, setConflict] = useState("");
   const [refundRow, setRefundRow] = useState<PaymentRow | null>(null);
   const payments = useQuery({
-    queryKey: paymentListKey(makerspaceId, status, subject, forRecording),
-    queryFn: () => staffRequest<PaymentRow[]>(paymentListPath(makerspaceId, status, subject, forRecording)),
+    queryKey: [...paymentListKey(makerspaceId, status, subject, forRecording), list.page, list.values.ordering],
+    queryFn: () => staffRequest<Paginated<PaymentRow>>(paymentListPath(makerspaceId, status, subject, forRecording) + `${status || subject || forRecording ? "&" : "?"}page=${list.page}&ordering=${encodeURIComponent(list.values.ordering)}`),
   });
+  useEffect(() => { setSelected([]); }, [makerspaceId, list.query]);
   // Marking paid offline is a two-step now: the API requires a receipt, so the click
   // opens the form rather than firing the mutation.
   const [settling, setSettling] = useState<{ ids: number[]; bulk: boolean } | null>(null);
@@ -77,7 +85,7 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
     mutation.mutate({ action, ids, bulk });
   };
   const columns: DataTableColumn<PaymentRow>[] = [
-    { key: "subject_label", header: "Subject", sortable: true },
+    { key: "subject_label", header: "Subject" },
     { key: "subject_type", header: "Type", render: (row) => labelFor(PAYMENT_SUBJECTS, row.subject_type) },
     { key: "status", header: "Status", render: (row) => labelFor(PAYMENT_STATUSES, row.status) },
     { key: "amount", header: "Amount", render: (row) => formatMoney(row.amount, row.currency), className: "font-semibold" },
@@ -124,6 +132,7 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
 
   return (
     <Panel title="Payments">
+      <ListViewControls state={list} makerspaceId={makerspaceId} entity="payments" search={false} sorts={[["-created_at", "Newest"], ["created_at", "Oldest"], ["amount", "Amount ascending"], ["-amount", "Amount descending"]]} />
       <div className="mb-3 flex flex-wrap gap-3">
         <label className="grid gap-1 text-xs text-muted">
           <span>Status</span>
@@ -145,8 +154,8 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
         onClear={() => setSelected([])}
         actions={(
           <>
-            {selected.length > 0 && selected.every((id) => payments.data?.some((row) => row.id === id && row.status === "pending" && access(row).record)) ? <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("mark-offline", selected, true)}>Mark offline</button> : null}
-            {selected.length > 0 && selected.every((id) => payments.data?.some((row) => row.id === id && row.status === "pending" && access(row).waive)) ? <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("waive", selected, true)}>Waive</button> : null}
+            {selected.length > 0 && selected.every((id) => payments.data?.results.some((row) => row.id === id && row.status === "pending" && access(row).record)) ? <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("mark-offline", selected, true)}>Mark offline</button> : null}
+            {selected.length > 0 && selected.every((id) => payments.data?.results.some((row) => row.id === id && row.status === "pending" && access(row).waive)) ? <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("waive", selected, true)}>Waive</button> : null}
           </>
         )}
       />
@@ -180,13 +189,14 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
       {mutation.error && !conflict ? <p role="alert" className="mb-3 text-sm text-danger">{mutation.error.message}</p> : null}
       <DataTable
         columns={columns}
-        data={payments.data ?? []}
+        data={payments.data?.results ?? []}
         loading={payments.isLoading}
         skeletonCols={8}
         selectedIds={selected}
         onSelectionChange={(ids) => setSelected(ids.map(Number))}
         emptyTitle="No matching payments"
       />
+      <Pagination page={list.page} totalPages={Math.max(1, Math.ceil((payments.data?.count ?? 0) / 24))} count={payments.data?.count ?? 0} pageSize={24} onChange={list.setPage} />
       {refundRow ? (
         <PaymentRefundDialog
           key={refundRow.id}

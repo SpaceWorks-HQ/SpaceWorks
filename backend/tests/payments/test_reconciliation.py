@@ -108,7 +108,7 @@ def test_list_is_manager_only_filtered_and_tenant_scoped():
     )
 
     assert response.status_code == 200
-    assert [row["id"] for row in response.data] == [booking.id]
+    assert [row["id"] for row in response.data["results"]] == [booking.id]
     assert authenticated_client(manager).get(list_url(other)).status_code == 404
     audit_only = custom_actor("payments-list-audit", space, [rbac.Action.VIEW_AUDIT])
     assert authenticated_client(audit_only).get(list_url(space)).status_code == 404

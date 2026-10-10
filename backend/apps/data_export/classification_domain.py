@@ -5,6 +5,7 @@ literal: a new column must be classified here before it can export.
 """
 
 EXPORTED_MODEL_FIELDS = {
+    "operations.SavedView": "id makerspace owner name entity state shared created_at updated_at",
     "apiclients.ApiClient": "id label client_id secret_encrypted previous_secret_encrypted previous_secret_valid_until client_type scopes rate_limit_tier makerspace allowed_origins is_active last_seen_at last_seen_ip import_provenance_digest credential_delivered_at created_by created_at updated_at",
     "apiclients.ApiKeyRequest": "id makerspace requester label reason allowed_origins status resolution_note resolved_by resolved_at created_at updated_at",
     "audit.AuditLog": "id actor action target_type target_id makerspace meta event_uuid row_mac created_at",

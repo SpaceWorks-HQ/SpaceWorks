@@ -250,5 +250,15 @@ Queries use `accounts/rbac.py:scope_for_scheduled_work`; see
 
 See [SOURCE-MAP-DOMAINS.md](SOURCE-MAP-DOMAINS.md) for hardware loans, payments,
 printing, events, the frontend directories and connected device monitoring.
-See also [SOURCE-MAP-frontend.md](SOURCE-MAP-frontend.md) for the standalone
+See also [SOURCE-MAP-FRONTEND.md](SOURCE-MAP-FRONTEND.md) for the standalone
 frontend directory and browser/kiosk flow map.
+See [SOURCE-MAP-CONSOLES.md](SOURCE-MAP-CONSOLES.md) for staff lists, saved views,
+command-palette discovery and the connected-device console map.
+
+Staff list preferences live in `operations/models_saved_views.py`, `serializers_saved_views.py` and
+`views_saved_views.py`; cross-entity discovery is `admin_api/search.py`. Shared pagination/ordering
+and entity authority live in `admin_api/list_options.py` and `staff_list_scope.py`.
+Saved-view audit targets travel as inert source provenance in
+`tenant_migration/audit_references_targets.py`, including after a preference is deleted.
+Booking-space and event handlers use explicit `views_admin_spaces.py` / `views_admin_events.py`
+barrels over the corresponding `views_admin_space_list/detail.py` and `views_admin_event_list/detail.py`.

@@ -98,7 +98,7 @@ def test_cashier_has_counter_rows_but_no_ledger_reports_waives_or_provider_refun
     base = f"/api/v1/admin/makerspace/{space.pk}"
     response = client.get(f"{base}/payments?for_recording=true")
     assert response.status_code == 200
-    assert {row["id"] for row in response.data} == {pending.pk, offline.pk}
+    assert {row["id"] for row in response.data["results"]} == {pending.pk, offline.pk}
     assert client.get(f"{base}/payments").status_code == 404
     assert client.get(f"{base}/analytics/payment-reconciliation").status_code == 404
     assert client.post(f"{base}/payments/{pending.pk}/waive", {}, format="json").status_code == 403

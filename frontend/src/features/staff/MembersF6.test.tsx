@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,10 +9,10 @@ const { staffRequest } = vi.hoisted(() => ({ staffRequest: vi.fn() }));
 vi.mock("../../lib/api", async () => ({ ...await vi.importActual("../../lib/api"), staffRequest }));
 
 function panel(finance = false, recording = false) {
-  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+  render(<MemoryRouter><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MembersPanel makerspaceId={7} membershipEnabled canManageMakerspace={false}
       canViewFinance={finance} canRecordPayment={recording} />
-  </QueryClientProvider>);
+  </QueryClientProvider></MemoryRouter>);
 }
 
 beforeEach(() => {

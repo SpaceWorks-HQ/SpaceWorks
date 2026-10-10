@@ -13,6 +13,8 @@ def _same(label, names, disposition, reason):
 
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
+    *_same("operations.SavedView", "shared state", D.RESET,
+           "Target publication and filter identifiers must be authorized anew."),
     *_same(
         "makerspaces.Makerspace", "timezone country opening_hours", D.PRESERVE,
         "The tenant location and advisory wall-clock schedule travel unchanged.",

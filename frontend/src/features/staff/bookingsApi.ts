@@ -53,7 +53,7 @@ export type Booking = {
 };
 
 export type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
-export type BookingFilters = { status?: BookingStatus | ""; starts_at?: string; ends_at?: string };
+export type BookingFilters = { status?: BookingStatus | ""; starts_at?: string; ends_at?: string; booking_id?: number };
 
 const SPACE_LIST_PATH: ApiPath = "/api/v1/admin/makerspaces/{makerspace_id}/spaces/";
 const SPACE_DETAIL_PATH: ApiPath = "/api/v1/admin/spaces/{id}/";
@@ -83,10 +83,10 @@ export const bookingKeys = {
   availability: (spaceId: number) => ["booking-space", spaceId, "availability"] as const,
 };
 
-export function useBookableSpaces(makerspaceId: number, page = 1) {
+export function useBookableSpaces(makerspaceId: number, page = 1, query = "") {
   return useQuery({
-    queryKey: [...bookingKeys.spaces(makerspaceId), page],
-    queryFn: () => staffRequest<Paginated<BookableSpace>>(staffPath(SPACE_LIST_PATH, { makerspace_id: makerspaceId }) + "?page=" + page),
+    queryKey: [...bookingKeys.spaces(makerspaceId), page, query],
+    queryFn: () => staffRequest<Paginated<BookableSpace>>(staffPath(SPACE_LIST_PATH, { makerspace_id: makerspaceId }) + "?" + (query || "page=" + page)),
   });
 }
 
@@ -97,13 +97,15 @@ export function useBookableSpace(spaceId: number) {
   });
 }
 
-export function useSpaceBookings(spaceId: number, filters: BookingFilters, page = 1) {
-  const query = new URLSearchParams({ page: String(page) });
+export function useSpaceBookings(spaceId: number, filters: BookingFilters, page = 1, ordering = "starts_at") {
+  const timestamp = (value: string) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toISOString(); };
+  const query = new URLSearchParams({ page: String(page), ordering });
   if (filters.status) query.set("status", filters.status);
-  if (filters.starts_at) query.set("starts_at", new Date(filters.starts_at).toISOString());
-  if (filters.ends_at) query.set("ends_at", new Date(filters.ends_at).toISOString());
+  if (filters.booking_id) query.set("booking_id", String(filters.booking_id));
+  if (filters.starts_at) query.set("starts_at", timestamp(filters.starts_at));
+  if (filters.ends_at) query.set("ends_at", timestamp(filters.ends_at));
   return useQuery({
-    queryKey: [...bookingKeys.bookings(spaceId), filters.status ?? "", filters.starts_at ?? "", filters.ends_at ?? "", page],
+    queryKey: [...bookingKeys.bookings(spaceId), filters.status ?? "", filters.starts_at ?? "", filters.ends_at ?? "", filters.booking_id ?? "", page, ordering],
     queryFn: () => staffRequest<Paginated<Booking>>(staffPath(SPACE_BOOKINGS_PATH, { id: spaceId }) + "?" + query),
   });
 }

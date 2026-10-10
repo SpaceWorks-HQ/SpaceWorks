@@ -2,6 +2,7 @@ from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics
 from rest_framework.filters import BaseFilterBackend
+from apps.admin_api.list_options import ListIdentityFilter, StableOrderingFilter
 from django.db.models import Q
 from django.conf import settings
 
@@ -11,6 +12,8 @@ from apps.hardware_requests.permissions import CanReviewRequest, CanViewHandover
 from apps.hardware_requests.serializers import AdminRequestSerializer
 from apps.hardware_requests.view_helpers import (
     ADMIN_LIST_ERROR_RESPONSES,
+    ERROR_400,
+    ERROR_401,
     request_queryset,
     handover_surface_module,
 )
@@ -60,7 +63,8 @@ class ScopedPiiSearchFilter(BaseFilterBackend):
 class PendingRequestsView(generics.ListAPIView):
     permission_classes = [CanReviewRequest]
     serializer_class = AdminRequestSerializer
-    filter_backends = [ScopedPiiSearchFilter]
+    filter_backends = [ListIdentityFilter, ScopedPiiSearchFilter, StableOrderingFilter]
+    ordering_fields = ["created_at", "return_due_at", "status"]
     search_fields = REQUEST_SEARCH_FIELDS
 
     def get_queryset(self):
@@ -68,7 +72,7 @@ class PendingRequestsView(generics.ListAPIView):
         require_module(makerspace_id, "request_workflow")
         _require_action(self.request.user, rbac.Action.ACCEPT_REQUEST, makerspace_id)
         return (
-            request_queryset()
+            rbac.scope_by_action(self.request.user, rbac.Action.ACCEPT_REQUEST, request_queryset())
             .filter(
                 makerspace_id=makerspace_id,
                 status=HardwareRequest.Status.PENDING_APPROVAL,
@@ -79,7 +83,7 @@ class PendingRequestsView(generics.ListAPIView):
     @extend_schema(
         tags=["Admin requests"],
         summary="List pending borrow requests",
-        responses={200: AdminRequestSerializer(many=True), **ADMIN_LIST_ERROR_RESPONSES},
+        responses={200: AdminRequestSerializer(many=True), 400: ERROR_400, 401: ERROR_401, **ADMIN_LIST_ERROR_RESPONSES},
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
@@ -88,7 +92,8 @@ class PendingRequestsView(generics.ListAPIView):
 class AcceptedRequestsView(generics.ListAPIView):
     permission_classes = [CanViewHandoverQueue]
     serializer_class = AdminRequestSerializer
-    filter_backends = [ScopedPiiSearchFilter]
+    filter_backends = [ListIdentityFilter, ScopedPiiSearchFilter, StableOrderingFilter]
+    ordering_fields = ["created_at", "return_due_at", "status"]
     search_fields = REQUEST_SEARCH_FIELDS
 
     def get_queryset(self):
@@ -96,7 +101,7 @@ class AcceptedRequestsView(generics.ListAPIView):
         require_module(makerspace_id, handover_surface_module(self.request))
         _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
         return (
-            request_queryset()
+            rbac.scope_by_action(self.request.user, rbac.Action.ISSUE_REQUEST, request_queryset())
             .filter(
                 makerspace_id=makerspace_id,
                 status=HardwareRequest.Status.ACCEPTED,
@@ -107,7 +112,7 @@ class AcceptedRequestsView(generics.ListAPIView):
     @extend_schema(
         tags=["Admin requests"],
         summary="List accepted requests awaiting issue",
-        responses={200: AdminRequestSerializer(many=True), **ADMIN_LIST_ERROR_RESPONSES},
+        responses={200: AdminRequestSerializer(many=True), 400: ERROR_400, 401: ERROR_401, **ADMIN_LIST_ERROR_RESPONSES},
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
@@ -116,7 +121,8 @@ class AcceptedRequestsView(generics.ListAPIView):
 class ActiveLoansView(generics.ListAPIView):
     permission_classes = [CanViewHandoverQueue]
     serializer_class = AdminRequestSerializer
-    filter_backends = [ScopedPiiSearchFilter]
+    filter_backends = [ListIdentityFilter, ScopedPiiSearchFilter, StableOrderingFilter]
+    ordering_fields = ["created_at", "return_due_at", "status"]
     search_fields = REQUEST_SEARCH_FIELDS
 
     def get_queryset(self):
@@ -124,7 +130,7 @@ class ActiveLoansView(generics.ListAPIView):
         require_module(makerspace_id, handover_surface_module(self.request))
         _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
         return (
-            request_queryset()
+            rbac.scope_by_action(self.request.user, rbac.Action.ISSUE_REQUEST, request_queryset())
             .filter(
                 makerspace_id=makerspace_id,
                 status__in=[
@@ -138,7 +144,7 @@ class ActiveLoansView(generics.ListAPIView):
     @extend_schema(
         tags=["Admin requests"],
         summary="List active loans awaiting return",
-        responses={200: AdminRequestSerializer(many=True), **ADMIN_LIST_ERROR_RESPONSES},
+        responses={200: AdminRequestSerializer(many=True), 400: ERROR_400, 401: ERROR_401, **ADMIN_LIST_ERROR_RESPONSES},
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
@@ -151,7 +157,8 @@ class RequestHistoryView(generics.ListAPIView):
     # ISSUE_REQUEST (the handover-queue viewers) to match the accepted/active loan views.
     permission_classes = [CanViewHandoverQueue]
     serializer_class = AdminRequestSerializer
-    filter_backends = [ScopedPiiSearchFilter]
+    filter_backends = [ListIdentityFilter, ScopedPiiSearchFilter, StableOrderingFilter]
+    ordering_fields = ["created_at", "return_due_at", "status"]
     search_fields = REQUEST_SEARCH_FIELDS
 
     def get_queryset(self):
@@ -159,7 +166,7 @@ class RequestHistoryView(generics.ListAPIView):
         require_module(makerspace_id, handover_surface_module(self.request))
         _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
         return (
-            request_queryset()
+            rbac.scope_by_action(self.request.user, rbac.Action.ISSUE_REQUEST, request_queryset())
             .filter(
                 makerspace_id=makerspace_id,
                 status__in=[
@@ -174,7 +181,7 @@ class RequestHistoryView(generics.ListAPIView):
     @extend_schema(
         tags=["Admin requests"],
         summary="List terminal request history (returned / rejected / closed with issue)",
-        responses={200: AdminRequestSerializer(many=True), **ADMIN_LIST_ERROR_RESPONSES},
+        responses={200: AdminRequestSerializer(many=True), 400: ERROR_400, 401: ERROR_401, **ADMIN_LIST_ERROR_RESPONSES},
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)

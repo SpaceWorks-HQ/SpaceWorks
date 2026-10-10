@@ -16,6 +16,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("accounts.MFAChallenge", "user"),
         ("accounts.StaffInvitation", "created_by"),
         ("accounts.StaffInvitation", "accepted_by"),
+        ("operations.SavedView", "owner"),
         ("accounts.DeviceGrant", "user"),
         ("accounts.DeviceRefreshFamily", "user"),
         ("accounts.NativeAppRegistration", "approved_by"),

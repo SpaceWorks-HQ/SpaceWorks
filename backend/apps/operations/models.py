@@ -10,6 +10,7 @@ from apps.makerspaces.models import Makerspace
 # the model, matching the barrel pattern the rest of this app uses.
 from apps.operations.models_scheduling import PeriodicTaskRun  # noqa: F401,E402
 from apps.operations.models_reminders import ReminderSchedule  # noqa: F401,E402
+from apps.operations.models_saved_views import SavedView  # noqa: F401,E402
 from apps.operations.models_rollups import (  # noqa: F401,E402
     ReportMetricRollup,
     ReportRollupCursor,

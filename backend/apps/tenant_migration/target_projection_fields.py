@@ -15,6 +15,8 @@ def _default(reason, *, allow_superadmin_override=False):
 
 
 TARGET_FIELD_PROJECTION = {
+    ("operations.SavedView", "shared"): TargetField(False, reason="Imported preferences require target-authorized publication."),
+    ("operations.SavedView", "state"): TargetField({}, reason="Source filter identifiers must not address target rows."),
     ("makerspaces.Makerspace", "frontend_domain"): TargetField(
         None, reason="A source domain must not enter the target credentialed-origin allowlist."
     ),

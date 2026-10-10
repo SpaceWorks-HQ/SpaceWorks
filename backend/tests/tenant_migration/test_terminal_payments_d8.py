@@ -88,7 +88,7 @@ def test_each_restored_terminal_payment_is_readable_secret_free_and_provider_ine
     )
 
     assert listed.status_code == 200
-    row = next(item for item in listed.data if item["id"] == payment.pk)
+    row = next(item for item in listed.data["results"] if item["id"] == payment.pk)
     assert row["status"] == status
     assert Decimal(row["amount"]) == Decimal("42.75")
     assert row["currency"] == "inr"

@@ -25,7 +25,7 @@ THIRD_PARTY_INSTALLED_APP_LABELS = frozenset(
 # deriving this set from data_export.EXPORTED_MODELS would let it travel before a
 # Lane-D-specific review.
 PROJECTED_MODEL_LABELS = frozenset(
-    """accounts.User apiclients.ApiKeyRequest audit.AuditLog
+    """operations.SavedView accounts.User apiclients.ApiKeyRequest audit.AuditLog
     backup.MakerspaceArchiveRecipient bookings.BookableSpace bookings.Booking boxes.Box
     boxes.BoxScan boxes.QrCode boxes.QrScanEvent devices.Device devices.DeviceEvent
     events.EventSeries events.Event events.EventRegistration

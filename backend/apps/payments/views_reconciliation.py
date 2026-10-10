@@ -3,6 +3,7 @@ from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_sche
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from apps.admin_api.list_options import StaffListPagination, ORDER_PAGE_PARAMETERS, order_list
 
 from apps.admin_api.permissions import IsActiveStaff
 from apps.accounts import rbac
@@ -18,6 +19,7 @@ from apps.payments.serializers_reconciliation import (
     PaymentBulkOfflineSerializer,
     PaymentListFilterSerializer,
     PaymentOfflineSerializer,
+    PaymentListResponseSerializer,
     PaymentReconciliationSerializer,
 )
 from apps.makerspaces.servability import servable_queryset
@@ -41,11 +43,12 @@ class PaymentListView(APIView):
         description="Requires view_finance. With for_recording=true, requires record_payment and returns only pending and offline-settled charges for counter receipt work.",
         request=None,
         parameters=[
+            *ORDER_PAGE_PARAMETERS,
             OpenApiParameter("status", OpenApiTypes.STR, enum=Payment.Status.values),
             OpenApiParameter("subject_type", OpenApiTypes.STR, enum=Payment.SubjectType.values),
             OpenApiParameter("for_recording", OpenApiTypes.BOOL),
         ],
-        responses={200: PaymentReconciliationSerializer(many=True), **ERRORS},
+        responses={200: PaymentListResponseSerializer, **ERRORS},
     )
     def get(self, request, makerspace_id):
         filters = PaymentListFilterSerializer(data=request.query_params)
@@ -60,19 +63,20 @@ class PaymentListView(APIView):
             ),
             pk=makerspace_id,
         )
-        rows = list(
-            list_payments(
-                actor=request.user,
-                makerspace_id=makerspace_id,
-                **filters.validated_data,
-            )
+        queryset = list_payments(
+            actor=request.user,
+            makerspace_id=makerspace_id,
+            **filters.validated_data,
         )
+        queryset = order_list(queryset, request.query_params, {"created_at", "amount", "status", "subject_type"}, "-created_at")
+        pager = StaffListPagination()
+        rows = pager.paginate_queryset(queryset, request, view=self)
         context = {
             "payment_subject_labels": resolve_subject_labels(rows),
             # One query for the page, not one per settled row.
             "payment_settlements": ManualSettlement.effective_for_many(rows),
         }
-        return Response(
+        return pager.get_paginated_response(
             PaymentReconciliationSerializer(rows, many=True, context=context).data
         )
 

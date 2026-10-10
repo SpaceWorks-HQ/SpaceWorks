@@ -13,6 +13,8 @@ import { StructuredApiError, staffRequest } from "../../lib/api";
 import { InvitationRequestsSection } from "./InvitationRequestsSection";
 import { MembershipPlansSection } from "./MembershipPlansSection";
 import { MemberTermsDialog } from "./MemberTermsDialog";
+import { useUrlListState } from "../../lib/useUrlListState";
+import { ListViewControls } from "./ListViewControls";
 import { Panel } from "./panels/shared";
 import { PaymentReconcileActions } from "./PaymentReconcileActions";
 import { MembershipReasonDialog } from "./MembershipReasonDialog";
@@ -36,19 +38,22 @@ export const membershipErrorText = (error: unknown) =>
 export function MembersPanel({ makerspaceId, membershipEnabled, canManageMakerspace = true, canViewFinance = false, canRecordPayment = false }: { makerspaceId: number; membershipEnabled: boolean; canManageMakerspace?: boolean; canViewFinance?: boolean; canRecordPayment?: boolean }) {
   const client = useQueryClient();
   const key = ["members", makerspaceId];
-  const [rosterPage, setRosterPage] = useState(1);
-  const [requestPage, setRequestPage] = useState(1);
+  const list = useUrlListState({ id: "", q: "", status: "", ordering: "user__username", page: "1", requestPage: "1", requestState: "", requestOrdering: "-created_at" });
+  const rosterPage = list.page;
+  const setRosterPage = list.setPage;
+  const requestPage = Number(list.values.requestPage);
+  const setRequestPage = (page: number) => list.setPage(page, "requestPage");
   const [planId, setPlanId] = useState<number | null>(null);
   const [decision, setDecision] = useState<{ id: number; kind: "member" | "request"; title: string } | null>(null);
   const roster = useQuery({
-    queryKey: [...key, "roster", rosterPage],
-    queryFn: () => staffRequest<PaginatedAdminMembershipList>(`/admin/memberships?makerspace_id=${makerspaceId}&page=${rosterPage}`),
+    queryKey: [...key, "roster", list.query],
+    queryFn: () => staffRequest<PaginatedAdminMembershipList>(`/admin/memberships?makerspace_id=${makerspaceId}&page=${rosterPage}&${new URLSearchParams({ q: list.values.q, status: list.values.status, ordering: list.values.ordering, id: list.values.id })}`),
   });
   const requests = useQuery({
-    queryKey: [...key, "requests", requestPage, membershipEnabled],
+    queryKey: [...key, "requests", requestPage, membershipEnabled, list.values.requestState, list.values.requestOrdering],
     // Not gated on the module: with it off the backend still lists STAFF invitations
     // (and only those), which staff must be able to approve or cancel.
-    queryFn: () => staffRequest<PaginatedMembershipRequestList>(`/admin/membership-requests?makerspace_id=${makerspaceId}&page=${requestPage}`),
+    queryFn: () => staffRequest<PaginatedMembershipRequestList>(`/admin/membership-requests?makerspace_id=${makerspaceId}&page=${requestPage}&${new URLSearchParams({ state: list.values.requestState, ordering: list.values.requestOrdering })}`),
   });
   const presence = useQuery({ queryKey: [...key, "presence"], queryFn: () => staffRequest<Presence[]>(`/admin/makerspace/${makerspaceId}/presence-sessions/current`) });
   const roles = useQuery({ queryKey: [...key, "roles"], queryFn: () => staffRequest<Role[]>(`/admin/makerspaces/${makerspaceId}/roles`) });
@@ -88,6 +93,8 @@ export function MembersPanel({ makerspaceId, membershipEnabled, canManageMakersp
 
   return <div className="grid gap-5">
     <Panel title="Members">
+      <ListViewControls state={list} makerspaceId={makerspaceId} entity="members" sorts={[["user__username", "Username"], ["-user__username", "Username descending"], ["status", "Status"]]} />
+      <label className="text-xs text-muted">Status<select className="desk-input" value={list.values.status} onChange={(event) => list.setFilter("status", event.target.value)}><option value="">All</option><option value="active">Active</option><option value="revoked">Revoked</option></select></label>
       <p className="mb-4 text-sm text-muted">Membership, referral and verification delegation, waiver compliance, and active presence for this makerspace.</p>
       {rosterRows.map((row) => <MemberRow
         key={row.id}
@@ -115,6 +122,10 @@ export function MembersPanel({ makerspaceId, membershipEnabled, canManageMakersp
       <MembershipPagination label="members" page={rosterPage} next={roster.data?.next} previous={roster.data?.previous} fetching={roster.isFetching} onPage={setRosterPage} />
     </Panel>
     <Panel title={membershipEnabled ? "Membership requests" : "Invitations"}><div className="mb-3 flex flex-wrap gap-2"><Field label="Invite role"><select className="desk-input" value={selectedRole ?? ""} onChange={(event) => setRoleId(Number(event.target.value))}>{roles.data?.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></Field><Field label="Invite email"><input className="desk-input" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} /></Field><button className="desk-button" disabled={!inviteEmail || !selectedRole || invite.isPending} onClick={() => invite.mutate()}>Invite</button></div>
+      <div className="mb-3 flex flex-wrap gap-3">
+        <label className="text-xs text-muted">Request state<select className="desk-input" value={list.values.requestState} onChange={(event) => list.update({ requestState: event.target.value, requestPage: "1" }, false)}><option value="">All</option>{["requested", "invited", "active", "revoked"].map((value) => <option key={value}>{value}</option>)}</select></label>
+        <label className="text-xs text-muted">Request sort<select className="desk-input" value={list.values.requestOrdering} onChange={(event) => list.update({ requestOrdering: event.target.value, requestPage: "1" }, false)}><option value="-created_at">Newest</option><option value="created_at">Oldest</option><option value="state">State</option></select></label>
+      </div>
       {roles.isError ? <p role="alert" className="text-sm text-danger">{membershipErrorText(roles.error)}</p> : null}
       {membershipEnabled ? <MembershipPlanPicker makerspaceId={makerspaceId} value={planId} onChange={setPlanId} /> : null}
       {requestRows.map((row) => <div className="flex items-center justify-between gap-3 border-t border-line py-3" key={row.id}><span className="text-sm text-ink">{requestLabel(row)} · {row.kind} · {row.state}</span>{(canManageMakerspace || !row.assigned_role || roles.data?.some((role) => role.id === row.assigned_role?.id)) && (row.state === "requested" || row.state === "invited") ? <div className="flex gap-2">{row.state === "requested" || row.user ? <button className="desk-button-primary" disabled={!selectedRole || approve.isPending} onClick={() => approve.mutate(row.id)}>Approve</button> : null}<button className="desk-button" onClick={() => { revokeRequest.reset(); setDecision({ id: row.id, kind: "request", title: row.state === "invited" ? "Cancel invitation" : "Decline membership request" }); }} disabled={revokeRequest.isPending}>{row.state === "invited" ? "Cancel invitation" : "Decline"}</button></div> : null}</div>)}

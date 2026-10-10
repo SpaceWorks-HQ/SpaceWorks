@@ -7,6 +7,11 @@ text, secrets, object keys or before/after payloads)."""
 from .presentation_catalog_types import P
 
 ENTRIES = (
+    P("saved_view.created", "Saved view created"),
+    P("saved_view.updated", "Saved view updated"),
+    P("saved_view.deleted", "Saved view deleted"),
+    P("saved_view.shared", "Saved view shared"),
+    P("saved_view.unshared", "Saved view made private"),
     P("audit.signing_key_rotation_aborted", "Audit signing key rotation aborted"),
     P("audit.signing_key_rotation_completed", "Audit signing key rotation completed"),
     P("audit.signing_key_rotation_failed", "Audit signing key rotation failed"),

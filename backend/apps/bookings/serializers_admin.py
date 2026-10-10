@@ -195,6 +195,7 @@ class BookingListResponseSerializer(serializers.Serializer):
 
 
 class BookingListFilterSerializer(serializers.Serializer):
+    booking_id = serializers.IntegerField(min_value=1, max_value=9223372036854775807, required=False)
     status = serializers.ChoiceField(choices=Booking.Status.choices, required=False)
     starts_at = serializers.DateTimeField(required=False)
     ends_at = serializers.DateTimeField(required=False)

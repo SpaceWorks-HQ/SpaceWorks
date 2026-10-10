@@ -61,6 +61,7 @@ class TenantDumpCatalogError(AssertionError):
 # Recompute after merging lane/w1-events, lane/w1-sweeper, lane/w1-profile,
 # lane/w1-rbac and lane/w1-security. Reminder schedules, makerspace profile fields,
 # and MFA credentials/challenges and staff invitations change the merged catalog.
+# lane/w5-lists adds operations.SavedView to the merged snapshot.
 # The security models are DROP in portable artifacts; the coordinator pins the digest.
 CATALOG_SCHEMA_SHA256 = "RECOMPUTE"
 

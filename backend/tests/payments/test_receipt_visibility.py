@@ -40,12 +40,12 @@ def test_the_staff_list_shows_the_standing_receipt_and_whether_it_was_corrected(
     client = authenticated_client(manager)
     url = f"/api/v1/admin/makerspace/{space.pk}/payments"
 
-    before = {row["id"]: row for row in client.get(url).data}
+    before = {row["id"]: row for row in client.get(url).data["results"]}
     client.post(
         f"{url}/{settled.pk}/amend-settlement",
         settlement_payload(method="cash", reference="till-2"), format="json",
     )
-    after = {row["id"]: row for row in client.get(url).data}
+    after = {row["id"]: row for row in client.get(url).data["results"]}
 
     assert before[settled.pk]["settlement"]["method"] == "upi"
     assert before[settled.pk]["settlement"]["reference"] == "UPI-77"

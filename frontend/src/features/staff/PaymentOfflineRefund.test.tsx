@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,15 +24,15 @@ function mount(dialog = true) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = vi.spyOn(queryClient, "invalidateQueries");
   const onClose = vi.fn();
-  const view = render(<QueryClientProvider client={queryClient}>
+  const view = render(<MemoryRouter><QueryClientProvider client={queryClient}>
     {dialog ? <PaymentRefundDialog makerspaceId={7} payment={payment} onClose={onClose} /> : <PaymentsPanel makerspaceId={7} actorActions={["view_finance", "record_payment", "manage_bookings", "manage_makerspace"]} />}
-  </QueryClientProvider>);
+  </QueryClientProvider></MemoryRouter>);
   return { ...view, invalidate, onClose };
 }
 
 beforeEach(() => {
   staffRequest.mockReset();
-  staffRequest.mockImplementation(async (_path: string, options?: RequestInit) => options?.method === "POST" ? payment : [payment]);
+  staffRequest.mockImplementation(async (_path: string, options?: RequestInit) => options?.method === "POST" ? payment : { count: 1, next: null, previous: null, results: [payment] });
 });
 
 describe("Offline refunds", () => {

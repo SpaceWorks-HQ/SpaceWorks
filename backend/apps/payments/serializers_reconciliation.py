@@ -148,3 +148,10 @@ class PaymentRefundRequestSerializer(serializers.Serializer):
         max_digits=12, decimal_places=2, min_value=Decimal("0.01")
     )
     reason = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+
+
+class PaymentListResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    results = PaymentReconciliationSerializer(many=True)

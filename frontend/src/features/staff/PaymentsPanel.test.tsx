@@ -1,9 +1,11 @@
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StructuredApiError } from "../../lib/api";
 import { PaymentsPanel } from "./PaymentsPanel";
+import type { Paginated } from "../../lib/usePaginatedQuery";
 import type { PaymentRow } from "./paymentsApi";
 
 const { staffRequest } = vi.hoisted(() => ({ staffRequest: vi.fn() }));
@@ -30,7 +32,7 @@ const payment: PaymentRow = {
 beforeEach(() => {
   staffRequest.mockReset();
   staffRequest.mockImplementation(async (_path: string, options?: RequestInit) =>
-    options?.method === "POST" ? payment : [payment]);
+    options?.method === "POST" ? payment : { count: 1, next: null, previous: null, results: [payment] });
 });
 
 function renderPanel() {
@@ -43,9 +45,9 @@ function renderPanel() {
   return {
     queryClient,
     ...render(
-      <QueryClientProvider client={queryClient}>
+      <MemoryRouter><QueryClientProvider client={queryClient}>
         <PaymentsPanel makerspaceId={7} actorActions={["view_finance", "record_payment", "manage_bookings", "manage_makerspace"]} />
-      </QueryClientProvider>,
+      </QueryClientProvider></MemoryRouter>,
     ),
   };
 }
@@ -111,14 +113,15 @@ describe("PaymentsPanel", () => {
 
   it("keeps the visible list, reports a 409 conflict, and refetches", async () => {
     let listRequests = 0;
-    let finishRefetch: ((rows: PaymentRow[]) => void) | undefined;
+    let finishRefetch: ((rows: Paginated<PaymentRow>) => void) | undefined;
     staffRequest.mockImplementation((_path: string, options?: RequestInit) => {
       if (options?.method === "POST") {
         return Promise.reject(new StructuredApiError(409, { detail: "Payment status changed" }));
       }
+      if (_path.includes("saved-views")) return Promise.resolve({ count: 0, next: null, previous: null, results: [] });
       listRequests += 1;
-      if (listRequests === 1) return Promise.resolve([payment]);
-      return new Promise<PaymentRow[]>((resolve) => { finishRefetch = resolve; });
+      if (listRequests === 1) return Promise.resolve({ count: 1, next: null, previous: null, results: [payment] });
+      return new Promise<Paginated<PaymentRow>>((resolve) => { finishRefetch = resolve; });
     });
     renderPanel();
     await waitForPayment();
@@ -133,7 +136,7 @@ describe("PaymentsPanel", () => {
       { method: "POST" },
     );
 
-    finishRefetch?.([payment]);
+    finishRefetch?.({ count: 1, next: null, previous: null, results: [payment] });
   });
 
   it("offers every payment subject the ledger records, renewal and loan charges included", async () => {
@@ -156,7 +159,7 @@ describe("PaymentsPanel", () => {
       },
     };
     staffRequest.mockImplementation(async (_path: string, options?: RequestInit) =>
-      options?.method === "POST" ? settled : [settled]);
+      options?.method === "POST" ? settled : { count: 1, next: null, previous: null, results: [settled] });
     renderPanel();
     await waitForPayment();
 

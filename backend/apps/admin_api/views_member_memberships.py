@@ -1,5 +1,7 @@
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from apps.admin_api.list_options import LIST_PARAMETERS, ORDER_PAGE_PARAMETERS, choice_filter, identity_filter, order_list
+from apps.admin_api.serializers_member_list import MembershipListResponseSerializer, MembershipRequestListResponseSerializer
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import PageNumberPagination
@@ -56,11 +58,21 @@ class AdminMembershipRosterView(APIView):
     permission_classes = [IsActiveStaff]
     pagination_class = MembershipPagination
 
-    @extend_schema(description="Requires manage_members in this makerspace; staff role administration and waiver publishing require manage_makerspace.", tags=["Admin memberships"], responses={200: AdminMembershipSerializer(many=True), **ERRORS})
+    @extend_schema(description="Requires manage_members in this makerspace; staff role administration and waiver publishing require manage_makerspace.", tags=["Admin memberships"], parameters=[*LIST_PARAMETERS, OpenApiParameter("makerspace_id", int, required=True), OpenApiParameter("status", str), OpenApiParameter("id", int, description="Select one membership within the authorized roster.")], responses={200: MembershipListResponseSerializer, **ERRORS})
     def get(self, request):
         makerspace = _makerspace(request.user, request.query_params.get("makerspace_id"))
-        active = MakerspaceWaiver.objects.filter(makerspace=makerspace, is_active=True).first()
+        active = rbac.scope_by_action(request.user, rbac.Action.MANAGE_MEMBERS, MakerspaceWaiver.objects.filter(makerspace=makerspace, is_active=True)).first()
         queryset = MakerspaceMembership.objects.filter(makerspace=makerspace).select_related("user", "assigned_role").order_by("user__username")
+        queryset = rbac.scope_by_action(request.user, rbac.Action.MANAGE_MEMBERS, queryset)
+        selected_id = identity_filter(request.query_params)
+        if selected_id is not None:
+            queryset = queryset.filter(pk=selected_id)
+        if request.query_params.get("q"):
+            queryset = queryset.filter(user__username__icontains=request.query_params["q"])
+        selected_status = choice_filter(request.query_params, "status", dict(MakerspaceMembership._meta.get_field("status").choices))
+        if selected_status:
+            queryset = queryset.filter(status=selected_status)
+        queryset = order_list(queryset, request.query_params, {"user__username", "status", "created_at"}, "user__username")
         pager = self.pagination_class()
         page = pager.paginate_queryset(queryset, request)
         context = {
@@ -83,19 +95,21 @@ class AdminMembershipRequestListView(APIView):
     permission_classes = [IsActiveStaff]
     pagination_class = MembershipPagination
 
-    @extend_schema(description="Requires manage_members in this makerspace; staff role administration and waiver publishing require manage_makerspace.", tags=["Admin memberships"], responses={200: MembershipRequestSerializer(many=True), **ERRORS})
+    @extend_schema(description="Requires manage_members in this makerspace; staff role administration and waiver publishing require manage_makerspace.", tags=["Admin memberships"], parameters=[*ORDER_PAGE_PARAMETERS, OpenApiParameter("makerspace_id", int, required=True), OpenApiParameter("state", str)], responses={200: MembershipRequestListResponseSerializer, **ERRORS})
     def get(self, request):
         makerspace = _makerspace(request.user, request.query_params.get("makerspace_id"))
         queryset = MembershipRequest.objects.filter(makerspace=makerspace).select_related("user", "assigned_role")
+        queryset = rbac.scope_by_action(request.user, rbac.Action.MANAGE_MEMBERS, queryset)
         if not module_enabled(makerspace, "membership"):
             # Staff must not be shown community join requests they have no enabled surface
             # to action -- but a STAFF invitation is core RBAC business and must stay
             # visible, or one issued with the module off could never be found again.
             queryset = queryset.filter(staff_invitation_q())
-        if request.query_params.get("state"):
-            queryset = queryset.filter(state=request.query_params["state"])
+        selected_state = choice_filter(request.query_params, "state", MembershipRequest.State.values)
+        if selected_state:
+            queryset = queryset.filter(state=selected_state)
         pager = self.pagination_class()
-        page = pager.paginate_queryset(queryset.order_by("-created_at"), request)
+        page = pager.paginate_queryset(order_list(queryset, request.query_params, {"created_at", "state"}, "-created_at"), request)
         return pager.get_paginated_response(MembershipRequestSerializer(page, many=True).data)
 
 
