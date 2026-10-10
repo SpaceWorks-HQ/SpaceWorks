@@ -1,6 +1,7 @@
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
 import { ChangePasswordGate } from "./ChangePasswordGate";
 import { LoginPanel } from "./LoginPanel";
+import { MfaFlow } from "../auth/MfaFlow";
 import { MakerspacePicker } from "./MakerspacePicker";
 import { StaffAccessDenied } from "./StaffAccessDenied";
 import { StaffWorkspace } from "./StaffWorkspace";
@@ -29,6 +30,9 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
     activeMakerspace,
     chooseMakerspace,
     login,
+    mfaChallenge,
+    setMfaChallenge,
+    mfaCompleted,
     makerspaces,
     queryClient,
     recovery,
@@ -48,6 +52,8 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
   if (restoring) {
     return <StaffLoading message="Restoring session..." restoring />;
   }
+
+  if (mfaChallenge) return <main className="desk-shell p-6"><MfaFlow key={mfaChallenge.challenge} challenge={mfaChallenge} onComplete={mfaCompleted} onCancel={() => setMfaChallenge(undefined)} /></main>;
 
   if (!user) {
     return (

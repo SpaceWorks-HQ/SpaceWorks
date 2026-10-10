@@ -13,7 +13,11 @@ from pathlib import Path
 from apps.backup.settings_policy import ENV_SURFACE
 
 DOC = Path(__file__).resolve().parents[2] / "docs" / "environment-reference.md"
-REFERENCE_DOCS = (DOC, DOC.with_name("environment-reference-delivery.md"))
+REFERENCE_DOCS = (
+    DOC,
+    DOC.with_name("environment-reference-delivery.md"),
+    DOC.with_name("environment-operations.md"),
+)
 
 
 def _documented():

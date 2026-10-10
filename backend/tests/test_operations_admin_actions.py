@@ -8,6 +8,7 @@ from apps.boxes.models import QrCode
 from apps.inventory.models import InventoryAsset, TrackingMode
 from apps.operations.models import QrPrintBatch, StockTransfer, StocktakeSession
 from tests.return_helpers import make_product, make_space, make_user
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -24,7 +25,7 @@ def make_superadmin(username="ops-admin-actions-super"):
 
 def admin_client(user=None):
     client = Client()
-    client.force_login(user or make_superadmin())
+    force_mfa_login(client, user or make_superadmin())
     return client
 
 

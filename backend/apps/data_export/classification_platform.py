@@ -15,6 +15,9 @@ GLOBAL_MODELS = {
 }
 
 OMITTED_MODELS = {
+    "accounts.UserMFA": "Platform MFA credentials never become target authority.",
+    "accounts.MFAChallenge": "Transient first-factor authentication proof.",
+    "accounts.StaffInvitation": "Deployment-local bearer authorization grant; target staff re-invite.",
     "hardware_requests.ReplayCommand": "Short-lived Station/session replay coordination; physical results and evidence travel independently.",
     "makerspaces.StationCredential": (
         "Live Station authentication authority; a portable tenant must rotate a new PIN."

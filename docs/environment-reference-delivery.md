@@ -115,4 +115,9 @@ Every `THROTTLE_*` value is a DRF rate string (`<n>/<second|minute|hour|day>`). 
 | `THROTTLE_TELEGRAM_WEBHOOK` | `'60/min'` |  |
 | `THROTTLE_TENANT_MIGRATION_READ` | `'120/min'` |  |
 | `THROTTLE_TENANT_MIGRATION_WRITE` | `'30/hour'` |  |
-
+| `THROTTLE_MFA_VERIFY` | `10/min` | Per-IP second-factor/enrollment budget; also controls control-panel verification. |
+| `THROTTLE_MFA_CHALLENGE` | `10/min` | Budget for one challenge token. |
+| `THROTTLE_MFA_USER` | `20/hour` | Account budget across challenges and IPs. |
+| `THROTTLE_MFA_MANAGE` | `10/hour` | Authenticated enrollment and recovery/disable management. |
+| `THROTTLE_STAFF_INVITE` | `20/hour` | Scoped staff invitation list/create/revoke/resend. |
+| `THROTTLE_STAFF_INVITE_ACCEPT` | `10/min` | Public invitation acceptance budget. |

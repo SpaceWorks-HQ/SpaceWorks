@@ -58,10 +58,10 @@ class TenantDumpCatalogError(AssertionError):
 # Re-blessed on integration: phases 11 and 10, the backup lane, Wave-0 offline refunds,
 # the 7a-7d devices chain and the 9a-9e kiosk chain all changed the catalog; recomputed
 # from the merged snapshot.
-# Recompute after merging lane/w1-events, lane/w1-sweeper, lane/w1-profile
-# and lane/w1-rbac:
-# reminder schedules and timezone/country/opening_hours change the merged catalog.
-# The coordinator pins the merged digest.
+# Recompute after merging lane/w1-events, lane/w1-sweeper, lane/w1-profile,
+# lane/w1-rbac and lane/w1-security. Reminder schedules, makerspace profile fields,
+# and MFA credentials/challenges and staff invitations change the merged catalog.
+# The security models are DROP in portable artifacts; the coordinator pins the digest.
 CATALOG_SCHEMA_SHA256 = "RECOMPUTE"
 
 

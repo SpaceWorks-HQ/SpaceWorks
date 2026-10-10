@@ -8,6 +8,7 @@ from apps.accounts.models import User
 from apps.accounts.services_password_reset import GENERIC_CONFIRM_ERROR
 from tests.accounts.password_reset_helpers import issue_otp
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -68,7 +69,7 @@ def test_django_admin_reset_action_invalidates_an_issued_otp(monkeypatch):
         is_superuser=True,
     )
     client = Client()
-    client.force_login(superadmin)
+    force_mfa_login(client, superadmin)
 
     response = client.post(
         reverse("admin:accounts_user_changelist"),

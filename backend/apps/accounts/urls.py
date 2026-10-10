@@ -44,7 +44,10 @@ from apps.accounts.views_oidc_browser import (
 from apps.accounts.views_claim import ClaimRedemptionView
 from apps.organizations.views_redeem import OrganizationInvitationRedeemView
 
+from apps.accounts.urls_security import auth_urlpatterns
+
 urlpatterns = [
+    *auth_urlpatterns,
     path("social/nonce", SocialNonceView.as_view(), name="social-nonce"),
     path("social/google", GoogleSocialLoginView.as_view(), name="social-google"),
     path("social/apple", AppleSocialLoginView.as_view(), name="social-apple"),

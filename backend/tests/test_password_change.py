@@ -8,6 +8,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.audit.models import AuditLog
+from tests.accounts.mfa_helpers import complete_enrollment, force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -36,6 +37,8 @@ def test_must_change_password_blocks_protected_api_until_rotated():
         {"username": "gated-superadmin", "password": "Current-Strong-123"},
         format="json",
     )
+    if login.data.get("mfa_required"):
+        login = complete_enrollment(client, login)
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
 
     blocked = client.get(AUDIT_LOGS)
@@ -124,7 +127,7 @@ def test_must_change_password_blocks_django_admin():
 
     user.must_change_password = False
     user.save(update_fields=["must_change_password"])
-    client.force_login(user)
+    force_mfa_login(client, user)
     assert client.get("/control/").status_code == 200
 
 

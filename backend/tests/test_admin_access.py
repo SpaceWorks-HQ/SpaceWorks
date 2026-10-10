@@ -1,4 +1,4 @@
-﻿from decimal import Decimal
+from decimal import Decimal
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -11,6 +11,7 @@ from apps.audit.models import AuditLog
 from apps.makerspaces import lifecycle
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.operations.models import StockTransfer
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -31,7 +32,7 @@ def test_non_superadmin_staff_is_denied_from_django_admin_index():
         is_staff=True,
     )
     client = Client()
-    client.force_login(user)
+    force_mfa_login(client, user)
 
     response = client.get("/control/")
 
@@ -46,7 +47,7 @@ def test_superadmin_is_allowed_to_django_admin_index():
         is_superuser=True,
     )
     client = Client()
-    client.force_login(user)
+    force_mfa_login(client, user)
 
     response = client.get("/control/")
 
@@ -122,7 +123,7 @@ def test_superadmin_can_delete_archived_makerspace_from_django_admin(monkeypatch
     monkeypatch.setattr(lifecycle, "_delete_storage_keys", lambda keys: None)
 
     client = Client()
-    client.force_login(superadmin)
+    force_mfa_login(client, superadmin)
     url = reverse("admin:makerspaces_makerspace_delete", args=[archived.pk])
 
     confirm = client.get(url)

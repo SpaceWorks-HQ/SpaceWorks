@@ -15,7 +15,10 @@ from .urls_staff import urlpatterns as staff_urlpatterns
 from .urls_utils import _separable as _separable
 
 
+from apps.accounts.urls_security import admin_urlpatterns as security_urlpatterns
+
 urlpatterns = [
+    *security_urlpatterns,
     *platform_urlpatterns,
     *roster_urlpatterns,
     *machine_service_urlpatterns,

@@ -15,6 +15,7 @@ from apps.audit.models import AuditLog
 from apps.makerspaces.cors import staff_origin_is_registered
 from apps.makerspaces.models import Makerspace
 from tests.return_helpers import make_user
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -31,7 +32,7 @@ def control_client():
     )
     # Managed hosting validates Host; `localhost` is an INFRA_HOSTS default.
     client = Client(HTTP_HOST="localhost")
-    client.force_login(superadmin)
+    force_mfa_login(client, superadmin)
     return client
 
 

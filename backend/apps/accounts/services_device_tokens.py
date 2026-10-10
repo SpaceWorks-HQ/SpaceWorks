@@ -102,6 +102,11 @@ def rotate_device_refresh(raw):
                 row.rotated_at = timezone.now()
                 row.blacklisted_at = row.rotated_at
                 row.save(update_fields=["rotated_at", "blacklisted_at"])
+                from apps.accounts.mfa_policy import assert_verified, credential, stamp
+                assert_verified(user, claims)
+                mfa = credential(user)
+                if mfa and mfa.enabled_at:
+                    stamp(user, mfa)
                 access, refresh, _ = issue_device_token_pair(user, grant, family=family)
                 result = access, refresh, grant, user
     if replay:

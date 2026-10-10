@@ -11,6 +11,7 @@ from apps.accounts.models import User
 from apps.hardware_requests.models import HardwareRequest, HardwareRequestItem
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.models import Makerspace
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -67,7 +68,7 @@ def make_hardware_request(status=HardwareRequest.Status.PENDING_APPROVAL):
 
 def admin_client(user):
     client = Client()
-    client.force_login(user)
+    force_mfa_login(client, user)
     return client
 
 

@@ -5,6 +5,7 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.makerspaces.models import Makerspace, MakerspaceArchiveRequest
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -40,7 +41,7 @@ def test_control_approve_action_confirms_impact_before_archiving():
     actor = superadmin()
     makerspace, archive_request = request_for("archive-admin-approve", actor)
     client = Client()
-    client.force_login(actor)
+    force_mfa_login(client, actor)
     action = {
         "action": "approve_selected",
         ACTION_CHECKBOX_NAME: [str(archive_request.pk)],
@@ -76,7 +77,7 @@ def test_control_decline_action_requires_and_records_note():
     actor = superadmin()
     makerspace, archive_request = request_for("archive-admin-decline", actor)
     client = Client()
-    client.force_login(actor)
+    force_mfa_login(client, actor)
     url = reverse("admin:makerspaces_makerspacearchiverequest_changelist")
     selection = {
         "action": "decline_selected",

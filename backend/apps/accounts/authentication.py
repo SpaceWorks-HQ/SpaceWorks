@@ -53,6 +53,8 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
         if user.is_tenant_dump_stub:
             raise AuthenticationFailed("Account is not available.")
         validate_auth_generation(token)
+        from apps.accounts.mfa_policy import assert_verified
+        assert_verified(user, token)
         from apps.backup.recovery import assert_principal_allowed
 
         assert_principal_allowed(user)

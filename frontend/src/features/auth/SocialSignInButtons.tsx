@@ -1,3 +1,5 @@
+import { MfaFlow } from "./MfaFlow";
+import { isMfaChallenge, type MfaChallenge } from "./mfaApi";
 import { useEffect, useRef, useState } from "react";
 
 import { publicV1Request } from "../../lib/api";
@@ -22,6 +24,11 @@ export function SocialSignInButtons({
   email?: string;
   makerspaceSlug?: string;
 }) {
+  const [challenge, setChallenge] = useState<MfaChallenge>();
+  const receive = (result: SocialLoginResult | MfaChallenge) => {
+    if (isMfaChallenge(result)) setChallenge(result);
+    else onSuccessRef.current(result);
+  };
   const googleHost = useRef<HTMLDivElement>(null);
   const onSuccessRef = useRef(onSuccess);
   const [config, setConfig] = useState<SocialConfig>();
@@ -53,7 +60,7 @@ export function SocialSignInButtons({
     callbackHandled.current = true;
     void completeOidcBrowserCallback()
       .then((result) => {
-        if (result) onSuccessRef.current(result);
+        if (result) receive(result);
       })
       .catch((nextError: unknown) => {
         setError(nextError instanceof Error ? nextError.message : "Identity-provider sign-in failed.");
@@ -68,7 +75,7 @@ export function SocialSignInButtons({
       host,
       config.google.web_client_id,
       surface,
-      (result) => onSuccessRef.current(result),
+      (result) => receive(result),
       (nextError) => setError(nextError.message),
     ).catch((nextError: unknown) => {
       setError(nextError instanceof Error ? nextError.message : "Google sign-in failed.");
@@ -86,8 +93,9 @@ export function SocialSignInButtons({
   const showBuiltins = surface === "staff" || memberAccounts;
   const showGoogle = showBuiltins && Boolean(config?.google?.enabled);
   const showApple = showBuiltins && Boolean(config?.apple?.enabled);
+  if (challenge) return <MfaFlow challenge={challenge} onCancel={() => setChallenge(undefined)}
+    onComplete={(result) => { setChallenge(undefined); onSuccessRef.current({ access: result.access, user: result.user as unknown as Record<string, unknown>, outcome: "existing" }); }} />;
   if (!showGoogle && !showApple && oidcProviders.length === 0) return null;
-
   return (
     <section className="mt-5 border-t border-line pt-5" aria-label="Social sign in">
       <p className="eyebrow mb-3 text-center">Or continue with</p>
@@ -102,7 +110,7 @@ export function SocialSignInButtons({
               setApplePending(true);
               setError("");
               try {
-                onSuccessRef.current(await signInWithApple(config?.apple?.service_id ?? "", surface));
+                receive(await signInWithApple(config?.apple?.service_id ?? "", surface));
               } catch (nextError) {
                 setError(nextError instanceof Error ? nextError.message : "Apple sign-in failed.");
               } finally {

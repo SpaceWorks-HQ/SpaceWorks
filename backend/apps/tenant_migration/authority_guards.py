@@ -38,6 +38,7 @@ AUTHORIZATION_SOURCES = (
     APPS_DIR / "accounts" / "rbac_superadmin.py",
     APPS_DIR / "makerspaces" / "role_authority.py",
     APPS_DIR / "makerspaces" / "role_assignments.py",
+    APPS_DIR / "accounts" / "mfa_policy.py",
     APPS_DIR / "machines" / "access.py",
 )
 SCANNED_MODEL_LABELS = frozenset({

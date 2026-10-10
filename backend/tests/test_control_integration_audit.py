@@ -22,6 +22,7 @@ from apps.integrations.models_sms import PlatformSmsSettings
 from apps.updates.models import PlatformUpdateSettings
 from config.admin_audit import AuditedControlChangeMixin
 from tests.return_helpers import make_user
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -44,7 +45,7 @@ def _superadmin_client():
         access_status=User.AccessStatus.ACTIVE, is_staff=True, is_superuser=True,
     )
     client = Client()
-    client.force_login(user)
+    force_mfa_login(client, user)
     return client, user
 
 

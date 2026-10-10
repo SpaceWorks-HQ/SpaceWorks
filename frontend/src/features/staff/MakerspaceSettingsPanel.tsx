@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Badge, Field } from "../../components/ui";
@@ -95,6 +96,7 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMak
   return (
     <Panel title="Makerspace settings">
       <div className="grid min-w-0 gap-4">
+        <Link to="/mfa" className="desk-link">Manage my authenticator and recovery codes</Link>
         <MakerspaceBrandingSettings
           makerspace={makerspace}
           settings={settings.data}

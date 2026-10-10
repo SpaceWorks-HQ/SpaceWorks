@@ -49,8 +49,8 @@ export function LoginPanel({
 
   return (
     <main className="desk-shell grid place-items-center px-5">
+      <div className="desk-panel w-full max-w-md p-6">
       <form
-        className="desk-panel w-full max-w-md p-6"
         onSubmit={(event) => {
           event.preventDefault();
           if (isPending) return;
@@ -115,10 +115,11 @@ export function LoginPanel({
             Forgot password?
           </Link>
         ) : null}
+      </form>
         {onSocialSuccess ? (
           <SocialSignInButtons surface="staff" onSuccess={onSocialSuccess} />
         ) : null}
-      </form>
+      </div>
     </main>
   );
 }

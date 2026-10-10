@@ -14,6 +14,7 @@ from apps.makerspaces.models import (
     MakerspaceMembership,
 )
 from apps.payments.models import Payment
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -175,7 +176,7 @@ def test_archive_admin_action_requires_confirmation_before_archiving():
     )
     make_membership_payment(makerspace, actor, "admin-owned")
     client = Client()
-    client.force_login(actor)
+    force_mfa_login(client, actor)
     url = reverse("admin:makerspaces_makerspace_changelist")
     action_data = {
         "action": "archive_makerspaces",

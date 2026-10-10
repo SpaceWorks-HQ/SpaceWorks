@@ -1,4 +1,4 @@
-﻿from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.contrib.messages import get_messages
 from django.test import Client, override_settings
 from django.urls import reverse
@@ -11,6 +11,7 @@ from apps.integrations.models import EmailLog
 from apps.inventory.models import InventoryAsset, TrackingMode
 from apps.makerspaces.models import MakerspaceMembership
 from tests.return_helpers import make_member, make_product, make_space, make_user
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -24,7 +25,7 @@ def make_superadmin(username="admin-parity-super"):
 
 def admin_client(user=None):
     client = Client()
-    client.force_login(user or make_superadmin())
+    force_mfa_login(client, user or make_superadmin())
     return client
 
 

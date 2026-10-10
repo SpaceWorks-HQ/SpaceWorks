@@ -14,6 +14,7 @@ from apps.apiclients.admin import ApiClientAdmin
 from apps.apiclients.models import ApiClient
 from apps.makerspaces.admin import MakerspaceAdmin
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -73,10 +74,10 @@ def test_api_client_admin_changelist_is_superadmin_only():
     url = reverse("admin:apiclients_apiclient_changelist")
 
     client = Client()
-    client.force_login(manager)
+    force_mfa_login(client, manager)
     assert client.get(url).status_code == 403
 
-    client.force_login(superadmin)
+    force_mfa_login(client, superadmin)
     assert client.get(url).status_code == 200
 
 
