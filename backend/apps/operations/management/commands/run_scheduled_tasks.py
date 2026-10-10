@@ -32,6 +32,7 @@ from django.utils import timezone
 # counterpart here, so a task added for the Celery deployment cannot silently go missing
 # from the beat-less one.
 SCHEDULED_TASKS = (
+    ("reminder-sweep", "apps.operations.tasks_reminders.run_reminder_sweep_task", 5),
     ("scan-offline-devices", "apps.devices.tasks.scan_offline_devices_task", 1),
     ("cleanup-kiosk-replay-commands", "apps.hardware_requests.tasks_replay.cleanup_replay_commands_task", 24 * 60),
     (

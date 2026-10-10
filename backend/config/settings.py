@@ -586,7 +586,15 @@ TENANT_DUMP_STAGING_MAX_AGE_SECONDS = env.int(
     "TENANT_DUMP_STAGING_MAX_AGE_SECONDS", default=7 * 24 * 60 * 60
 )
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
+REMINDER_SWEEP_BATCH_SIZE = env.int("REMINDER_SWEEP_BATCH_SIZE", default=200)
+if REMINDER_SWEEP_BATCH_SIZE < 1:
+    raise ImproperlyConfigured("REMINDER_SWEEP_BATCH_SIZE must be positive.")
+
 CELERY_BEAT_SCHEDULE = {
+    "reminder-sweep": {
+        "task": "apps.operations.tasks_reminders.run_reminder_sweep_task",
+        "schedule": crontab(minute="*/5"),
+    },
     "scan-offline-devices": {
         "task": "apps.devices.tasks.scan_offline_devices_task",
         "schedule": crontab(minute="*"),

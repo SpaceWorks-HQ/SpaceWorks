@@ -106,6 +106,8 @@ def _model_rules():
             "Tenant row travels only after its explicit Lane D field/row projection.",
         ))
     for label, reason in OMITTED_MODELS.items():
+        # Includes operations.ReminderSchedule: source-local coordination never
+        # travels. Target sources reconstruct it from their imported domain rows.
         add(label, ModelRule(ModelDisposition.DROP, reason))
     for label, reason in EXPLICIT_DROP_MODEL_REASONS.items():
         add(label, ModelRule(ModelDisposition.DROP, reason))

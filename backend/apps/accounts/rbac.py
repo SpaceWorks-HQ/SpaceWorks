@@ -73,6 +73,28 @@ def scope_by_makerspace(actor, queryset, makerspace_field="makerspace_id"):
     return queryset.filter(**{f"{makerspace_field}__in": scope})
 
 
+def scope_for_scheduled_work(queryset, *, makerspace_id=None, field="makerspace_id"):
+    """Scope internal scheduler work without impersonating a staff User.
+
+    Background work excludes archived, inactive and hard-hidden tenants. Keep
+    not-restored/frozen tenants in the scan so the write gate can count skips.
+    This is an internal query boundary, never authorization for an HTTP actor;
+    callers must still hold the tenant write gate before modifying scoped rows.
+    """
+    from apps.makerspaces.models import Makerspace
+
+    tenants = Makerspace.objects.filter(
+        archived_at__isnull=True,
+        lifecycle_state=Makerspace.LifecycleState.ACTIVE,
+        superadmin_access_enabled=True,
+    )
+    if makerspace_id is not None:
+        if type(makerspace_id) is not int or makerspace_id < 1:
+            raise ValueError("Scheduled work requires a persisted makerspace id.")
+        tenants = tenants.filter(pk=makerspace_id)
+    return queryset.filter(**{f"{field}__in": tenants.values("pk")})
+
+
 def makerspaces_for_action(actor, action):
     """Return makerspace ids where actor's membership role grants action, or ALL."""
     if _actor_refused(actor):

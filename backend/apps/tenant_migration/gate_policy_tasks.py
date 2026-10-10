@@ -65,6 +65,9 @@ TASK_TENANT_RESOLVERS = {
 
 
 TASK_INTERNAL_PARTICIPANTS = {
+    "apps.operations.tasks_reminders.run_reminder_sweep_task": (
+        "Reminder discovery, claims and dispatch use one skip-and-count tenant boundary."
+    ),
     **REPLAY_TASK_PARTICIPANTS,
     "apps.devices.tasks.scan_offline_devices_task": "Offline/retention service gates each tenant separately.",
     "apps.tenant_migration.tasks.run_migration_export_job_task": (
@@ -112,6 +115,9 @@ TASK_INTERNAL_PARTICIPANTS = {
 
 
 FANOUT_GATE_PARTICIPANTS = {
+    "apps.operations.reminder_sweeper.run_reminder_sweep": (
+        "Shared source-local reminders; each tenant is gated before discovery or dispatch."
+    ),
     **REPLAY_FANOUT_PARTICIPANTS,
     "apps.devices.services_offline.scan_offline_devices": "Device offline edges and auth-artifact retention.",
     "apps.data_export.tasks.purge_expired_exports_task": "Expired export cleanup.",
@@ -133,4 +139,3 @@ FANOUT_GATE_PARTICIPANTS = {
         "Expired kiosk operator lease cleanup."
     ),
 }
-

@@ -48,6 +48,9 @@ SCANNED_MODEL_LABELS = frozenset({
 
 
 EXPLICIT_AUTHORITY_FIELDS = {
+    ("makerspaces.Makerspace", "lifecycle_state"): (
+        "Scheduled-work visibility is target-owned; Lane D resets lifecycle state."
+    ),
     ("makerspaces.MakerspaceMembership", "makerspace"): "Tenant boundary for membership authority.",
     ("makerspaces.MakerspaceMembership", "user"): "Identity receiving the membership grant.",
     ("makerspaces.MakerspaceMembership", "role"): "Legacy fallback authority is reduced to Member/CUSTOM.",
