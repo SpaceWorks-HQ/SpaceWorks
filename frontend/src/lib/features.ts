@@ -11,6 +11,8 @@ export type FeatureDefinition = {
 // per line, keys in this order) that the guard reads.
 export const FEATURE_DEFINITIONS: readonly FeatureDefinition[] = [
   { key: "billing.reminders", parent_module: "notifications", label: "Payment reminders" },
+  { key: "loans.renewals", parent_module: "request_workflow", label: "Loan renewals" },
+  { key: "loans.limits", parent_module: "request_workflow", label: "Borrow limits" },
   { key: "staff.invitations", parent_module: null, label: "Staff invitations" },
   { key: "security.staff_mfa_required", parent_module: null, label: "Require MFA for staff" },
   { key: "membership.vouching", parent_module: "membership", label: "Membership vouching" },

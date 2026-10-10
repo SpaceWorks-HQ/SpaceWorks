@@ -1,9 +1,4 @@
-"""Explicit registrations for the shared reminder sweep.
-
-Sources discover scoped domain subjects and rebuild messages at dispatch time so
-cancelled/returned subjects do not receive stale notifications. See the test-only
-example in tests/operations/reminder_example.py and docs/reminder-schedules.md.
-"""
+"""Explicit registrations of scoped, live-revalidated reminder sources."""
 
 from apps.operations.reminder_types import (  # noqa: F401 - explicit compatibility exports
     ReminderMessage, ReminderSource, ReminderSubject,
@@ -14,11 +9,12 @@ from apps.operations.reminder_types import (  # noqa: F401 - explicit compatibil
 from apps.operations.membership_payment_reminders import MEMBERSHIP_PAYMENT_SOURCE
 
 def _production_sources():
+    from apps.hardware_requests.loan_reminders import LOAN_REMINDER_SOURCES
     from apps.payments.reminders import build_payment_message, discover_payments, dispatch_payment_message
     return (MEMBERSHIP_PAYMENT_SOURCE, ReminderSource(
         key="payments.due", module="request_workflow", feature="billing.reminders",
         discover=discover_payments, build=build_payment_message, dispatch=dispatch_payment_message,
-    ))
+    ), *LOAN_REMINDER_SOURCES)
 
 
 # Tests can override production registrations; an empty tuple disables all sources.
@@ -43,6 +39,8 @@ def registered_sources():
         if not callable(source.discover) or not callable(source.build):
             raise ValueError(f"Reminder source callbacks are required: {source.key}")
         if source.dispatch is not None and not callable(source.dispatch):
-            raise ValueError(f"Reminder dispatch callback must be callable: {source.key}")
+            raise ValueError(f"Reminder source dispatcher must be callable: {source.key}")
+        if type(source.requires_notifications) is not bool:
+            raise ValueError(f"Reminder notifications gate must be boolean: {source.key}")
         seen.add(source.key)
     return sources

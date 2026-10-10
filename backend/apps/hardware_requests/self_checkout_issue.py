@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.audit import services as audit
+from apps.inventory import availability
 from apps.boxes.models import QrScanEvent
 from apps.evidence.finalization import charge_storage_once
 from apps.evidence.consumption import mark_consumed
@@ -19,6 +20,7 @@ from apps.hardware_requests.workflow_errors import InvalidTransition, RequestVal
 from apps.makerspaces.guards import require_feature, require_feature_locked
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.servability import is_servable
+from apps.makerspaces.loan_policy import loan_days
 
 
 def checkout_tool(makerspace, requester, payload, *, evidence_id, remark=""):
@@ -43,7 +45,6 @@ def checkout_tool(makerspace, requester, payload, *, evidence_id, remark=""):
         makerspace = require_feature_locked(makerspace, "inventory.self_checkout")
         if not is_servable(makerspace):
             raise RequestValidationError("Makerspace is not available.")
-        due_at = timezone.now() + timedelta(days=(makerspace.default_loan_days or 7))
         _lock_unused_evidence(evidence, issue=True)
         charge_storage_once(evidence, finalized.size)
         mark_consumed(evidence)
@@ -52,6 +53,8 @@ def checkout_tool(makerspace, requester, payload, *, evidence_id, remark=""):
             raise InvalidTransition("This QR code is already checked out.")
 
         target_label, product_quantities, asset_ids, container = _checkout_target(qr)
+        availability.enforce_product_borrow_limits(makerspace, requester, product_quantities)
+        due_at = timezone.now() + timedelta(days=loan_days(makerspace, product_quantities))
         hardware_request = _issued_request(
             makerspace,
             requester,

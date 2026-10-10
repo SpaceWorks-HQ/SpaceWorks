@@ -4,6 +4,10 @@ from .target_projection_types import RowDisposition, RowPolicy
 
 
 ROW_POLICIES = {
+    "makerspaces.MakerspaceLoanPolicy": RowPolicy(
+        RowDisposition.PRESERVE_LIVE,
+        "Tenant loan preferences travel; target-owned feature switches still gate renewals and limits.",
+    ),
     "operations.ReminderSchedule": RowPolicy(
         RowDisposition.DROP,
         "Source-local reminder coordination is rebuilt by target sources; claims never travel.",

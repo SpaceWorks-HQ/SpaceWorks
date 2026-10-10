@@ -56,13 +56,4 @@ class MakerspaceDisabledRowSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class ReturnPolicySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Makerspace
-        fields = ["id", "default_loan_days"]
-        read_only_fields = ["id"]
-
-    def validate_default_loan_days(self, value):
-        if value < 1:
-            raise serializers.ValidationError("Default loan days must be at least 1.")
-        return value
+from apps.admin_api.serializers_loan_policy import ReturnPolicySerializer  # noqa: E402,F401

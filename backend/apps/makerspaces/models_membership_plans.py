@@ -20,6 +20,8 @@ from django.db.models import F, Q
 
 
 class MembershipPlan(models.Model):
+    loan_max_active = models.PositiveIntegerField(null=True, blank=True)
+    loan_max_items = models.PositiveIntegerField(null=True, blank=True)
     class Interval(models.TextChoices):
         MONTHLY = "monthly", "Monthly"
         YEARLY = "yearly", "Yearly"

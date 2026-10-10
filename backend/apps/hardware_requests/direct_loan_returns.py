@@ -25,6 +25,7 @@ from apps.hardware_requests.workflow_errors import (
 )
 from apps.inventory import availability
 from apps.inventory.models import InventoryAsset, TrackingMode
+from apps.makerspaces.models import Makerspace
 
 
 def return_direct_loan(
@@ -52,6 +53,9 @@ def return_direct_loan(
     finalized = validate_evidence_upload(evidence, label="Return")
 
     with transaction.atomic():
+        # Renewals, issues and both return paths take the tenant lock first. This
+        # serializes changes to the linked request/loan and storage accounting.
+        Makerspace.objects.select_for_update().get(pk=loan.makerspace_id)
         locked = (
             PublicToolLoan.objects.select_for_update(of=("self",))
             .select_related("container", "makerspace", "request")

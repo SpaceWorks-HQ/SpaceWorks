@@ -1,3 +1,4 @@
+import { StaffLoanRenew } from "../StaffLoanRenew";
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -196,7 +197,7 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
       </Panel>
       {!guestOnly ? (
         <Panel title="Active loans">
-          {active.isLoading ? <RequestListSkeleton /> : <RequestList rows={active.results} canViewAudit={canViewAudit} actions={(row) => <ActiveActions row={row} disabled={action.isPending} openModal={openModal} setDueRow={setDueRow} setReturnRow={setReturnRow} />} />}
+          {active.isLoading ? <RequestListSkeleton /> : <RequestList rows={active.results} canViewAudit={canViewAudit} actions={(row) => <><ActiveActions row={row} disabled={action.isPending} openModal={openModal} setDueRow={setDueRow} setReturnRow={setReturnRow} />{makerspace.enabled_features?.includes("loans.renewals") ? <StaffLoanRenew makerspaceId={makerspace.id} requestId={row.id} /> : null}</>} />}
           <Pagination page={active.page} totalPages={active.totalPages} onChange={active.setPage} count={active.count} pageSize={active.pageSize} />
           {active.error instanceof Error ? <p className="mt-2 text-sm text-danger">{active.error.message}</p> : null}
         </Panel>

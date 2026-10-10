@@ -14,9 +14,10 @@ verification/error helpers in `views_social_helpers.py`. `integrations/health.py
 `health_status.py` rollups and `health_chat.py` destination/legacy delivery summaries. The
 read-only scheduler control page lives in `operations/admin_scheduling.py`.
 The shared reminder foundation is `operations/models_reminders.py`,
-`reminder_registry.py`, `reminder_services.py`, `reminder_sweeper.py` and
+`reminder_types.py`, `reminder_registry.py`, `reminder_services.py`, `reminder_sweeper.py` and
 `tasks_reminders.py`; `membership_payment_reminders.py` registers the admission
-payment-deadline consumer for F3 membership notices. The explicit `payments.due`
+payment-deadline consumer for F3 membership notices. Loan borrower/staff sources
+are registered explicitly alongside these payment consumers. The explicit `payments.due`
 consumer in `payments/reminders.py` uses durable claims for owner-only email.
 Core due dates and billing policy live in `payments/due_dates.py`, `models_billing.py`
 and `views_billing.py`; manual receipt corrections/release reuse
@@ -50,6 +51,21 @@ in `payments/admission_access.py`. `operations/tasks_admissions.py` drives expir
 and settlement recovery in both schedulers. Application-export audit writes and
 settlement activation take explicit tenant write boundaries; reviewer debt summaries
 use the existing finance-scoped payment context.
+
+Loan policy lives in `makerspaces/models_loan_policy.py` and `loan_policy.py`;
+`admin_api/views_loan_policy.py` / `serializers_loan_policy.py` extend the existing
+return-policy route. `hardware_requests/workflow.py` exports `renewal_workflow.py`
+for policy-bound extensions; `renewal_views.py` serves member/staff actions.
+`loan_reminders.py` and `loan_reminder_notifications.py` adapt F1 claims to borrower
+mail and F3 escalation. `inventory/availability_loan_limits.py` owns borrower quantity
+ceilings; `accounts/rbac_borrowers.py` scopes owned rows even without membership.
+`makerspaces/member_loans.py` includes reviewed and direct loans in member activity.
+See [loan-policy.md](loan-policy.md) for defaults, inheritance, gates and routes.
+`tenant_migration/tenant_dump_authority_loans.py` declares portable loan terms and
+renewal history; the fan-out gate registry names the legacy reminder helper that
+actually holds the boundary.
+Frontend loan controls are `staff/MakerspaceLoanPolicySettings.tsx`,
+`staff/StaffLoanRenew.tsx` and `members/MemberLoanRenew.tsx` under features/.
 
 - `backend/config/` — Django project (`settings.py`, `urls.py`, wsgi/asgi). All API routes under `/api/`.
   `config/admin_access.py` holds the `/control/` gating, CSP middleware, and the hidden-scope drift-guard

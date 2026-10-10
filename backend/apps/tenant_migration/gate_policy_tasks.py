@@ -136,7 +136,7 @@ FANOUT_GATE_PARTICIPANTS = {
     "apps.evidence.services_retention.sweep_evidence_retention": (
         "Evidence object expiry."
     ),
-    "apps.hardware_requests.services_return_reminders.run_return_reminders": (
+    "apps.hardware_requests.services_return_reminders._run_legacy_return_reminders": (
         "Overdue loan reminders."
     ),
     "apps.makerspaces.tasks.refresh_github_contributions_task": "GitHub profile refresh.",

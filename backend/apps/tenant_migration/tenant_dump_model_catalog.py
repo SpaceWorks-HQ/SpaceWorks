@@ -49,7 +49,7 @@ PROJECTED_MODEL_LABELS = frozenset(
     machines.ServiceRequestConsumption machines.ServiceRequestFile
     maintenance.MaintenanceLog maintenance.MaintenanceLogDocument
     maintenance.MaintenanceSchedule makerspaces.Makerspace
-    makerspaces.MakerspaceMembership makerspaces.MakerspaceWaiver
+    makerspaces.MakerspaceLoanPolicy makerspaces.MakerspaceMembership makerspaces.MakerspaceWaiver
     makerspaces.MemberCard makerspaces.MemberProfile makerspaces.MemberProject
     makerspaces.MembershipRequest makerspaces.MembershipPlan makerspaces.MembershipTerm
     makerspaces.MakerspaceMembershipSettings makerspaces.MembershipVouch

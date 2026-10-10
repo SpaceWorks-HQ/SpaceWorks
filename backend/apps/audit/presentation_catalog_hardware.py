@@ -86,6 +86,7 @@ ENTRIES = (
     P("request.accepted", "Request accepted", ("accepted",)),
     P("request.issued", "Request issued", ("box_id", "evidence_id")),
     P("request.rejected", "Request rejected"),
+    P("request.renewed", "Loan renewed", ("old_return_due_at", "return_due_at", "renewal_count", "staff")),
     P("request.return_due_updated", "Request return due updated", ("return_due_at",)),
     P("request.submitted", "Request submitted"),
     P("stock_transfer.applied", "Stock transfer applied"),

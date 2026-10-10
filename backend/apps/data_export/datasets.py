@@ -12,6 +12,7 @@ P = TenantPredicate
 # never expand a routing relation into the related tenant's row.
 DATASET_SPECS = {
     "operations.SavedView": ("preferences/saved_views.csv", P(("makerspace",))),
+    "makerspaces.MakerspaceLoanPolicy": ("makerspace/loan_policy.csv", P(("makerspace",))),
     "apiclients.ApiClient": ("makerspace/api_clients.csv", P(("makerspace",))),
     "apiclients.ApiKeyRequest": ("makerspace/api_key_requests.csv", P(("makerspace",))),
     "audit.AuditLog": ("audit/audit_log.csv", P(("makerspace",))),

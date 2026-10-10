@@ -87,6 +87,7 @@ from apps.makerspaces.models_admission import (  # noqa: E402,F401
     MakerspaceMembershipSettings,
     MembershipVouch,
 )
+from apps.makerspaces.models_loan_policy import MakerspaceLoanPolicy  # noqa: E402,F401
 from apps.makerspaces.models_invitation_requests import (  # noqa: E402,F401
     InvitationRequest,
 )

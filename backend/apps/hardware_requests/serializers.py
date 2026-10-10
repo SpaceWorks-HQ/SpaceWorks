@@ -161,6 +161,7 @@ class AdminRequestSerializer(serializers.Serializer):
     issued_at = serializers.DateTimeField(read_only=True)
     return_due_at = serializers.DateTimeField(read_only=True)
     return_reminder_sent_at = serializers.DateTimeField(read_only=True)
+    renewal_count = serializers.IntegerField(read_only=True)
     closed_at = serializers.DateTimeField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)

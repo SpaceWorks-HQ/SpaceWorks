@@ -13,6 +13,7 @@ class ReminderSubject:
     subject: str
     kind: str
     due_at: datetime
+    # Signed integral seconds; callers translate their policy's hours/days once.
     offsets: tuple[int, ...] = (0,)
 
 
@@ -35,3 +36,4 @@ class ReminderSource:
     # A domain dispatcher runs after the live tenant gate check. None keeps the
     # foundation's staff-inbox emitter for sources that already use it.
     dispatch: Callable[[Makerspace, ReminderSchedule, ReminderMessage, datetime, tzinfo], None] | None = None
+    requires_notifications: bool = True

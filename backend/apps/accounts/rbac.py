@@ -31,6 +31,7 @@ from .rbac_memberships import (
     _membership_is_space_manager,
     membership_role,
 )
+from .rbac_borrowers import scope_by_borrower
 from .rbac_organizations import (
     _org_actions_for,
     _organization_authority_memberships,

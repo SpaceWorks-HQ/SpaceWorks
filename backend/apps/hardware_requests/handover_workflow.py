@@ -5,6 +5,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.audit import services as audit
+from apps.accounts import rbac
 from apps.boxes.models import Box, BoxScan
 from apps.evidence import storage
 from apps.evidence.consumption import mark_consumed
@@ -26,10 +27,13 @@ from apps.hardware_requests.workflow_errors import (
 )
 from apps.hardware_requests.workflow_utils import constraint_name, locked_request
 from apps.inventory import availability
+from apps.makerspaces.loan_policy import loan_days
+from apps.makerspaces.models import Makerspace
 
 
 def assign_box(actor, request, box_code):
     with transaction.atomic():
+        Makerspace.objects.select_for_update().get(pk=request.makerspace_id)
         locked = locked_request(request)
         if locked.status != HardwareRequest.Status.ACCEPTED:
             raise InvalidTransition(
@@ -120,6 +124,7 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
         raise EvidenceNotUploaded("Issue evidence has not been uploaded.")
 
     with transaction.atomic():
+        Makerspace.objects.select_for_update().get(pk=request.makerspace_id)
         locked = locked_request(request)
         if locked.status != HardwareRequest.Status.ACCEPTED:
             raise InvalidTransition(
@@ -150,6 +155,7 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
         # locks before availability.issue_items() takes the InventoryProduct lock
         # avoids a lock-order inversion / deadlock across the handout flows.
         issue_individual_assets(actor, locked, asset_qr_payloads)
+        availability.enforce_request_borrow_limits(locked, rejects_by_item)
         availability.issue_items(locked, rejects_by_item)
         locked.issue_evidence = evidence
         locked.issue_remark = remark
@@ -157,7 +163,7 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
         locked.issued_at = timezone.now()
         if locked.return_due_at is None:
             locked.return_due_at = locked.issued_at + timedelta(
-                days=locked.makerspace.default_loan_days or 7
+                days=loan_days(locked.makerspace, [item.product for item in locked.items.filter(issued_quantity__gt=0).select_related("product__category")])
             )
         locked.status = HardwareRequest.Status.ISSUED
         try:
@@ -196,6 +202,7 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
 
 def set_return_due(actor, request, return_due_at):
     with transaction.atomic():
+        Makerspace.objects.select_for_update().get(pk=request.makerspace_id)
         locked = locked_request(request)
         if locked.status not in {
             HardwareRequest.Status.ACCEPTED,
@@ -205,6 +212,9 @@ def set_return_due(actor, request, return_due_at):
             raise InvalidTransition(
                 f"Cannot set return due time for hardware request with status {locked.status}."
             )
+        rbac.scope_by_action(actor, rbac.Action.ACCEPT_REQUEST, PublicToolLoan.objects.all()).filter(
+            request=locked, status=PublicToolLoan.Status.CHECKED_OUT,
+        ).update(due_at=return_due_at)
         locked.return_due_at = return_due_at
         locked.return_reminder_sent_at = None
         locked.save(

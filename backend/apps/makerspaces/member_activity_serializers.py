@@ -1,6 +1,10 @@
 from rest_framework import serializers
 
 class MemberLoanActivitySerializer(serializers.Serializer):
+    request_id = serializers.IntegerField()
+    renewal_count = serializers.IntegerField()
+    can_renew = serializers.BooleanField()
+    renewal_refusal = serializers.CharField(allow_null=True)
     label = serializers.CharField()
     checked_out_at = serializers.DateTimeField()
     due_at = serializers.DateTimeField(allow_null=True)
