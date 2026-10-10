@@ -27,7 +27,7 @@ describe("finance console controls", () => {
   it("renders the ledger without mutation controls for a read-only treasurer", async () => {
     panel(["view_finance"]);
     await screen.findByText("Room charge");
-    expect(staffRequest).toHaveBeenCalledWith("/admin/makerspace/7/payments?status=pending&page=1&ordering=-created_at");
+    expect(staffRequest).toHaveBeenCalledWith("/admin/makerspace/7/payments?status=pending&page=1&ordering=due_at");
     expect(screen.queryByRole("button", { name: "Mark offline" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Waive" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refund" })).not.toBeInTheDocument();
@@ -36,7 +36,7 @@ describe("finance console controls", () => {
   it("uses counter scope and offers receipt recording to a cashier", async () => {
     panel(["record_payment"]);
     await screen.findByText("Room charge");
-    expect(staffRequest).toHaveBeenCalledWith("/admin/makerspace/7/payments?for_recording=true&status=pending&page=1&ordering=-created_at");
+    expect(staffRequest).toHaveBeenCalledWith("/admin/makerspace/7/payments?for_recording=true&status=pending&page=1&ordering=due_at");
     expect(screen.getByRole("button", { name: "Mark offline" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Waive" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Paid online" })).not.toBeInTheDocument();
