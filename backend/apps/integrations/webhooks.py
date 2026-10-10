@@ -7,6 +7,7 @@ import socket
 import time
 from urllib.parse import urljoin
 
+from apps.integrations.lifecycle_data import structured_event
 from apps.integrations.notification_enums import trim_for_channel
 from apps.integrations.webhook_validation import (
     ResolvedAddress,
@@ -165,6 +166,7 @@ def webhook_event_body(log) -> dict:
         "text": log.text_body,
         "data": log.payload or {},
         "created_at": log.created_at.isoformat() if log.created_at else None,
+        "structured": structured_event(log),
     }
 
 
@@ -194,4 +196,3 @@ def send_signed_webhook(log) -> bool:
             extra={"makerspace_id": log.makerspace_id, "destination_id": destination.pk},
         )
         raise WebhookDeliveryError("Webhook delivery failed.") from exc
-

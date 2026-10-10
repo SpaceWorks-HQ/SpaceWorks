@@ -5,10 +5,6 @@ from types import MappingProxyType
 PUBLIC_READ = "public:read"
 PUBLIC_WRITE = "public:write"
 PUBLIC_ALL = "public:*"
-ADMIN_READ = "admin:read"
-ADMIN_WRITE = "admin:write"
-ADMIN_ALL = "admin:*"
-REPORTS_READ = "reports:read"
 
 TARGET_GLOBAL = "global"
 TARGET_TENANT_SLUG = "tenant_slug"

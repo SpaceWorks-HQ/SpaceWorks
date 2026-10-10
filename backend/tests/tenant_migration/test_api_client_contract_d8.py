@@ -9,7 +9,7 @@ import pytest
 from django.utils import timezone
 
 from apps.apiclients.models import ApiClient, ApiKeyRequest
-from apps.apiclients.scope_registry import ADMIN_READ, PUBLIC_READ, PUBLIC_WRITE
+from apps.apiclients.scope_registry import PUBLIC_ALL, PUBLIC_READ, PUBLIC_WRITE
 from apps.makerspaces.models import Makerspace
 from apps.admin_api import api_client_serializers_clients as serializers_clients
 from apps.tenant_migration.host_credential_delivery import CredentialDeliveryStore
@@ -193,11 +193,11 @@ def test_privileged_scope_validation_uses_only_explicit_approval_bit(
     monkeypatch, approved, accepted
 ):
     capture_id = uuid.uuid4()
-    catalog = _catalog(_catalog_entry(canonical_scopes=[ADMIN_READ]))
+    catalog = _catalog(_catalog_entry(canonical_scopes=[PUBLIC_ALL]))
     record = _approval(
         catalog,
         capture_id=capture_id,
-        target_scopes=[ADMIN_READ],
+        target_scopes=[PUBLIC_ALL],
         privileged_scopes_approved=approved,
     )
     calls = []

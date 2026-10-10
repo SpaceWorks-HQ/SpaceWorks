@@ -60,7 +60,8 @@ def notify_booking_status(booking, event, *, sync=False):
         # `text` is the STAFF body: chat channels are a staff surface, so the member's
         # "your booking is confirmed" wording must never be what reaches a room.
         return LifecyclePayload(
-            text=staff["text_body"], emails=tuple(emails), context=context
+            text=staff["text_body"], emails=tuple(emails), context=context,
+            data={"booking_id": row.pk, "space_id": row.space_id},
         )
 
     return notify_lifecycle(

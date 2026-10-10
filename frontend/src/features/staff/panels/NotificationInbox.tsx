@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Panel, useStaffGet, type Makerspace } from "./shared";
 import { staffRequest } from "../../../lib/api";
+import { notificationsUnreadQueryKey } from "../useUnreadNotifications";
 
 type NotificationLevel = "info" | "warning" | "critical";
 
@@ -38,7 +39,7 @@ export function NotificationInbox({ makerspace }: { makerspace: Makerspace }) {
   );
   const invalidateNotifications = () => {
     queryClient.invalidateQueries({ queryKey: ["notifications", makerspace.id] });
-    queryClient.invalidateQueries({ queryKey: ["notifications-unread-count", makerspace.id] });
+    queryClient.invalidateQueries({ queryKey: notificationsUnreadQueryKey(makerspace.id) });
   };
   const markRead = useMutation({
     mutationFn: (id: number) =>

@@ -16,7 +16,6 @@ from apps.apiclients import scope_registry
 from apps.apiclients.checks import check_scope_registry
 from apps.apiclients.models import ApiClient as ApiClientModel
 from apps.apiclients.scope_registry import (
-    ADMIN_ALL,
     LEGACY_SCOPE,
     PUBLIC_ALL,
     PUBLIC_READ,
@@ -61,7 +60,7 @@ def _signed_headers(client_id, secret, path):
     }
 
 
-@pytest.mark.parametrize("scope", [LEGACY_SCOPE, PUBLIC_ALL, ADMIN_ALL])
+@pytest.mark.parametrize("scope", [LEGACY_SCOPE, PUBLIC_ALL, "admin:*"])
 def test_unknown_protected_route_denies_before_wildcards(scope):
     request = _request("/api/v1/public/unregistered/")
 
@@ -151,7 +150,7 @@ def test_scope_registry_system_check_catches_widened_prefix():
     "scopes,expected_message",
     [
         (["not:a:scope"], "Unknown API-client scope"),
-        (["admin:write"], "Browser clients may only use public/read scopes"),
+        (["admin:write"], "Unknown API-client scope"),
     ],
 )
 def test_serializer_rejects_unknown_and_browser_write_scopes(scopes, expected_message):

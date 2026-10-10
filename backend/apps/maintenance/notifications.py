@@ -71,6 +71,11 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
             emails=emails,
             scope=scope,
             context=context,
+            data={
+                "machine_id": machine.pk,
+                "schedule_id": schedule.pk if schedule else None,
+                "maintenance_log_id": log.pk if log else None,
+            },
         )
 
     return notify_lifecycle(

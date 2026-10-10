@@ -4,11 +4,13 @@ import logging
 from dataclasses import dataclass, field
 
 from django.db import transaction
+from django.utils import timezone
 
 from apps.integrations import notification_rules
 from apps.integrations.chat_templates import render_chat_text
 from apps.integrations.dispatch import dispatch_email
 from apps.integrations.dispatch_channels import dispatch_channel
+from apps.integrations.lifecycle_data import lifecycle_data
 from apps.integrations.models import (
     EmailLog,
     NotificationChannel,
@@ -46,6 +48,9 @@ class LifecyclePayload:
     # adapter has no editable chat wording yet and `text` is sent verbatim — which is
     # also what happens when a space has authored no ChatTemplate row.
     context: dict | None = None
+    # Explicit domain IDs only; template contexts can contain contact fields and secrets.
+    data: dict = field(default_factory=dict)
+    staff_channels_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -108,10 +113,12 @@ def _dispatch_email_delivery(makerspace, feature_event, delivery, sync, delivere
     _increment(target, NotificationChannel.EMAIL)
 
 
-def _run_guarded(makerspace, feature, event, build, sync):
+def _run_guarded(makerspace, feature, event, build, sync, occurred_at=None):
     delivered, failed = {}, {}
     try:
         payload = build()
+        data = lifecycle_data(payload.data)
+        data["occurred_at"] = occurred_at or timezone.now().isoformat()
         enabled = {
             channel: is_notification_enabled(makerspace, feature, channel)
             for channel in NotificationChannel.values
@@ -132,7 +139,7 @@ def _run_guarded(makerspace, feature, event, build, sync):
             NotificationChannel.WEBHOOK,
             NotificationChannel.NATIVE_PUSH,
         ):
-            if not enabled[channel]:
+            if not enabled[channel] or not payload.staff_channels_enabled:
                 continue
             try:
                 logs = dispatch_channel(
@@ -140,6 +147,7 @@ def _run_guarded(makerspace, feature, event, build, sync):
                     channel=channel,
                     feature=feature,
                     event=event,
+                    payload=data,
                     text_body=(
                         # Native push is not a room: it is the member's own device, and
                         # it must not inherit a chat body written for a staff channel.
@@ -195,11 +203,13 @@ def notify_lifecycle(makerspace, *, feature, event, build, sync=False):
             extra={"feature": feature, "event": event},
         )
         return NotificationResult(False, {}, {})
+    # Snapshot at the event, before on_commit/queue delays; all rooms and retries agree.
+    occurred_at = timezone.now().isoformat()
     if sync:
-        return _run_guarded(makerspace, feature, event, build, True)
+        return _run_guarded(makerspace, feature, event, build, True, occurred_at)
     try:
         transaction.on_commit(
-            lambda: _run_guarded(makerspace, feature, event, build, False),
+            lambda: _run_guarded(makerspace, feature, event, build, False, occurred_at),
             robust=True,
         )
     except Exception:

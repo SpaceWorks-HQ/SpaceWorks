@@ -113,7 +113,10 @@ def notify_printer_service_status(request, event, *, sync=False):
                 to_email=recipient, subject=rendered["subject"], text_body=rendered["text_body"],
                 html_body=rendered["html_body"], audience="staff", stream="printing", mute_event=event,
             ) for recipient in recipients)
-        return LifecyclePayload(text=_staff_body(event, row), emails=tuple(emails))
+        return LifecyclePayload(
+            text=_staff_body(event, row), emails=tuple(emails),
+            data={"machine_service_request_id": row.pk},
+        )
 
     try:
         return notify_lifecycle(makerspace, feature="printing", event=event, build=build, sync=sync)

@@ -45,6 +45,7 @@ FEATURE_EVENTS = {
         "schedule_completed",
     ),
     F.MEMBERS: ("request_pending", "member_joined"),
+    F.API_ACCESS: ("api_key_request_resolved",),
 }
 
 # Exact default on/off per (feature, channel). Preserves today's behavior: hardware/printing
@@ -59,6 +60,8 @@ DEFAULT_CHANNEL_STATE = {
     F.BOOKINGS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
     F.MAINTENANCE: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
     F.MEMBERS: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    # Preserve the old resolution email + Telegram default, now mutable and metered.
+    F.API_ACCESS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
 }
 
 

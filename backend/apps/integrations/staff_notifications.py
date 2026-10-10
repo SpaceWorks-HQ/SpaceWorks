@@ -18,6 +18,7 @@ _FEATURE_ACTIONS = {
     "bookings": rbac.Action.MANAGE_BOOKINGS,
     "maintenance": rbac.Action.MANAGE_MACHINES,
     "members": rbac.Action.MANAGE_MAKERSPACE,
+    "api_access": rbac.Action.MANAGE_MAKERSPACE,
 }
 
 _FEATURE_STREAMS = {
