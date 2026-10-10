@@ -104,7 +104,12 @@ def transform_value(
     if isinstance(disposition, Redacted):
         if (model, source) == ("audit.AuditLog", "meta"):
             return {"meta_redacted": True}
-        if source == "custom_answers":
+        if source in {"custom_answers", "application_answers"}:
+            if source == "application_answers" and isinstance(value, str):
+                try:
+                    value = json.loads(value)
+                except (TypeError, ValueError):
+                    return {"custom_answers_redacted": True}
             return redact_custom_answers(value)
         return f"[{disposition.marker.upper()}]"
     if not isinstance(disposition, Transformed):

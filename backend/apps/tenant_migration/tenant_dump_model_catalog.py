@@ -52,6 +52,7 @@ PROJECTED_MODEL_LABELS = frozenset(
     makerspaces.MakerspaceMembership makerspaces.MakerspaceWaiver
     makerspaces.MemberCard makerspaces.MemberProfile makerspaces.MemberProject
     makerspaces.MembershipRequest makerspaces.MembershipPlan makerspaces.MembershipTerm
+    makerspaces.MakerspaceMembershipSettings makerspaces.MembershipVouch
     makerspaces.InvitationRequest makerspaces.Station
     notifications.Notification operations.InventoryAdjustment operations.QrPrintBatch
     operations.QrPrintBatchItem operations.ReportMetricRollup operations.StockTransfer

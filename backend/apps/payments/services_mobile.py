@@ -40,7 +40,7 @@ def create_mobile_intent(payment_id, *, actor):
             .first()
         )
         payment = (
-            Payment.objects.select_for_update()
+            Payment.objects.select_for_update(of=("self",))
             .select_related('makerspace')
             .get(pk=payment_id)
         )

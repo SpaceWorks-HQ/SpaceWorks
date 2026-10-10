@@ -599,6 +599,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.operations.tasks_platform.run_platform_problem_checks_task",
         "schedule": crontab(minute="*/15"),
     },
+    "membership-admissions": {
+        "task": "apps.operations.tasks_admissions.sweep_membership_admissions_task",
+        "schedule": crontab(minute="*/5"),
+    },
     "scan-offline-devices": {
         "task": "apps.devices.tasks.scan_offline_devices_task",
         "schedule": crontab(minute="*"),

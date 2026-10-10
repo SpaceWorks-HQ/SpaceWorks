@@ -12,6 +12,8 @@ export type FeatureDefinition = {
 export const FEATURE_DEFINITIONS: readonly FeatureDefinition[] = [
   { key: "staff.invitations", parent_module: null, label: "Staff invitations" },
   { key: "security.staff_mfa_required", parent_module: null, label: "Require MFA for staff" },
+  { key: "membership.vouching", parent_module: "membership", label: "Membership vouching" },
+  { key: "membership.application_form", parent_module: "membership", label: "Membership application form" },
   { key: "payments.machines", parent_module: "machines", label: "Machine payments" },
   { key: "payments.bookings", parent_module: "bookings", label: "Booking payments" },
   { key: "payments.events", parent_module: "events", label: "Event payments" },

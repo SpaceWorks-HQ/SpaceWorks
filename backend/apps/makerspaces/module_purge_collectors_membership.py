@@ -51,6 +51,7 @@ def membership_delete(makerspace, cursor):
         InvitationRequest,
         MemberCard,
         MemberProfile,
+        MakerspaceMembershipSettings,
         MembershipPlan,
         MembershipRequest,
         MembershipTerm,
@@ -64,6 +65,9 @@ def membership_delete(makerspace, cursor):
     # cascade from the profile.
     profiles, profile_labels = _delete(
         MemberProfile.objects.filter(membership__makerspace=makerspace)
+    )
+    admission, admission_labels = _delete(
+        MakerspaceMembershipSettings.objects.filter(makerspace=makerspace)
     )
     requests, request_labels = _delete(
         MembershipRequest.objects.filter(makerspace=makerspace)
@@ -87,11 +91,12 @@ def membership_delete(makerspace, cursor):
     return _counts(
         model_labels=(
             profile_labels | request_labels | card_labels | term_labels | plan_labels
-            | lead_labels
+            | lead_labels | admission_labels
         ),
         member_cards=cards,
         member_profiles=profiles,
         membership_requests=requests,
+        membership_admission_settings=admission,
         membership_terms=terms,
         membership_plans=plans,
         invitation_requests=leads,

@@ -1,0 +1,233 @@
+"""Provider/merchant/payment coordination behind the stable checkout barrel.
+
+Admission owns the makerspace lock before the payment lock. Checkout explicitly
+locks its credential rows and Payment only; related Makerspace rows are read-only.
+Vendor helpers on the compatibility barrel preserve established caller patches.
+"""
+
+import logging
+
+from django.db import transaction
+
+from apps.payments import services_checkout as compatibility
+from apps.payments.checkout_expiry import live_checkout_url
+from apps.payments.money import to_minor_units
+from apps.payments.connect import restrict_account_status
+from apps.payments.models import (
+    MakerspacePaymentSettings,
+    Payment,
+    PlatformStripeConnectSettings,
+)
+from apps.payments.resolution import resolve_payment_source, source_for_payment
+from apps.payments.services_checkout_audit import record_checkout_created
+from apps.payments.subjects import resolve_subject_labels, subject_label
+
+from apps.payments.checkout_provider import (
+    _application_fee_amount, _checkout_idempotency_key, _create_checkout_via_provider, _value,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class _ConnectAccountCannotCharge(Exception):
+    def __init__(self, merchant_id):
+        self.merchant_id = merchant_id
+
+
+class PaymentRailConflict(Exception):
+    pass
+
+
+def create_checkout(payment):
+    """Schedule checkout creation; Stripe failure is deliberately never caller-visible."""
+    transaction.on_commit(
+        lambda: _create_checkout_safely(payment.pk, actor=payment.created_by)
+    )
+
+
+def _claim_provider(payment):
+    """Stamp vendor provenance on an unclaimed row exactly once, under its lock.
+
+    A charge raised while no gateway was configured carries `provider=unclaimed`: real
+    money owed with no rail behind it. The first checkout that actually reaches a provider
+    is what decides whose rail it is, so the stamp happens here -- inside the transaction
+    already holding the settings and Payment locks -- and never again. A Postgres trigger
+    enforces the "never again", so it cannot be undone by a later save or bulk update.
+
+    Silent when nothing resolves: the caller's own `source_for_payment` check raises the
+    user-visible PaymentsUnavailable, and duplicating it here would report a claim failure
+    for a space that simply has no credentials.
+    """
+    source = resolve_payment_source(payment.makerspace)
+    if source is None:
+        return
+    payment.provider = source.vendor
+    payment.stripe_provider = source.provider
+    payment.stripe_connected_account_id = source.connected_account_id
+    payment.stripe_application_fee_amount = _application_fee_amount(
+        payment.amount, source.application_fee_bps, payment.currency
+    )
+    payment.save(
+        update_fields=[
+            "provider",
+            "stripe_provider",
+            "stripe_connected_account_id",
+            "stripe_application_fee_amount",
+            "updated_at",
+        ]
+    )
+
+
+def _create_checkout_safely(payment_id, *, actor=None):
+    try:
+        compatibility.create_checkout_url(payment_id, actor=actor)
+    except Exception:
+        logger.exception("payment_checkout_creation_failed", extra={"payment_id": payment_id})
+
+
+def create_checkout_url(payment_id, *, actor=None):
+    """Create and persist a pending payment's Checkout URL exactly once."""
+    try:
+        return _create_checkout_url_atomic(payment_id, actor=actor)
+    except _ConnectAccountCannotCharge as exc:
+        merchant = MakerspacePaymentSettings.objects.get(pk=exc.merchant_id)
+        restrict_account_status(merchant)
+        raise compatibility.stripe_client.PaymentsUnavailable(
+            "Stripe Connect account cannot accept charges."
+        ) from None
+
+
+def _create_checkout_url_atomic(payment_id, *, actor=None):
+    payment_snapshot = Payment.objects.only(
+        "makerspace_id", "stripe_provider", "provider"
+    ).get(pk=payment_id)
+    with transaction.atomic():
+        # Checkout lock order is platform settings (Connect only) -> makerspace
+        # settings -> Payment. Credential updates take their corresponding
+        # settings lock before checking Payment rows. Payment-only reconciliation
+        # must never acquire either settings lock, keeping the order acyclic.
+        # An unclaimed row's rail is not known until the source resolves, and it may turn
+        # out to be Connect. Taking the platform lock we might not need is safe; discovering
+        # we need it after taking the makerspace lock would invert the documented order.
+        unclaimed = payment_snapshot.provider == Payment.Provider.UNCLAIMED
+        if (
+            payment_snapshot.stripe_provider == Payment.StripeProvider.CONNECT
+            or unclaimed
+        ):
+            platform = (
+                PlatformStripeConnectSettings.objects.select_for_update()
+                .filter(pk=1)
+                .first()
+            )
+            # An unclaimed row only MIGHT resolve to Connect, so the lock is taken
+            # speculatively to keep the platform -> makerspace -> Payment order. Its
+            # absence is only fatal for a row already stamped Connect: a self-hosted
+            # deployment with raw credentials has no platform row at all, and demanding
+            # one here refused every cash-raised charge the moment Stripe was configured.
+            if platform is None and not unclaimed:
+                raise compatibility.stripe_client.PaymentsUnavailable(
+                    "Stripe Connect is not configured."
+                )
+        merchant = (
+            MakerspacePaymentSettings.objects.select_for_update()
+            .filter(makerspace_id=payment_snapshot.makerspace_id)
+            .first()
+        )
+        payment = Payment.objects.select_for_update(of=("self",)).select_related("makerspace").get(pk=payment_id)
+        if payment.status != Payment.Status.PENDING:
+            return ""
+        if payment.online_rail == Payment.OnlineRail.NATIVE_PAYMENT_INTENT:
+            raise PaymentRailConflict('The payment already uses the native payment rail.')
+        # Generic column first: a Razorpay row never fills the Stripe one, and without
+        # this the service would mint a fresh payment link on every call -- several live
+        # links for one charge, any of which a member could pay.
+        # Only a page nobody has confirmed closed: a legacy row whose expiry cleared just
+        # the Stripe columns must mint a new link rather than hand back the dead one.
+        if live := live_checkout_url(payment):
+            return live
+        if payment.online_rail is None:
+            payment.online_rail = Payment.OnlineRail.CHECKOUT
+        if payment.provider == Payment.Provider.UNCLAIMED:
+            _claim_provider(payment)
+        source = source_for_payment(payment)
+        if source is None:
+            raise compatibility.stripe_client.PaymentsUnavailable("Payments are not configured.")
+        if payment.stripe_provider == Payment.StripeProvider.CONNECT:
+            if (
+                merchant is None
+                or merchant.connect_account_id
+                != payment.stripe_connected_account_id
+            ):
+                raise compatibility.stripe_client.PaymentsUnavailable(
+                    "Stripe Connect account is unavailable."
+                )
+            refreshed = compatibility.refresh_connected_account(merchant)
+            if not (
+                refreshed.connect_status == MakerspacePaymentSettings.ConnectStatus.ACTIVE
+                and refreshed.connect_charges_enabled
+            ):
+                raise _ConnectAccountCannotCharge(refreshed.pk)
+        # Return the payer to the space they reached the charge THROUGH, not the one that
+        # owns it. For a collaborative-event charge those differ: host A owns the payment,
+        # member space B routed it, and B is the only member area the visitor can actually
+        # sign into -- `via_makerspace` is exactly that routing record. Sending them to A
+        # lands them in a space where they hold no membership. Archived spaces then resolve
+        # to the central recovery route instead of a dead tenant domain. Both the Stripe
+        # branch below and the provider seam read this one value.
+        member_url = compatibility.member_payment_return_url(
+            payment.via_makerspace or payment.makerspace
+        )
+        if not member_url:
+            logger.warning("payment_checkout_return_url_unavailable", extra={"payment_id": payment_id})
+            raise compatibility.stripe_client.PaymentsUnavailable("A payment return URL is not configured.")
+        label = subject_label(payment, resolve_subject_labels([payment]))
+        if payment.provider != Payment.Provider.STRIPE:
+            # Non-Stripe rows go through the provider seam. The Stripe branch below is
+            # left untouched on purpose: it is the path taking real money today, and
+            # this phase must not change its behaviour to add a second vendor.
+            checkout_url = _create_checkout_via_provider(
+                payment, source, label, member_url
+            )
+            record_checkout_created(payment, actor=actor)
+            return checkout_url
+        checkout_params = {
+            "mode": "payment",
+            "client_reference_id": str(payment.pk),
+            "success_url": f"{member_url}?checkout=success",
+            "cancel_url": f"{member_url}?checkout=cancelled",
+            "metadata": {"payment_id": str(payment.pk), "makerspace_id": str(payment.makerspace_id)},
+            "line_items": [{"price_data": {"currency": payment.currency, "unit_amount": to_minor_units(payment.amount, payment.currency), "product_data": {"name": label}}, "quantity": 1}],
+        }
+        if payment.stripe_application_fee_amount:
+            checkout_params["payment_intent_data"] = {
+                "application_fee_amount": payment.stripe_application_fee_amount
+            }
+        session = compatibility.stripe_client.create_checkout_session(
+            source,
+            idempotency_key=_checkout_idempotency_key(payment),
+            **checkout_params,
+        )
+        session_id, checkout_url = _value(session, "id"), _value(session, "url")
+        if not session_id or not checkout_url:
+            raise compatibility.stripe_client.PaymentsUnavailable("Stripe did not return a Checkout URL.")
+        payment.stripe_checkout_session_id = session_id
+        payment.stripe_checkout_url = checkout_url
+        payment.stripe_checkout_session_expired_at = None
+        # Written in step with the historic columns. Migration 0010 backfilled existing
+        # rows for the same reason: a checkout only the Stripe-shaped columns know about
+        # is invisible to every provider-agnostic path added from here on.
+        payment.external_order_id = session_id
+        payment.checkout_url = checkout_url
+        payment.save(
+            update_fields=[
+                "stripe_checkout_session_id",
+                "stripe_checkout_url",
+                "stripe_checkout_session_expired_at",
+                "external_order_id",
+                "checkout_url",
+                "online_rail",
+                "updated_at",
+            ]
+        )
+        record_checkout_created(payment, actor=actor)
+        return checkout_url

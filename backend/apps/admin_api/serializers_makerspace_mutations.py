@@ -92,6 +92,8 @@ class MakerspaceMutationMixin:
             if discord_webhook_url is not missing:
                 locked.set_discord_webhook_url(discord_webhook_url)
             locked.save()
+            from apps.makerspaces.membership_admission_settings import sync_legacy_settings
+            sync_legacy_settings(actor, locked, validated_data)
             if access_changes:
                 try:
                     set_superadmin_access(

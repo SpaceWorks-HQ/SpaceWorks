@@ -7,6 +7,7 @@ entries are merged into `AUDIT_META_REFERENCES` there.
 from .audit_references_targets import AuditReference, AuditReferenceDisposition
 
 R = AuditReferenceDisposition.REMAP
+S = AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT
 
 _TERM_ACTIONS = (
     "membership.term_created",
@@ -26,6 +27,11 @@ def _edges(model, pairs):
 
 
 MEMBERSHIP_AUDIT_EDGES = {
+    ("membership.request_activated", "membership_id"): AuditReference(R, "makerspaces.MakerspaceMembership"),
+    ("membership.vouched", "vouch_id"): AuditReference(S, "makerspaces.MembershipVouch"),
+    ("membership.vouched", "voucher_id"): AuditReference(S, "accounts.User"),
+    ("membership.vouchers_flagged", "voucher_ids"): AuditReference(S, "accounts.User"),
+    ("membership.payment_after_expiry", "payment_id"): AuditReference(R, "payments.Payment"),
     **_edges(
         "makerspaces.MakerspaceMembership",
         tuple((action, "membership_id") for action in _TERM_ACTIONS),

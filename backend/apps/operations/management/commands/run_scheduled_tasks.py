@@ -34,6 +34,7 @@ from django.utils import timezone
 SCHEDULED_TASKS = (
     ("reminder-sweep", "apps.operations.tasks_reminders.run_reminder_sweep_task", 5),
     ("platform-problem-checks", "apps.operations.tasks_platform.run_platform_problem_checks_task", 15),
+    ("membership-admissions", "apps.operations.tasks_admissions.sweep_membership_admissions_task", 5),
     ("scan-offline-devices", "apps.devices.tasks.scan_offline_devices_task", 1),
     ("cleanup-kiosk-replay-commands", "apps.hardware_requests.tasks_replay.cleanup_replay_commands_task", 24 * 60),
     (

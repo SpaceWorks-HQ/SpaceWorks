@@ -23,7 +23,8 @@ from apps.makerspaces.servability import servable_queryset
 from apps.makerspaces.waiver_services import accept_waiver
 from apps.makerspaces.waiver_state import acceptance_on_file, current_acceptance
 
-ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer, 409: ErrorSerializer, 429: ErrorSerializer}
+ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer,
+          409: ErrorSerializer, 423: ErrorSerializer, 429: ErrorSerializer, 503: ErrorSerializer}
 
 
 def _membership(user, makerspace_id):
@@ -52,7 +53,7 @@ class PublicMembershipRequestView(APIView):
         require_module(makerspace, "membership")
         serializer = MembershipRequestCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        outcome = request_membership(request.user, makerspace)
+        outcome = request_membership(request.user, makerspace, serializer.validated_data.get("application_answers"))
         return Response(MembershipOutcomeSerializer(outcome).data, status=201)
 
 
@@ -68,7 +69,7 @@ class MyMembershipsView(APIView):
         ).select_related("makerspace", "assigned_role")
         requests = servable_queryset(
             MembershipRequest.objects.filter(user=request.user), relation="makerspace"
-        ).select_related("makerspace")
+        ).select_related("makerspace", "admission_payment")
         rows = []
         for membership in memberships:
             active = MakerspaceWaiver.objects.filter(makerspace=membership.makerspace, is_active=True).first()
@@ -83,7 +84,11 @@ class MyMembershipsView(APIView):
                          "waiver_accepted": acceptance_on_file(membership),
                          "waiver_acceptance_required": bool(active and not current_acceptance(membership, active_waiver=active))})
         return Response({"memberships": rows, "requests": [
-            {"makerspace": {"slug": item.makerspace.slug, "name": item.makerspace.name}, "state": item.state, "kind": item.kind}
+            {"id": item.pk, "makerspace": {"id": item.makerspace_id, "slug": item.makerspace.slug, "name": item.makerspace.name},
+             "state": item.state, "kind": item.kind,
+             "admission_payment": {"id": item.admission_payment_id, "status": item.admission_payment.status,
+                                   "amount": str(item.admission_payment.amount), "currency": item.admission_payment.currency} if item.admission_payment_id else None,
+             "expires_at": item.expires_at}
             for item in requests
         ]})
 

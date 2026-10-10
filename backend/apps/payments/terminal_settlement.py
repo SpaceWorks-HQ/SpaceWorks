@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from apps.audit import services as audit
 from apps.payments.models import Payment
+from apps.payments.admission_settlement import resume_admission_after_settlement
 
 
 def handle_stripe_paid_after_terminal(payment, *, event_id, intent_id=None):
@@ -95,4 +96,5 @@ def promote_waived_to_paid_online(payment, *, intent_id=None):
         payment.stripe_payment_intent_id = intent_id
     from apps.payments.notifications import notify_payment
     notify_payment(payment, "payment_received")
+    resume_admission_after_settlement(payment)
     return payment

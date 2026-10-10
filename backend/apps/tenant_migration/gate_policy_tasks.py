@@ -68,6 +68,9 @@ TASK_TENANT_RESOLVERS = {
 
 
 TASK_INTERNAL_PARTICIPANTS = {
+    "apps.operations.tasks_admissions.sweep_membership_admissions_task": (
+        "Admission expiry and committed-settlement recovery gate each tenant before writes."
+    ),
     "apps.operations.tasks_reminders.run_reminder_sweep_task": (
         "Reminder discovery, claims and dispatch use one skip-and-count tenant boundary."
     ),
@@ -118,6 +121,9 @@ TASK_INTERNAL_PARTICIPANTS = {
 
 
 FANOUT_GATE_PARTICIPANTS = {
+    "apps.makerspaces.membership_admission_payments.sweep_admissions": (
+        "Admission expiry and settlement retries use separate skip-and-count tenant boundaries."
+    ),
     "apps.operations.reminder_sweeper.run_reminder_sweep": (
         "Shared source-local reminders; each tenant is gated before discovery or dispatch."
     ),

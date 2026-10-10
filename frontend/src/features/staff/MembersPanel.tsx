@@ -4,9 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Field } from "../../components/ui";
 import type {
   AdminMembership,
-  MembershipRequest,
   PaginatedAdminMembershipList,
-  PaginatedMembershipRequestList,
   PatchedMembershipCapabilities,
 } from "../../generated/api";
 import { StructuredApiError, staffRequest } from "../../lib/api";
@@ -21,6 +19,8 @@ import { MembershipReasonDialog } from "./MembershipReasonDialog";
 import { MembershipPagination } from "./MembershipPagination";
 import { MembershipPlanPicker } from "./MembershipPlanPicker";
 import { MembershipWaiverPanel } from "./MembershipWaiverPanel";
+import { MembershipAdmissionReview, MembershipVouchers, type ReviewMembershipRequest } from "./MembershipAdmissionReview";
+import type { AdmissionVouch } from "../members/membershipAdmissionApi";
 
 type Presence = { display_name: string; role_label: string; started_at: string; expires_at: string };
 type Role = { id: number; name: string };
@@ -53,7 +53,7 @@ export function MembersPanel({ makerspaceId, membershipEnabled, canManageMakersp
     queryKey: [...key, "requests", requestPage, membershipEnabled, list.values.requestState, list.values.requestOrdering],
     // Not gated on the module: with it off the backend still lists STAFF invitations
     // (and only those), which staff must be able to approve or cancel.
-    queryFn: () => staffRequest<PaginatedMembershipRequestList>(`/admin/membership-requests?makerspace_id=${makerspaceId}&page=${requestPage}&${new URLSearchParams({ state: list.values.requestState, ordering: list.values.requestOrdering })}`),
+    queryFn: () => staffRequest<{ results: ReviewMembershipRequest[]; count: number; next: string | null; previous: string | null }>(`/admin/membership-requests?makerspace_id=${makerspaceId}&page=${requestPage}&${new URLSearchParams({ state: list.values.requestState, ordering: list.values.requestOrdering })}`),
   });
   const presence = useQuery({ queryKey: [...key, "presence"], queryFn: () => staffRequest<Presence[]>(`/admin/makerspace/${makerspaceId}/presence-sessions/current`) });
   const roles = useQuery({ queryKey: [...key, "roles"], queryFn: () => staffRequest<Role[]>(`/admin/makerspaces/${makerspaceId}/roles`) });
@@ -123,12 +123,16 @@ export function MembersPanel({ makerspaceId, membershipEnabled, canManageMakersp
     </Panel>
     <Panel title={membershipEnabled ? "Membership requests" : "Invitations"}><div className="mb-3 flex flex-wrap gap-2"><Field label="Invite role"><select className="desk-input" value={selectedRole ?? ""} onChange={(event) => setRoleId(Number(event.target.value))}>{roles.data?.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></Field><Field label="Invite email"><input className="desk-input" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} /></Field><button className="desk-button" disabled={!inviteEmail || !selectedRole || invite.isPending} onClick={() => invite.mutate()}>Invite</button></div>
       <div className="mb-3 flex flex-wrap gap-3">
-        <label className="text-xs text-muted">Request state<select className="desk-input" value={list.values.requestState} onChange={(event) => list.update({ requestState: event.target.value, requestPage: "1" }, false)}><option value="">All</option>{["requested", "invited", "active", "revoked"].map((value) => <option key={value}>{value}</option>)}</select></label>
+        <label className="text-xs text-muted">Request state<select className="desk-input" value={list.values.requestState} onChange={(event) => list.update({ requestState: event.target.value, requestPage: "1" }, false)}><option value="">All</option>{["requested", "invited", "awaiting_vouches", "awaiting_payment", "expired", "canceled", "active", "revoked"].map((value) => <option key={value}>{value}</option>)}</select></label>
         <label className="text-xs text-muted">Request sort<select className="desk-input" value={list.values.requestOrdering} onChange={(event) => list.update({ requestOrdering: event.target.value, requestPage: "1" }, false)}><option value="-created_at">Newest</option><option value="created_at">Oldest</option><option value="state">State</option></select></label>
       </div>
       {roles.isError ? <p role="alert" className="text-sm text-danger">{membershipErrorText(roles.error)}</p> : null}
       {membershipEnabled ? <MembershipPlanPicker makerspaceId={makerspaceId} value={planId} onChange={setPlanId} /> : null}
-      {requestRows.map((row) => <div className="flex items-center justify-between gap-3 border-t border-line py-3" key={row.id}><span className="text-sm text-ink">{requestLabel(row)} · {row.kind} · {row.state}</span>{(canManageMakerspace || !row.assigned_role || roles.data?.some((role) => role.id === row.assigned_role?.id)) && (row.state === "requested" || row.state === "invited") ? <div className="flex gap-2">{row.state === "requested" || row.user ? <button className="desk-button-primary" disabled={!selectedRole || approve.isPending} onClick={() => approve.mutate(row.id)}>Approve</button> : null}<button className="desk-button" onClick={() => { revokeRequest.reset(); setDecision({ id: row.id, kind: "request", title: row.state === "invited" ? "Cancel invitation" : "Decline membership request" }); }} disabled={revokeRequest.isPending}>{row.state === "invited" ? "Cancel invitation" : "Decline"}</button></div> : null}</div>)}
+      {requestRows.map((row) => <MembershipAdmissionReview key={row.id} row={row} makerspaceId={makerspaceId}
+        manageable={canManageMakerspace || !row.assigned_role || Boolean(roles.data?.some((role) => role.id === row.assigned_role?.id))}
+        canViewFinance={canViewFinance} canRecordPayment={canRecordPayment || canManageMakerspace} canWaive={canManageMakerspace}
+        approvePending={approve.isPending} declinePending={revokeRequest.isPending} selectedRole={selectedRole}
+        onApprove={() => approve.mutate(row.id)} onDecline={() => { revokeRequest.reset(); setDecision({ id: row.id, kind: "request", title: row.state === "invited" ? "Cancel invitation" : "Decline membership request" }); }} />)}
       {requests.isLoading ? <p className="text-sm text-muted">Loading requests…</p> : null}
       {requests.isError ? <p role="alert" className="text-sm text-danger">{membershipErrorText(requests.error)}</p> : null}
       {requests.isSuccess && !requestRows.length ? <p className="text-sm text-muted">No membership requests on this page.</p> : null}
@@ -166,14 +170,10 @@ function MemberRow({ makerspaceId, member, roles, canManageMakerspace, canViewFi
   const manageable = canManageMakerspace || roles.some((role) => role.id === member.assigned_role?.id);
   const displayName = member.user.display_name || member.user.username;
   return <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line py-3">
-    <div><p className="font-semibold text-ink">{displayName}</p><p className="text-xs text-muted">{member.assigned_role?.name ?? "Member"} · {member.status} · waiver {member.waiver_required ? (member.waiver_current ? "current" : "needed") : "not required"}</p>{canViewFinance ? <PaymentReconcileActions makerspaceId={makerspaceId} payment={member.payment} canRecordPayment={canRecordPayment || canManageMakerspace} canWaive={canManageMakerspace} invalidateKeys={[["members", makerspaceId]]} /> : null}</div>
+    <div><p className="font-semibold text-ink">{displayName}</p><p className="text-xs text-muted">{member.assigned_role?.name ?? "Member"} · {member.status} · waiver {member.waiver_required ? (member.waiver_current ? "current" : "needed") : "not required"}</p><MembershipVouchers vouches={(member as AdminMembership & { vouches?: AdmissionVouch[] }).vouches} />{canViewFinance ? <PaymentReconcileActions makerspaceId={makerspaceId} payment={member.payment} canRecordPayment={canRecordPayment || canManageMakerspace} canWaive={canManageMakerspace} invalidateKeys={[["members", makerspaceId]]} /> : null}</div>
     <div className="flex flex-wrap items-center gap-2">
       {membershipEnabled ? <Badge tone={member.verified_at ? "success" : "neutral"}>{member.verified_at ? "Verified" : "Not verified"}</Badge> : null}
       {active ? <>{member.waiver_required && !member.waiver_current ? <button className="desk-button" type="button" disabled={changingWitness} onClick={onWitness}>Record witnessed acceptance</button> : null}{membershipEnabled ? <><label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={member.can_refer} disabled={changingCapabilities} onChange={(event) => onCapability({ can_refer: event.target.checked })} />Can refer</label><label className="flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={member.can_verify} disabled={changingCapabilities} onChange={(event) => onCapability({ can_verify: event.target.checked })} />Can verify</label><button className="desk-button" type="button" disabled={changingVerification} onClick={onVerify}>{member.verified_at ? "Unverify" : "Verify"}</button><button className="desk-button" type="button" onClick={onTerms}>Terms</button></> : null}{manageable ? <><select aria-label={`Role for ${displayName}`} className="desk-input" defaultValue={member.assigned_role?.id ?? ""} onChange={(event) => onChangeRole(Number(event.target.value))} disabled={changingRole}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select><button className="desk-button" type="button" onClick={onRevoke}>Revoke</button></> : null}</> : null}
     </div>
   </div>;
-}
-
-function requestLabel(request: MembershipRequest) {
-  return request.user?.username ?? request.invite_email;
 }

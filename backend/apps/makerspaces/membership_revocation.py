@@ -42,6 +42,8 @@ def revoke_membership(actor, membership, reason=""):
             from apps.makerspaces.membership_payments import cancel_for_membership
 
             cancel_for_membership(membership, actor)
+            from apps.makerspaces.membership_admission_payments import cancel_for_admitted_member
+            cancel_for_admitted_member(actor, membership)
             # Everything else the membership carried that acts on its behalf goes with it:
             # the ID card (a live credential bearing their name and face) and any term with
             # its pending renewal charge.
@@ -50,12 +52,16 @@ def revoke_membership(actor, membership, reason=""):
 
             revoke_for_membership(actor, membership)
             cancel_terms_for_membership(actor, membership)
+            from apps.makerspaces.membership_vouching import flag_vouchers
+            flag_vouchers(actor, membership)
         from apps.presence.services import end_sessions_for_membership
         end_sessions_for_membership(actor, membership)
-        MembershipRequest.objects.filter(makerspace=makerspace, user=membership.user,
-                                         state__in=["requested", "invited"]).update(
-            state=MembershipRequest.State.REVOKED, decided_by=actor, decided_at=timezone.now()
-        )
+        for row in MembershipRequest.objects.select_for_update().filter(
+            makerspace=makerspace, user=membership.user,
+            state__in=["requested", "invited", "awaiting_vouches", "awaiting_payment"],
+        ):
+            from apps.makerspaces.membership_admission_payments import close_admission
+            close_admission(actor, row, "revoked")
         return membership
 
 
@@ -73,7 +79,10 @@ def revoke_request(actor, request, reason=""):
             membership = MakerspaceMembership.objects.filter(makerspace=makerspace, user=request.user).first()
             if membership:
                 return revoke_membership(actor, membership, reason)
-        was_requested = request.state == MembershipRequest.State.REQUESTED
+        was_requested = request.state in ("requested", "awaiting_vouches", "awaiting_payment")
+        from apps.makerspaces.membership_admission_payments import close_admission
+        if request.state in ("requested", "invited", "awaiting_vouches", "awaiting_payment"):
+            close_admission(actor, request, "revoked")
         request.state = MembershipRequest.State.REVOKED
         request.decided_by = actor
         request.decided_at = timezone.now()
@@ -81,6 +90,10 @@ def revoke_request(actor, request, reason=""):
         request.save()
         audit.record(actor, "membership.revoked", makerspace=makerspace, target=request)
         if was_requested:
-            from apps.makerspaces.membership_notifications_research import notify_membership_decision
-            notify_membership_decision(request, "declined")
+            if request.admission_managed:
+                from apps.makerspaces.membership_admission_notifications import notify_admission
+                notify_admission(request, "declined")
+            else:
+                from apps.makerspaces.membership_notifications_research import notify_membership_decision
+                notify_membership_decision(request, "declined")
         return request

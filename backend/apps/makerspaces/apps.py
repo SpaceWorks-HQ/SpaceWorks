@@ -58,6 +58,14 @@ class MakerspacesConfig(AppConfig):
             # tenant insert, just like default-role provisioning.
             PiiMakerspaceWriteFence.objects.get_or_create(makerspace=instance)
 
+        def ensure_admission_settings_on_create(sender, instance, created, **kwargs):
+            if created:
+                from apps.makerspaces.models import MakerspaceMembershipSettings
+                MakerspaceMembershipSettings.objects.get_or_create(makerspace=instance, defaults={
+                    "join_mode": "approval" if instance.membership_policy == "request" else instance.membership_policy,
+                    "joining_fee": instance.membership_dues_amount,
+                })
+
         post_save.connect(
             reconcile_selfhost_domain,
             sender=Makerspace,
@@ -82,6 +90,8 @@ class MakerspacesConfig(AppConfig):
             dispatch_uid="makerspaces.ensure_pii_write_fence_on_create",
             weak=False,
         )
+        post_save.connect(ensure_admission_settings_on_create, sender=Makerspace,
+                          dispatch_uid="makerspaces.ensure_admission_settings_on_create", weak=False)
         post_delete.connect(
             invalidate_hosting_cache,
             sender=Makerspace,

@@ -119,6 +119,7 @@ FIVE_CONFIG_FIELDS = {
 }
 
 CUSTOM_ANSWERS = {
+    ("makerspaces.MembershipRequest", "application_answers"),
     ("bookings.Booking", "custom_answers"),
     ("events.EventRegistration", "custom_answers"),
 }

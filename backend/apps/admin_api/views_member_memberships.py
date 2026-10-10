@@ -1,5 +1,5 @@
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import extend_schema, OpenApiParameter, PolymorphicProxySerializer
 from apps.admin_api.list_options import LIST_PARAMETERS, ORDER_PAGE_PARAMETERS, choice_filter, identity_filter, order_list
 from apps.admin_api.serializers_member_list import MembershipListResponseSerializer, MembershipRequestListResponseSerializer
 from rest_framework import status
@@ -13,7 +13,7 @@ from apps.admin_api.permissions import IsActiveStaff
 from apps.admin_api.serializers_member_memberships import (AdminMembershipSerializer, ApproveRequestSerializer,
     InvitationSerializer, MembershipRequestSerializer, RevokeSerializer, RoleIdSerializer)
 from apps.admin_api.serializers_payment_summary import scoped_payment_context
-from apps.admin_api.views_roles import ERRORS
+from apps.admin_api.views_roles import ERRORS as ROLE_ERRORS
 from apps.makerspaces import membership_services, waiver_services
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.membership_gating import require_module_for_request, staff_invitation_q
@@ -22,6 +22,8 @@ from apps.makerspaces.models import MakerspaceMembership, MakerspaceRole, Makers
 from apps.makerspaces.serializers_memberships import MemberWaiverResponseSerializer, WaiverPublishSerializer
 from apps.makerspaces.servability import servable_queryset
 from apps.payments.models import Payment
+
+ERRORS = {**ROLE_ERRORS, 423: ROLE_ERRORS[400], 503: ROLE_ERRORS[400]}
 
 
 class MembershipPagination(PageNumberPagination):
@@ -44,6 +46,7 @@ def _role(makerspace, role_id):
 
 def _membership_context(actor, membership, **extra):
     return {
+        "actor": actor,
         **extra,
         **scoped_payment_context(
             actor,
@@ -52,6 +55,13 @@ def _membership_context(actor, membership, **extra):
             [membership.pk],
         ),
     }
+
+
+def _admission_context(actor, rows):
+    return {"actor": actor, **scoped_payment_context(
+        actor, rbac.Action.VIEW_FINANCE, Payment.SubjectType.MEMBERSHIP_REQUEST,
+        [row.pk for row in rows],
+    )}
 
 
 class AdminMembershipRosterView(APIView):
@@ -76,6 +86,7 @@ class AdminMembershipRosterView(APIView):
         pager = self.pagination_class()
         page = pager.paginate_queryset(queryset, request)
         context = {
+            "actor": request.user,
             # Resolved once for the whole roster. The waiver predicates take it as an
             # explicit argument precisely so a per-row lookup cannot become an N+1.
             "active_waiver": active,
@@ -98,7 +109,7 @@ class AdminMembershipRequestListView(APIView):
     @extend_schema(description="Requires manage_members in this makerspace; staff role administration and waiver publishing require manage_makerspace.", tags=["Admin memberships"], parameters=[*ORDER_PAGE_PARAMETERS, OpenApiParameter("makerspace_id", int, required=True), OpenApiParameter("state", str)], responses={200: MembershipRequestListResponseSerializer, **ERRORS})
     def get(self, request):
         makerspace = _makerspace(request.user, request.query_params.get("makerspace_id"))
-        queryset = MembershipRequest.objects.filter(makerspace=makerspace).select_related("user", "assigned_role")
+        queryset = MembershipRequest.objects.filter(makerspace=makerspace).select_related("user", "assigned_role", "admission_payment").prefetch_related("vouches__voucher")
         queryset = rbac.scope_by_action(request.user, rbac.Action.MANAGE_MEMBERS, queryset)
         if not module_enabled(makerspace, "membership"):
             # Staff must not be shown community join requests they have no enabled surface
@@ -110,7 +121,7 @@ class AdminMembershipRequestListView(APIView):
             queryset = queryset.filter(state=selected_state)
         pager = self.pagination_class()
         page = pager.paginate_queryset(order_list(queryset, request.query_params, {"created_at", "state"}, "-created_at"), request)
-        return pager.get_paginated_response(MembershipRequestSerializer(page, many=True).data)
+        return pager.get_paginated_response(MembershipRequestSerializer(page, many=True, context=_admission_context(request.user, page)).data)
 
 
 class AdminInvitationView(APIView):
@@ -122,13 +133,13 @@ class AdminInvitationView(APIView):
         serializer = InvitationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         item = membership_services.invite_membership(request.user, makerspace, serializer.validated_data["invite_email"], _role(makerspace, serializer.validated_data["role_id"]))
-        return Response(MembershipRequestSerializer(item).data, status=status.HTTP_201_CREATED)
+        return Response(MembershipRequestSerializer(item, context=_admission_context(request.user, [item])).data, status=status.HTTP_201_CREATED)
 
 
 class AdminRequestApproveView(APIView):
     permission_classes = [IsActiveStaff]
 
-    @extend_schema(description="Requires manage_members in this makerspace; staff role administration and waiver publishing require manage_makerspace.", tags=["Admin memberships"], request=ApproveRequestSerializer, responses={200: AdminMembershipSerializer, **ERRORS})
+    @extend_schema(description="Requires manage_members. Returns an admission request when payment is due, otherwise the activated membership.", tags=["Admin memberships"], request=ApproveRequestSerializer, responses={200: PolymorphicProxySerializer(component_name="MembershipApprovalOutcome", serializers=[AdminMembershipSerializer, MembershipRequestSerializer], resource_type_field_name=None), **ERRORS})
     def post(self, request, pk):
         item = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_MEMBERS, MembershipRequest.objects.select_related("makerspace")), pk=pk)
         makerspace = _makerspace(request.user, item.makerspace_id)
@@ -142,6 +153,8 @@ class AdminRequestApproveView(APIView):
             require_module(makerspace, "membership")
             plan = get_object_or_404(MembershipPlan.objects.filter(makerspace=makerspace), pk=serializer.validated_data["plan_id"])
         membership = membership_services.approve_request(request.user, item, role, plan=plan)
+        if isinstance(membership, MembershipRequest):
+            return Response(MembershipRequestSerializer(membership, context=_admission_context(request.user, [membership])).data)
         membership = MakerspaceMembership.objects.select_related(
             "user", "assigned_role"
         ).get(pk=membership.pk)
@@ -162,7 +175,7 @@ class AdminRequestRevokeView(APIView):
         require_module_for_request(_makerspace(request.user, item.makerspace_id), item)
         serializer = RevokeSerializer(data=request.data); serializer.is_valid(raise_exception=True)
         item = membership_services.revoke_request(request.user, item, serializer.validated_data.get("reason", ""))
-        return Response(MembershipRequestSerializer(item).data)
+        return Response(MembershipRequestSerializer(item, context=_admission_context(request.user, [item])).data)
 
 
 class AdminMembershipRevokeM2View(APIView):

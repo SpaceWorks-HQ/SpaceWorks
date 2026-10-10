@@ -62,7 +62,7 @@ class AdminMembershipCapabilitiesView(APIView):
             membership = membership_services.set_can_refer(request.user, membership, serializer.validated_data["can_refer"])
         if "can_verify" in serializer.validated_data:
             membership = membership_services.set_can_verify(request.user, membership, serializer.validated_data["can_verify"])
-        return Response(AdminMembershipSerializer(membership).data)
+        return Response(AdminMembershipSerializer(membership, context={"actor": request.user}).data)
 
 
 class AdminMembershipVerifyView(APIView):
@@ -73,7 +73,7 @@ class AdminMembershipVerifyView(APIView):
         membership = _membership_for_verifier(request.user, pk)
         require_module(membership.makerspace, "membership")
         membership = membership_services.verify_member(request.user, membership)
-        return Response(AdminMembershipSerializer(membership).data)
+        return Response(AdminMembershipSerializer(membership, context={"actor": request.user}).data)
 
 
 class AdminMembershipUnverifyView(APIView):
@@ -84,4 +84,4 @@ class AdminMembershipUnverifyView(APIView):
         membership = _membership_for_verifier(request.user, pk)
         require_module(membership.makerspace, "membership")
         membership = membership_services.unverify_member(request.user, membership)
-        return Response(AdminMembershipSerializer(membership).data)
+        return Response(AdminMembershipSerializer(membership, context={"actor": request.user}).data)

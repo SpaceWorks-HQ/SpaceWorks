@@ -15,7 +15,8 @@ verification/error helpers in `views_social_helpers.py`. `integrations/health.py
 read-only scheduler control page lives in `operations/admin_scheduling.py`.
 The shared reminder foundation is `operations/models_reminders.py`,
 `reminder_registry.py`, `reminder_services.py`, `reminder_sweeper.py` and
-`tasks_reminders.py`; consumer registrations are explicit and initially empty.
+`tasks_reminders.py`; `membership_payment_reminders.py` registers the first
+consumer for F3 membership payment-due notices.
 Queries use `accounts/rbac.py:scope_for_scheduled_work`; see
 [reminder-schedules.md](reminder-schedules.md) for UTC, claims and migration rules.
 Platform monitoring uses `admin_api/views_platform_monitoring.py` and its schema sibling;
@@ -24,6 +25,23 @@ Platform monitoring uses `admin_api/views_platform_monitoring.py` and its schema
 `platform_integration_health.py` reads channels without creating settings; `tasks_platform.py`
 and `scheduler_telemetry.py` own scheduled checks and beat completion telemetry.
 Tenant counters and allowances are read by `makerspaces/usage_snapshot.py`.
+
+Membership admission is described in [membership-admission.md](membership-admission.md).
+`makerspaces/models_admission.py` owns the settings and immutable vouch models.
+`membership_services.py` remains the explicit compatibility barrel over
+`membership_helpers.py`, `membership_legacy.py` and `membership_admission.py`.
+Admission settings/forms/vouches/charges live in `membership_admission_settings.py`,
+`membership_admission_forms.py`, `membership_vouching.py` and
+`membership_admission_payments.py`; all grants use `membership_activation.py`.
+`membership_admission_direct.py` applies gates to walk-in and core creation paths.
+`views_admission.py` serves the public policy and owned applicant/voucher routes;
+`admin_api/views_membership_admission.py` serves manager settings. Existing staff
+review serializers include answer snapshots and named vouches. Committed payment
+callbacks live in `payments/admission_settlement.py`, with narrow rejoin debt access
+in `payments/admission_access.py`. `operations/tasks_admissions.py` drives expiry
+and settlement recovery in both schedulers. Application-export audit writes and
+settlement activation take explicit tenant write boundaries; reviewer debt summaries
+use the existing finance-scoped payment context.
 
 - `backend/config/` — Django project (`settings.py`, `urls.py`, wsgi/asgi). All API routes under `/api/`.
   `config/admin_access.py` holds the `/control/` gating, CSP middleware, and the hidden-scope drift-guard
@@ -207,7 +225,8 @@ Tenant counters and allowances are read by `makerspaces/usage_snapshot.py`.
   + `unique_values.py` (barrel: the rules dict is
   `unique_values_core.py`, the disposition/policy types `unique_values_policy.py`) + `closure_references.py`;
   `tenant_dump_model_catalog.py` + `tenant_dump_field_snapshot.py` +
-  `tenant_dump_authority.py`/`tenant_dump_catalog.py` (Lane D's deny-by-default source catalog), and
+  `tenant_dump_authority.py` (public barrel over literal `tenant_dump_authority_entries.py`
+  and domain supplements)/`tenant_dump_catalog.py` (Lane D's deny-by-default source catalog), and
   `tenant_dump_source_projection.py` (single-makerspace raw rows plus decision-22 grant closure);
   `tenant_dump_builder.py` (Lane D's migrated scratch → verified custom-dump orchestrator), with
   `tenant_dump_database.py`, `tenant_dump_graph.py`, `tenant_dump_raw.py`, `tenant_dump_sql.py` and

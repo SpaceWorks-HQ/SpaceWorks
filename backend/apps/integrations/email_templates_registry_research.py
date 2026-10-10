@@ -10,7 +10,7 @@ from .email_templates_registry_helpers import EmailTemplateRegistryEntry, bag
 FAMILY_EVENTS = {
     "payments": ("charge_raised", "payment_due_soon", "payment_overdue",
                  "payment_received", "refund_issued", "payment_failed"),
-    "membership": ("approved", "declined", "renewal_due", "lapsed", "renewal_failed"),
+    "membership": ("approved", "declined", "renewal_due", "lapsed", "renewal_failed", "awaiting_payment", "payment_due"),
     "stock": ("low_stock", "procurement_received"),
     "maintenance": ("due_soon", "overdue"),
     "certifications": ("granted", "revoked", "expiring", "expired"),

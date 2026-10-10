@@ -24,6 +24,8 @@ Continued from [SOURCE-MAP.md](SOURCE-MAP.md); paths are relative to the reposit
   The staff recovery screen remains phase 9e.
 - `backend/apps/payments/` — immutable multi-subject Payment authority, per-space raw credentials + managed
   Stripe Connect resolution, checkout/webhook settlement, reconciliation, native PaymentSheet intents.
+  `services_checkout.py` is the explicit compatibility barrel over `checkout_coordination.py`
+  (credential/payment locks) and `checkout_provider.py` (provider requests and currency helpers).
   `services_webhooks.py` re-exports Connect handling from `services_connect_webhooks.py`;
   `notifications.py` supplies bounded payment snapshots to the feature/channel matrix.
 - `backend/apps/printing/` — **TOMBSTONED** (Project B): only an `AppConfig` and an empty `models.py`, kept

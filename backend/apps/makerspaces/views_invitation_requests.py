@@ -2,10 +2,9 @@
 
 Anonymous, throttled per client, honeypotted exactly like `RequestSubmitView`: the hidden
 `website` field being filled returns the SAME 202 acknowledgement a real submission gets
-and stores nothing, so a bot cannot tell the two apart. The module gate answers 404 --
+and stores nothing, so a bot cannot tell the two apart. The module gate answers 400 --
 a makerspace without `membership` has no invitation queue to fill.
 """
-from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers, status
@@ -18,7 +17,7 @@ from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.hardware_requests.public_views import _honeypot_filled
 from apps.makerspaces.editions import require_public_surface
 from apps.makerspaces.invitation_request_services import submit_invitation_request
-from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.guards import require_module
 from apps.makerspaces.servability import servable_queryset
 
 ACK = {"detail": "Thanks - the makerspace will be in touch."}
@@ -50,8 +49,10 @@ class PublicInvitationRequestView(APIView):
         responses={
             202: InvitationRequestAckSerializer,
             400: ErrorSerializer,
-            404: OpenApiResponse(description="Unknown makerspace or membership disabled."),
+            404: OpenApiResponse(description="Unknown makerspace."),
+            423: ErrorSerializer,
             429: ErrorSerializer,
+            503: ErrorSerializer,
         },
     )
     def post(self, request, makerspace_slug):
@@ -61,8 +62,7 @@ class PublicInvitationRequestView(APIView):
         if _honeypot_filled(request.data):
             return Response(ACK, status=status.HTTP_202_ACCEPTED)
         require_public_surface("membership")
-        if not module_enabled(makerspace, "membership"):
-            raise Http404()
+        require_module(makerspace, "membership")
         serializer = InvitationRequestCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data

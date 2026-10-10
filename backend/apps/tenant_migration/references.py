@@ -80,6 +80,7 @@ PAYMENT_SUBJECT_REFERENCES = {
     "event_registration": "events.EventRegistration",
     "makerspace_membership": "makerspaces.MakerspaceMembership",
     "membership_term": "makerspaces.MembershipTerm",
+    "membership_request": "makerspaces.MembershipRequest",
     "loan_deposit": "hardware_requests.HardwareRequest",
     "loan_late_fee": "hardware_requests.HardwareRequest",
 }

@@ -37,7 +37,7 @@ def record_offline_refund(payment, *, amount, reason, receipt, actor):
     payload.is_valid(raise_exception=True)
     data = payload.validated_data
     locked = (
-        offline_refund_queryset(actor).select_for_update().select_related("makerspace")
+        offline_refund_queryset(actor).select_for_update(of=("self",)).select_related("makerspace")
         .filter(pk=payment.pk, makerspace_id=payment.makerspace_id).first()
     )
     if locked is None:

@@ -15,10 +15,12 @@ from apps.makerspaces.models import (
 )
 
 
-def _activate_membership(actor, makerspace, user, role, *, request=None, source):
+def _activate_membership(actor, makerspace, user, role, *, request=None, source, skip_dues=False):
     """Activate or reactivate exactly one membership in the mandated lock order."""
     with transaction.atomic():
         makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+        from apps.makerspaces.membership_admission_settings import ensure_join_allowed
+        ensure_join_allowed(makerspace)
         driving_request = None
         if request is not None:
             driving_request = MembershipRequest.objects.select_for_update().get(pk=request.pk)
@@ -27,6 +29,8 @@ def _activate_membership(actor, makerspace, user, role, *, request=None, source)
             if driving_request.state not in (
                 MembershipRequest.State.REQUESTED,
                 MembershipRequest.State.INVITED,
+                MembershipRequest.State.AWAITING_VOUCHES,
+                MembershipRequest.State.AWAITING_PAYMENT,
             ):
                 raise ValidationError({"detail": "This membership request is no longer open."})
             if driving_request.user_id not in (None, user.pk):
@@ -47,6 +51,10 @@ def _activate_membership(actor, makerspace, user, role, *, request=None, source)
             raise ValidationError({"role_id": "Role must belong to this makerspace."})
 
         adding = membership is None or membership.status != "active"
+        direct_request = None
+        if adding and request is None and not role.granted_actions:
+            from apps.makerspaces.membership_admission_direct import prepare_direct_admission
+            direct_request = prepare_direct_admission(actor, makerspace, user, role)
         if adding:
             limits.check_quota(makerspace, "members", adding=1)
 
@@ -82,7 +90,7 @@ def _activate_membership(actor, makerspace, user, role, *, request=None, source)
 
         open_requests = list(MembershipRequest.objects.select_for_update().filter(
             makerspace=makerspace,
-            state__in=[MembershipRequest.State.REQUESTED, MembershipRequest.State.INVITED],
+            state__in=["requested", "invited", "awaiting_vouches", "awaiting_payment"],
         ).filter(Q(user=user) | Q(invite_email=(user.email or "").strip().lower())))
         for item in open_requests:
             item.state = MembershipRequest.State.ACTIVE
@@ -93,6 +101,8 @@ def _activate_membership(actor, makerspace, user, role, *, request=None, source)
                 item.assigned_role = role
                 fields.insert(0, "assigned_role")
             item.save(update_fields=fields)
+            audit.record(actor, "membership.request_activated", makerspace=makerspace,
+                         target=item, meta={"membership_id": membership.pk})
 
         if adding or source == "approval" or open_requests:
             action = "membership.approved" if source == "approval" else "membership.joined"
@@ -116,5 +126,9 @@ def _activate_membership(actor, makerspace, user, role, *, request=None, source)
                 create_for_active_membership,
             )
 
-            create_for_active_membership(membership, actor)
+            if direct_request is not None:
+                from apps.makerspaces.membership_admission_direct import finish_direct_admission
+                finish_direct_admission(actor, direct_request, membership)
+            elif not skip_dues:
+                create_for_active_membership(membership, actor)
         return membership

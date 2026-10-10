@@ -16,6 +16,23 @@ SUPPLEMENTAL_AUTHORITY_ENTRIES = (
     *_same("operations.SavedView", "shared state", D.RESET,
            "Target publication and filter identifiers must be authorized anew."),
     *_same(
+        "makerspaces.MakerspaceMembershipSettings",
+        "join_mode vouch_replaces_approval", D.RESET,
+        "Admission authority is authorized by target reviewers, never the source policy.",
+    ),
+    *_same(
+        "makerspaces.MembershipRequest", "admission_managed", D.RESET,
+        "Imported application history cannot activate a membership after settlement.",
+    ),
+    *_same(
+        "makerspaces.MembershipRequest", "application_answers", (D.PRESERVE, D.DROP),
+        "Full tenant identities retain their answers; stub-linked personal answers do not travel.",
+    ),
+    *_same(
+        "makerspaces.MembershipVouch", "voucher created_at expires_at", D.PRESERVE,
+        "A vouch is historical accountability, never transferred admission authority.",
+    ),
+    *_same(
         "makerspaces.Makerspace", "timezone country opening_hours", D.PRESERVE,
         "The tenant location and advisory wall-clock schedule travel unchanged.",
     ),

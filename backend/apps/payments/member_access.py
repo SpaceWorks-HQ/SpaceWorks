@@ -43,6 +43,10 @@ def member_may_see_own_charges(user, makerspace_id):
       deliberate existing contract and not mine to reverse;
     * ownership is read through `member_payment_queryset`, already filtered to
       `member=user`, so it can only ever admit someone to their own money.
+
+    An approved rejoining applicant has one narrow exception: their new pending
+    admission charge. The queryset restricts them to that charge, so this never
+    restores history or settlement access to debts held by the revoked membership.
     """
     from apps.makerspaces.models import MakerspaceMembership
 
@@ -59,9 +63,9 @@ def member_may_see_own_charges(user, makerspace_id):
     if MakerspaceMembership.objects.filter(
         user=user, makerspace_id=makerspace_id
     ).exists():
-        # A membership exists but did not qualify above, so it is revoked, pending or
-        # otherwise inactive. That answer stands.
-        return False
+        from apps.payments.admission_access import admission_payment_queryset
+
+        return admission_payment_queryset(user, makerspace_id).exists()
     from apps.payments.member_scope import member_payment_queryset
 
     return member_payment_queryset(user, makerspace_id).exists()
