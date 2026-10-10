@@ -26,11 +26,13 @@ describe("Track 3 staff payments", () => {
     const submit = vi.fn();
     render(
       <BookableSpaceForm
+        makerspaceId={7}
         initialValues={EMPTY_SPACE_FORM}
         onSubmit={submit}
         pending={false}
         submitLabel="Create"
       />,
+      { wrapper: wrapper() },
     );
 
     fireEvent.change(screen.getByRole("spinbutton", { name: /Booking price/ }), {

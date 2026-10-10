@@ -33,7 +33,7 @@ from apps.makerspaces.models import Makerspace
 TEMPLATE_FIELDS = frozenset({
     "title", "description", "location", "location_kind", "custom_form", "capacity",
     "payment_amount", "registration_requires_approval",
-    "registration_cutoff_lead_minutes", "is_public",
+    "registration_cutoff_lead_minutes", "cancellation_cutoff_hours", "is_public",
 })
 RECURRENCE_FIELDS = frozenset({
     "recurrence_timezone", "dtstart_local_date", "dtstart_local_time",
@@ -92,6 +92,7 @@ def _event_values(series, occurrence):
         "capacity": series.capacity,
         "payment_amount": series.payment_amount,
         "registration_requires_approval": series.registration_requires_approval,
+        "cancellation_cutoff_hours": series.cancellation_cutoff_hours,
         "registration_cutoff_lead_minutes": series.registration_cutoff_lead_minutes,
         "is_public": series.is_public,
         "status": (

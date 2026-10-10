@@ -20,7 +20,7 @@ describe("booking editor training link", () => {
     vi.mocked(staffRequest).mockRejectedValue(new Error("Module disabled"));
     const submit = vi.fn();
     show(submit);
-    expect(await screen.findByText(/Machine types are unavailable/)).toBeVisible();
+    expect(await screen.findByText(/Machine type choices are unavailable/)).toBeVisible();
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Updated bench" } });
     fireEvent.click(screen.getByText("Save space"));
     expect(submit).toHaveBeenCalledWith(expect.objectContaining({ name: "Updated bench" }));
@@ -31,8 +31,8 @@ describe("booking editor training link", () => {
     vi.mocked(staffRequest).mockRejectedValue(new Error("Module disabled"));
     const submit = vi.fn();
     show(submit);
-    await screen.findByText(/Machine types are unavailable/);
-    fireEvent.change(screen.getByRole("combobox", { name: /Training for machine type/ }), { target: { value: "" } });
+    await screen.findByText(/Machine type choices are unavailable/);
+    fireEvent.change(screen.getByRole("combobox", { name: /Machine type for certification/ }), { target: { value: "" } });
     fireEvent.click(screen.getByText("Save space"));
     expect(submit).toHaveBeenCalledWith(expect.objectContaining({ machine_type: null }));
   });

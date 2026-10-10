@@ -8,6 +8,7 @@ import { Link, useParams } from "react-router-dom";
 import type { ArchivedPaymentSummary, MembershipPolicyEnum } from "../../generated/api";
 import { bootstrapTenant, memberRequest, refreshAccessToken, StructuredApiError } from "../../lib/api";
 import { MemberAuthPanel } from "./MemberAuthPanel";
+import { MyBookings } from "../bookings/MyBookings";
 import { InvitationRequestForm } from "./InvitationRequestForm";
 import { JoinMembershipCta } from "./JoinMembershipCta";
 import { presenceStartLocation } from "./geolocation";
@@ -161,6 +162,7 @@ export function MemberArea() {
     {unauthenticated && !showSignIn && policy?.startsWith("invite") ? <p className="text-sm text-muted">Sign in to view memberships or claim an invitation.</p> : null}
     {error ? <p className="text-sm text-danger" role="alert">{message(error)}</p> : null}
     {memberships.isError && !unauthenticated ? <Link className="desk-button-secondary inline-flex" to="/admin">Sign in</Link> : null}
+    {membership?.membership_status === "active" && bootstrap.data?.modules.includes("bookings") ? <MyBookings slug={resolvedSlug} /> : null}
     <SupportContact branding={bootstrap.data?.branding} />
   </main>;
 }

@@ -22,6 +22,8 @@ export type PublicAvailability = {
   public_token: string;
   starts_at: string;
   ends_at: string;
+  timezone: string;
+  opening_intervals: { starts_at: string; ends_at: string }[];
   availability: { starts_at: string; ends_at: string; booker_name: string | null }[] | null;
 };
 

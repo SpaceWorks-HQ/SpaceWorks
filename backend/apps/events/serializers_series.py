@@ -21,6 +21,9 @@ class EventSeriesWriteSerializer(serializers.Serializer):
         max_digits=12, decimal_places=2, min_value=0, default=0, required=False,
     )
     registration_requires_approval = serializers.BooleanField(default=False, required=False)
+    cancellation_cutoff_hours = serializers.IntegerField(
+        allow_null=True, default=None, min_value=0, max_value=8760, required=False,
+    )
     registration_cutoff_lead_minutes = serializers.IntegerField(
         allow_null=True, default=None, min_value=0, required=False,
     )
@@ -73,6 +76,7 @@ class EventSeriesDetailSerializer(EventSeriesSummarySerializer):
         fields = EventSeriesSummarySerializer.Meta.fields + (
             "description", "location", "location_kind", "custom_form", "capacity",
             "payment_amount", "registration_requires_approval",
+            "cancellation_cutoff_hours",
             "registration_cutoff_lead_minutes", "is_public", "created_by_id", "created_at",
             "image_url",
         )

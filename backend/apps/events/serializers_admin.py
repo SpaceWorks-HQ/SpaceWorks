@@ -42,6 +42,10 @@ class EventWriteSerializer(serializers.Serializer):
     registration_requires_approval = serializers.BooleanField(
         default=False, required=False,
     )
+    cancellation_cutoff_hours = serializers.IntegerField(
+        allow_null=True, default=None, min_value=0, max_value=8760, required=False,
+        help_text="Member cancellation closes this many hours before start; null means start.",
+    )
     registration_cutoff_at = serializers.DateTimeField(
         allow_null=True, default=None, required=False,
     )
@@ -53,7 +57,7 @@ class EventWriteSerializer(serializers.Serializer):
             'title', 'description', 'starts_at', 'ends_at', 'location',
             'location_kind', 'custom_form', 'capacity', 'is_public', 'payment_amount',
             'registration_requires_approval', 'registration_cutoff_at',
-            'registration_cutoff_lead_minutes',
+            'registration_cutoff_lead_minutes', 'cancellation_cutoff_hours',
             'image_key',
         ))),
         required=False,
@@ -140,6 +144,7 @@ class EventAdminSerializer(serializers.ModelSerializer):
             'capacity',
             'payment_amount',
             'registration_requires_approval',
+            'cancellation_cutoff_hours',
             'registration_cutoff_at',
             'registration_cutoff_lead_minutes',
             'effective_registration_cutoff_at',

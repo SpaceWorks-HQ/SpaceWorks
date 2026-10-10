@@ -31,6 +31,7 @@ BASE_MODEL_LOOKUPS = {
     'admin-bookable-space-image-finalize': ('bookings.BookableSpace', 'makerspace_id'),
     'admin-bookable-space-image-delete': ('bookings.BookableSpace', 'makerspace_id'),
     'admin-space-booking-list': ('bookings.BookableSpace', 'makerspace_id'),
+    'admin-space-booking-eligible-members': ('bookings.BookableSpace', 'makerspace_id'),
     'admin-booking-approve': ('bookings.Booking', 'space__makerspace_id'),
     'admin-booking-reject': ('bookings.Booking', 'space__makerspace_id'),
     'admin-booking-cancel': ('bookings.Booking', 'space__makerspace_id'),

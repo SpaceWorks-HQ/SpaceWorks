@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import F, Q
 from apps.encryption.mappers import ScopedPiiModelMixin
@@ -81,6 +81,15 @@ class BookableSpace(models.Model):
         validators=[MinValueValidator(1)],
     )
     booking_lead_time_minutes = models.PositiveIntegerField(default=60)
+    buffer_before_minutes = models.PositiveIntegerField(
+        default=0, validators=[MaxValueValidator(1440)],
+    )
+    buffer_after_minutes = models.PositiveIntegerField(
+        default=0, validators=[MaxValueValidator(1440)],
+    )
+    cancellation_cutoff_hours = models.PositiveIntegerField(
+        default=0, validators=[MaxValueValidator(8760)],
+    )
     max_booking_advance_days = models.PositiveIntegerField(
         default=30,
         validators=[MinValueValidator(1)],

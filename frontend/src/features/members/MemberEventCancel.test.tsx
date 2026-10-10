@@ -54,4 +54,19 @@ describe("member event cancellation", () => {
     expect(screen.getByRole("button", { name: "Cancel registration" })).toBeEnabled();
     expect(invalidate).not.toHaveBeenCalled();
   });
+
+  it("shows the expired deadline and directs the member to staff", () => {
+    const client = new QueryClient();
+    render(<QueryClientProvider client={client}><MemberEventCancel makerspaceId={7} makerspaceSlug="lab" registrationId={11} status="registered" canCancel={false} /></QueryClientProvider>);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByText("The cancellation deadline has passed. Contact staff.")).toBeVisible();
+    expect(staffRequest).not.toHaveBeenCalled();
+  });
+
+  it("displays the cutoff in the member's local clock", () => {
+    const client = new QueryClient();
+    const cutoff = "2026-10-13T10:30:00Z";
+    render(<QueryClientProvider client={client}><MemberEventCancel makerspaceId={7} makerspaceSlug="lab" registrationId={11} status="waitlisted" canCancel cutoffAt={cutoff} /></QueryClientProvider>);
+    expect(screen.getByText(`Cancel before ${new Date(cutoff).toLocaleString()}.`)).toBeVisible();
+  });
 });

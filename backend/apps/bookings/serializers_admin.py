@@ -89,6 +89,9 @@ class BookableSpaceAdminSerializer(serializers.ModelSerializer):
             'max_booking_duration_minutes',
             'booking_lead_time_minutes',
             'max_booking_advance_days',
+            'buffer_before_minutes',
+            'buffer_after_minutes',
+            'cancellation_cutoff_hours',
             'custom_form',
             'requester_notifications_enabled',
             'payment_amount',
@@ -121,6 +124,9 @@ class BookableSpaceBookingRulesSerializer(serializers.ModelSerializer):
             'max_booking_duration_minutes',
             'booking_lead_time_minutes',
             'max_booking_advance_days',
+            'buffer_before_minutes',
+            'buffer_after_minutes',
+            'cancellation_cutoff_hours',
             'approval_mode',
         )
 

@@ -102,6 +102,7 @@ def _bookings(makerspace_id, member, now):
 
 
 def _event_registrations(makerspace, member):
+    from apps.events.cancellation_policy import cancellation_cutoff, member_can_cancel
     from apps.events.member_history import registrations_for_space
     from apps.events.models import EventRegistration
 
@@ -125,6 +126,7 @@ def _event_registrations(makerspace, member):
     ).only(
         "id", "checkin_token", "status", "created_at", "event__title",
         "event__starts_at", "event__ends_at", "event__status", "event__makerspace_id",
+        "event__cancellation_cutoff_hours",
         "registered_via_makerspace_id", "host_waiver_id",
     )
     if getattr(member, "_claim_audit_context", None) is not None:
@@ -190,6 +192,8 @@ def _event_registrations(makerspace, member):
             "checkin_token": str(row.checkin_token) if usable_token(row) else None,
             "event_title": row.event.title, "starts_at": row.event.starts_at,
             "ends_at": row.event.ends_at, "status": row.status,
+            "cancellation_cutoff_at": cancellation_cutoff(row.event),
+            "can_cancel": member_can_cancel(row, now=now),
             "waitlist_position": row.waitlist_position if row.status == EventRegistration.Status.WAITLISTED else None,
             "feedback_available": feedback_available,
             "feedback_path": (

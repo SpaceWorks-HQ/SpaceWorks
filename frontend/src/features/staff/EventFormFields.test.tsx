@@ -47,4 +47,18 @@ describe("EventFields registration policy", () => {
     expect(payload.registration_cutoff_at).toBeNull();
     expect(payload.registration_cutoff_lead_minutes).toBe(30);
   });
+
+  it("edits member cancellation hours and restores the start-time default", () => {
+    render(<Harness />);
+    const hours = screen.getByLabelText(/Member cancellation closes hours before/);
+    fireEvent.change(hours, { target: { value: "24" } });
+    expect(hours).toHaveValue(24);
+    fireEvent.change(hours, { target: { value: "" } });
+    expect(hours).toHaveValue(null);
+    const payload = payloadFor({
+      ...emptyEventForm, starts_at: "2026-09-03T10:00", ends_at: "2026-09-03T12:00",
+      cancellation_cutoff_hours: 24,
+    });
+    expect(payload.cancellation_cutoff_hours).toBe(24);
+  });
 });

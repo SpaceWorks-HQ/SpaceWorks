@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.events import services
+from apps.apiclients.throttling import MemberPrincipalRateThrottle
 from apps.events.member_history import registrations_for_space
 from apps.events.models import EventRegistration
 from apps.events.serializers_admin import EmptyActionSerializer
@@ -25,6 +26,10 @@ class MemberRegistrationCancelResponseSerializer(serializers.Serializer):
 
 class MemberEventRegistrationCancelView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [MemberPrincipalRateThrottle]
+    # Reuse the configured event mutation rate with the member-principal namespace.
+    # It is distinct from registration's create budget, so registering never prevents cancel.
+    throttle_scope = "event_register"
 
     @extend_schema(
         tags=["Member events"],
@@ -32,6 +37,7 @@ class MemberEventRegistrationCancelView(APIView):
         description=(
             "Releases pending charges and uses the event's existing waitlist promotion "
             "policy. Settled charges are retained; this action does not issue a refund."
+            " Members may cancel only before the event's cancellation cutoff (null means start)."
         ),
         request=EmptyActionSerializer,
         responses={
@@ -44,6 +50,9 @@ class MemberEventRegistrationCancelView(APIView):
             403: OpenApiResponse(ErrorSerializer, description="An active membership is required."),
             404: OpenApiResponse(ErrorSerializer, description="Owned registration not found."),
             409: OpenApiResponse(ErrorSerializer, description="Registration cannot be cancelled."),
+            429: OpenApiResponse(ErrorSerializer, description="Rate limit exceeded."),
+            423: OpenApiResponse(ErrorSerializer, description="Tenant frozen for migration."),
+            503: OpenApiResponse(ErrorSerializer, description="Tenant write gate unavailable."),
         },
     )
     def post(self, request, makerspace_id, pk):
@@ -62,5 +71,7 @@ class MemberEventRegistrationCancelView(APIView):
         require_module(registration.event.makerspace, "events")
         serializer = EmptyActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        registration = services.cancel_registration(registration, actor=request.user)
+        registration = services.cancel_registration(
+            registration, actor=request.user, member_cancel=True,
+        )
         return Response(MemberRegistrationCancelResponseSerializer(registration).data)

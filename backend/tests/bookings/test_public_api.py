@@ -164,7 +164,7 @@ def test_availability_visibility_flags_and_confirmed_overlap_only():
     assert named_response.data['availability'][0]['booker_name'] == 'Named confirmed'
     assert len(named_response.data['availability']) == 1
     assert set(named_response.data) == {
-        'public_token', 'starts_at', 'ends_at', 'availability'
+        'public_token', 'starts_at', 'ends_at', 'availability', 'timezone', 'opening_intervals'
     }
 
 

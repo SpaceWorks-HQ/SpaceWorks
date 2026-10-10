@@ -5,30 +5,44 @@ from apps.operations.reminder_types import (  # noqa: F401 - explicit compatibil
 )
 
 
-# No AppConfig hooks or autodiscovery: production consumers register here explicitly.
-from apps.operations.membership_payment_reminders import MEMBERSHIP_PAYMENT_SOURCE
+# None selects production; a tuple is an exact override, including an empty tuple.
+REMINDER_SOURCES: tuple[ReminderSource, ...] | None = None
 
 
 def _production_sources():
     from apps.hardware_requests.loan_reminders import LOAN_REMINDER_SOURCES
+    from apps.operations.membership_payment_reminders import MEMBERSHIP_PAYMENT_SOURCE
     from apps.payments.reminders import build_payment_message, discover_payments, dispatch_payment_message
+    from apps.separability.registry import runtime_active
     from . import reminder_machine_sources as machines
 
-    return (MEMBERSHIP_PAYMENT_SOURCE, ReminderSource(
+    sources = [MEMBERSHIP_PAYMENT_SOURCE, ReminderSource(
         key="payments.due", module="request_workflow", feature="billing.reminders",
         discover=discover_payments, build=build_payment_message, dispatch=dispatch_payment_message,
-    ), *LOAN_REMINDER_SOURCES,
-        ReminderSource("machines.certification_expiry", "machines", machines.discover_certifications,
-                       machines.build_certification, "machines.certification_reminders", machines.dispatch_certification),
-        ReminderSource("machines.certification_digest", "machines", machines.discover_digest,
-                       machines.build_digest, "machines.certification_reminders", machines.dispatch_digest),
-        ReminderSource("maintenance.due", "maintenance", machines.discover_maintenance,
-                       machines.build_maintenance, "maintenance.reminders", machines.dispatch_maintenance),
-    )
+    ), *LOAN_REMINDER_SOURCES]
+    # Core consumers always remain. Domain imports/registrations are runtime-only:
+    # operations must load even when a separable domain app is tombstoned.
+    if runtime_active("machines"):
+        sources.extend((
+            ReminderSource("machines.certification_expiry", "machines", machines.discover_certifications,
+                           machines.build_certification, "machines.certification_reminders", machines.dispatch_certification),
+            ReminderSource("machines.certification_digest", "machines", machines.discover_digest,
+                           machines.build_digest, "machines.certification_reminders", machines.dispatch_digest),
+        ))
+    if runtime_active("maintenance"):
+        sources.append(ReminderSource(
+            "maintenance.due", "maintenance", machines.discover_maintenance,
+            machines.build_maintenance, "maintenance.reminders", machines.dispatch_maintenance,
+        ))
+    if runtime_active("events"):
+        from apps.events.reminders import EVENT_REMINDER_SOURCE
 
+        sources.append(EVENT_REMINDER_SOURCE)
+    if runtime_active("bookings"):
+        from apps.bookings.reminders import BOOKING_REMINDER_SOURCE
 
-# Tests can override production registrations; an empty tuple disables all sources.
-REMINDER_SOURCES: tuple[ReminderSource, ...] | None = None
+        sources.append(BOOKING_REMINDER_SOURCE)
+    return tuple(sources)
 
 
 def registered_sources():

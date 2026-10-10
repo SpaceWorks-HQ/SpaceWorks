@@ -12,6 +12,7 @@ export const emptyEventForm: EventFormValues = {
   timezone_name: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
   capacity: 0, payment_amount: "0.00", registration_requires_approval: false,
   registration_cutoff_at: null, registration_cutoff_lead_minutes: null,
+  cancellation_cutoff_hours: null,
   is_public: false,
   custom_form: null,
 };
@@ -31,6 +32,7 @@ export function valuesFor(event: StaffEvent): EventFormValues {
     registration_requires_approval: event.registration_requires_approval,
     registration_cutoff_at: event.registration_cutoff_at ? localDate(event.registration_cutoff_at) : null,
     registration_cutoff_lead_minutes: event.registration_cutoff_lead_minutes,
+    cancellation_cutoff_hours: event.cancellation_cutoff_hours ?? null,
     is_public: event.is_public,
     custom_form: event.custom_form,
   };
@@ -59,6 +61,7 @@ export function EventFields({ values, setValues, disabled = false, approvalLocke
     <label className="grid gap-1 text-sm font-semibold text-ink">Location<input className="desk-input" value={values.location} onChange={(e) => set("location", e.target.value)} disabled={disabled} maxLength={255} /></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Capacity<input className="desk-input" type="number" min="0" value={values.capacity} onChange={(e) => set("capacity", Number(e.target.value))} disabled={disabled} /><span className="text-xs font-normal text-muted">Use 0 for Unlimited.</span></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Registration price<input className="desk-input" type="number" min="0" step="0.01" value={values.payment_amount} onChange={(e) => set("payment_amount", e.target.value)} disabled={disabled} /><span className="text-xs font-normal text-muted">Charged only when a place is confirmed.</span></label>
+    <label className="grid gap-1 text-sm font-semibold text-ink">Member cancellation closes hours before<input className="desk-input" type="number" min="0" max="8760" value={values.cancellation_cutoff_hours ?? ""} onChange={(e) => set("cancellation_cutoff_hours", e.target.value === "" ? null : Number(e.target.value))} disabled={disabled} /><span className="text-xs font-normal text-muted">Leave blank to allow cancellation until the event starts. Settled refunds are handled by staff.</span></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Registration cutoff<select className="desk-input" value={cutoffMode} disabled={disabled} onChange={(e) => { const mode = e.target.value; setValues({ ...values, registration_cutoff_at: mode === "absolute" ? (values.starts_at || "") : null, registration_cutoff_lead_minutes: mode === "lead" ? 0 : null }); }}><option value="none">No cutoff</option><option value="absolute">At a date and time</option><option value="lead">Before the event starts</option></select></label>
     {cutoffMode === "absolute" ? <label className="grid gap-1 text-sm font-semibold text-ink">Cutoff time<input className="desk-input" type="datetime-local" value={values.registration_cutoff_at ?? ""} onChange={(e) => set("registration_cutoff_at", e.target.value)} disabled={disabled} required /></label> : null}
     {cutoffMode === "lead" ? <label className="grid gap-1 text-sm font-semibold text-ink">Minutes before start<input className="desk-input" type="number" min="0" value={values.registration_cutoff_lead_minutes ?? 0} onChange={(e) => set("registration_cutoff_lead_minutes", Number(e.target.value))} disabled={disabled} /></label> : null}

@@ -15,10 +15,14 @@ Wave 2 also registers opt-in certification expiry/digest and maintenance consume
 see [machine-training-maintenance.md](machine-training-maintenance.md). Upgrading
 leaves these features and their external notification channels off.
 
+E3/B10 add event and booking reminders through the same F1 sweep.
+
 ## Registering a source
 
-Add a `ReminderSource` explicitly in `operations/reminder_registry.py:_production_sources`.
-`REMINDER_SOURCES` is a test override (`None` means production; an empty tuple means none).
+Add a `ReminderSource` explicitly to `operations/reminder_registry.py:_production_sources`.
+Runtime-active checks guard the lazy imports, so operations still loads when a domain
+app is tombstoned. `REMINDER_SOURCES=None` selects these production sources; a tuple
+is an exact override used by isolated source tests.
 Its module and optional feature must already exist in their canonical registries.
 The sweeper checks both and, by default, the `notifications` module before discovery or claims;
 deployment tombstones are handled by `module_enabled` at the same boundary.
@@ -61,6 +65,13 @@ inbox does not suppress borrower duty mail. Email still respects its own module
 and matrix/mute settings. Staff escalation keeps the notifications gate.
 The default emitter adds no member delivery or matrix event families; domain
 consumers own those through their dispatch callbacks.
+Event and booking callbacks use the same five arguments and return `NotificationResult`;
+an empty result denotes suppressed delivery. Delivery failures mark the schedule FAILED;
+suppressed deliveries count as skipped. Both remain terminal under F1's at-most-once
+contract. Legacy callbacks returning `None` still count attempts, preserving consumers
+without delivery receipts. Event and booking notices go only to their requester, never
+to the shared staff inbox or a chat room. They re-read live status and eligibility
+immediately before delivery.
 
 The runnable **test-only** example is
 `backend/tests/operations/reminder_example.py`; it must never be added to the
@@ -166,3 +177,34 @@ automatically. The legacy zero-step sent marker is written only after borrower
 email delivery, so a suppressed/failed attempt does not become delivery proof if
 the policy is later removed. The legacy path revalidates active status, current
 due time and absence of a policy after discovery, before it claims a reminder.
+
+## Event and booking consumers (E3/B10)
+
+`events/reminders.py` discovers published events with REGISTERED members;
+`bookings/reminders.py` discovers CONFIRMED bookings. Each domain revalidates tenant,
+status, start instant, enabled lead offset and active member account before sending.
+Events use durable `registered_via_makerspace` provenance (legacy null means venue),
+so a collaborative attendee receives only their own routed reminder.
+The live User email is used instead of supplied contact text. Revoked membership,
+restricted/suspended account, member opt-out and requester selection suppress mail.
+
+Makerspace settings `event_reminder_lead_hours` and `booking_reminder_lead_hours` default
+to `[24]`; `[]` disables. Policies accept up to 100 distinct whole hours from 1 to 8760.
+The existing staff settings PATCH exposes both lists with explicit OpenAPI array schemas.
+The notification matrix `events.reminder` / `bookings.reminder` events, editable requester
+email templates, requester recipient selection, email module and quotas all apply. Existing booking
+requester-email overrides also govern booking reminders. Events keep their existing
+email default OFF until staff enable the events email cell. Reminder mail uses the
+makerspace local timezone, including DST; elapsed lead offsets remain UTC instants.
+Confirmed registrations in the member ICS feed carry matching DISPLAY VALARM components;
+cancelled, tentative and public feed components carry no member alarm.
+
+Discovery covers upcoming starts within the longest lead horizon and catches overdue
+steps until the start. Subjects enter discovery batches only when an unfinished step
+is due now; a future second offset cannot hold a batch after the first step completes
+and starve later attendees. All offsets are scheduled on first discovery.
+One missed step is dispatched at most once; policies
+and due timestamps do not reset completed claims. Production subject identities include
+the UTC start instant, so rescheduling creates a new occurrence while preserving the
+old committed claim. A reminder suppressed after a claim is terminal, consistent with
+F1's at-most-once guarantee.

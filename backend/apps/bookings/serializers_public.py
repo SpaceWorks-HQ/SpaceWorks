@@ -86,10 +86,20 @@ class PublicAvailabilityIntervalSerializer(serializers.Serializer):
     booker_name = serializers.CharField(allow_null=True, read_only=True)
 
 
+class PublicOpeningIntervalSerializer(serializers.Serializer):
+    starts_at = serializers.DateTimeField(read_only=True)
+    ends_at = serializers.DateTimeField(read_only=True)
+
+
 class PublicSpaceAvailabilitySerializer(serializers.Serializer):
     public_token = serializers.UUIDField(read_only=True)
     starts_at = serializers.DateTimeField(read_only=True)
     ends_at = serializers.DateTimeField(read_only=True)
+    timezone = serializers.CharField(read_only=True)
+    opening_intervals = PublicOpeningIntervalSerializer(
+        many=True, read_only=True,
+        help_text='Open windows in UTC, accounting for makerspace hours and dated exceptions.',
+    )
     availability = PublicAvailabilityIntervalSerializer(
         many=True,
         allow_null=True,
@@ -106,6 +116,17 @@ class PublicBookingInputSerializer(serializers.Serializer):
         required=False,
         write_only=True,
     )
+
+    def validate(self, attrs):
+        errors = {}
+        for field in ('starts_at', 'ends_at'):
+            raw = self.initial_data.get(field)
+            parsed = parse_datetime(raw) if isinstance(raw, str) else raw
+            if parsed is None or timezone.is_naive(parsed):
+                errors[field] = 'Datetime must include a timezone offset.'
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
 
 class PublicBookingResponseSerializer(serializers.Serializer):

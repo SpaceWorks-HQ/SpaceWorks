@@ -91,6 +91,18 @@ def register(
         locked, member, normalized_email, generation, event_hash
     )
     if existing and existing.status == EventRegistration.Status.CANCELLED:
+        # The unique payment subject preserves historical money. Reusing a cancelled
+        # paid row would find its terminal charge and silently provide a free place.
+        from apps.payments.models import Payment
+
+        if locked.payment_amount > 0 or Payment.objects.filter(
+            makerspace=locked.makerspace,
+            subject_type=Payment.SubjectType.EVENT_REGISTRATION,
+            subject_id=existing.pk,
+        ).exists():
+            raise EventInvalidTransition(
+                "A cancelled paid registration cannot be registered again. Contact staff."
+            )
         existing.member = member or existing.member
         existing.registered_via_makerspace = via_makerspace or locked.makerspace
         # Written together, but they diverge later: a purge clears the provenance above and

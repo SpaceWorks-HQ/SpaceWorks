@@ -17,6 +17,9 @@ from apps.makerspaces.models_makerspace_validation import clean_makerspace
 from apps.makerspaces.profile_validation import (
     default_timezone, validate_country, validate_opening_hours, validate_timezone,
 )
+from apps.makerspaces.reminder_policy import (
+    default_reminder_lead_hours, validate_reminder_lead_hours,
+)
 from apps.makerspaces.validators import (
     validate_presence_presets,
     DEFAULT_PRESENCE_PRESETS,
@@ -119,6 +122,12 @@ class Makerspace(MakerspaceSecretsMixin, models.Model):
     superadmin_access_enabled = models.BooleanField(default=True)
     staff_notifications_enabled = models.BooleanField(default=True)
     booking_requester_notifications_enabled = models.BooleanField(default=False)
+    event_reminder_lead_hours = models.JSONField(
+        default=default_reminder_lead_hours, blank=True, validators=[validate_reminder_lead_hours],
+    )
+    booking_reminder_lead_hours = models.JSONField(
+        default=default_reminder_lead_hours, blank=True, validators=[validate_reminder_lead_hours],
+    )
     logo_key = models.CharField(max_length=300, blank=True, default="")
     cover_image_key = models.CharField(max_length=300, blank=True, default="")
     # Case-insensitive uniqueness is enforced by the Lower() UniqueConstraint in Meta

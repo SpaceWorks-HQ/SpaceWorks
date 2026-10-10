@@ -33,7 +33,7 @@ export type BookableSpace = {
 
 export type BookableSpacePayload = Pick<BookableSpace,
   "name" | "kind" | "description" | "capacity" | "location" | "is_public" |
-  "show_public_availability" | "show_public_booker_names" | "approval_mode" |
+  "show_public_availability" | "show_public_booker_names" |
   "custom_form" | "requester_notifications_enabled" | "payment_amount" | "machine_type"
 >;
 
