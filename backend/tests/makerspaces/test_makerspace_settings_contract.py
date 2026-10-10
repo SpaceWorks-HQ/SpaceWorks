@@ -101,6 +101,29 @@ def test_staff_without_manage_makerspace_cannot_set_the_lapsed_flag():
     assert lab.lapsed_members_cannot_borrow is False
 
 
+# --- public print-status recovery policy -----------------------------------------------
+
+
+def test_public_print_status_lookup_policy_round_trips_and_rejects_unknown_values():
+    lab = space("contract-print-policy")
+    manager = make_member("contract-print-policy-manager", lab)
+    client = authenticated_client(manager)
+
+    accepted = client.patch(
+        detail(lab), {"public_print_status_lookup_policy": "email_unverified"}, format="json"
+    )
+    refused = client.patch(
+        detail(lab), {"public_print_status_lookup_policy": "anyone"}, format="json"
+    )
+
+    assert accepted.status_code == 200
+    assert accepted.data["public_print_status_lookup_policy"] == "email_unverified"
+    assert refused.status_code == 400
+    assert "public_print_status_lookup_policy" in refused.data
+    lab.refresh_from_db()
+    assert lab.public_print_status_lookup_policy == "email_unverified"
+
+
 # --- audit rows name what changed, never secret values ---------------------------------
 
 
