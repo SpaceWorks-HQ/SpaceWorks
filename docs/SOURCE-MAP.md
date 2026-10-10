@@ -175,6 +175,15 @@
   transitions (atomic + row-locked + audited; also `assign_box`/`issue_request`/`return_items`);
   `permissions.py`, `exceptions.py` (workflow→HTTP map + `ErrorSerializer._EXCEPTION_MAP`),
   `notifications.py` (Telegram seam), public submit/verify/status views, `send_return_reminders` command.
+  Phase 9c replay: `models_replay.py` owns omitted command coordination; `replay_authorization.py`
+  reloads the human lease and live policy; `replay_serializers.py`/`replay_payload_serializers.py` and
+  `replay_fingerprint.py` normalize the protocol; `replay_prepare.py` establishes evidence/ownership;
+  `replay_claims.py` fences claims; `replay_execute.py`/`replay_dispatch.py` wrap the shared online
+  dispatcher and workflow transaction. `replay_views.py` is mounted by makerspaces/station_urls.py;
+  `replay_cleanup.py`/`tasks_replay.py` implement bounded daily cleanup, with settings checks in checks.py.
+  `evidence/finalization_completed.py` supplies database-only finalized reuse under domain locks.
+  `frontend/src/features/kiosk/kioskReplayApi.ts` hand-writes typed prepare/execute calls using only
+  Station cookie + human lease; the client queue and recovery screen belong to later slices.
 - `backend/apps/payments/` — immutable multi-subject Payment authority, per-space raw credentials + managed
   Stripe Connect resolution, checkout/webhook settlement, reconciliation, native PaymentSheet intents.
 - `backend/apps/printing/` — **TOMBSTONED** (Project B): only an `AppConfig` and an empty `models.py`, kept

@@ -43,6 +43,13 @@ def test_every_declared_task_actually_resolves():
         assert callable(getattr(import_module(module_path), attribute))
 
 
+def test_replay_cleanup_is_daily_in_both_schedulers():
+    from django.conf import settings
+    task = "apps.hardware_requests.tasks_replay.cleanup_replay_commands_task"
+    assert settings.CELERY_BEAT_SCHEDULE["cleanup-kiosk-replay-commands"]["task"] == task
+    assert ("cleanup-kiosk-replay-commands", task, 24 * 60) in SCHEDULED_TASKS
+
+
 def test_password_reset_drain_is_registered_in_both_schedulers():
     from django.conf import settings
 

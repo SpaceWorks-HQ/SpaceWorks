@@ -15,6 +15,7 @@ GLOBAL_MODELS = {
 }
 
 OMITTED_MODELS = {
+    "hardware_requests.ReplayCommand": "Short-lived Station/session replay coordination; physical results and evidence travel independently.",
     "makerspaces.StationCredential": (
         "Live Station authentication authority; a portable tenant must rotate a new PIN."
     ),

@@ -215,6 +215,34 @@ def test_whole_tenant_purge_removes_every_station_kind():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_whole_tenant_purge_removes_protected_replay_chain_before_domain_and_evidence(monkeypatch):
+    from datetime import timedelta
+    from uuid import uuid4
+    from django.utils import timezone
+    from apps.hardware_requests.models import ReplayCommand
+    monkeypatch.setattr(lifecycle, "_delete_storage_keys", lambda keys: None)
+    space = _space("purge-replay-chain")
+    actor = User.objects.create_superuser(username="replay-purge-admin")
+    station = Station.objects.create(makerspace=space, kind="handover", name="Replay desk")
+    photo = EvidencePhoto.objects.create(makerspace=space, evidence_type="issue",
+                                        object_key="purge/replay/photo", uploaded_by=actor)
+    request = HardwareRequest.objects.create(makerspace=space, requester=actor, requester_username=actor.username)
+    fields = dict(makerspace=space, station=station, actor=actor, operator_lease_id=uuid4(),
+                  station_session_id=uuid4(), station_version=1, payload_fingerprint="0" * 64,
+                  operation_kind="reviewed_issue", operation_version=1, aggregate_id=uuid4(),
+                  client_created_at=timezone.now(), expires_at=timezone.now() + timedelta(hours=1),
+                  subject_request=request, evidence=photo)
+    first = ReplayCommand.objects.create(**fields, client_command_id=uuid4(), sequence=1)
+    second = ReplayCommand.objects.create(**fields, client_command_id=uuid4(), sequence=2, predecessor=first)
+    ids = (first.pk, second.pk)
+    lifecycle.purge(lifecycle.archive(space, actor), actor)
+    assert not ReplayCommand.objects.filter(pk__in=ids).exists()
+    assert not EvidencePhoto.objects.filter(pk=photo.pk).exists()
+    assert not HardwareRequest.objects.filter(pk=request.pk).exists()
+    assert not Station.objects.filter(pk=station.pk).exists()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_importing_to_active_transition_is_atomic(monkeypatch):
     space = _space("activate-import", Makerspace.LifecycleState.IMPORTING)
     original_save = Makerspace.save

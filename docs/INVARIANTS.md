@@ -1976,6 +1976,29 @@ Load-bearing details that carried over unchanged:
   `kiosk.online_command_executed` row carrying station/session/version/lease identity. Capability off
   answers 400, missing authority 403, `inventory.kiosk` off refuses the session uniformly. Deployment
   quarantine revokes every lease; leases and revocations are omitted from tenant archives.
+- **Handover replay is ordered, token-fenced coordination over the existing workflows (phase 9c).**
+  `hardware_requests.ReplayCommand` stores only canonical SHA-256 identity, Station/session/human lease,
+  aggregate sequence/predecessor, claim state, catalogued failure and stable domain/evidence references.
+  It never stores payload/response JSON, raw QR or borrower PII. Prepare and execute require the same
+  signed Station cookie, exact Origin/Referer and `X-Station-CSRF`, plus `X-Kiosk-Operator-Lease`.
+  Replay reloads the lease's real User without requiring their normal browser login to remain live;
+  current account, membership/organization RBAC, Station version/revocation and operation capabilities
+  are checked before claim and again before the domain effect. Module/feature off is 400.
+  Prepare establishes one immutable evidence identity and presigns staging only. Execute commits a
+  short claim plus `kiosk.replay_claimed` audit before S3, then commits workflow effects, stable results and `kiosk.replay_succeeded`
+  together in one outer transaction. Nested workflows reuse finalized evidence from database state,
+  so their domain locks never span completed-evidence S3 cleanup. Stale claims are reclaimed after
+  five minutes with a new token; an old executor cannot release or complete a newer claim.
+  Duplicate success has no second physical effect; changed canonical identity conflicts. Expected
+  domain refusals become terminal typed failures with `kiosk.replay_failed`; storage/unknown faults
+  stay retryable. Failed evidence stays immutable and readable under existing evidence permissions
+  and retention. Maximum command age (eight hours) cannot exceed coordination retention (seven days),
+  and server timestamp validation prevents cleanup from reopening old ownership keys. Daily bounded
+  cleanup expires prepared/stale-claimed work and deletes retained terminal leaves, preserving any
+  predecessor still referenced by a descendant. Whole-tenant purge removes all replay links first.
+  Coordination and its actor edge never travel in portable tenant exports. Direct return may resolve
+  the loan from its succeeded predecessor chain; per-item resolutions keep the existing staff contract.
+  Browser queue and recovery UI are separate slices.
 - **Registering for an event does NOT require a `PresenceSession`; check-in does.**
   `require_active_member` (identity + membership + waiver) was split out of
   `require_active_member_presence`, and **only** `PublicEventRegistrationView` switched wholesale. The

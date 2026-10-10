@@ -577,6 +577,10 @@ TENANT_DUMP_STAGING_MAX_AGE_SECONDS = env.int(
 )
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
 CELERY_BEAT_SCHEDULE = {
+    "cleanup-kiosk-replay-commands": {
+        "task": "apps.hardware_requests.tasks_replay.cleanup_replay_commands_task",
+        "schedule": crontab(hour=3, minute=20),
+    },
     "flush-api-client-usage": {
         "task": "apps.apiclients.tasks.flush_api_client_usage_task",
         "schedule": crontab(minute="*"),
@@ -738,6 +742,10 @@ KIOSK_OPERATOR_LEASE_TTL_SECONDS = env.int(
 KIOSK_OPERATOR_LEASE_RETENTION_SECONDS = env.int(
     "KIOSK_OPERATOR_LEASE_RETENTION_SECONDS", default=7 * 24 * 60 * 60
 )
+KIOSK_COMMAND_MAX_AGE_SECONDS = env.int("KIOSK_COMMAND_MAX_AGE_SECONDS", default=8 * 60 * 60)
+KIOSK_REPLAY_RETENTION_SECONDS = env.int("KIOSK_REPLAY_RETENTION_SECONDS", default=7 * 24 * 60 * 60)
+KIOSK_REPLAY_CLAIM_TIMEOUT_SECONDS = env.int("KIOSK_REPLAY_CLAIM_TIMEOUT_SECONDS", default=5 * 60)
+KIOSK_REPLAY_CLEANUP_BATCH_SIZE = env.int("KIOSK_REPLAY_CLEANUP_BATCH_SIZE", default=500)
 EVENT_CHECKIN_WINDOW_BEFORE_HOURS = env.int(
     "EVENT_CHECKIN_WINDOW_BEFORE_HOURS", default=24
 )
@@ -927,6 +935,8 @@ REST_FRAMEWORK = {
         "kiosk_operator_lease": env(
             "THROTTLE_KIOSK_OPERATOR_LEASE", default="30/hour"
         ),
+        "kiosk_replay_prepare": env("THROTTLE_KIOSK_REPLAY_PREPARE", default="60/hour"),
+        "kiosk_replay_execute": env("THROTTLE_KIOSK_REPLAY_EXECUTE", default="240/hour"),
         # Fixed, not env-tunable: the plan pins reveal at exactly 5/hour.
         "kiosk_station_reveal": "5/hour",
         "event_calendar_feed_token": env(

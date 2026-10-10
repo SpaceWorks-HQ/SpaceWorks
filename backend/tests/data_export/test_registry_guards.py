@@ -34,6 +34,16 @@ def test_complete_registry_is_valid():
     validate_all()
 
 
+def test_replay_coordination_is_omitted_and_actor_never_expands_user_closure():
+    from apps.data_export.models import OMITTED_MODELS
+    from apps.data_export.references import USER_EDGES
+    from apps.data_export.types import Fidelity
+    assert "hardware_requests.ReplayCommand" in OMITTED_MODELS
+    for fidelity in Fidelity:
+        edge = USER_EDGES[(fidelity, "hardware_requests.ReplayCommand", "actor")]
+        assert not edge.included and not edge.raw
+
+
 def test_field_disposition_guard_detects_missing_field():
     fields = dict(FIELDS)
     fields.pop((Fidelity.REDACTED, "inventory.Category", "name"))

@@ -12,6 +12,16 @@ def _same(label, names, disposition, reason):
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
     *_same(
+        "hardware_requests.ReplayCommand",
+        "id makerspace station actor operator_lease_id station_session_id station_version "
+        "client_command_id payload_fingerprint operation_kind operation_version aggregate_id "
+        "sequence predecessor state claim_token claimed_at claim_attempts client_created_at "
+        "expires_at created_at updated_at completed_at failure_code failure_detail "
+        "subject_request subject_loan evidence result_request result_loan result_return_event",
+        D.DROP,
+        "Replay ownership and claims are source-local coordination and never travel.",
+    ),
+    *_same(
         "makerspaces.Station",
         "created_by",
         D.RESET,

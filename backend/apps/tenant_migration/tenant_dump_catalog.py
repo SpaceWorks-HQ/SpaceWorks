@@ -59,7 +59,9 @@ class TenantDumpCatalogError(AssertionError):
 # Station/StationCredential metadata plus the explicit event-owned binding.
 # Re-blessed for phase 9b after adding the omitted, all-DROP kiosk
 # StationOperatorLease and StationSessionRevocation tables.
-CATALOG_SCHEMA_SHA256 = "7cb4c27597b7900aed159ae34a2a91f492f7a57b33387ab553b8e8a06246fa51"
+# Phase 9c adds only the all-DROP ReplayCommand model (31 fields). Reconstructed
+# snapshot graph reproduces the prior digest exactly before adding this reviewed row.
+CATALOG_SCHEMA_SHA256 = "28e593005a2cc5df32e4a4a61aac2735c21e473e75222ebdd72b6c3c81e44d17"
 
 
 def catalog_models(apps_registry=apps):

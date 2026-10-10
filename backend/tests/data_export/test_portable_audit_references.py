@@ -39,6 +39,34 @@ def _product(makerspace):
     )
 
 
+def test_replay_audit_keeps_station_binding_and_namespaces_source_coordination_ids():
+    from uuid import uuid4
+    from apps.hardware_requests.models import ReplayCommand
+    from apps.makerspaces.models import Station
+    actor = make_user("replay-audit-actor")
+    makerspace = make_space("replay-audit-export")
+    station = Station.objects.create(makerspace=makerspace, kind="handover", name="Export desk")
+    command = ReplayCommand.objects.create(
+        makerspace=makerspace, station=station, actor=actor, operator_lease_id=uuid4(),
+        station_session_id=uuid4(), station_version=1, client_command_id=uuid4(),
+        payload_fingerprint="0" * 64, operation_kind="assign_box", operation_version=1,
+        aggregate_id=uuid4(), sequence=1, client_created_at=timezone.now(),
+        expires_at=timezone.now() + timedelta(hours=1),
+    )
+    audit.record(actor, "kiosk.replay_prepared", makerspace=makerspace, target=station,
+                 meta={"station_id": station.pk, "replay_id": str(command.pk),
+                       "operator_lease_id": str(command.operator_lease_id),
+                       "station_session_id": str(command.station_session_id),
+                       "aggregate_id": str(command.aggregate_id)})
+    files, _archive_bytes, _manifest = archive_files(make_job(makerspace, actor))
+    row = next(row for row in csv_rows(files, "audit/audit_log.csv") if row["action"] == "kiosk.replay_prepared")
+    meta = json.loads(row["meta"])
+    assert meta["station_id"] == station.pk
+    for field in ("replay_id", "operator_lease_id", "station_session_id", "aggregate_id"):
+        assert str(meta[field]).startswith("source:")
+    assert not any("replaycommand" in path.lower() for path in files)
+
+
 def test_exported_audit_target_keeps_a_remappable_pair():
     actor = make_user("audit-exported-target")
     makerspace = make_space("audit-exported-target")

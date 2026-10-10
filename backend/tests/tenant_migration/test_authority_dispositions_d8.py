@@ -15,6 +15,15 @@ def _fields(label, names, dispositions):
 
 EXPECTED = dict(
     [
+        *_fields(
+            "hardware_requests.ReplayCommand",
+            "id makerspace station actor operator_lease_id station_session_id station_version "
+            "client_command_id payload_fingerprint operation_kind operation_version aggregate_id "
+            "sequence predecessor state claim_token claimed_at claim_attempts client_created_at "
+            "expires_at created_at updated_at completed_at failure_code failure_detail "
+            "subject_request subject_loan evidence result_request result_loan result_return_event",
+            D.DROP,
+        ),
         *_fields("accounts.User", "is_superuser is_staff role", D.RESET),
         *_fields("accounts.User", "groups user_permissions", D.DROP),
         *_fields(

@@ -14,6 +14,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from apps.audit import services as audit
+from apps.accounts import rbac
 from apps.boxes.models import QrCode, QrScanEvent
 from apps.boxes.serializers import QrCodeSerializer, qr_target_payload
 from apps.hardware_requests import direct_loan_workflow, workflow
@@ -37,13 +38,15 @@ def channel_meta(lease, kind, **extra):
     }
 
 
-def _request(makerspace, pk):
-    return get_object_or_404(HardwareRequest, pk=pk, makerspace=makerspace)
+def _request(makerspace, pk, user, action):
+    return get_object_or_404(rbac.scope_by_action(user, action, HardwareRequest.objects.all()),
+                             pk=pk, makerspace=makerspace)
 
 
-def _direct_loan(makerspace, pk):
+def _direct_loan(makerspace, pk, user):
     return get_object_or_404(
-        PublicToolLoan, pk=pk, makerspace=makerspace,
+        rbac.scope_by_action(user, rbac.Action.RETURN_REQUEST, PublicToolLoan.objects.all()),
+        pk=pk, makerspace=makerspace,
         source=PublicToolLoan.Source.ADMIN_DIRECT,
     )
 
@@ -63,13 +66,13 @@ def _resolve_qr(makerspace, user, data):
 
 
 def _assign_box(makerspace, user, data):
-    updated = workflow.assign_box(user, _request(makerspace, data["request_id"]), data["box_code"])
+    updated = workflow.assign_box(user, _request(makerspace, data["request_id"], user, rbac.Action.ASSIGN_BOX), data["box_code"])
     return AdminRequestSerializer(updated).data, {"request_id": updated.pk}
 
 
 def _reviewed_issue(makerspace, user, data):
     updated = workflow.issue_request(
-        user, _request(makerspace, data["request_id"]), data["evidence_id"], data["remark"],
+        user, _request(makerspace, data["request_id"], user, rbac.Action.ISSUE_REQUEST), data["evidence_id"], data["remark"],
         asset_qr_payloads=data["asset_qr_payloads"], rejects=data["rejects"],
     )
     return AdminRequestSerializer(updated).data, {
@@ -79,7 +82,7 @@ def _reviewed_issue(makerspace, user, data):
 
 def _reviewed_return(makerspace, user, data):
     updated = workflow.return_items(
-        user, _request(makerspace, data["request_id"]), data["evidence_id"],
+        user, _request(makerspace, data["request_id"], user, rbac.Action.RETURN_REQUEST), data["evidence_id"],
         data["remark"], data["box_code"], data["resolutions"],
     )
     return AdminRequestSerializer(updated).data, {
@@ -108,11 +111,11 @@ def _direct_handout(makerspace, user, data):
 
 def _direct_return(makerspace, user, data):
     returned = direct_loan_workflow.return_direct_loan(
-        _direct_loan(makerspace, data["loan_id"]), user, data["evidence_id"],
+        _direct_loan(makerspace, data["loan_id"], user), user, data["evidence_id"],
         data["notes"], data["resolutions"], qr_payload=data.get("qr_payload", ""),
     )
     return DirectLoanSerializer(returned).data, {
-        "loan_id": returned.pk, "evidence_id": data["evidence_id"],
+        "loan_id": returned.pk, "request_id": returned.request_id, "evidence_id": data["evidence_id"],
     }
 
 
@@ -126,9 +129,14 @@ DISPATCH = {
 }
 
 
+def dispatch_validated(*, station, user, kind, payload):
+    """Shared service dispatch; callers own authorization and transaction boundaries."""
+    return DISPATCH[kind](station.makerspace, user, payload)
+
+
 def execute(*, station, lease, user, kind, payload):
     makerspace = station.makerspace
-    result, refs = DISPATCH[kind](makerspace, user, payload)
+    result, refs = dispatch_validated(station=station, user=user, kind=kind, payload=payload)
     audit.record(
         user, "kiosk.online_command_executed", makerspace=makerspace, target=station,
         meta=channel_meta(lease, kind, **refs),
@@ -139,7 +147,10 @@ def execute(*, station, lease, user, kind, payload):
 def work_package(*, station, lease, user, kind, pk):
     makerspace = station.makerspace
     if kind == "reviewed_request":
-        hardware_request = _request(makerspace, pk)
+        requests = (rbac.scope_by_action(user, rbac.Action.ASSIGN_BOX, HardwareRequest.objects.all())
+                    | rbac.scope_by_action(user, rbac.Action.ISSUE_REQUEST, HardwareRequest.objects.all())
+                    | rbac.scope_by_action(user, rbac.Action.RETURN_REQUEST, HardwareRequest.objects.all()))
+        hardware_request = get_object_or_404(requests, pk=pk, makerspace=makerspace)
         box = hardware_request.assigned_box
         items = hardware_request.items.select_related("product").order_by("pk")
         data = {
@@ -167,7 +178,7 @@ def work_package(*, station, lease, user, kind, pk):
         }
         refs = {}
     else:
-        loan = _direct_loan(makerspace, pk)
+        loan = _direct_loan(makerspace, pk, user)
         requester = loan.requester
         data = {
             "status": loan.status,

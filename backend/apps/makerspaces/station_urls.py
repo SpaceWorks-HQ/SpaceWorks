@@ -1,4 +1,5 @@
 from django.urls import path
+from apps.hardware_requests.replay_views import KioskReplayExecuteView, KioskReplayPrepareView
 
 from apps.hardware_requests.kiosk_views import (
     KioskEvidencePrepareView,
@@ -19,6 +20,10 @@ from apps.makerspaces.station_views_public import (
 
 
 urlpatterns = [
+    path("kiosk-stations/<uuid:public_token>/replay/prepare/",
+         KioskReplayPrepareView.as_view(), name="kiosk-replay-prepare"),
+    path("kiosk-stations/<uuid:public_token>/replay/<uuid:client_command_id>/execute/",
+         KioskReplayExecuteView.as_view(), name="kiosk-replay-execute"),
     path(
         "admin/makerspace/<int:makerspace_id>/kiosk-stations/",
         KioskStationListCreateView.as_view(),
