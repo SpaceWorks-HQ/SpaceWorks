@@ -3,6 +3,7 @@ from celery import shared_task
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.servability import servable_queryset
 from apps.operations.report_rollups import finalize_evidence_rollups
+from apps.operations.tasks_reminders import run_reminder_sweep_task  # noqa: F401
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)

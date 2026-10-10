@@ -106,6 +106,9 @@ OMITTED_MODELS = {
     "makerspaces.ImportedUserReconciliation": "Target-side operator reconciliation input.",
     "makerspaces.SubdomainRequest": "Source-deployment routing request.",
     "operations.PeriodicTaskRun": "Deployment scheduler state.",
+    "operations.ReminderSchedule": (
+        "Source-local reminder claims do not travel; target sources rebuild from domain rows."
+    ),
     "operations.ReportDelivery": "Report delivery telemetry and a short-lived download coordination key; not rebuild data.",
     "operations.ReportRollupCursor": "Rebuildable report rollup coordination and retention-fence state.",
     "events.EventOrganizer": (

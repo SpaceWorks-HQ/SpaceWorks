@@ -165,6 +165,8 @@ RELATIONAL_USER_FIELDS = frozenset(
 )
 
 _EXCLUDED_USER_EDGE_REASONS = {
+    # operations.ReminderSchedule deliberately has no accounts.User FK: opaque
+    # domain subject identities cannot add accounts to the portable user closure.
     ("makerspaces.Station", "created_by"): (
         "Station provisioning provenance is omitted from every tenant export."
     ),

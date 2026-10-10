@@ -58,7 +58,9 @@ class TenantDumpCatalogError(AssertionError):
 # Re-blessed on integration: phases 11 and 10, the backup lane, Wave-0 offline refunds,
 # the 7a-7d devices chain and the 9a-9e kiosk chain all changed the catalog; recomputed
 # from the merged snapshot.
-CATALOG_SCHEMA_SHA256 = "ff05f1988ee048b26717042c02dbfc23bd46d2731aa3598cd8433e32a0a57a96"
+# Recompute after merging lane/w1-events and lane/w1-sweeper (F1 adds
+# source-local ReminderSchedule, DROP); the coordinator pins the merged digest.
+CATALOG_SCHEMA_SHA256 = "RECOMPUTE"
 
 
 def catalog_models(apps_registry=apps):

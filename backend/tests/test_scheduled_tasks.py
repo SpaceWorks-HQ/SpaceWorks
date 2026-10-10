@@ -24,6 +24,17 @@ from apps.tenant_migration.services_import_job import (
 pytestmark = pytest.mark.django_db
 
 
+def test_shared_reminder_sweep_has_equal_five_minute_cadence():
+    from django.conf import settings
+
+    task = "apps.operations.tasks_reminders.run_reminder_sweep_task"
+    entry = settings.CELERY_BEAT_SCHEDULE["reminder-sweep"]
+    assert entry["task"] == task
+    assert entry["schedule"]._orig_minute == "*/5"
+    assert entry["schedule"]._orig_hour == "*"
+    assert ("reminder-sweep", task, 5) in SCHEDULED_TASKS
+
+
 def test_every_beat_entry_has_a_beat_less_counterpart():
     # The drift guard. A task added to CELERY_BEAT_SCHEDULE for the Celery deployment
     # must not silently go missing from the deployment that has no beat to run it.

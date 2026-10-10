@@ -13,6 +13,11 @@ Cloud surfaces: `accounts/views_social.py` explicitly exports the nonce/login vi
 verification/error helpers in `views_social_helpers.py`. `integrations/health.py` explicitly exports
 `health_status.py` rollups and `health_chat.py` destination/legacy delivery summaries. The
 read-only scheduler control page lives in `operations/admin_scheduling.py`.
+The shared reminder foundation is `operations/models_reminders.py`,
+`reminder_registry.py`, `reminder_services.py`, `reminder_sweeper.py` and
+`tasks_reminders.py`; consumer registrations are explicit and initially empty.
+Queries use `accounts/rbac.py:scope_for_scheduled_work`; see
+[reminder-schedules.md](reminder-schedules.md) for UTC, claims and migration rules.
 
 - `backend/config/` — Django project (`settings.py`, `urls.py`, wsgi/asgi). All API routes under `/api/`.
   `config/admin_access.py` holds the `/control/` gating, CSP middleware, and the hidden-scope drift-guard
@@ -180,7 +185,8 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
   `task_gate.py` (the write-drain lock protocol and its AST coverage guards in `source_gate_guards.py`);
   `archive_envelope.py` + `object_export.py` (streamed into `age`); `admission.py` (the source-superadmin
   closure approval); `materialization.py` + `raw_repository.py` + `row_planning.py`/`row_dispositions.py`
-  (one-shot insertion); `target_projection.py` + `unique_values.py` (barrel: the rules dict is
+  (one-shot insertion); `target_projection.py` (barrel over `target_projection_{types,fields,rows,references}.py`)
+  + `unique_values.py` (barrel: the rules dict is
   `unique_values_core.py`, the disposition/policy types `unique_values_policy.py`) + `closure_references.py`;
   `tenant_dump_model_catalog.py` + `tenant_dump_field_snapshot.py` +
   `tenant_dump_authority.py`/`tenant_dump_catalog.py` (Lane D's deny-by-default source catalog), and
@@ -234,3 +240,5 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
 
 See [SOURCE-MAP-DOMAINS.md](SOURCE-MAP-DOMAINS.md) for hardware loans, payments,
 printing, events, the frontend directories and connected device monitoring.
+See also [SOURCE-MAP-frontend.md](SOURCE-MAP-frontend.md) for the standalone
+frontend directory and browser/kiosk flow map.
