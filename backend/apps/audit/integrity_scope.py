@@ -28,6 +28,7 @@ from .integrity_activation import _verify_activation
 from .integrity_anchor_errors import ANCHOR_TRANSPORT, VERIFICATION_UNAVAILABLE
 from .integrity_batches import _continues, _verify_batches
 from .integrity_rotations import _verify_rotation_chain
+from .integrity_scope_anchors import verify_scope_batch_anchor
 
 CHAIN_INVALID = {
     AuditFailureClass.CHAIN_CONTINUITY, AuditFailureClass.KEY_INTERVAL,
@@ -131,8 +132,8 @@ def _local_chain_status(makerspace_id, keys, result):
     return "locally_verified"
 
 
-def anchor_phase(makerspace_id, result, *, read_budget):
-    """Fill anchor status; ``AnchorReadBudgetExceeded`` propagates to the caller."""
+def anchor_phase(makerspace_id, result, *, read_budget, genesis_row_limit):
+    """Fill anchor status; resource-limit exceptions propagate to the caller."""
     if not str(getattr(settings, "AUDIT_ATTESTATION_ANCHOR_BACKEND", "")).strip():
         result.anchor_status = "not_configured"
         return result
@@ -153,9 +154,10 @@ def anchor_phase(makerspace_id, result, *, read_budget):
         return None if known == "unavailable" else known
 
     failure = (
-        _verify_activation(keys[0], sink)
+        _verify_activation(keys[0], sink, genesis_row_limit=genesis_row_limit)
         or _verify_rotation_chain(keys, sink)
-        or _verify_batches(makerspace_id, sink, local_verifier=answer_from_phase_one)
+        or _verify_batches(makerspace_id, sink, local_verifier=answer_from_phase_one,
+                           anchor_verifier=verify_scope_batch_anchor)
     )
     if failure is None:
         result.anchor_status = "externally_anchored"

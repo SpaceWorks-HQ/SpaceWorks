@@ -7,7 +7,9 @@ a hint that it exists.
 """
 
 from django.http import Http404
-from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
+from drf_spectacular.utils import (
+    OpenApiParameter, OpenApiResponse, PolymorphicProxySerializer, extend_schema, inline_serializer,
+)
 from rest_framework import serializers, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -21,6 +23,7 @@ from apps.audit.models import AuditVerificationRun
 from apps.audit.serializers_verification import (
     VerificationAcceptedSerializer,
     VerificationRequestSerializer,
+    VerificationRunPageSerializer,
     VerificationRunSerializer,
     run_payload,
     status_url,
@@ -30,12 +33,19 @@ from apps.makerspaces.models import Makerspace
 ERROR_BODY = inline_serializer(
     "AuditVerificationError", {"code": serializers.CharField(), "detail": serializers.CharField()}
 )
+DETAIL_ERROR = inline_serializer("AuditVerificationDetailError", {"detail": serializers.CharField()})
+FILTER_ERROR = inline_serializer("AuditVerificationFilterError", {
+    name: serializers.ListField(child=serializers.CharField(), required=False)
+    for name in ("action", "target_type", "target_id", "actor", "start", "end", "non_field_errors")
+})
 ERRORS = {
-    400: OpenApiResponse(ERROR_BODY, description="Invalid filters, `narrow_audit_range` or "
-                         "`audit_verification_scope_too_large`."),
-    401: OpenApiResponse(description="Not authenticated."),
-    403: OpenApiResponse(description="Not active staff."),
-    404: OpenApiResponse(description="Makerspace or run not in the caller's VIEW_AUDIT scope."),
+    400: OpenApiResponse(PolymorphicProxySerializer(
+        component_name="AuditVerificationBadRequest", serializers=[ERROR_BODY, FILTER_ERROR],
+        resource_type_field_name=None,
+    ), description="Invalid filters, `narrow_audit_range` or `audit_verification_scope_too_large`."),
+    401: OpenApiResponse(DETAIL_ERROR, description="Not authenticated."),
+    403: OpenApiResponse(DETAIL_ERROR, description="Not active staff."),
+    404: OpenApiResponse(DETAIL_ERROR, description="Makerspace or run not in the caller's VIEW_AUDIT scope."),
 }
 
 
@@ -72,7 +82,8 @@ class AuditVerificationListCreateView(APIView):
     @extend_schema(
         tags=["Audit verification"],
         summary="List audit verification runs for one makerspace",
-        responses={200: VerificationRunSerializer(many=True), **ERRORS},
+        parameters=[OpenApiParameter("page", int, description="Page number (24 runs per page).")],
+        responses={200: VerificationRunPageSerializer, **ERRORS},
     )
     def get(self, request, makerspace_id):
         makerspace = _scoped_makerspace(request.user, makerspace_id)
@@ -97,7 +108,7 @@ class AuditVerificationListCreateView(APIView):
         responses={
             202: VerificationAcceptedSerializer,
             409: OpenApiResponse(ERROR_BODY, description="`audit_verification_busy`."),
-            429: OpenApiResponse(description="Throttled."),
+            429: OpenApiResponse(DETAIL_ERROR, description="Throttled."),
             **ERRORS,
         },
     )

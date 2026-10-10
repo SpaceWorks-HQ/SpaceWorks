@@ -42,7 +42,7 @@ export function AuditLog() {
   return (
     <Panel title="Audit logs">
       <AuditLogFilters filters={filters} onChange={updateFilters} />
-      <AuditVerificationStatus makerspaceId={filters.makerspace} params={filterParams} />
+      <AuditVerificationStatus key={new URLSearchParams(filterParams).toString()} makerspaceId={filters.makerspace} params={filterParams} />
       <div className="grid gap-2 text-sm">
         {logs.error ? <p className="text-sm text-danger">{logs.error.message}</p> : null}
         {logs.isLoading ? <AuditLogSkeleton /> : null}

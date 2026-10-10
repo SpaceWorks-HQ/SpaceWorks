@@ -52,7 +52,8 @@
   (catalogue in `presentation_catalog*.py`, deny policy in `presentation_catalog_dynamic.py`, drift guard in
   `presentation_guards.py` + `presentation_discovery.py`), used by the audit list, the request timeline and
   the `audit-trail` CSV. Staff verification runs: models in `models_verification_runs.py`, admission in
-  `verification_runs.py`, one attempt in `verification_execution.py` over `integrity_scope.py`, the task in
+  `verification_runs.py`, one attempt in `verification_execution.py` over `integrity_scope.py` (bounded
+  genesis membership in `integrity_rows.py`, query-free fetched batch checks in `integrity_scope_anchors.py`), the task in
   `tasks_verification.py`, the API in `views_verification.py`/`serializers_verification.py`, read-only
   `/control/` views in `admin_verification.py`. The request timeline's audit/retention helper is
   `hardware_requests/timeline_service_audit.py`; the audit report is `operations/reports_audit.py`.

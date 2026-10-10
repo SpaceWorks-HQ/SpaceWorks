@@ -16,10 +16,12 @@ from apps.audit.signing import deployment_identity
 from .integrity_anchor_errors import anchor_read_failure
 
 
-def _verify_batches(makerspace_id, sink, *, local_verifier=None):
+def _verify_batches(makerspace_id, sink, *, local_verifier=None, anchor_verifier=None):
     """``local_verifier(batch, key)`` replaces the per-batch relation-query membership
     check, so a bulk caller can answer from one preloaded leaf load (or skip batches it
-    already verified) while continuity, anchors and the deleted tail stay authoritative."""
+    already verified). ``anchor_verifier(batch, key, external)`` verifies a fetched
+    envelope against local signed state without rebuilding it from relation queries.
+    Continuity, anchors and the deleted tail stay authoritative."""
     expected_seq = 1
     previous_root = None
     keys = {
@@ -49,18 +51,20 @@ def _verify_batches(makerspace_id, sink, *, local_verifier=None):
         failure = (local_verifier or verify_batch_local)(batch, key)
         if failure:
             return failure
-        try:
-            envelope = batch_envelope(batch)
-        except AuditBatchError as exc:
-            return AuditIntegrityFailure(
-                AuditFailureClass.SIGNATURE,
-                str(exc),
-                makerspace_id,
-                batch.batch_seq,
-            )
+        envelope = None
+        if anchor_verifier is None:
+            try:
+                envelope = batch_envelope(batch)
+            except AuditBatchError as exc:
+                return AuditIntegrityFailure(
+                    AuditFailureClass.SIGNATURE,
+                    str(exc),
+                    makerspace_id,
+                    batch.batch_seq,
+                )
         identity = (
             deployment_identity(),
-            envelope["payload"]["scope"],
+            scope_name(makerspace_id),
             batch.signer_fingerprint,
             batch.batch_seq,
         )
@@ -68,7 +72,7 @@ def _verify_batches(makerspace_id, sink, *, local_verifier=None):
             external = sink.fetch(identity)
         except AnchorError as exc:
             return anchor_read_failure(exc, makerspace_id, batch.batch_seq)
-        if external is None or not anchors_match(external, envelope):
+        if external is None or (anchor_verifier is None and not anchors_match(external, envelope)):
             failure_class = (
                 AuditFailureClass.ANCHOR_MISSING
                 if external is None
@@ -80,6 +84,10 @@ def _verify_batches(makerspace_id, sink, *, local_verifier=None):
                 makerspace_id,
                 batch.batch_seq,
             )
+        if anchor_verifier is not None:
+            failure = anchor_verifier(batch, key, external)
+            if failure:
+                return failure
         previous_root = bytes(batch.merkle_root)
         expected_seq += 1
 

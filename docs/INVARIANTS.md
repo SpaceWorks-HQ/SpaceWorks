@@ -1373,6 +1373,17 @@ resolves as `revoked` forever; reprint never rotates. No rendered PDF is written
   reads per attempt — preflighted at admission and rechecked in the task. Runs are `OmittedModel`s (a target
   deployment must not inherit a source's verification), purged events-first, and only a superuser sees the
   closed `failure_code` and diagnostic coordinates.
+- **Genesis membership is bounded too.** Staff verification uses the same 50,000-row cap for
+  the activation manifest and its current membership set (manifest IDs plus every un-MAC'd row).
+  Check manifest length before signature work; load at most cap + 1 current rows with a SQL limit.
+  Exhaustion terminates `INCOMPLETE/verification_bounds_exceeded`, preserves calculated aggregates
+  and never retries. MAC'd post-cutover rows are excluded from this membership load. Existing
+  whole-log command callers retain their optional, unlimited path.
+- **Anchor checks do not reload batch leaves.** Selected local membership is verified from one bulk
+  leaf load. The scoped anchor phase verifies each fetched envelope's payload with the local stored
+  signature/public key and compares its signed batch coordinates with local state, without rebuilding
+  envelopes through per-batch leaf/key queries. Unselected batches receive chain/anchor checks without
+  claiming local membership coverage for their rows.
 - **Report reachability is per definition.** `allowed_formats`, `schedulable`, `previewable` and
   `deployment_aggregate` on `ReportDefinition` are enforced server-side (preview, export, schedule create/
   update, the runner's `_skip_reason`, every deployment-wide catalogue/analytics/export view). `audit-trail`

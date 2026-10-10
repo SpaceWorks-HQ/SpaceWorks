@@ -50,7 +50,7 @@ describe("AuditLog", () => {
   beforeEach(() => {
     staffRequest.mockReset();
     staffRequest.mockImplementation((path: string, options?: RequestInit) => {
-      if (options?.method === "POST") return Promise.resolve({ id: 1, state: "QUEUED", deduplicated: false, status_url: "" });
+      if (options?.method === "POST") return Promise.resolve({ id: 1, state: "QUEUED", deduplicated: false, status_url: "/api/v1/admin/makerspace/7/audit-verifications/1" });
       if (path.includes("/audit-verifications/1")) return Promise.resolve(run());
       return Promise.resolve(page);
     });
@@ -64,8 +64,12 @@ describe("AuditLog", () => {
   });
 
   it("resets to page 1 and sends validated filter names on change", async () => {
+    staffRequest.mockImplementation((path: string) => Promise.resolve({ ...page, count: 48,
+      next: path.includes("page=2") ? null : "?page=2", previous: path.includes("page=2") ? "?page=1" : null }));
     renderPanel();
     await screen.findByText("Request issued");
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(staffRequest.mock.calls[staffRequest.mock.calls.length - 1]?.[0]).toContain("page=2"));
     fireEvent.change(screen.getByLabelText("Action"), { target: { value: "request.issued" } });
     await waitFor(() => {
       const calls = staffRequest.mock.calls; const last = calls[calls.length - 1]?.[0] as string;
@@ -85,6 +89,25 @@ describe("AuditLog", () => {
     const post = staffRequest.mock.calls.find(([, options]) => options?.method === "POST");
     expect(post?.[0]).toBe("/admin/makerspace/7/audit-verifications");
     expect(JSON.parse(post?.[1]?.body as string)).toEqual({ action: "x.y" });
+  });
+
+  it("clears the old verdict on a filter or makerspace change without polling the old run in another tenant", async () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Makerspace ID"), { target: { value: "7" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify these entries" }));
+    await screen.findByText("All entries fully verified.");
+    fireEvent.change(screen.getByLabelText("Action"), { target: { value: "request.returned" } });
+    expect(screen.queryByText("All entries fully verified.")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Makerspace ID"), { target: { value: "8" } });
+    await waitFor(() => expect(staffRequest.mock.calls[staffRequest.mock.calls.length - 1]?.[0]).toContain("makerspace=8"));
+    expect(staffRequest.mock.calls.some(([path]) => path === "/admin/makerspace/8/audit-verifications/1")).toBe(false);
+    expect(screen.getByRole("button", { name: "Verify these entries" })).toBeEnabled();
+  });
+
+  it("renders audit request errors", async () => {
+    staffRequest.mockRejectedValue(new Error("Invalid audit range."));
+    renderPanel();
+    expect(await screen.findByText("Invalid audit range.")).toBeInTheDocument();
   });
 });
 

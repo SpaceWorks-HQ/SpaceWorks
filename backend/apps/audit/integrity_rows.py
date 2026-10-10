@@ -1,6 +1,6 @@
 """Audit-row and cutover-membership phases of whole-log verification."""
 
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, Q
 
 from apps.audit.batch_format import genesis_entry
 from apps.audit.batch_verification import AuditFailureClass, AuditIntegrityFailure
@@ -33,7 +33,20 @@ def _verify_rows():
     return None
 
 
-def _verify_genesis_membership(key):
+class GenesisMembershipLimitExceeded(Exception):
+    """Resource exhaustion, not evidence of tampering or retryable transport failure."""
+
+
+def _check_genesis_limit(key, row_limit):
+    stored = key.activation_payload.get("genesis_rows")
+    if row_limit is not None and isinstance(stored, list) and len(stored) > row_limit:
+        raise GenesisMembershipLimitExceeded("The cutover manifest exceeds the row limit.")
+
+
+def _verify_genesis_membership(key, *, row_limit=None):
+    # Existing whole-log command callers may omit the limit. Staff verification always
+    # supplies one, bounding both manifest processing and database materialization.
+    _check_genesis_limit(key, row_limit)
     stored = key.activation_payload.get("genesis_rows")
     if not isinstance(stored, list):
         return _failure(key, "The cutover manifest has no valid genesis membership.")
@@ -43,10 +56,15 @@ def _verify_genesis_membership(key):
         return _failure(key, "The cutover manifest membership shape is invalid.")
     if len(expected) != len(stored):
         return _failure(key, "The cutover manifest repeats an audit row id.")
-    current = {
-        row.pk: row
-        for row in AuditLog.objects.filter(makerspace_id=key.makerspace_id)
-    }
+    rows = AuditLog.objects.filter(makerspace_id=key.makerspace_id).filter(
+        Q(pk__in=expected) | Q(row_mac__isnull=True)
+    ).order_by("pk")
+    # MAC'd post-cutover rows cannot affect genesis membership. Still include EVERY
+    # un-MAC'd row so an undeclared legacy row cannot disappear behind a narrow filter.
+    current_rows = list(rows if row_limit is None else rows[:row_limit + 1])
+    if row_limit is not None and len(current_rows) > row_limit:
+        raise GenesisMembershipLimitExceeded("The cutover row set exceeds the row limit.")
+    current = {row.pk: row for row in current_rows}
     for audit_log_id, expected_entry in expected.items():
         row = current.get(audit_log_id)
         try:

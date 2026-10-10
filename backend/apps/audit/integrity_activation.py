@@ -12,7 +12,7 @@ from apps.audit.signing import (
 from apps.ed25519 import Ed25519Error, encode_key, verify_bytes
 
 from .integrity_anchor_errors import anchor_read_failure
-from .integrity_rows import _verify_genesis_membership
+from .integrity_rows import _check_genesis_limit, _verify_genesis_membership
 
 
 def _verify_scope_registry():
@@ -43,7 +43,7 @@ def _verify_scope_registry():
     return None
 
 
-def _verify_activation(key, sink):
+def _verify_activation(key, sink, *, genesis_row_limit=None):
     if key.activated_at is None:
         return AuditIntegrityFailure(
             AuditFailureClass.ACTIVATION_MISSING,
@@ -54,6 +54,8 @@ def _verify_activation(key, sink):
     try:
         if not isinstance(key.activation_payload, dict):
             raise Ed25519Error("The cutover payload shape is invalid.")
+        # Refuse oversized manifests before canonicalizing/signature work or sink I/O.
+        _check_genesis_limit(key, genesis_row_limit)
         if key.activation_payload.get("deployment_id") != deployment_identity():
             raise Ed25519Error("The cutover belongs to another deployment.")
         if key.activation_payload.get("public_key") != encode_key(bytes(key.public_key)):
@@ -107,4 +109,4 @@ def _verify_activation(key, sink):
             "The cutover anchor conflicts with local state.",
             key.makerspace_id,
         )
-    return _verify_genesis_membership(key)
+    return _verify_genesis_membership(key, row_limit=genesis_row_limit)

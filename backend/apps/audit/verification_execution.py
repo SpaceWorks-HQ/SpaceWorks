@@ -15,6 +15,7 @@ from django.db import OperationalError, connection, transaction
 from apps.audit.anchors import AnchorReadBudget, AnchorReadBudgetExceeded
 from apps.audit.batches import scope_session_lock
 from apps.audit.integrity_anchor_errors import ANCHOR_TRANSPORT
+from apps.audit.integrity_rows import GenesisMembershipLimitExceeded
 from apps.audit.integrity_scope import anchor_phase, local_phase
 from apps.audit.models import AuditVerificationRun, AuditVerificationRunEvent
 
@@ -92,8 +93,9 @@ def execute_attempt(run_id):
                                    failure_code="verification_bounds_exceeded")
             try:
                 anchor_phase(run.makerspace_id, result,
-                             read_budget=AnchorReadBudget(runs.MAX_ANCHOR_READS))
-            except AnchorReadBudgetExceeded:
+                             read_budget=AnchorReadBudget(runs.MAX_ANCHOR_READS),
+                             genesis_row_limit=runs.MAX_EXPANDED_LEAVES)
+            except (AnchorReadBudgetExceeded, GenesisMembershipLimitExceeded):
                 result.anchor_status = "unavailable"
                 return runs.finish(run, State.INCOMPLETE, attempt,
                                    failure_code="verification_bounds_exceeded", **_fields(result))

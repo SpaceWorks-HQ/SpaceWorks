@@ -81,6 +81,13 @@ class VerificationRunSerializer(serializers.Serializer):
     )
 
 
+class VerificationRunPageSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    results = VerificationRunSerializer(many=True)
+
+
 def status_url(run):
     return reverse("admin-audit-verification-detail", args=[run.makerspace_id, run.pk])
 

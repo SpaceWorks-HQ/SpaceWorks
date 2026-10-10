@@ -33,7 +33,8 @@ export function verificationVerdict(run: VerificationRun): string {
   const invalid = c.mac_invalid_count + c.batch_invalid_count > 0
     || c.chain_status === "invalid" || c.anchor_status === "invalid";
   if (invalid) return "Integrity problems were found in this range.";
-  const full = c.row_count > 0 && c.mac_valid_count === c.row_count
+  const full = run.state === "SUCCEEDED" && c.row_count > 0 && c.mac_valid_count === c.row_count
+    && !c.unattested_count && !c.mac_unavailable_count && !c.unbatched_count && !c.batch_unavailable_count
     && c.local_batch_verified_count === c.row_count && c.chain_status === "locally_verified"
     && c.anchor_status === "externally_anchored" && c.externally_anchored_count === c.row_count;
   return full ? "All entries fully verified." : "No invalid entries found; verification coverage is incomplete.";
@@ -45,6 +46,7 @@ function gaps(c: Coverage): string[] {
   if (c.mac_unavailable_count) out.push(`${c.mac_unavailable_count} MAC unavailable`);
   if (c.unbatched_count) out.push(`${c.unbatched_count} not yet in a signed batch`);
   if (c.batch_unavailable_count) out.push(`${c.batch_unavailable_count} batch unavailable`);
+  if (c.chain_status === "unavailable" || c.chain_status === "pending") out.push("scope chain unavailable");
   if (c.anchor_status === "not_configured") out.push("external anchor not configured");
   if (c.anchor_status === "unavailable") out.push("external anchor unavailable");
   return out;
@@ -58,18 +60,20 @@ export function AuditVerificationStatus({
   params: Record<string, string>;
 }) {
   const queryClient = useQueryClient();
-  const [runId, setRunId] = useState<number | null>(null);
+  const [accepted, setAccepted] = useState<Accepted | null>(null);
+  const runId = accepted?.id ?? null;
   const base = `/admin/makerspace/${makerspaceId}/audit-verifications`;
   const start = useMutation({
     mutationFn: () => {
       const { makerspace: _ignored, ...body } = params;
       return staffRequest<Accepted>(base, { method: "POST", body: JSON.stringify(body) });
     },
-    onSuccess: (accepted) => setRunId(accepted.id),
+    onSuccess: setAccepted,
   });
   const status = useQuery({
     queryKey: ["audit-verification", makerspaceId, runId],
-    queryFn: () => staffRequest<VerificationRun>(`${base}/${runId}`),
+    // The API returns a versioned relative URL; staffRequest already adds /api/v1.
+    queryFn: () => staffRequest<VerificationRun>(accepted!.status_url.replace(/^\/api\/v1(?=\/)/, "")),
     enabled: runId !== null,
     // Poll only while non-terminal; unmounting the panel stops it with the query.
     refetchInterval: (query) => (query.state.data?.terminal ? false : POLL_MS),
@@ -86,15 +90,22 @@ export function AuditVerificationStatus({
         <button
           className="desk-button-primary"
           type="button"
-          disabled={!makerspaceId || start.isPending || (run !== undefined && !run.terminal)}
+          disabled={!makerspaceId || start.isPending || (accepted !== null && !run?.terminal)}
           onClick={() => start.mutate()}
         >
           Verify these entries
         </button>
         {!makerspaceId ? <span className="text-muted">Choose one makerspace to verify.</span> : null}
+        {accepted && !run ? <span className="text-muted">Loading verification status…</span> : null}
         {run ? <span className="font-medium">{verificationVerdict(run)}</span> : null}
       </div>
       {start.error ? <p className="mt-2 text-danger">{start.error.message}</p> : null}
+      {status.error ? (
+        <p className="mt-2 text-danger">
+          {status.error.message}{" "}
+          <button type="button" className="desk-button-ghost" onClick={() => void status.refetch()}>Retry status</button>
+        </p>
+      ) : null}
       {run?.terminal && gaps(run.coverage).length ? (
         <p className="mt-2 text-muted">Coverage gaps: {gaps(run.coverage).join(", ")}.</p>
       ) : null}
