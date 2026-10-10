@@ -61,6 +61,13 @@ EXPECTED_TARGET_VALUES = {
     ("makerspaces.MembershipRequest", "auto_activate_on_claim"): False,
     ("machines.MachineType", "managing_action"): "",
     ("integrations.NotificationDestination", "is_active"): False,
+    # Phase 7a: an imported device carries no live authority until the target re-enrolls it.
+    ("devices.Device", "status"): "pending",
+    ("devices.Device", "last_seen_at"): None,
+    ("devices.Device", "offline_since"): None,
+    ("devices.Device", "offline_notified_at"): None,
+    ("devices.Device", "revoked_at"): None,
+    ("devices.Device", "revoked_by"): None,
 }
 
 
