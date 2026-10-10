@@ -125,6 +125,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         # Phase 9b: the model is omitted; the edge is declared for completeness.
         ("makerspaces.StationOperatorLease", "actor"),
         ("hardware_requests.ReplayCommand", "actor"),
+        ("hardware_requests.ReplayCommand", "resolved_by"),
         ("makerspaces.MembershipRequest", "user"),
         ("makerspaces.MembershipRequest", "requested_by"),
         ("makerspaces.MembershipRequest", "invited_by"),

@@ -3,7 +3,7 @@
 #   up [args]       Compose up -d; retire live and remove successful one-shots.
 #   down [args]     Compose down; volumes persist unless you pass -v.
 #   test [args]     Pytest in disposable Postgres/Redis/MinIO; default args: -q.
-#   e2e [args]      Seed the running dev stack and run host Playwright (needs npm).
+#   e2e [args]      Seed the running dev stack; Playwright against a production preview.
 #   <other> [args]  Forward verbatim to Compose: logs, exec, run, ps, restart, etc.
 # Restart affects long-running services only; up recreates the four one-shots.
 # E2E creates a fresh tenant each run; dev.sh down -v wipes the dev database.
@@ -127,9 +127,25 @@ e2e() {
   done
   compose exec -T backend python manage.py seed_e2e --write-json /tmp/e2e-seed.json
   docker cp spaceworks-backend:/tmp/e2e-seed.json "$HOST_ROOT/frontend/e2e/.seed.json"
+  e2e_preview "$@"
+}
+
+# Playwright runs against a production build (the kiosk service worker exists only
+# there), served by `vite preview` behind the same /api proxy so cookies and exact
+# Station Origin checks behave as in production. Dev CORS already admits :5173.
+e2e_preview() {
+  local port="${E2E_PREVIEW_PORT:-5173}" api="${E2E_API_URL:-http://localhost:8000}" preview_pid deadline
   cd "$ROOT/frontend"
-  E2E_API_URL=http://localhost:8000 E2E_BASE_URL=http://localhost:5000 \
-    E2E_SEED_FILE="$HOST_ROOT/frontend/e2e/.seed.json" npx playwright test "$@"
+  VITE_API_URL="http://localhost:$port/api" npm run build
+  VITE_DEV_PROXY_TARGET="$api" node ./node_modules/vite/bin/vite.js preview     --host localhost --port "$port" --strictPort &
+  preview_pid=$!
+  trap 'kill "$preview_pid" 2>/dev/null || true; wait "$preview_pid" 2>/dev/null || true' EXIT INT TERM
+  deadline=$((SECONDS + 60))
+  until curl -sf --max-time 2 "http://localhost:$port/" >/dev/null; do
+    if ((SECONDS >= deadline)); then echo "Production preview did not become ready." >&2; return 1; fi
+    sleep 1
+  done
+  E2E_API_URL="$api" E2E_BASE_URL="http://localhost:$port"     E2E_SEED_FILE="$HOST_ROOT/frontend/e2e/.seed.json" npx playwright test "$@"
 }
 
 case "${1:-}" in

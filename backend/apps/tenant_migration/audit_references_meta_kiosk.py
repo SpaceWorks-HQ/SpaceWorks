@@ -61,7 +61,7 @@ KIOSK_AUDIT_EDGES = {
     ),
 }
 
-_REPLAY_ACTIONS = ("kiosk.replay_prepared", "kiosk.replay_claimed", "kiosk.replay_succeeded", "kiosk.replay_failed")
+_REPLAY_ACTIONS = ("kiosk.replay_prepared", "kiosk.replay_claimed", "kiosk.replay_succeeded", "kiosk.replay_failed", "kiosk.replay_resolved")
 for _field, _model in (
     ("station_id", "makerspaces.Station"), ("evidence_id", "evidence.EvidencePhoto"),
     ("subject_request_id", "hardware_requests.HardwareRequest"),
@@ -73,3 +73,4 @@ for _field, _model in (
     KIOSK_AUDIT_EDGES.update(_edges(R, _model, ((a, _field) for a in _REPLAY_ACTIONS)))
 for _field in ("replay_id", "operator_lease_id", "station_session_id", "aggregate_id"):
     KIOSK_AUDIT_EDGES.update(_edges(S, None, ((a, _field) for a in _REPLAY_ACTIONS)))
+KIOSK_AUDIT_EDGES[("kiosk.replay_resolved", "replacement_replay_id")] = AuditReference(S, None)

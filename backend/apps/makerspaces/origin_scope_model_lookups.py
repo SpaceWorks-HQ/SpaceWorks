@@ -1,6 +1,8 @@
 """Static model-backed origin scopes, split from request resolution logic."""
 
 BASE_MODEL_LOOKUPS = {
+    'admin-kiosk-replay-detail': ('hardware_requests.ReplayCommand', 'makerspace_id'),
+    'admin-kiosk-replay-resolve': ('hardware_requests.ReplayCommand', 'makerspace_id'),
     'admin-kiosk-station-detail': ('makerspaces.Station', 'makerspace_id'),
     'admin-kiosk-station-rotate': ('makerspaces.Station', 'makerspace_id'),
     'admin-kiosk-station-reveal': ('makerspaces.Station', 'makerspace_id'),

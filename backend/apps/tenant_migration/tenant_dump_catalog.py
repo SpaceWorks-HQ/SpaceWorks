@@ -61,7 +61,9 @@ class TenantDumpCatalogError(AssertionError):
 # StationOperatorLease and StationSessionRevocation tables.
 # Phase 9c adds only the all-DROP ReplayCommand model (31 fields). Reconstructed
 # snapshot graph reproduces the prior digest exactly before adding this reviewed row.
-CATALOG_SCHEMA_SHA256 = "28e593005a2cc5df32e4a4a61aac2735c21e473e75222ebdd72b6c3c81e44d17"
+# Phase 9e adds four all-DROP replay resolution fields. Snapshot reconstruction
+# reproduces the 9c baseline before the reviewed addition (35 replay fields).
+CATALOG_SCHEMA_SHA256 = "05d7640db93d33a3f993cebe562afbcaacc6629b4e42adf2cc8bb5497c15e19c"
 
 
 def catalog_models(apps_registry=apps):

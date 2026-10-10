@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
 import { KioskOnlineHandover } from "./KioskOnlineHandover";
@@ -14,11 +14,14 @@ import {
 import { enterKioskMode, useIdleReset } from "./kioskSession";
 import { useKioskQueue } from "./useKioskQueue";
 import { KioskOfflineHandover } from "./KioskOfflineHandover";
+import { KioskReplayCorrection } from "./KioskReplayCorrection";
 
 // Only an online-obtained lease and selected package can survive an offline reload.
 // Reset destroys encrypted local work; the cookie and human grant remain server-owned.
 export function KioskStationPage() {
   const { slug, stationToken = "" } = useParams();
+  const [searchParams] = useSearchParams();
+  const recoveryId = searchParams.get("recovery");
   const [pin, setPin] = useState("");
   const [session, setSession] = useState<KioskBootstrap | null>(null);
   const [lease, setLease] = useState<KioskLease | null>(null);
@@ -26,7 +29,7 @@ export function KioskStationPage() {
   const [pending, setPending] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const [resetRequested, setResetRequested] = useState(false);
-  const offline = useKioskQueue(stationToken, slug);
+  const offline = useKioskQueue(stationToken, slug, recoveryId);
   const activeSession = session ?? offline.queue?.session ?? null;
   const activeLease = lease ?? offline.queue?.lease ?? null;
   const queueMode = Boolean(offline.queue && (!offline.online || offline.restored || continuing));
@@ -73,7 +76,7 @@ export function KioskStationPage() {
           <button className="desk-button-primary" type="submit" disabled={pending || pin.length !== 8}>{pending ? "Unlocking…" : "Unlock station"}</button>
         </form> : <div className="mt-5 grid gap-4">
           <p className="text-sm text-muted">{activeSession.makerspace.name} · {activeSession.station.kind} station</p>
-          {!activeLease ? <button className="desk-button-primary" type="button" disabled={!offline.online} onClick={signIn}>Start operator shift</button> : queueMode && offline.queue ? <KioskOfflineHandover
+          {recoveryId ? <KioskReplayCorrection key={`${stationToken}/${recoveryId}`} id={recoveryId} token={stationToken} session={activeSession} online={offline.online} onQueueChange={offline.setQueue} /> : !activeLease ? <button className="desk-button-primary" type="button" disabled={!offline.online} onClick={signIn}>Start operator shift</button> : queueMode && offline.queue ? <KioskOfflineHandover
             queue={offline.queue} onChange={() => { void offline.refresh(); }} retry={() => { void offline.retry(); }}
             acknowledge={() => { void lock().catch(() => setError("Local reset failed.")); }}
           /> : <>

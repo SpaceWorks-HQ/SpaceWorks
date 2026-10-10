@@ -49,7 +49,6 @@ def issue_individual_assets(actor, locked, asset_qr_payloads):
         .filter(
             makerspace=locked.makerspace,
             payload__in=asset_qr_payloads,
-            status=QrCode.Status.ACTIVE,
             target_type=QrCode.TargetType.ASSET,
         )
         .order_by("pk")
@@ -59,6 +58,8 @@ def issue_individual_assets(actor, locked, asset_qr_payloads):
         qr = qrs_by_payload.get(payload)
         if qr is None:
             raise RequestValidationError(INDIVIDUAL_HANDOUT_ERROR)
+        if qr.status != QrCode.Status.ACTIVE:
+            raise RequestValidationError("QR code is not active for this makerspace.")
         if qr.id in seen_qr_ids:
             raise InvalidTransition("The same QR code was scanned more than once.")
         seen_qr_ids.add(qr.id)

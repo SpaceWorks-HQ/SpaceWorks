@@ -1,7 +1,9 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { useKioskQueue } from "./useKioskQueue";
-import { listQueues } from "./offlineQueueStore";
+import { listQueues, loadQueue } from "./offlineQueueStore";
+import { session, lease, work, draft } from "./offlineTestFixtures";
+import type { OfflineQueue } from "./offlineQueueTypes";
 
 vi.mock("./offlineQueueStore", () => ({ listQueues: vi.fn(), loadQueue: vi.fn(), saveWorkPackage: vi.fn(), wipeQueue: vi.fn() }));
 vi.mock("./kioskReplayClient", () => ({ replayQueue: vi.fn() }));
@@ -27,4 +29,20 @@ it("keeps a cached handover in offline mode when the reachable backend is unheal
   const { result } = renderHook(() => useKioskQueue("token"));
   await waitFor(() => expect(listQueues).toHaveBeenCalled());
   expect(result.current.online).toBe(false);
+});
+
+it("restores the explicitly selected correction without choosing between unrelated shifts", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+  const queue: OfflineQueue = { version: 1, scope: "original", token: "token", apiBase: "/api/v1", session, lease,
+    works: [{ id: "work", aggregateId: "aggregate", work }], commands: [{ envelope: draft(),
+      workPackageId: "work", evidenceRecordId: null, status: "queued", attempts: 0, nextRetryAt: 0,
+      lastFailure: null, result: null, uploaded: false }] };
+  const correction: OfflineQueue = { ...queue, scope: "correction", commands: [
+    { ...queue.commands[0], recoveryReplayId: "selected-failure" },
+  ] };
+  vi.mocked(listQueues).mockResolvedValue([queue, correction]);
+  vi.mocked(loadQueue).mockResolvedValue(correction);
+  const { result } = renderHook(() => useKioskQueue("token", "space", "selected-failure"));
+  await waitFor(() => expect(result.current.queue?.scope).toBe("correction"));
+  expect(result.current.restored).toBe(true);
 });

@@ -14,6 +14,7 @@ export function KioskOfflineHandover({ queue, onChange, retry, acknowledge }: {
   const [kind, setKind] = useState<ReplayEnvelope["kind"]>("assign_box");
   const [box, setBox] = useState("");
   const [remark, setRemark] = useState("");
+  const [assetQrs, setAssetQrs] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [camera, setCamera] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -36,13 +37,15 @@ export function KioskOfflineHandover({ queue, onChange, retry, acknowledge }: {
       const evidence = image ? { evidence_type: returning ? "return" as const : "issue" as const,
         content_type: image.type, size_bytes: image.size } : undefined;
       const payload = operation === "assign_box" ? { request_id: work.id, box_code: box.trim() }
-        : operation === "reviewed_issue" ? { request_id: work.id, remark: remark.trim(), asset_qr_payloads: [], rejects: [] }
+        : operation === "reviewed_issue" ? { request_id: work.id, remark: remark.trim(),
+          asset_qr_payloads: assetQrs.split(/\r?\n/).map((value) => value.trim()).filter(Boolean), rejects: [] }
         : operation === "reviewed_return" ? { request_id: work.id, box_code: box.trim(), remark: remark.trim(),
           resolutions: work.lines.map((line) => ({ item_id: line.item_id, returned: Math.max(0, line.quantity - line.returned) })) }
-        : { loan_id: work.id, notes: remark.trim(), qr_payload: box.trim(), resolutions: [] };
+        : { loan_id: work.id, notes: remark.trim(), qr_payload: box.trim(), resolutions:
+          work.lines.filter((line) => line.quantity > line.returned).map((line) => ({ item_id: line.item_id, returned: line.quantity - line.returned })) };
       const envelope = { ...identity, kind: operation, payload, ...(evidence ? { evidence } : {}) } as ReplayEnvelope;
       onChange(await enqueueCommand(queue.scope, loaded.id, envelope, image));
-      setPhoto(null); setBox(""); setRemark("");
+      setPhoto(null); setBox(""); setRemark(""); setAssetQrs("");
       void registerKioskSync().catch(() => undefined);
       retry();
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Capture failed. Nothing was queued."); }
@@ -60,6 +63,7 @@ export function KioskOfflineHandover({ queue, onChange, retry, acknowledge }: {
       </select></label>
       {operation === "assign_box" || returning ? <label className="grid gap-1 text-sm">Scan box or return QR<input className="desk-input font-mono" required value={box} disabled={busy} onChange={(event) => setBox(event.target.value)} /></label> : null}
       {operation !== "assign_box" ? <>
+        {operation === "reviewed_issue" ? <label className="grid gap-1 text-sm">Asset QRs (one per line)<textarea className="desk-input font-mono" disabled={busy} value={assetQrs} onChange={(event) => setAssetQrs(event.target.value)} /></label> : null}
         <label className="grid gap-1 text-sm">Evidence photo<input key={`${selected}/${operation}/${photo ? "selected" : "empty"}`} type="file" accept="image/*" capture="environment" disabled={busy} onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} /></label>
         {Boolean(navigator.mediaDevices) ? <button type="button" className="desk-button-secondary" disabled={busy} onClick={() => setCamera(true)}>Take evidence photo</button> : null}
         {photo ? <p className="text-sm" role="status">Photo selected; it will be normalized and encrypted with the command.</p> : null}

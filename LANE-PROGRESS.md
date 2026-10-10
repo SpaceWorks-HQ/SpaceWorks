@@ -1,3 +1,87 @@
+# Lane 9e ? failed replay resolution and browser coverage
+
+Branch lane/9e, based on lane/9d. All code is inside this worktree and unstaged.
+No git state-changing command or backend/real-stack test was run.
+
+## Completed in 9e
+
+- Stage 1 actual-tree audit and corrections: docs/stage1-p9e.md.
+- Four resolution fields/checks, immutable terminal attempts, deterministic locks,
+  idempotent acknowledgement and compatible fresh-success replacement linking.
+- Current action/tenant/origin-scoped paginated list/detail/resolve routes, explicit
+  OpenAPI DTOs/errors, no-store responses and real-User resolution audit metadata.
+- User-edge, tenant snapshot/DROP/digest, audit/origin registrations, protected-link
+  cleanup and whole-tenant purge ordering. No new model/module/feature key.
+- Requests recovery panel, every typed reason's guidance, permission-gated evidence
+  preview/expiry, confirmation and precise TanStack recovery/queue invalidation.
+- Current Station/session + new lease/work/photo correction via the encrypted queue;
+  saved correction identity survives reconnect/reload, with explicit success linking.
+- Fixed advertised command age to the actual setting (default eight hours), ACTIVE
+  status for stored direct-return QR IDs, and typed revoked individual-issue QRs.
+- Current issued/outstanding work-package item lines enable known-subject returns.
+- Isolated Station/accepted-request/QR seed helper; secrets omitted from stdout;
+  production preview launcher on spare :5173 and serial offline-handover Playwright.
+- Recovery invariants/ownership: docs/KIOSK-RECOVERY.md and docs/SOURCE-MAP.md.
+
+## Validation
+
+- npx.cmd tsc -b passed. npm.cmd test: 82 files / 332 tests passed.
+- npm.cmd run build passed, including generated SW verification (91 assets).
+- npm.cmd run typecheck:e2e passed; Playwright discovered 11 tests across 6 specs.
+  Changed Python syntax and file ceilings checked;
+  snapshot reconstruction reproduced the old digest before adding four fields.
+- Database/Playwright execution is NOT claimed. Coordinator must run isolated tests,
+  real-stack e2e, migrations/OpenAPI regeneration and external review gates.
+- codex doctor: home/config unavailable and provider unreachable; CLI gates blocked.
+- Local frontend deps were copied into this lane from the existing main dependency
+  cache; initial commands lacked deps. PowerShell requires npm.cmd/npx.cmd wrappers.
+
+## Tests added for coordinator
+
+- backend/tests/hardware_requests/test_kiosk_replay_recovery.py: acknowledgement and
+  replacement idempotency, immutable failure/evidence/domain, conflict compatibility,
+  database consistency, unknown IDs, cleanup ordering and source-gate refusal.
+- test_kiosk_replay_recovery_scope.py: pagination/filters/safe fields, cross-tenant
+  and origin denial, custom operation/evidence scope, revoked users/membership,
+  disabled-kiosk history and hidden-superadmin scoping.
+- test_kiosk_replay_recovery_concurrency.py: competing review races, one success
+  resolving at most one failure (independent PostgreSQL connections).
+- test_kiosk_replay_recovery_purge.py: protected resolution links before tenant purge.
+- test_kiosk_recovery_contracts.py: configured age, revoked stored direct-return QR,
+  predecessor-derived direct-return replacement, unknown direct-handout subject,
+  User/origin/audit/DROP/schema catalog completeness. recovery_helpers.py supports them.
+- frontend/src/features/kiosk/KioskReplayRecoveryPanel.test.tsx: accessible list/detail,
+  preview/retention/permission, explicit acknowledgement, errors, paging/invalidation.
+- KioskReplayCorrection.test.tsx: offline denial, fresh successful replay/link,
+  failed correction preservation, persisted correction restore and idle visibility.
+- replayCorrectionCapture.test.ts: current lease/work, new identity/photo/QRs,
+  capture error; replayRecoveryGuidance.test.ts: entire typed catalog.
+- recoveryQueuePersistence.test.ts: recovery link encrypted and reloadable;
+  useKioskQueue.test.tsx: explicit correction restores among unrelated shifts.
+- frontend/e2e/offline-handover.spec.ts: real SW/offline reload/encrypted queue,
+  direct staging upload/reconnect, duplicate effect counts/human channel audit,
+  QR revocation, retained failed evidence preview and acknowledgement audit/UI.
+
+## Remaining / owner follow-up
+
+- Direct-handout auto-linking is fail-closed: the failed model retains neither
+  borrower nor selected-item context. Owner must choose a persisted subject contract
+  before expanding it. New offline issue-then-return item identity remains deferred.
+- Correction return UI uses all outstanding items as returned; damage/loss still
+  uses the established staff return surface. No force-success or payload edits.
+- INVARIANTS.md was not edited due to its inherited >300-line size; focused sibling
+  contract used instead. Generated schema/client artifacts intentionally untouched.
+- Coordinator: verify integrated backend mounts, configure valid API_CLIENT_ENC_KEY
+  and >=32-byte EVENT_STATION_PIN_PEPPER, then run dev.sh e2e and regression suites.
+- Outside this slice: 9c maps borrower RequesterBlocked to permission_revoked, so
+  9d treats that borrower refusal as operator revocation and wipes local scope.
+  Server failed evidence remains retained; distinct borrower failure typing needs
+  a follow-up in replay_failures.py/replayPolicy.ts. It was not changed here.
+
+---
+
+## Inherited lane 9d record (preserved)
+
 # Lane 9d ? encrypted offline client and generated app shell
 
 Branch lane/9d, based on lane/9c. All changes are unstaged. No commit, checkout,

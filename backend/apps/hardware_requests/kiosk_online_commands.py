@@ -24,7 +24,6 @@ from apps.hardware_requests.self_checkout_models import PublicToolLoan
 from apps.hardware_requests.serializers import AdminRequestSerializer
 
 RESOLUTIONS = ["returned", "damaged", "missing"]
-COMMAND_AGE_LIMIT_SECONDS = 15 * 60
 
 
 def channel_meta(lease, kind, **extra):
@@ -160,7 +159,8 @@ def work_package(*, station, lease, user, kind, pk):
             "box": box.label if box else None,
             "lines": [
                 {"item_id": item.pk, "label": item.product.name,
-                 "quantity": item.accepted_quantity, "returned": item.returned_quantity}
+                 "quantity": item.accepted_quantity if hardware_request.status == "accepted" else item.issued_quantity,
+                 "returned": item.returned_quantity + item.damaged_quantity + item.missing_quantity}
                 for item in items[:100]
             ],
         }
@@ -180,12 +180,14 @@ def work_package(*, station, lease, user, kind, pk):
     else:
         loan = _direct_loan(makerspace, pk, user)
         requester = loan.requester
+        return_lines = DirectLoanSerializer(loan).data.get("return_items", [])
         data = {
             "status": loan.status,
             "display_label": f"Loan #{loan.pk}",
             "person_display": getattr(requester, "display_name", "") or "",
             "box": loan.container.label if loan.container_id else None,
-            "lines": [],
+            "lines": [{"item_id": line["item_id"], "label": line["product_name"],
+                       "quantity": line["remaining_quantity"], "returned": 0} for line in return_lines[:100]],
         }
         refs = {"loan_id": loan.pk, "request_id": loan.request_id}
     audit.record(
@@ -196,6 +198,6 @@ def work_package(*, station, lease, user, kind, pk):
         "kind": kind, "id": pk, **data,
         "return_resolutions": RESOLUTIONS,
         "expires_at": min(lease.expires_at, timezone.now() + timedelta(hours=1)),
-        "command_age_limit_seconds": COMMAND_AGE_LIMIT_SECONDS,
+        "command_age_limit_seconds": settings.KIOSK_COMMAND_MAX_AGE_SECONDS,
         "evidence_max_bytes": settings.EVIDENCE_MAX_BYTES,
     }

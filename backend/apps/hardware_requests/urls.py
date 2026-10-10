@@ -1,10 +1,14 @@
 from django.urls import path
 
 from apps.hardware_requests import cron_views, timeline_views, views
+from apps.hardware_requests import replay_recovery_views as recovery
 
 app_name = "hardware_requests"
 
 urlpatterns = [
+    path("admin/makerspace/<int:makerspace_id>/kiosk-replays/", recovery.ReplayRecoveryListView.as_view(), name="admin-kiosk-replay-list"),
+    path("admin/kiosk-replays/<uuid:pk>/", recovery.ReplayRecoveryDetailView.as_view(), name="admin-kiosk-replay-detail"),
+    path("admin/kiosk-replays/<uuid:pk>/resolve/", recovery.ReplayRecoveryResolveView.as_view(), name="admin-kiosk-replay-resolve"),
     path(
         "internal/cron/return-reminders",
         cron_views.ReturnReminderCronView.as_view(),
@@ -121,5 +125,4 @@ urlpatterns = [
         name="guest-admin-request-return",
     ),
 ]
-
 

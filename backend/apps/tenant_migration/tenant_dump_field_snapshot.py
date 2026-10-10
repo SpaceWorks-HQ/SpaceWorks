@@ -6,7 +6,7 @@ override in tenant_dump_authority.py before the catalog guard will pass.
 """
 
 FIRST_PARTY_FIELD_NAMES = {
-    'hardware_requests.ReplayCommand': frozenset('id makerspace station actor operator_lease_id station_session_id station_version client_command_id payload_fingerprint operation_kind operation_version aggregate_id sequence predecessor state claim_token claimed_at claim_attempts client_created_at expires_at created_at updated_at completed_at failure_code failure_detail subject_request subject_loan evidence result_request result_loan result_return_event'.split()),
+    'hardware_requests.ReplayCommand': frozenset('id makerspace station actor operator_lease_id station_session_id station_version client_command_id payload_fingerprint operation_kind operation_version aggregate_id sequence predecessor state claim_token claimed_at claim_attempts client_created_at expires_at created_at updated_at completed_at failure_code failure_detail subject_request subject_loan evidence result_request result_loan result_return_event resolution_code resolved_by resolved_at replacement_command'.split()),
     'accounts.User': frozenset('access_status date_joined display_name email email_verified_at external_checkin_user_id first_name groups id is_active is_staff is_superuser is_tenant_dump_stub is_walk_in last_login last_name must_change_password password phone phone_e164 phone_verified_at restriction_reason role self_registered_at telegram_user_id user_permissions username'.split()),
     'accounts.EmailVerificationChallenge': frozenset('code_digest consumed_at created_at email expires_at failed_attempts id last_sent_at user'.split()),
     'accounts.DailyOtpEmailCounter': frozenset('count day id'.split()),

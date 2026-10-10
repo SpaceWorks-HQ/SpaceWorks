@@ -236,6 +236,10 @@
   Background Sync. `frontend/scripts/kiosk-pwa.ts` bundles it through Vite and injects
   final asset revisions; `verify-pwa-build.mjs` checks emitted artifacts. Static
   `public/sw.js` is removed. The offline rules live in `docs/KIOSK-OFFLINE.md`.
+  Failed handover recovery lives in `hardware_requests/replay_recovery_*` and
+  `features/kiosk/KioskReplay*`; its review, correction and retention contract is
+  documented in `docs/KIOSK-RECOVERY.md`. `operations/e2e_kiosk_seed.py` supplies
+  isolated real-workflow fixtures; `dev.sh e2e` runs Playwright against a production preview.
 - `frontend/src/features/organizations/` — public organization presentation and invitation redemption:
   `PublicOrganizationPage.tsx` renders the public profile and paginated cross-makerspace event catalogue,
   `OrganizationInvitationRedeemPage.tsx` binds a single-use invitation after member sign-in, and

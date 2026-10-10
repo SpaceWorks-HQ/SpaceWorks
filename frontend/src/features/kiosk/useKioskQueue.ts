@@ -15,7 +15,7 @@ export async function registerKioskSync() {
   await sync?.register("spaceworks-kiosk-replay");
 }
 
-export function useKioskQueue(token: string, slug?: string) {
+export function useKioskQueue(token: string, slug?: string, recoveryId?: string | null) {
   const [queue, setQueue] = useState<OfflineQueue | null>(null);
   const [online, setOnline] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
@@ -29,12 +29,13 @@ export function useKioskQueue(token: string, slug?: string) {
     let active = true;
     setQueue(null); setRestored(false);
     void listQueues().then((queues) => {
-      const selected = queues.filter((item) => item.token === token && (!slug || item.session.makerspace.slug === slug));
+      const selected = queues.filter((item) => item.token === token && (!slug || item.session.makerspace.slug === slug)
+        && (!recoveryId || item.commands.some((command) => command.recoveryReplayId === recoveryId)));
       // Never choose between two human shifts implicitly.
       if (active && selected.length === 1) { setQueue(selected[0]); setRestored(true); }
     }).catch(() => { if (active) setStorageError("Encrypted offline storage is unavailable. Continue online."); });
     return () => { active = false; };
-  }, [token, slug]);
+  }, [token, slug, recoveryId]);
 
   const refresh = useCallback(async () => {
     if (scope) {

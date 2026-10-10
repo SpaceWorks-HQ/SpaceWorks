@@ -57,7 +57,7 @@ function checkSelectedCommand(loaded: LoadedWork, envelope: ReplayEnvelope) {
   }
 }
 
-export function enqueueCommand(scope: string, workId: string, draft: ReplayEnvelope, photo?: Blob) {
+export function enqueueCommand(scope: string, workId: string, draft: ReplayEnvelope, photo?: Blob, recoveryReplayId?: string) {
   return withQueueLock(() => usingDb(async (db) => {
     const state = await readQueue(db, scope);
     const loaded = state?.works.find((item) => item.id === workId);
@@ -91,7 +91,8 @@ export function enqueueCommand(scope: string, workId: string, draft: ReplayEnvel
       throw new Error("Encrypted photo queue limit reached (100 MiB). Nothing was dropped.");
     }
     const command: LocalCommand = { envelope, workPackageId: loaded.id, evidenceRecordId: evidenceId,
-      status: "queued", attempts: 0, nextRetryAt: 0, lastFailure: null, result: null, uploaded: false };
+      status: "queued", attempts: 0, nextRetryAt: 0, lastFailure: null, result: null, uploaded: false,
+      ...(recoveryReplayId ? { recoveryReplayId } : {}) };
     state.commands.push(command);
     if (expired(queueDeadline(state))) throw new Error("This handover expired before capture completed.");
     await writeQueue(db, await encodeQueue(key, state), evidence);

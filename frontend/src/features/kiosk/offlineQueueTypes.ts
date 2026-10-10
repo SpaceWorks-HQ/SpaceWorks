@@ -15,6 +15,7 @@ export type LocalCommand = {
   lastFailure: string | null;
   result: ReplayResult | null;
   uploaded: boolean;
+  recoveryReplayId?: string;
 };
 export type LoadedWork = { id: string; aggregateId: string; work: KioskWorkPackage };
 export type OfflineQueue = {

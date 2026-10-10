@@ -17,7 +17,8 @@ SUPPLEMENTAL_AUTHORITY_ENTRIES = (
         "client_command_id payload_fingerprint operation_kind operation_version aggregate_id "
         "sequence predecessor state claim_token claimed_at claim_attempts client_created_at "
         "expires_at created_at updated_at completed_at failure_code failure_detail "
-        "subject_request subject_loan evidence result_request result_loan result_return_event",
+        "subject_request subject_loan evidence result_request result_loan result_return_event "
+        "resolution_code resolved_by resolved_at replacement_command",
         D.DROP,
         "Replay ownership and claims are source-local coordination and never travel.",
     ),

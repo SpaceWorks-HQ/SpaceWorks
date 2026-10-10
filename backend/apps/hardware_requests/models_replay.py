@@ -6,8 +6,14 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from .replay_resolution_constraints import resolution_constraints
+
 
 class ReplayCommand(models.Model):
+    class Resolution(models.TextChoices):
+        ACKNOWLEDGED_NO_CHANGE = "acknowledged_no_change"
+        REPLACED_ONLINE = "replaced_online"
+
     class State(models.TextChoices):
         PREPARED = "prepared"
         CLAIMED = "claimed"
@@ -61,6 +67,12 @@ class ReplayCommand(models.Model):
     result_return_event = models.ForeignKey(
         "hardware_requests.ReturnEvent", null=True, blank=True, on_delete=models.PROTECT,
     )
+    resolution_code = models.CharField(max_length=24, choices=Resolution.choices, null=True, blank=True)
+    resolved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
+                                    related_name="resolved_kiosk_replays")
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    replacement_command = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT,
+                                            related_name="resolved_failures")
 
     class Meta:
         constraints = [
@@ -89,7 +101,7 @@ class ReplayCommand(models.Model):
                            | (~models.Q(state="failed") & models.Q(failure_code__isnull=True, failure_detail__isnull=True))),
                 name="replay_failure_consistent",
             ),
-        ]
+        ] + resolution_constraints()
         indexes = [
             models.Index(fields=("state", "expires_at"), name="replay_state_expiry_idx"),
             models.Index(fields=("station", "station_session_id", "aggregate_id"), name="replay_stream_idx"),
@@ -121,4 +133,16 @@ class ReplayCommand(models.Model):
             original = type(self).objects.filter(pk=self.pk).values(*immutable).first()
             if original and any(original[key] != getattr(self, key) for key in immutable):
                 raise ValidationError("Replay ownership and canonical identity are immutable.")
+            terminal = ("state", "payload_fingerprint", "evidence_id", "failure_code", "failure_detail",
+                        "created_at", "updated_at", "completed_at", "subject_request_id", "subject_loan_id",
+                        "result_request_id", "result_loan_id", "result_return_event_id")
+            review = ("resolution_code", "resolved_by_id", "resolved_at", "replacement_command_id")
+            persisted = type(self).objects.filter(pk=self.pk).values(*terminal, *review).first()
+            if persisted and persisted["state"] in ("failed", "succeeded"):
+                if any(persisted[key] != getattr(self, key) for key in terminal):
+                    raise ValidationError("A terminal replay attempt is immutable.")
+                if persisted["resolution_code"] and any(persisted[key] != getattr(self, key) for key in review):
+                    raise ValidationError("Replay review metadata is immutable.")
+                # Preserve auto_now even when a caller performs an ordinary save.
+                kwargs["update_fields"] = review
         return super().save(*args, **kwargs)

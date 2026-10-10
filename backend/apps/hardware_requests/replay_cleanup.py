@@ -36,7 +36,7 @@ def cleanup_replay_commands(*, now=None, tenant_limit=500):
                     counts["expired"] += 1
                 ids = list(ReplayCommand.objects.filter(
                     makerspace_id=makerspace_id, state__in=("succeeded", "failed"),
-                    completed_at__lte=cutoff, successors__isnull=True,
+                    completed_at__lte=cutoff, successors__isnull=True, resolved_failures__isnull=True,
                 ).order_by("pk").values_list("pk", flat=True)[:settings.KIOSK_REPLAY_CLEANUP_BATCH_SIZE])
                 counts["deleted"] += ReplayCommand.objects.filter(pk__in=ids).delete()[0]
     return counts
