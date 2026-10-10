@@ -11,6 +11,7 @@ import type { ApiPath } from "../../generated/api";
 import { StructuredApiError, tenantPublicRequest, tenantPublicRequestBlob } from "../../lib/api";
 import { useTenant, useTenantPath } from "../../lib/tenant";
 import { EventRegistrationForm } from "./EventRegistrationForm";
+import { EventPrice } from "../events/EventPrice";
 import { formatSlug } from "./PublicInventoryParts";
 import { useTenantBootstrap } from "./usePublicInventory";
 import { SkipLink } from "../../components/SkipLink";
@@ -24,6 +25,8 @@ type PublicEvent = {
   ends_at: string;
   location: string;
   capacity: number | null;
+  payment_amount: string;
+  currency: string;
   availability: "Available" | "Limited" | "Full";
   registration_requires_approval: boolean;
   effective_registration_cutoff_at: string | null;
@@ -126,7 +129,7 @@ export function PublicEventsPage() {
           <div className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="title-panel">{item.title}</h3><p className="eyebrow mt-1"><time dateTime={item.starts_at}>{eventTime(item)}</time></p>{item.location ? <p className="eyebrow mt-1">{item.location}</p> : null}</div><StatusBadge status={item.status} /></div>
           {item.description ? <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink">{item.description}</p> : null}
-          <dl className="mt-4 flex flex-wrap gap-4 text-sm"><div><dt className="eyebrow">Capacity</dt><dd className="font-mono font-semibold text-ink">{unlimited ? "Unlimited" : item.capacity}</dd></div><div><dt className="eyebrow">Availability</dt><dd className="font-mono font-semibold text-ink">{item.availability}</dd></div></dl>
+          <dl className="mt-4 flex flex-wrap gap-4 text-sm"><EventPrice amount={item.payment_amount} currency={item.currency} /><div><dt className="eyebrow">Capacity</dt><dd className="font-mono font-semibold text-ink">{unlimited ? "Unlimited" : item.capacity}</dd></div><div><dt className="eyebrow">Availability</dt><dd className="font-mono font-semibold text-ink">{item.availability}</dd></div></dl>
           {!item.registration_open ? <p className="mt-4 text-sm font-semibold text-muted">Registration closed{item.effective_registration_cutoff_at ? ` · ${new Date(item.effective_registration_cutoff_at).toLocaleString()}` : ""}</p> : null}
           <div className="mt-4 flex flex-wrap gap-2"><button className="desk-button-primary" type="button" disabled={!item.registration_open} aria-expanded={open} onClick={() => setActiveToken(open ? null : item.public_token)}>{open ? "Close form" : actionLabel}</button>
           <button className="desk-button" type="button" disabled={calendarToken === item.public_token} onClick={() => downloadCalendar(item)}>{calendarToken === item.public_token ? "Preparing…" : "Add to calendar"}</button></div>

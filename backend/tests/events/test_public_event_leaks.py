@@ -25,6 +25,8 @@ EXPECTED_FIELDS = {
     'location_kind',
     'custom_form',
     'capacity',
+    'payment_amount',
+    'currency',
     'availability',
     'registration_requires_approval',
     'effective_registration_cutoff_at',

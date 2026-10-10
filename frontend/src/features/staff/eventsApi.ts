@@ -34,6 +34,7 @@ export {
 } from "./eventsApiTypes";
 export {
   useApproveEventRegistration,
+  useCancelEventRegistration,
   useEventEligibleMembers,
   useEventRegistrations,
   useMarkEventAttended,

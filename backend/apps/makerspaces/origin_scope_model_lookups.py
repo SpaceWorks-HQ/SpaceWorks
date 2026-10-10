@@ -60,6 +60,7 @@ BASE_MODEL_LOOKUPS = {
     'admin-event-certificate-revoke': ('events.EventAttendanceCertificate', 'registration__event__makerspace_id'),
     'admin-event-certificate-reissue': ('events.EventAttendanceCertificate', 'registration__event__makerspace_id'),
     'admin-event-registration-approve': ('events.EventRegistration', 'event__makerspace_id'),
+    'admin-event-registration-cancel': ('events.EventRegistration', 'event__makerspace_id'),
     'admin-event-registration-reject': ('events.EventRegistration', 'event__makerspace_id'),
     'admin-event-registration-promote': ('events.EventRegistration', 'event__makerspace_id'),
     'admin-event-collaborators': ('events.Event', 'makerspace_id'),
