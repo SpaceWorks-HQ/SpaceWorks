@@ -70,6 +70,8 @@ class KioskStationBootstrapSerializer(serializers.Serializer):
 class KioskOperatorLeaseSerializer(serializers.Serializer):
     lease_token = serializers.CharField()
     lease_id = serializers.UUIDField()
+    session_id = serializers.UUIDField()
+    actor_id = serializers.IntegerField()
     expires_at = serializers.DateTimeField()
     allowed_actions = serializers.ListField(child=serializers.CharField())
     permitted_operations = serializers.ListField(child=serializers.CharField())

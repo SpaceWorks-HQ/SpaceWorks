@@ -14,6 +14,13 @@ vi.mock("./kioskApi", () => ({
   prepareEvidence: vi.fn(),
 }));
 
+// These tests pin 9b online behavior; offline storage/reachability have separate
+// real-storage, presentation and production-browser coverage.
+vi.mock("./useKioskQueue", () => ({ useKioskQueue: () => ({
+  queue: null, setQueue: vi.fn(), online: true, storageError: null, restored: false,
+  save: vi.fn(), retry: vi.fn(), reset: vi.fn().mockResolvedValue(undefined),
+}) }));
+
 const bootstrap: api.KioskBootstrap = {
   station: { id: 3, name: "Front desk", kind: "scanner" },
   makerspace: { id: 1, slug: "space", name: "Space" },

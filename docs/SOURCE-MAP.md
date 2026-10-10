@@ -183,7 +183,8 @@
   `replay_cleanup.py`/`tasks_replay.py` implement bounded daily cleanup, with settings checks in checks.py.
   `evidence/finalization_completed.py` supplies database-only finalized reuse under domain locks.
   `frontend/src/features/kiosk/kioskReplayApi.ts` hand-writes typed prepare/execute calls using only
-  Station cookie + human lease; the client queue and recovery screen belong to later slices.
+  Station cookie + human lease; `kioskReplayClient.ts` now owns encrypted foreground/SW replay.
+  The staff recovery screen remains phase 9e.
 - `backend/apps/payments/` — immutable multi-subject Payment authority, per-space raw credentials + managed
   Stripe Connect resolution, checkout/webhook settlement, reconciliation, native PaymentSheet intents.
 - `backend/apps/printing/` — **TOMBSTONED** (Project B): only an `AppConfig` and an empty `models.py`, kept
@@ -225,6 +226,16 @@
   `EventCheckInStationPage.tsx` exchanges the event-scoped PIN, then reuses the offline roster/sync API,
   IndexedDB state and operator UI owned by `features/staff/eventCheckInOfflineApi.ts`,
   `eventCheckInOfflineStore.ts` and `OfflineCheckInOperator.tsx`.
+- `frontend/src/features/kiosk/` — Station shell, selected offline handover and queue status.
+  `offlineQueueStore.ts`/`offlineQueueDb.ts` own atomic encrypted work/commands/evidence,
+  cross-context locks, caps and expiry; `offlineEvidence.ts` owns pixel normalization.
+  `replayPolicy.ts` owns scheduling/backoff and typed authority/domain distinctions.
+  `frontend/src/lib/encryptedIndexedDb.ts` supplies storage/crypto mechanics shared
+  with the legacy event adapter, whose database/wire format remains unchanged.
+  `frontend/src/sw.ts` owns kiosk app-shell fetch policy and opportunistic encrypted
+  Background Sync. `frontend/scripts/kiosk-pwa.ts` bundles it through Vite and injects
+  final asset revisions; `verify-pwa-build.mjs` checks emitted artifacts. Static
+  `public/sw.js` is removed. The offline rules live in `docs/KIOSK-OFFLINE.md`.
 - `frontend/src/features/organizations/` — public organization presentation and invitation redemption:
   `PublicOrganizationPage.tsx` renders the public profile and paginated cross-makerspace event catalogue,
   `OrganizationInvitationRedeemPage.tsx` binds a single-use invitation after member sign-in, and

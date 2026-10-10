@@ -1,7 +1,6 @@
-// In-memory kiosk session helpers. Nothing here touches localStorage/IndexedDB: the
-// Station cookie is HttpOnly and the lease token lives only in React state, so a reload
-// or idle reset drops all operator authority. Fullscreen and wake lock are usability
-// controls only; they grant nothing.
+// In-memory timer/fullscreen helpers. The offline adapter owns encrypted loaded
+// leases/packages and explicit key destruction; the Station cookie stays HttpOnly.
+// Fullscreen and wake lock are usability controls only; they grant nothing.
 import { useEffect, useRef } from "react";
 
 export const KIOSK_IDLE_RESET_MS = 5 * 60 * 1000;

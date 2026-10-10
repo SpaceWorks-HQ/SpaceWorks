@@ -1,222 +1,200 @@
-# Lane 9c - replay server
+# Lane 9d ? encrypted offline client and generated app shell
 
-Branch lane/9c, based on lane/9b. All repository edits remain unstaged. No commits,
-merges, checkouts, index changes or database tests were performed.
+Branch lane/9d, based on lane/9c. All changes are unstaged. No commit, checkout,
+merge, index mutation or backend database test was performed.
 
 ## Completed
 
-- Compared phase 9c, the phase-9 overview, stage1-p9 and HANDOVER-CODEX section 7
-  against the actual 9a/9b tree and migration leaves. Review copy:
-  docs/plans/2026-09-03-forward-plan/reviews/stage1-p9c.md (gitignored).
-- Added ReplayCommand, immutable ownership, stream/predecessor constraints, canonical
-  envelope validation and fingerprints; no persisted payload, QR or PII.
-- Added Station-cookie + signed-human-lease replay authentication without normal
-  login; live account/RBAC/module/feature/session/version checks at both boundaries.
-- Added atomic prepare/evidence identity, direct staging presigns, short claims,
-  stale recovery, token fencing, shared workflow dispatch, stable result references,
-  transactional success/audit and safe typed failures. Storage/unknown faults retry.
-  Each committed claim also writes kiosk.replay_claimed without its fencing token, so
-  a transient execution has an audit trail even when no domain effect is committed.
-- Added database-only finalized evidence reuse inside domain transactions, avoiding
-  the existing completed finalizer's S3 delete while request/evidence locks are held.
-  The adapter does not take attachment locks early; existing workflows retain their
-  request/loan-before-evidence order and authoritative retention lock checks.
-  Replay does not hold extra makerspace/credential locks across dispatch: that would
-  invert existing quota lock order. Authority is reloaded immediately before dispatch.
-  Concurrent prepares serialize through the owner unique constraint and locked retry.
-- Added bounded expiry/terminal-leaf cleanup, daily beat/beat-less scheduling, timing
-  checks, independent throttles and whole-tenant purge ordering.
-- Registered omitted coordination, actor edge, all-DROP authority, exact field graph,
-  source-gate participants, token origin ownership and every replay audit ID path.
-- Re-blessed schema digest to 28e593005a2cc5df32e4a4a61aac2735c21e473e75222ebdd72b6c3c81e44d17.
-  Static graph reconstruction reproduced the previous digest exactly before adding
-  the reviewed 31-field model. Live Django catalog validation remains for coordinator.
-- Added drf-spectacular request/result/error/auth schemas and handwritten frontend
-  prepare/execute helpers; updated INVARIANTS and SOURCE-MAP.
+- Step 0: audited the actual 9c replay model/services, 9b shell, migration leaves,
+  parent/review plans and HANDOVER-CODEX section 7. Review: docs/stage1-p9d.md,
+  the authorized worktree fallback for the main checkout's unwritable review path.
+- Extracted shared IDB/key/AES-GCM mechanics. Legacy event database/version/stores,
+  scopes and no-AAD blob wire format remain readable; event adapter owns semantics.
+- Added encrypted kiosk queue/work/evidence with version/scope/kind/UUID AAD,
+  non-extractable keys, random IVs, global 50-command/100 MiB evidence caps,
+  atomic capture writes, cross-window/worker Web Locks, expiry and key/data wipe.
+- Added pixel-only oriented JPEG normalization, maximum 1600px edge, bounded size,
+  metadata stripping and memory release. No plaintext persisted photo/lease/remark.
+- Added stable-ID prepare/upload/execute replay, persisted intermediate recovery,
+  same-envelope execute, per-aggregate dependency blocking, jittered backoff,
+  authority wipe and retained typed borrower/domain failures. Presigns are not stored.
+- Integrated selected online work-package persistence, cached continuation, queued
+  states, explicit reset/acknowledgement and cold-shell refusal. Idle prompts before
+  discarding pending work. Existing no-store health confirms unlock reachability;
+  onLine is only a hint. API base stays inside encrypted state for worker replay.
+- Added session_id/actor_id to the existing human-lease response/schema, plus 400
+  documentation. Existing lease service still writes the User-attributed audit.
+- Vite bundles src/sw.ts and injects final SHA-256 index/chunk/WASM revisions;
+  install verifies actual bytes, activation only removes old SpaceWorks caches,
+  updates wait for old clients/events, and kiosk navigations use the public shell.
+  API/auth/config/evidence/presigned responses never enter Cache Storage. Added
+  opportunistic encrypted Background Sync, build verifier and nginx cache headers.
+- Removed public/sw.js. Added KIOSK-OFFLINE.md and updated SOURCE-MAP ownership.
+- Added unit tests plus isolated production-worker Chromium smoke verification.
 
-## Migration
+## Checks actually run
 
-backend/apps/hardware_requests/migrations/0025_kiosk_replay.py depends on:
-- hardware_requests/0024_anonymous_request_submission
-- makerspaces/0074_station_operator_leases (plan's 0073 reference was stale)
-- evidence/0006_evidence_retention
-- swappable accounts.User dependency
+- npm ci: PowerShell npm.ps1 execution policy refused it; npm.cmd ci --cache
+  .npm-cache then failed EACCES fetching registry.npmjs.org/zxing-wasm.
+- Dependency install attempt also could not fetch vite-plugin-pwa/fake-indexeddb.
+  Existing main-checkout node_modules were READ/copied into this lane, allowing
+  validation without changing dependencies or package-lock.json.
+- npx.cmd --no-install tsc -b: exit 0 (also checked by npm build).
+- npm.cmd test -- --reporter=dot: 77 files, 315 tests passed, exit 0. An existing
+  jsdom ?Not implemented: navigation to another Document? diagnostic was non-failing.
+- npm.cmd run build: exit 0; ?PWA verified: 91 revisioned shell/assets, kiosk
+  navigation fallback, scanner WASM.?
+- node scripts/verify-pwa-browser.mjs: exit 0; cold offline shell refusal, REAL
+  browser non-extractable IDB key and encrypted command/photo capture, actual
+  1600x800 JPEG without inserted EXIF marker, ordered same-envelope replay, and
+  static-only cache verified against a SIMULATED replay server. No backend domain
+  effect is tested by this smoke check. Chromium is required to rerun it.
+- Python AST parsing: changed serializers/view and added backend test parsed.
+  This is syntax validation, NOT a passing Django/database test.
+- git diff --check: no whitespace errors. Every touched/new extant file <300 lines.
+  Index remains empty; AGENTS.md/CLAUDE.md remain byte-identical and unedited.
 
 ## Coordinator work remaining
 
-- Copy stage1-p9c.md from this worktree to the main checkout's requested review path;
-  the main path is outside this lane's writable root.
-- Run Django checks and makemigrations --check --dry-run, apply migrations, run the
-  tests listed below against the isolated PostgreSQL/Redis/MinIO harness, plus the
-  existing kiosk/station, evidence, catalog/source-gate, backup and tenant suites.
-- Run frontend typechecking and kioskReplayApi.test.ts (dependencies absent here).
-- Regenerate frontend/openapi-schema.json and frontend/src/generated/api.ts, as the
-  lane instructions reserve generated artifacts for the coordinator.
-- Perform coordinator review/QA and staging/commit. No passing DB/frontend tests claimed.
+- Copy docs/stage1-p9d.md to the main checkout's reviews/stage1-p9d.md if desired.
+- Run scripts/dev.sh test tests/hardware_requests/test_kiosk_offline_scope.py,
+  existing kiosk/station/replay/evidence suites, Django checks and schema generation.
+- Regenerate frontend/openapi-schema.json and frontend/src/generated/api.ts for
+  the additive lease DTO/schema fields. They are intentionally untouched here.
+- Perform external Stage-4 review and real-stack owner QA/9e outage/revocation/
+  Background Sync/update checks. codex doctor failed config/home resolution and
+  provider reachability in this sandbox; no external gate is claimed passed.
+- Stage/commit remains the coordinator's job; no merge or push was attempted.
 
-## Checks actually completed
+## Migrations, skips and owner decisions
 
-- Python AST parsing of all 53 changed/new Python files: no syntax errors.
-- validate_http_coverage, validate_task_coverage, validate_object_mutation_coverage,
-  validate_fanout_gate_coverage: all returned OK using the repo's static AST guards.
-- git diff --check: no whitespace errors. Touched production Python files are below
-  300 lines except the accepted config/settings.py exception.
-- Final read-only index check is empty; AGENTS.md and CLAUDE.md remain byte-identical.
-- System Python has no Django; pip dependency download was denied by sandbox network
-  access. An ignored .venv was created for that attempt. No DB suite was invoked.
+- No migration/model/module/feature/settings change. Actual leaves inspected:
+  hardware_requests/0025_kiosk_replay, makerspaces/0074_station_operator_leases.
+- Dependency deviation: vite-plugin-pwa was unavailable locally and registry access
+  denied. A small repository Vite injectManifest plugin generates/verifies the
+  worker without new dependencies. npm lock file is unchanged.
+- INVARIANTS.md already exceeds the task's any-touched-file 300-line ceiling.
+  New rules live in docs/KIOSK-OFFLINE.md, linked by SOURCE-MAP; no unrelated
+  3,000-line doc split or AGENTS/CLAUDE edit was attempted.
+- New prospective direct-handout selection/issue-then-return item mapping is not
+  advertised: 9b supplies reviewed-request selection only, and 9c requires existing
+  server item IDs. Queue adapter supports reviewed requests and loaded existing
+  direct-loan returns. No empty resolution list is invented as return-all.
+- No owner decision blocks the delivered reviewed-handover scope. Before expanding
+  prospective direct item handouts, choose the client/product-to-item ID contract
+  already identified by stage1-p9c. Failed replay resolution remains phase 9e.
+- Temporary npm/browser artifacts are ignored. Automatic policy blocked recursive
+  cleanup; no files outside this lane were edited.
 
-## Skips, decisions and defects outside this slice
+## Defects noticed outside phase 9d
 
-- No browser queue/service worker, recovery UI, standalone offline QR lookup or new
-  module/feature key; those are outside phase 9c.
-- Chained direct return resolves the new loan. Newly-created item lines still require
-  server item IDs in resolutions, as the existing staff contract dictates. Container-only
-  chained returns work. Before advertising fully offline issue-then-return of item
-  lines, choose a client-product-to-server-item resolution contract; no silent return-all.
-- Existing direct_loan_returns._return_scan_qr accepts a matching expected QR without
-  checking ACTIVE status. This slice preserves the workflow's behavior; the plan's
-  claim that every existing return re-checks QR revocation is too strong.
-- Existing evidence finalization stale promotion recovery does not fence S3 copy by
-  its claim token; replay fences database commits, but does not redesign that storage
-  protocol. Coordinator should review simultaneous slow stale promotions separately.
-- 9b's frontend KioskWorkPackage kind union omits the server's prospective direct_handout
-  kind; unchanged here because the direct-handout kiosk UI is later work.
+- 9b advertises a 900-second work-package command age while 9c defaults to eight
+  hours. The client honors the narrower advertised limit; no server setting changed.
+- Existing direct_loan_returns._return_scan_qr matches expected QR payloads without
+  checking ACTIVE status. Preserved; coordinator should review that domain defect.
 
 ## File inventory
-- backend/apps/backup/settings_policy.py
-- backend/apps/data_export/classification_platform.py
-- backend/apps/data_export/references_core.py
-- backend/apps/evidence/finalization_completed.py
-- backend/apps/evidence/storage.py
-- backend/apps/hardware_requests/apps.py
-- backend/apps/hardware_requests/checks.py
-- backend/apps/hardware_requests/kiosk_online_commands.py
-- backend/apps/hardware_requests/migrations/0025_kiosk_replay.py
-- backend/apps/hardware_requests/models.py
-- backend/apps/hardware_requests/models_replay.py
-- backend/apps/hardware_requests/replay_authorization.py
-- backend/apps/hardware_requests/replay_claims.py
-- backend/apps/hardware_requests/replay_cleanup.py
-- backend/apps/hardware_requests/replay_dispatch.py
-- backend/apps/hardware_requests/replay_execute.py
-- backend/apps/hardware_requests/replay_failures.py
-- backend/apps/hardware_requests/replay_fingerprint.py
-- backend/apps/hardware_requests/replay_payload_serializers.py
-- backend/apps/hardware_requests/replay_prepare.py
-- backend/apps/hardware_requests/replay_records.py
-- backend/apps/hardware_requests/replay_serializers.py
-- backend/apps/hardware_requests/replay_throttles.py
-- backend/apps/hardware_requests/replay_views.py
-- backend/apps/hardware_requests/tasks.py
-- backend/apps/hardware_requests/tasks_replay.py
-- backend/apps/makerspaces/lifecycle_purge.py
-- backend/apps/makerspaces/origin_scope_routes.py
-- backend/apps/makerspaces/station_urls.py
-- backend/apps/operations/management/commands/run_scheduled_tasks.py
-- backend/apps/tenant_migration/audit_references_meta_kiosk.py
-- backend/apps/tenant_migration/gate_policy.py
-- backend/apps/tenant_migration/gate_policy_objects.py
-- backend/apps/tenant_migration/gate_policy_replay.py
-- backend/apps/tenant_migration/tenant_dump_authority_supplement.py
-- backend/apps/tenant_migration/tenant_dump_catalog.py
-- backend/apps/tenant_migration/tenant_dump_field_snapshot.py
-- backend/config/settings.py
-- backend/tests/data_export/test_portable_audit_references.py
-- backend/tests/data_export/test_registry_guards.py
-- backend/tests/evidence/test_kiosk_replay_evidence.py
-- backend/tests/hardware_requests/replay_helpers.py
-- backend/tests/hardware_requests/test_kiosk_replay.py
-- backend/tests/hardware_requests/test_kiosk_replay_checks.py
-- backend/tests/hardware_requests/test_kiosk_replay_cleanup.py
-- backend/tests/hardware_requests/test_kiosk_replay_concurrency.py
-- backend/tests/hardware_requests/test_kiosk_replay_crashes.py
-- backend/tests/makerspaces/test_tenant_lifecycle.py
-- backend/tests/tenant_migration/test_authority_dispositions_d8.py
-- backend/tests/tenant_migration/test_authority_guard.py
-- backend/tests/tenant_migration/test_reference_registry.py
-- backend/tests/tenant_migration/test_tenant_dump_catalog_d1.py
-- backend/tests/test_scheduled_tasks.py
-- docs/INVARIANTS.md
-- docs/SOURCE-MAP.md
-- frontend/src/features/kiosk/kioskReplayApi.test.ts
-- frontend/src/features/kiosk/kioskReplayApi.ts
+
+- .gitignore
 - LANE-PROGRESS.md
-- docs/plans/2026-09-03-forward-plan/reviews/stage1-p9c.md (gitignored review)
+- backend/apps/makerspaces/station_serializers.py
+- backend/apps/makerspaces/station_views_public.py
+- backend/tests/hardware_requests/test_kiosk_offline_scope.py
+- docs/KIOSK-OFFLINE.md
+- docs/SOURCE-MAP.md
+- docs/stage1-p9d.md
+- frontend/nginx.conf
+- frontend/package.json
+- frontend/public/sw.js
+- frontend/scripts/kiosk-pwa.ts
+- frontend/scripts/verify-pwa-browser.mjs
+- frontend/scripts/verify-pwa-build.mjs
+- frontend/src/App.kioskOffline.test.tsx
+- frontend/src/App.tsx
+- frontend/src/features/kiosk/KioskOfflineHandover.tsx
+- frontend/src/features/kiosk/KioskOnlineHandover.tsx
+- frontend/src/features/kiosk/KioskQueueStatus.tsx
+- frontend/src/features/kiosk/KioskStationPage.offline.test.tsx
+- frontend/src/features/kiosk/KioskStationPage.test.tsx
+- frontend/src/features/kiosk/KioskStationPage.tsx
+- frontend/src/features/kiosk/kioskApi.ts
+- frontend/src/features/kiosk/kioskReplayApi.ts
+- frontend/src/features/kiosk/kioskReplayClient.test.ts
+- frontend/src/features/kiosk/kioskReplayClient.ts
+- frontend/src/features/kiosk/kioskSession.ts
+- frontend/src/features/kiosk/offlineEvidence.test.ts
+- frontend/src/features/kiosk/offlineEvidence.ts
+- frontend/src/features/kiosk/offlineQueueDb.ts
+- frontend/src/features/kiosk/offlineQueueStore.test.ts
+- frontend/src/features/kiosk/offlineQueueStore.ts
+- frontend/src/features/kiosk/offlineQueueTypes.ts
+- frontend/src/features/kiosk/offlineTestFixtures.ts
+- frontend/src/features/kiosk/replayPolicy.ts
+- frontend/src/features/kiosk/useKioskQueue.test.tsx
+- frontend/src/features/kiosk/useKioskQueue.ts
+- frontend/src/features/staff/eventCheckInOfflineStore.test.ts
+- frontend/src/features/staff/eventCheckInOfflineStore.ts
+- frontend/src/lib/encryptedIndexedDb.test.ts
+- frontend/src/lib/encryptedIndexedDb.ts
+- frontend/src/main.tsx
+- frontend/src/sw.test.ts
+- frontend/src/sw.ts
+- frontend/src/swPolicy.ts
+- frontend/src/test/memoryIndexedDb.ts
+- frontend/tsconfig.node.json
+- frontend/vite.config.ts
 
-## Added tests (all need coordinator execution)
+## Added test cases
 
-backend/tests/data_export/test_portable_audit_references.py
-- test_replay_audit_keeps_station_binding_and_namespaces_source_coordination_ids
+frontend/src/App.kioskOffline.test.tsx
+- opens a UUID Station shell while tenant bootstrap is unavailable
+- preserves bootstrap gating for ordinary tenant routes
 
-backend/tests/data_export/test_registry_guards.py
-- test_replay_coordination_is_omitted_and_actor_never_expands_user_closure
+frontend/src/features/kiosk/KioskStationPage.offline.test.tsx
+- cold offline shell refuses unlock, search and capture
+- restores only the selected encrypted handover and presents pending work as Queued
 
-backend/tests/evidence/test_kiosk_replay_evidence.py
-- test_failed_qr_photo_is_readable_and_cleanup_keeps_it
-- test_finalized_reuse_inside_domain_transaction_has_no_storage_io
-- test_invalid_or_absent_upload_is_terminal_and_retains_photo
-- test_prepare_presigns_same_staging_photo_on_retry_and_rejects_metadata_conflict
-- test_staging_promotion_happens_once_and_later_staging_bytes_cannot_replace_final
-- test_storage_failure_rolls_back_prepare_and_leaves_execute_retryable
-- test_unconsumed_failure_reads_staging_and_expired_state_never_reads_storage
+frontend/src/features/kiosk/kioskReplayClient.test.ts
+- recovers uncertain delivery with the SAME UUID/envelope; duplicate success skips execute
+- blocks a failed aggregate's successor while independent handovers continue
+- waits for claim contention without running its successor, then reuses stable server IDs
+- resumes persisted preparing/uploading/executing states after a context closes
+- wipes revoked authority but retains borrower presence/membership/waiver failures
+- uploads decrypted evidence directly and keeps it out of the envelope and result
+- supports PUT headers and treats storage 403 as a retryable expired presign
 
-backend/tests/hardware_requests/test_kiosk_replay.py
-- test_a_different_lease_cannot_take_over_an_owned_command
-- test_canonical_objects_ignore_key_order_and_lists_preserve_order
-- test_chained_direct_return_resolves_created_container_loan
-- test_changed_payload_and_stream_position_conflict_without_mutating_original
-- test_command_age_is_enforced_at_prepare
-- test_current_box_mismatch_is_a_terminal_return_failure
-- test_current_presence_and_inventory_refusals_are_typed
-- test_issue_deposit_and_box_scan_failures_are_typed_and_terminal
-- test_live_revocation_prevents_domain_effect
-- test_module_off_and_missing_cookie_origin_csrf_or_lease_fail_closed
-- test_permission_is_checked_again_after_s3_and_before_domain_commit
-- test_predecessor_pending_failed_and_cross_aggregate_refusals
-- test_prepare_and_execute_duplicate_apply_exactly_one_box_scan_without_login
-- test_reviewed_issue_and_return_commit_with_replay_results
-- test_source_gate_refuses_prepare_and_execute_without_mutation
-- test_tenant_reference_and_model_identity_guards
-- test_unknown_protocol_and_untrusted_tenant_are_refused
+frontend/src/features/kiosk/offlineEvidence.test.ts
+- bounds portrait/landscape dimensions and never upscales
+- uses oriented decoded pixels, encodes fresh JPEG bytes and releases pixels
+- blocks oversize/empty output and releases the decoded bitmap on failure
 
-backend/tests/hardware_requests/test_kiosk_replay_checks.py
-- test_default_replay_timing_is_valid
-- test_replay_age_cannot_outlive_tombstones_and_claim_timeout_is_shorter
-- test_replay_timing_rejects_nonpositive_and_noninteger_values
+frontend/src/features/kiosk/offlineQueueStore.test.ts
+- stores private work, envelopes, lease and image only as authenticated ciphertext
+- atomically appends concurrent captures, retaining sequence and predecessor IDs
+- enforces the 50-command cap without dropping an earlier capture
+- blocks over-budget evidence before either command or photo commits
+- expires at advertised command age, wipes keys/images, and cannot queue fresh work
+- rejects ciphertext substitution across scopes and metadata tampering
+- refuses missing scope metadata and unavailable Web Locks without plaintext fallback
 
-backend/tests/hardware_requests/test_kiosk_replay_cleanup.py
-- test_cleanup_does_not_touch_a_fresh_claim
-- test_closed_source_gate_skips_cleanup
-- test_expiry_is_bounded_and_never_deletes_evidence
-- test_retained_descendant_protects_predecessor_and_old_envelope_cannot_reopen
+frontend/src/features/kiosk/useKioskQueue.test.tsx
+- does not treat onLine=true as proof that a cold Station can unlock
+- keeps a cached handover in offline mode when the reachable backend is unhealthy
 
-backend/tests/hardware_requests/test_kiosk_replay_concurrency.py
-- test_a_slow_stale_executor_cannot_commit_after_a_new_claim_succeeds
-- test_concurrent_prepare_creates_one_owner_and_one_evidence
-- test_fresh_claim_collision_executes_one_issue
+frontend/src/features/staff/eventCheckInOfflineStore.test.ts
+- reads a pre-extraction version-one fixture encrypted without AAD
+- preserves prefix wipe and expiry cleanup of keys and blobs
+- refuses state whose encrypted expiry disagrees with plaintext pruning metadata
 
-backend/tests/hardware_requests/test_kiosk_replay_crashes.py
-- test_an_old_executor_cannot_release_a_reclaimed_token
-- test_stale_claim_recovers_each_crash_without_double_issue
-- test_unknown_exception_rolls_back_domain_and_preserves_retryability
+frontend/src/lib/encryptedIndexedDb.test.ts
+- clones a non-extractable AES-256 key and uses fresh 96-bit IVs
+- destroys scoped keys and ciphertext together, preserving other scopes
 
-backend/tests/makerspaces/test_tenant_lifecycle.py
-- test_whole_tenant_purge_removes_protected_replay_chain_before_domain_and_evidence
+frontend/src/sw.test.ts
+- supports kiosk-only navigations, never expands offline support to staff/member pages
+- caches only exact revisioned static assets, excluding API/auth/evidence/presigns
 
-backend/tests/tenant_migration/test_authority_guard.py
-- test_every_replay_field_has_an_explicit_drop_override
+backend/tests/hardware_requests/test_kiosk_offline_scope.py
+- test_operator_lease_exposes_exact_human_and_session_scope_no_store (NOT RUN)
 
-backend/tests/tenant_migration/test_reference_registry.py
-- test_replay_audit_paths_have_exact_portable_or_source_local_dispositions
-
-backend/tests/tenant_migration/test_tenant_dump_catalog_d1.py
-- test_replay_catalog_is_exactly_the_live_field_universe_and_all_drop
-
-backend/tests/test_scheduled_tasks.py
-- test_replay_cleanup_is_daily_in_both_schedulers
-
-backend/tests/tenant_migration/test_authority_dispositions_d8.py: 31 ReplayCommand
-field cases added to the existing exact disposition matrix tests.
-
-frontend/src/features/kiosk/kioskReplayApi.test.ts: bearer-only transport/same-envelope
-and typed conflict preservation/no login refresh.
+frontend/src/features/kiosk/KioskStationPage.test.tsx: existing online tests now isolate the new offline/reachability hook; no existing behavior assertion removed.

@@ -9,12 +9,13 @@ import {
   type KioskWorkPackage,
 } from "./kioskApi";
 
-type Props = { token: string; lease: KioskLease; makerspaceId: number };
+type Props = { token: string; lease: KioskLease; makerspaceId: number;
+  onWorkLoaded?: (work: KioskWorkPackage) => Promise<void> };
 
 // Online reviewed-request handover: load the minimal work package, then assign a box,
 // issue or return through the lease-checked command route. Evidence goes straight to
 // object storage via the kiosk presign; the server promotes it inside the workflow.
-export function KioskOnlineHandover({ token, lease, makerspaceId }: Props) {
+export function KioskOnlineHandover({ token, lease, makerspaceId, onWorkLoaded }: Props) {
   const [requestId, setRequestId] = useState("");
   const [work, setWork] = useState<KioskWorkPackage | null>(null);
   const [boxCode, setBoxCode] = useState("");
@@ -27,7 +28,11 @@ export function KioskOnlineHandover({ token, lease, makerspaceId }: Props) {
 
   async function load(id: number) {
     setError(null);
-    try { setWork(await loadWorkPackage(token, lease.lease_token, "reviewed_request", id)); }
+    try {
+      const loaded = await loadWorkPackage(token, lease.lease_token, "reviewed_request", id);
+      setWork(loaded);
+      await onWorkLoaded?.(loaded);
+    }
     catch { setWork(null); setError("That request is not available to this Station."); }
   }
 

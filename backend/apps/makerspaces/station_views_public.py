@@ -146,7 +146,7 @@ class KioskOperatorLeaseView(APIView):
         tags=TAGS, summary="Issue a human operator lease on this Station session",
         request=None,
         responses={201: KioskOperatorLeaseSerializer, 401: GENERIC_ERROR,
-                   403: GENERIC_ERROR, 429: GENERIC_ERROR},
+                   400: GENERIC_ERROR, 403: GENERIC_ERROR, 429: GENERIC_ERROR},
     )
     def post(self, request, public_token, *args, **kwargs):
         station, credential, session_id, expires_at = live_session(request, public_token)
@@ -157,6 +157,7 @@ class KioskOperatorLeaseView(APIView):
         )
         body = KioskOperatorLeaseSerializer({
             "lease_token": token, "lease_id": lease.pk, "expires_at": lease.expires_at,
+            "session_id": lease.station_session_id, "actor_id": lease.actor_id,
             "allowed_actions": lease.allowed_actions,
             "permitted_operations": permitted_operations(
                 station.makerspace, station.kind, lease.allowed_actions

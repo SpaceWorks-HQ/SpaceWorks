@@ -64,3 +64,5 @@ docs/roadmap.md
 frontend/e2e/.seed.json
 frontend/playwright-report/
 frontend/test-results/
+frontend/.npm-cache/
+frontend/.pwa-browser/

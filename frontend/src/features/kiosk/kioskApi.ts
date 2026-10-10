@@ -1,6 +1,7 @@
 // Typed calls for the phase 9b kiosk Station. The Station cookie is HttpOnly and
 // path-bound, so the browser sends it with `credentials: "include"`; the operator lease
-// is held only in memory and sent as a header. Nothing here is persisted.
+// is sent as a header. The offline adapter encrypts a loaded lease/package; this
+// transport never persists cookies, normal login credentials or responses.
 import { API_V1_URL, staffRequest, StructuredApiError } from "../../lib/api";
 import type { UploadResponse } from "../staff/panels/EvidenceUpload";
 
@@ -14,13 +15,15 @@ export type KioskBootstrap = {
 export type KioskLease = {
   lease_token: string;
   lease_id: string;
+  session_id?: string;
+  actor_id?: number;
   expires_at: string;
   allowed_actions: string[];
   permitted_operations: string[];
 };
 
 export type KioskWorkPackage = {
-  kind: "reviewed_request" | "direct_loan";
+  kind: "reviewed_request" | "direct_loan" | "direct_handout";
   id: number;
   status: string;
   display_label: string;

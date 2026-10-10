@@ -1,5 +1,6 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { kioskPwa } from "./scripts/kiosk-pwa";
 
 // This config file runs in Node, but the project carries no @types/node (the app
 // itself is browser-only). Declaring the one global we need keeps `tsc -b` happy
@@ -7,7 +8,7 @@ import { defineConfig } from "vitest/config";
 declare const process: { env: Record<string, string | undefined> };
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), kioskPwa()],
   server: {
     port: 5000,
     // Inside the dev container the backend is another service on the compose

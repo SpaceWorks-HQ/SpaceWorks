@@ -1,7 +1,8 @@
 // The replay bearer lease identifies the human after a normal browser login expires.
 // These calls deliberately use the Station cookie + lease, with no login refresh.
-import { API_V1_URL, StructuredApiError } from "../../lib/api";
-import type { ApiErrorBody } from "../../lib/api";
+import { configuredApiUrl } from "../../lib/runtimeConfig";
+import { StructuredApiError } from "../../lib/api/errors";
+import type { ApiErrorBody } from "../../lib/api/errors";
 import type { UploadResponse } from "../staff/panels/EvidenceUpload";
 
 type Resolution = {
@@ -59,11 +60,12 @@ export type ReplayResult = {
   upload?: UploadResponse | null;
 };
 
-async function replayRequest(token: string, lease: string, suffix: string, envelope: ReplayEnvelope) {
+async function replayRequest(token: string, lease: string, suffix: string, envelope: ReplayEnvelope, apiBase?: string) {
   const response = await fetch(
-    `${API_V1_URL}/kiosk-stations/${encodeURIComponent(token)}/replay/${suffix}`,
+    `${apiBase ?? configuredApiUrl().replace(/\/api$/, "/api/v1")}/kiosk-stations/${encodeURIComponent(token)}/replay/${suffix}`,
     {
       method: "POST", credentials: "include", cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
       headers: { "Content-Type": "application/json", "X-Station-CSRF": "1", "X-Kiosk-Operator-Lease": lease },
       body: JSON.stringify(envelope),
     },
@@ -75,10 +77,10 @@ async function replayRequest(token: string, lease: string, suffix: string, envel
   return await response.json() as ReplayResult;
 }
 
-export function prepareReplay(token: string, lease: string, envelope: ReplayEnvelope) {
-  return replayRequest(token, lease, "prepare/", envelope);
+export function prepareReplay(token: string, lease: string, envelope: ReplayEnvelope, apiBase?: string) {
+  return replayRequest(token, lease, "prepare/", envelope, apiBase);
 }
 
-export function executeReplay(token: string, lease: string, envelope: ReplayEnvelope) {
-  return replayRequest(token, lease, `${encodeURIComponent(envelope.client_command_id)}/execute/`, envelope);
+export function executeReplay(token: string, lease: string, envelope: ReplayEnvelope, apiBase?: string) {
+  return replayRequest(token, lease, `${encodeURIComponent(envelope.client_command_id)}/execute/`, envelope, apiBase);
 }
