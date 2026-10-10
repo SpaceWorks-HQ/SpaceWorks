@@ -74,7 +74,9 @@ class KioskOnlineCommandResultSerializer(serializers.Serializer):
 
 
 class KioskWorkPackageRequestSerializer(serializers.Serializer):
-    kind = serializers.ChoiceField(choices=["reviewed_request", "direct_loan"])
+    # `direct_handout` is prospective: `id` is the borrower's user id, checked for an
+    # active membership in the Station's makerspace before any display name returns.
+    kind = serializers.ChoiceField(choices=["reviewed_request", "direct_loan", "direct_handout"])
     id = serializers.IntegerField(min_value=1)
 
 

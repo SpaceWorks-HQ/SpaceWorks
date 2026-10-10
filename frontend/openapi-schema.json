@@ -52878,10 +52878,11 @@
             "KioskWorkPackageRequestKindEnum": {
                 "enum": [
                     "reviewed_request",
-                    "direct_loan"
+                    "direct_loan",
+                    "direct_handout"
                 ],
                 "type": "string",
-                "description": "* `reviewed_request` - reviewed_request\n* `direct_loan` - direct_loan"
+                "description": "* `reviewed_request` - reviewed_request\n* `direct_loan` - direct_loan\n* `direct_handout` - direct_handout"
             },
             "LedgerResponse": {
                 "type": "object",

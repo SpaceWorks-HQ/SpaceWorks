@@ -154,6 +154,18 @@ def work_package(*, station, lease, user, kind, pk):
             ],
         }
         refs = {"request_id": hardware_request.pk}
+    elif kind == "direct_handout":
+        from apps.hardware_requests.direct_loan_views import _borrower_for_makerspace
+
+        borrower = _borrower_for_makerspace(makerspace, pk)
+        data = {
+            "status": "prospective",
+            "display_label": "New direct handout",
+            "person_display": borrower.display_name or borrower.username,
+            "box": None,
+            "lines": [],
+        }
+        refs = {}
     else:
         loan = _direct_loan(makerspace, pk)
         requester = loan.requester

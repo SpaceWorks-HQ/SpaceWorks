@@ -216,3 +216,43 @@ def test_feature_off_answers_400_and_evidence_prepare_presigns_staging(monkeypat
         "resolutions": [{"item_id": 1, "returned": 1}],
     })
     assert off.status_code == 400
+
+
+def test_work_package_is_minimal_tenant_scoped_and_audited():
+    space, other = kiosk_space(), kiosk_space("kiosk-wp-other")
+    staff = make_staff(space)
+    client, token, headers, station = leased(space, staff)
+    hardware_request = make_accepted_request(space, make_product(space, name="Drill"), 2)
+    url = reverse("kiosk-station-work-package", kwargs={"public_token": token})
+    ok = client.post(url, {"kind": "reviewed_request", "id": hardware_request.pk}, format="json", **headers)
+    assert ok.status_code == 200, ok.data
+    assert ok["Cache-Control"] == "private, no-store"
+    assert ok.data["status"] == "accepted"
+    assert ok.data["lines"] == [{"item_id": hardware_request.items.get().pk, "label": "Drill", "quantity": 2, "returned": 0}]
+    assert "requester_contact_email" not in ok.data
+    log = AuditLog.objects.get(action="kiosk.work_package_issued")
+    assert log.actor == staff and log.meta["request_id"] == hardware_request.pk
+    assert log.meta["station_id"] == station["id"]
+    foreign = make_accepted_request(other, make_product(other), 1)
+    assert client.post(url, {"kind": "reviewed_request", "id": foreign.pk}, format="json", **headers).status_code == 404
+    scanner_client, scanner_token, scanner_headers, _ = leased(space, staff, kind="scanner")
+    scanner_url = reverse("kiosk-station-work-package", kwargs={"public_token": scanner_token})
+    assert scanner_client.post(
+        scanner_url, {"kind": "reviewed_request", "id": hardware_request.pk}, format="json", **scanner_headers
+    ).status_code == 403
+
+
+def test_prospective_direct_handout_package_requires_an_active_local_member():
+    from tests.events.checkin_helpers import make_member
+
+    space, other = kiosk_space(), kiosk_space("kiosk-dh-other")
+    staff = make_staff(space)
+    client, token, headers, _ = leased(space, staff)
+    url = reverse("kiosk-station-work-package", kwargs={"public_token": token})
+    member = make_member(space, display_name="Grace Hopper")
+    ok = client.post(url, {"kind": "direct_handout", "id": member.pk}, format="json", **headers)
+    assert ok.status_code == 200, ok.data
+    assert ok.data["person_display"] == "Grace Hopper" and ok.data["status"] == "prospective"
+    outsider = make_member(other, username="outsider")
+    response = client.post(url, {"kind": "direct_handout", "id": outsider.pk}, format="json", **headers)
+    assert response.status_code == 403

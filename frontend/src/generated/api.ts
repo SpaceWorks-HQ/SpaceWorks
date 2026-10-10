@@ -2650,7 +2650,7 @@ export type KioskWorkPackageRequest = {
   "id": number;
 };
 
-export type KioskWorkPackageRequestKindEnum = "reviewed_request" | "direct_loan";
+export type KioskWorkPackageRequestKindEnum = "reviewed_request" | "direct_loan" | "direct_handout";
 
 export type LedgerResponse = {
   "count": number;

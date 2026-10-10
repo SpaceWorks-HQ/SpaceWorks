@@ -49,6 +49,7 @@ TAGS = ["Kiosk stations"]
 WORK_PACKAGE_OPERATIONS = {
     "reviewed_request": ("assign_box", "reviewed_issue", "reviewed_return"),
     "direct_loan": ("direct_return",),
+    "direct_handout": ("direct_handout",),
 }
 
 
