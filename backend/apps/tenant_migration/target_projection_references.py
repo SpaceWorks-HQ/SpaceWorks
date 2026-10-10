@@ -6,8 +6,8 @@ from .target_projection_types import ForeignKeyPolicy, ReferenceDisposition, See
 SEEDED_RESOLUTIONS = {
     "inventory.Category": SeededResolution(
         lookup_fields=("slug",),
-        archive_update_fields=("name", "display_order", "icon", "created_at", "updated_at"),
-        reason="Resolve seeded placeholders by slug while retaining tenant-edited presentation data.",
+        archive_update_fields=("name", "display_order", "icon", "loan_days", "max_renewals", "created_at", "updated_at"),
+        reason="Resolve seeded placeholders by slug while retaining tenant-edited presentation and loan terms.",
     ),
     "machines.MachineType": SeededResolution(
         lookup_fields=("slug",),

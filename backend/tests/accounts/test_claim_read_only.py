@@ -20,6 +20,8 @@ READ_ONLY_CASES = (
     ("member-waiver", "HEAD", "waiver"),
     ("member-activity", "GET", "activity"),
     ("member-activity", "HEAD", "activity"),
+    ("member-certifications", "GET", "certifications"),
+    ("member-certifications", "HEAD", "certifications"),
     ("member-payment-history", "GET", "payments"),
     ("member-payment-history", "HEAD", "payments"),
     ("member-profile", "GET", "profile"),
@@ -57,6 +59,7 @@ def case_url(case, space, membership):
     return {
         "waiver": f"{base}/waiver",
         "activity": f"{base}/activity",
+        "certifications": f"{base}/certifications",
         "payments": f"{base}/payments",
         "profile": f"{base}/profile",
         "directory": f"{base}/directory",

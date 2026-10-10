@@ -35,6 +35,15 @@ from apps.tenant_migration.target_projection import (
 
 
 EXPECTED_TARGET_VALUES = {
+    ("operations.SavedView", "shared"): False,
+    ("operations.SavedView", "state"): {},
+    ("makerspaces.MakerspaceMembershipSettings", "join_mode"): "approval",
+    ("makerspaces.MakerspaceMembershipSettings", "vouch_replaces_approval"): False,
+    ("makerspaces.MembershipRequest", "state"): "canceled",
+    ("makerspaces.MembershipRequest", "admission_managed"): False,
+    ("payments.MakerspaceBillingSettings", "reminder_days_before"): [],
+    ("payments.MakerspaceBillingSettings", "reminder_days_after"): [],
+    ("payments.MakerspaceBillingSettings", "max_reminders"): 0,
     ("makerspaces.Makerspace", "frontend_domain"): None,
     ("makerspaces.Makerspace", "frontend_domain_status"): Makerspace.DomainStatus.PENDING,
     ("makerspaces.Makerspace", "domain_verified_at"): None,
@@ -97,6 +106,7 @@ def test_expected_values_cover_the_complete_projection():
 
 def test_only_operator_selectable_policy_fields_allow_an_override():
     allowed = {
+        ("makerspaces.MakerspaceMembershipSettings", "join_mode"),
         ("makerspaces.Makerspace", "membership_policy"),
         ("makerspaces.Makerspace", "referrals_enabled"),
         ("makerspaces.Makerspace", "enabled_modules"),
@@ -137,7 +147,8 @@ def test_authority_rows_follow_the_explicit_drop_or_decision_22_policy():
 
 def test_only_open_membership_request_states_are_authority_rows():
     policy = ROW_POLICIES["makerspaces.MembershipRequest"]
-    assert policy.condition == ("state", frozenset({"requested", "invited"}))
+    assert policy.condition == ("state", frozenset({"requested", "invited", "awaiting_vouches"}))
+    assert row_disposition("makerspaces.MembershipRequest", {"state": "awaiting_vouches"}, None) == "drop"
 
 
 def test_every_notification_recipient_kind_is_declared_dropped():
@@ -164,6 +175,8 @@ def test_category_resolution_retains_archived_tenant_edits():
         "name": "Lab Sensors",
         "display_order": 41,
         "icon": "radar",
+        "loan_days": 14,
+        "max_renewals": 0,
         "created_at": "source-created",
         "updated_at": "source-updated",
     }
@@ -172,6 +185,8 @@ def test_category_resolution_retains_archived_tenant_edits():
         "name": "Lab Sensors",
         "display_order": 41,
         "icon": "radar",
+        "loan_days": 14,
+        "max_renewals": 0,
         "created_at": "source-created",
         "updated_at": "source-updated",
     }
