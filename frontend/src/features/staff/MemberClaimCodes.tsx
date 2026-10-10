@@ -105,6 +105,7 @@ export function MemberClaimCodes({
           {issue.isPending ? "Issuing…" : "Issue claim code"}
         </button>
       </div>
+      {!walkIns.length ? <p className="mt-2 text-sm text-muted">No eligible walk-ins in this member list.</p> : null}
       {issued ? (
         <div className="mt-4 grid gap-4 rounded-lg border border-line bg-surface p-4 md:grid-cols-[1fr_180px]">
           <div>
@@ -134,7 +135,7 @@ export function MemberClaimCodes({
           </div>
         ))}
         {active.isLoading ? <p className="text-sm text-muted">Loading active claim codes…</p> : null}
-        {!active.isLoading && !active.data?.length ? <p className="text-sm text-muted">No active claim codes.</p> : null}
+        {active.isSuccess && !active.data?.length ? <p className="text-sm text-muted">No active claim codes.</p> : null}
       </div>
       {active.error ? <p className="mt-3 text-sm text-danger" role="alert">{active.error.message}</p> : null}
       {error ? <p className="mt-3 text-sm text-danger" role="alert">{error.message}</p> : null}

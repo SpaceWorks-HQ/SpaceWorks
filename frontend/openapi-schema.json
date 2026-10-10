@@ -54787,6 +54787,14 @@
                     "membership_dues": {
                         "$ref": "#/components/schemas/MemberDues"
                     },
+                    "membership_term": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/MemberTerm"
+                            }
+                        ],
+                        "nullable": true
+                    },
                     "notices": {
                         "type": "array",
                         "items": {
@@ -55800,6 +55808,35 @@
                     "display_name",
                     "email",
                     "password"
+                ]
+            },
+            "MemberTerm": {
+                "type": "object",
+                "properties": {
+                    "plan_name": {
+                        "type": "string"
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "ends_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "current": {
+                        "type": "boolean"
+                    },
+                    "blocks_borrowing": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "blocks_borrowing",
+                    "current",
+                    "ends_at",
+                    "plan_name",
+                    "starts_at"
                 ]
             },
             "MemberVerificationAck": {

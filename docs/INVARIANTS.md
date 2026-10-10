@@ -618,8 +618,11 @@ key needs the same treatment.
 dashboard simply does not exist for a space that runs no memberships — and every frontend query
 feeding it must include `membershipModuleOn` in its `enabled`, or it calls a gated endpoint and
 errors. `member_dashboard_service` adds loan history, request history (previously only ACTIVE
-self-checkout loans were visible, so a member could not see a request they submitted), dues, and
-notices. Notices are DERIVED from member-owned rows: `notifications.Notification` is
+self-checkout loans were visible, so a member could not see a request they submitted), dues, the
+member's own plan term (`membership_term`, 2026-10-09 — current-else-latest, `current` computed with
+`require_current_term`'s own predicate, `blocks_borrowing` when none is current and the space refuses
+lapsed members) and notices (`term_lapsed`, `term_ending_soon` within 7 days). Notices are DERIVED from
+member-owned rows: `notifications.Notification` is
 makerspace-wide, has no recipient column and shares one `read_at`, so serving it would leak staff
 alerts and let one member's read mark speak for everyone. Payment/receipt visibility sits OUTSIDE
 the gate — `member_may_see_own_charges` admits an account with no membership that owns a charge
@@ -723,24 +726,36 @@ them.
 **The `membership` module gates the community feature, not RBAC (A7).** `MakerspaceMembership` is core
 RBAC state, so gating it wholesale would lock a makerspace out of its own staff administration.
 **Never gated:** membership list/create, role assignment, revoke, capabilities, staff roster,
-`memberships/me`. **Gated by `membership`:** public join request, request queue/approve/revoke,
-verify/unverify, member waiver + accept, member activity, referrals. Invitations run staff and community
-intent down **one** path in `membership_services.invite_membership`, discriminated by the assigned role's
-`granted_actions` — a role granting no actions is a community invitation (gated) however it is named; a
-role granting actions is a staff invitation and must keep working with the module off. Module gates are
-**additive `AND`s** — `refer_membership` still checks `referrals_enabled` and `can_refer`.
+`memberships/me`, and waivers (member read + accept, staff publish + witness — liability evidence, made
+core by `cd2936d1`). **Gated by `membership`:** public join request, community requests in the queue and
+the approve/decline on them, verify/unverify, member activity, referrals, profiles/directory, member cards,
+plans and terms. Invitations run staff and community intent down **one** path in
+`membership_services.invite_membership`, discriminated by the assigned role's `granted_actions` — a role
+granting no actions is a community invitation (gated) however it is named; a role granting actions is a
+staff invitation and must keep working with the module off. **That discrimination holds at every later
+step, in `membership_gating.py`** (2026-10-09): with the module off the queue lists only staff invitations,
+approving or declining one works (approving it INTO a role with no actions mints a community member and is
+gated, and so is attaching a plan), and claiming a community invitation or a referral is refused — and
+omitted from discovery — even when it was issued while the module was on. Before that, a staff invitation
+issued module-off could never be listed, approved or declined, and a referral stayed claimable after the
+module was switched off. Module gates are **additive `AND`s** — `refer_membership` still checks
+`referrals_enabled` and `can_refer`.
 
 **Membership plans, terms and invitation requests (forward plan phase 6, 2026-09-04).** Plans are optional
 and never an access state: a `MembershipTerm` expiring changes neither `MakerspaceMembership.status` nor
 `User.access_status`; the only effect is the per-makerspace opt-in `lapsed_members_cannot_borrow`, enforced
 solely by `request_access.require_current_term` AFTER the who-may-submit rule has admitted the member
 ("active" = `status=active AND ends_at > now`, so it does not depend on the hourly sweep), and a member who
-has never held a term is untouched. It guards **every borrow path** — the reviewed-request submit, member
-self-checkout and staff direct handout (the rule is about the borrower, not about who hands the tool over)
-— and never a return; with `membership` uninstalled it is inert (2026-10-09; before that a member refused
-at the request form could still self-checkout). One renewal charge per term, raised only by
+has never held a term is untouched. **It is called on every path that HANDS a member a tool** — request
+submission, self-checkout and its issue-evidence presign, and staff direct handout — and on no path that
+takes one back: a lapsed member can always return. (It had one call site, request submission, until
+2026-10-09: a lapsed member could still self-check-out or be handed a tool at the desk, and the switch was
+missing from the settings serializer, so the console toggle never rendered.) It is inert while the
+`membership` module is off, since plans are that module's. Bookings, events and machine service are not
+borrowing and are not covered. One renewal charge per term, raised only by
 `membership_plan_services.run_membership_renewals` as `Payment(subject_type=membership_term,
-subject_id=term.pk)` inside the 7-day window and only when `online_payments_enabled(ms, "membership")` —
+subject_id=term.pk)` inside the 7-day window and only when `charge_tracking_enabled(ms, "membership")` —
+the debt is recorded first and a checkout is attached second, only when `online_payments_enabled` — and
 the Payment unique constraint is the idempotency, a payment failure is logged and never touches the term,
 and settlement does not auto-open the next term (staff do). An `InvitationRequest` is a lead, not authority:
 name/email/phone are scoped source PII (encrypted at rest, purged with `membership`, `(PRESERVE, DROP)` in
@@ -1421,7 +1436,18 @@ whose final key is never client-writable (staging presign → single promotion i
 `member_card_storage.finalize_photo`) and whose bytes need recorded consent. **Revoke redacts
 immediately** (photo bytes deleted, quota freed, name blanked); reissue rotates the QR and the old payload
 resolves as `revoked` forever; reprint never rotates. No rendered PDF is written to storage. The
-`membership` purge revokes the QRs and deletes the cards and photo bytes.
+`membership` purge revokes the QRs and deletes the cards and photo bytes. **Revoking the MEMBERSHIP
+revokes its card** (`member_card_services.revoke_for_membership`, reason `membership_revoked`, same
+redaction), with no module gate and no card action — `revoke_membership` is core RBAC and the authority to
+revoke the membership is the authority here; until 2026-10-09 a revoked member's card stayed a live
+credential bearing their name and photo. The same revocation cancels every ACTIVE `MembershipTerm` and its
+pending renewal charge (`membership_plan_services.cancel_terms_for_membership`), as it already cancelled
+the dues charge. An invitation for someone who is already an active member is refused, as a referral was. **One LIVE
+card per membership, not one card ever** (`makerspaces/0073`: `MemberCard.membership` became a
+ForeignKey with the partial `uniq_live_member_card_per_membership`): a revoked card stays as the redacted
+record behind its revoked QR and a fresh card (new number, new QR) can be issued — as a OneToOne the first
+revocation stranded the member, since issue refused an existing row and reissue refused a revoked one. The
+tenant-migration uniqueness policy moved from `field:membership` to that constraint name.
 
 ### Audit presentation and staff verification (phase 10)
 

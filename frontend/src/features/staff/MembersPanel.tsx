@@ -15,6 +15,10 @@ import { MembershipPlansSection } from "./MembershipPlansSection";
 import { MemberTermsDialog } from "./MemberTermsDialog";
 import { Panel } from "./panels/shared";
 import { PaymentReconcileActions } from "./PaymentReconcileActions";
+import { MembershipReasonDialog } from "./MembershipReasonDialog";
+import { MembershipPagination } from "./MembershipPagination";
+import { MembershipPlanPicker } from "./MembershipPlanPicker";
+import { MembershipWaiverPanel } from "./MembershipWaiverPanel";
 
 type Presence = { display_name: string; role_label: string; started_at: string; expires_at: string };
 type Role = { id: number; name: string };
@@ -32,25 +36,34 @@ export const membershipErrorText = (error: unknown) =>
 export function MembersPanel({ makerspaceId, membershipEnabled }: { makerspaceId: number; membershipEnabled: boolean }) {
   const client = useQueryClient();
   const key = ["members", makerspaceId];
+  const [rosterPage, setRosterPage] = useState(1);
+  const [requestPage, setRequestPage] = useState(1);
+  const [planId, setPlanId] = useState<number | null>(null);
+  const [decision, setDecision] = useState<{ id: number; kind: "member" | "request"; title: string } | null>(null);
   const roster = useQuery({
-    queryKey: [...key, "roster"],
-    queryFn: () => staffRequest<PaginatedAdminMembershipList>(`/admin/memberships?makerspace_id=${makerspaceId}`),
+    queryKey: [...key, "roster", rosterPage],
+    queryFn: () => staffRequest<PaginatedAdminMembershipList>(`/admin/memberships?makerspace_id=${makerspaceId}&page=${rosterPage}`),
   });
   const requests = useQuery({
-    queryKey: [...key, "requests"],
-    queryFn: () => staffRequest<PaginatedMembershipRequestList>(`/admin/membership-requests?makerspace_id=${makerspaceId}`),
-    enabled: membershipEnabled,
+    queryKey: [...key, "requests", requestPage, membershipEnabled],
+    // Not gated on the module: with it off the backend still lists STAFF invitations
+    // (and only those), which staff must be able to approve or cancel.
+    queryFn: () => staffRequest<PaginatedMembershipRequestList>(`/admin/membership-requests?makerspace_id=${makerspaceId}&page=${requestPage}`),
   });
   const presence = useQuery({ queryKey: [...key, "presence"], queryFn: () => staffRequest<Presence[]>(`/admin/makerspace/${makerspaceId}/presence-sessions/current`) });
   const roles = useQuery({ queryKey: [...key, "roles"], queryFn: () => staffRequest<Role[]>(`/admin/makerspaces/${makerspaceId}/roles`) });
   const [roleId, setRoleId] = useState<number | null>(null);
+  // What the dropdown SHOWS: the first role until staff pick another. Approve and Invite
+  // must post this, not `roleId` -- that stays null until a change event, so with one role
+  // (or the default left alone) both used to send `role_id: null` and fail.
+  const selectedRole = roleId ?? roles.data?.[0]?.id ?? null;
   const [inviteEmail, setInviteEmail] = useState("");
-  const [waiver, setWaiver] = useState({ version: "", body: "" });
   const [termsMember, setTermsMember] = useState<AdminMembership | null>(null);
   const refresh = () => client.invalidateQueries({ queryKey: key });
-  const revoke = useMutation({ mutationFn: (id: number) => staffRequest(`/admin/memberships/${id}/revoke`, { method: "POST", body: JSON.stringify({}) }), onSuccess: refresh });
-  const revokeRequest = useMutation({ mutationFn: (id: number) => staffRequest(`/admin/membership-requests/${id}/revoke`, { method: "POST", body: JSON.stringify({}) }), onSuccess: refresh });
-  const approve = useMutation({ mutationFn: (id: number) => staffRequest(`/admin/membership-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ role_id: roleId }) }), onSuccess: refresh });
+  const decisionSaved = () => { setDecision(null); void refresh(); };
+  const revoke = useMutation({ mutationFn: ({ id, reason }: { id: number; reason: string }) => staffRequest(`/admin/memberships/${id}/revoke`, { method: "POST", body: JSON.stringify({ reason }) }), onSuccess: decisionSaved });
+  const revokeRequest = useMutation({ mutationFn: ({ id, reason }: { id: number; reason: string }) => staffRequest(`/admin/membership-requests/${id}/revoke`, { method: "POST", body: JSON.stringify({ reason }) }), onSuccess: decisionSaved });
+  const approve = useMutation({ mutationFn: (id: number) => staffRequest(`/admin/membership-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ role_id: selectedRole, ...(membershipEnabled && planId ? { plan_id: planId } : {}) }) }), onSuccess: refresh });
   const changeRole = useMutation({ mutationFn: ({ id, nextRoleId }: { id: number; nextRoleId: number }) => staffRequest(`/admin/memberships/${id}/role`, { method: "PATCH", body: JSON.stringify({ role_id: nextRoleId }) }), onSuccess: refresh });
   const capabilities = useMutation({
     mutationFn: ({ id, next }: { id: number; next: PatchedMembershipCapabilities }) =>
@@ -67,11 +80,9 @@ export function MembersPanel({ makerspaceId, membershipEnabled }: { makerspaceId
       }),
     onSuccess: refresh,
   });
-  const invite = useMutation({ mutationFn: () => staffRequest(`/admin/makerspace/${makerspaceId}/membership-invitations`, { method: "POST", body: JSON.stringify({ invite_email: inviteEmail, role_id: roleId }) }), onSuccess: () => { setInviteEmail(""); refresh(); } });
-  const publishWaiver = useMutation({ mutationFn: () => staffRequest(`/admin/makerspaces/${makerspaceId}/waiver`, { method: "PUT", body: JSON.stringify(waiver) }), onSuccess: refresh });
+  const invite = useMutation({ mutationFn: () => staffRequest(`/admin/makerspace/${makerspaceId}/membership-invitations`, { method: "POST", body: JSON.stringify({ invite_email: inviteEmail, role_id: selectedRole }) }), onSuccess: () => { setInviteEmail(""); refresh(); } });
   const witnessWaiver = useMutation({ mutationFn: (id: number) => staffRequest(`/admin/memberships/${id}/waiver/witness`, { method: "POST", body: JSON.stringify({}) }), onSuccess: refresh });
-  const error = revoke.error ?? revokeRequest.error ?? approve.error ?? changeRole.error ?? capabilities.error ?? verify.error ?? invite.error ?? publishWaiver.error ?? witnessWaiver.error;
-  const selectedRole = roleId ?? roles.data?.[0]?.id ?? null;
+  const error = revoke.error ?? revokeRequest.error ?? approve.error ?? changeRole.error ?? capabilities.error ?? verify.error ?? invite.error ?? witnessWaiver.error;
   const rosterRows = roster.data?.results ?? [];
   const requestRows = requests.data?.results ?? [];
 
@@ -92,20 +103,28 @@ export function MembersPanel({ makerspaceId, membershipEnabled }: { makerspaceId
         onCapability={(next) => capabilities.mutate({ id: row.id, next })}
         onVerify={() => verify.mutate({ id: row.id, verified: !Boolean(row.verified_at) })}
         onWitness={() => witnessWaiver.mutate(row.id)}
-        onRevoke={() => revoke.mutate(row.id)}
+        onRevoke={() => { revoke.reset(); setDecision({ id: row.id, kind: "member", title: `Revoke ${row.user.display_name || row.user.username}` }); }}
         onTerms={() => setTermsMember(row)}
       />)}
       {roster.isLoading ? <p className="text-sm text-muted">Loading members…</p> : null}
       {roster.isError ? <p className="text-sm text-danger" role="alert">{membershipErrorText(roster.error)}</p> : null}
+      {roster.isSuccess && !rosterRows.length ? <p className="text-sm text-muted">No members on this page.</p> : null}
+      <MembershipPagination label="members" page={rosterPage} next={roster.data?.next} previous={roster.data?.previous} fetching={roster.isFetching} onPage={setRosterPage} />
     </Panel>
     <Panel title={membershipEnabled ? "Membership requests" : "Invitations"}><div className="mb-3 flex flex-wrap gap-2"><Field label="Invite role"><select className="desk-input" value={selectedRole ?? ""} onChange={(event) => setRoleId(Number(event.target.value))}>{roles.data?.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></Field><Field label="Invite email"><input className="desk-input" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} /></Field><button className="desk-button" disabled={!inviteEmail || !selectedRole || invite.isPending} onClick={() => invite.mutate()}>Invite</button></div>
-      {membershipEnabled ? requestRows.map((row) => <div className="flex items-center justify-between gap-3 border-t border-line py-3" key={row.id}><span className="text-sm text-ink">{requestLabel(row)} · {row.kind} · {row.state}</span>{row.state === "requested" ? <div className="flex gap-2"><button className="desk-button-primary" disabled={!selectedRole || approve.isPending} onClick={() => approve.mutate(row.id)}>Approve</button><button className="desk-button" onClick={() => revokeRequest.mutate(row.id)} disabled={revokeRequest.isPending}>Revoke</button></div> : null}</div>) : null}
-      {membershipEnabled && requests.isLoading ? <p className="text-sm text-muted">Loading requests…</p> : null}</Panel>
+      {roles.isError ? <p role="alert" className="text-sm text-danger">{membershipErrorText(roles.error)}</p> : null}
+      {membershipEnabled ? <MembershipPlanPicker makerspaceId={makerspaceId} value={planId} onChange={setPlanId} /> : null}
+      {requestRows.map((row) => <div className="flex items-center justify-between gap-3 border-t border-line py-3" key={row.id}><span className="text-sm text-ink">{requestLabel(row)} · {row.kind} · {row.state}</span>{row.state === "requested" || row.state === "invited" ? <div className="flex gap-2">{row.state === "requested" || row.user ? <button className="desk-button-primary" disabled={!selectedRole || approve.isPending} onClick={() => approve.mutate(row.id)}>Approve</button> : null}<button className="desk-button" onClick={() => { revokeRequest.reset(); setDecision({ id: row.id, kind: "request", title: row.state === "invited" ? "Cancel invitation" : "Decline membership request" }); }} disabled={revokeRequest.isPending}>{row.state === "invited" ? "Cancel invitation" : "Decline"}</button></div> : null}</div>)}
+      {requests.isLoading ? <p className="text-sm text-muted">Loading requests…</p> : null}
+      {requests.isError ? <p role="alert" className="text-sm text-danger">{membershipErrorText(requests.error)}</p> : null}
+      {requests.isSuccess && !requestRows.length ? <p className="text-sm text-muted">No membership requests on this page.</p> : null}
+      <MembershipPagination label="requests" page={requestPage} next={requests.data?.next} previous={requests.data?.previous} fetching={requests.isFetching} onPage={setRequestPage} /></Panel>
     {membershipEnabled ? <InvitationRequestsSection makerspaceId={makerspaceId} roles={roles.data ?? []} /> : null}
     {membershipEnabled ? <MembershipPlansSection makerspaceId={makerspaceId} /> : null}
     <Panel title="Currently present">{presence.data?.length ? presence.data.map((row) => <p className="border-t border-line py-2 text-sm text-ink" key={`${row.display_name}-${row.started_at}`}>{row.display_name} <span className="text-muted">· {row.role_label} · until {new Date(row.expires_at).toLocaleTimeString()}</span></p>) : <p className="text-sm text-muted">No active member presence sessions.</p>}</Panel>
-    <Panel title="Current waiver"><div className="grid gap-2"><Field label="Waiver version"><input className="desk-input" value={waiver.version} onChange={(event) => setWaiver({ ...waiver, version: event.target.value })} /></Field><Field label="Waiver text"><textarea className="desk-input min-h-28" value={waiver.body} onChange={(event) => setWaiver({ ...waiver, body: event.target.value })} /></Field><button className="desk-button-primary w-fit" disabled={!waiver.version || !waiver.body || publishWaiver.isPending} onClick={() => publishWaiver.mutate()}>Publish waiver</button></div></Panel>
+    <MembershipWaiverPanel makerspaceId={makerspaceId} />
     {error ? <p className="text-sm text-danger" role="alert">{membershipErrorText(error)}</p> : null}
+    {decision ? <MembershipReasonDialog key={`${decision.kind}-${decision.id}`} title={decision.title} pending={revoke.isPending || revokeRequest.isPending} error={(decision.kind === "member" ? revoke.error : revokeRequest.error) ? membershipErrorText(decision.kind === "member" ? revoke.error : revokeRequest.error) : null} onClose={() => setDecision(null)} onConfirm={(reason) => (decision.kind === "member" ? revoke : revokeRequest).mutate({ id: decision.id, reason })} /> : null}
     {termsMember ? <MemberTermsDialog key={termsMember.id} makerspaceId={makerspaceId} membershipId={termsMember.id} memberName={termsMember.user.display_name || termsMember.user.username} onClose={() => setTermsMember(null)} /> : null}
   </div>;
 }

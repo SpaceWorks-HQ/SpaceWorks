@@ -116,8 +116,11 @@ def test_request_queue_and_decisions_are_gated():
 
     listed = client.get(reverse("admin-membership-requests"), {"makerspace_id": off.id})
 
-    assert listed.status_code == 400
-    assert "module" in listed.data
+    # The queue narrows rather than refusing: STAFF invitations are core RBAC business and
+    # stay listed module-off, community rows never do (see
+    # test_membership_gating_a7_end_to_end.py for the rows and the decisions on them).
+    assert listed.status_code == 200
+    assert listed.data["results"] == []
 
 
 def test_verify_and_unverify_are_gated():

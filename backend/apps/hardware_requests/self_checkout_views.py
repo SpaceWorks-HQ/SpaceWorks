@@ -47,10 +47,13 @@ class PublicToolEvidenceUploadUrlView(APIView):
     def post(self, request, makerspace_slug, *args, **kwargs):
         makerspace = _public_tool_makerspace(makerspace_slug)
         require_feature(makerspace, "inventory.self_checkout")
-        require_active_member_presence(request.user, makerspace)
+        presence = require_active_member_presence(request.user, makerspace)
         serializer = PublicToolEvidenceUrlRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        if data["evidence_type"] == EvidencePhoto.EvidenceType.ISSUE:
+            # Issue evidence is the first step of taking a tool; return evidence never is.
+            require_current_term(makerspace, presence.membership)
         if data["content_type"] not in settings.EVIDENCE_ALLOWED_MIME:
             raise ValidationError({"content_type": "Unsupported evidence content type."})
         object_key = evidence_object_key(makerspace.id, data["evidence_type"])

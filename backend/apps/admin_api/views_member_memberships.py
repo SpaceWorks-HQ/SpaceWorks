@@ -14,8 +14,10 @@ from apps.admin_api.serializers_payment_summary import scoped_payment_context
 from apps.admin_api.views_roles import ERRORS
 from apps.makerspaces import membership_services, waiver_services
 from apps.makerspaces.guards import require_module
+from apps.makerspaces.membership_gating import require_module_for_request, staff_invitation_q
+from apps.makerspaces.platform import module_enabled
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceRole, MakerspaceWaiver, MembershipPlan, MembershipRequest
-from apps.makerspaces.serializers_memberships import WaiverPublishSerializer
+from apps.makerspaces.serializers_memberships import MemberWaiverResponseSerializer, WaiverPublishSerializer
 from apps.makerspaces.servability import servable_queryset
 from apps.payments.models import Payment
 
@@ -84,10 +86,12 @@ class AdminMembershipRequestListView(APIView):
     @extend_schema(tags=["Admin memberships"], responses={200: MembershipRequestSerializer(many=True), **ERRORS})
     def get(self, request):
         makerspace = _makerspace(request.user, request.query_params.get("makerspace_id"))
-        # Gated alongside approve/revoke: staff must not be shown a queue of community
-        # join requests they have no enabled surface to action.
-        require_module(makerspace, "membership")
         queryset = MembershipRequest.objects.filter(makerspace=makerspace).select_related("user", "assigned_role")
+        if not module_enabled(makerspace, "membership"):
+            # Staff must not be shown community join requests they have no enabled surface
+            # to action -- but a STAFF invitation is core RBAC business and must stay
+            # visible, or one issued with the module off could never be found again.
+            queryset = queryset.filter(staff_invitation_q())
         if request.query_params.get("state"):
             queryset = queryset.filter(state=request.query_params["state"])
         pager = self.pagination_class()
@@ -114,13 +118,16 @@ class AdminRequestApproveView(APIView):
     def post(self, request, pk):
         item = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_MAKERSPACE, MembershipRequest.objects.select_related("makerspace")), pk=pk)
         makerspace = _makerspace(request.user, item.makerspace_id)
-        require_module(makerspace, "membership")
         serializer = ApproveRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        role = _role(makerspace, serializer.validated_data["role_id"])
+        require_module_for_request(makerspace, item, outcome_role=role)
         plan = None
         if serializer.validated_data.get("plan_id") is not None:
+            # Plans are the module's own surface, whatever the request is.
+            require_module(makerspace, "membership")
             plan = get_object_or_404(MembershipPlan.objects.filter(makerspace=makerspace), pk=serializer.validated_data["plan_id"])
-        membership = membership_services.approve_request(request.user, item, _role(makerspace, serializer.validated_data["role_id"]), plan=plan)
+        membership = membership_services.approve_request(request.user, item, role, plan=plan)
         membership = MakerspaceMembership.objects.select_related(
             "user", "assigned_role"
         ).get(pk=membership.pk)
@@ -138,7 +145,7 @@ class AdminRequestRevokeView(APIView):
     @extend_schema(tags=["Admin memberships"], request=RevokeSerializer, responses={200: MembershipRequestSerializer, **ERRORS})
     def post(self, request, pk):
         item = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_MAKERSPACE, MembershipRequest.objects.select_related("makerspace")), pk=pk)
-        require_module(_makerspace(request.user, item.makerspace_id), "membership")
+        require_module_for_request(_makerspace(request.user, item.makerspace_id), item)
         serializer = RevokeSerializer(data=request.data); serializer.is_valid(raise_exception=True)
         item = membership_services.revoke_request(request.user, item, serializer.validated_data.get("reason", ""))
         return Response(MembershipRequestSerializer(item).data)
@@ -187,7 +194,15 @@ class AdminMembershipRoleM2View(APIView):
 class AdminWaiverView(APIView):
     permission_classes = [IsActiveStaff]
 
-    @extend_schema(tags=["Admin memberships"], request=WaiverPublishSerializer, responses={200: WaiverPublishSerializer, **ERRORS})
+    @extend_schema(tags=["Admin memberships"], responses={200: MemberWaiverResponseSerializer, **ERRORS})
+    def get(self, request, makerspace_id):
+        makerspace = _makerspace(request.user, makerspace_id)
+        waiver = MakerspaceWaiver.objects.filter(makerspace=makerspace, is_active=True).first()
+        return Response({"has_waiver": False} if waiver is None else {
+            "has_waiver": True, "version": waiver.version, "body": waiver.body,
+        })
+
+    @extend_schema(tags=["Admin memberships"], request=WaiverPublishSerializer, responses={200: MemberWaiverResponseSerializer, **ERRORS})
     def put(self, request, makerspace_id):
         makerspace = _makerspace(request.user, makerspace_id)
         serializer = WaiverPublishSerializer(data=request.data); serializer.is_valid(raise_exception=True)

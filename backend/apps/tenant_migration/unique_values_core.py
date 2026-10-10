@@ -184,9 +184,9 @@ CORE_UNIQUE_RULES = {
         field="object_key",
         generator=_maintenance_document_key,
     ),
-    ("makerspaces.MemberCard", "field:membership"): _policy(
+    ("makerspaces.MemberCard", "uniq_live_member_card_per_membership"): _policy(
         REMAP,
-        "One card per membership: the remapped membership reference keeps the pair unique.",
+        "One LIVE card per membership: the remapped membership reference keeps it unique.",
     ),
     ("makerspaces.Makerspace", "field:anonymous_requester"): _policy(
         NULL,

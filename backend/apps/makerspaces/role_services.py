@@ -14,6 +14,9 @@ from apps.organizations.models import (
     OrganizationMakerspace,
 )
 
+# The protected community role every activation path assigns (`roles.MEMBER_ROLE_DEFINITION`).
+MEMBER_ROLE_SLUG = "member"
+
 
 class RoleConflict(Exception):
     """A role cannot be deleted (protected, or still assigned to a membership).
@@ -134,6 +137,12 @@ def _validate_actions(actor, makerspace, actions, role=None):
             raise ValidationError(
                 {"granted_actions": "The Space Manager role must retain manage_makerspace."}
             )
+    if role and role.is_protected and role.slug == MEMBER_ROLE_SLUG and values:
+        # Every open join, referral claim, walk-in and imported adoption activates onto
+        # this role, and `invite_membership` reads "grants no actions" as "community
+        # invitation". An action here would hand staff authority to all of them and turn
+        # the module gate on community invitations into a bypass.
+        raise ValidationError({"granted_actions": "The Member role grants no staff actions."})
     # No Guest Admin ceiling any more: migration 0052 retired it as a built-in, so the
     # handover role is an ordinary custom role and is bounded by the general rule above --
     # you cannot grant an action you do not hold yourself. `rbac.HANDOUT_ACTIONS` survives
@@ -237,7 +246,12 @@ def update_role(*, makerspace, role, actor, name=None, granted_actions=None):
         if name is not None and name.strip() != role.name:
             if MakerspaceRole.objects.filter(makerspace=makerspace, name__iexact=name.strip()).exclude(pk=role.pk).exists():
                 raise ValidationError({"name": "A role with this name already exists."})
-            role.name, role.slug = name, _slug_for(makerspace, name, role.pk)
+            role.name = name
+            # A protected default is found by its slug (`member` by every activation path,
+            # tenant migration and `ensure_default_roles`), so renaming one relabels it and
+            # never re-slugs it -- re-slugging would break every join at once.
+            if not role.is_protected:
+                role.slug = _slug_for(makerspace, name, role.pk)
             changes.append("name")
         if granted_actions is not None:
             role.granted_actions = _validate_actions(actor, makerspace, granted_actions, role)

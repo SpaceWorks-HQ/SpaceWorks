@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { staffRequest } from "../../lib/api";
+import { memberRequest } from "../../lib/api";
 import { ImageUploader } from "../staff/ImageUploader";
 import { Field } from "./memberProfile/Field";
 import { tagsToText, textToTags } from "./memberProfile/helpers";
@@ -25,7 +25,7 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
   const client = useQueryClient();
   const profile = useQuery({
     queryKey: ["member", "profile-page", makerspaceId],
-    queryFn: () => staffRequest<MemberProfile>(`/member/makerspaces/${makerspaceId}/profile`),
+    queryFn: () => memberRequest<MemberProfile>(`/member/makerspaces/${makerspaceId}/profile`),
     retry: false,
   });
   const [draft, setDraft] = useState<MemberProfile | null>(null);
@@ -59,7 +59,7 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
 
   const save = useMutation({
     mutationFn: () =>
-      staffRequest<MemberProfile>(`/member/makerspaces/${makerspaceId}/profile`, {
+      memberRequest<MemberProfile>(`/member/makerspaces/${makerspaceId}/profile`, {
         method: "PUT",
         body: JSON.stringify({
           is_visible: draft?.is_visible ?? false,
@@ -90,6 +90,7 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
   if (profile.isLoading) {
     return <section className="desk-panel p-5 text-sm text-muted">Loading your profile…</section>;
   }
+  if (profile.isError) return <section className="desk-panel p-5"><p role="alert" className="text-sm text-danger">{profile.error instanceof Error ? profile.error.message : "Unable to load your profile."}</p></section>;
   if (!draft) return null;
 
   const patch = (changes: Partial<MemberProfile>) => {
@@ -129,6 +130,7 @@ export function MemberProfilePanel({ makerspaceId }: { makerspaceId: number }) {
 
       <div className="mt-4">
         <ImageUploader
+          request={memberRequest}
           endpoint={`/member/makerspaces/${makerspaceId}/profile/image`}
           currentUrl={draft.avatar_url}
           label="Avatar"

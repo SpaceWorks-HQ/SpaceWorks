@@ -43,7 +43,7 @@ def issue_direct_loan(
     require_current_term(
         makerspace, require_active_member_presence(borrower, makerspace).membership
     )
-    evidence =EvidencePhoto.objects.filter(
+    evidence = EvidencePhoto.objects.filter(
         pk=evidence_id,
         makerspace=makerspace,
         evidence_type=EvidencePhoto.EvidenceType.ISSUE,

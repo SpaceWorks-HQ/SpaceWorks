@@ -43,10 +43,16 @@ def _makerspace_for(actor, action, makerspace_id):
 
 
 def _card_for(actor, action, pk):
-    return get_object_or_404(
+    card = get_object_or_404(
         rbac.scope_by_action(actor, action, MemberCard.objects.select_related("makerspace", "membership__assigned_role")),
         pk=pk,
     )
+    # The same gate `_makerspace_for` applies to list/issue/sheet/resolve: reissue mints a
+    # fresh QR and print renders a PDF, so neither may run on a space without the module.
+    # Revocation that follows a MEMBERSHIP revocation does not come through here -- it is
+    # core RBAC state and must redact the card whether or not the module is installed.
+    require_module(card.makerspace, "membership")
+    return card
 
 
 class _Pagination(PageNumberPagination):

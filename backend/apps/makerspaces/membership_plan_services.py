@@ -97,6 +97,19 @@ def cancel_term(actor, term):
     return term
 
 
+def cancel_terms_for_membership(actor, membership):
+    """Cancel every ACTIVE term of a membership that has just been revoked, with its renewal.
+
+    Called from `revoke_membership`, which is core RBAC and runs with the module off too,
+    so there is no module gate here. Without it a revoked member kept an active term and a
+    PENDING renewal charge that the sweep had raised for a membership that no longer exists.
+    """
+    for term in MembershipTerm.objects.filter(
+        membership=membership, status=MembershipTerm.Status.ACTIVE
+    ):
+        cancel_term(actor, term)
+
+
 def _cancel_pending_renewal(makerspace, term, actor):
     from apps.payments.models import Payment
     from apps.payments.reconciliation import cancel_pending

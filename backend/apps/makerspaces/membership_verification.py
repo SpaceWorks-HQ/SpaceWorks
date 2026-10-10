@@ -15,6 +15,10 @@ def _set_capability(actor, membership, field, value):
         membership = MakerspaceMembership.objects.select_for_update().get(pk=membership.pk)
         if not rbac.can(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk):
             raise PermissionDenied()
+        if value and membership.status != "active":
+            # Revocation clears both delegations; granting one back to a revoked row would
+            # only be undone again by reactivation, and reads as authority meanwhile.
+            raise ValidationError({"detail": "Only an active membership can be delegated."})
         setattr(membership, field, bool(value))
         membership.save(update_fields=[field])
         audit.record(actor, f"membership.{field}_changed", makerspace=makerspace,

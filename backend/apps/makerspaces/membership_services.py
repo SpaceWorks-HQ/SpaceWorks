@@ -1,15 +1,17 @@
 """Audited, locked lifecycle changes for makerspace memberships."""
 
 from django.db import IntegrityError, transaction
-from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.audit import services as audit
 from apps.makerspaces import role_services
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.membership_activation import _activate_membership
+from apps.makerspaces.membership_revocation import (  # noqa: F401 - re-export barrel
+    revoke_membership,
+    revoke_request,
+)
 from apps.makerspaces.membership_verification import (
     set_can_refer,
     set_can_verify,
@@ -127,6 +129,12 @@ def invite_membership(actor, makerspace, invite_email, assigned_role):
         if _is_community_invitation(role):
             require_module(makerspace, "membership")
         user = User.objects.filter(email__iexact=email).first()
+        # The rule `refer_membership` already had. Approving an invitation for someone who is
+        # already a member would silently rewrite their role; that is `change_role`'s job.
+        if user and MakerspaceMembership.objects.filter(
+            makerspace=makerspace, user=user, status="active"
+        ).exists():
+            raise ValidationError({"detail": "This person is already an active member."})
         try:
             request = MembershipRequest.objects.create(
                 makerspace=makerspace, user=user, invite_email=email,
@@ -192,6 +200,11 @@ def claim_invitation(user, request_id):
         raise ValidationError({"detail": "Invitation is not claimable."})
     if not user.email or request.invite_email != normalized_email(user.email):
         raise PermissionDenied()
+    from apps.makerspaces.membership_gating import require_module_for_request
+
+    # A community invitation or a referral is the module's own path (A7); a staff
+    # invitation keeps working with the module off.
+    require_module_for_request(request.makerspace, request)
     if request.auto_activate_on_claim:
         if not _eligible_user(user):
             raise ValidationError({"detail": "An active account with a verified email is required."})
@@ -202,12 +215,17 @@ def claim_invitation(user, request_id):
 
 
 def approve_request(actor, request, assigned_role, plan=None):
-    """Activate the membership; with a `plan`, open its first term in the same call."""
-    membership = _approve_request(actor, request, assigned_role)
-    if plan is not None:
-        from apps.makerspaces.membership_plan_services import create_term
+    """Activate the membership; with a `plan`, open its first term in the SAME transaction.
 
-        create_term(actor, membership, plan)
+    One transaction, so a refused term (an inactive or foreign plan) also refuses the
+    approval instead of leaving an active member the 400 told staff was not created.
+    """
+    with transaction.atomic():
+        membership = _approve_request(actor, request, assigned_role)
+        if plan is not None:
+            from apps.makerspaces.membership_plan_services import create_term
+
+            create_term(actor, membership, plan)
     return membership
 
 
@@ -228,55 +246,6 @@ def _approve_request(actor, request, assigned_role):
         role_services.can_assign_role(actor, makerspace, assigned_role, target_membership=existing)
         return _activate_membership(actor, makerspace, request.user, assigned_role,
                                     request=request, source="approval")
-
-
-def revoke_membership(actor, membership, reason=""):
-    with transaction.atomic():
-        makerspace = Makerspace.objects.select_for_update().get(pk=membership.makerspace_id)
-        membership = MakerspaceMembership.objects.select_for_update().get(pk=membership.pk)
-        actor_is_superadmin = actor.is_superuser or actor.role == User.Role.SUPERADMIN
-        if not actor_is_superadmin and rbac.Action.MANAGE_MAKERSPACE in rbac.actions_for_membership(membership):
-            raise PermissionDenied("Only a superadmin can revoke a makerspace manager.")
-        changed = membership.status != "revoked"
-        if changed:
-            membership.status = "revoked"
-            membership.revoked_at = timezone.now()
-            membership.revoked_by = actor
-            membership.revocation_reason = reason or ""
-        membership.can_refer = False
-        membership.can_verify = False
-        membership.save()
-        if changed:
-            audit.record(actor, "membership.revoked", makerspace=makerspace, target=membership,
-                         meta={"reason": membership.revocation_reason})
-            from apps.makerspaces.membership_payments import cancel_for_membership
-
-            cancel_for_membership(membership, actor)
-        from apps.presence.services import end_sessions_for_membership
-        end_sessions_for_membership(actor, membership)
-        MembershipRequest.objects.filter(makerspace=makerspace, user=membership.user,
-                                         state__in=["requested", "invited"]).update(
-            state=MembershipRequest.State.REVOKED, decided_by=actor, decided_at=timezone.now()
-        )
-        return membership
-
-
-def revoke_request(actor, request, reason=""):
-    request = MembershipRequest.objects.select_related("makerspace").get(pk=request.pk)
-    with transaction.atomic():
-        makerspace = Makerspace.objects.select_for_update().get(pk=request.makerspace_id)
-        request = MembershipRequest.objects.select_for_update().get(pk=request.pk)
-        if request.state == MembershipRequest.State.ACTIVE and request.user_id:
-            membership = MakerspaceMembership.objects.filter(makerspace=makerspace, user=request.user).first()
-            if membership:
-                return revoke_membership(actor, membership, reason)
-        request.state = MembershipRequest.State.REVOKED
-        request.decided_by = actor
-        request.decided_at = timezone.now()
-        request.decision_note = reason or request.decision_note
-        request.save()
-        audit.record(actor, "membership.revoked", makerspace=makerspace, target=request)
-        return request
 
 
 def change_role(actor, membership, assigned_role):

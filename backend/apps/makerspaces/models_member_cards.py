@@ -23,12 +23,18 @@ class MemberCard(ScopedPiiModelMixin, models.Model):
     )
     # SET_NULL so a redacted card target survives membership deletion and historic
     # immutable scans keep pointing at a row, never at a reused integer.
-    membership = models.OneToOneField(
+    #
+    # A ForeignKey, not a OneToOne: a membership holds at most ONE LIVE card (the partial
+    # constraint below), but its revoked cards stay as the redacted record behind their
+    # revoked QRs. As a OneToOne, the first revocation -- a lost card, or the membership
+    # being revoked and later reactivated -- stranded the member: issue refused because a
+    # card row existed, and reissue refused because that card was revoked.
+    membership = models.ForeignKey(
         "makerspaces.MakerspaceMembership",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="member_card",
+        related_name="member_cards",
     )
     # Printed on the card; per-makerspace sequence, never the QR payload.
     card_number = models.PositiveIntegerField()
@@ -51,6 +57,11 @@ class MemberCard(ScopedPiiModelMixin, models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["makerspace", "card_number"], name="uniq_member_card_number"
+            ),
+            models.UniqueConstraint(
+                fields=["membership"],
+                condition=models.Q(revoked_at__isnull=True, membership__isnull=False),
+                name="uniq_live_member_card_per_membership",
             ),
             # Photo fields travel as a set: all present (with consent) or all absent.
             models.CheckConstraint(

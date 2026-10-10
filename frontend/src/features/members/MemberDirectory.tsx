@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { staffRequest } from "../../lib/api";
+import { memberRequest } from "../../lib/api";
 import type { MemberProfile } from "./MemberProfilePanel";
 
 type DirectoryEntry = {
@@ -37,13 +37,13 @@ export function MemberDirectory({ makerspaceId }: { makerspaceId: number }) {
   const [openId, setOpenId] = useState<number | null>(null);
   const directory = useQuery({
     queryKey: ["member", "directory", makerspaceId],
-    queryFn: () => staffRequest<Directory>(`/member/makerspaces/${makerspaceId}/directory`),
+    queryFn: () => memberRequest<Directory>(`/member/makerspaces/${makerspaceId}/directory`),
     retry: false,
   });
   const detail = useQuery({
     queryKey: ["member", "directory", makerspaceId, openId],
     queryFn: () =>
-      staffRequest<MemberProfile>(
+      memberRequest<MemberProfile>(
         `/member/makerspaces/${makerspaceId}/directory/${openId}`,
       ),
     enabled: openId !== null,
@@ -53,7 +53,7 @@ export function MemberDirectory({ makerspaceId }: { makerspaceId: number }) {
   if (directory.isLoading) {
     return <section className="desk-panel p-5 text-sm text-muted">Loading members…</section>;
   }
-  if (directory.isError) return null;
+  if (directory.isError) return <section className="desk-panel p-5"><p role="alert" className="text-sm text-danger">{directory.error instanceof Error ? directory.error.message : "Unable to load members."}</p></section>;
 
   const entries = directory.data?.members ?? [];
   const hidden = directory.data?.hidden_count ?? 0;
@@ -61,6 +61,8 @@ export function MemberDirectory({ makerspaceId }: { makerspaceId: number }) {
   return (
     <section className="desk-panel p-5">
       <h2 className="title-panel">Members</h2>
+      {detail.isLoading ? <p className="text-sm text-muted">Loading profile…</p> : null}
+      {detail.isError ? <p role="alert" className="text-sm text-danger">{detail.error instanceof Error ? detail.error.message : "Unable to load this profile."}</p> : null}
       {entries.length === 0 ? (
         <p className="mt-1 text-sm text-muted">Nobody has published a profile yet.</p>
       ) : (

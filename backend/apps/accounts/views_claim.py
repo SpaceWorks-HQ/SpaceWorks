@@ -12,7 +12,7 @@ from apps.accounts.serializers_claim import (
     ClaimRedemptionResponseSerializer,
     ClaimRedemptionSerializer,
 )
-from apps.accounts.services_claim import consume_claim_code
+from apps.accounts.services_claim import ClaimCodeError, consume_claim_code
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.tenant_migration.gate_runtime import tenant_write
@@ -42,16 +42,27 @@ class ClaimRedemptionView(APIView):
         makerspace = get_public_makerspace(
             serializer.validated_data["makerspace_slug"]
         )
+        refusal = None
         with tenant_write(makerspace.pk):
-            claim = consume_claim_code(
-                serializer.validated_data["code"],
-                redemption_ip=request.META.get("REMOTE_ADDR") or "0.0.0.0",
-                makerspace_id=makerspace.pk,
-            )
-            pair = mint_claim_tokens(claim)
-            user = attach_claim_context(claim.membership.user, claim)
-            response = Response(
-                {"access": pair.access, "user": user_payload(user, request=request)}
-            )
-            set_refresh_cookies(response, pair.refresh, request)
-            return response
+            # A refusal must COMMIT what the service recorded -- the refusal audit, the
+            # failed-attempt counter and the lockout -- before it surfaces. Raising inside
+            # tenant_write's transaction rolled all three back, so over HTTP a wrong code
+            # left no trace and the brute-force limit never accumulated.
+            try:
+                claim = consume_claim_code(
+                    serializer.validated_data["code"],
+                    redemption_ip=request.META.get("REMOTE_ADDR") or "0.0.0.0",
+                    makerspace_id=makerspace.pk,
+                )
+            except ClaimCodeError as exc:
+                refusal = exc
+            else:
+                pair = mint_claim_tokens(claim)
+                user = attach_claim_context(claim.membership.user, claim)
+                response = Response(
+                    {"access": pair.access, "user": user_payload(user, request=request)}
+                )
+                set_refresh_cookies(response, pair.refresh, request)
+        if refusal is not None:
+            raise refusal
+        return response

@@ -6,8 +6,10 @@ from rest_framework.views import APIView
 
 from apps.admin_api.permissions import active_user
 from apps.hardware_requests.exceptions import ErrorSerializer
+from apps.makerspaces.membership_gating import is_staff_invitation
 from apps.makerspaces.membership_services import claim_invitation, normalized_email
 from apps.makerspaces.models import MakerspaceMembership, MembershipRequest
+from apps.makerspaces.platform import module_enabled
 from apps.makerspaces.serializers_memberships import (
     InvitationClaimOutcomeSerializer,
     InvitationListSerializer,
@@ -46,7 +48,12 @@ class InvitationDiscoveryView(APIView):
         if not active_user(request.user):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
-        invitations = _claimable_invitations(request.user)
+        # A community invitation or referral of a space that has since switched the
+        # module off is not claimable (the claim answers 400), so it is not offered.
+        invitations = [
+            item for item in _claimable_invitations(request.user)
+            if is_staff_invitation(item) or module_enabled(item.makerspace, "membership")
+        ]
         return Response({"invitations": [_invitation_payload(item) for item in invitations]})
 
 

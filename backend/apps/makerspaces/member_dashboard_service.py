@@ -129,6 +129,59 @@ def membership_dues(membership):
     }
 
 
+TERM_ENDING_WINDOW = timedelta(days=7)
+
+
+def membership_term(membership):
+    """The member's own plan term: the current one, else the most recent. None = no plans.
+
+    `current` uses the same predicate as `request_access.require_current_term` (ACTIVE and
+    `ends_at` in the future), so the dashboard can never call a term current that the
+    borrowing rule treats as lapsed, whatever the hourly sweep has got to.
+    """
+    from apps.makerspaces.models import MembershipTerm
+
+    terms = MembershipTerm.objects.filter(membership=membership).select_related("plan")
+    current = (
+        terms.filter(status=MembershipTerm.Status.ACTIVE, ends_at__gt=timezone.now())
+        .order_by("-ends_at", "-pk")
+        .first()
+    )
+    shown = current or terms.order_by("-ends_at", "-pk").first()
+    if shown is None:
+        return None
+    return {
+        "plan_name": shown.plan.name,
+        "starts_at": shown.starts_at,
+        "ends_at": shown.ends_at,
+        "current": current is not None,
+        "blocks_borrowing": current is None and membership.makerspace.lapsed_members_cannot_borrow,
+    }
+
+
+def _term_notices(term, now):
+    if term is None:
+        return []
+    if not term["current"]:
+        return [{
+            "level": "critical" if term["blocks_borrowing"] else "warning",
+            "event": "term_lapsed",
+            "title": "Your membership term has ended",
+            "body": (
+                "You cannot borrow until staff renew your membership."
+                if term["blocks_borrowing"] else "Speak to staff to renew it."
+            ),
+        }]
+    if term["ends_at"] - now <= TERM_ENDING_WINDOW:
+        return [{
+            "level": "info",
+            "event": "term_ending_soon",
+            "title": f"Your {term['plan_name']} term ends soon",
+            "body": "",
+        }]
+    return []
+
+
 def notices(membership, activity):
     """Things that need this member's attention, derived from their own rows.
 
@@ -152,6 +205,7 @@ def notices(membership, activity):
             "title": "A waiver needs your acceptance",
             "body": "You cannot borrow or check in until the current waiver is accepted.",
         })
+    feed.extend(_term_notices(activity.get("membership_term"), now))
     if not accountability.get("membership_active", True):
         feed.append({
             "level": "warning",
