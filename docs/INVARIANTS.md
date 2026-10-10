@@ -1499,6 +1499,39 @@ not module keys** (one app can own several keys — `printing`/`machines`/`machi
 - `MANAGE_DEVICES` is a Space Manager default (`makerspaces/0073` backfill) and is **never
   organization-grantable**; Inventory/Machine Managers do not get it.
 
+**Printer commands and terminal reports (forward plan phase 7b).**
+
+- A binding requires `devices`, `machines` and `machine_service`, an active printer Device and
+  active Machine in the same tenant. Creation and approval require `MANAGE_DEVICES` and current
+  machine-specific management scope. A snapshot never supplies authority.
+- Commands pin the exact owning Device and key version. Random delivery tokens travel once and
+  their digest stays private. Bounded lazy expiry/backoff never grants simultaneous leases. After
+  acknowledgement, the signed owner can report through a long print without extending the delivery
+  lease. Revocation/key rotation refuses prior authority. Disabling/deleting a binding cancels
+  unprocessed commands and jobs.
+- Terminal measurements require a stable operation UUID, immutable external job ID, actual minutes
+  and explicit typed `MachineConsumable` quantities. Reserved pools use existing grams or quantity
+  reconciliation inputs. Failure additionally requires a reason and percentage. Unknown fields,
+  device-supplied money and ambiguous measurements are rejected before claim.
+- Claim and application are separate transactions. Identical operation plus canonical payload returns
+  the stored result; different payload/operation conflicts. Application calls only existing
+  `service_workflow_actions.complete/fail`, with `actor=None` for automatic effects or the approving
+  User for staff effects. Workflow failure rolls back consumption, charge and transition, retains
+  the claim and records review in a fresh transaction. Review never auto-retries.
+- Automatic application defaults false. The existing payment service reads current authoritative
+  pricing; the adapter accepts no pricing input. Failure retains the workflow's no-charge behavior.
+  Telemetry updates advisory job fields and last-seen only. Authoritative maintenance/reserved/offline
+  and running states take precedence; public machine output stays unchanged.
+- Free-text failure notes use scoped PII encryption and a database write fence. Services take the
+  source gate, then PII fence, then tenant/device/command/job/request/machine locks. Database guards
+  freeze claimed identities, measurements and consumptions while permitting adapter FK `SET_NULL`,
+  authorized purge and PII ciphertext maintenance. Application verifies the plaintext report hash.
+- Exports classify all four models and creator/processor User edges, omit lease digests and preserve
+  typed history. Portable import and raw dumps disable bindings, cancel commands, clear leases,
+  preserve applied/cancelled history and turn unprocessed jobs into review. Imported work stays inert
+  after re-enrollment. Device purge deletes printer rows first; adapter purge nulls live links and
+  retains device history.
+
 ## Machine scoping — `MANAGE_MACHINES` is per role, and fails CLOSED
 
 Moved here from "Hard Rules", where it had been appended and had grown to ~430 lines. Content is

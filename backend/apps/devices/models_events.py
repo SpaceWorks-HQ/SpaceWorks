@@ -25,6 +25,17 @@ class DeviceEvent(models.Model):
         ROTATED = "rotated", "Rotated"
         REVOKED = "revoked", "Revoked"
         HEARTBEAT = "heartbeat", "Heartbeat"
+        PRINTER_BOUND = "printer_bound", "printer bound"
+        PRINTER_UNBOUND = "printer_unbound", "printer unbound"
+        PRINTER_JOB_CREATED = "printer_job_created", "printer job created"
+        COMMAND_LEASED = "command_leased", "command leased"
+        COMMAND_ACKNOWLEDGED = "command_acknowledged", "command acknowledged"
+        COMMAND_DELIVERY_FAILED = "command_delivery_failed", "command delivery failed"
+        PRINTER_TELEMETRY_RECEIVED = "printer_telemetry_received", "printer telemetry received"
+        PRINTER_RESULT_CLAIMED = "printer_result_claimed", "printer result claimed"
+        PRINTER_RESULT_APPLIED = "printer_result_applied", "printer result applied"
+        PRINTER_RESULT_NEEDS_REVIEW = "printer_result_needs_review", "printer result needs review"
+        PRINTER_JOB_CANCELLED = "printer_job_cancelled", "printer job cancelled"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     makerspace = models.ForeignKey(

@@ -39,6 +39,11 @@ DEVICE_ROUTES = {
 }
 
 
+from .route_registry_7b import printer_routes
+
+DEVICE_ROUTES.update(printer_routes(DeviceRoute, DEVICE_SIGNATURE, ALL_KINDS))
+
+
 def entry_for(request):
     match = getattr(request, "resolver_match", None)
     view_name = getattr(match, "view_name", None)

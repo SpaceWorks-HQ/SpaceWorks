@@ -105,12 +105,20 @@
   `services_enrollment.py` (PoP enroll/rotate/reactivate), `services_identity.py` (create/PATCH/revoke),
   `services_requests.py` (atomic nonce claim, heartbeat), `services_events.py` (DeviceEvent + typed
   `devices.*` audit).
+  Phase 7b adds `models_commands.py` and `models_printers.py` for durable delivery, bindings
+  and typed immutable reports. `services_commands.py` owns lease/ack/backoff; `printer_access.py`
+  owns current adapter checks and scope; `services_printer_reports.py` claims measurements before
+  `services_printer_apply.py` invokes the existing machine workflow in a separate transaction.
+  Binding and creation services are separate siblings; `printer_state.py` derives advisory staff
+  state. `urls_7b.py`/`route_registry_7b.py` extend the exact protocol and staff surfaces.
+  Shared export, PII, purge, origin and tenant-migration registries compose `*_7b.py` siblings.
 - `backend/apps/data_export/` — Space-Manager data export (Phase 4). Per-fidelity (`REDACTED`/`PORTABLE`)
   disposition registry over models, fields, datasets, traversals and the global-user reference closure, with
   **drift guards that refuse an unclassified model or field**. `classification.py` and `references.py`
   are thin barrels: the exported field lists live in `classification_domain.py`, the global/omitted
   model reasons in `classification_platform.py`, and the declared `accounts.User` edges in
-  `references_core.py` — classify a new model there. Its `guards._equal(subject, declared,
+  `references_core.py`; adapter extensions compose `classification_7b.py`/`references_7b.py`.
+  Credential omission checks live in `guards_credentials.py` behind the original `guards.py` exports. Its `guards._equal(subject, declared,
   actual)` is called with the *scanned* set passed as `declared`, so `extra=` in a failure means **scanned
   but not registered** — read the signature before deciding which side to fix.
 - `backend/apps/tenant_migration/` — per-makerspace migration, managed → self-host (Phase 5B), in

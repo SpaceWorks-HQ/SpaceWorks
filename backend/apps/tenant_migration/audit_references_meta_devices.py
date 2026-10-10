@@ -27,3 +27,7 @@ DEVICE_AUDIT_EDGES = {
         for action in DEVICE_AUDIT_ACTIONS
     },
 }
+
+from .audit_references_meta_7b import PRINTER_AUDIT_EDGES
+
+DEVICE_AUDIT_EDGES.update(PRINTER_AUDIT_EDGES)

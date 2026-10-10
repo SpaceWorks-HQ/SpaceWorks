@@ -525,16 +525,24 @@ Opt-in, no dependencies; installed only by the `full`/`everything` profiles.
 - **What it is** — device identity for printers and label printers on the space's own network. A
   device is **not** a staff account: it holds an Ed25519 key, proves possession of it once at
   enrollment, and then signs every request (protocol in `docs/device-protocol.md`).
-- **What it adds** — the staff device list (`MANAGE_DEVICES`, Space Managers by default): create a
-  device and its one-time enrollment, rename it, set its offline threshold, rotate its key, revoke it.
-  Devices call the token-authenticated enrollment challenge/complete routes and the signed heartbeat.
-  Every change leaves an append-only device event plus a `devices.*` audit row.
-- **Without it** — the staff list answers 400 naming `devices`, and every enrollment and signed
-  device request is refused before it can claim a nonce or write a row. Enrolled devices keep their
-  rows but cannot authenticate until it is re-installed.
-- **Data** — `purge_module_data devices` deletes replay nonces and enrollments first, then the device
-  event history and the devices themselves. A tenant export carries devices and their history but never
-  their keys, enrollments or nonces, so a moved or restored device must enroll again.
+- **What it adds** — staff device enrollment, rename, offline threshold, key rotation and revocation,
+  plus signed heartbeats. With `machines` and `machine_service` installed, staff holding
+  `MANAGE_DEVICES` and management scope for the selected machine can bind a printer and create a
+  command for its explicitly assigned in-progress request. Bounded delivery leases become durable
+  ownership after acknowledgement. Measurements pass through the existing completion/failure workflow.
+  Automatic application defaults off; scoped staff approval supplies the approving User. Charges use
+  current machine pricing, and failed jobs create no charge. Telemetry affects staff display only.
+  Every mutation leaves typed device provenance and an audit row. The server wire contract is in
+  [Printer protocol](device-printer-protocol.md).
+- **Without it** — device routes answer 400 and cannot enroll, authenticate or mutate. Printer routes
+  additionally require both machine modules and answer 400 when either is off. Tombstoning the devices
+  app removes its routes with 404.
+- **Data** — `purge_module_data devices` deletes printer consumption claims, jobs, commands and
+  bindings, then replay nonces, enrollments, device events and identities. Machine workflows and the
+  payment ledger survive. Purging a machine adapter nulls live printer links and retains history;
+  missing targets cannot deliver or finish. Tenant moves retain applied reports and source snapshots,
+  disable bindings and automatic application, cancel commands, clear delivery credentials and turn
+  unprocessed work into inert review. Device keys, enrollments and nonces never travel.
 
 ---
 

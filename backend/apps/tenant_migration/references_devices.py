@@ -19,6 +19,11 @@ SOURCE_LOCAL_SNAPSHOT_FIELDS = frozenset(
 )
 
 
+from .references_7b import PRINTER_SOURCE_SNAPSHOT_FIELDS
+
+SOURCE_LOCAL_SNAPSHOT_FIELDS |= PRINTER_SOURCE_SNAPSHOT_FIELDS
+
+
 def validate_source_snapshot_fields(error_class, *, raw_scalar_references, exported_fields):
     for label, name in sorted(SOURCE_LOCAL_SNAPSHOT_FIELDS):
         field = apps.get_model(label)._meta.get_field(name)

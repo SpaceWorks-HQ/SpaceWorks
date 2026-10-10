@@ -19,6 +19,7 @@ from .tenant_dump_field_snapshot import (
     UNMANAGED_FIELD_NAMES,
 )
 from .tenant_dump_types import AuthorityDisposition, AuthorityField
+from .row_conditions import condition_matches
 
 
 def _reviewed_allowlists():
@@ -128,6 +129,12 @@ def _selected_disposition(model, field, source, rule, selector):
                 f"Invalid conditional disposition for {model._meta.label}.{field.name}."
             )
         return selected
+    from .target_projection import TARGET_FIELD_PROJECTION
+
+    target = TARGET_FIELD_PROJECTION.get((model._meta.label, field.name))
+    if target is not None and target.condition is not None and condition_matches(target.condition, source):
+        if AuthorityDisposition.RESET in rule.dispositions:
+            return AuthorityDisposition.RESET
     # D1 source filtering has already retained only the preserving branch for these
     # mixed row predicates. Identity-stub selection supplies an explicit selector.
     if AuthorityDisposition.PRESERVE in rule.dispositions:
@@ -141,10 +148,7 @@ def _reset_value(model, field, source):
     from .target_projection import TARGET_FIELD_PROJECTION
 
     target = TARGET_FIELD_PROJECTION.get((model._meta.label, field.name))
-    if target is not None and (
-        target.condition is None
-        or source.get(target.condition[0]) == target.condition[1]
-    ):
+    if target is not None and condition_matches(target.condition, source):
         return target.resolved_value(model._meta.label, field.name)
     explicit = {
         ("accounts.User", "is_superuser"): False,

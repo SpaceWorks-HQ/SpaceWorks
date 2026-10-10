@@ -24,6 +24,10 @@ MAKERSPACE_KWARG_ROUTES = {
     'admin-notification-rules': 'makerspace_id',
     'admin-machine-service-request-list-create': 'makerspace_id',
 }
+from .origin_scope_routes_7b import PRINTER_MAKERSPACE_ROUTES
+
+MAKERSPACE_KWARG_ROUTES.update(PRINTER_MAKERSPACE_ROUTES)
+
 # These routes have no tenant-bearing path segment by design: each is a listing whose
 # queryset is explicitly narrowed by the named makerspace query parameter.
 QUERY_SCOPED_ROUTES = {

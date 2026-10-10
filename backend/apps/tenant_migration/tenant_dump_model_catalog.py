@@ -64,6 +64,10 @@ PROJECTED_MODEL_LABELS = frozenset(
     warranty.WarrantyDocument""".split()
 )
 
+from .catalog_7b import PRINTER_PROJECTED_LABELS
+
+PROJECTED_MODEL_LABELS |= PRINTER_PROJECTED_LABELS
+
 PRESERVE_LIVE_MODEL_LABELS = frozenset({"machines.MachineOperator"})
 
 EXPLICIT_DROP_MODEL_REASONS = {

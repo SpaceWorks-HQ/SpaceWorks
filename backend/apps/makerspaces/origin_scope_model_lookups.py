@@ -141,3 +141,7 @@ TARGET_SET_LOOKUPS = {
     'admin-user-reset-password': (
         'makerspaces.MakerspaceMembership', 'user_id', 'makerspace_id'),
 }
+
+from .origin_scope_routes_7b import PRINTER_MODEL_LOOKUPS
+
+BASE_MODEL_LOOKUPS.update(PRINTER_MODEL_LOOKUPS)

@@ -22,3 +22,7 @@ DEVICE_AUTHORITY_ENTRIES = tuple(
         D.PRESERVE, "Monotonic: the target's first enrollment must exceed it."
     )),
 )
+
+from .tenant_dump_authority_7b import PRINTER_AUTHORITY_ENTRIES
+
+DEVICE_AUTHORITY_ENTRIES += PRINTER_AUTHORITY_ENTRIES

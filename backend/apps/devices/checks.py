@@ -84,4 +84,6 @@ def check_device_protocol_settings(app_configs=None, **kwargs):
             "DEVICE_NONCE_TTL_SECONDS must cover twice DEVICE_SIGNATURE_MAX_SKEW_SECONDS.",
             id="devices.E003",
         ))
+    if settings.DEVICE_COMMAND_LEASE_SECONDS < 1 or settings.DEVICE_COMMAND_MAX_ATTEMPTS < 1:
+        errors.append(Error("Device command lease and retry limit must be positive.", id="devices.E004"))
     return errors

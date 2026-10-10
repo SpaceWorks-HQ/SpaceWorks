@@ -208,6 +208,10 @@ FIRST_PARTY_FIELD_NAMES = {
     'tenant_migration.ExternalTenantReference': frozenset('created_at field_name id makerspace snapshot source_archive_digest source_model_label source_object_id target_model_label target_object_id'.split()),
 }
 
+from .catalog_7b import PRINTER_FIELD_NAMES
+
+FIRST_PARTY_FIELD_NAMES.update(PRINTER_FIELD_NAMES)
+
 AUTO_CREATED_FIELD_NAMES = {
     'auth.Group_permissions': frozenset('group id permission'.split()),
     'accounts.User_groups': frozenset('group id user'.split()),

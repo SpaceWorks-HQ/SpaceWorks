@@ -22,6 +22,7 @@ USER_PROJECTIONS = {
 }
 
 ALWAYS_OMITTED = {
+    ("devices.DeviceCommand", "lease_token_digest"): "Deployment-local command delivery credential.",
     # Trigger-maintained full-text vectors: derived from exported columns and rebuilt by
     # the search trigger on the target, so they never travel (apps/inventory/search.py).
     ("inventory.InventoryProduct", "search_vector"): "Derived search vector, rebuilt by trigger.",

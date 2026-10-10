@@ -124,6 +124,11 @@ DATASET_SPECS = {
 }
 
 
+from .datasets_7b import printer_dataset_specs
+
+DATASET_SPECS.update(printer_dataset_specs(P))
+
+
 def _columns(fidelity, label):
     model = apps.get_model(label)
     columns = []

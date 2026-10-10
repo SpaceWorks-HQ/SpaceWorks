@@ -430,3 +430,5 @@ Django control plane (`/control/`) is still not proxied through it. Redis state 
 `allinone_state` volume so rate-limit counters survive a restart; queued deliveries do not need to (tasks
 acknowledge late and are re-enqueued on commit).
 
+
+Connected printer delivery uses `DEVICE_COMMAND_LEASE_SECONDS=60` and `DEVICE_COMMAND_MAX_ATTEMPTS=10`. These positive operational knobs govern acknowledgement and bounded delivery retries. An acknowledged print may finish after its delivery lease expires. Device key rotation/revocation invalidates prior command ownership. Automatic terminal application defaults off per printer binding; staff review uses existing machine scope and charging rules.

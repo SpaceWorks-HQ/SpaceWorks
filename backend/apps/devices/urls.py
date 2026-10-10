@@ -41,3 +41,7 @@ urlpatterns = [
     ),
     path("device/heartbeat", DeviceHeartbeatView.as_view(), name="device-heartbeat"),
 ]
+
+from .urls_7b import urlpatterns as printer_urlpatterns
+
+urlpatterns += printer_urlpatterns
