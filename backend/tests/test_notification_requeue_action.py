@@ -21,6 +21,7 @@ from apps.integrations.notification_enums import (
     NotificationFeature,
 )
 from tests.return_helpers import make_member, make_space, make_user
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -62,7 +63,7 @@ def test_requeue_moves_only_failed_rows_audits_and_enqueues(monkeypatch):
     enqueued = []
     monkeypatch.setattr(dispatch_channels, "_enqueue_notification", enqueued.append)
     client = Client()
-    client.force_login(_superadmin("requeue-super"))
+    force_mfa_login(client, _superadmin("requeue-super"))
 
     response = _post(client, [failed, sent, skipped])
 
@@ -90,7 +91,7 @@ def test_requeue_with_the_broker_down_leaves_the_row_failed(monkeypatch):
 
     monkeypatch.setattr(tasks.deliver_notification_task, "delay", broker_down)
     client = Client()
-    client.force_login(_superadmin("requeue-broker-super"))
+    force_mfa_login(client, _superadmin("requeue-broker-super"))
 
     response = _post(client, [failed])
 
@@ -111,7 +112,7 @@ def test_a_space_manager_cannot_reach_the_requeue_action(monkeypatch):
         lambda *_: pytest.fail("a non-superadmin must not re-queue"),
     )
     client = Client()
-    client.force_login(manager)
+    force_mfa_login(client, manager)
 
     response = _post(client, [failed])
 

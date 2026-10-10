@@ -1,5 +1,6 @@
 from django.conf import settings
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema, PolymorphicProxySerializer
+from apps.accounts.serializers_mfa import MFAChallengeResponseSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -78,7 +79,7 @@ class SocialLoginView(APIView):
     provider = None
 
     @extend_schema(tags=["Social auth"], auth=[], request=SocialLoginSerializer,
-        responses={200: SocialLoginResponseSerializer, **errors(400, 401, 403, 404, 409, 429, 503), 409: OpenApiResponse(ErrorSerializer, description="Includes `social_device_restart_required` when burned pre-grant inputs must be replaced.")})
+        responses={200: PolymorphicProxySerializer(component_name="SocialLoginResult", serializers=[SocialLoginResponseSerializer, MFAChallengeResponseSerializer], resource_type_field_name=None), **errors(400, 401, 403, 404, 409, 429, 503), 409: OpenApiResponse(ErrorSerializer, description="Includes `social_device_restart_required` when burned pre-grant inputs must be replaced.")})
     def post(self, request):
         serializer = SocialLoginSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -134,6 +135,23 @@ class SocialLoginView(APIView):
             adopt_pending_memberships_for_user(user)
             scope = staff_origin_scope(request)
             staff_scope = None if scope is NO_STAFF_ORIGIN_SCOPE else str(scope)
+            from apps.accounts.mfa_policy import needs_challenge
+            from apps.accounts.mfa_challenges import start
+            from apps.accounts.mfa_sessions import context, device_context
+            if needs_challenge(user):
+                device = None
+                if data["delivery"] == "device":
+                    from apps.accounts.mfa_policy import credential
+                    mfa = credential(user)
+                    if nonce_row.device_grant_id and not (mfa and mfa.enabled_at):
+                        # Enrollment revokes old grants. Restart with fresh attestation
+                        # so the second step can create a replacement grant safely.
+                        raise SocialDeviceRestartRequired()
+                    device = device_context(attestation_challenge, verified_attestation, nonce_row.device_grant)
+                response = Response(start(user, context=context(request, surface=data["surface"],
+                    staff_scope=staff_scope, device=device)))
+                response["Cache-Control"] = "no-store"
+                return response
             tokens = issue_social_session(
                 user,
                 surface=data["surface"],

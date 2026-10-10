@@ -5,7 +5,8 @@ the enumeration reasoning. The only status that distinguishes anything is 404 wh
 SMS is not configured at all, which is deployment state, not account state.
 """
 
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema, PolymorphicProxySerializer
+from apps.accounts.serializers_mfa import MFAChallengeResponseSerializer, MFACompletedSerializer
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -105,10 +106,12 @@ class PhoneLoginConfirmView(APIView):
         auth=[],
         request=PhoneConfirmSerializer,
         responses={
-            200: OpenApiResponse(description="Member session issued."),
+            200: PolymorphicProxySerializer(component_name="PhoneLoginResult", serializers=[MFACompletedSerializer, MFAChallengeResponseSerializer], resource_type_field_name=None),
+            401: OpenApiResponse(description="The first-factor account is no longer available."),
             400: OpenApiResponse(description="Invalid or expired code."),
             404: OpenApiResponse(description="Phone sign-in is not configured."),
             429: OpenApiResponse(description="Request throttled."),
+            503: OpenApiResponse(description="Authentication write boundary unavailable."),
         },
     )
     def post(self, request):
@@ -126,6 +129,13 @@ class PhoneLoginConfirmView(APIView):
 
         from apps.accounts.tokens import SpaceWorksRefreshToken
 
+        from apps.accounts.mfa_policy import needs_challenge
+        from apps.accounts.mfa_challenges import start
+        from apps.accounts.mfa_sessions import context
+        if needs_challenge(user):
+            response = Response(start(user, context=context(request, surface="member")))
+            response["Cache-Control"] = "no-store"
+            return response
         refresh = SpaceWorksRefreshToken.for_user(user)
         # Hardcoded "member", never derived from the request. An SMS code is the weakest
         # factor here (SIM swap, number recycling) and staff surfaces reject this claim.

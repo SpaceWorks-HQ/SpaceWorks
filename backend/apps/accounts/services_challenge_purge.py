@@ -41,15 +41,21 @@ def purge_spent_challenges(*, retention=RETENTION):
     from apps.accounts.models import EmailVerificationChallenge
     from apps.accounts.models_phone import PhoneVerificationChallenge
     from apps.accounts.models_password_reset import PasswordResetEnvelope
+    from apps.accounts.models_mfa import MFAChallenge
+    from django.conf import settings
 
     now = timezone.now()
     cutoff = now - retention
     deleted = {}
-    for model in (EmailVerificationChallenge, PhoneVerificationChallenge):
+    for model in (EmailVerificationChallenge, PhoneVerificationChallenge, MFAChallenge):
         label = model._meta.label
+        spent = _spent(now) if model is not MFAChallenge else (
+            Q(consumed_at__isnull=False) | Q(expires_at__lt=now)
+            | Q(attempts__gte=settings.MFA_MAX_ATTEMPTS)
+        )
         try:
             count, _ = (
-                model.objects.filter(_spent(now))
+                model.objects.filter(spent)
                 .filter(created_at__lt=cutoff)
                 .delete()
             )

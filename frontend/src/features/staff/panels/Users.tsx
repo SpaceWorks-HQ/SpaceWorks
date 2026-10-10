@@ -5,6 +5,7 @@ import { ConfirmDialog } from "../../../components/ui";
 import { staffRequest, type StaffAuthUser } from "../../../lib/api";
 import { Panel, useStaffGet, type Makerspace } from "./shared";
 import { RoleManager } from "./RoleManager";
+import { StaffInvitations } from "./StaffInvitations";
 import { UsersTable } from "./UsersTable";
 import {
   AddStaffModal,
@@ -201,6 +202,7 @@ export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }:
           onRevoke={setRevokeTarget}
           onChangeRole={(membership, roleId) => changeRole.mutateAsync({ membership, roleId })}
         />
+        {canManageRoles && makerspaces.find((space) => space.id === msId)?.enabled_features?.includes("staff.invitations") ? <StaffInvitations key={msId} msId={msId} roles={assignableRoles} /> : null}
         {canManageRoles ? (
           <RoleManager msId={msId} actorActions={actorActions} isSuperadmin={isSuperadmin} onRolesChanged={afterStaffChange} />
         ) : null}

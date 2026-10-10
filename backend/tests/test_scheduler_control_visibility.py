@@ -12,6 +12,7 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.operations.models import PeriodicTaskRun
 from tests.return_helpers import make_member, make_space, make_user
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -20,7 +21,7 @@ URL = "admin:operations_periodictaskrun_changelist"
 
 def _client(user):
     client = Client()
-    client.force_login(user)
+    force_mfa_login(client, user)
     return client
 
 

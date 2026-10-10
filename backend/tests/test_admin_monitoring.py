@@ -13,6 +13,7 @@ from apps.evidence.models import EvidencePhoto
 from apps.inventory.models import InventoryAsset
 from apps.operations.models import QrPrintBatch
 from tests.return_helpers import make_product, make_space, make_user
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db
 
@@ -29,7 +30,7 @@ def make_superadmin(username="admin-monitoring-super"):
 
 def admin_client(user=None):
     client = Client()
-    client.force_login(user or make_superadmin())
+    force_mfa_login(client, user or make_superadmin())
     return client
 
 

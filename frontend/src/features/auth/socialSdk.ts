@@ -1,3 +1,4 @@
+import type { MfaChallenge } from "./mfaApi";
 import { publicV1Request } from "../../lib/api";
 
 export type SocialProvider = "google" | "apple";
@@ -73,7 +74,7 @@ async function requestNonce(provider: SocialProvider, surface: SocialSurface) {
 }
 
 async function complete(provider: SocialProvider, surface: SocialSurface, idToken: string, nonce: string, appleName = "") {
-  return publicV1Request<SocialLoginResult>(`/auth/social/${provider}`, {
+  return publicV1Request<SocialLoginResult | MfaChallenge>(`/auth/social/${provider}`, {
     method: "POST",
     credentials: "include",
     body: JSON.stringify({
@@ -91,7 +92,7 @@ export async function mountGoogleButton(
   element: HTMLElement,
   clientId: string,
   surface: SocialSurface,
-  onSuccess: (result: SocialLoginResult) => void,
+  onSuccess: (result: SocialLoginResult | MfaChallenge) => void,
   onError: (error: Error) => void,
 ) {
   const { nonce } = await requestNonce("google", surface);
@@ -158,7 +159,7 @@ export async function beginOidcBrowser(
   window.location.assign(started.authorization_url);
 }
 
-export async function completeOidcBrowserCallback(): Promise<SocialLoginResult | null> {
+export async function completeOidcBrowserCallback(): Promise<SocialLoginResult | MfaChallenge | null> {
   const query = new URLSearchParams(window.location.search);
   const code = query.get("code")?.trim() ?? "";
   const state = query.get("state")?.trim() ?? "";
@@ -176,7 +177,7 @@ export async function completeOidcBrowserCallback(): Promise<SocialLoginResult |
   }
   clearOidcQuery();
   if (!nonce) throw new Error("Identity-provider sign-in expired. Please try again.");
-  return publicV1Request<SocialLoginResult>("/auth/social/oidc/callback", {
+  return publicV1Request<SocialLoginResult | MfaChallenge>("/auth/social/oidc/callback", {
     method: "POST",
     credentials: "include",
     body: JSON.stringify({ code, state, nonce }),

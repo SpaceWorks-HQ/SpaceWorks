@@ -11,6 +11,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("username")
+        parser.add_argument("--reset-mfa", action="store_true", help="Discard a lost authenticator; next login must re-enroll.")
         parser.add_argument("--password", help="Use an explicit password instead of generating one.")
 
     def handle(self, *args, **options):
@@ -20,6 +21,9 @@ class Command(BaseCommand):
         password = options.get("password") or secrets.token_urlsafe(24)
         try:
             set_recovery_principal(user, password)
+            if options.get("reset_mfa"):
+                from apps.accounts.mfa_recovery import reset_superadmin_mfa
+                reset_superadmin_mfa(user)
         except Exception as exc:
             raise CommandError(str(exc)) from exc
         self.stdout.write(f"Recovered superadmin: {user.username}")

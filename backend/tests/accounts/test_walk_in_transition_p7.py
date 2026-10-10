@@ -22,6 +22,7 @@ from apps.accounts.transition_services import (
 )
 from apps.audit.models import AuditLog
 from tests.device_helpers import make_native_app_registration
+from tests.accounts.mfa_helpers import force_mfa_login
 
 pytestmark = pytest.mark.django_db(transaction=True)
 PASSWORD = "Safe transition password 947!"
@@ -250,7 +251,7 @@ def test_admin_password_form_transitions_walk_in_before_setting_credential():
     )
     user = make_walk_in("walk-in-admin-target", "admin-target@example.test")
     client = Client()
-    client.force_login(admin)
+    force_mfa_login(client, admin)
 
     response = client.post(
         reverse("admin:auth_user_password_change", args=[user.pk]),

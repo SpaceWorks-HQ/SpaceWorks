@@ -13,10 +13,12 @@ from pathlib import Path
 from apps.backup.settings_policy import ENV_SURFACE
 
 DOC = Path(__file__).resolve().parents[2] / "docs" / "environment-reference.md"
+DOCS = (DOC, DOC.with_name("environment-operations.md"))
 
 
 def _documented():
-    return set(re.findall(r"^\| `([A-Z0-9_]+)` \|", DOC.read_text(encoding="utf-8"), re.M))
+    return set().union(*(set(re.findall(r"^\| `([A-Z0-9_]+)` \|", doc.read_text(encoding="utf-8"), re.M))
+                         for doc in DOCS))
 
 
 def test_every_environment_variable_is_in_the_reference():

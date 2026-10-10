@@ -29,6 +29,10 @@ class FeatureDefinition:
 
 
 FEATURE_DEFINITIONS = (
+    FeatureDefinition("staff.invitations", None, "Staff invitations",
+                      "Invite staff with a single-use email link.", default_enabled=True),
+    FeatureDefinition("security.staff_mfa_required", None, "Require MFA for staff",
+                      "Require staff with actions in this space to enroll in TOTP MFA."),
     FeatureDefinition(
         "payments.machines", "machines", "Machine payments",
         "Charge for machine service requests via Stripe.",

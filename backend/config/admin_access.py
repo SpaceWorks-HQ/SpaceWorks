@@ -42,6 +42,12 @@ class AdminSuperuserOnlyMiddleware:
             )
         if self._is_admin_path(request.path):
             user = getattr(request, "user", None)
+            if getattr(user, "is_authenticated", False) and self._has_access(user):
+                from apps.accounts.control_mfa import session_verified
+                if not session_verified(request) and request.path != f"{self.admin_prefix}logout/":
+                    from django.shortcuts import redirect
+                    return redirect("/mfa/control/")
+            user = getattr(request, "user", None)
             if getattr(user, "is_authenticated", False) and not self._has_access(user):
                 # The admin login view authenticates before we can see the user, so an
                 # is_staff non-superuser can mint a Django admin session. Flush it here so

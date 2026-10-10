@@ -29,6 +29,34 @@ a `pip-audit` CI job. The global CSP `script-src` omits `'unsafe-eval'`; a tiny
 origin to `img-src` **only for `/control/` responses** (django-unfold ships eval-requiring Alpine.js; the
 JSON API + public docs stay on the strict policy).
 
+**Staff MFA and invitations (Wave 1).** TOTP is mandatory for superadmins, required for
+staff when a makerspace enables `security.staff_mfa_required`, and optional for members.
+Password, social/OIDC, phone and native sign-in return an opaque five-minute challenge
+before issuing any session tokens. Current provider adapters do not parse an MFA
+assertion, so social/OIDC always require SpaceWorks verification. A locked credential
+accepts a +/-1 time-step window and refuses replay. Ten recovery codes are hashed and
+shown once; regeneration and optional disable require password reauthentication.
+Secrets and enrollment keys use the existing Fernet mechanism. Credential versions
+invalidate older access, refresh, device and control-panel sessions. `/mfa/control/`
+finishes the Django password session before `/control/` becomes accessible. Operators
+can recover a lost superadmin authenticator with host-only `recover_superadmin --reset-mfa`;
+this clears credentials and sessions and forces fresh enrollment, rather than bypassing MFA.
+Spent MFA challenges join the existing 30-day auth-challenge cleanup.
+
+`staff.invitations` defaults on. Staff with makerspace-management authority invite an
+address to a permitted local role, list/revoke/resend invitations in Users, and receive
+a copyable link even when tenant email delivery is unavailable. Email addresses are
+encrypted, tokens are stored as digests, resend rotates the bearer and rechecks the
+current sender's authority, and acceptance is
+single use. Existing accounts prove their current password and enrolled MFA; new
+accounts receive a verified address. Both get the same response with no session tokens.
+Acceptance rechecks tenant servability, role grants and the inviter's current ceiling;
+revoked, restricted, walk-in and imported-stub principals cannot regain authority.
+Management and public acceptance are throttled and audited. Credentials, challenges
+and invitation grants are omitted from portable tenant dumps; staff must be invited
+again on the target deployment. See the [environment reference](environment-reference.md)
+for deployment budgets and timings.
+
 **Django admin coverage** is complete (every domain model registered; immutable/workflow-owned models
 read-only; a `list_filter` per makerspace-scoped admin). The Unfold sidebar (`config/unfold.py`) is curated
 into grouped sections and a test asserts every sidebar link resolves. `tests/test_admin_hidden_scope.py`

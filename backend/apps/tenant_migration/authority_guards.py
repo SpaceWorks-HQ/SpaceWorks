@@ -35,6 +35,7 @@ AUTHORIZATION_SOURCES = (
     APPS_DIR / "accounts" / "rbac_memberships.py",
     APPS_DIR / "accounts" / "rbac_organizations.py",
     APPS_DIR / "accounts" / "rbac_superadmin.py",
+    APPS_DIR / "accounts" / "mfa_policy.py",
     APPS_DIR / "machines" / "access.py",
 )
 SCANNED_MODEL_LABELS = frozenset({

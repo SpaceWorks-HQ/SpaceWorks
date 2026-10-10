@@ -11,6 +11,13 @@ def _refused(name, methods, reason):
 
 
 AUTH_CLAIM_ROUTES = {
+    **_refused("auth-mfa", ("GET", "HEAD", "POST"), "claim sessions cannot manage MFA"),
+    **_refused("auth-mfa-enroll", ("POST",), "claim sessions cannot enroll MFA"),
+    **_refused("auth-mfa-confirm", ("POST",), "claim sessions cannot enroll MFA"),
+    **_refused("auth-mfa-verify", ("POST",), "claim sessions cannot exchange credentials"),
+    **_refused("auth-mfa-recovery", ("POST",), "claim sessions cannot manage MFA"),
+    **_refused("auth-mfa-disable", ("POST",), "claim sessions cannot manage MFA"),
+    **_refused("auth-staff-invitation-accept", ("POST",), "claim sessions cannot acquire staff authority"),
     **_refused("social-nonce", ("POST",), "claim sessions cannot start identity linking"),
     **_refused("social-google", ("POST",), "claim sessions cannot change identity"),
     **_refused("social-apple", ("POST",), "claim sessions cannot change identity"),

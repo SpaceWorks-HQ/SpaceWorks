@@ -7,6 +7,7 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 from django.utils import timezone
 from rest_framework.test import APIClient
+from tests.accounts.mfa_helpers import complete_enrollment
 
 from apps.makerspaces.models import Makerspace
 from apps.tenant_migration.gate_errors import (
@@ -88,6 +89,9 @@ def test_login_and_refresh_remain_available_while_one_tenant_is_closed(settings)
         {"username": actor.username, "password": "gate-test-password"},
         format="json",
     )
+    assert login.status_code == 200
+    if login.data.get("mfa_required"):
+        login = complete_enrollment(client, login)
     refresh = client.post(
         "/api/v1/auth/refresh",
         HTTP_X_REFRESH_CSRF="1",

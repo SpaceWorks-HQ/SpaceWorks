@@ -866,6 +866,12 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "apps.hardware_requests.exceptions.workflow_exception_handler",
     "DEFAULT_THROTTLE_RATES": {
         "login": env("THROTTLE_LOGIN", default="10/min"),
+        "mfa_verify": env("THROTTLE_MFA_VERIFY", default="10/min"),
+        "mfa_challenge": env("THROTTLE_MFA_CHALLENGE", default="10/min"),
+        "mfa_user": env("THROTTLE_MFA_USER", default="20/hour"),
+        "mfa_manage": env("THROTTLE_MFA_MANAGE", default="10/hour"),
+        "staff_invite": env("THROTTLE_STAFF_INVITE", default="20/hour"),
+        "staff_invite_accept": env("THROTTLE_STAFF_INVITE_ACCEPT", default="10/min"),
         "device_attestation_challenge": env("THROTTLE_DEVICE_ATTESTATION_CHALLENGE", default="5/min"),
         "device_login": env("THROTTLE_DEVICE_LOGIN", default="5/min"),
         "device_login_user": env("THROTTLE_DEVICE_LOGIN_USER", default="10/hour"),
@@ -1244,3 +1250,10 @@ if SENTRY_DSN:
         traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
         environment=env("SENTRY_ENVIRONMENT", default="production" if not DEBUG else "development"),
     )
+
+MFA_CHALLENGE_TTL_SECONDS = env.int("MFA_CHALLENGE_TTL_SECONDS", default=300)
+MFA_MAX_ATTEMPTS = env.int("MFA_MAX_ATTEMPTS", default=5)
+if not 60 <= MFA_CHALLENGE_TTL_SECONDS <= 600:
+    raise ImproperlyConfigured("MFA_CHALLENGE_TTL_SECONDS must be between 60 and 600.")
+if not 1 <= MFA_MAX_ATTEMPTS <= 10:
+    raise ImproperlyConfigured("MFA_MAX_ATTEMPTS must be between 1 and 10.")

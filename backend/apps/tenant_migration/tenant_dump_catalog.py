@@ -58,7 +58,9 @@ class TenantDumpCatalogError(AssertionError):
 # Re-blessed on integration: phases 11 and 10, the backup lane, Wave-0 offline refunds,
 # the 7a-7d devices chain and the 9a-9e kiosk chain all changed the catalog; recomputed
 # from the merged snapshot.
-CATALOG_SCHEMA_SHA256 = "ff05f1988ee048b26717042c02dbfc23bd46d2731aa3598cd8433e32a0a57a96"
+# Re-blessed for platform MFA credentials/challenges and deployment-local staff invites;
+# all three are explicitly DROP in portable tenant artifacts.
+CATALOG_SCHEMA_SHA256 = "eb188ca5af3f81a15af1923fad3d928e2e9b4709a1a731c19f663c988f031970"
 
 
 def catalog_models(apps_registry=apps):

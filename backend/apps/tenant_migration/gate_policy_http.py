@@ -26,6 +26,13 @@ HTTP_EXEMPTIONS = {
         "for hours against a tenant that is being moved."
     ),
     "auth-login": "Global user session state is excluded from tenant quiescence.",
+    "auth-mfa": "Global MFA credential state is excluded from tenant quiescence.",
+    "auth-mfa-enroll": "Global MFA enrollment state is excluded from tenant quiescence.",
+    "auth-mfa-confirm": "Global MFA credential and session state is excluded from tenant quiescence.",
+    "auth-mfa-verify": "Global MFA verification and session state is excluded from tenant quiescence.",
+    "auth-mfa-recovery": "Global MFA recovery credentials are excluded from tenant quiescence.",
+    "auth-mfa-disable": "Global MFA credential state is excluded from tenant quiescence.",
+    "control-mfa": "Global MFA credential and control-session state is excluded from tenant quiescence.",
     "auth-refresh": "Global user session state is excluded from tenant quiescence.",
     "auth-logout": "Global user session state is excluded from tenant quiescence.",
     "auth-change-password": "Global credential edits are excluded from tenant quiescence.",
@@ -63,8 +70,9 @@ HTTP_ANONYMOUS_EXEMPTIONS = {
     "apps.accounts.views_phone.PhoneLoginStartView.post": "Global phone-login challenge state.",
     "apps.accounts.views_phone.PhoneLoginConfirmView.post": "Global phone identity and session state.",
     "apps.accounts.views_registration.MemberSignUpView.post": "Global user registration state.",
-    "apps.accounts.views_session.LoginView.post": "Global user session state.",
-    "apps.accounts.views_session.LogoutView.post": "Global user session state.",
+    "apps.accounts.views_login.LoginView.post": "Global user session state.",
+    "apps.accounts.views_profile.LogoutView.post": "Global user session state.",
+    "apps.accounts.views_mfa.MFAEnrollmentView.post": "Global MFA enrollment challenge state.",
     "apps.accounts.views_social_login.SocialNonceView.post": "Global social-login nonce state.",
     "apps.accounts.views_social_login.SocialLoginView.post": "Global social identity and session state.",
     "apps.payments_rail.views_connect.StripeConnectWebhookView.post": "Platform Connect routing state.",
@@ -77,6 +85,9 @@ HTTP_ANONYMOUS_EXEMPTIONS = {
 
 
 HTTP_ANONYMOUS_PARTICIPANTS = {
+    "apps.accounts.views_staff_invitations.StaffInvitationAcceptView.post": (
+        "Token resolves one tenant; acceptance takes tenant_write before account or membership writes."
+    ),
     **REPLAY_HTTP_PARTICIPANTS,
     "apps.hardware_requests.cron_views.ReturnReminderCronView.post": (
         "The fan-out reminder service takes the skip-and-count gate once per request."
@@ -103,4 +114,3 @@ ADMIN_ACTION_EXEMPTIONS = {
         "Tenant purge is expressly excluded from source quiescence."
     ),
 }
-

@@ -47,6 +47,9 @@ function EditionHome() {
   return <PublicInventoryPage />;
 }
 
+const MfaAccountPage = lazy(() => import("./features/auth/MfaAccountPage").then((m) => ({ default: m.MfaAccountPage })));
+const StaffInvitationAcceptPage = lazy(() => import("./features/auth/StaffInvitationAcceptPage").then((m) => ({ default: m.StaffInvitationAcceptPage })));
+
 function RouteFallback() {
   return <main className="grid min-h-screen place-items-center bg-bg px-6"><p className="text-sm font-semibold text-muted">Loading...</p></main>;
 }
@@ -54,7 +57,11 @@ function RouteFallback() {
 export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landing: ReactNode }) {
   const location = useLocation();
   let routes: ReactNode;
-  if (location.pathname === "/member/archived") {
+  if (location.pathname === "/mfa") {
+    routes = <Routes><Route path="/mfa" element={<MfaAccountPage />} /></Routes>;
+  } else if (location.pathname === "/staff-invitations/accept") {
+    routes = <Routes><Route path="/staff-invitations/accept" element={<StaffInvitationAcceptPage />} /></Routes>;
+  } else if (location.pathname === "/member/archived") {
     routes = <Routes><Route path="/member/archived" element={<ArchivedPayments />} /></Routes>;
   } else if (location.pathname.startsWith("/organization-invitations/redeem/")) {
     routes = <Routes><Route path="/organization-invitations/redeem/:token" element={<OrganizationInvitationRedeemPage />} /></Routes>;
