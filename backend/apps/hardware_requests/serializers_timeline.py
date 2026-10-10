@@ -6,12 +6,24 @@ class TimelineActorSerializer(serializers.Serializer):
     role = serializers.CharField()
 
 
+class EvidenceRetentionSerializer(serializers.Serializer):
+    """Retention coordination only: ``null`` on the event means no state row exists,
+    which is NOT a claim that the bytes are available."""
+
+    state = serializers.ChoiceField(choices=["expiring", "expired"])
+    object_expired_at = serializers.DateTimeField(allow_null=True)
+
+
 class TimelineEventSerializer(serializers.Serializer):
-    kind = serializers.CharField()
+    kind = serializers.CharField(
+        help_text="Event kind. `audit` events carry `detail.action`, `detail.action_label`, "
+        "projected `detail.meta`, `detail.meta_redacted` and `detail.target_link`."
+    )
     at = serializers.DateTimeField()
     actor = TimelineActorSerializer(allow_null=True)
     detail = serializers.DictField()
     evidence_id = serializers.IntegerField(allow_null=True)
+    evidence_retention = EvidenceRetentionSerializer(allow_null=True, required=False)
 
 
 class RequestTimelineResponseSerializer(serializers.Serializer):

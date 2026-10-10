@@ -27,6 +27,7 @@ export const openApiTags = [
   "Admin warranty",
   "Analytics",
   "Asset units",
+  "Audit verification",
   "Auth",
   "Backup",
   "Backup recipients",
@@ -236,6 +237,8 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/archive-recipients/{id}/verify",
   "/api/v1/admin/makerspace/{makerspace_id}/archive-requests",
   "/api/v1/admin/makerspace/{makerspace_id}/archive-requests/{id}/withdraw",
+  "/api/v1/admin/makerspace/{makerspace_id}/audit-verifications",
+  "/api/v1/admin/makerspace/{makerspace_id}/audit-verifications/{run_id}",
   "/api/v1/admin/makerspace/{makerspace_id}/backups",
   "/api/v1/admin/makerspace/{makerspace_id}/categories",
   "/api/v1/admin/makerspace/{makerspace_id}/certification-types",
@@ -675,6 +678,8 @@ export type AdminRequestItem = {
   "issued_assets": Array<unknown>;
 };
 
+export type AllowedFormatsEnum = "csv" | "xlsx";
+
 export type AnalyticsReportResponse = AnalyticsSummary | TakenItemsReport | ActiveLoansReport | ReturnsReport | DamagedMissingReport | DamagedLostReport | QrScansReport | MostLentReport | TopBorrowersReport | RecentlyAddedReport | MachineUsageReport | EventAttendanceReport | BookingUtilizationReport | MaintenanceActivityReport | MemberActivityReport | FabLabHealthReport | PaymentReconciliationReport | GenericAnalyticsReport;
 
 export type AnalyticsSummary = {
@@ -686,6 +691,8 @@ export type AnalyticsSummary = {
   "damaged_quantity": number;
   "missing_quantity": number;
 };
+
+export type AnchorStatusEnum = "pending" | "not_configured" | "externally_anchored" | "invalid" | "unavailable";
 
 export type ApiClient = {
   "id": number;
@@ -903,13 +910,29 @@ export type AttendedEvent = {
 
 export type AuditLog = {
   "id": number;
-  "actor"?: number | null;
+  "actor": number | null;
   "action": string;
-  "makerspace"?: number | null;
-  "target_type"?: string;
-  "target_id"?: string;
-  "meta"?: unknown;
-  "created_at"?: string;
+  "makerspace": number | null;
+  "target_type": string;
+  "target_id": string;
+  "meta": {
+  [key: string]: unknown;
+};
+  "created_at": string;
+  "action_label": string;
+  "actor_display": string | null;
+  "meta_redacted": boolean;
+  "target_link": AuditTargetLink | null;
+};
+
+export type AuditTargetLink = {
+  "label": string;
+  "path": string;
+};
+
+export type AuditVerificationError = {
+  "code": string;
+  "detail": string;
 };
 
 export type AuthMembership = {
@@ -1232,6 +1255,8 @@ export type CertificationType = {
   "created_at": string;
   "updated_at": string;
 };
+
+export type ChainStatusEnum = "pending" | "locally_verified" | "invalid" | "unavailable";
 
 export type ChangePassword = {
   "current_password": string;
@@ -2018,6 +2043,11 @@ export type EvidenceGetResponse = {
   "expires_in": number;
 };
 
+export type EvidenceRetention = {
+  "state": EvidenceRetentionStateEnum;
+  "object_expired_at": string | null;
+};
+
 export type EvidenceRetentionPolicy = {
   "makerspace_id": number;
   "platform_default_days": number;
@@ -2049,6 +2079,8 @@ export type EvidenceRetentionPreviewResponse = {
   "late_write_receipts": number;
   "late_write_receipts_due": number;
 };
+
+export type EvidenceRetentionStateEnum = "expiring" | "expired";
 
 export type EvidenceUrlRequest = {
   "evidence_type": EvidenceUrlRequestEvidenceTypeEnum;
@@ -5782,6 +5814,9 @@ export type ReportCatalogItem = {
   "grains": Array<string>;
   "chart_hint": string;
   "aggregate_supported": boolean;
+  "allowed_formats": Array<AllowedFormatsEnum>;
+  "schedulable": boolean;
+  "previewable": boolean;
 };
 
 export type ReportDelivery = {
@@ -5800,7 +5835,7 @@ export type ReportError = {
   "code"?: string;
 };
 
-export type ReportKeyEnum = "summary" | "taken-items" | "active-loans" | "returns" | "damaged-missing" | "damaged-lost" | "qr-scans" | "most-lent" | "top-borrowers" | "recently-added" | "machine-usage" | "event-attendance" | "booking-utilization" | "maintenance-activity" | "member-activity" | "machine-service" | "printer-service" | "fablab-health" | "payment-reconciliation" | "loan-throughput" | "inventory-control" | "evidence-compliance" | "import-quality" | "procurement-performance" | "communications-health" | "community-engagement" | "certification-coverage" | "module-operational-health";
+export type ReportKeyEnum = "summary" | "taken-items" | "active-loans" | "returns" | "damaged-missing" | "damaged-lost" | "qr-scans" | "most-lent" | "top-borrowers" | "recently-added" | "machine-usage" | "event-attendance" | "booking-utilization" | "maintenance-activity" | "member-activity" | "machine-service" | "printer-service" | "fablab-health" | "payment-reconciliation" | "loan-throughput" | "inventory-control" | "evidence-compliance" | "import-quality" | "procurement-performance" | "communications-health" | "community-engagement" | "certification-coverage" | "module-operational-health" | "audit-trail";
 
 export type ReportSchedule = {
   "id": number;
@@ -6500,6 +6535,7 @@ export type TimelineEvent = {
   [key: string]: unknown;
 };
   "evidence_id": number | null;
+  "evidence_retention"?: EvidenceRetention | null;
 };
 
 export type ToBuyItem = {
@@ -6646,6 +6682,38 @@ export type User = {
 
 export type UserRoleEnum = "superadmin" | "space_manager" | "requester";
 
+export type VerificationAccepted = {
+  "id": number;
+  "state": string;
+  "deduplicated": boolean;
+  "status_url": string;
+};
+
+export type VerificationCoverage = {
+  "attempt": number;
+  "chain_status": ChainStatusEnum;
+  "anchor_status": AnchorStatusEnum;
+  "row_count": number;
+  "mac_valid_count": number;
+  "unattested_count": number;
+  "mac_invalid_count": number;
+  "mac_unavailable_count": number;
+  "unbatched_count": number;
+  "local_batch_verified_count": number;
+  "batch_invalid_count": number;
+  "batch_unavailable_count": number;
+  "externally_anchored_count": number;
+};
+
+export type VerificationFilters = {
+  "action": string;
+  "target_type": string;
+  "target_id": string;
+  "actor": number | null;
+  "start": string | null;
+  "end": string | null;
+};
+
 export type VerificationReport = {
   "format_version": number;
   "target_makerspace_id": number;
@@ -6662,6 +6730,33 @@ export type VerificationReport = {
   "identities_created": number;
   "external_references_created": number;
 };
+
+export type VerificationRequest = {
+  "action"?: string;
+  "target_type"?: string;
+  "target_id"?: string;
+  "actor"?: number;
+  "start"?: string;
+  "end"?: string;
+};
+
+export type VerificationRun = {
+  "id": number;
+  "makerspace": number;
+  "state": VerificationRunStateEnum;
+  "terminal": boolean;
+  "snapshot_max_id": number;
+  "filters": VerificationFilters;
+  "coverage": VerificationCoverage;
+  "created_at": string;
+  "updated_at": string;
+  "status_url": string;
+  "failure_code"?: string;
+  "first_audit_log_id"?: number | null;
+  "first_batch_seq"?: number | null;
+};
+
+export type VerificationRunStateEnum = "QUEUED" | "RUNNING" | "RETRYING" | "SUCCEEDED" | "INCOMPLETE" | "FAILED" | "TIMED_OUT";
 
 export type WaiverAcceptResponse = {
   "accepted": boolean;

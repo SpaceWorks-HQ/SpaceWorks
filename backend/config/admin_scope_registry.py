@@ -8,6 +8,7 @@ readable; both names are re-exported there, which is where every caller imports 
 # Keyed by "app_label.model_name" (lowercase) -> ORM lookup ending in _id.
 NESTED_MAKERSPACE_LOOKUPS = {
     "accounts.memberclaimcode": "membership__makerspace_id",
+    "audit.auditverificationrunevent": "run__makerspace_id",
     "accounts.oidcbrowserattempt": "intended_membership__makerspace_id",
     "makerspaces.membershiprequest": "makerspace_id",
     "makerspaces.makerspacewaiver": "makerspace_id",

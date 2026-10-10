@@ -1,7 +1,9 @@
 from decimal import Decimal
 
 from apps.operations.report_registry import (
+    DEPLOYMENT_AGGREGATE_REPORT_KEYS,
     REPORT_KEYS,
+    ReportNotFound,
     ReportResult,
     report_definition,
 )
@@ -22,6 +24,9 @@ def report_data(
     report_filters=None, grain="day",
 ):
     definition = report_definition(report_key)
+    if not definition.previewable:
+        # Export-only: the generic JSON analytics path must never become a second list.
+        raise ReportNotFound()
     kwargs = dict(limit=_normalized_limit(limit), date_range=date_range, **(report_filters or {}))
     if definition.grains:
         kwargs["grain"] = grain
@@ -57,8 +62,10 @@ def required_modules(report_key):
     return report_definition(report_key).required_modules
 
 
-def validate_report_key(report_key, *, for_export=False):
-    return report_definition(report_key, for_export=for_export)
+def validate_report_key(report_key, *, for_export=False, deployment_aggregate=False):
+    return report_definition(
+        report_key, for_export=for_export, deployment_aggregate=deployment_aggregate
+    )
 
 
 def _normalized_limit(limit):

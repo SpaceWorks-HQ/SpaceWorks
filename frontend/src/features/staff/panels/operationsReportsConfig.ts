@@ -2,7 +2,13 @@ export type ReportCatalogItem = {
   key: string; title: string; fields: string[]; exportable: boolean; summary: boolean;
   required_modules: string[]; available: boolean | null; unavailable_reason: string | null;
   grains: string[]; chart_hint: string; aggregate_supported: boolean;
+  // Server capabilities (phase 10). Absent on an older server: treat as unrestricted.
+  allowed_formats?: Array<"csv" | "xlsx">; schedulable?: boolean; previewable?: boolean;
 };
+
+export function reportFormats(report: Pick<ReportCatalogItem, "allowed_formats">): Array<"csv" | "xlsx"> {
+  return report.allowed_formats?.length ? report.allowed_formats : ["csv", "xlsx"];
+}
 export type ReportCatalog = { results: ReportCatalogItem[] };
 export type ReportKey = string;
 

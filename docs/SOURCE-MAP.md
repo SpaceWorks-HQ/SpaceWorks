@@ -46,7 +46,17 @@
   artifact-bound API-client reset record.
 - `backend/apps/audit/` — append-only `AuditLog` + `audit.record(...)` (Postgres-trigger immutable), with
   signing/batch models in `models_signing.py`, verification phases behind the `integrity.py` barrel, and
-  object-store/HTTP collector protocols behind the `anchors.py` barrel.
+  object-store/HTTP collector protocols behind the `anchors.py` barrel (typed sink failures in
+  `anchors_base.py`, the per-attempt read budget in `anchors_budget.py`, budgeted S3 reads in
+  `anchors_object_io.py`). `presentation.py` is the ONE projector from a stored row to what staff may see
+  (catalogue in `presentation_catalog*.py`, deny policy in `presentation_catalog_dynamic.py`, drift guard in
+  `presentation_guards.py` + `presentation_discovery.py`), used by the audit list, the request timeline and
+  the `audit-trail` CSV. Staff verification runs: models in `models_verification_runs.py`, admission in
+  `verification_runs.py`, one attempt in `verification_execution.py` over `integrity_scope.py` (bounded
+  genesis membership in `integrity_rows.py`, query-free fetched batch checks in `integrity_scope_anchors.py`), the task in
+  `tasks_verification.py`, the API in `views_verification.py`/`serializers_verification.py`, read-only
+  `/control/` views in `admin_verification.py`. The request timeline's audit/retention helper is
+  `hardware_requests/timeline_service_audit.py`; the audit report is `operations/reports_audit.py`.
 - `backend/apps/evidence/` — evidence photos (immutable once attached), S3 storage helpers, signed upload/view URLs gated by
   per-makerspace `UPLOAD_EVIDENCE` + active status.
   `retention_models.py` owns the optional per-makerspace `EvidenceRetentionPolicy` override and per-photo

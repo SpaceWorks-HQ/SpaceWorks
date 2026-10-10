@@ -826,6 +826,8 @@ REST_FRAMEWORK = {
         # mistypes a physically handed code must not consume the staff issue budget (or
         # vice versa), repeating the phone-OTP shared-bucket failure.
         "member_claim_issue": env("THROTTLE_MEMBER_CLAIM_ISSUE", default="10/hour"),
+        # Each staff verification run is bounded cryptographic + anchor work.
+        "audit_verification": env("THROTTLE_AUDIT_VERIFICATION", default="6/hour"),
         "member_claim_redeem": env("THROTTLE_MEMBER_CLAIM_REDEEM", default="10/min"),
         # Tighter than the email OTP rates: every one of these costs the operator money
         # and lands on a stranger's handset if the number is wrong.

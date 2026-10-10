@@ -13,6 +13,9 @@ class ReportCatalogItemSerializer(serializers.Serializer):
     grains = serializers.ListField(child=serializers.CharField())
     chart_hint = serializers.CharField()
     aggregate_supported = serializers.BooleanField()
+    allowed_formats = serializers.ListField(child=serializers.ChoiceField(choices=["csv", "xlsx"]))
+    schedulable = serializers.BooleanField()
+    previewable = serializers.BooleanField()
 
 
 class ReportCatalogSerializer(serializers.Serializer):

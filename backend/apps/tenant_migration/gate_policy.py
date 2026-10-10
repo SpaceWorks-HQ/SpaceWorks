@@ -142,6 +142,9 @@ TASK_TENANT_RESOLVERS = {
     "apps.admin_api.tasks.process_bulk_import_job": (
         "admin_api.BulkImportJob", 0, "makerspace_id"
     ),
+    "apps.audit.tasks.run_audit_verification": (
+        "audit.AuditVerificationRun", 0, "makerspace_id"
+    ),
     "apps.data_export.tasks.run_data_export_task": (
         "data_export.DataExportJob", 0, "makerspace_id"
     ),

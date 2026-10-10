@@ -16,11 +16,32 @@ from apps.ed25519 import (
 
 
 class AnchorError(RuntimeError):
-    pass
+    """Compatibility base. A concrete sink never raises this plain type.
+
+    Callers that only need "the anchor could not be used" keep catching the base; a
+    verifier that must decide whether to RETRY catches the subclasses, which the sinks
+    choose where the cause is still known (a status code, a decode failure, a setting).
+    """
 
 
-class AnchorConflict(AnchorError):
-    pass
+class AnchorTransportError(AnchorError):
+    """The provider could not be reached or answered transiently (timeout, 429, 5xx)."""
+
+
+class AnchorConfigurationError(AnchorError):
+    """The sink is mis-configured or refused us permanently (settings, 401/403, other 4xx)."""
+
+
+class AnchorInvalidEvidence(AnchorError):
+    """The provider answered, but what it returned is not valid anchor evidence."""
+
+
+class AnchorConflict(AnchorInvalidEvidence):
+    """Well-formed evidence that disagrees with the requested or local state."""
+
+
+# Raised by decoding/validating a fetched body; the sinks turn these into evidence errors.
+MALFORMED_EVIDENCE_ERRORS = (KeyError, TypeError, ValueError, UnicodeError)
 
 
 def _identity(payload):

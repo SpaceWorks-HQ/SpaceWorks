@@ -34,6 +34,8 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("apiclients.ApiKeyRequest", "requester"),
         ("apiclients.ApiKeyRequest", "resolved_by"),
         ("audit.AuditLog", "actor"),
+        # actor_filter is a scalar filter-value snapshot, deliberately NOT a User edge.
+        ("audit.AuditVerificationRun", "requested_by"),
         ("bookings.BookableSpace", "created_by"),
         ("machines.CertificationGrant", "granted_by"),
         ("machines.CertificationGrant", "revoked_by"),

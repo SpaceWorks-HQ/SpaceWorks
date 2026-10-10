@@ -49,4 +49,14 @@ urlpatterns = [
         name="user-restore-access",
     ),
     path("audit-logs", views.AuditLogListView.as_view(), name="admin-audit-logs"),
+    path(
+        "makerspace/<int:makerspace_id>/audit-verifications",
+        views.AuditVerificationListCreateView.as_view(),
+        name="admin-audit-verifications",
+    ),
+    path(
+        "makerspace/<int:makerspace_id>/audit-verifications/<int:run_id>",
+        views.AuditVerificationDetailView.as_view(),
+        name="admin-audit-verification-detail",
+    ),
 ]

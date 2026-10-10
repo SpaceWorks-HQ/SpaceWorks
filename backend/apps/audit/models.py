@@ -114,6 +114,10 @@ from .models_signing import (  # noqa: E402
     AuditSigningKeyRotation,
     AuditSigningKeyRotationEvent,
 )
+from .models_verification_runs import (  # noqa: E402
+    AuditVerificationRun,
+    AuditVerificationRunEvent,
+)
 
 
 __all__ = [
@@ -124,4 +128,6 @@ __all__ = [
     "AuditSigningKey",
     "AuditSigningKeyRotation",
     "AuditSigningKeyRotationEvent",
+    "AuditVerificationRun",
+    "AuditVerificationRunEvent",
 ]

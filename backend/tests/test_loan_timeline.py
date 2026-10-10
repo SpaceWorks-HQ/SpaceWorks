@@ -202,5 +202,99 @@ def test_non_audit_role_receives_no_requester_pii():
     assert "Borrower Name" not in body
 
 
+# --- phase 10: audit rows and evidence retention on the same timeline ----------------
 
 
+def _audit_events(response):
+    return [event for event in response.data["events"] if event["kind"] == "audit"]
+
+
+def test_timeline_joins_direct_and_declared_request_references_only():
+    from apps.audit import services as audit
+
+    makerspace, manager, _, _, request = _full_lifecycle_rows()
+    other_space = make_space("loan-timeline-audit-other")
+    direct = audit.record(
+        manager, "request.issued", makerspace=makerspace, target=request,
+        meta={"box_id": 1, "evidence_id": 2, "remark": "free text"},
+    )
+    declared = audit.record(
+        manager, "box.scanned", makerspace=makerspace, target=makerspace,
+        meta={"box_id": 1, "request_id": request.pk},
+    )
+    # `request_id` in an action that does NOT declare it as a request reference.
+    audit.record(
+        manager, "request.return_due_updated", makerspace=makerspace,
+        target=makerspace, meta={"request_id": request.pk},
+    )
+    # Same request PK, other tenant.
+    audit.record(
+        manager, "box.scanned", makerspace=other_space, target=other_space,
+        meta={"request_id": request.pk},
+    )
+
+    events = _audit_events(authenticated_client(manager).get(_timeline_url(request)))
+
+    by_id = {event["detail"]["id"]: event for event in events}
+    assert set(by_id) == {direct.pk, declared.pk}
+    assert by_id[direct.pk]["detail"]["meta"] == {"box_id": 1, "evidence_id": 2}
+    assert by_id[direct.pk]["detail"]["meta_redacted"] is True
+    assert by_id[direct.pk]["detail"]["action_label"] == "Request issued"
+    assert by_id[declared.pk]["detail"]["target_link"] is None
+
+
+def test_timeline_evidence_retention_states_and_null_without_object_keys():
+    from apps.evidence.models import EvidenceObjectRetentionState
+
+    _, manager, _, _, request = _full_lifecycle_rows()
+    return_event = ReturnEvent.objects.get(request=request)
+    EvidenceObjectRetentionState.objects.create(
+        evidence_id=return_event.evidence_id,
+        status=EvidenceObjectRetentionState.Status.EXPIRED,
+        object_expired_at=timezone.now(),
+    )
+
+    response = authenticated_client(manager).get(_timeline_url(request))
+
+    events = response.data["events"]
+    issue = next(event for event in events if event["kind"] == "issue_evidence")
+    returned = next(event for event in events if event["kind"] == "return_event")
+    assert issue["evidence_retention"] is None
+    assert returned["evidence_retention"]["state"] == "expired"
+    assert returned["evidence_retention"]["object_expired_at"] is not None
+    body = response.content.decode("utf-8")
+    assert "object_key" not in body and "X-Amz" not in body
+
+
+def test_timeline_query_count_does_not_grow_with_audit_rows():
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from apps.audit import services as audit
+
+    makerspace, manager, _, _, request = _full_lifecycle_rows()
+    client = authenticated_client(manager)
+    audit.record(manager, "request.issued", makerspace=makerspace, target=request)
+    with CaptureQueriesContext(connection) as one:
+        client.get(_timeline_url(request))
+    for _ in range(5):
+        audit.record(manager, "request.issued", makerspace=makerspace, target=request)
+    with CaptureQueriesContext(connection) as many:
+        response = client.get(_timeline_url(request))
+    assert len(_audit_events(response)) == 6
+    assert len(many.captured_queries) == len(one.captured_queries)
+
+
+def test_timeline_audit_limit_truncates_deterministically():
+    from apps.audit import services as audit
+
+    makerspace, manager, _, _, request = _full_lifecycle_rows()
+    for _ in range(3):
+        audit.record(manager, "request.issued", makerspace=makerspace, target=request)
+    client = authenticated_client(manager)
+    first = client.get(_timeline_url(request), {"limit": 2})
+    again = client.get(_timeline_url(request), {"limit": 2})
+    assert first.data["truncated"] is True
+    assert [e["detail"]["id"] for e in first.data["events"]] == [
+        e["detail"]["id"] for e in again.data["events"]
+    ]

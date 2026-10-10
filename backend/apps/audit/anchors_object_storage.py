@@ -11,26 +11,31 @@ from django.conf import settings
 from django.utils import timezone
 
 from .anchors_base import (
+    AnchorConfigurationError,
     AnchorConflict,
-    AnchorError,
     _identity,
     _validate_fetched,
     anchors_match,
 )
+from .anchors_object_io import classify_storage_error, iter_object_keys, read_json_object
 from .anchors_object_rotation import ObjectStorageRotationMixin
 
 
 class ObjectStorageAnchorSink(ObjectStorageRotationMixin):
     """Immutable one-object-per-sequence sink for an object-lock enabled bucket."""
 
-    def __init__(self):
+    def __init__(self, read_budget=None):
+        self.read_budget = read_budget
         self.bucket = str(getattr(settings, "AUDIT_ATTESTATION_S3_BUCKET", ""))
         self.prefix = str(
             getattr(settings, "AUDIT_ATTESTATION_S3_PREFIX", "audit-anchors")
         ).strip("/")
-        self.retention_days = int(
-            getattr(settings, "AUDIT_ATTESTATION_RETENTION_DAYS", 0)
-        )
+        try:
+            self.retention_days = int(
+                getattr(settings, "AUDIT_ATTESTATION_RETENTION_DAYS", 0)
+            )
+        except (TypeError, ValueError) as exc:
+            raise AnchorConfigurationError("The anchor retention period is invalid.") from exc
         # `or "COMPLIANCE"` because BLANK is not the same as absent here. Compose passes
         # `AUDIT_ATTESTATION_S3_OBJECT_LOCK_MODE: ${...:-}`, which makes the variable
         # present-but-empty, and django-environ only applies its default when a variable
@@ -41,11 +46,11 @@ class ObjectStorageAnchorSink(ObjectStorageRotationMixin):
             getattr(settings, "AUDIT_ATTESTATION_S3_OBJECT_LOCK_MODE", "") or "COMPLIANCE"
         ).upper()
         if not self.bucket or self.retention_days < 1:
-            raise AnchorError(
+            raise AnchorConfigurationError(
                 "The anchor bucket and a positive retention period are required."
             )
         if self.lock_mode not in {"COMPLIANCE", "GOVERNANCE"}:
-            raise AnchorError("The S3 object-lock mode is invalid.")
+            raise AnchorConfigurationError("The S3 object-lock mode is invalid.")
 
     def _client(self):
         return boto3.client(
@@ -88,51 +93,35 @@ class ObjectStorageAnchorSink(ObjectStorageRotationMixin):
         deployment_id, scope, signer, batch_seq = identity
         return f"{self._directory(deployment_id, scope, signer)}/{batch_seq:020d}.json"
 
+    def _keys(self, prefix, message):
+        return iter_object_keys(
+            self._client(), self.bucket, prefix, self.read_budget, message
+        )
+
     def fetch(self, identity):
-        try:
-            response = self._client().get_object(
-                Bucket=self.bucket, Key=self._key(identity)
-            )
-            raw = response["Body"].read()
-            return _validate_fetched(identity, json.loads(raw.decode("utf-8")))
-        except ClientError as exc:
-            status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
-            code = exc.response.get("Error", {}).get("Code")
-            if status == 404 or code in {"404", "NoSuchKey", "NotFound"}:
-                return None
-            raise AnchorError("The object anchor could not be fetched.") from exc
-        except (BotoCoreError, OSError, UnicodeError, ValueError) as exc:
-            raise AnchorError("The object anchor could not be fetched.") from exc
+        return read_json_object(
+            self._client(), self.bucket, self._key(identity),
+            lambda body: _validate_fetched(identity, body), self.read_budget,
+        )
 
     def _latest_sequence(self, identity):
         deployment_id, scope, signer, _batch_seq = identity
         prefix = self._directory(deployment_id, scope, signer) + "/"
-        try:
-            paginator = self._client().get_paginator("list_objects_v2")
-            sequences = []
-            for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
-                for item in page.get("Contents", []):
-                    name = item["Key"].removeprefix(prefix).removesuffix(".json")
-                    if name.isdigit():
-                        sequences.append(int(name))
-            return max(sequences, default=-1)
-        except (BotoCoreError, ClientError) as exc:
-            raise AnchorError("The object anchor head could not be read.") from exc
+        sequences = []
+        for key in self._keys(prefix, "The object anchor head could not be read."):
+            name = key.removeprefix(prefix).removesuffix(".json")
+            if name.isdigit():
+                sequences.append(int(name))
+        return max(sequences, default=-1)
 
     def _scope_has_another_signer(self, identity):
         deployment_id, scope, signer, _batch_seq = identity
         prefix = self._scope_directory(deployment_id, scope) + "/"
-        try:
-            paginator = self._client().get_paginator("list_objects_v2")
-            for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
-                for item in page.get("Contents", []):
-                    relative = item["Key"].removeprefix(prefix)
-                    anchored_signer, separator, _name = relative.partition("/")
-                    if separator and anchored_signer != signer:
-                        return True
-            return False
-        except (BotoCoreError, ClientError) as exc:
-            raise AnchorError("The object anchor signer pin could not be read.") from exc
+        for key in self._keys(prefix, "The object anchor signer pin could not be read."):
+            anchored_signer, separator, _name = key.removeprefix(prefix).partition("/")
+            if separator and anchored_signer != signer:
+                return True
+        return False
 
     def publish(self, envelope):
         identity = _identity(envelope["payload"])
@@ -197,7 +186,11 @@ class ObjectStorageAnchorSink(ObjectStorageRotationMixin):
                 if existing is not None and anchors_match(existing, envelope):
                     return existing
                 raise AnchorConflict("A concurrent conflicting anchor won.") from exc
-            raise AnchorError("The object anchor could not be persisted.") from exc
+            raise classify_storage_error(
+                exc, "The object anchor could not be persisted."
+            ) from exc
         except BotoCoreError as exc:
-            raise AnchorError("The object anchor could not be persisted.") from exc
+            raise classify_storage_error(
+                exc, "The object anchor could not be persisted."
+            ) from exc
         return _validate_fetched(identity, stored)

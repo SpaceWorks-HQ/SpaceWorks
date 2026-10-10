@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { Field } from "../../../components/ui";
 import type { NotificationDestination } from "../notificationDestinationTypes";
-import type { ReportCatalogItem } from "./operationsReportsConfig";
+import { reportFormats, type ReportCatalogItem } from "./operationsReportsConfig";
 import {
   CADENCES,
   MAX_RECIPIENT_EMAILS,
@@ -88,7 +88,9 @@ export function ReportScheduleForm({
 }) {
   const [form, setForm] = useState(initial);
   const [problem, setProblem] = useState<string | null>(null);
-  const grains = reports.find((report) => report.key === form.report_key)?.grains ?? ["day"];
+  const selected = reports.find((report) => report.key === form.report_key);
+  const grains = selected?.grains ?? ["day"];
+  const formats = selected ? reportFormats(selected) : (["csv", "xlsx"] as const);
   const set = <K extends keyof ScheduleFormValues>(key: K, value: ScheduleFormValues[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
     setProblem(null);
@@ -111,8 +113,14 @@ export function ReportScheduleForm({
           value={form.report_key}
           onChange={(event) => {
             const key = event.target.value;
-            const allowed = reports.find((report) => report.key === key)?.grains ?? ["day"];
-            setForm((current) => ({ ...current, report_key: key, grain: allowed.includes(current.grain) ? current.grain : allowed[0] }));
+            const next = reports.find((report) => report.key === key);
+            const allowed = next?.grains ?? ["day"];
+            const nextFormats = next ? reportFormats(next) : ["csv", "xlsx"];
+            setForm((current) => ({
+              ...current, report_key: key,
+              grain: allowed.includes(current.grain) ? current.grain : allowed[0],
+              format: nextFormats.includes(current.format) ? current.format : (nextFormats[0] as ReportSchedule["format"]),
+            }));
             setProblem(null);
           }}
         >
@@ -127,7 +135,7 @@ export function ReportScheduleForm({
       </Field>
       <Field label="Format">
         <select className="desk-input" value={form.format} onChange={(event) => set("format", event.target.value as ReportSchedule["format"])}>
-          <option value="csv">CSV</option><option value="xlsx">XLSX</option>
+          {formats.map((format) => <option key={format} value={format}>{format.toUpperCase()}</option>)}
         </select>
       </Field>
       <Field label="Cadence">

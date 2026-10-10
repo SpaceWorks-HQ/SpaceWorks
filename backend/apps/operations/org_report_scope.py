@@ -30,6 +30,8 @@ ORGANIZATION_REPORT_ACTIONS = frozenset({
     rbac.Action.MANAGE_MAKERSPACE,
 })
 EXCLUDED_ORGANIZATION_REPORT_KEYS = frozenset({
+    # Tenant accountability data: never flattened across an organization's spaces.
+    "audit-trail",
     # Unique borrowers can span makerspaces, while the duration averages do not
     # expose the sample counts needed to combine them without bias.
     "loan-throughput",
