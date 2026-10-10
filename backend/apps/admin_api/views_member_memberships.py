@@ -17,7 +17,7 @@ from apps.makerspaces.guards import require_module
 from apps.makerspaces.membership_gating import require_module_for_request, staff_invitation_q
 from apps.makerspaces.platform import module_enabled
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceRole, MakerspaceWaiver, MembershipPlan, MembershipRequest
-from apps.makerspaces.serializers_memberships import WaiverPublishSerializer
+from apps.makerspaces.serializers_memberships import MemberWaiverResponseSerializer, WaiverPublishSerializer
 from apps.makerspaces.servability import servable_queryset
 from apps.payments.models import Payment
 
@@ -194,7 +194,15 @@ class AdminMembershipRoleM2View(APIView):
 class AdminWaiverView(APIView):
     permission_classes = [IsActiveStaff]
 
-    @extend_schema(tags=["Admin memberships"], request=WaiverPublishSerializer, responses={200: WaiverPublishSerializer, **ERRORS})
+    @extend_schema(tags=["Admin memberships"], responses={200: MemberWaiverResponseSerializer, **ERRORS})
+    def get(self, request, makerspace_id):
+        makerspace = _makerspace(request.user, makerspace_id)
+        waiver = MakerspaceWaiver.objects.filter(makerspace=makerspace, is_active=True).first()
+        return Response({"has_waiver": False} if waiver is None else {
+            "has_waiver": True, "version": waiver.version, "body": waiver.body,
+        })
+
+    @extend_schema(tags=["Admin memberships"], request=WaiverPublishSerializer, responses={200: MemberWaiverResponseSerializer, **ERRORS})
     def put(self, request, makerspace_id):
         makerspace = _makerspace(request.user, makerspace_id)
         serializer = WaiverPublishSerializer(data=request.data); serializer.is_valid(raise_exception=True)

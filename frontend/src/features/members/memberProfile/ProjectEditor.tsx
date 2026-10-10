@@ -1,4 +1,5 @@
 import { ImageUploader } from "../../staff/ImageUploader";
+import { memberRequest } from "../../../lib/api";
 import { profileToneForIdentity } from "./helpers";
 import { type ProjectDraft } from "./types";
 
@@ -39,6 +40,7 @@ export function ProjectEditor({
       {project.id ? (
         <div className="mt-3">
           <ImageUploader
+            request={memberRequest}
             endpoint={`/member/makerspaces/${makerspaceId}/profile/image`}
             currentUrl={imageUrl}
             label="Project image"

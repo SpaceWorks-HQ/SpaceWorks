@@ -46,9 +46,10 @@ export async function uploadPublicImage(
   // endpoints use one triple for the avatar and for each project image, discriminated
   // by `project_id`, and the attach needs it as much as the presign does.
   extraBody: Record<string, unknown> = {},
+  request: typeof staffRequest = staffRequest,
 ) {
   await rejectOversizePublicImage(file);
-  const presigned = await staffRequest<PresignResponse>(endpoint, {
+  const presigned = await request<PresignResponse>(endpoint, {
     method: "POST",
     body: JSON.stringify({
       content_type: file.type || "application/octet-stream",
@@ -72,7 +73,7 @@ export async function uploadPublicImage(
     if (!res.ok) throw new Error(`Storage upload failed (${res.status})`);
   }
 
-  await staffRequest(endpoint, {
+  await request(endpoint, {
     method: "PUT",
     body: JSON.stringify({ object_key: presigned.object_key, ...extraBody }),
   });
@@ -94,6 +95,8 @@ type ImageUploaderProps = {
   extraBody?: Record<string, unknown>;
   /** Query string appended to the clear request, which carries no body. */
   clearQuery?: string;
+  /** Use the member refresh session when rendered in the member area. */
+  request?: typeof staffRequest;
 };
 
 /**
@@ -112,6 +115,7 @@ export function ImageUploader({
   shape = "square",
   extraBody,
   clearQuery = "",
+  request = staffRequest,
 }: ImageUploaderProps) {
   const inputId = useId();
   const objectUrlRef = useRef<string | null>(null);
@@ -151,7 +155,7 @@ export function ImageUploader({
     setStatus("uploading");
     setError("");
     try {
-      await uploadPublicImage(endpoint, file, extraBody);
+      await uploadPublicImage(endpoint, file, extraBody, request);
       setStatus("idle");
       setLocalPreview(file);
       onChanged();
@@ -167,7 +171,7 @@ export function ImageUploader({
     setStatus("uploading");
     setError("");
     try {
-      await staffRequest(`${endpoint}${clearQuery}`, { method: "DELETE" });
+      await request(`${endpoint}${clearQuery}`, { method: "DELETE" });
       setStatus("idle");
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);

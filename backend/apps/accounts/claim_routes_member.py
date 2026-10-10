@@ -62,6 +62,8 @@ MEMBER_CLAIM_ROUTES = {
     **_options("member-payment-mobile-intent"),
     ("member-referrals", "POST"): Refused("walk-ins cannot delegate membership eligibility"),
     **_options("member-referrals"),
+    ("member-verification", "POST"): Refused("claim sessions cannot verify other members"),
+    **_options("member-verification"),
     # Profile payloads include event activity. D5 applies the claim-local event filter;
     # D3 records that mixed ownership so it cannot be mistaken for a plain local read.
     ("member-profile", "GET"): LocallyFiltered(tenant=ID),

@@ -48,6 +48,22 @@ function renderPanel() {
 }
 
 describe("MemberClaimCodes", () => {
+  it("revokes an active code and clears the displayed secret", async () => {
+    staffRequest.mockImplementation((_path: string, options?: RequestInit) => options?.method === "POST" ? Promise.resolve(ISSUED) : Promise.resolve([ISSUED]));
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Walk-in member"), { target: { value: "11" } });
+    fireEvent.click(screen.getByText("Issue claim code"));
+    await screen.findByText(ISSUED.code);
+    fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith("/admin/makerspaces/7/member-claim-codes/41/revoke", { method: "POST" }));
+    await waitFor(() => expect(screen.queryByText(ISSUED.code)).toBeNull());
+  });
+  it("shows load errors without claiming the list is empty", async () => {
+    staffRequest.mockRejectedValue(new Error("Claim codes unavailable")); renderPanel();
+    expect(screen.getByText("Loading active claim codes…")).toBeVisible();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Claim codes unavailable");
+    expect(screen.queryByText("No active claim codes.")).toBeNull();
+  });
   it("offers only walk-ins and renders the one-time code, QR, and expiry", async () => {
     renderPanel();
     await screen.findByText("No active claim codes.");
@@ -72,4 +88,3 @@ describe("MemberClaimCodes", () => {
     );
   });
 });
-

@@ -9,6 +9,7 @@ from apps.makerspaces.views_memberships import (
 )
 from apps.makerspaces.views_invitation_requests import PublicInvitationRequestView
 from apps.makerspaces.views_member_referrals import MemberReferralView
+from apps.makerspaces.member_verification_views import MemberVerificationView
 from apps.makerspaces.member_activity_views import MemberActivityView
 from apps.makerspaces.member_card_views import (
     MemberCardOwnView,
@@ -38,6 +39,7 @@ urlpatterns = [
     # and is spliced in by `config.urls.separable`. Declared here it would keep resolving,
     # and stay in the OpenAPI schema, on a deployment that ships no events app.
     path("member/makerspaces/<int:makerspace_id>/referrals", MemberReferralView.as_view(), name="member-referrals"),
+    path("member/makerspaces/<int:makerspace_id>/verification", MemberVerificationView.as_view(), name="member-verification"),
     path("member/makerspaces/<int:makerspace_id>/profile", MemberProfileView.as_view(), name="member-profile"),
     path("member/makerspaces/<int:makerspace_id>/profile/image", MemberProfileImageView.as_view(), name="member-profile-image"),
     path("member/makerspaces/<int:makerspace_id>/member-card", MemberCardOwnView.as_view(), name="member-card"),
