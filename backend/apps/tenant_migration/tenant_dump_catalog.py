@@ -58,7 +58,9 @@ class TenantDumpCatalogError(AssertionError):
 # Re-blessed on integration: phases 11 and 10, the backup lane, Wave-0 offline refunds,
 # the 7a-7d devices chain and the 9a-9e kiosk chain all changed the catalog; recomputed
 # from the merged snapshot.
-CATALOG_SCHEMA_SHA256 = "ff05f1988ee048b26717042c02dbfc23bd46d2731aa3598cd8433e32a0a57a96"
+# F8 adds operations.SavedView; the coordinator must verify this snapshot-derived
+# pin against the live Django model graph before committing the lane.
+CATALOG_SCHEMA_SHA256 = "55fb7b5cb3255f90fb7f94868fdc765adc51856dd1b17197c4a51ad80f2b8075"
 
 
 def catalog_models(apps_registry=apps):

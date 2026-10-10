@@ -13,6 +13,8 @@ def _same(label, names, disposition, reason):
 
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
+    *_same("operations.SavedView", "shared state", D.RESET,
+           "Target publication and filter identifiers must be authorized anew."),
     *_same(
         "hardware_requests.ReplayCommand",
         "id makerspace station actor operator_lease_id station_session_id station_version "

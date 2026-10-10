@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { ConfirmDialog, DetailDrawer, EmptyState, Skeleton, StatusBadge } from "../../components/ui";
 import { CustomAnswersView } from "../forms/CustomAnswersView";
@@ -13,6 +14,7 @@ import {
   type BookingAction,
   type BookingFilters,
 } from "./bookingsApi";
+import { useUrlListState } from "../../lib/useUrlListState";
 import { PaymentReconcileActions } from "./PaymentReconcileActions";
 
 type PendingAction = { booking: Booking; action: BookingAction };
@@ -43,18 +45,19 @@ export function BookingDrawer({ makerspaceId, spaceId, onClose }: {
 }) {
   const spaceQuery = useBookableSpace(spaceId);
   const space = spaceQuery.data;
-  const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<BookingFilters>({});
+  const [params] = useSearchParams();
+  const list = useUrlListState({ page: "1", status: "", starts_at: "", ends_at: "", ordering: "starts_at" }, `booking-${spaceId}.`);
+  const { page, setPage } = list;
+  const filters: BookingFilters = { ...list.values, status: list.values.status as BookingFilters["status"], booking_id: Number(params.get("space")) === spaceId ? Number(params.get("booking")) || undefined : undefined };
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
-  const bookings = useSpaceBookings(spaceId, filters, page);
+  const bookings = useSpaceBookings(spaceId, filters, page, list.values.ordering);
   const update = useUpdateBookableSpace(makerspaceId, spaceId);
   const deactivate = useDeactivateBookableSpace(makerspaceId, spaceId);
   const action = useBookingAction(makerspaceId, spaceId);
 
   const setFilter = <K extends keyof BookingFilters>(key: K, value: BookingFilters[K]) => {
-    setFilters((current) => ({ ...current, [key]: value }));
-    setPage(1);
+    list.setFilter(key, String(value ?? ""));
   };
   const actionError = update.error || deactivate.error || action.error;
 
@@ -84,6 +87,7 @@ export function BookingDrawer({ makerspaceId, spaceId, onClose }: {
                 <h3 id="space-bookings-title" className="title-section">Bookings <span className="font-mono">({bookings.data?.count ?? 0})</span></h3>
                 <p className="mt-1 text-xs text-muted">Contact details and custom answers are staff-only.</p>
               </div>
+              <label className="text-xs text-muted">Sort<select className="desk-input" value={list.values.ordering} onChange={(event) => list.setFilter("ordering", event.target.value)}><option value="starts_at">Starts first</option><option value="-starts_at">Starts last</option><option value="created_at">Created first</option></select></label>
               <div className="mb-3 grid gap-2 sm:grid-cols-3">
                 <label className="grid gap-1 text-xs font-semibold text-muted">Status
                   <select className="desk-input" value={filters.status ?? ""} onChange={(event) => setFilter("status", event.target.value as BookingFilters["status"])}>

@@ -1,6 +1,8 @@
 import { Link, Navigate, useLocation } from "react-router-dom";
 
 import { StaffDock } from "./StaffDock";
+import { CommandPalette } from "./CommandPalette";
+import { StaffListContext } from "./StaffListContext";
 import { StaffHeader } from "./StaffHeader";
 import { StaffTabContent } from "./StaffTabContent";
 import { EmptyState } from "../../components/ui/EmptyState";
@@ -112,11 +114,11 @@ export function StaffWorkspace({
   const normalizedDeniedTabs = new Set(["requests", "notifications"]);
   const normalizeDenied = routeTabDenied && !!routeTab && normalizedDeniedTabs.has(routeTab);
   if ((!routeTabDenied || normalizeDenied) && location.pathname !== activeTabPath) {
-    return <Navigate replace to={activeTabPath} />;
+    return <Navigate replace to={activeTabPath + location.search} />;
   }
 
   return (
-    <main className="desk-shell grid grid-cols-1">
+    <StaffListContext.Provider value={{ ownerName: user.username, canShare: canManageMakerspace }}><main className="desk-shell grid grid-cols-1">
       <SkipLink />
       <section className="min-w-0">
         <StaffHeader
@@ -132,6 +134,7 @@ export function StaffWorkspace({
           user={user}
         />
 
+        {activeMakerspace ? <CommandPalette key={activeMakerspace.id} makerspaceId={activeMakerspace.id} makerspaceSlug={activeMakerspace.slug} allowedTabs={moduleAllowedTabs} guestOnly={guestOnly} singleTenantLocked={singleTenantLocked} ownerName={user.username} /> : null}
         <div className="min-w-0 p-5 pb-28" id="main-content" tabIndex={-1}>
           {routeTabDenied ? (
             <EmptyState
@@ -183,6 +186,6 @@ export function StaffWorkspace({
         setTab={setTab}
         singleTenantLocked={singleTenantLocked}
       />
-    </main>
+    </main></StaffListContext.Provider>
   );
 }

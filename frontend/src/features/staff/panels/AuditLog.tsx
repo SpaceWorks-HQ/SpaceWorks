@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useUrlListState } from "../../../lib/useUrlListState";
+import { ListViewControls } from "../ListViewControls";
 
 import { Skeleton } from "../../../components/ui";
 import { AuditLogFilters, auditFilterParams, emptyAuditFilters, type AuditFilters } from "./AuditLogFilters";
@@ -24,23 +25,25 @@ type AuditLogResponse = {
   results: AuditLogEntry[];
 };
 
-export function AuditLog() {
-  const [filters, setFilters] = useState<AuditFilters>(emptyAuditFilters);
-  const [page, setPage] = useState(1);
+export function AuditLog({ makerspaceId }: { makerspaceId?: number }) {
+  const list = useUrlListState({ ...emptyAuditFilters, makerspace: makerspaceId ? String(makerspaceId) : "", ordering: "-created_at", page: "1" });
+  const filters: AuditFilters = list.values;
+  const { page, setPage } = list;
   const filterParams = auditFilterParams(filters);
   const params = new URLSearchParams(filterParams);
   params.set("page", String(page));
+  params.set("ordering", list.values.ordering);
   const query = params.toString();
   const logs = useStaffGet<AuditLogResponse>(["audit", query], `/admin/audit-logs?${query}`);
 
   // Any filter change resets to the first page; the old page may not exist any more.
   const updateFilters = (next: AuditFilters) => {
-    setFilters(next);
-    setPage(1);
+    list.update(next);
   };
 
   return (
     <Panel title="Audit logs">
+      {makerspaceId ? <ListViewControls state={list} makerspaceId={makerspaceId} entity="audit" search={false} sorts={[["-created_at", "Newest"], ["created_at", "Oldest"], ["action", "Action"]]} /> : null}
       <AuditLogFilters filters={filters} onChange={updateFilters} />
       <AuditVerificationStatus key={new URLSearchParams(filterParams).toString()} makerspaceId={filters.makerspace} params={filterParams} />
       <div className="grid gap-2 text-sm">

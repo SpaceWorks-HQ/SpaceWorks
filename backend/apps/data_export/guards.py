@@ -215,6 +215,9 @@ def validate_user_edges(user_edges=USER_EDGES):
 # reviewable act: the guard below still demands EXACT equality, so any JSON field that is
 # neither declared in JSON_FIELDS nor listed here still fails discovery.
 NON_REFERENCE_JSON_FIELDS = frozenset({
+    # Inert filter snapshots; identity filters are not live relation edges. Reset
+    # on tenant import so source identifiers never address unrelated target rows.
+    ("operations.SavedView", "state"),
     # Controlled metric dimension labels (module key, period, report key) -- never an id.
     ("operations.ReportMetricRollup", "dimensions"),
     # Export inputs (dates, day window, payment enums) and staff-entered emails; no ids.

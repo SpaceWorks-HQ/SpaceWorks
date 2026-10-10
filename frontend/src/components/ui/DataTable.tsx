@@ -15,6 +15,7 @@ type DataTableProps<T> = {
   columns: DataTableColumn<T>[]; data: T[]; getRowId?: (row: T) => Key; selectedIds?: Key[];
   onSelectionChange?: (ids: Key[]) => void; loading?: boolean; emptyTitle?: string; emptyDescription?: string; emptyAction?: ReactNode;
   skeletonCols?: number;
+  ordering?: string; onOrderingChange?: (ordering: string) => void;
 };
 
 export function DataTable<T>({
@@ -28,8 +29,10 @@ export function DataTable<T>({
   emptyDescription,
   emptyAction,
   skeletonCols,
+  ordering, onOrderingChange,
 }: DataTableProps<T>) {
-  const [sort, setSort] = useState<SortState | null>(null);
+  const [localSort, setSort] = useState<SortState | null>(null);
+  const sort: SortState | null = ordering !== undefined ? { key: ordering.replace(/^-/, ""), direction: ordering.startsWith("-") ? "desc" : "asc" } : localSort;
   const selectedSet = useMemo(() => new Set(selectedIds ?? []), [selectedIds]);
   const visibleIds = useMemo(() => data.map(getRowId), [data, getRowId]);
   const selectionEnabled = Boolean(selectedIds && onSelectionChange);
@@ -42,12 +45,13 @@ export function DataTable<T>({
   }, [allSelected, someSelected]);
 
   const sortedData = useMemo(() => {
-    if (!sort) return data;
+    if (!sort || ordering !== undefined) return data;
     return [...data].sort((a, b) => compareValues(getCellValue(a, sort.key), getCellValue(b, sort.key), sort.direction));
-  }, [data, sort]);
+  }, [data, sort, ordering]);
 
   const toggleSort = (column: DataTableColumn<T>) => {
     if (!column.sortable) return;
+    if (onOrderingChange) { onOrderingChange(sort?.key === column.key && sort.direction === "asc" ? `-${column.key}` : column.key); return; }
     setSort((current) => ({
       key: column.key,
       direction: current?.key === column.key && current.direction === "asc" ? "desc" : "asc",

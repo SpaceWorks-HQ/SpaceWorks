@@ -12,6 +12,7 @@ RAW_USER_REFERENCE_FIELDS = frozenset(  # Raw integers are not discoverable as F
 # Every forward relation to accounts.User in the internal model graph, including M2M.
 RELATIONAL_USER_FIELDS = frozenset(
     {
+        ("operations.SavedView", "owner"),
         ("accounts.DeviceGrant", "user"),
         ("accounts.DeviceRefreshFamily", "user"),
         ("accounts.NativeAppRegistration", "approved_by"),

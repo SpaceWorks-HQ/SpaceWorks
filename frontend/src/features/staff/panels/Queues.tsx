@@ -1,10 +1,12 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Field } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import { Pagination } from "../../../components/ui/Pagination";
 import { useDebouncedValue } from "../../../lib/useDebouncedValue";
+import { useUrlListState } from "../../../lib/useUrlListState";
+import { ListViewControls } from "../ListViewControls";
 import { usePaginatedQuery } from "../../../lib/usePaginatedQuery";
 import { issueErrorMessage } from "../issueErrors";
 import { Panel, type Makerspace } from "./shared";
@@ -67,12 +69,18 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
   const [returnRow, setReturnRow] = useState<HardwareRequest | null>(null);
   const [modalError, setModalError] = useState("");
   const [defaultLoanDays, setDefaultLoanDays] = useState(String(makerspace.default_loan_days ?? 7));
-  const [showHistory, setShowHistory] = useState(false);
-  const [search, setSearch] = useState("");
+  const list = useUrlListState({ id: "", search: "", ordering: "-created_at", pendingPage: "1", acceptedPage: "1", activePage: "1", historyPage: "1", history: "false" });
+  const showHistory = list.values.history === "true";
+  const search = list.values.search;
+  const setSearch = (value: string) => list.setFilter("search", value);
   const debouncedSearch = useDebouncedValue(search);
 
   const pending = usePaginatedQuery<HardwareRequest>({
     key: ["pending", makerspace.id],
+    id: list.values.id,
+    page: Number(list.values.pendingPage),
+    onPageChange: (page) => list.setPage(page, "pendingPage"),
+    ordering: list.values.ordering,
     path: `/admin/makerspace/${makerspace.id}/pending-requests`,
     enabled: !guestOnly,
     search: debouncedSearch,
@@ -80,18 +88,30 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
   });
   const accepted = usePaginatedQuery<HardwareRequest>({
     key: ["accepted", makerspace.id],
+    id: list.values.id,
+    page: Number(list.values.acceptedPage),
+    onPageChange: (page) => list.setPage(page, "acceptedPage"),
+    ordering: list.values.ordering,
     path: `/admin/makerspace/${makerspace.id}/accepted-requests`,
     search: debouncedSearch,
     resetKey: String(makerspace.id),
   });
   const active = usePaginatedQuery<HardwareRequest>({
     key: ["active", makerspace.id],
+    id: list.values.id,
+    page: Number(list.values.activePage),
+    onPageChange: (page) => list.setPage(page, "activePage"),
+    ordering: list.values.ordering,
     path: `/admin/makerspace/${makerspace.id}/active-loans`,
     search: debouncedSearch,
     resetKey: String(makerspace.id),
   });
   const history = usePaginatedQuery<HardwareRequest>({
     key: ["request-history", makerspace.id],
+    id: list.values.id,
+    page: Number(list.values.historyPage),
+    onPageChange: (page) => list.setPage(page, "historyPage"),
+    ordering: list.values.ordering,
     path: `/admin/makerspace/${makerspace.id}/request-history`,
     enabled: showHistory,
     search: debouncedSearch,
@@ -160,6 +180,7 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
 
   return (
     <div className="grid gap-4">
+      <ListViewControls state={list} makerspaceId={makerspace.id} entity="requests" search={false} sorts={[["-created_at", "Newest"], ["created_at", "Oldest"], ["return_due_at", "Due first"]]} />
       <Field label="Search requests"><input className="desk-input" placeholder="Search requester name, email, phone, or purpose" value={search} onChange={(event) => setSearch(event.target.value)} /></Field>
       {!guestOnly ? (
         <Panel title="Pending review">
@@ -180,7 +201,7 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
           {active.error instanceof Error ? <p className="mt-2 text-sm text-danger">{active.error.message}</p> : null}
         </Panel>
       ) : null}
-      <HistoryPanel show={showHistory} loading={history.isLoading} rows={history.results} page={history.page} totalPages={history.totalPages} count={history.count} pageSize={history.pageSize} canViewAudit={canViewAudit} onPageChange={history.setPage} onToggle={() => setShowHistory((value) => !value)} />
+      <HistoryPanel show={showHistory} loading={history.isLoading} rows={history.results} page={history.page} totalPages={history.totalPages} count={history.count} pageSize={history.pageSize} canViewAudit={canViewAudit} onPageChange={history.setPage} onToggle={() => list.setFilter("history", String(!showHistory))} />
       <AcceptRequestModal row={acceptRow} open={Boolean(acceptRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitAccept} />
       <ReturnDueModal row={dueRow} defaultValue={dueRow?.return_due_at ? localDateTimeValue(dueRow.return_due_at) : localDateTimeValue(defaultDueDate(Number(defaultLoanDays) || 7).toISOString())} open={Boolean(dueRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitReturnDue} />
       <RejectRequestModal row={rejectRow} open={Boolean(rejectRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitReject} />
@@ -253,5 +274,4 @@ function localDateTimeValue(value: string) {
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
-
 

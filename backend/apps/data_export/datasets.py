@@ -11,6 +11,7 @@ P = TenantPredicate
 # A dataset has one root model.  Relationship values are IDs/snapshots; a dataset may
 # never expand a routing relation into the related tenant's row.
 DATASET_SPECS = {
+    "operations.SavedView": ("preferences/saved_views.csv", P(("makerspace",))),
     "apiclients.ApiClient": ("makerspace/api_clients.csv", P(("makerspace",))),
     "apiclients.ApiKeyRequest": ("makerspace/api_key_requests.csv", P(("makerspace",))),
     "audit.AuditLog": ("audit/audit_log.csv", P(("makerspace",))),

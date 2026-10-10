@@ -1,4 +1,4 @@
-﻿import type { Key } from "react";
+import type { Key } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -6,7 +6,9 @@ import { ConfirmDialog, DataTable, Field, FilterBar, Modal, StatusBadge } from "
 import type { DataTableColumn } from "../../../components/ui";
 import { downloadStaffFile, staffRequest } from "../../../lib/api";
 import { useDebouncedValue } from "../../../lib/useDebouncedValue";
-import { readStorage, writeStorage } from "../../../lib/safeStorage";
+import { useUrlListState } from "../../../lib/useUrlListState";
+import { Pagination } from "../../../components/ui/Pagination";
+import { SavedViewsMenu } from "../SavedViewsMenu";
 import { ImageUploader } from "../ImageUploader";
 import { ChainOfCustodyBlock } from "./LoanTimeline";
 import { invalidateInventoryViews } from "../queryInvalidation";
@@ -33,8 +35,9 @@ import {
 
 export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = false }: { makerspace: Makerspace; canViewAudit?: boolean; canUseToBuy?: boolean }) {
   const queryClient = useQueryClient();
-  const storageKey = `inventory.view.${makerspace.id}`;
-  const [search, setSearch] = useState(() => readStorage(storageKey));
+  const list = useUrlListState({ id: "", q: "", ordering: "name", page: "1", archived: "false", low_stock: "false" });
+  const search = list.values.q;
+  const setSearch = (value: string) => list.setFilter("q", value);
   const [selectedIds, setSelectedIds] = useState<Key[]>([]);
   const [form, setForm] = useState<ItemForm>(emptyForm);
   const [adjustForm, setAdjustForm] = useState<AdjustmentForm>(emptyAdjust);
@@ -49,11 +52,10 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
   const [fixQty, setFixQty] = useState("1");
   const [qrConfirm, setQrConfirm] = useState<boolean | null>(null);
   const [bulkQrMessage, setBulkQrMessage] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
-  const [showLowStock, setShowLowStock] = useState(false);
+  const showArchived = list.values.archived === "true";
+  const showLowStock = list.values.low_stock === "true";
   const debouncedSearch = useDebouncedValue(search);
   useEffect(() => {
-    setSearch(readStorage(`inventory.view.${makerspace.id}`));
     setSelectedIds([]);
     setForm(emptyForm);
     setAdjustForm(emptyAdjust);
@@ -68,12 +70,11 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
     setFixQty("1");
     setQrConfirm(null);
     setBulkQrMessage("");
-    setShowArchived(false);
-    setShowLowStock(false);
   }, [makerspace.id]);
   const lowStockParam = showLowStock ? "&low_stock=true" : "";
-  const inventoryQuery = `/admin/makerspace/${makerspace.id}/inventory?page_size=1000&archived=${showArchived ? "true" : "false"}&q=${encodeURIComponent(debouncedSearch)}${lowStockParam}`;
-  const products = useStaffGet<{ results: AdminProduct[] }>(["inventory", makerspace.id, showArchived ? "archived" : "active", showLowStock ? "low" : "all", debouncedSearch], inventoryQuery);
+  const inventoryQuery = `/admin/makerspace/${makerspace.id}/inventory?page=${list.page}&id=${encodeURIComponent(list.values.id)}&ordering=${encodeURIComponent(list.values.ordering)}&archived=${showArchived ? "true" : "false"}&q=${encodeURIComponent(debouncedSearch)}${lowStockParam}`;
+  const products = useStaffGet<{ count: number; results: AdminProduct[] }>(["inventory", makerspace.id, showArchived ? "archived" : "active", showLowStock ? "low" : "all", debouncedSearch, list.page, list.values.ordering, list.values.id], inventoryQuery);
+  useEffect(() => { setSelectedIds([]); }, [makerspace.id, list.query]);
   const categories = useStaffGet<CategoryListResponse>(["categories", makerspace.id], `/admin/makerspace/${makerspace.id}/categories`);
   const invalidate = () => {
     invalidateInventoryViews(queryClient, makerspace.id, makerspace.slug);
@@ -220,9 +221,8 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
           actions={(
             <>
               <button className="desk-button-primary" type="button" onClick={() => { setForm(emptyForm); setAddOpen(true); }}>Add item</button>
-              <button className="desk-button-ghost" type="button" onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Show active" : "Show archived"}</button>
-              <button className="desk-button-ghost" type="button" onClick={() => setShowLowStock((value) => !value)}>{showLowStock ? "All stock" : "Low stock"}</button>
-              <button className="desk-button-ghost" type="button" onClick={() => writeStorage(storageKey, search)}>Save view</button>
+              <button className="desk-button-ghost" type="button" onClick={() => list.setFilter("archived", String(!showArchived))}>{showArchived ? "Show active" : "Show archived"}</button>
+              <button className="desk-button-ghost" type="button" onClick={() => list.setFilter("low_stock", String(!showLowStock))}>{showLowStock ? "All stock" : "Low stock"}</button>
               <button className="desk-button-success" type="button" disabled={!selectedIds.length || bulkQr.isPending} onClick={() => { setBulkQrMessage(""); setQrConfirm(true); }}>Enable QR</button>
               <button className="desk-button-danger" type="button" disabled={!selectedIds.length || bulkQr.isPending} onClick={() => { setBulkQrMessage(""); setQrConfirm(false); }}>Disable QR</button>
               <button className="desk-button-ghost" type="button" disabled={exportInventory.isPending} onClick={() => exportInventory.mutate("csv")}>{selectedIds.length ? `Export CSV (${selectedIds.length})` : "Export CSV"}</button>
@@ -230,7 +230,11 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
             </>
           )}
         />
-        <DataTable<AdminProduct> columns={columns} data={rows} getRowId={(row) => row.id} selectedIds={selectedIds} onSelectionChange={setSelectedIds} loading={products.isLoading} emptyTitle={showArchived ? "No archived inventory" : "No active inventory"} skeletonCols={columns.length + 1} />
+        <SavedViewsMenu makerspaceId={makerspace.id} entity="inventory" state={list.values} onRestore={list.restore} />
+        {list.values.id ? <button className="desk-button-ghost" type="button" onClick={() => list.setFilter("id", "")}>Clear selected result</button> : null}
+        <DataTable<AdminProduct> ordering={list.values.ordering} onOrderingChange={(value) => list.setFilter("ordering", value)} columns={columns} data={rows} getRowId={(row) => row.id} selectedIds={selectedIds} onSelectionChange={setSelectedIds} loading={products.isLoading} emptyTitle={showArchived ? "No archived inventory" : "No active inventory"} skeletonCols={columns.length + 1} />
+        <Pagination page={list.page} totalPages={Math.max(1, Math.ceil((products.data?.count ?? 0) / 24))} count={products.data?.count ?? 0} pageSize={24} onChange={list.setPage} />
+        {products.error ? <p role="alert" className="text-sm text-danger">{products.error.message}</p> : null}
         {toBuyMessage ? <p className="text-sm text-muted">{toBuyMessage}</p> : null}
         {bulkQrMessage ? <p className="text-sm text-muted">{bulkQrMessage}</p> : null}
         {exportInventory.error ? <p className="text-sm text-danger">{exportInventory.error instanceof Error ? exportInventory.error.message : "Could not export inventory."}</p> : null}

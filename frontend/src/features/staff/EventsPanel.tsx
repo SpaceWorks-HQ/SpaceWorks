@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { EmptyState, Skeleton, StatusBadge } from "../../components/ui";
 import { StructuredApiError } from "../../lib/api";
@@ -16,6 +16,9 @@ import {
 } from "./EventFormFields";
 import { useCreateEvent, useEvents, type StaffEvent } from "./eventsApi";
 import { useCreateEventSeries, useEventSeriesList } from "./eventSeriesApi";
+import { useUrlListState } from "../../lib/useUrlListState";
+import { ListViewControls } from "./ListViewControls";
+import { useSearchParams } from "react-router-dom";
 import { Panel } from "./panels/shared";
 
 export { EventDrawer };
@@ -25,15 +28,20 @@ function dateRange(event: StaffEvent) {
 }
 
 export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
-  const [page, setPage] = useState(1);
-  const events = useEvents(makerspaceId, page);
+  const list = useUrlListState({ q: "", status: "", ordering: "starts_at", page: "1" });
+  const { page, setPage } = list;
+  const [params, setParams] = useSearchParams();
+  const events = useEvents(makerspaceId, page, list.query);
   const create = useCreateEvent(makerspaceId);
   const series = useEventSeriesList(makerspaceId);
   const createSeries = useCreateEventSeries(makerspaceId);
   const [values, setValues] = useState<EventFormValues>(emptyEventForm);
   const [seriesValues, setSeriesValues] = useState(emptySeriesForm);
   const [creationMode, setCreationMode] = useState<"single" | "series">("single");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(() => Number(params.get("event")) || null);
+  const linkedId = params.get("event");
+  useEffect(() => { setSelectedId(Number(linkedId) || null); }, [linkedId]);
+  const closeSelection = () => { setSelectedId(null); setParams((current) => { const next = new URLSearchParams(current); next.delete("event"); return next; }); };
   const [selectedSeriesId, setSelectedSeriesId] = useState<number | null>(null);
 
   function submit(event: FormEvent) {
@@ -57,9 +65,11 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
 
   const apiError = events.error instanceof StructuredApiError ? events.error : null;
   if (apiError?.status === 403) return <Panel title="Events"><EmptyState title="Permission required" description="Event management access is required." /></Panel>;
-  if (apiError?.status === 400) return <Panel title="Events"><EmptyState title="Events module unavailable" description={apiError.message} /></Panel>;
+  if (apiError?.status === 400 && apiError.body.module) return <Panel title="Events"><EmptyState title="Events module unavailable" description={apiError.message} /></Panel>;
 
   return <Panel title="Events">
+    <ListViewControls state={list} makerspaceId={makerspaceId} entity="events" sorts={[["starts_at", "Starts first"], ["-starts_at", "Starts last"], ["title", "Title"]]} />
+    <label className="text-xs text-muted">Status<select className="desk-input" value={list.values.status} onChange={(event) => list.setFilter("status", event.target.value)}><option value="">All</option>{["draft", "published", "cancelled", "completed"].map((value) => <option key={value}>{value}</option>)}</select></label>
     <p className="mb-4 text-sm text-muted">Create events, review applications, and record attendance.</p>
     <CollaborationInbox makerspaceId={makerspaceId} />
     <EventSeriesCollaborationInbox makerspaceId={makerspaceId} />
@@ -92,7 +102,7 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
       <span className="font-mono text-muted">Page {page}{" - "}{events.data.count} total</span>
       <button className="desk-button" type="button" disabled={!events.data.next} onClick={() => setPage((current) => current + 1)}>Next</button>
     </div> : null}
-    {selectedId !== null ? <EventDrawer key={selectedId} eventId={selectedId} makerspaceId={makerspaceId} onClose={() => setSelectedId(null)} /> : null}
+    {selectedId !== null ? <EventDrawer key={selectedId} eventId={selectedId} makerspaceId={makerspaceId} onClose={closeSelection} /> : null}
     {selectedSeriesId !== null ? <EventSeriesDrawer key={selectedSeriesId} seriesId={selectedSeriesId} makerspaceId={makerspaceId} onClose={() => setSelectedSeriesId(null)} onSelectOccurrence={(eventId) => { setSelectedSeriesId(null); setSelectedId(eventId); }} /> : null}
   </Panel>;
 }

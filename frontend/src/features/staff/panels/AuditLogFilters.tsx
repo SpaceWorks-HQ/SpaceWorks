@@ -24,11 +24,14 @@ export function auditFilterParams(filters: AuditFilters): Record<string, string>
   if (filters.actor) params.actor = filters.actor;
   if (filters.targetType) params.target_type = filters.targetType;
   if (filters.targetId) params.target_id = filters.targetId;
-  if (filters.start) params.start = new Date(`${filters.start}T00:00:00`).toISOString();
+  if (filters.start) {
+    const start = new Date(`${filters.start}T00:00:00`);
+    params.start = Number.isNaN(start.getTime()) ? filters.start : start.toISOString();
+  }
   if (filters.end) {
     const end = new Date(`${filters.end}T00:00:00`);
     end.setDate(end.getDate() + 1);
-    params.end = end.toISOString();
+    params.end = Number.isNaN(end.getTime()) ? filters.end : end.toISOString();
   }
   return params;
 }

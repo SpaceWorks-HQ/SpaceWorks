@@ -125,7 +125,7 @@ def test_deposit_is_raised_on_issue_with_a_receipt_label(django_capture_on_commi
 
     listed = authenticated_client(staff).get(f"/api/v1/admin/makerspace/{makerspace.pk}/payments")
     assert listed.status_code == 200
-    row = next(item for item in listed.data if item["id"] == deposit.pk)
+    row = next(item for item in listed.data["results"] if item["id"] == deposit.pk)
     assert row["subject_type"] == "loan_deposit"
     assert row["subject_label"] == f"Loan deposit - request #{request.pk}"
     assert Decimal(row["refunded_amount"]) == Decimal("0.00") and row["refunds"] == []

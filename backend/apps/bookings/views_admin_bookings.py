@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts import rbac
+from apps.admin_api.list_options import ORDER_PAGE_PARAMETERS, order_list
 from apps.admin_api.permissions import IsActiveStaff
 from apps.bookings.serializers_admin import (
     BookingAdminSerializer,
@@ -19,6 +20,7 @@ from apps.bookings import services
 from apps.bookings.models import Booking
 from apps.hardware_requests.view_helpers import (
     ERROR_400,
+    ERROR_401,
     ERROR_403,
     ERROR_404,
     ERROR_409,
@@ -28,6 +30,7 @@ from apps.payments.models import Payment
 
 
 SCOPED_ERROR_RESPONSES = {
+    401: ERROR_401,
     403: ERROR_403,
     404: ERROR_404,
 }
@@ -38,7 +41,7 @@ VALIDATED_ERROR_RESPONSES = {
 
 
 class _BookingPagination(PageNumberPagination):
-    page_size = 100
+    page_size = 24
     page_size_query_param = 'page_size'
     max_page_size = 500
 
@@ -70,7 +73,7 @@ class SpaceBookingListView(APIView):
         tags=['Admin bookings'],
         summary='List bookings for a space',
         request=None,
-        parameters=[BookingListFilterSerializer],
+        parameters=[BookingListFilterSerializer, *ORDER_PAGE_PARAMETERS],
         responses={
             200: BookingListResponseSerializer,
             **VALIDATED_ERROR_RESPONSES,
@@ -87,13 +90,15 @@ class SpaceBookingListView(APIView):
             field='space__makerspace_id',
         )
         data = filters.validated_data
+        if data.get('booking_id'):
+            queryset = queryset.filter(pk=data['booking_id'])
         if data.get('status'):
             queryset = queryset.filter(status=data['status'])
         if data.get('starts_at'):
             queryset = queryset.filter(starts_at__gte=data['starts_at'])
         if data.get('ends_at'):
             queryset = queryset.filter(ends_at__lte=data['ends_at'])
-        queryset = queryset.order_by('starts_at', 'id')
+        queryset = order_list(queryset, request.query_params, {"starts_at", "status", "created_at"}, "starts_at")
         paginator = _BookingPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
         context = scoped_payment_context(

@@ -25,6 +25,10 @@ type Options = {
    * high page number.
    */
   resetKey?: string;
+  page?: number;
+  onPageChange?: (page: number) => void;
+  ordering?: string;
+  id?: string;
 };
 
 /**
@@ -36,21 +40,25 @@ type Options = {
  */
 export function usePaginatedQuery<T>(options: Options) {
   const { key, path, pageSize = 24, enabled = true, search = "", resetKey = "" } = options;
-  const [page, setPage] = useState(1);
+  const [localPage, setLocalPage] = useState(1);
+  const page = options.page ?? localPage;
+  const setPage = options.onPageChange ?? setLocalPage;
   const trimmedSearch = search.trim();
 
   useEffect(() => {
-    setPage(1);
-  }, [trimmedSearch, resetKey]);
+    if (options.page === undefined) setLocalPage(1);
+  }, [trimmedSearch, resetKey, options.page]);
 
   const separator = path.includes("?") ? "&" : "?";
   let url = `${path}${separator}page=${page}&page_size=${pageSize}`;
   if (trimmedSearch) {
     url += `&search=${encodeURIComponent(trimmedSearch)}`;
   }
+  if (options.ordering) url += `&ordering=${encodeURIComponent(options.ordering)}`;
+  if (options.id) url += `&id=${encodeURIComponent(options.id)}`;
 
   const query = useQuery({
-    queryKey: [...key, page, pageSize, trimmedSearch],
+    queryKey: [...key, page, pageSize, trimmedSearch, options.ordering ?? "", options.id ?? ""],
     queryFn: () => staffRequest<Paginated<T>>(url),
     enabled,
     placeholderData: keepPreviousData,

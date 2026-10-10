@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,9 +37,9 @@ const roster = {
 function renderPanel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={client}>
+    <MemoryRouter><QueryClientProvider client={client}>
       <MembersPanel makerspaceId={3} membershipEnabled={false} />
-    </QueryClientProvider>,
+    </QueryClientProvider></MemoryRouter>,
   );
 }
 
@@ -81,9 +82,9 @@ const pendingRequests = {
 function renderWith(membershipEnabled: boolean) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={client}>
+    <MemoryRouter><QueryClientProvider client={client}>
       <MembersPanel makerspaceId={3} membershipEnabled={membershipEnabled} />
-    </QueryClientProvider>,
+    </QueryClientProvider></MemoryRouter>,
   );
 }
 
@@ -184,7 +185,30 @@ describe("MembersPanel request queue", () => {
     expect(await screen.findByText("No members on this page.")).toBeVisible();
     fireEvent.click(screen.getByText("Next requests"));
     expect(await screen.findByText("No membership requests on this page.")).toBeVisible();
-    expect(staffRequest).toHaveBeenCalledWith("/admin/memberships?makerspace_id=3&page=2");
-    expect(staffRequest).toHaveBeenCalledWith("/admin/membership-requests?makerspace_id=3&page=2");
+    expect(staffRequest).toHaveBeenCalledWith(expect.stringContaining("/admin/memberships?makerspace_id=3&page=2"));
+    expect(staffRequest).toHaveBeenCalledWith(expect.stringContaining("/admin/membership-requests?makerspace_id=3&page=2"));
+  });
+
+  it("keeps request filters and sort in server state without resetting the roster page", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<MemoryRouter initialEntries={["/admin/members?page=2&requestPage=3"]}><QueryClientProvider client={client}>
+      <MembersPanel makerspaceId={3} membershipEnabled={false} />
+    </QueryClientProvider></MemoryRouter>);
+    fireEvent.change(screen.getByLabelText("Request state"), { target: { value: "invited" } });
+    fireEvent.change(screen.getByLabelText("Request sort"), { target: { value: "created_at" } });
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith("/admin/membership-requests?makerspace_id=3&page=1&state=invited&ordering=created_at"));
+    expect(staffRequest.mock.calls.filter(([url]) => url.startsWith("/admin/memberships?"))
+      .every(([url]) => url.includes("page=2"))).toBe(true);
+  });
+
+  it("reveals a selected palette result and can clear its URL filter", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<MemoryRouter initialEntries={["/admin/members?id=7"]}><QueryClientProvider client={client}>
+      <MembersPanel makerspaceId={3} membershipEnabled={false} />
+    </QueryClientProvider></MemoryRouter>);
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(expect.stringContaining("&id=7")));
+    fireEvent.click(screen.getByRole("button", { name: "Clear selected result" }));
+    await waitFor(() => expect(staffRequest).toHaveBeenCalledWith(expect.stringMatching(/\/admin\/memberships\?.*&id=$/)));
+    expect(screen.queryByRole("button", { name: "Clear selected result" })).toBeNull();
   });
 });

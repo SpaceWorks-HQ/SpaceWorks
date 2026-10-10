@@ -36,7 +36,16 @@ def audit_target_dispositions(models=MODELS):
     dispositions = {}
     for label, model_disposition in models.items():
         key = normalize_audit_target_type(label)
-        if isinstance(model_disposition, Exported):
+        if label == "operations.SavedView":
+            # Preferences can be deleted while their immutable audit rows survive.
+            # Keep the source ID as typed provenance, never a live target binding
+            # requiring a row that may no longer exist in the portable archive.
+            dispositions[key] = AuditReference(
+                AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT,
+                label,
+                "audit_saved_view_target",
+            )
+        elif isinstance(model_disposition, Exported):
             dispositions[key] = AuditReference(
                 AuditReferenceDisposition.REMAP, label
             )

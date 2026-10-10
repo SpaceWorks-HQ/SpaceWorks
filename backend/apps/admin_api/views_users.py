@@ -2,6 +2,7 @@ from django.db import transaction
 from django.http import Http404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import generics
+from apps.admin_api.list_options import StableOrderingFilter
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -22,6 +23,7 @@ from apps.admin_api.serializers_users import (
 )
 from apps.audit import services as audit
 from apps.audit.models import AuditLog
+from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
 from apps.makerspaces.servability import is_servable
 
@@ -220,13 +222,16 @@ class AuditLogPagination(PageNumberPagination):
         "a start/end range may span at most 366 days. A valid but out-of-scope makerspace "
         "yields an empty page."
     ),
-    parameters=[AuditLogFilterSerializer],
-    responses={200: AuditLogSerializer(many=True), 400: OpenApiResponse(description="Invalid filter.")},
+    parameters=[AuditLogFilterSerializer, OpenApiParameter("ordering", str, enum=["created_at", "-created_at", "action", "-action", "target_type", "-target_type"])],
+    responses={200: AuditLogSerializer(many=True), **{code: ErrorSerializer for code in (400, 401, 403, 404)}},
 )
 class AuditLogListView(generics.ListAPIView):
     serializer_class = AuditLogSerializer
     permission_classes = [IsActiveStaff]
     pagination_class = AuditLogPagination
+    filter_backends = [StableOrderingFilter]
+    ordering_fields = ["created_at", "action", "target_type"]
+    ordering = ["-created_at", "-pk"]
 
     def get_queryset(self):
         filters = AuditLogFilterSerializer(data=self.request.query_params)
