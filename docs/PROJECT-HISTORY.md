@@ -6,6 +6,17 @@
 
 ## Condensed changelog (newest first — full detail in `git log`)
 
+- **2026-10-09 — membership completeness lane (`lane/membership`).** An audit of every membership case
+  and their combinations (policy × pricing × vouching × verification × waiver × accounts × lapsed ×
+  actor) found and fixed: the lapsed-members rule ran only at request submission and its switch was
+  unreachable; a staff invitation issued with the module off could never be approved, while a
+  referral stayed claimable after the module went off; the protected Member role could be granted
+  actions or re-slugged by a rename (breaking every join); revoking a membership left its card live
+  and its terms and renewal charges open; a revoked card could never be replaced; the console posted
+  `role_id: null` on approve/invite; members could not see their own term. Paid + invite-only and
+  free + vouch are pinned end to end. Pay-before-activation, vouch-before-activation, referral limits
+  and a `closed` policy are owner decisions, not built.
+
 - **2026-09-04 — forward plan phase 6: money and membership depth.** Refunds as immutable ledger lines
   over `paid_online` charges, settled through the provider seam and its webhooks; `payments.loans` raises a
   deposit on issue and a capped late fee once at close, from the workflow module, never blocking unless the
