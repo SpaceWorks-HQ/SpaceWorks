@@ -112,16 +112,27 @@ def test_public_print_status_lookup_policy_round_trips_and_rejects_unknown_value
     accepted = client.patch(
         detail(lab), {"public_print_status_lookup_policy": "email_unverified"}, format="json"
     )
+    entry = AuditLog.objects.filter(action="makerspace.updated", makerspace=lab).latest("id")
     refused = client.patch(
         detail(lab), {"public_print_status_lookup_policy": "anyone"}, format="json"
     )
 
     assert accepted.status_code == 200
     assert accepted.data["public_print_status_lookup_policy"] == "email_unverified"
+    assert entry.actor_id == manager.pk
+    assert entry.meta == {"fields": ["public_print_status_lookup_policy"]}
     assert refused.status_code == 400
     assert "public_print_status_lookup_policy" in refused.data
     lab.refresh_from_db()
     assert lab.public_print_status_lookup_policy == "email_unverified"
+
+    # Back to the default round-trips too; a refused value wrote no audit row.
+    restored = client.patch(
+        detail(lab), {"public_print_status_lookup_policy": "token_only"}, format="json"
+    )
+    assert restored.status_code == 200
+    assert client.get(detail(lab)).data["public_print_status_lookup_policy"] == "token_only"
+    assert AuditLog.objects.filter(action="makerspace.updated", makerspace=lab).count() == 2
 
 
 # --- audit rows name what changed, never secret values ---------------------------------
