@@ -14033,7 +14033,7 @@
         "/api/v1/admin/makerspace/{makerspace_id}/api-settings": {
             "get": {
                 "operationId": "api_v1_admin_makerspace_api_settings_retrieve",
-                "summary": "Retrieve or update API integration settings",
+                "summary": "Retrieve API integration settings",
                 "parameters": [
                     {
                         "in": "path",
@@ -14062,12 +14062,18 @@
                             }
                         },
                         "description": ""
+                    },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
                     }
                 }
             },
             "patch": {
                 "operationId": "api_v1_admin_makerspace_api_settings_partial_update",
-                "summary": "Retrieve or update API integration settings",
+                "summary": "Update API integration settings",
                 "parameters": [
                     {
                         "in": "path",
@@ -14115,6 +14121,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Field validation errors, keyed by field."
+                    },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
                     }
                 }
             }
@@ -15665,6 +15680,12 @@
                     "400": {
                         "description": "Invalid image upload request."
                     },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
+                    },
                     "503": {
                         "description": "Public image storage is unavailable."
                     }
@@ -15725,6 +15746,12 @@
                     "400": {
                         "description": "Invalid image object key or size."
                     },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
+                    },
                     "503": {
                         "description": "Public image storage is unavailable."
                     }
@@ -15761,6 +15788,12 @@
                             }
                         },
                         "description": ""
+                    },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
                     }
                 }
             }
@@ -17610,6 +17643,12 @@
                     "400": {
                         "description": "Invalid image upload request."
                     },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
+                    },
                     "503": {
                         "description": "Public image storage is unavailable."
                     }
@@ -17670,6 +17709,12 @@
                     "400": {
                         "description": "Invalid image object key or size."
                     },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
+                    },
                     "503": {
                         "description": "Public image storage is unavailable."
                     }
@@ -17706,6 +17751,12 @@
                             }
                         },
                         "description": ""
+                    },
+                    "403": {
+                        "description": "The actor lacks manage_makerspace here."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or outside the actor's scope."
                     }
                 }
             }
@@ -18299,6 +18350,12 @@
                 "responses": {
                     "200": {
                         "description": "Grouped module status."
+                    },
+                    "403": {
+                        "description": "Active superadmin access is required."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or hidden from superadmins by its own manager."
                     }
                 }
             }
@@ -18351,6 +18408,12 @@
                     },
                     "400": {
                         "description": "Unknown module, or not shipped by this deployment."
+                    },
+                    "403": {
+                        "description": "Active superadmin access is required."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or hidden from superadmins by its own manager."
                     }
                 }
             }
@@ -18404,6 +18467,12 @@
                     },
                     "400": {
                         "description": "Core module, or required by an installed module."
+                    },
+                    "403": {
+                        "description": "Active superadmin access is required."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, or hidden from superadmins by its own manager."
                     }
                 }
             }
@@ -20574,7 +20643,7 @@
         "/api/v1/admin/makerspace/{makerspace_id}/return-policy": {
             "get": {
                 "operationId": "api_v1_admin_makerspace_return_policy_retrieve",
-                "summary": "Retrieve or update return policy",
+                "summary": "Retrieve the return policy",
                 "parameters": [
                     {
                         "in": "path",
@@ -20603,12 +20672,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, hidden from superadmins, or outside the actor's scope for this method."
                     }
                 }
             },
             "patch": {
                 "operationId": "api_v1_admin_makerspace_return_policy_partial_update",
-                "summary": "Retrieve or update return policy",
+                "summary": "Update the return policy",
                 "parameters": [
                     {
                         "in": "path",
@@ -20656,6 +20728,12 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Field validation errors, keyed by field."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, hidden from superadmins, or outside the actor's scope for this method."
                     }
                 }
             }
@@ -22347,7 +22425,7 @@
         "/api/v1/admin/makerspaces": {
             "get": {
                 "operationId": "api_v1_admin_makerspaces_list",
-                "summary": "List or create makerspaces",
+                "summary": "List makerspaces the actor has a staff surface in",
                 "tags": [
                     "Admin makerspaces"
                 ],
@@ -22369,12 +22447,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "403": {
+                        "description": "Not an active staff account."
                     }
                 }
             },
             "post": {
                 "operationId": "api_v1_admin_makerspaces_create",
-                "summary": "List or create makerspaces",
+                "summary": "Create a makerspace (superadmin only)",
                 "tags": [
                     "Admin makerspaces"
                 ],
@@ -22413,6 +22494,12 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Field validation errors, keyed by field."
+                    },
+                    "403": {
+                        "description": "Only a superadmin can create a makerspace."
                     }
                 }
             }
@@ -26261,7 +26348,7 @@
         "/api/v1/admin/makerspaces/{id}": {
             "get": {
                 "operationId": "api_v1_admin_makerspaces_retrieve",
-                "summary": "Retrieve or update a makerspace",
+                "summary": "Retrieve a makerspace's settings",
                 "parameters": [
                     {
                         "in": "path",
@@ -26290,12 +26377,16 @@
                             }
                         },
                         "description": ""
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, hidden from superadmins, or outside the actor's scope for this method."
                     }
                 }
             },
             "patch": {
                 "operationId": "api_v1_admin_makerspaces_partial_update",
-                "summary": "Retrieve or update a makerspace",
+                "description": "Needs manage_makerspace. `enabled_modules` is superadmin-owned and edited only in /control/ or the module console: a body carrying it is refused with 403.",
+                "summary": "Update a makerspace's settings",
                 "parameters": [
                     {
                         "in": "path",
@@ -26343,6 +26434,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Field validation errors, keyed by field."
+                    },
+                    "403": {
+                        "description": "The body carries `enabled_modules`."
+                    },
+                    "404": {
+                        "description": "Makerspace not found, archived, not active, hidden from superadmins, or outside the actor's scope for this method."
                     }
                 }
             }
@@ -26995,7 +27095,7 @@
             "delete": {
                 "operationId": "api_v1_admin_memberships_destroy",
                 "description": "Remove a single makerspace membership (un-assign a delegable role).\n\nScope contract (mirrors the create path's non-escalation model): a Space Manager may\nrevoke ONLY delegable-role memberships within their MANAGE_MAKERSPACE scope; a superadmin\nmay revoke any, except inside a superadmin-hidden makerspace (governance hard-block ->\n404). 404-before-403: out-of-scope existence is hidden as 404, a delegable-scope actor\naiming at a SPACE_MANAGER gets 403.",
-                "summary": "Revoke a staff membership",
+                "summary": "Revoke a makerspace staff membership",
                 "parameters": [
                     {
                         "in": "path",
@@ -27016,7 +27116,13 @@
                 ],
                 "responses": {
                     "204": {
-                        "description": "No response body"
+                        "description": "Membership revoked."
+                    },
+                    "403": {
+                        "description": "A Space Manager membership can only be revoked by a superadmin."
+                    },
+                    "404": {
+                        "description": "Membership not found or outside the actor's makerspace scope."
                     }
                 }
             }
@@ -53856,6 +53962,9 @@
                     "referrals_enabled": {
                         "type": "boolean"
                     },
+                    "lapsed_members_cannot_borrow": {
+                        "type": "boolean"
+                    },
                     "filament_low_stock_threshold_grams": {
                         "type": "string",
                         "format": "decimal",
@@ -53953,7 +54062,9 @@
                         "type": "string",
                         "readOnly": true
                     },
-                    "cors_allowed_origins": {},
+                    "cors_allowed_origins": {
+                        "readOnly": true
+                    },
                     "enabled_modules": {
                         "type": "array",
                         "items": {
@@ -54078,6 +54189,7 @@
                 "required": [
                     "archive_custody_state",
                     "branding_config",
+                    "cors_allowed_origins",
                     "cover_image_key",
                     "cover_image_url",
                     "created_at",
@@ -59618,6 +59730,9 @@
                     "referrals_enabled": {
                         "type": "boolean"
                     },
+                    "lapsed_members_cannot_borrow": {
+                        "type": "boolean"
+                    },
                     "filament_low_stock_threshold_grams": {
                         "type": "string",
                         "format": "decimal",
@@ -59715,7 +59830,9 @@
                         "type": "string",
                         "readOnly": true
                     },
-                    "cors_allowed_origins": {},
+                    "cors_allowed_origins": {
+                        "readOnly": true
+                    },
                     "enabled_modules": {
                         "type": "array",
                         "items": {

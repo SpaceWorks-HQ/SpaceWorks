@@ -243,12 +243,13 @@ skip one and the objects simply outlive every row that could name them, or the r
 writes a total that omits them. `public_image_key_in_use` also has to learn the new model, or two
 entities can claim one key and clearing either blanks the other. The `BookableSpace` gap this
 paragraph used to name is **FIXED** — `recompute_storage._public_image_keys` now includes it, with
-a comment recording why. **The surviving instance of the same bug is `MaintenanceLogDocument`**: it
-is charged to quota on upload (`maintenance/services_documents.py`), collected by the makerspace
-purge **and** by its module purge plan, but is **absent from `recompute_storage`**, so the
-authoritative reconciler writes a total omitting every maintenance document and silently lowers a
-space's recorded usage. This list exists because that failure mode keeps recurring in the one
-mechanism that fails silently. Storage accounting itself is a **no-op on self-host** (`limits.add_storage`/`free_storage`
+a comment recording why. `MaintenanceLogDocument` had the same hole (charged on upload, collected
+by both purges, absent from the reconciler) and is fixed too; the 2026-10-09 makerspace audit then
+found three more charged kinds the reconciler omitted — member-card photos, event-series images and
+event attendance certificates — now counted and pinned by `tests/test_storage_reconciler_gaps.py`.
+**Any new `limits.add_storage` call site needs its kind in `recompute_storage`**, or the
+authoritative reconciler silently lowers a space's recorded usage. This list exists because that
+failure mode keeps recurring in the one mechanism that fails silently. Storage accounting itself is a **no-op on self-host** (`limits.add_storage`/`free_storage`
 return early), so a test asserting `storage_bytes_used` must force managed mode with
 `monkeypatch.setattr(limits, 'is_self_host', lambda: False)` and wrap `on_commit` object deletes in
 `django_capture_on_commit_callbacks(execute=True)`.

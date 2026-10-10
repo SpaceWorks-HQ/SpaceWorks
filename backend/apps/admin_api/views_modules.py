@@ -15,6 +15,7 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveSuperAdmin
 from apps.makerspaces.module_groups import deployment_app_status, grouped_module_status
 from apps.makerspaces.module_install import (
@@ -35,10 +36,35 @@ class ModuleActionSerializer(serializers.Serializer):
     key = serializers.CharField()
 
 
-def _makerspace(makerspace_id):
+_ERRORS = {
+    403: OpenApiResponse(description="Active superadmin access is required."),
+    404: OpenApiResponse(
+        description=(
+            "Makerspace not found, archived, not active, or hidden from superadmins "
+            "by its own manager."
+        )
+    ),
+}
+
+
+def _makerspace(actor, makerspace_id):
     # Archived spaces are excluded everywhere but /control/, and installing a module on
     # one would be a change nobody can see the effect of.
-    return get_object_or_404(servable_queryset(), pk=makerspace_id)
+    #
+    # Resolved through rbac rather than servability alone: a makerspace whose manager
+    # switched superadmin access off is hard-hidden from the global superadmin, and an
+    # object lookup on a hidden space answers 404 like every other staff route. Without
+    # this the module console was the one surface that still let a superadmin reshape a
+    # space it is supposed to be unable to see.
+    return get_object_or_404(
+        rbac.scope_by_action(
+            actor,
+            rbac.Action.MANAGE_MAKERSPACE,
+            servable_queryset(),
+            field="id",
+        ),
+        pk=makerspace_id,
+    )
 
 
 class ModuleGroupListView(APIView):
@@ -47,10 +73,10 @@ class ModuleGroupListView(APIView):
     @extend_schema(
         tags=["Platform"],
         summary="List module groups and their install state for a makerspace",
-        responses={200: OpenApiResponse(description="Grouped module status.")},
+        responses={200: OpenApiResponse(description="Grouped module status."), **_ERRORS},
     )
     def get(self, request, makerspace_id):
-        makerspace = _makerspace(makerspace_id)
+        makerspace = _makerspace(request.user, makerspace_id)
         return Response(
             {
                 "groups": grouped_module_status(makerspace),
@@ -73,10 +99,11 @@ class ModuleInstallView(APIView):
         responses={
             200: OpenApiResponse(description="Keys newly installed."),
             400: OpenApiResponse(description="Unknown module, or not shipped by this deployment."),
+            **_ERRORS,
         },
     )
     def post(self, request, makerspace_id):
-        makerspace = _makerspace(makerspace_id)
+        makerspace = _makerspace(request.user, makerspace_id)
         serializer = ModuleActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -104,10 +131,11 @@ class ModuleUninstallView(APIView):
         responses={
             200: OpenApiResponse(description="Keys uninstalled."),
             400: OpenApiResponse(description="Core module, or required by an installed module."),
+            **_ERRORS,
         },
     )
     def post(self, request, makerspace_id):
-        makerspace = _makerspace(makerspace_id)
+        makerspace = _makerspace(request.user, makerspace_id)
         serializer = ModuleActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:

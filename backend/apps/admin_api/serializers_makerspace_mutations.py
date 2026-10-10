@@ -156,10 +156,4 @@ class MakerspaceMutationMixin:
                     )
                 }
             )
-        locked.frontend_domain_changed_at = timezone.now()
-        if domain_verification.is_self_host() and frontend_domain:
-            locked.frontend_domain_status = Makerspace.DomainStatus.VERIFIED
-            locked.domain_verified_at = timezone.now()
-        else:
-            locked.frontend_domain_status = Makerspace.DomainStatus.PENDING
-            locked.domain_verified_at = None
+        domain_verification.apply_domain_change(locked, frontend_domain)

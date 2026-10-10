@@ -86,6 +86,7 @@ class MakerspaceSerializer(
             "membership_policy",
             "membership_dues_amount",
             "referrals_enabled",
+            "lapsed_members_cannot_borrow",
             "filament_low_stock_threshold_grams",
             "superadmin_access_enabled",
             "archive_custody_state",
@@ -137,6 +138,12 @@ class MakerspaceSerializer(
         read_only_fields = [
             "id",
             "public_api_key",
+            # Derived from the active API clients' allowed origins
+            # (`apiclients.services.sync_makerspace_origins`), each of which passed the
+            # exact-origin boundary. Writable here it was a raw JSONField any
+            # manage_makerspace holder could fill with anything, straight into the
+            # public-origin allowlist, until the next client sync overwrote it.
+            "cors_allowed_origins",
             "logo_key",
             "logo_url",
             "cover_image_key",
