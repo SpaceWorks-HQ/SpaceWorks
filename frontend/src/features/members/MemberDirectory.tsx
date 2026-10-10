@@ -69,7 +69,7 @@ export function MemberDirectory({ makerspaceId }: { makerspaceId: number }) {
         <ul className="mt-3 space-y-2">
           {entries.map((entry) => {
             const tone = identityTone(entry.membership_id);
-            return <li className={`border-l-2 ${openId === entry.membership_id ? "border-secondary bg-secondary/15" : tone.border} pl-2`} key={entry.membership_id}>
+            return <li className={`border-l-2 ${openId === entry.membership_id ? "border-secondary" : tone.border} pl-2`} key={entry.membership_id}>
               <button
                 className="desk-button-ghost w-full justify-start text-left"
                 type="button"
@@ -110,7 +110,7 @@ export function MemberDirectory({ makerspaceId }: { makerspaceId: number }) {
 
 function ProfileDetail({ profile }: { profile: MemberProfile }) {
   return (
-    <div className="mt-2 rounded-lg border border-secondary bg-secondary/10 p-3">
+    <div className="desk-panel mt-2 border-secondary p-3">
       {profile.institution ? (
         <p className="text-sm text-muted">{profile.institution}</p>
       ) : null}

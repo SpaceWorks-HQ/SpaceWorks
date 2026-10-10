@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { staffRequest } from "../../lib/api";
 import { ImageUploader } from "./ImageUploader";
+import { MakerspaceThemeSettings } from "./MakerspaceThemeSettings";
 import type { Makerspace } from "./StaffPanels";
 
 type Props = {
@@ -156,6 +157,7 @@ export function MakerspaceBrandingSettings({ makerspace, settings, loading }: Pr
         ) : null}
         </form>
       </div>
+      <MakerspaceThemeSettings makerspace={makerspace} settings={settings} loading={loading} />
     </div>
   );
 }

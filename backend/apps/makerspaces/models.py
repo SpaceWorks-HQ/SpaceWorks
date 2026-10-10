@@ -47,8 +47,8 @@ def default_enabled_modules():
 def default_theme_config():
     return {
         "mode": "light",
-        "primary_color": "#2563eb",
-        "accent_color": "#16a34a",
+        "primary_color": "",
+        "accent_color": "",
         "logo_url": "",
     }
 

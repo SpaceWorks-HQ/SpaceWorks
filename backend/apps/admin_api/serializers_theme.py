@@ -5,7 +5,12 @@ from rest_framework import serializers
 @extend_schema_field({
     "type": "object",
     "additionalProperties": False,
-    "description": "Public/member colours; unsafe contrast falls back to the default palette.",
+    "description": (
+        "Public/member secondary colours. Foreground, hover/pressed states and light/dark "
+        "link ink are derived automatically. Rejects palettes below 4.5:1 text or 3:1 "
+        "component contrast in either mode (including 80% counter text and tinted surfaces). "
+        "Blank colours use the product palette. Staff chrome and status colours stay fixed."
+    ),
     "properties": {
         "mode": {"type": "string", "enum": ["system", "light", "dark"]},
         "primary_color": {"type": "string", "pattern": r"^$|^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"},
@@ -19,8 +24,30 @@ class ThemeConfigField(serializers.JSONField):
 
 MAKERSPACE_WRITE_ERRORS = {
     400: OpenApiResponse(
-        response={"type": "object", "additionalProperties": {}},
-        description="Field validation errors, including invalid theme configuration.",
+        response={
+            "type": "object",
+            "additionalProperties": {},
+            "properties": {
+                "theme_config": {
+                    "oneOf": [
+                        {"type": "array", "items": {"type": "string"}},
+                        {
+                            "type": "object",
+                            "required": ["code", "messages"],
+                            "properties": {
+                                "code": {"type": "string", "enum": ["theme_contrast"]},
+                                "messages": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                    ],
+                },
+            },
+        },
+        description=(
+            "Field validation errors. Contrast errors have theme_config: "
+            "{code: 'theme_contrast', messages: string[]} with mode, failing pair, "
+            "measured ratio and required ratio."
+        ),
     ),
     401: OpenApiResponse(
         response={"type": "object", "properties": {"detail": {"type": "string"}}},

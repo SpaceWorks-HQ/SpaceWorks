@@ -115,6 +115,10 @@ class MakerspaceValidationMixin:
         try:
             return validate_theme_config(value)
         except DjangoValidationError as exc:
+            if any(error.code == "theme_contrast" for error in exc.error_list):
+                raise serializers.ValidationError({
+                    "code": "theme_contrast", "messages": exc.messages,
+                }) from exc
             raise serializers.ValidationError(exc.messages) from exc
 
     def validate_public_code(self, value):

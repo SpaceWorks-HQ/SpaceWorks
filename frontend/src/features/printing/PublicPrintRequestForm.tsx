@@ -213,7 +213,7 @@ export function PrintDetailsForm({
           </p>
         ) : null}
         <button
-          className="desk-button-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
+          className="desk-button-secondary w-full disabled:cursor-not-allowed disabled:opacity-50"
           disabled={
             !form.title.trim() ||
             submitPending

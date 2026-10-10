@@ -32,7 +32,7 @@ export function ProductQuickViewModal({
       backdrop="blur"
       footer={(
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <button className="desk-button-primary" type="button" onClick={onClose}>
+          <button className="desk-button-secondary" type="button" onClick={onClose}>
             Close
           </button>
         </div>

@@ -63,11 +63,11 @@ export function PublicEventFeedbackPage() {
   return <main style={brandStyle} className="desk-shell flex min-h-screen flex-col"><section className="mx-auto w-full max-w-2xl flex-1 px-5 py-10">
     <p className="eyebrow">{data.event.title}</p><h1 className="title-page mt-2">{data.survey.title}</h1>
     <p className="mt-2 text-sm text-muted">{data.mode === "anonymous" ? "No account or response identifier is stored with this response." : "Certificates are available only to members recorded as attended."}</p>
-    {data.requires_auth && !restored ? <Card className="mt-5"><p className="text-sm text-muted">Sign in through the member area before submitting certificate feedback.</p><Link className="desk-button-primary mt-3" to={tenantPath("member")}>Member sign in</Link></Card> : null}
+    {data.requires_auth && !restored ? <Card className="mt-5"><p className="text-sm text-muted">Sign in through the member area before submitting certificate feedback.</p><Link className="desk-button-secondary mt-3" to={tenantPath("member")}>Member sign in</Link></Card> : null}
     <form className="desk-panel mt-5 grid gap-5 p-5" onSubmit={(event) => { event.preventDefault(); const next = validateCustomAnswers(data.survey.questions, answers); setErrors(next); if (!Object.keys(next).length) submit.mutate(); }}>
       <CustomFormFields schema={data.survey.questions} answers={answers} onChange={setAnswers} errors={{ ...errors, ...customAnswerErrors(apiErrors) }} yesNoAsCheckbox />
       {data.requires_auth ? <label className="grid gap-1"><span className="eyebrow">Registration email</span><input className="desk-input" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label> : null}
-      <button className="desk-button-primary" type="submit" disabled={submit.isPending || (data.requires_auth && !restored)}>{submit.isPending ? "Submitting..." : "Submit feedback"}</button>
+      <button className="desk-button-secondary" type="submit" disabled={submit.isPending || (data.requires_auth && !restored)}>{submit.isPending ? "Submitting..." : "Submit feedback"}</button>
       {submit.error ? <p className="text-sm text-danger" role="alert">{submit.error.message}</p> : null}
     </form>
   </section><SiteFooter branding={bootstrap?.branding} /></main>;

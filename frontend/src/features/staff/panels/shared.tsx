@@ -51,6 +51,7 @@ export type Makerspace = {
     support_email?: string;
     support_url?: string;
   } | null;
+  theme_config?: Record<string, string>;
 };
 
 export type Product = {

@@ -96,7 +96,7 @@ export function MemberArea() {
   // hung off a membership, so every one of its endpoints refuses with 400 without it.
 
   if (restoring) return <main className="desk-shell grid place-items-center px-5 text-sm text-muted">Restoring session…</main>;
-  if (claimSession && bootstrap.data) return <MemberClaimSession slug={resolvedSlug} makerspaceId={makerspaceId} modules={bootstrap.data.modules} geofenceEnabled={bootstrap.data.makerspace.geofence_enabled} />;
+  if (claimSession && bootstrap.data) return <div style={brandStyle}><MemberClaimSession slug={resolvedSlug} makerspaceId={makerspaceId} modules={bootstrap.data.modules} geofenceEnabled={bootstrap.data.makerspace.geofence_enabled} /></div>;
   if (showSignIn) return <div style={brandStyle}><MemberAuthPanel makerspaceSlug={resolvedSlug} onAuthenticated={() => { setShowSignIn(false); void client.invalidateQueries({ queryKey: ["member"] }); }} /><div className="px-5 pb-5"><SupportContact branding={bootstrap.data?.branding} /></div></div>;
 
   return <main style={brandStyle} className="desk-shell mx-auto max-w-3xl space-y-5 px-5 py-8"><header><p className="eyebrow text-secondary-ink">Member area</p><h1 className="title-page mt-2">Your makerspace access</h1><ThemeToggle /></header>
