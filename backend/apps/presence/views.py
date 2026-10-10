@@ -69,15 +69,19 @@ class PresenceEndView(APIView):
 class PresenceRosterView(APIView):
     permission_classes = [IsActiveStaff]
 
-    @extend_schema(tags=["Admin makerspaces"], request=None, responses={200: PresenceRosterSerializer(many=True), **ERRORS})
+    @extend_schema(tags=["Admin makerspaces"], description="Requires manage_members in this makerspace.", request=None, responses={200: PresenceRosterSerializer(many=True), **ERRORS})
     def get(self, request, makerspace_id):
-        get_object_or_404(servable_queryset(), pk=makerspace_id)
-        if not rbac.can(request.user, rbac.Action.MANAGE_MAKERSPACE, makerspace_id):
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied()
+        get_object_or_404(
+            rbac.scope_by_action(
+                request.user, rbac.Action.MANAGE_MEMBERS, servable_queryset(), field="id",
+            ),
+            pk=makerspace_id,
+        )
         from django.utils import timezone
         from apps.presence.models import PresenceSession
-        sessions = PresenceSession.objects.filter(
+        sessions = rbac.scope_by_action(
+            request.user, rbac.Action.MANAGE_MEMBERS, PresenceSession.objects.all(),
+        ).filter(
             makerspace_id=makerspace_id, ended_at__isnull=True, expires_at__gt=timezone.now()
         ).select_related("member", "membership__assigned_role").order_by("started_at", "id")
         return Response(PresenceRosterSerializer(sessions, many=True).data)

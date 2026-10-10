@@ -19,6 +19,11 @@ def revoke_membership(actor, membership, reason=""):
     with transaction.atomic():
         makerspace = Makerspace.objects.select_for_update().get(pk=membership.makerspace_id)
         membership = MakerspaceMembership.objects.select_for_update().get(pk=membership.pk)
+        if not rbac.can(actor, rbac.Action.MANAGE_MEMBERS, makerspace.pk):
+            raise PermissionDenied()
+        if (not rbac.can(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk)
+                and rbac.actions_for_membership(membership)):
+            raise PermissionDenied("Managing staff memberships requires makerspace administration.")
         actor_is_superadmin = actor.is_superuser or actor.role == User.Role.SUPERADMIN
         if not actor_is_superadmin and rbac.Action.MANAGE_MAKERSPACE in rbac.actions_for_membership(membership):
             raise PermissionDenied("Only a superadmin can revoke a makerspace manager.")
@@ -59,6 +64,11 @@ def revoke_request(actor, request, reason=""):
     with transaction.atomic():
         makerspace = Makerspace.objects.select_for_update().get(pk=request.makerspace_id)
         request = MembershipRequest.objects.select_for_update().get(pk=request.pk)
+        if not rbac.can(actor, rbac.Action.MANAGE_MEMBERS, makerspace.pk):
+            raise PermissionDenied()
+        if (request.assigned_role_id and request.assigned_role.granted_actions
+                and not rbac.can(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk)):
+            raise PermissionDenied("Managing staff invitations requires makerspace administration.")
         if request.state == MembershipRequest.State.ACTIVE and request.user_id:
             membership = MakerspaceMembership.objects.filter(makerspace=makerspace, user=request.user).first()
             if membership:

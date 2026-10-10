@@ -1,6 +1,6 @@
 """Staff queue for public invitation requests: list, invite, decline.
 
-`MANAGE_MAKERSPACE` surfaces, module-gated by `membership`. "Invite" calls the ordinary
+`MANAGE_MEMBERS` surfaces, module-gated by `membership`. "Invite" calls the ordinary
 `membership_services.invite_membership`, so the invitation it produces is subject to the
 same role non-escalation and community/staff discrimination as one typed in by hand.
 """
@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
+from apps.admin_api.views_roles import ERRORS
 from apps.admin_api.serializers_member_memberships import RoleIdSerializer
 from apps.admin_api.serializers_membership_plans import InvitationRequestSerializer
 from apps.admin_api.views_member_memberships import _makerspace as manageable_makerspace
@@ -25,7 +26,7 @@ def _row(actor, pk):
     row = get_object_or_404(
         rbac.scope_by_action(
             actor,
-            rbac.Action.MANAGE_MAKERSPACE,
+            rbac.Action.MANAGE_MEMBERS,
             InvitationRequest.objects.select_related("makerspace"),
         ),
         pk=pk,
@@ -38,9 +39,9 @@ class InvitationRequestListView(APIView):
     permission_classes = [IsActiveStaff]
 
     @extend_schema(
-        tags=["Admin memberships"],
+        tags=["Admin memberships"], description="Requires manage_members in this makerspace. Staff role administration and membership plan definitions require manage_makerspace.",
         summary="List invitation requests (optionally filtered by ?status=)",
-        responses={200: InvitationRequestSerializer(many=True)},
+        responses={200: InvitationRequestSerializer(many=True), **ERRORS},
     )
     def get(self, request, makerspace_id):
         makerspace = require_module(
@@ -59,10 +60,10 @@ class InvitationRequestInviteView(APIView):
     permission_classes = [IsActiveStaff]
 
     @extend_schema(
-        tags=["Admin memberships"],
+        tags=["Admin memberships"], description="Requires manage_members in this makerspace. Staff role administration and membership plan definitions require manage_makerspace.",
         summary="Turn an invitation request into a membership invitation",
         request=RoleIdSerializer,
-        responses={200: InvitationRequestSerializer, 400: INVALID},
+        responses={200: InvitationRequestSerializer, 400: INVALID, **ERRORS},
     )
     def post(self, request, pk):
         row = _row(request.user, pk)
@@ -79,10 +80,10 @@ class InvitationRequestDeclineView(APIView):
     permission_classes = [IsActiveStaff]
 
     @extend_schema(
-        tags=["Admin memberships"],
+        tags=["Admin memberships"], description="Requires manage_members in this makerspace. Staff role administration and membership plan definitions require manage_makerspace.",
         summary="Decline an invitation request",
         request=None,
-        responses={200: InvitationRequestSerializer, 400: INVALID},
+        responses={200: InvitationRequestSerializer, 400: INVALID, **ERRORS},
     )
     def post(self, request, pk):
         row = _row(request.user, pk)

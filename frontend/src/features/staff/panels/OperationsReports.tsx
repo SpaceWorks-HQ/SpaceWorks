@@ -33,7 +33,7 @@ export function OperationsReports({
   printingOnly = false,
   canViewAudit,
   canManageMachines,
-  canManageMakerspace,
+  canViewFinance = false,
 }: {
   makerspace: Makerspace;
   makerspaces: Makerspace[];
@@ -41,7 +41,7 @@ export function OperationsReports({
   printingOnly?: boolean;
   canViewAudit: boolean;
   canManageMachines: boolean;
-  canManageMakerspace: boolean;
+  canViewFinance?: boolean;
 }) {
   const [allMakerspaces, setAllMakerspaces] = useState(false);
   const [startDate, setStartDate] = useState("");
@@ -193,7 +193,7 @@ export function OperationsReports({
             </div>
           ) : null}
         </div>
-        {!printingOnly && reportsEnabled ? (
+        {!printingOnly && hardwareEnabled ? (
           <DataState loading={summary.isLoading} error={summary.error} empty={!summary.data}>
             <StatCards
               stats={[
@@ -225,7 +225,7 @@ export function OperationsReports({
               ["missing_quantity", summary.data?.missing_quantity ?? 0],
             ] }} />
           </DataState>
-        ) : !printingOnly ? <p className="mt-3 text-sm text-muted">Module disabled</p> : null}
+        ) : !printingOnly && !reportsEnabled ? <p className="mt-3 text-sm text-muted">Module disabled</p> : null}
       </Panel>
 
       {!printingOnly ? (
@@ -245,7 +245,7 @@ export function OperationsReports({
       <OperationsReportsHardware analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} enabled={hardwareEnabled} aggregate={aggregate} makerspaceName={makerspaceName} />
       <OperationsReportsCoverage catalog={catalogEntries} analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} grain={grain} aggregate={aggregate} makerspaceName={makerspaceName} />
       <OperationsReportsMembers makerspaceId={makerspace.id} aggregate={aggregate} startDate={startDate} endDate={endDate} enabled={hardwareEnabled} />
-      {canManageMakerspace ? <OperationsReportsPayments analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} enabled={reportsEnabled} makerspaceName={makerspaceName} /> : null}
+      {canViewFinance || isSuperadmin ? <OperationsReportsPayments analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} enabled={reportsEnabled} makerspaceName={makerspaceName} /> : null}
       </>
       ) : null}
 

@@ -1,4 +1,4 @@
-﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -44,7 +44,7 @@ function renderPanel() {
     queryClient,
     ...render(
       <QueryClientProvider client={queryClient}>
-        <PaymentsPanel makerspaceId={7} />
+        <PaymentsPanel makerspaceId={7} actorActions={["view_finance", "record_payment", "manage_bookings", "manage_makerspace"]} />
       </QueryClientProvider>,
     ),
   };

@@ -20,7 +20,7 @@ from apps.makerspaces.servability import servable_queryset
 def _membership_for_manager(actor, pk):
     queryset = rbac.scope_by_action(
         actor,
-        rbac.Action.MANAGE_MAKERSPACE,
+        rbac.Action.MANAGE_MEMBERS,
         MakerspaceMembership.objects.select_related("makerspace", "user", "assigned_role"),
         field="makerspace_id",
     )
@@ -30,13 +30,14 @@ def _membership_for_manager(actor, pk):
 def _membership_for_verifier(actor, pk):
     manager_scope = rbac.scope_by_action(
         actor,
-        rbac.Action.MANAGE_MAKERSPACE,
+        rbac.Action.MANAGE_MEMBERS,
         MakerspaceMembership.objects.all(),
         field="makerspace_id",
     ).values("makerspace_id")
     delegate_scope = servable_queryset(
-        MakerspaceMembership.objects.filter(
-            user=actor, status="active", can_verify=True
+        rbac.scope_by_makerspace(
+            actor,
+            MakerspaceMembership.objects.filter(user=actor, status="active", can_verify=True),
         ),
         relation="makerspace",
     ).values("makerspace_id")
@@ -51,9 +52,10 @@ def _membership_for_verifier(actor, pk):
 class AdminMembershipCapabilitiesView(APIView):
     permission_classes = [IsActiveStaff]
 
-    @extend_schema(tags=["Admin memberships"], request=MembershipCapabilitiesSerializer, responses={200: AdminMembershipSerializer, **ERRORS})
+    @extend_schema(tags=["Admin memberships"], description="Requires manage_members in this makerspace. Staff role administration and membership plan definitions require manage_makerspace.", request=MembershipCapabilitiesSerializer, responses={200: AdminMembershipSerializer, **ERRORS})
     def patch(self, request, pk):
         membership = _membership_for_manager(request.user, pk)
+        require_module(membership.makerspace, "membership")
         serializer = MembershipCapabilitiesSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         if "can_refer" in serializer.validated_data:
@@ -66,7 +68,7 @@ class AdminMembershipCapabilitiesView(APIView):
 class AdminMembershipVerifyView(APIView):
     permission_classes = [IsActiveStaff]
 
-    @extend_schema(request=None, tags=["Admin memberships"], responses={200: AdminMembershipSerializer, **ERRORS})
+    @extend_schema(request=None, tags=["Admin memberships"], description="Requires manage_members or an active membership with can_verify in this makerspace. Delegated verifiers cannot verify themselves.", responses={200: AdminMembershipSerializer, **ERRORS})
     def post(self, request, pk):
         membership = _membership_for_verifier(request.user, pk)
         require_module(membership.makerspace, "membership")
@@ -77,7 +79,7 @@ class AdminMembershipVerifyView(APIView):
 class AdminMembershipUnverifyView(APIView):
     permission_classes = [IsActiveStaff]
 
-    @extend_schema(request=None, tags=["Admin memberships"], responses={200: AdminMembershipSerializer, **ERRORS})
+    @extend_schema(request=None, tags=["Admin memberships"], description="Requires manage_members or an active membership with can_verify in this makerspace. Delegated verifiers cannot unverify themselves.", responses={200: AdminMembershipSerializer, **ERRORS})
     def post(self, request, pk):
         membership = _membership_for_verifier(request.user, pk)
         require_module(membership.makerspace, "membership")

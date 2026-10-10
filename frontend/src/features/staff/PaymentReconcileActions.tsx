@@ -20,10 +20,14 @@ export function PaymentReconcileActions({
   makerspaceId,
   payment,
   invalidateKeys = [],
+  canRecordPayment = true,
+  canWaive = true,
 }: {
   makerspaceId: number;
   payment: PaymentSummary | null;
   invalidateKeys?: readonly (readonly unknown[])[];
+  canRecordPayment?: boolean;
+  canWaive?: boolean;
 }) {
   const queryClient = useQueryClient();
   // Marking paid offline needs the receipt the API requires, so the button opens the
@@ -53,22 +57,22 @@ export function PaymentReconcileActions({
       <StatusBadge status={payment.status} />
       {payment.status === "pending" ? (
         <>
-          <button
+          {canRecordPayment ? <button
             className="desk-button-success"
             type="button"
             disabled={mutation.isPending}
             onClick={() => setSettling(true)}
           >
             Mark offline
-          </button>
-          <button
+          </button> : null}
+          {canWaive ? <button
             className="desk-button-warn"
             type="button"
             disabled={mutation.isPending}
             onClick={() => mutation.mutate({ action: "waive" })}
           >
             Waive
-          </button>
+          </button> : null}
         </>
       ) : null}
       {mutation.error ? (

@@ -19,10 +19,15 @@ import {
 import { PaymentRefundDialog } from "./PaymentRefundDialog";
 import { SettlementDialog } from "./SettlementDialog";
 import { Panel } from "./panels/shared";
+import { paymentAccess } from "./paymentAccess";
 
 type Action = "mark-offline" | "waive";
 
-export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
+export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = false }: {
+  makerspaceId: number; actorActions?: readonly string[]; isSuperadmin?: boolean;
+}) {
+  const forRecording = !isSuperadmin && !actorActions.includes("view_finance");
+  const access = (row: PaymentRow) => paymentAccess(actorActions, isSuperadmin, row);
   const queryClient = useQueryClient();
   const [status, setStatus] = useState("pending");
   const [subject, setSubject] = useState("");
@@ -30,8 +35,8 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
   const [conflict, setConflict] = useState("");
   const [refundRow, setRefundRow] = useState<PaymentRow | null>(null);
   const payments = useQuery({
-    queryKey: paymentListKey(makerspaceId, status, subject),
-    queryFn: () => staffRequest<PaymentRow[]>(paymentListPath(makerspaceId, status, subject)),
+    queryKey: paymentListKey(makerspaceId, status, subject, forRecording),
+    queryFn: () => staffRequest<PaymentRow[]>(paymentListPath(makerspaceId, status, subject, forRecording)),
   });
   // Marking paid offline is a two-step now: the API requires a receipt, so the click
   // opens the form rather than firing the mutation.
@@ -94,20 +99,20 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
               could only ever answer 409. */}
           {row.status === "pending" ? (
             <>
-              <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("mark-offline", [row.id], false)}>
+              {access(row).record ? <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("mark-offline", [row.id], false)}>
                 Mark offline
-              </button>
-              <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("waive", [row.id], false)}>
+              </button> : null}
+              {access(row).waive ? <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("waive", [row.id], false)}>
                 Waive
-              </button>
+              </button> : null}
             </>
           ) : null}
-          {row.status === "paid_offline" && row.settlement ? (
+          {row.status === "paid_offline" && row.settlement && access(row).record ? (
             <button className="desk-button" type="button" disabled={amend.isPending} onClick={() => setAmending(row)}>
               Correct receipt
             </button>
           ) : null}
-          {row.status === "paid_online" || row.status === "paid_offline" ? (
+          {(row.status === "paid_online" || row.status === "paid_offline") && access(row).refund ? (
             <button className="desk-button" type="button" onClick={() => setRefundRow(row)}>
               Refund
             </button>
@@ -124,7 +129,7 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
           <span>Status</span>
           <select className="desk-input" value={status} onChange={(event) => { setStatus(event.target.value); setSelected([]); }}>
             <option value="">All statuses</option>
-            {PAYMENT_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            {PAYMENT_STATUSES.filter(([value]) => !forRecording || ["pending", "paid_offline"].includes(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
         <label className="grid gap-1 text-xs text-muted">
@@ -140,8 +145,8 @@ export function PaymentsPanel({ makerspaceId }: { makerspaceId: number }) {
         onClear={() => setSelected([])}
         actions={(
           <>
-            <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("mark-offline", selected, true)}>Mark offline</button>
-            <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("waive", selected, true)}>Waive</button>
+            {selected.length > 0 && selected.every((id) => payments.data?.some((row) => row.id === id && row.status === "pending" && access(row).record)) ? <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("mark-offline", selected, true)}>Mark offline</button> : null}
+            {selected.length > 0 && selected.every((id) => payments.data?.some((row) => row.id === id && row.status === "pending" && access(row).waive)) ? <button className="desk-button" type="button" disabled={mutation.isPending} onClick={() => run("waive", selected, true)}>Waive</button> : null}
           </>
         )}
       />

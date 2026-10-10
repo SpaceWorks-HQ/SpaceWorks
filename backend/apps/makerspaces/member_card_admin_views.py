@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.audit import services as audit
+from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces import member_card_printing, member_card_services, member_card_templates
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.member_card_serializers import (
@@ -30,7 +31,12 @@ from apps.makerspaces.member_card_serializers import (
 from apps.makerspaces.member_card_views import snapshot_for
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MemberCard
 
-ERRORS = {403: OpenApiResponse(description="Missing member-card action."), 404: OpenApiResponse(description="Not found.")}
+ERRORS = {
+    400: OpenApiResponse(ErrorSerializer, description="Invalid card input or membership module disabled."),
+    401: OpenApiResponse(ErrorSerializer, description="Authentication required."),
+    403: OpenApiResponse(ErrorSerializer, description="Missing member-card action or inactive account."),
+    404: OpenApiResponse(ErrorSerializer, description="Not found in the permitted makerspace."),
+}
 TAG = "Admin memberships"
 
 

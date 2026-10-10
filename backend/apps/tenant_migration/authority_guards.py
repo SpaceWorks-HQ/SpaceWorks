@@ -2,7 +2,8 @@
 
 The mechanical part scans attribute access, ORM lookup names, ``getattr`` field names,
 and ``values_list``/``only`` field strings in the ``accounts/rbac*.py`` implementation
-modules and ``machines/access.py``. It then intersects those names with a reviewed set of
+modules, the locked makerspace role-authority/assignment modules and ``machines/access.py``.
+It then intersects those names with a reviewed set of
 exported authorization models. The explicit declarations also cover
 authority/disclosure inputs identified by the migration threat model.
 
@@ -35,6 +36,8 @@ AUTHORIZATION_SOURCES = (
     APPS_DIR / "accounts" / "rbac_memberships.py",
     APPS_DIR / "accounts" / "rbac_organizations.py",
     APPS_DIR / "accounts" / "rbac_superadmin.py",
+    APPS_DIR / "makerspaces" / "role_authority.py",
+    APPS_DIR / "makerspaces" / "role_assignments.py",
     APPS_DIR / "machines" / "access.py",
 )
 SCANNED_MODEL_LABELS = frozenset({

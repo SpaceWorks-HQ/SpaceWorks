@@ -38,25 +38,28 @@ class PaymentListView(APIView):
     @extend_schema(
         tags=["Payments"],
         summary="List makerspace payments for reconciliation",
+        description="Requires view_finance. With for_recording=true, requires record_payment and returns only pending and offline-settled charges for counter receipt work.",
         request=None,
         parameters=[
             OpenApiParameter("status", OpenApiTypes.STR, enum=Payment.Status.values),
             OpenApiParameter("subject_type", OpenApiTypes.STR, enum=Payment.SubjectType.values),
+            OpenApiParameter("for_recording", OpenApiTypes.BOOL),
         ],
         responses={200: PaymentReconciliationSerializer(many=True), **ERRORS},
     )
     def get(self, request, makerspace_id):
+        filters = PaymentListFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        for_recording = filters.validated_data["for_recording"]
         get_object_or_404(
             rbac.scope_by_action(
                 request.user,
-                rbac.Action.MANAGE_MAKERSPACE,
+                rbac.Action.RECORD_PAYMENT if for_recording else rbac.Action.VIEW_FINANCE,
                 servable_queryset(),
                 field="id",
             ),
             pk=makerspace_id,
         )
-        filters = PaymentListFilterSerializer(data=request.query_params)
-        filters.is_valid(raise_exception=True)
         rows = list(
             list_payments(
                 actor=request.user,
@@ -105,6 +108,7 @@ class PaymentMarkOfflineView(_PaymentActionView):
 
     @extend_schema(
         tags=["Payments"], summary="Mark a payment paid offline",
+        description="Requires record_payment or the existing scoped payment-subject authority. Appends an audited manual settlement receipt.",
         request=PaymentOfflineSerializer,
         responses={200: PaymentReconciliationSerializer, **ERRORS},
     )
@@ -130,6 +134,7 @@ class PaymentSettlementAmendView(APIView):
 
     @extend_schema(
         tags=["Payments"], summary="Correct how a settled payment was received",
+        description="Requires record_payment or the existing scoped payment-subject authority. Appends a correction; the original receipt remains immutable.",
         request=PaymentOfflineSerializer,
         responses={200: PaymentReconciliationSerializer, **ERRORS},
     )
@@ -183,6 +188,7 @@ class PaymentBulkMarkOfflineView(_PaymentBulkActionView):
 
     @extend_schema(
         tags=["Payments"], summary="Mark payments paid offline in one transaction",
+        description="Requires record_payment or the existing scoped payment-subject authority for every charge in the batch.",
         request=PaymentBulkOfflineSerializer,
         responses={200: PaymentReconciliationSerializer(many=True), **ERRORS},
     )

@@ -70,6 +70,8 @@ export function StaffTabContent({
     return <Panel title="No makerspace">Assign a makerspace to this account.</Panel>;
   }
   const makerspaceKey = activeMakerspace.id;
+  const actorActions = currentUser.makerspaces.find((space) => space.id === makerspaceKey)?.actions ?? [];
+  const has = (action: string) => isSuperadmin || actorActions.includes(action);
   return (
     <StaffPanelErrorBoundary resetKey={`${makerspaceKey}:${activeTab}`}>
       <Suspense fallback={<div className="p-4"><Skeleton className="h-40 w-full" /></div>}>
@@ -131,17 +133,20 @@ export function StaffTabContent({
         <OrganizationAnalyticsPanel makerspaces={makerspaces} />
       ) : null}
       {activeTab === "bookings" && canManageBookings ? <BookingsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}
-      {activeTab === "members" && canManageMakerspace ? (
+      {activeTab === "members" && has("manage_members") ? (
         <MembersPanel
           key={makerspaceKey}
           makerspaceId={activeMakerspace.id}
           membershipEnabled={(activeMakerspace.enabled_modules ?? []).includes("membership")}
+          canManageMakerspace={canManageMakerspace}
+          canViewFinance={has("view_finance")}
+          canRecordPayment={has("record_payment")}
         />
       ) : null}
       {activeTab === "cards" && canUseMemberCards ? (
         <MemberCardsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} />
       ) : null}
-      {activeTab === "payments" && canManageMakerspace ? <PaymentsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}
+      {activeTab === "payments" && (has("view_finance") || has("record_payment")) ? <PaymentsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} actorActions={actorActions} isSuperadmin={isSuperadmin} /> : null}
       {activeTab === "tobuy" ? (
         <ProcurementPanel
           key={makerspaceKey}
@@ -186,7 +191,7 @@ export function StaffTabContent({
           printingOnly={printingOnly}
           canViewAudit={canViewAudit}
           canManageMachines={canManageMachines}
-          canManageMakerspace={canManageMakerspace}
+          canViewFinance={has("view_finance")}
         />
       ) : null}
       {activeTab === "direct" && canIssueDirectLoan ? <DirectLoans key={makerspaceKey} makerspace={activeMakerspace} /> : null}

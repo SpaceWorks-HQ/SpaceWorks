@@ -24,7 +24,7 @@ function mount(dialog = true) {
   const invalidate = vi.spyOn(queryClient, "invalidateQueries");
   const onClose = vi.fn();
   const view = render(<QueryClientProvider client={queryClient}>
-    {dialog ? <PaymentRefundDialog makerspaceId={7} payment={payment} onClose={onClose} /> : <PaymentsPanel makerspaceId={7} />}
+    {dialog ? <PaymentRefundDialog makerspaceId={7} payment={payment} onClose={onClose} /> : <PaymentsPanel makerspaceId={7} actorActions={["view_finance", "record_payment", "manage_bookings", "manage_makerspace"]} />}
   </QueryClientProvider>);
   return { ...view, invalidate, onClose };
 }
