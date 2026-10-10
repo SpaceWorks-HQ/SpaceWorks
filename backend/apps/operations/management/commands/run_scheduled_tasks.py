@@ -187,6 +187,11 @@ class Command(BaseCommand):
         from apps.operations.models_scheduling import PeriodicTaskRun
 
         only = options.get("task")
+        known = [name for name, _path, _interval in SCHEDULED_TASKS]
+        if only and only not in known:
+            # A typo here used to exit 0 having run nothing, which a cron entry reports
+            # as success forever. Tombstoned apps' tasks are already absent from the list.
+            raise CommandError(f"Unknown task {only!r}. Known tasks: {', '.join(known)}.")
         if (options["dry_run"] or options["batch_size"] is not None) and only not in EVIDENCE_OPTION_TASKS:
             raise CommandError(
                 "--dry-run and --batch-size require --task evidence-object-expiry or "
@@ -225,9 +230,9 @@ class Command(BaseCommand):
             except Exception as exc:  # noqa: BLE001 - one failing task must not stop the rest
                 with transaction.atomic():
                     row = PeriodicTaskRun.objects.select_for_update().get(name=name)
-                    row.last_error = str(exc)[:500]
+                    row.last_error = type(exc).__name__
                     row.save(update_fields=["last_error"])
-                self.stderr.write(self.style.ERROR(f"failed {name}: {exc}"))
+                self.stderr.write(self.style.ERROR(f"failed {name}: {type(exc).__name__}"))
                 continue
 
             with transaction.atomic():

@@ -802,6 +802,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Validation failed, or the makerspace module this route belongs to is off."
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
                     }
                 }
             },
@@ -855,6 +864,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Validation failed, or the makerspace module this route belongs to is off."
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Not an active member of that makerspace."
                     }
                 }
             }
@@ -16414,6 +16432,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             }
@@ -16473,6 +16500,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             },
@@ -16549,6 +16585,18 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Validation failed, or the makerspace module this route belongs to is off."
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             }
@@ -16608,6 +16656,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             }
@@ -16881,6 +16938,18 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Validation failed, or the makerspace module this route belongs to is off."
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             }
@@ -18512,6 +18581,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             },
@@ -18671,6 +18749,15 @@
                 "responses": {
                     "204": {
                         "description": "Destination removed."
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             }
@@ -18707,6 +18794,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             },
@@ -18807,6 +18903,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             },
@@ -18864,6 +18969,18 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Validation failed, or the makerspace module this route belongs to is off."
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             }
@@ -18900,6 +19017,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             },
@@ -28697,6 +28823,12 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
                     }
                 }
             },
@@ -28740,6 +28872,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Validation failed, or the makerspace module this route belongs to is off."
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
                     }
                 }
             }
@@ -28766,6 +28907,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Self-hosted deployment: Stripe Connect is a managed-only surface."
                     }
                 }
             },
@@ -28809,6 +28959,18 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Validation failed, or the makerspace module this route belongs to is off."
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Self-hosted deployment: Stripe Connect is a managed-only surface."
                     }
                 }
             }
@@ -29038,6 +29200,12 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
                     }
                 }
             },
@@ -29081,6 +29249,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Validation failed, or the makerspace module this route belongs to is off."
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
                     }
                 }
             }
@@ -30299,6 +30476,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "The updates module is not run by any live makerspace."
                     }
                 }
             },
@@ -30342,6 +30528,18 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "description": "Validation failed, or the makerspace module this route belongs to is off."
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "The updates module is not run by any live makerspace."
                     }
                 }
             }
@@ -30368,6 +30566,15 @@
                             }
                         },
                         "description": ""
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "The updates module is not run by any live makerspace."
                     }
                 }
             }
@@ -36585,6 +36792,9 @@
                             }
                         },
                         "description": ""
+                    },
+                    "503": {
+                        "description": "The recovery gate is closed: the database is unreachable or a restore is running."
                     }
                 }
             }
@@ -36612,6 +36822,9 @@
                             }
                         },
                         "description": ""
+                    },
+                    "503": {
+                        "description": "Not ready: host marker, database identity, migrations, fences or PII keys failed."
                     }
                 }
             }
@@ -36803,7 +37016,19 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Delivery attempt result."
+                        "description": "Delivery attempt result; `delivered: false` with a reason when Telegram is unconfigured or rejects the message."
+                    },
+                    "400": {
+                        "description": "Validation failed, or the makerspace module this route belongs to is off."
+                    },
+                    "401": {
+                        "description": "Not signed in."
+                    },
+                    "403": {
+                        "description": "Signed in, but this action or makerspace is not permitted (or the secret is wrong)."
+                    },
+                    "404": {
+                        "description": "Not found, not visible to this actor, or the surface is not enabled here."
                     }
                 }
             }
@@ -36838,6 +37063,15 @@
                 "responses": {
                     "200": {
                         "description": "Acknowledged; no action taken."
+                    },
+                    "400": {
+                        "description": "Validation failed, or the makerspace module this route belongs to is off."
+                    },
+                    "403": {
+                        "description": "TELEGRAM_WEBHOOK_SECRET is unset, or the secret-token header is wrong."
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded; retry after the interval in Retry-After."
                     }
                 }
             }
@@ -36892,6 +37126,12 @@
                     },
                     "403": {
                         "description": "TLS issuance is denied."
+                    },
+                    "400": {
+                        "description": "Managed mode: the Host header is not an infra host."
+                    },
+                    "503": {
+                        "description": "The recovery gate is closed; deny issuance."
                     }
                 }
             }
@@ -36920,8 +37160,11 @@
                         },
                         "description": ""
                     },
+                    "401": {
+                        "description": "Not signed in."
+                    },
                     "503": {
-                        "description": "No response body"
+                        "description": "No usable Redis (unset, misconfigured or unreachable); poll instead."
                     }
                 }
             }
@@ -39483,10 +39726,10 @@
                         "description": ""
                     },
                     "401": {
-                        "description": "No response body"
+                        "description": "Missing or wrong METRICS_TOKEN."
                     },
                     "404": {
-                        "description": "No response body"
+                        "description": "METRICS_TOKEN is not set."
                     }
                 }
             }
@@ -69184,6 +69427,26 @@
         {
             "name": "Notifications",
             "description": "Persistent staff inbox notifications."
+        },
+        {
+            "name": "Platform",
+            "description": "Superadmin platform settings: email, social sign-in, Stripe Connect, updates."
+        },
+        {
+            "name": "Admin hosting",
+            "description": "Platform subdomains and custom-domain verification."
+        },
+        {
+            "name": "Internal",
+            "description": "Infrastructure-only routes (TLS ask, cron); refused at the public edge."
+        },
+        {
+            "name": "API clients",
+            "description": "HMAC API clients, their scopes and integration settings."
+        },
+        {
+            "name": "API key requests",
+            "description": "Staff requests for a superadmin to issue an API client."
         }
     ]
 }

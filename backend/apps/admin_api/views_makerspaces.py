@@ -23,6 +23,7 @@ from apps.makerspaces.domain_audit import record_domain_change
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.origin_scope import origin_scoped_makerspace_id
 from apps.makerspaces.servability import servable_queryset
+from apps.openapi_errors import errors
 
 
 _INVALID = OpenApiResponse(description="Field validation errors, keyed by field.")
@@ -121,7 +122,7 @@ class MakerspaceListCreateView(generics.ListCreateAPIView):
     get=extend_schema(
         tags=["Admin makerspaces"],
         summary="Retrieve a makerspace's settings",
-        responses={200: MakerspaceSerializer, 404: _NOT_FOUND},
+        responses={200: MakerspaceSerializer, 401: OpenApiResponse(description="Authentication required."), 404: _NOT_FOUND},
     ),
     patch=extend_schema(
         tags=["Admin makerspaces"],
@@ -133,6 +134,7 @@ class MakerspaceListCreateView(generics.ListCreateAPIView):
         responses={
             200: MakerspaceSerializer,
             400: _INVALID,
+            401: OpenApiResponse(description="Authentication required."),
             403: OpenApiResponse(description="The body carries `enabled_modules`."),
             404: _NOT_FOUND,
         },

@@ -101,15 +101,18 @@ def dispatch_email(
         and makerspace is not None
         and connection == "makerspace"
     ):
+        # Imported BEFORE the try: `except PiiWriteFenced` below names it, and a failure
+        # raised ahead of an in-try import (the quota lookup itself) would otherwise turn
+        # the intended logged fail-open into UnboundLocalError out of the mail path.
+        from apps.encryption.write_fence import (
+            PiiWriteFenced,
+            assert_mapped_write_allowed,
+        )
+
         try:
             limit = limits.resource_limit(makerspace, "email")
             if limit is not None:
                 with transaction.atomic():
-                    from apps.encryption.write_fence import (
-                        PiiWriteFenced,
-                        assert_mapped_write_allowed,
-                    )
-
                     assert_mapped_write_allowed(makerspace.id)
                     counter, _ = DailyEmailCounter.objects.get_or_create(
                         makerspace=makerspace,
@@ -187,7 +190,10 @@ def _enqueue(log_id):
                 log.status = EmailLog.Status.FAILED
                 log.error = sanitize_email_error(exc)
                 log.save(update_fields=["status", "error", "updated_at"])
-        logger.exception("email_enqueue_failed", extra={"email_log_id": log_id})
+        logger.error(
+            "email_enqueue_failed",
+            extra={"email_log_id": log_id, "error_class": type(exc).__name__},
+        )
 
 
 def _deliver(log):

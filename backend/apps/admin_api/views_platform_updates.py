@@ -1,4 +1,4 @@
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -8,6 +8,7 @@ from django.http import Http404
 from apps.admin_api.permissions import IsActiveSuperAdmin
 from apps.audit import services as audit
 from apps.makerspaces.deployment_modules import updates_module_enabled
+from apps.openapi_errors import errors
 from apps.updates import services
 from apps.updates.models import PlatformUpdateSettings
 
@@ -58,6 +59,20 @@ class PlatformUpdateSettingsSerializer(serializers.ModelSerializer):
         )
 
 
+_MODULE_OFF = "The updates module is not run by any live makerspace."
+
+
+@extend_schema_view(
+    get=extend_schema(
+        responses={200: PlatformUpdateSettingsSerializer, **errors(401, 403, 404, e404=_MODULE_OFF)}
+    ),
+    patch=extend_schema(
+        responses={
+            200: PlatformUpdateSettingsSerializer,
+            **errors(400, 401, 403, 404, e404=_MODULE_OFF),
+        }
+    ),
+)
 @extend_schema(
     tags=["Platform"],
     summary="Retrieve or update automatic production update settings",
@@ -87,7 +102,10 @@ class PlatformUpdateSettingsView(generics.RetrieveUpdateAPIView):
     tags=["Platform"],
     summary="Queue the latest production release for installation",
     request=None,
-    responses={status.HTTP_202_ACCEPTED: PlatformUpdateSettingsSerializer},
+    responses={
+        status.HTTP_202_ACCEPTED: PlatformUpdateSettingsSerializer,
+        **errors(401, 403, 404, e404=_MODULE_OFF),
+    },
 )
 class PlatformUpdateRequestView(APIView):
     permission_classes = [IsActiveSuperAdmin]
@@ -95,10 +113,13 @@ class PlatformUpdateRequestView(APIView):
     def post(self, request):
         _require_updates_module()
         instance = services.queue_update()
+        # queue_update leaves a RUNNING update alone; the audit row must say the request
+        # changed nothing rather than read as a second queued update.
         audit.record(
             request.user,
             "platform.update_requested",
             target=instance,
+            meta={"noop": instance.status == PlatformUpdateSettings.Status.RUNNING},
         )
         return Response(
             PlatformUpdateSettingsSerializer(instance).data,

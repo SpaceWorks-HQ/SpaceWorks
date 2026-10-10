@@ -15,6 +15,26 @@
   (360/720-minute cadence) across cutover and purge. The policy moved to `MANAGE_MAKERSPACE` and
   Makerspace settings. The historical phase-9 statement below that every `EvidencePhoto` row is retained
   stays true of what shipped then; attached evidence rows are still never deleted.
+- **2026-10-09 — lane `cloud`: online services, every condition.** This batch audited hosting,
+  updates, the scheduler, live SSE, platform integrations, outbound channels, API clients and
+  object storage, then closed the gaps it found.
+  - **Fixed:**
+    - `ENABLE_HTTPS` now exempts the internal probes from the HTTPS redirect.
+    - `dispatch_email` and the chat-quota checks fail open as intended.
+    - Header secrets no longer 500 on non-ASCII values.
+    - The JWKS fetch now answers 503, not 500, on malformed and truncated bodies.
+    - The live stream survives a bad or lost Redis.
+    - A crashed update no longer locks the console.
+    - `update.sh` keeps the version marker honest on rollback.
+    - OIDC identities can be unlinked.
+    - The social-settings API applies the `/control/` lockout guard.
+    - `/control/` edits to platform integrations now write audit rows.
+  - **Added:**
+    - Per-room and space-wide delivery health in the console.
+    - A read-only `PeriodicTaskRun` page in `/control/`.
+    - Documented error responses on every cloud-surface route.
+    - A complete `docs/environment-reference.md`.
+    - Provider-failure test matrices for every chat channel, Twilio, FCM, JWKS, DNS and HMAC.
 
 - **2026-09-04 — forward plan phase 6: money and membership depth.** Refunds as immutable ledger lines
   over `paid_online` charges, settled through the provider seam and its webhooks; `payments.loans` raises a

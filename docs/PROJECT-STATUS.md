@@ -48,7 +48,7 @@ cleared by `/auth/change-password`).
 
 **Releases are titled `SpaceWorks <version>`** (owner convention, 2026-08-15), where the version is the
 git-tag form `v<semver>-<branch>.<n>.<sha>` — e.g. `SpaceWorks v0.5.1-main.12.a9cd82c0dd89`. **The
-`SpaceWorks ` prefix is a display title, not part of the version value:** `updates.UpdateState` stores the
+`SpaceWorks ` prefix is a display title, not part of the version value:** `updates.PlatformUpdateSettings` stores the
 bare string in `current_version`/`available_version`/`target_version`, and writing the prefix into those
 columns (or comparing against it) would break every version equality check the update flow makes. Compose
 `f"SpaceWorks {version}"` at the display layer.

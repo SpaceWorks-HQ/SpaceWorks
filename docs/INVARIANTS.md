@@ -3244,3 +3244,30 @@ govern it. The one thing the release loop still computes is `previous_version`, 
 listed tag that is not the current one: `ghcr-retention.py` needs it to keep the previous version's
 images so the installer's rollback-to-previous-release path has something to fall back to. Deleting
 releases would therefore not just lose history, it would eventually strand that rollback.
+
+**Cloud-completeness rules (lane `cloud`, 2026-10-09).**
+
+- **Internal plain-HTTP probes are exempt from the HTTPS redirect.** `SECURE_REDIRECT_EXEMPT`
+  covers `/api/v1/health/`, `/api/v1/internal/` and `/api/v1/metrics/`. The TLS, SaaS and cloud
+  stacks set `ENABLE_HTTPS=true`, and the compose healthchecks, Caddy's on-demand TLS ask and
+  Prometheus all reach the backend port over plain HTTP. A 301 to `https://` there is a failure,
+  not an upgrade: the backend never reports healthy and no custom-domain certificate is ever
+  issued. Proxied browser traffic is already marked secure, so it is unaffected.
+- **A secret read from a request header is compared with `constant_time_compare`, or as bytes.**
+  `hmac.compare_digest(str, str)` raises `TypeError` on any non-ASCII character, so a stranger
+  could turn the cron, Telegram-webhook or Razorpay 403/400 into a 500 at will.
+- **Under Compose, a variable reaches Django only through an explicit `environment:` entry.**
+  No service uses `env_file`. That is why `METRICS_TOKEN` and `SENTRY_*` were documented but
+  inert until they were passed through.
+- **`docs/environment-reference.md` lists every `ENV_SURFACE` name.**
+  `tests/test_environment_reference_drift.py` holds it complete in both directions.
+- **`/control/` edits to platform integration settings write an audit row.**
+  `config/admin_audit.AuditedControlChangeMixin` covers the platform email, SMS, push, social,
+  login-method, OIDC and update settings. The row's metadata names the changed fields and never
+  their values.
+- **The social-settings API and the `/control/` form share one lockout predicate.** It is
+  `social_lockout.disabling_lockout_message`, so the API cannot clear a provider that the form
+  would refuse to clear.
+- **`claim_update` treats an observed `RUNNING` row as an interrupted run.** Claim runs only
+  under the host update lock, so a `RUNNING` row it sees is stale by construction.
+  `update.sh` resets `.spaceworks-version` to the release it rolls back to.

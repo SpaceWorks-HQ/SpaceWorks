@@ -166,11 +166,13 @@ def test_one_failing_task_does_not_stop_the_others(monkeypatch):
     assert PeriodicTaskRun.objects.get(name="return-reminders").last_error
 
 
-def test_a_failed_task_is_still_due_next_run():
+def test_a_task_whose_interval_has_elapsed_is_due():
     import apps.operations.management.commands.run_scheduled_tasks as module
 
-    # last_run_at is only advanced on success, so a transient failure retries on the
-    # next cron tick instead of waiting a full interval.
+    # This used to be named "a failed task is still due next run" and claimed that
+    # last_run_at advances only on success. It does not: the runner stamps last_run_at
+    # BEFORE the work (AT-MOST-ONCE, see run_scheduled_tasks.handle), so a failed run
+    # waits a full interval. What this test has only ever checked is `is_due` itself.
     row = PeriodicTaskRun.objects.create(
         name="return-reminders", last_run_at=timezone.now() - timedelta(hours=2)
     )
@@ -227,3 +229,11 @@ def test_abandoned_upload_task_reconciles_receipts_before_new_cleanup(monkeypatc
         ("reconcile", {"dry_run": True, "batch_size": 3}),
         ("cleanup", {"dry_run": True, "batch_size": 3}),
     ]
+
+
+def test_an_unknown_task_name_is_an_error_not_a_silent_success():
+    from django.core.management.base import CommandError
+
+    with pytest.raises(CommandError, match="Unknown task 'return-reminder'"):
+        call_command("run_scheduled_tasks", "--task", "return-reminder", stdout=StringIO())
+    assert not PeriodicTaskRun.objects.exists()

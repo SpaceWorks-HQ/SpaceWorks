@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import type { ApiPath } from "../../generated/api";
 import { Badge, Metric } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
+import { type ChatDestinationsHealth, IntegrationHealthRooms } from "./IntegrationHealthRooms";
 import type { Makerspace } from "./StaffPanels";
 import { staffTabPath } from "./staffTabs";
 
@@ -36,6 +37,14 @@ type IntegrationHealth = {
   };
   smtp: SectionHealth & { configured?: boolean };
   telegram: SectionHealth & { configured?: boolean };
+  sms?: SectionHealth & { configured?: boolean };
+  native_push?: SectionHealth & {
+    configured?: boolean;
+    enabled?: boolean;
+    failed?: number;
+    last_failure?: { error: string; at: string } | null;
+  };
+  chat_destinations?: ChatDestinationsHealth;
   worker: SectionHealth & {
     broker_configured?: boolean;
     eager?: boolean;
@@ -115,6 +124,28 @@ export function IntegrationHealthPanel({ makerspace }: { makerspace: Makerspace 
 
           <HealthBlock title="Telegram" status={data.telegram.status} detail={data.telegram.detail}>
             <ConfiguredBadge configured={data.telegram.configured} />
+          </HealthBlock>
+
+          <HealthBlock title="SMS" status={data.sms?.status} detail={data.sms?.detail}>
+            <ConfiguredBadge configured={data.sms?.configured} />
+          </HealthBlock>
+
+          <HealthBlock title="Native push" status={data.native_push?.status} detail={data.native_push?.detail}>
+            <ConfiguredBadge configured={data.native_push?.configured} />
+            <p className="mt-2 text-sm text-muted">{data.native_push?.enabled ? "Enabled" : "Disabled for this makerspace"}</p>
+            {data.native_push?.last_failure ? <p className="mt-2 break-words text-sm text-danger">
+              Last delivery failed: {data.native_push.last_failure.error || "No error detail."}
+              {" - "}{relativeTime(data.native_push.last_failure.at)}
+            </p> : null}
+          </HealthBlock>
+
+          <HealthBlock
+            title="Chat and webhook rooms"
+            status={data.chat_destinations?.status}
+            detail={data.chat_destinations?.detail}
+            wide
+          >
+            <IntegrationHealthRooms section={data.chat_destinations} formatTime={relativeTime} />
           </HealthBlock>
 
           <HealthBlock title="Worker" status={data.worker.status} detail={data.worker.detail} wide>

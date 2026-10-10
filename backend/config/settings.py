@@ -958,6 +958,14 @@ SECURE_PROXY_SSL_HEADER = (
     ("HTTP_X_FORWARDED_PROTO", "https") if TRUST_X_FORWARDED_PROTO else None
 )
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=ENABLE_HTTPS)
+# Plain-HTTP callers INSIDE the deployment must not be bounced to https:// -- there is no
+# TLS on the backend port, so the redirect is a failure, not an upgrade. These are the
+# compose healthchecks (`urllib` follows the 301 onto a TLS-less port), Caddy's on-demand
+# TLS ask (any non-200 means no certificate is ever issued for a custom domain) and a
+# Prometheus scrape. A request that arrives through the TLS proxy is already secure
+# (`TRUST_X_FORWARDED_PROTO`), so it was never redirected: the exemption changes the answer
+# only for a caller that reached the plain backend port, which is exactly the internal one.
+SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/", r"^api/v1/internal/", r"^api/v1/metrics/$"]
 SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=ENABLE_HTTPS)
 CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=ENABLE_HTTPS)
 # Needed for admin/login POST when reached over HTTPS via a custom domain behind a
@@ -1118,6 +1126,11 @@ SPECTACULAR_SETTINGS = {
         {"name": "Asset units", "description": "Individual asset unit generation and QR assignment."},
         {"name": "Health", "description": "Health and readiness probes."},
         {"name": "Notifications", "description": "Persistent staff inbox notifications."},
+        {"name": "Platform", "description": "Superadmin platform settings: email, social sign-in, Stripe Connect, updates."},
+        {"name": "Admin hosting", "description": "Platform subdomains and custom-domain verification."},
+        {"name": "Internal", "description": "Infrastructure-only routes (TLS ask, cron); refused at the public edge."},
+        {"name": "API clients", "description": "HMAC API clients, their scopes and integration settings."},
+        {"name": "API key requests", "description": "Staff requests for a superadmin to issue an API client."},
     ],
 }
 

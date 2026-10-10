@@ -163,12 +163,12 @@ def test_integration_health_subsection_failure_is_fail_safe(monkeypatch):
     def raise_smtp(_makerspace):
         raise RuntimeError("smtp health exploded")
 
-    monkeypatch.setattr(integration_health, "_smtp_section", raise_smtp)
+    monkeypatch.setattr("apps.integrations.health_status._smtp_section", raise_smtp)
 
     response = authenticated_client(manager).get(health_url(makerspace))
 
     assert response.status_code == 200
-    assert response.data["smtp"] == {"status": "unknown", "detail": "smtp health exploded"}
+    assert response.data["smtp"] == {"status": "unknown", "detail": "RuntimeError"}
     assert response.data["status"] == "warn"
 
 

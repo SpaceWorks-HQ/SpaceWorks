@@ -5,6 +5,8 @@ from django.utils import timezone
 
 from apps.updates.models import PlatformUpdateSettings
 
+INTERRUPTED_MESSAGE = "The previous update was interrupted before it finished."
+
 
 @transaction.atomic
 def queue_update():
@@ -27,6 +29,14 @@ def queue_update():
 @transaction.atomic
 def claim_update(*, current_version, available_version, force=False):
     settings = _locked_settings()
+    if settings.status == PlatformUpdateSettings.Status.RUNNING:
+        # The host only claims while holding the update lock, so a RUNNING row seen here
+        # belongs to a run that died before its cleanup trap fired (host reboot, OOM kill).
+        # Left alone it is RUNNING forever and the console disables both controls; record
+        # it as the failure it was, then decide this run normally.
+        settings.status = PlatformUpdateSettings.Status.FAILED
+        settings.target_version = ""
+        settings.last_error = INTERRUPTED_MESSAGE
     settings.current_version = current_version
     settings.available_version = available_version
     settings.last_checked_at = timezone.now()

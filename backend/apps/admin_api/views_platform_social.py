@@ -1,9 +1,10 @@
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics, serializers
 
 from apps.accounts.models_social import PlatformSocialAuthSettings
 from apps.admin_api.permissions import IsActiveSuperAdmin
 from apps.audit import services as audit
+from apps.openapi_errors import errors
 
 
 class PlatformSocialAuthSettingsSerializer(serializers.ModelSerializer):
@@ -38,6 +39,23 @@ class PlatformSocialAuthSettingsSerializer(serializers.ModelSerializer):
             cleaned.append(item.strip())
         return list(dict.fromkeys(cleaned))
 
+    def validate(self, attrs):
+        # The same refusal the /control/ form applies (`social_lockout`): clearing a
+        # provider through the API must not strand accounts the form would protect.
+        from apps.accounts.social_lockout import GOOGLE_FIELDS, disabling_lockout_message
+
+        stored = self.instance
+        incoming = PlatformSocialAuthSettings(
+            **{
+                field: attrs.get(field, getattr(stored, field, "") if stored else "")
+                for field in (*GOOGLE_FIELDS, "apple_service_id", "apple_native_app_ids")
+            }
+        )
+        message = disabling_lockout_message(stored, incoming)
+        if message:
+            raise serializers.ValidationError(message)
+        return attrs
+
     def update(self, instance, validated_data):
         private_key = validated_data.pop("apple_private_key", None)
         if private_key is not None:
@@ -48,6 +66,10 @@ class PlatformSocialAuthSettingsSerializer(serializers.ModelSerializer):
         return instance
 
 
+@extend_schema_view(
+    get=extend_schema(responses={200: PlatformSocialAuthSettingsSerializer, **errors(401, 403)}),
+    patch=extend_schema(responses={200: PlatformSocialAuthSettingsSerializer, **errors(400, 401, 403)}),
+)
 @extend_schema(
     tags=["Platform"], summary="Retrieve or update platform social auth settings"
 )

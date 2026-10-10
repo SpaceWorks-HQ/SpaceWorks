@@ -50,12 +50,13 @@ PRODUCTION_MANIFESTS = (
     "render.yaml",
     "docker-compose.prod.yml",
     "deploy/render.managed.yaml",
+    "docker-compose.cloud.yml",
 )
 
 # The services that run backend Python. docker-compose hands them one environment block
 # through a YAML anchor, so a variable added to `backend` alone does not reach the others
 # -- which is why the keys are collected per service and intersected, not unioned.
-BACKEND_SERVICES = ("backend", "migrate", "worker", "beat")
+BACKEND_SERVICES = ("backend", "migrate", "worker", "beat", "live", "app", "cron")
 
 # A default is "on-box" when it names this machine or a compose service hostname: correct
 # only where the browser, the backend and the storage are all the same host.

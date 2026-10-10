@@ -48,6 +48,8 @@ def _deny_tls():
     responses={
         200: OpenApiResponse(description="TLS issuance is allowed."),
         403: OpenApiResponse(description="TLS issuance is denied."),
+        400: OpenApiResponse(description="Managed mode: the Host header is not an infra host."),
+        503: OpenApiResponse(description="The recovery gate is closed; deny issuance."),
     },
     auth=[],
 )

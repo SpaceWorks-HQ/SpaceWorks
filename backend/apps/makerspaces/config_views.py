@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.integrations.email import email_enabled
+from apps.openapi_errors import errors
 
 
 class PublicConfigSerializer(serializers.Serializer):
@@ -26,7 +27,7 @@ class PublicConfigView(APIView):
     @extend_schema(
         tags=["Platform"],
         summary="Return frontend-safe platform configuration",
-        responses={200: PublicConfigSerializer},
+        responses={200: PublicConfigSerializer, **errors(400, 503)},
     )
     def get(self, request, *args, **kwargs):
         payload = {

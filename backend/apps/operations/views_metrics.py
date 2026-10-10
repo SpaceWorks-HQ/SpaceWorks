@@ -19,7 +19,9 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
-CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8"
+from apps.openapi_errors import errors
+
+CONTENT_TYPE ="text/plain; version=0.0.4; charset=utf-8"
 
 
 def _escape_label(value):
@@ -153,7 +155,14 @@ class MetricsView(APIView):
             "deployment's METRICS_TOKEN as a bearer token; 404 when no token is configured."
         ),
         request=None,
-        responses={(200, "text/plain"): OpenApiTypes.STR, 401: None, 404: None},
+        responses={
+            (200, "text/plain"): OpenApiTypes.STR,
+            **errors(
+                401, 404,
+                e401="Missing or wrong METRICS_TOKEN.",
+                e404="METRICS_TOKEN is not set.",
+            ),
+        },
     )
     def get(self, request, *args, **kwargs):
         expected = getattr(settings, "METRICS_TOKEN", "")

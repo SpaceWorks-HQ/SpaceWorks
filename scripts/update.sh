@@ -7,6 +7,19 @@ cd "$ROOT"
 
 OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
 COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)
+APP_SERVICE=backend
+IMAGE_SERVICES=(migrate backend worker beat frontend)
+layer="${SPACEWORKS_COMPOSE_LAYER:-}"
+if [[ -z "$layer" && "${SPACEWORKS_COMPOSE_BUILD_LAYER:-0}" == 1 ]]; then
+  layer=build
+fi
+if [[ -z "$layer" && -f "$ROOT/.spaceworks-layer" ]]; then
+  layer="$(tr -d '[:space:]' < "$ROOT/.spaceworks-layer")"
+fi
+if [[ "$layer" == single ]]; then
+  APP_SERVICE=app
+  IMAGE_SERVICES=(migrate app)
+fi
 LOCK_DIR="$ROOT/.spaceworks-update.lock"
 VERSION_FILE="$ROOT/.spaceworks-version"
 RELEASE_API="https://api.github.com/repos/SpaceWorks-HQ/SpaceWorks/releases/latest"
@@ -87,7 +100,7 @@ fi
 wait_for_backend() {
   local _
   for _ in $(seq 1 60); do
-    if "${COMPOSE[@]}" exec -T backend python -c \
+    if "${COMPOSE[@]}" exec -T "$APP_SERVICE" python -c \
       "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/readiness/', timeout=3).read()" \
       >/dev/null 2>&1; then
       return 0
@@ -109,7 +122,12 @@ cleanup() {
       "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]]; then
       say "Update failed; rolling application containers back to $previous_version."
       export MAKERSPACE_IMAGE_TAG="$previous_version"
-      "${COMPOSE[@]}" pull migrate backend worker beat frontend || \
+      # The marker pins every later wrapper call (scripts/spaceworks-compose.sh), so it must
+      # name the release the containers are being returned to. Left on the new tag, the next
+      # plain `up -d` would start the release that just failed, outside this script's gates.
+      printf '%s\n' "$previous_version" > "$VERSION_FILE" || \
+        say "WARNING: could not reset $VERSION_FILE to $previous_version."
+      "${COMPOSE[@]}" pull "${IMAGE_SERVICES[@]}" || \
         say "Could not refresh previous images; trying the host's cached copies."
       if "${COMPOSE[@]}" up -d && wait_for_backend; then
         say "Rollback complete: $previous_version is healthy."
@@ -140,7 +158,10 @@ if [[ "$MODULE_ONLY" == 1 ]]; then
   exit 0
 fi
 
+# Bounded: an unanswered GitHub API call must fail this run (cron logs it and retries next
+# week) instead of holding the update lock forever.
 release_json="$(curl --fail --silent --show-error --location \
+  --connect-timeout 10 --max-time 30 --retry 2 --retry-delay 5 \
   --header 'Accept: application/vnd.github+json' \
   --header 'User-Agent: spaceworks-self-host-updater' \
   "$RELEASE_API")"
@@ -190,7 +211,7 @@ say "Creating database backup backups/$backup_name."
   --name "$backup_name" >/dev/null
 
 say "Pulling immutable release images."
-"${COMPOSE[@]}" pull migrate backend worker beat frontend
+"${COMPOSE[@]}" pull "${IMAGE_SERVICES[@]}"
 
 say "Running migrations and replacing application containers."
 deployment_started=1

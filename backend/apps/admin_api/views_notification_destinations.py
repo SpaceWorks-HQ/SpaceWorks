@@ -24,6 +24,7 @@ from apps.integrations.dispatch_channels import channel_module_blocks
 from apps.admin_api.notification_scope import ScopeTargetError, apply_scope
 from apps.integrations.models_destinations import NotificationDestination
 from apps.makerspaces.servability import servable_queryset
+from apps.openapi_errors import errors
 
 
 def _makerspace(request, makerspace_id):
@@ -44,7 +45,12 @@ class NotificationDestinationListView(APIView):
     permission_classes = [IsActiveStaff]
     http_method_names = ["get", "post", "head", "options"]
 
-    @extend_schema(responses={200: NotificationDestinationSerializer(many=True)})
+    @extend_schema(
+        responses={
+            200: NotificationDestinationSerializer(many=True),
+            **errors(401, 403, 404),
+        }
+    )
     def get(self, request, makerspace_id, *args, **kwargs):
         makerspace = _makerspace(request, makerspace_id)
         return Response(
@@ -165,7 +171,12 @@ class NotificationDestinationDetailView(APIView):
         destination = _queryset(makerspace).get(pk=destination.pk)
         return Response(NotificationDestinationSerializer(destination).data)
 
-    @extend_schema(responses={204: OpenApiResponse(description="Destination removed.")})
+    @extend_schema(
+        responses={
+            204: OpenApiResponse(description="Destination removed."),
+            **errors(401, 403, 404),
+        }
+    )
     def delete(self, request, makerspace_id, destination_id, *args, **kwargs):
         makerspace, destination = self._destination(request, makerspace_id, destination_id)
         label, channel = destination.label, destination.channel

@@ -12,10 +12,12 @@ def reserve_notification_quota(makerspace, channel) -> bool:
 
     if limits.is_self_host():
         return True
-    limit = limits.resource_limit(makerspace, channel)
-    if limit is None:
-        return True
     try:
+        # Inside the try: a malformed override makes the lookup itself raise, and that
+        # must fail open like every other quota failure here rather than drop the fan-out.
+        limit = limits.resource_limit(makerspace, channel)
+        if limit is None:
+            return True
         from apps.integrations.models import DailyNotificationCounter
 
         with transaction.atomic():

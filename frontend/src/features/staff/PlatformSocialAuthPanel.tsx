@@ -64,6 +64,10 @@ export function PlatformSocialAuthPanel() {
       <p className="text-sm text-muted">
         Platform-wide identities link to global accounts; makerspace permissions still come from each membership.
       </p>
+      {settings.data ? <div className="mt-2 text-sm text-muted">
+        <p>Google: {[settings.data.google_web_client_id, settings.data.google_ios_client_id, settings.data.google_android_client_id].some((id) => id.trim()) ? "Client IDs configured" : "Not configured"}</p>
+        <p>Apple: {settings.data.apple_service_id.trim() || settings.data.apple_native_app_ids.length ? "Audiences configured" : "Not configured"}</p>
+      </div> : null}
       <div className="mt-4 space-y-5">
         <fieldset disabled={disabled} className="space-y-3">
           <legend className="font-semibold text-ink">Google OAuth clients</legend>

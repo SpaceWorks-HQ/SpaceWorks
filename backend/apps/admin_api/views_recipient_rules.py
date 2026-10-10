@@ -33,6 +33,7 @@ from apps.integrations.recipient_rule_management import replace_recipient_rules
 from apps.machines import role_scope
 from apps.makerspaces.platform import feature_enabled
 from apps.makerspaces.servability import servable_queryset
+from apps.openapi_errors import errors
 
 DELEGATION_FEATURE = "notifications.delegated_recipients"
 
@@ -59,7 +60,9 @@ class NotificationRecipientRulesView(APIView):
     permission_classes = [IsActiveStaff]
     http_method_names = ["get", "put", "head", "options"]
 
-    @extend_schema(responses={200: RecipientRulesResponseSerializer})
+    @extend_schema(
+        responses={200: RecipientRulesResponseSerializer, **errors(401, 403, 404)}
+    )
     def get(self, request, makerspace_id, *args, **kwargs):
         makerspace, delegated, reach = _access(request, makerspace_id)
         return Response(

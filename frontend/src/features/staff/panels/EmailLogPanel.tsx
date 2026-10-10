@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Panel, useStaffGet, type Makerspace } from "./shared";
 import { staffRequest } from "../../../lib/api";
 
-type EmailLogStatus = "" | "sent" | "failed" | "pending" | "sending";
+type EmailLogStatus = "" | "sent" | "failed" | "pending" | "sending" | "skipped";
 
 type EmailLogEntry = {
   id: number;
@@ -68,6 +68,7 @@ export function EmailLogPanel({ makerspace }: { makerspace: Makerspace }) {
           <option value="failed">Failed</option>
           <option value="pending">Pending</option>
           <option value="sending">Sending</option>
+          <option value="skipped">Skipped</option>
         </select>
       </div>
       {logs.isLoading ? <p className="mb-3 text-sm text-muted">Loading email logs...</p> : null}
@@ -102,7 +103,7 @@ export function EmailLogPanel({ makerspace }: { makerspace: Makerspace }) {
                   </span>
                 </td>
                 <td className="max-w-72 break-words px-2 py-2 text-muted">
-                  {log.status === "failed" ? truncate(log.error) : ""}
+                  {log.status === "failed" || log.status === "skipped" ? truncate(log.error) : ""}
                 </td>
                 <td className="whitespace-nowrap px-2 py-2">
                   {log.status === "failed" || log.status === "sending" ? (

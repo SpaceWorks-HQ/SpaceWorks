@@ -112,7 +112,14 @@ class MakerspacePaymentSettingsAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
             )
 
     def save_model(self, request, obj, form, change):
-        updated = update_payment_settings(obj, form.payment_setting_changes())
+        changes = form.payment_setting_changes()
+        with transaction.atomic():
+            updated = update_payment_settings(obj, changes)
+            audit.record(
+                request.user, "payments.settings_updated",
+                makerspace=updated.makerspace, target=updated,
+                meta={"via": "control", "changed_fields": sorted(set(form.changed_data) & set(changes))},
+            )
         for field in obj._meta.concrete_fields:
             setattr(obj, field.attname, getattr(updated, field.attname))
 

@@ -56,7 +56,7 @@ class SubdomainRequestAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
                     )
                     suffix = str(settings.PLATFORM_DOMAIN_SUFFIX or "").strip().lower()
                     current = (locked_ms.frontend_domain or "").lower()
-                    if current and current.endswith(suffix):
+                    if suffix and current and current.endswith(suffix):
                         raise DjangoValidationError(
                             "This makerspace already has a platform subdomain."
                         )

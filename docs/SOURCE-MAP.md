@@ -8,6 +8,12 @@
 
 ## Current source map (real paths)
 
+Cloud surfaces: `accounts/views_social.py` explicitly exports the nonce/login views in
+`views_social_login.py` and identity management in `views_social_identities.py`, with shared
+verification/error helpers in `views_social_helpers.py`. `integrations/health.py` explicitly exports
+`health_status.py` rollups and `health_chat.py` destination/legacy delivery summaries. The
+read-only scheduler control page lives in `operations/admin_scheduling.py`.
+
 - `backend/config/` — Django project (`settings.py`, `urls.py`, wsgi/asgi). All API routes under `/api/`.
   `config/admin_access.py` holds the `/control/` gating, CSP middleware, and the hidden-scope drift-guard
   registries (`NESTED_MAKERSPACE_LOOKUPS`, `GLOBAL_ADMIN_MODELS`).

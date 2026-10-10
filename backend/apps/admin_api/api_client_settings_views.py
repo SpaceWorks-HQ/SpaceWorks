@@ -19,7 +19,7 @@ _FORBIDDEN = OpenApiResponse(description="The actor lacks manage_makerspace here
     get=extend_schema(
         tags=["API clients"],
         summary="Retrieve API integration settings",
-        responses={200: ApiIntegrationSettingsSerializer, 403: _FORBIDDEN, 404: _NOT_FOUND},
+        responses={200: ApiIntegrationSettingsSerializer, 401: OpenApiResponse(description="Authentication required."), 403: _FORBIDDEN, 404: _NOT_FOUND},
     ),
     patch=extend_schema(
         tags=["API clients"],
@@ -27,6 +27,7 @@ _FORBIDDEN = OpenApiResponse(description="The actor lacks manage_makerspace here
         responses={
             200: ApiIntegrationSettingsSerializer,
             400: OpenApiResponse(description="Field validation errors, keyed by field."),
+            401: OpenApiResponse(description="Authentication required."),
             403: _FORBIDDEN,
             404: _NOT_FOUND,
         },

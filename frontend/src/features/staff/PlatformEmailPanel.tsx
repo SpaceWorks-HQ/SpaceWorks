@@ -75,6 +75,9 @@ export function PlatformEmailPanel() {
       <p className="text-sm text-muted">
         Instance-wide SMTP for password resets and makerspace notifications when a makerspace has no SMTP configured.
       </p>
+      {settings.data ? <p className="mt-2 text-sm text-muted">
+        {settings.data.smtp_host.trim() ? "SMTP host configured" : "Not configured"}
+      </p> : null}
 
       <div className="mt-4 rounded-md border border-line bg-surface p-3">
         <div className="grid gap-2 sm:grid-cols-2">
@@ -130,4 +133,3 @@ function platformEmailPayload(form: PlatformEmailForm) {
   if (form.smtp_password) payload.smtp_password = form.smtp_password;
   return payload;
 }
-

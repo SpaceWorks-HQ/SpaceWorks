@@ -1,12 +1,16 @@
 """Bounded OIDC discovery and authorization-code exchange."""
 
 import json
+import logging
 import time
 from urllib.parse import urlsplit
 
 import requests
+from urllib3.exceptions import HTTPError as Urllib3HTTPError
 from django.conf import settings
 from django.core.cache import cache
+
+logger = logging.getLogger(__name__)
 
 
 class OidcProviderUnavailable(Exception):
@@ -22,7 +26,11 @@ def discover(provider):
         f"oidc-discovery:{provider.pk}:{provider.updated_at.timestamp()}:"
         f"{provider.issuer}"
     )
-    cached = cache.get(cache_key)
+    try:
+        cached = cache.get(cache_key)
+    except Exception:
+        logger.warning("oidc_discovery_cache_read_failed")
+        cached = None
     if isinstance(cached, dict):
         return cached
     suffix = ".well-known/openid-configuration"
@@ -37,11 +45,13 @@ def discover(provider):
     for name in ("authorization_endpoint", "token_endpoint", "jwks_uri"):
         if not _is_https_endpoint(document.get(name)):
             raise OidcProviderUnavailable()
-    cache.set(
-        cache_key,
-        document,
-        max(1, min(int(settings.OIDC_DISCOVERY_CACHE_SECONDS), 3600)),
-    )
+    try:
+        cache.set(
+            cache_key, document,
+            max(1, min(int(settings.OIDC_DISCOVERY_CACHE_SECONDS), 3600)),
+        )
+    except Exception:
+        logger.warning("oidc_discovery_cache_write_failed")
     return document
 
 
@@ -69,6 +79,7 @@ def exchange_code(provider, document, *, code, redirect_uri, code_verifier):
 
 def _json_request(method, url, *, unavailable, rejected=None, data=None):
     started = time.monotonic()
+    response = None
     try:
         response = getattr(requests, method)(
             url,
@@ -83,6 +94,8 @@ def _json_request(method, url, *, unavailable, rejected=None, data=None):
         if length > settings.OIDC_HTTP_MAX_BYTES:
             raise unavailable()
         body = response.raw.read(settings.OIDC_HTTP_MAX_BYTES + 1)
+        if time.monotonic() - started > settings.OIDC_HTTP_TIMEOUT_SECONDS:
+            raise unavailable()
         if len(body) > settings.OIDC_HTTP_MAX_BYTES:
             raise unavailable()
         payload = json.loads(body)
@@ -99,8 +112,16 @@ def _json_request(method, url, *, unavailable, rejected=None, data=None):
         return payload
     except unavailable:
         raise
-    except (requests.RequestException, ValueError, TypeError, json.JSONDecodeError) as exc:
+    except (requests.RequestException, Urllib3HTTPError, OSError, ValueError, TypeError) as exc:
         raise unavailable() from exc
+    finally:
+        if response is not None:
+            close = getattr(response, "close", None)
+            if close is not None:
+                try:
+                    close()
+                except Exception:
+                    logger.warning("oidc_response_close_failed")
 
 
 def _is_https_endpoint(value):
