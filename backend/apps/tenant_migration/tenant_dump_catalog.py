@@ -79,6 +79,8 @@ class TenantDumpCatalogError(AssertionError):
 # the coordinator recomputes the combined machine, maintenance and loan catalog.
 # Merge lane/w2-events with integration/2026-10 (including lane/w2-loans and
 # lane/w2-machines); the coordinator recomputes the merged event/booking catalog.
+# Merge lane/w2-notify with integration/2026-10 (including lane/w2-events,
+# lane/w2-machines and lane/w2-loans); the coordinator recomputes the merged digest.
 CATALOG_SCHEMA_SHA256 = "RECOMPUTE"
 
 

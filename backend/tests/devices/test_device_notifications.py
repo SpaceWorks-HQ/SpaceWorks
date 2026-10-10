@@ -23,13 +23,15 @@ from tests.return_helpers import make_member
 pytestmark = pytest.mark.django_db
 
 
-def test_devices_catalog_is_complete_selectable_and_default_off():
+def test_devices_catalog_keeps_external_channels_off_and_personal_inbox_on():
     space = device_space("device-alert-defaults")
     assert NotificationFeature.DEVICES in SELECTABLE_FEATURES
     assert FEATURE_MODULES[NotificationFeature.DEVICES] == "devices"
     assert FEATURE_EVENTS[NotificationFeature.DEVICES] == ("offline", "recovered")
     assert set(DEFAULT_CHANNEL_STATE[NotificationFeature.DEVICES]) == set(NotificationChannel.values)
-    assert not any(is_notification_enabled(space, "devices", channel) for channel in NotificationChannel.values)
+    assert is_notification_enabled(space, "devices", NotificationChannel.IN_APP)
+    assert not any(is_notification_enabled(space, "devices", channel)
+                   for channel in NotificationChannel.values if channel != NotificationChannel.IN_APP)
     NotificationPreference.objects.create(makerspace=space, feature="devices", channel="email", enabled=True)
     assert is_notification_enabled(space, "devices", "email")
     assert not is_notification_enabled(space, "devices", "telegram")
@@ -77,7 +79,7 @@ def test_notifications_are_on_commit_and_capture_the_state_edge(monkeypatch, dja
     space, _manager, _client, device_id, _private = active_device("device-alert-edge")
     row = Device.objects.get(pk=device_id)
     observed = []
-    monkeypatch.setattr(notify, "_run_guarded", lambda _space, _feature, event, build, _sync, _occurred_at=None: observed.append((event, build())))
+    monkeypatch.setattr(notify, "_run_guarded", lambda _space, _feature, event, build, _sync, _occurred_at=None, _event_key=None: observed.append((event, build())))
     row.offline_since = timezone.now()
     with django_capture_on_commit_callbacks(execute=True):
         notify_device_state(space, row, "offline", now=timezone.now())

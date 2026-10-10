@@ -28,6 +28,7 @@ import { AdmissionJoin } from "./AdmissionJoin";
 import { MemberAdmission, MemberVouch } from "./MemberAdmission";
 import { admissionKeys, publicAdmission, ownAdmission, type AdmissionRequest } from "./membershipAdmissionApi";
 import type { CustomAnswers } from "../forms/customFormTypes";
+import { MemberNotifications } from "../notifications/MemberNotifications";
 
 type Membership = { makerspace: { slug: string; name: string }; membership_status: string; role: string; waiver_acceptance_required: boolean; can_refer: boolean; can_verify: boolean; verified_at: string | null; referrals_enabled: boolean };
 type Memberships = { memberships: Membership[]; requests: (Partial<AdmissionRequest> & { makerspace: { id?: number; slug: string; name: string }; state: string; kind: string })[] };
@@ -131,6 +132,7 @@ export function MemberArea() {
       {/* Notices first: they are the reason to open a dashboard at all. */}
       {activity.data ? <MemberNotices notices={activity.data.notices} /> : null}
       {membership?.membership_status === "active" && (bootstrap.data?.modules ?? []).includes("machines") ? <MemberCertifications key={makerspaceId} makerspaceId={makerspaceId} /> : null}
+      {membership.membership_status === "active" && bootstrap.data?.modules.includes("notifications") ? <MemberNotifications makerspaceId={makerspaceId} features={bootstrap.data.features} /> : null}
       {activity.data ? <MemberActivityPanel activity={activity.data} makerspaceId={makerspaceId} makerspaceSlug={resolvedSlug} /> : null}
       {activity.data ? <MemberTerm term={activity.data.membership_term} /> : null}
       {activity.data ? <MemberDues dues={activity.data.membership_dues} /> : null}

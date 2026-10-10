@@ -41,24 +41,22 @@ class NotificationDeliveryLogAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
 
     @admin.action(description="Re-queue failed deliveries", permissions=["view"])
     def requeue_failed_deliveries(self, request, queryset):
-        from apps.audit import services as audit
-        from apps.integrations.dispatch_channels import _enqueue_notification
+        from apps.integrations.delivery_services import retry_delivery
         from apps.integrations.notification_enums import NotificationDeliveryStatus
+        from rest_framework.exceptions import APIException
+        from apps.backup.not_restored import TenantNotRestored
+        from apps.tenant_migration.gate_errors import SourceMigrationGateError
 
         failed = list(queryset.filter(status=NotificationDeliveryStatus.FAILED))
+        count = 0
         for log in failed:
-            log.status = NotificationDeliveryStatus.PENDING
-            log.error = ""
-            log.save(update_fields=["status", "error", "updated_at"])
-            audit.record(
-                request.user,
-                "notification.delivery_requeued",
-                makerspace=log.makerspace,
-                target=log,
-                meta={"channel": log.channel, "event": log.event, "attempts": log.attempts},
-            )
-            _enqueue_notification(log.pk)
-        self.message_user(request, f"Re-queued {len(failed)} failed deliver{'y' if len(failed) == 1 else 'ies'}.")
+            try:
+                updated = retry_delivery(request.user, log, expected_generation=log.retry_generation)
+                count += updated.retry_generation > log.retry_generation
+            except (APIException, TenantNotRestored, SourceMigrationGateError):
+                # A disabled channel, inaccessible tenant or vanished row cannot abort the batch.
+                continue
+        self.message_user(request, f"Re-queued {count} failed deliver{'y' if count == 1 else 'ies'}.")
     readonly_fields = (
         "makerspace", "channel", "feature", "event", "text_body", "payload",
         "status", "error", "attempts", "created_at", "updated_at", "sent_at",

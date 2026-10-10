@@ -27,6 +27,7 @@ from .models_destinations import (
     NotificationDestination,
 )
 from .models_push import PlatformPushSettings, PushDevice
+from .models_suppression import EmailSuppression
 from .models_recipients import (
     NotificationRecipient,
     NotificationRecipientKind,
@@ -51,6 +52,7 @@ __all__ = [
     'DestinationMachineScope',
     'DestinationMachineTypeScope',
     'EmailLog',
+    'EmailSuppression',
     'EmailNotificationMute',
     'EmailTemplate',
     'MachineTypeEmailTemplate',

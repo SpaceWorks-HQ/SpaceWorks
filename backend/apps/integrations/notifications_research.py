@@ -3,8 +3,8 @@
 import logging
 from functools import wraps
 
-from apps.accounts.models import User
 from apps.accounts import rbac
+from apps.accounts.models import User
 from apps.integrations import recipients
 from apps.integrations.email_templates import render
 from apps.integrations.email_templates_registry_helpers import bag
@@ -13,6 +13,7 @@ from apps.integrations.notify import EmailDelivery, LifecyclePayload, notify_lif
 from apps.integrations.staff_notifications import staff_emails_for_feature
 from apps.makerspaces.models import MakerspaceMembership
 from apps.makerspaces.servability import is_servable
+from apps.notifications.inbox import InboxDelivery
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +57,13 @@ def notify_family(makerspace, feature, event, subject, *, data, scope=None,
                                 stream=stream, audience="staff")
                   for email in (staff_emails_for_feature(makerspace, feature, event=event, scope=scope)
                                 if include_staff and not requester_only else [])]
+        inbox = ()
         if member_id and event in REQUESTER_EVENTS.get(stream, ()):
             owner = User.objects.filter(pk=member_id, is_active=True,
                                         access_status=User.AccessStatus.ACTIVE).first()
-            memberships = MakerspaceMembership.objects.all()
+            memberships = rbac.scope_notification_policy(
+                MakerspaceMembership.objects.all(), makerspace_id=makerspace.pk,
+            )
             certification_reminder = feature == "certifications" and event in ("expiring", "expired")
             if certification_reminder:
                 memberships = rbac.scope_for_scheduled_work(memberships, makerspace_id=makerspace.pk)
@@ -82,14 +86,17 @@ def notify_family(makerspace, feature, event, subject, *, data, scope=None,
             if recipients.has_selection(makerspace, feature, event, scope):
                 permitted = permitted and recipients.requester_selected(makerspace, feature, event, scope)
             owner_email = (owner.email or "").strip() if owner else ""
-            if owner_email and permitted:
+            if owner and permitted:
                 own_context = {**context, "subject": requester_subject or subject}
                 own = render(makerspace, stream, "requester", event, own_context)
-                emails.append(EmailDelivery(to_email=owner_email, subject=own["subject"],
+                inbox = (InboxDelivery(member_id, own["subject"], own["text_body"],
+                                       f"/m/{makerspace.slug}/member"),)
+                if owner_email:
+                    emails.append(EmailDelivery(to_email=owner_email, subject=own["subject"],
                                             text_body=own["text_body"], html_body=own["html_body"],
-                                            stream=stream, audience="requester"))
+                                            stream=stream, audience="requester", user_id=member_id))
         return LifecyclePayload(text=staff["text_body"], context=context, emails=tuple(emails),
-                                scope=scope, data=data,
+                                scope=scope, data=data, inbox=inbox,
                                 staff_channels_enabled=include_staff and not requester_only)
 
     try:

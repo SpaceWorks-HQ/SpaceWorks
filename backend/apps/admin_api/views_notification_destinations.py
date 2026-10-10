@@ -85,6 +85,7 @@ class NotificationDestinationListView(APIView):
                 label=data["label"],
                 telegram_chat_id=(data.get("telegram_chat_id") or "").strip(),
                 is_active=data.get("is_active", True),
+                payload_version=data["payload_version"],
             )
             raw = (data.get("webhook_url") or "").strip()
             if raw:
@@ -141,6 +142,7 @@ class NotificationDestinationDetailView(APIView):
             destination.label = data["label"]
             destination.telegram_chat_id = (data.get("telegram_chat_id") or "").strip()
             destination.is_active = data.get("is_active", True)
+            destination.payload_version = data["payload_version"]
             raw = (data.get("webhook_url") or "").strip()
             if raw:
                 # Blank means "keep the stored credential": the caller cannot read it back,

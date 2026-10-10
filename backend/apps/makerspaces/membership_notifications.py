@@ -8,6 +8,7 @@ from apps.integrations.email_templates_fablab import membership_context
 from apps.integrations.notify import EmailDelivery, LifecyclePayload, notify_lifecycle
 from apps.integrations.staff_notifications import staff_emails_for_feature
 from apps.makerspaces.models import MakerspaceMembership, MembershipRequest
+from apps.notifications.inbox import InboxDelivery
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,8 @@ def _member_email(membership, *, event, subject, body):
             stream="membership",
             event=event,
             audience="member",
+            recipient_id=membership.user_id,
+            feature="members",
         )
     except Exception:
         logger.warning(
@@ -53,7 +56,7 @@ def send_member_verified(membership):
     )
 
 
-def _staff_payload(makerspace, event, context, data):
+def _staff_payload(makerspace, event, context, data, user_id=None):
     from apps.integrations.recipients import feature_available
     from apps.makerspaces.servability import is_servable
     makerspace.refresh_from_db()
@@ -74,6 +77,8 @@ def _staff_payload(makerspace, event, context, data):
     )
     return LifecyclePayload(
         text=staff["text_body"], emails=emails, context=context, data=data,
+        inbox=(InboxDelivery(user_id, "Membership update", f"Your membership: {event.replace('_', ' ')}.",
+                             f"/m/{makerspace.slug}/member"),) if user_id else (),
     )
 
 
@@ -88,6 +93,7 @@ def notify_membership_request_pending(request, *, sync=False):
             "request_pending",
             membership_context(row.makerspace, "request_pending", request=row),
             {"membership_request_id": row.pk},
+            row.user_id,
         )
 
     return notify_lifecycle(
@@ -112,6 +118,7 @@ def notify_member_joined(membership, *, sync=False):
             "member_joined",
             membership_context(row.makerspace, "member_joined", user=row.user),
             {"membership_id": row.pk},
+            row.user_id,
         )
 
     return notify_lifecycle(

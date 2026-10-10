@@ -162,6 +162,15 @@ FEATURE_DEFINITIONS = (
         requires_modules=("maintenance", "machines"),
     ),
     FeatureDefinition(
+        "notifications.member_inbox", "notifications", "Member inbox",
+        "Personal lifecycle messages and read state for members.", default_enabled=False,
+    ),
+    FeatureDefinition(
+        "notifications.member_preferences", "notifications", "Member communication preferences",
+        "Members can mute optional families per personal channel; safety mail stays on.",
+        default_enabled=False,
+    ),
+    FeatureDefinition(
         "machines.certifications", "machines", "Certification gating",
         "Members must hold an unexpired certification for a machine type before "
         "booking it or requesting work on it.",

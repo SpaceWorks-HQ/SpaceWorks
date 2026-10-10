@@ -116,6 +116,9 @@ def test_rollback_drops_delivery(monkeypatch, django_capture_on_commit_callbacks
 def test_each_matrix_cell_only_dispatches_its_channel(monkeypatch, selected):
     space = make_space(f"fanout-{selected}")
     emails, channels = [], []
+    inbox = []
+    monkeypatch.setattr("apps.notifications.inbox.write_matrix_inbox",
+                        lambda space, feature, event, payload, key: inbox.append(payload))
     enabled_channel(monkeypatch, selected)
     successful_sinks(monkeypatch, emails, channels)
     result = notify.notify_lifecycle(
@@ -124,9 +127,15 @@ def test_each_matrix_cell_only_dispatches_its_channel(monkeypatch, selected):
     if selected == NotificationChannel.EMAIL:
         assert len(emails) == 1
         assert channels == []
+    elif selected == NotificationChannel.IN_APP:
+        assert emails == [] and channels == []
+        assert len(inbox) == 1 and inbox[0] == payload()
+        assert result.delivered_counts == {}
+        return
     else:
         assert emails == []
         assert [call["channel"] for call in channels] == [selected]
+    assert inbox == []
     assert result.delivered_counts == {selected: 1}
 
 
@@ -212,4 +221,3 @@ def test_hardware_submitted_adapter_calls_one_fanout_and_carries_no_buttons(monk
     # callback route it fed.
     assert not hasattr(calls[0][2], "telegram_reply_markup")
     assert "Review and decide in the staff console." in calls[0][2].text
-

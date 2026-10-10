@@ -5,10 +5,12 @@ from types import SimpleNamespace
 
 from django.conf import settings
 
+from apps.accounts import rbac
 from apps.integrations.email_templates import printing_context, render
 from apps.integrations.notify import EmailDelivery, LifecyclePayload, notify_lifecycle
 from apps.integrations.staff_notifications import staff_emails_for_feature
 from apps.machines.printer_capabilities import is_printer_type
+from apps.notifications.inbox import InboxDelivery
 
 logger = logging.getLogger(__name__)
 REQUESTER_EVENTS = frozenset({"submitted", "accepted", "started", "rejected", "completed"})
@@ -94,7 +96,9 @@ def notify_printer_service_status(request, event, *, sync=False):
 
     def build():
         from apps.machines.models import MachineServiceRequest
-        row = MachineServiceRequest.objects.select_related(
+        row = rbac.scope_notification_policy(
+            MachineServiceRequest.objects.all(), makerspace_id=makerspace.pk,
+        ).select_related(
             "makerspace", "requester", "queue__machine_type", "bucket__machine__machine_type"
         ).get(pk=request_id)
         emails = []
@@ -105,6 +109,7 @@ def notify_printer_service_status(request, event, *, sync=False):
                     to_email=recipient, subject=rendered["subject"], text_body=rendered["text_body"],
                     html_body=rendered["html_body"], audience="requester", target="requester",
                     stream="printing", mute_event=event,
+                    user_id=row.member_id or row.requester_id,
                 ))
         recipients = staff_emails_for_feature(makerspace, "printing", event=event)
         if recipients:
@@ -116,6 +121,10 @@ def notify_printer_service_status(request, event, *, sync=False):
         return LifecyclePayload(
             text=_staff_body(event, row), emails=tuple(emails),
             data={"machine_service_request_id": row.pk},
+            inbox=(InboxDelivery(row.member_id or row.requester_id, f"Print request #{row.pk}",
+                                 f"Your print request: {event.replace('_', ' ')}.",
+                                 f"/m/{makerspace.slug}/member"),)
+            if event in REQUESTER_EVENTS and (row.member_id or row.requester_id) else (),
         )
 
     try:

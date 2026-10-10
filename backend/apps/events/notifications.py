@@ -11,6 +11,7 @@ from apps.integrations.email_templates_registry_fablab_defaults import (
 from apps.integrations.notify import EmailDelivery, LifecyclePayload, notify_lifecycle
 from apps.integrations.staff_notifications import staff_emails_for_feature
 from apps.makerspaces.servability import servable_q
+from apps.notifications.inbox import InboxDelivery
 from apps.organizations.models import OrganizationMakerspace
 
 
@@ -53,6 +54,10 @@ def _notify_makerspace(
                 "event_id": event.pk, "series_id": event.series_id,
                 "registration_id": registration.pk if registration else None,
             },
+            inbox=(InboxDelivery(registration.member_id, "Event registration update",
+                                 f"Your registration for {event.title}: {event_name.replace('_', ' ')}.",
+                                 f"/m/{makerspace.slug}/member"),)
+            if registration and registration.member_id and makerspace.pk == event.makerspace_id else (),
         )
 
     return notify_lifecycle(

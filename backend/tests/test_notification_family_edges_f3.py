@@ -34,7 +34,7 @@ pytestmark = pytest.mark.django_db
 
 def captured_events(monkeypatch):
     events = []
-    monkeypatch.setattr(notify, "_run_guarded", lambda ms, feature, event, build, sync, occurred_at=None:
+    monkeypatch.setattr(notify, "_run_guarded", lambda ms, feature, event, build, sync, occurred_at=None, event_key=None:
                         events.append((feature, event)))
     return events
 

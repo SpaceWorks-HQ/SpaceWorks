@@ -26,7 +26,7 @@ Read by every backend process. `ALLOWED_HOSTS`, `SECRET_KEY` and the proxy postu
 | `INFRA_HOSTS` | `['localhost', '127.0.0.1', 'backend', 'backend:8000']` | Container hostnames recognised as infrastructure callers by the managed host gate. |
 | `LOG_JSON` | `not DEBUG` |  |
 | `LOG_LEVEL` | `'INFO'` |  |
-| `PUBLIC_APP_BASE_URL` | `''` | Browser origin used in emailed links. Blank falls back to localhost, which is unclickable for real users. |
+| `PUBLIC_APP_BASE_URL` | `''` | Browser origin used in emailed links. Blank falls back to localhost, which is unclickable for real users. Personal optional mail emits RFC 8058 one-click headers only with an HTTPS origin whose `/api/v1` path reaches the backend. |
 | `SECRET_KEY` | — | Required. Rotating it invalidates sessions and signed tokens. |
 | `SPACEWORKS_EDITION` | `'makerspace'` |  |
 | `TOMBSTONED_APPS` | read outside `settings.py` | Comma-separated separable apps to remove from this deployment. |
@@ -85,7 +85,7 @@ Redis backs the cache (rate limits, nonces, verified hosts), the Celery broker a
 | `CELERY_BROKER_URL` | `''` |  |
 | `CELERY_RESULT_BACKEND` | `''` |  |
 | `CELERY_TASK_ALWAYS_EAGER` | `_celery_broker == ''` |  |
-| `REMINDER_SWEEP_BATCH_SIZE` | `200` | Positive subject/claim batch per source and makerspace; shared reminders run every five minutes. |
+| `REMINDER_SWEEP_BATCH_SIZE` | `200` | Positive subject/claim batch per source and makerspace; shared reminders run every five minutes. Also bounds each inbox/delivery retention batch, including platform email logs (90 days read/sent/skipped, 365 failed; unread/in-flight kept). |
 | `CRON_SECRET` | `''` | Enables `POST /api/v1/internal/cron/return-reminders`; 404 while unset. |
 | `LIVE_MAX_STREAM_SECONDS` | `3600` |  |
 | `LIVE_REDIS_URL` | `''` | Defaults to the Celery broker; empty or unparseable makes `/api/v1/live/` answer 503 and the console polls. |

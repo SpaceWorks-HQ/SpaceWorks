@@ -124,6 +124,9 @@ FANOUT_GATE_PARTICIPANTS = {
     "apps.makerspaces.membership_admission_payments.sweep_admissions": (
         "Admission expiry and settlement retries use separate skip-and-count tenant boundaries."
     ),
+    "apps.notifications.retention.run_notification_retention": (
+        "Bounded inbox and terminal delivery cleanup gates each tenant separately."
+    ),
     "apps.operations.reminder_sweeper.run_reminder_sweep": (
         "Shared source-local reminders; each tenant is gated before discovery or dispatch."
     ),

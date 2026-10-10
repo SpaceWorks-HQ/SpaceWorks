@@ -5,6 +5,7 @@ literal: a new column must be classified here before it can export.
 """
 
 EXPORTED_MODEL_FIELDS = {
+    "notifications.MemberNotificationPreference": "id makerspace user feature channel enabled updated_at",
     "operations.SavedView": "id makerspace owner name entity state shared created_at updated_at",
     "makerspaces.MakerspaceLoanPolicy": "id makerspace default_loan_days loan_renewal_mode loan_max_renewals loan_renewal_days loan_max_active loan_max_items loan_reminder_offsets_hours loan_escalate_overdue_days updated_at",
     "apiclients.ApiClient": "id label client_id secret_encrypted previous_secret_encrypted previous_secret_valid_until client_type scopes rate_limit_tier makerspace allowed_origins is_active last_seen_at last_seen_ip import_provenance_digest credential_delivered_at created_by created_at updated_at",
@@ -44,7 +45,7 @@ EXPORTED_MODEL_FIELDS = {
     "integrations.EmailNotificationMute": "id makerspace target stream event audience created_at created_by",
     "integrations.EmailTemplate": "id stream audience key makerspace subject text_body html_body is_active created_at updated_at",
     "integrations.MachineTypeEmailTemplate": "id stream audience key makerspace machine_type subject text_body html_body is_active created_at updated_at",
-    "integrations.NotificationDestination": "id makerspace channel label webhook_url telegram_chat_id signing_secret is_active created_at updated_at",
+    "integrations.NotificationDestination": "id makerspace channel label webhook_url telegram_chat_id signing_secret is_active payload_version created_at updated_at",
     "integrations.NotificationPreference": "id makerspace feature channel enabled updated_by created_at updated_at",
     "integrations.NotificationRecipient": "id makerspace feature event kind role user created_at created_by",
     "integrations.RecipientCategoryScope": "id recipient category",

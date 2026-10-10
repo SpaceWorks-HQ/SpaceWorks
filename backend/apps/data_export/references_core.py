@@ -13,6 +13,10 @@ RAW_USER_REFERENCE_FIELDS = frozenset(  # Raw integers are not discoverable as F
 # MakerspaceLoanPolicy has no accounts.User FKs; its sole relation is makerspace.
 RELATIONAL_USER_FIELDS = frozenset(
     {
+        ("notifications.NotificationInboxRow", "user"),
+        ("notifications.MemberNotificationPreference", "user"),
+        ("integrations.EmailSuppression", "created_by"),
+        ("integrations.EmailLog", "recipient"),
         ("accounts.UserMFA", "user"),
         ("accounts.MFAChallenge", "user"),
         ("accounts.StaffInvitation", "created_by"),

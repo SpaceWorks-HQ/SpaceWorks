@@ -38,6 +38,10 @@ def deliver_native_push(log):
         event=log.event,
         scope=NotificationScope.from_dict((log.payload or {}).get("scope")),
     )
+    from apps.notifications.preferences import personal_enabled
+    user_ids = [uid for uid in user_ids if personal_enabled(
+        log.makerspace, uid, log.feature, "native_push", event=log.event,
+    )]
     devices = PushDevice.objects.filter(
         makerspace=log.makerspace, user_id__in=user_ids, active=True,
         device_grant__status="active", user__is_active=True, user__access_status="active",

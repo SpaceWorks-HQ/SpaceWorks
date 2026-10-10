@@ -39,6 +39,9 @@ SOURCE_FIELDS = (
 SECONDARY_FIELDS = _fields(
     "integrations.EmailLog", ("to_email", "subject", "text_body", "html_body"),
     "makerspace_id", "secondary", ((255, 255, None, None), ("none",) * 4),
+) + _fields(
+    "notifications.NotificationInboxRow", ("title", "summary"),
+    "makerspace_id", "secondary", ((None, None), ("none", "none")),
 )
 ALL_FIELDS = SOURCE_FIELDS + SECONDARY_FIELDS
 BY_MODEL = {}

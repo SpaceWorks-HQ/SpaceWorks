@@ -130,7 +130,7 @@ describe("StaffDock", () => {
     fireEvent.click(operateButton);
     expect(screen.getByRole("link", { name: /Notifications/ })).toHaveTextContent("3");
     await waitFor(() => expect(staffRequest).toHaveBeenCalledTimes(1));
-    expect(staffRequest).toHaveBeenCalledWith("/notifications/makerspace/7/unread-count");
+    expect(staffRequest).toHaveBeenCalledWith("/notifications/inbox/7/unread-count");
   });
 
   it("does not request unread notifications without permission or an active makerspace", async () => {

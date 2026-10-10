@@ -1,5 +1,7 @@
 from django.db import models
 
+from .models_inbox import MemberNotificationPreference, NotificationInboxRow
+
 
 class Notification(models.Model):
     class Level(models.TextChoices):

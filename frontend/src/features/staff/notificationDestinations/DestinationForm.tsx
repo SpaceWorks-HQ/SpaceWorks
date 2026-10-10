@@ -33,6 +33,7 @@ export function DestinationForm({
   const [chatId, setChatId] = useState(destination?.telegram_chat_id ?? "");
   const [signingSecret, setSigningSecret] = useState("");
   const [isActive, setIsActive] = useState(destination?.is_active ?? true);
+  const [payloadVersion, setPayloadVersion] = useState(destination?.payload_version ?? 1);
   const [scope, setScope] = useState<DestinationScope>(destination?.scope ?? EMPTY_SCOPE);
   const [error, setError] = useState("");
 
@@ -51,6 +52,7 @@ export function DestinationForm({
             ...(channel === "webhook" && signingSecret ? { signing_secret: signingSecret } : {}),
             telegram_chat_id: channel === "telegram" ? chatId : "",
             is_active: isActive,
+            payload_version: payloadVersion,
             scope,
           }),
         },
@@ -111,8 +113,8 @@ export function DestinationForm({
             value={chatId}
           />
           <span className="text-xs text-muted">
-            Rooms share this makerspace's bot — add the same bot to each group. Accept and
-            reject buttons keep working because there is one bot and one webhook.
+            Add this makerspace's bot to each group. Alerts are outbound only;
+            review requests in the staff console.
           </span>
         </label>
       ) : (
@@ -148,11 +150,16 @@ export function DestinationForm({
           />
           <span className="text-xs text-muted">
             Every notification routed to this endpoint arrives as JSON with an HMAC-SHA256
-            signature over the exact body. It is the same message a chat room would receive.
+            signature over the exact body. Select the payload format below.
           </span>
         </label>
       ) : null}
 
+      {channel === "webhook" ? <label className="grid gap-1 text-sm">Payload format
+          <select className="desk-input" value={payloadVersion} onChange={(event) => setPayloadVersion(Number(event.target.value) as 1 | 2)}>
+            <option value={1}>v1 legacy envelope</option><option value={2}>v2 structured domain IDs</option>
+          </select>
+      </label> : null}
       <label className="flex items-center gap-2 text-sm">
         <input
           checked={isActive}

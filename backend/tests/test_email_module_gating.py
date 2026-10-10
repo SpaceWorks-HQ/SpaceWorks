@@ -157,11 +157,11 @@ def test_a_skip_counts_as_neither_delivered_nor_failed():
     delivery = SimpleNamespace(
         to_email="member@example.test", subject="S", text_body="B", html_body="",
         stream="membership", mute_event="invitation", audience="member",
-        target="", persist_body=True,
+        target="", persist_body=True, user_id=None,
     )
     delivered, failed = {}, {}
 
-    _dispatch_email_delivery(makerspace, "invitation", delivery, True, delivered, failed)
+    _dispatch_email_delivery(makerspace, "members", "invitation", delivery, True, delivered, failed, {})
 
     assert delivered == {} and failed == {}
 

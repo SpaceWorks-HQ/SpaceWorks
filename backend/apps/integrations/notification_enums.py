@@ -29,6 +29,7 @@ class NotificationFeature(models.TextChoices):
 
 
 class NotificationChannel(models.TextChoices):
+    IN_APP = "in_app", "Inbox"
     EMAIL = "email", "Email"
     TELEGRAM = "telegram", "Telegram"
     SLACK = "slack", "Slack"
@@ -104,6 +105,7 @@ class NotificationDeliveryStatus(models.TextChoices):
 # out — overstating what the toggle does. Tenant email is gated by
 # `dispatch.email_module_blocks`, which knows about the exemptions; this table does not.
 CHANNEL_MODULE_KEYS = {
+    "in_app": "notifications",
     "telegram": "telegram",
     "slack": "slack",
     "mattermost": "mattermost",

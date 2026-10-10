@@ -182,6 +182,8 @@ def send_makerspace_email(
     event="",
     audience="",
     sync=False,
+    recipient_id=None,
+    feature="",
 ):
     from apps.integrations.dispatch import dispatch_email
 
@@ -202,7 +204,8 @@ def send_makerspace_email(
             audience=audience,
             connection="makerspace",
             sync=sync,
+            recipient_id=recipient_id,
+            feature=feature,
         )
         sent += 1 if log.status == log.Status.SENT else 0
     return sent
-

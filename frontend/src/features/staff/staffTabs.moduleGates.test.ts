@@ -1,0 +1,84 @@
+import { describe, expect, it } from "vitest";
+import { getStaffAccess } from "./staffAccess";
+import { filterTabsByEnabledModules } from "./staffTabs";
+
+describe("every tab is gated on the module that backs it", () => {
+  // A saved makerspace always carries the six core keys, because `_canonical_modules`
+  // adds them back on every write -- so "module off" is a non-empty list that omits it.
+  const CORE = ["public_inventory", "request_workflow", "staff_admin", "scanner", "qr_management", "evidence_uploads"];
+  const tabsFor = (modules: string[]) =>
+    filterTabsByEnabledModules(getStaffAccess([], true, false).allowedTabs, { enabled_modules: modules });
+
+  it.each([
+    ["tobuy", "procurement"],
+    ["transfers", "stock_transfers"],
+    ["stocktake", "stocktake"],
+    ["containers", "containers"],
+    ["bulk", "bulk_import"],
+    ["notifications", "notifications"],
+    ["machines", "machines"],
+    ["handover", "machine_service"],
+    ["events", "events"],
+    ["bookings", "bookings"],
+    ["reports", "reports"],
+  ])("hides %s when %s is uninstalled", (tab, module) => {
+    expect(tabsFor([...CORE, module])).toContain(tab);
+    expect(tabsFor(CORE)).not.toContain(tab);
+  });
+
+  it("gates QR tools on print batches, not on the core key it cannot switch off", () => {
+    // Every action in the panel requires a selected batch, so `qr_management` -- which is
+    // core and always on -- gated nothing at all.
+    expect(tabsFor(CORE)).not.toContain("qr");
+    expect(tabsFor([...CORE, "qr_print_batches"])).toContain("qr");
+  });
+
+  it("keeps core-backed tabs when every optional module is off", () => {
+    const tabs = tabsFor(CORE);
+
+    for (const tab of ["dashboard", "requests", "inventory", "ledger", "scanner", "settings", "users", "audit"]) {
+      expect(tabs).toContain(tab);
+    }
+  });
+
+  it("keeps members and the email log ungated", () => {
+    const tabs = tabsFor(CORE);
+
+    // Gating `members` would take the staff roster and role assignment with it, letting a
+    // space lock itself out of its own administration.
+    expect(tabs).toContain("members");
+    // A module-blocked message becomes a terminal SKIPPED row so the operator can see what
+    // the toggle suppressed; gating the log would hide exactly that evidence.
+    expect(tabs).toContain("email-logs");
+  });
+
+  it("treats an unloaded makerspace as unrestricted rather than blanking the console", () => {
+    expect(filterTabsByEnabledModules(getStaffAccess([], true, false).allowedTabs, undefined))
+      .toContain("tobuy");
+  });
+});
+
+
+describe("modules console tab", () => {
+  it("is superadmin-only, mirroring who owns enabled_modules on the backend", () => {
+    // A staff PATCH carrying enabled_modules is a hard 403; the console must not become
+    // the way around that.
+    expect(getStaffAccess([], true, false).allowedTabs).toContain("modules");
+    expect(getStaffAccess(["manage_makerspace"], false, false).allowedTabs).not.toContain("modules");
+  });
+
+  it("stays available in a single-tenant deployment", () => {
+    // Unlike `platform`: a single-tenant operator is exactly who needs to install modules,
+    // and /control/ is not proxied on the public frontend port for them to fall back to.
+    expect(getStaffAccess([], true, true).allowedTabs).toContain("modules");
+    expect(getStaffAccess([], true, true).allowedTabs).not.toContain("platform");
+  });
+
+  it("is never removed by a module gate", () => {
+    // The registry is core. A console that vanished with the modules it administers
+    // would be unusable exactly when an operator needed it.
+    const core = ["public_inventory", "request_workflow", "staff_admin", "scanner", "qr_management", "evidence_uploads"];
+    expect(filterTabsByEnabledModules(getStaffAccess([], true, false).allowedTabs, { enabled_modules: core }))
+      .toContain("modules");
+  });
+});

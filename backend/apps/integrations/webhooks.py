@@ -158,6 +158,9 @@ def sign_webhook_body(secret: str, body: bytes, timestamp: int) -> str:
 def webhook_event_body(log) -> dict:
     """The JSON a signed webhook receives: exactly the notification a chat room would get,
     plus the ids the matrix already attached. No `meta`, no contact fields."""
+    if getattr(getattr(log, "destination", None), "payload_version", 1) == 2:
+        from apps.integrations.webhook_schema import structured_body
+        return structured_body(log)
     return {
         "id": log.pk,
         "event": log.event,
@@ -187,6 +190,10 @@ def send_signed_webhook(log) -> bool:
         DELIVERY_HEADER: str(log.pk),
         "User-Agent": "SpaceWorks-Webhook/1",
     }
+    if getattr(destination, "payload_version", 1) == 2:
+        from apps.integrations.webhook_schema import canonical_event
+        headers[EVENT_HEADER] = canonical_event(log)
+        headers["User-Agent"] = "SpaceWorks-Webhook/2"
     try:
         _deliver(url, body, headers)
         return True

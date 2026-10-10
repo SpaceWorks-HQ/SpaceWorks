@@ -154,7 +154,7 @@ def test_api_access_catalog_preserves_defaults_and_can_be_muted_via_scoped_api()
     actor = make_member("api-resolution-manager", space)
     assert FEATURE_EVENTS[FEATURE] == (EVENT,)
     assert DEFAULT_CHANNEL_STATE[FEATURE] == {
-        channel: channel in {"email", "telegram"} for channel in NotificationChannel.values
+        channel: channel in {"email", "telegram", "in_app"} for channel in NotificationChannel.values
     }
     url = reverse("admin-notification-rules", kwargs={"makerspace_id": space.pk})
     response = authenticated_client(actor).patch(url, {

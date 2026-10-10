@@ -35,14 +35,20 @@ def run_reminder_sweep(*, now=None, limit=None, tz_resolver=None, source_keys=No
     sources = reminder_registry.registered_sources()
     if source_keys is not None:
         sources = tuple(source for source in sources if source.key in source_keys)
-    if not sources:
-        return {"dispatched": 0, "skipped": 0, "failed": 0}
+        if not sources:
+            return {"dispatched": 0, "skipped": 0, "failed": 0}
     if transaction.get_connection().in_atomic_block or not transaction.get_autocommit():
         raise RuntimeError("Reminder sweeps require autocommit.")
     now = utc_time(timezone.now() if now is None else now)
     limit = settings.REMINDER_SWEEP_BATCH_SIZE if limit is None else limit
     if type(limit) is not int or limit < 1:
         raise ValueError("Reminder sweep batch size must be a positive integer.")
+    if source_keys is None:
+        # Global retention belongs to F1, not the legacy loan-only sweep.
+        from apps.notifications.retention import run_notification_retention
+        run_notification_retention(now=now, limit=limit)
+    if not sources:
+        return {"dispatched": 0, "skipped": 0, "failed": 0}
     counts = {"dispatched": 0, "skipped": 0, "failed": 0}
     tenants = rbac.scope_for_scheduled_work(Makerspace.objects.all(), field="pk").order_by("pk")
     for makerspace in tenants.iterator(chunk_size=100):
