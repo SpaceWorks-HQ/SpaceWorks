@@ -11,6 +11,8 @@ declare const process: { env: Record<string, string | undefined> };
 export const API_URL = process.env.E2E_API_URL ?? "http://localhost:8100";
 
 type SeedFile = {
+  event_title?: string;
+  bookable_space?: string;
   slug: string;
   makerspace_id: number;
   makerspace_name: string;
@@ -36,6 +38,8 @@ function loadSeed(): SeedFile | null {
 const seedFile = loadSeed();
 
 export const SEED = {
+  eventTitle: seedFile?.event_title ?? "E2E Public Workshop",
+  bookableSpace: seedFile?.bookable_space ?? "E2E Public Bench",
   slug: seedFile?.slug ?? "e2e-space",
   makerspaceId: seedFile?.makerspace_id ?? 0,
   makerspaceName: seedFile?.makerspace_name ?? "E2E Makerspace",

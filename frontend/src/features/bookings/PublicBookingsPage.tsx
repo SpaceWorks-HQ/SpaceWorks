@@ -1,3 +1,4 @@
+import { useTenantBranding } from "../../lib/useTenantBranding";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -35,6 +36,7 @@ export function PublicBookingsPage() {
   const tenantPath = useTenantPath(makerspaceSlug);
   const bootstrapQuery = useTenantBootstrap(makerspaceSlug, tenant.mode === "central");
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
+  const brandStyle = useTenantBranding(bootstrap);
   const modules = tenant.mode === "single" ? tenant.modules : new Set(bootstrap?.modules ?? []);
   const spaces = usePublicSpaces(makerspaceSlug);
   const [activeToken, setActiveToken] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export function PublicBookingsPage() {
   const displayName = bootstrap?.branding.display_name || bootstrap?.makerspace.name || formatSlug(makerspaceSlug) || "Makerspace";
 
   return (
-    <main className="desk-shell flex min-h-screen flex-col">
+    <main style={brandStyle} className="desk-shell flex min-h-screen flex-col">
       <SkipLink />
       <header className="border-b border-line bg-panel">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -105,7 +107,7 @@ export function PublicBookingsPage() {
           </div>
         ) : null}
       </section>
-      <SiteFooter />
+      <SiteFooter branding={bootstrap?.branding} />
     </main>
   );
 }

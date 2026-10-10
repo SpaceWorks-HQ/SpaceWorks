@@ -43,7 +43,7 @@ install/run/update, using the crash-recoverable PID/timestamp update lock when `
 restore and compound host recovery stay WSL2-only because they require AF_UNIX sockets and
 root-owned-file trust semantics. See
 `docs/setup-for-makerspaces.md`. TLS is env-gated (`ENABLE_HTTPS`, default off). First-run
-`setup_instance` seeds `superadmin`/`super123` + `must_change_password` (surfaced by login + `/auth/me`,
+`setup_instance` creates `superadmin` with a generated password printed once + `must_change_password` (surfaced by login + `/auth/me`,
 cleared by `/auth/change-password`).
 
 **Releases are titled `SpaceWorks <version>`** (owner convention, 2026-08-15), where the version is the

@@ -8,12 +8,10 @@ import "./index.css";
 import { cleanupLegacyAccessToken } from "./lib/api";
 import { queryClient } from "./lib/queryClient";
 import { TenantProvider } from "./lib/tenant";
-import { readStorage } from "./lib/safeStorage";
+import { initializeTheme } from "./lib/theme";
 import { pruneExpiredOfflineStates } from "./features/staff/eventCheckInOfflineStore";
 
-if (readStorage("makerspace.theme") === "dark") {
-  document.documentElement.classList.add("dark");
-}
+initializeTheme();
 cleanupLegacyAccessToken();
 void pruneExpiredOfflineStates().catch(() => undefined);
 if (import.meta.env.PROD && "serviceWorker" in navigator) {

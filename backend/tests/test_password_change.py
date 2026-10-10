@@ -1,3 +1,5 @@
+from io import StringIO
+
 import pytest
 from django.contrib.auth import authenticate, get_user_model
 from django.core.management import call_command
@@ -16,7 +18,7 @@ AUDIT_LOGS = "/api/v1/admin/audit-logs"
 
 
 def test_must_change_password_blocks_protected_api_until_rotated():
-    """The default super123 seed must not reach protected staff endpoints over the
+    """The generated first-run credential must not reach protected staff endpoints over the
     API before rotating — only the rotation/me path stays open."""
     get_user_model().objects.create_user(
         username="gated-superadmin",
@@ -54,30 +56,55 @@ def test_setup_instance_default_superadmin_must_change_password(monkeypatch):
     monkeypatch.delenv("SETUP_SUPERADMIN_USERNAME", raising=False)
     monkeypatch.delenv("SETUP_SUPERADMIN_PASSWORD", raising=False)
 
-    call_command("setup_instance")
+    output = StringIO()
+    call_command("setup_instance", stdout=output, no_color=True)
 
     user = get_user_model().objects.get(username="superadmin")
     assert user.must_change_password is True
-    assert user.check_password("super123")
+    password = output.getvalue().split("Generated superadmin password: ", 1)[1].splitlines()[0]
+    assert len(password) >= 32
+    assert user.check_password(password)
+    output = StringIO()
+    call_command("setup_instance", stdout=output, no_color=True)
+    user.refresh_from_db()
+    assert user.check_password(password)
+    assert "Generated superadmin password:" not in output.getvalue()
 
 
 def test_setup_instance_explicit_password_does_not_force_change(monkeypatch):
     monkeypatch.delenv("SETUP_SUPERADMIN_USERNAME", raising=False)
     monkeypatch.delenv("SETUP_SUPERADMIN_PASSWORD", raising=False)
 
+    output = StringIO()
     call_command(
         "setup_instance",
         username="explicit-superadmin",
         password="Explicit-Strong-123",
+        stdout=output,
     )
 
     user = get_user_model().objects.get(username="explicit-superadmin")
     assert user.must_change_password is False
     assert user.check_password("Explicit-Strong-123")
+    assert "Explicit-Strong-123" not in output.getvalue()
+
+
+def test_setup_instance_generates_distinct_credentials(monkeypatch):
+    monkeypatch.delenv("SETUP_SUPERADMIN_PASSWORD", raising=False)
+    passwords = []
+    for username in ("generated-one", "generated-two"):
+        output = StringIO()
+        call_command("setup_instance", username=username, stdout=output, no_color=True)
+        password = output.getvalue().split("Generated superadmin password: ", 1)[1].splitlines()[0]
+        passwords.append(password)
+        user = get_user_model().objects.get(username=username)
+        assert user.check_password(password)
+        assert user.must_change_password
+    assert passwords[0] != passwords[1]
 
 
 def test_must_change_password_blocks_django_admin():
-    """The default super123 seed must not reach /admin/ before rotating, or it would
+    """The generated first-run credential must not reach /admin/ before rotating, or it would
     bypass the API/staff-console forced-change gate."""
     user = get_user_model().objects.create_user(
         username="admin-gated-super",

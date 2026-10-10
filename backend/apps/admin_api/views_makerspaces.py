@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.admin_api.permissions import IsActiveStaff
+from apps.admin_api.serializers_theme import MAKERSPACE_WRITE_ERRORS
 from apps.admin_api.serializers_makerspaces import (
     MakerspaceSerializer,
     MakerspaceSwitcherSerializer,
@@ -24,6 +25,7 @@ from apps.makerspaces.servability import servable_queryset
 
 
 @extend_schema(tags=["Admin makerspaces"], summary="List or create makerspaces")
+@extend_schema(methods=["POST"], responses={201: MakerspaceSerializer, **MAKERSPACE_WRITE_ERRORS})
 class MakerspaceListCreateView(generics.ListCreateAPIView):
     serializer_class = MakerspaceSerializer
     permission_classes = [IsActiveStaff]
@@ -89,6 +91,7 @@ class MakerspaceListCreateView(generics.ListCreateAPIView):
 
 
 @extend_schema(tags=["Admin makerspaces"], summary="Retrieve or update a makerspace")
+@extend_schema(methods=["PATCH"], responses={200: MakerspaceSerializer, **MAKERSPACE_WRITE_ERRORS})
 class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = MakerspaceSerializer
     permission_classes = [IsActiveStaff]

@@ -1,3 +1,4 @@
+import { useTenantBranding } from "../../lib/useTenantBranding";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
@@ -42,7 +43,7 @@ function publicEventsPath(slug: string) {
 
 function eventTime(event: PublicEvent) {
   const options: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
-  return `${new Date(event.starts_at).toLocaleString(undefined, options)} – ${new Date(event.ends_at).toLocaleString(undefined, options)}`;
+  return `${new Date(event.starts_at).toLocaleString(undefined, options)} â€“ ${new Date(event.ends_at).toLocaleString(undefined, options)}`;
 }
 
 export function PublicEventsPage() {
@@ -52,6 +53,7 @@ export function PublicEventsPage() {
   const tenantPath = useTenantPath(makerspaceSlug);
   const bootstrapQuery = useTenantBootstrap(makerspaceSlug, tenant.mode === "central");
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
+  const brandStyle = useTenantBranding(bootstrap);
   const [activeToken, setActiveToken] = useState<string | null>(null);
   const [calendarToken, setCalendarToken] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<{ token: string; message: string } | null>(null);
@@ -94,7 +96,7 @@ export function PublicEventsPage() {
     }
   }
 
-  return <main className="desk-shell flex min-h-screen flex-col">
+  return <main style={brandStyle} className="desk-shell flex min-h-screen flex-col">
     <SkipLink />
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -127,15 +129,15 @@ export function PublicEventsPage() {
           <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="title-panel">{item.title}</h3><p className="eyebrow mt-1"><time dateTime={item.starts_at}>{eventTime(item)}</time></p>{item.location ? <p className="eyebrow mt-1">{item.location}</p> : null}</div><StatusBadge status={item.status} /></div>
           {item.description ? <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink">{item.description}</p> : null}
           <dl className="mt-4 flex flex-wrap gap-4 text-sm"><div><dt className="eyebrow">Capacity</dt><dd className="font-mono font-semibold text-ink">{unlimited ? "Unlimited" : item.capacity}</dd></div><div><dt className="eyebrow">Availability</dt><dd className="font-mono font-semibold text-ink">{item.availability}</dd></div></dl>
-          {!item.registration_open ? <p className="mt-4 text-sm font-semibold text-muted">Registration closed{item.effective_registration_cutoff_at ? ` · ${new Date(item.effective_registration_cutoff_at).toLocaleString()}` : ""}</p> : null}
-          <div className="mt-4 flex flex-wrap gap-2"><button className="desk-button-primary" type="button" disabled={!item.registration_open} aria-expanded={open} onClick={() => setActiveToken(open ? null : item.public_token)}>{open ? "Close form" : actionLabel}</button>
-          <button className="desk-button" type="button" disabled={calendarToken === item.public_token} onClick={() => downloadCalendar(item)}>{calendarToken === item.public_token ? "Preparing…" : "Add to calendar"}</button></div>
+          {!item.registration_open ? <p className="mt-4 text-sm font-semibold text-muted">Registration closed{item.effective_registration_cutoff_at ? ` Â· ${new Date(item.effective_registration_cutoff_at).toLocaleString()}` : ""}</p> : null}
+          <div className="mt-4 flex flex-wrap gap-2"><button className="desk-button-secondary" type="button" disabled={!item.registration_open} aria-expanded={open} onClick={() => setActiveToken(open ? null : item.public_token)}>{open ? "Close form" : actionLabel}</button>
+          <button className="desk-button" type="button" disabled={calendarToken === item.public_token} onClick={() => downloadCalendar(item)}>{calendarToken === item.public_token ? "Preparingâ€¦" : "Add to calendar"}</button></div>
           {calendarError?.token === item.public_token ? <p className="mt-2 text-sm text-danger" role="alert">{calendarError.message}</p> : null}
           {open && item.registration_open ? <div className="mt-4"><EventRegistrationForm key={item.public_token} makerspaceSlug={makerspaceSlug} publicToken={item.public_token} waitlist={waitlist} approvalRequired={item.registration_requires_approval} customForm={item.custom_form} /></div> : null}
           </div>
         </article>;
       })}</div></section>)}</div> : null}
     </section>
-    <SiteFooter />
+    <SiteFooter branding={bootstrap?.branding} />
   </main>;
 }

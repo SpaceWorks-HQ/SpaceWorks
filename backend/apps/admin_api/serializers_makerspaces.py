@@ -1,3 +1,4 @@
+from apps.admin_api.serializers_theme import ThemeConfigField
 from rest_framework import serializers
 
 from apps.admin_api.serializers_makerspace_aux import (
@@ -19,6 +20,7 @@ class MakerspaceSerializer(
     MakerspaceMutationMixin,
     serializers.ModelSerializer,
 ):
+    theme_config = ThemeConfigField(required=False)
     resource_limit_overrides = serializers.JSONField(required=False)
     frontend_domain = serializers.CharField(
         required=False,

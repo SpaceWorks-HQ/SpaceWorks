@@ -10,7 +10,7 @@ from apps.makerspaces.origin_scope import (
 
 
 def active_user(user):
-    # `must_change_password` (the default super123 seed) must NOT be able to reach
+    # `must_change_password` (the generated first-run credential) must NOT be able to reach
     # protected staff/admin endpoints over the API before rotating — only the
     # IsAuthenticated rotation path (/auth/change-password, /auth/me) stays open.
     return bool(

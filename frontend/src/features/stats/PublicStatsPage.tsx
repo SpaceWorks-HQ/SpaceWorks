@@ -1,3 +1,5 @@
+import { SiteFooter } from "../../components/SiteFooter";
+import { useTenantBranding } from "../../lib/useTenantBranding";
 import { Link, useParams } from "react-router-dom";
 
 import { MakerspaceBrand } from "../../components/MakerspaceBrand";
@@ -27,6 +29,7 @@ export function PublicStatsPage() {
   );
   const statsQuery = usePublicStats(makerspaceSlug);
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
+  const brandStyle = useTenantBranding(bootstrap);
   const displayName =
     bootstrap?.branding.display_name ||
     bootstrap?.makerspace.name ||
@@ -34,7 +37,7 @@ export function PublicStatsPage() {
     "Makerspace";
 
   return (
-    <main className="desk-shell">
+    <main style={brandStyle} className="desk-shell">
       <SkipLink />
       <header className="border-b border-line bg-panel">
         <div className="mx-auto flex max-w-screen-2xl flex-col gap-4 px-5 py-6 sm:px-8">
@@ -85,7 +88,7 @@ export function PublicStatsPage() {
           </>
         ) : null}
       </section>
-    </main>
+    <SiteFooter branding={bootstrap?.branding} /></main>
   );
 }
 

@@ -2,26 +2,22 @@ from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
-from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils.crypto import get_random_string
 
-from apps.makerspaces.capabilities import (
-    default_enabled_features,
-    prune_features,
-    validate_capabilities,
-)
+from apps.makerspaces.capabilities import default_enabled_features
 from apps.makerspaces.module_registry import default_enabled_module_keys
 from apps.makerspaces.provenance import validate_actor_snapshot
 from apps.makerspaces.request_access import reconcile_enabled_modules
 from apps.makerspaces.models_makerspace_secrets import MakerspaceSecretsMixin
+from apps.makerspaces.models_makerspace_validation import clean_makerspace
 from apps.makerspaces.validators import (
+    validate_presence_presets,
     DEFAULT_PRESENCE_PRESETS,
     validate_google_maps_url,
-    validate_presence_presets,
 )
 from apps.makerspaces.models import (
     default_branding_config,
@@ -191,7 +187,7 @@ class Makerspace(MakerspaceSecretsMixin, models.Model):
         on_delete=models.PROTECT,
         related_name="+",
     )
-    # Soft-delete state. archived_at IS NOT NULL â‡’ archived (single source of truth; no
+    # Soft-delete state. archived_at IS NOT NULL => archived (single source of truth; no
     # separate boolean). Operational reachability also requires lifecycle_state=ACTIVE;
     # importing/aborted rows stay visible only to narrow import/recovery operations.
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
@@ -261,37 +257,4 @@ class Makerspace(MakerspaceSecretsMixin, models.Model):
         super().save(*args, **kwargs)
 
     def clean(self):
-        if self.presence_preset_minutes:
-            validate_presence_presets(self.presence_preset_minutes)
-        # Drop features whose module is not in this row's set BEFORE validating. The
-        # module set is authoritative — `_canonical_modules` already normalizes rather
-        # than rejects (it adds core keys back), and this is the same class of
-        # normalization on the other axis.
-        #
-        # Without it a row can be born invalid and then never saved again: creating a
-        # makerspace with a narrow `enabled_modules` still takes the FIELD default for
-        # `enabled_features`, which includes the default-on `payments.enabled` and
-        # `mobile.push`. Those demand modules the row does not have, so `clean()` raised
-        # on every subsequent save — including saves that touched neither field, such as
-        # a Space Manager toggling public stats.
-        #
-        # The user-facing strictness is unaffected: the `/control/` capability matrix and
-        # `module_install` call `validate_capabilities` directly before saving, so a
-        # conflict the operator actually expressed is still reported there rather than
-        # silently cleared.
-        kept, _dropped = prune_features(
-            self.enabled_features or [], self.enabled_modules or []
-        )
-        self.enabled_modules, self.enabled_features = validate_capabilities(
-            self.enabled_modules or [], kept
-        )
-        if self.hidden_from_central_directory and not self.frontend_domain:
-            raise ValidationError(
-                {
-                    "hidden_from_central_directory": (
-                        "A frontend domain is required to hide a makerspace from the central directory."
-                    )
-                }
-            )
-        if self.geofence_enabled and not self.geofence_effective:
-            raise ValidationError({"geofence_enabled": "Set both latitude and longitude before enabling the geofence."})
+        clean_makerspace(self)
