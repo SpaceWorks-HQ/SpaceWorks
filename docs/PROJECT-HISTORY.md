@@ -279,3 +279,8 @@ One line per shipped batch. The rules these introduced live in `docs/INVARIANTS.
   orphaned backend lifecycles into the React console.
 - **Deploy / production** (2026-06-19): single-tenant branded frontend, Supabase free-tier dual-mode
   (env-toggled; localhost default unchanged), lean-paid production deploy artifacts + perf hardening.
+
+
+Pending lane integration: 2026-10-10 phase 7d monitoring/notification/identity UI and module-health
+coverage drafted against 7a; local frontend checks complete, database verification and 7b/7c adapter
+UI integration outstanding. This entry is not a shipped-release claim.

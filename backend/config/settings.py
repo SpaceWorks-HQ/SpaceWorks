@@ -579,6 +579,10 @@ TENANT_DUMP_STAGING_MAX_AGE_SECONDS = env.int(
 )
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
 CELERY_BEAT_SCHEDULE = {
+    "scan-offline-devices": {
+        "task": "apps.devices.tasks.scan_offline_devices_task",
+        "schedule": crontab(minute="*"),
+    },
     "flush-api-client-usage": {
         "task": "apps.apiclients.tasks.flush_api_client_usage_task",
         "schedule": crontab(minute="*"),
@@ -686,6 +690,12 @@ if "events" in TOMBSTONED_APPS:
         name: entry
         for name, entry in CELERY_BEAT_SCHEDULE.items()
         if ".events." not in entry["task"]
+    }
+
+if "devices" in TOMBSTONED_APPS:
+    CELERY_BEAT_SCHEDULE = {
+        name: entry for name, entry in CELERY_BEAT_SCHEDULE.items()
+        if ".devices." not in entry["task"]
     }
 
 CORS_ALLOWED_ORIGINS = env.list(

@@ -41,6 +41,8 @@ class DeviceEvent(models.Model):
         LABEL_COMMAND_SUCCEEDED = "label_command_succeeded", "Label command succeeded"
         LABEL_COMMAND_RETRY_SCHEDULED = "label_command_retry_scheduled", "Label command retry scheduled"
         LABEL_COMMAND_FAILED = "label_command_failed", "Label command failed"
+        OFFLINE = "offline_detected", "Offline detected"
+        RECOVERED = "recovered", "Recovered"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     makerspace = models.ForeignKey(

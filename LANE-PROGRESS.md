@@ -219,3 +219,197 @@ backend/tests/tombstone/test_label_devices_7c.py
 Existing tests/tenant_migration/test_authority_dispositions_d8.py and
 test_target_projection.py now include the 7c authority/projection expectations;
 their existing tests are retained, not newly written.
+
+---
+
+# Lane 7d progress - handoff
+
+## Completed
+
+1. Reviewed the 7d/parent plans, parent review and HANDOVER-CODEX section 7 against lane/7a.
+   Review: docs/stage1-p7d.md. It cannot be written to the requested main-checkout path under
+   this lane's edit-only-worktree restriction; coordinator must copy it there.
+2. Split source-gate HTTP/task/object declarations behind gate_policy.py and staff lazy/platform
+   rendering behind StaffTabLoaders.tsx / StaffPlatformTabContent.tsx. Prior policy entries preserved.
+3. Added servable/module-filtered, per-tenant source-gated offline scan, row-locked offline/recovery
+   events and audited bounded nonce/terminal-enrollment retention. Never-seen activation comes from
+   retained enrolled events; reactivation clears old observation state. Heartbeat uses the shared
+   record_activity_locked hook. Nonce cleanup retains one extra second for inclusive signature skew.
+4. Registered identical one-minute Celery/beatless schedules and devices tombstone filters, plus both
+   task/fan-out gate catalogs. Beatless cron must run every minute to obtain one-minute latency.
+5. Added selectable devices offline/recovered notification feature, complete default-off channel
+   state, MANAGE_DEVICES fallback, active membership filtering, shared push recipients and staff-only
+   email/chat templates with credential-free edge snapshots; on-commit delivery fails safe.
+6. Added paginated identity/status console with create/rename/threshold/revoke/rotate/reactivate,
+   loading/error/retry/empty states, short fingerprints, local one-time enrollment modal and shared
+   query invalidation. Secret-bearing mutations return void; modal close clears bearer state.
+   Custom device managers can reach the device email-template stream. Device stream module-off is 400; affected email-template endpoints document error response schemas.
+7. Extended existing module operational health offline failure classification, preserving device -> mobile.
+   Added typed portable audit edges in a new devices_7d registry sibling. No new model/module/action/
+   capability/environment setting or field-name snapshot change.
+8. Updated invariants, source map, module documentation and explicitly pending status/history.
+
+## Remaining / skipped / decisions
+
+- This worktree contains only 7a. No 7b printer binding/job/command/telemetry APIs and no 7c label
+  selectors/send/reprint APIs exist. Printer/command components, needs-review approvals and
+  QrBatchDevicePrint child were not built against guessed routes. Integrate sibling lanes, then add
+  those components, hook authenticated printer traffic into record_activity_locked and widen tab
+  access using their machine/QR-scoped APIs. Identity tab currently requires MANAGE_DEVICES to match 7a.
+- Do not edit generated OpenAPI JSON/types here; coordinator regenerates them.
+- Both choice-only migrations are explicit drafts because Django is not installed. Coordinator must
+  run makemigrations --check, schema validation, DB tests and gated independent review before accepting.
+- No owner product decision needed for implemented scope. Adapter UI is a missing lane dependency.
+- No git state-changing command, staging, commit, merge or push performed. Every change is unstaged.
+- codex doctor: CLI executes, but home/config resolution fails and provider endpoints are unreachable.
+  Independent CLI review is blocked in this sandbox; coordinator owns that gate.
+- No database tests were run and none are claimed to pass.
+
+## Verification actually performed
+
+- Focused Vitest run: 7 files, 64 tests passed (new device UI/tab/matrix tests plus existing staff-tab,
+  organization analytics/governance and member-card navigation tests).
+- node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json: exit 0.
+- node node_modules/vite/bin/vite.js build: exit 0, 472 modules transformed.
+- Python AST parsed every changed Python file; gate-policy dictionary entries compared to HEAD;
+  file ceilings checked (only existing accepted settings.py exception); AGENTS/CLAUDE byte parity
+  and coordinator-generated-file ownership checked. git diff --check: exit 0 (line-ending warnings).
+- After final ASCII text cleanup, the 3 new frontend files were re-run: 15 tests passed; typecheck and Vite build again exited 0.
+- Frontend dependencies copied read-only from main checkout into this lane's gitignored node_modules;
+  built dist is gitignored and not part of the handoff.
+
+## Migrations
+
+- backend/apps/devices/migrations/0002_offline_event_choices.py -> devices.0001_device_identity.
+  AlterField DeviceEvent.event_type choices only; no retained-history data mutation.
+- backend/apps/integrations/migrations/0026_device_notifications.py -> integrations.0025_webhook_channel.
+  AlterField feature choices on NotificationPreference, NotificationDeliveryLog, NotificationRecipient,
+  ChatTemplate; AlterField EmailTemplate.stream choices. No new row/field/model.
+
+## Coordinator test run
+
+Use ./scripts/dev.sh test tests/devices tests/test_scheduled_tasks.py tests/test_email_templates_registry.py
+with the isolated runner. Also run notification/email/staff-notification regression suites,
+tests/tenant_migration (source-gate/audit/export guards), tests/data_export, tests/operations/report coverage,
+tests/tombstone, tests/modules and device backup/restore authority checks. Do not run two suites on one DB.
+Run makemigrations --check and spectacular schema validation; regenerate both frontend API artifacts.
+
+## Exact backend test inventory (written, not executed)
+
+- backend/tests/devices/test_device_notifications.py
+  - test_devices_catalog_is_complete_selectable_and_default_off
+  - test_device_fallback_is_active_manage_devices_staff_in_this_tenant
+  - test_explicit_user_selection_matches_email_and_push_and_honors_opt_out
+  - test_templates_are_staff_only_validated_and_contain_no_secrets
+  - test_notifications_are_on_commit_and_capture_the_state_edge
+  - test_default_off_emits_no_external_delivery
+  - test_provider_exception_does_not_fail_offline_scan_or_recovery
+  - test_device_stream_visible_to_identity_manager_and_hidden_without_module
+  - test_choice_migrations_match_runtime_fields
+  - test_device_delivery_is_suppressed_if_module_is_disabled_before_commit
+  - test_foreign_named_recipient_cannot_receive_device_notification
+  - test_device_template_direct_access_with_module_off_is_400
+- backend/tests/devices/test_device_report_coverage.py
+  - test_health_row_counts_offline_as_failure_and_recovery_as_activity
+  - test_recovery_is_not_a_failure_and_other_tenant_is_excluded
+  - test_state_edges_have_portable_typed_device_references
+- backend/tests/devices/test_offline.py
+  - test_threshold_boundary_and_repeated_scan_are_one_edge
+  - test_never_seen_active_uses_immutable_activation_event_and_pending_is_ignored
+  - test_revoked_device_is_not_marked_offline
+  - test_cleanup_is_bounded_terminal_expired_only_and_tenant_scoped
+  - test_failed_or_replayed_signed_request_cannot_recover
+  - test_cleanup_keeps_nonce_through_inclusive_timestamp_boundary
+  - test_reactivation_starts_fresh_observation_window
+- backend/tests/devices/test_offline_concurrency.py
+  - test_concurrent_scans_and_recoveries_emit_one_edge_each
+- backend/tests/devices/test_offline_task.py
+  - test_frozen_tenant_is_skipped_and_other_tenant_is_processed
+  - test_unservable_and_module_off_tenants_are_excluded
+  - test_tombstoned_runtime_does_no_work
+  - test_task_and_service_are_declared_and_gate_policy_barrel_is_exact
+  - test_beatless_tombstone_filter_removes_device_task
+  - test_beat_settings_remove_exact_same_device_task_when_tombstoned
+- backend/tests/test_email_templates_registry.py
+  - test_registry_declares_all_send_path_keys (existing test updated for two devices staff templates)
+- backend/tests/test_scheduled_tasks.py
+  - test_device_offline_scan_has_equal_one_minute_cadence
+  - test_device_scan_due_only_is_once_per_minute
+
+## Frontend tests added (executed)
+
+- frontend/src/features/staff/panels/DevicesPanel.test.tsx: 7 tests - accessible state/fingerprint,
+  token absent from caches/storage/URL and Escape focus restoration, create grant consumption,
+  pagination/invalidation, loading/retry, empty/no-selection and revoke confirmation.
+- frontend/src/features/staff/devicesTab.test.ts: 7 cases - 5 forbidden action combinations,
+  device-manager/superadmin access plus template access, module gate and stable scoped routes.
+- frontend/src/features/staff/devicesNotificationMatrix.test.tsx: 1 test - default-off UI and explicit opt-in save.
+
+## Defects noticed beyond the main monitoring flow
+
+- Existing staff-email fallback admitted revoked memberships, unlike native push; corrected with active filter.
+- Existing 7a nonce pruning was unbounded and could reopen replay during the inclusive skew boundary;
+  removed request-time pruning and added scheduled retention grace/regression.
+- Existing email-template surfaces for other disabled streams return 404; left their behavior unchanged.
+  The newly introduced devices stream follows required module-off 400 behavior.
+
+## Every created or modified file
+
+- backend/apps/devices/migrations/0002_offline_event_choices.py
+- backend/apps/devices/notifications.py
+- backend/apps/devices/services_offline.py
+- backend/apps/devices/tasks.py
+- backend/apps/integrations/email_templates_registry_devices.py
+- backend/apps/integrations/email_templates_registry_devices_defaults.py
+- backend/apps/integrations/migrations/0026_device_notifications.py
+- backend/apps/tenant_migration/audit_references_meta_devices_7d.py
+- backend/apps/tenant_migration/gate_policy_http.py
+- backend/apps/tenant_migration/gate_policy_objects.py
+- backend/apps/tenant_migration/gate_policy_tasks.py
+- backend/tests/devices/test_device_notifications.py
+- backend/tests/devices/test_device_report_coverage.py
+- backend/tests/devices/test_offline.py
+- backend/tests/devices/test_offline_concurrency.py
+- backend/tests/devices/test_offline_task.py
+- docs/stage1-p7d.md
+- frontend/src/features/staff/StaffPlatformTabContent.tsx
+- frontend/src/features/staff/StaffTabLoaders.tsx
+- frontend/src/features/staff/deviceQueryKeys.ts
+- frontend/src/features/staff/devicesApi.ts
+- frontend/src/features/staff/devicesNotificationMatrix.test.tsx
+- frontend/src/features/staff/devicesTab.test.ts
+- frontend/src/features/staff/panels/DeviceEnrollmentModal.tsx
+- frontend/src/features/staff/panels/DeviceIdentitySection.tsx
+- frontend/src/features/staff/panels/DevicesPanel.test.tsx
+- frontend/src/features/staff/panels/DevicesPanel.tsx
+- LANE-PROGRESS.md
+- backend/apps/admin_api/serializers_email_templates.py
+- backend/apps/admin_api/views_email_templates_common.py
+- backend/apps/admin_api/views_email_templates_space.py
+- backend/apps/devices/models_events.py
+- backend/apps/devices/services_enrollment.py
+- backend/apps/devices/services_events.py
+- backend/apps/devices/services_requests.py
+- backend/apps/devices/views_heartbeat.py
+- backend/apps/integrations/email_templates_registry.py
+- backend/apps/integrations/models_email.py
+- backend/apps/integrations/notification_catalog.py
+- backend/apps/integrations/notification_enums.py
+- backend/apps/integrations/recipients_selection.py
+- backend/apps/integrations/staff_notifications.py
+- backend/apps/operations/management/commands/run_scheduled_tasks.py
+- backend/apps/operations/reports_module_health.py
+- backend/apps/tenant_migration/audit_references_meta.py
+- backend/apps/tenant_migration/gate_policy.py
+- backend/config/settings.py
+- backend/tests/test_email_templates_registry.py
+- backend/tests/test_scheduled_tasks.py
+- docs/INVARIANTS.md
+- docs/MODULES.md
+- docs/PROJECT-HISTORY.md
+- docs/PROJECT-STATUS.md
+- docs/SOURCE-MAP.md
+- frontend/src/features/staff/NotificationRecipientPicker.tsx
+- frontend/src/features/staff/StaffTabContent.tsx
+- frontend/src/features/staff/staffAccess.ts
+- frontend/src/features/staff/staffTabs.ts

@@ -15,6 +15,7 @@ class EmailTemplate(models.Model):
         # `membership`, not `members`: the feature key and the stream name genuinely
         # differ here, and existing EmailLog rows already carry `membership`.
         MEMBERSHIP = "membership", "Membership"
+        DEVICES = "devices", "Devices"
 
     class Audience(models.TextChoices):
         REQUESTER = "requester", "Requester"
@@ -180,4 +181,3 @@ class EmailNotificationMute(models.Model):
 
     def __str__(self):
         return f"{self.makerspace}:{self.target}:{self.stream}/{self.event} muted"
-

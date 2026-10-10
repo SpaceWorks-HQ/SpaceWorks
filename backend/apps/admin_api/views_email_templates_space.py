@@ -1,5 +1,5 @@
 from django.http import Http404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -8,6 +8,8 @@ from apps.audit import services as audit
 from apps.integrations.email_templates import render_preview
 from apps.integrations.email_templates_registry import REGISTRY
 from apps.integrations.models import EmailTemplate
+
+from .serializers_email_templates import EmailTemplateErrorSerializer
 
 from .views_email_templates_common import (
     EmailTemplateDetailSerializer,
@@ -24,12 +26,24 @@ from .views_email_templates_common import (
 )
 
 
+ERROR_RESPONSES = {
+    code: OpenApiResponse(EmailTemplateErrorSerializer, description=description)
+    for code, description in (
+        (400, "Invalid template or devices module disabled."),
+        (401, "Authentication required."),
+        (403, "Active staff authority required."),
+        (404, "Template or makerspace outside scope, or unknown template."),
+        (423, "Makerspace frozen for tenant migration."),
+    )
+}
+
+
 @extend_schema(tags=["Email templates"])
 class EmailTemplateListView(APIView):
     permission_classes = [IsActiveStaff]
     http_method_names = ["get", "head", "options"]
 
-    @extend_schema(responses={200: EmailTemplateListItemSerializer(many=True)})
+    @extend_schema(responses={200: EmailTemplateListItemSerializer(many=True), **ERROR_RESPONSES})
     def get(self, request, makerspace_id, *args, **kwargs):
         streams = _visible_streams(request.user, makerspace_id)
         if not streams:
@@ -54,14 +68,14 @@ class EmailTemplateDetailView(SpaceTemplateMixin, APIView):
     permission_classes = [IsActiveStaff]
     http_method_names = ["get", "patch", "head", "options"]
 
-    @extend_schema(responses={200: EmailTemplateDetailSerializer})
+    @extend_schema(responses={200: EmailTemplateDetailSerializer, **ERROR_RESPONSES})
     def get(self, request, makerspace_id, stream, audience, key, *args, **kwargs):
         makerspace = self._resolve_template(request, makerspace_id, stream, audience, key)
         return Response(EmailTemplateDetailSerializer(
             _space_detail_payload(makerspace, stream, audience, key)
         ).data)
 
-    @extend_schema(request=EmailTemplateUpdateSerializer, responses={200: EmailTemplateDetailSerializer})
+    @extend_schema(request=EmailTemplateUpdateSerializer, responses={200: EmailTemplateDetailSerializer, **ERROR_RESPONSES})
     def patch(self, request, makerspace_id, stream, audience, key, *args, **kwargs):
         makerspace = self._resolve_template(request, makerspace_id, stream, audience, key)
         payload = EmailTemplateUpdateSerializer(data=request.data, context={
@@ -84,7 +98,7 @@ class EmailTemplateResetView(SpaceTemplateMixin, APIView):
     permission_classes = [IsActiveStaff]
     http_method_names = ["post", "options"]
 
-    @extend_schema(request=None, responses={200: EmailTemplateDetailSerializer})
+    @extend_schema(request=None, responses={200: EmailTemplateDetailSerializer, **ERROR_RESPONSES})
     def post(self, request, makerspace_id, stream, audience, key, *args, **kwargs):
         makerspace = self._resolve_template(request, makerspace_id, stream, audience, key)
         EmailTemplate.objects.filter(makerspace=makerspace, stream=stream,
@@ -102,7 +116,7 @@ class EmailTemplatePreviewView(APIView):
     http_method_names = ["post", "options"]
 
     @extend_schema(request=EmailTemplatePreviewRequestSerializer,
-                   responses={200: EmailTemplatePreviewResponseSerializer})
+                   responses={200: EmailTemplatePreviewResponseSerializer, **ERROR_RESPONSES})
     def post(self, request, makerspace_id, *args, **kwargs):
         payload = EmailTemplatePreviewRequestSerializer(data=request.data)
         payload.is_valid(raise_exception=True)

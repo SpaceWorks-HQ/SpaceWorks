@@ -20,6 +20,8 @@ AUDIT_ACTIONS = {
     EventType.ROTATED: "devices.rotated",
     EventType.REVOKED: "devices.revoked",
     EventType.HEARTBEAT: "devices.heartbeat_received",
+    EventType.OFFLINE: "devices.offline_detected",
+    EventType.RECOVERED: "devices.recovered",
 }
 ALLOWED_DETAIL_KEYS = frozenset({"purpose", "changes", "status"})
 

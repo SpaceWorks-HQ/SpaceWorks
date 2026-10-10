@@ -1339,6 +1339,29 @@ immediately** (photo bytes deleted, quota freed, name blanked); reissue rotates 
 resolves as `revoked` forever; reprint never rotates. No rendered PDF is written to storage. The
 `membership` purge revokes the QRs and deletes the cards and photo bytes.
 
+**Connected device monitoring (forward-plan phase 7d lane).** Both Celery beat and the beatless
+scheduler register `apps.devices.tasks.scan_offline_devices_task` every minute and omit it when
+`devices` is deployment-tombstoned. A beatless installation must invoke cron every minute to attain
+that latency. The scan iterates canonically servable, module-enabled tenants, takes one
+`fanout_tenant_write` boundary per tenant and uses Makerspace -> Device lock order. Offline/recovery
+edges append `DeviceEvent` and `devices.*` audit rows with a null User actor, once per edge.
+Never-seen active devices use their retained enrollment event as the activation time; pending and
+revoked devices are excluded. Reactivation starts a fresh observation window. Bounded cleanup removes
+only expired nonces and terminal expired enrollments; a one-second nonce grace protects the inclusive
+integer-second signature window. No event or audit history is retention-pruned.
+
+`devices` notification events `offline`/`recovered` are distinct from maintenance, selectable,
+module-gated and default-off on every channel. Active `MANAGE_DEVICES` staff form the fallback;
+explicit recipient rules retain existing opt-out, tenant and reach filters. Email and chat templates
+use a staff-only `devices` stream and credential-free edge snapshots. Notifications run after commit
+and cannot roll back a heartbeat or scan. `devices.offline_detected` counts as a failure in the existing
+module-health report; recovery is activity only and singular `device.*` remains native mobile activity.
+
+The identity-only Devices console requires `MANAGE_DEVICES` until 7b/7c adapter surfaces exist. Enrollment
+bearers live only in local modal state: secret requests return void to TanStack mutations, and closing
+the modal discards them. Shared query keys start with `["devices", makerspaceId]`; mutations invalidate
+both list and detail. Machine/QR-only adapter controls must wait for scoped sibling APIs.
+
 ## Handover roles and the retired Guest Admin
 
 **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`); handover staff get a **custom

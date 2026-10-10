@@ -18,7 +18,7 @@ class DeviceHeartbeatView(APIView):
     permission_classes = [DeviceRoutePermission]
 
     @extend_schema(
-        summary="Report that a device is alive (signed device request)",
+        summary="Report device activity and recover an offline device (signed request)",
         request=None,
         responses={
             200: DeviceIdentitySerializer,

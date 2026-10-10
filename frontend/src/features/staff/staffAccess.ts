@@ -1,7 +1,7 @@
 const ALL_TABS = [
   "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "organized", "bookings", "members", "cards", "tobuy", "transfers",
   "stocktake", "containers", "ledger", "reports", "accountability", "warranty", "bulk", "qr", "scanner", "api", "settings", "emailtemplates", "users", "platform", "audit",
-  "email-logs", "payments", "organizations", "organization-analytics", "modules", "exports", "backups", "migration",
+  "devices", "email-logs", "payments", "organizations", "organization-analytics", "modules", "exports", "backups", "migration",
 ] as const;
 
 export const STAFF_TAB_KEYS: readonly string[] = ALL_TABS;
@@ -23,6 +23,7 @@ export const TAB_LABELS: Record<string, string> = {
   qr: "QR Tools",
   scanner: "Scanner",
   machines: "Machines",
+  devices: "Devices",
   events: "Events",
   organized: "Organized events",
   bookings: "Bookings",
@@ -51,7 +52,7 @@ export const TAB_LABELS: Record<string, string> = {
 export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
   { label: "Operate", tabs: ["dashboard", "notifications", "requests", "direct", "handover", "payments", "ledger", "transfers", "stocktake", "tobuy"] },
   { label: "Inventory", tabs: ["inventory", "categories", "needsfix", "containers", "bulk", "qr", "scanner"] },
-  { label: "Machines", tabs: ["machines"] },
+  { label: "Machines", tabs: ["machines", "devices"] },
   { label: "Events", tabs: ["events", "organized"] },
   { label: "Bookings", tabs: ["bookings"] },
   { label: "Members", tabs: ["members", "cards"] },
@@ -133,13 +134,14 @@ export function getStaffAccess(
     if (tabName === "warranty") return canEditInventory || canSeePrinting;
     if (tabName === "users") return canManageMakerspace;
     if (tabName === "settings") return canManageMakerspace;
-    if (tabName === "emailtemplates") return canEditInventory || canSeePrinting;
+    if (tabName === "emailtemplates") return canEditInventory || canSeePrinting || has("manage_devices");
     if (tabName === "email-logs") return canManageMakerspace;
     if (tabName === "platform") return isSuperadmin && !singleTenantLocked;
     // Superadmin-only, matching the backend: `enabled_modules` is superadmin-owned and a
     // staff PATCH carrying it is a hard 403. Unlike `platform` this IS available in a
     // single-tenant deployment -- that operator is exactly who needs to install modules.
     if (tabName === "modules") return isSuperadmin;
+    if (tabName === "devices") return has("manage_devices");
     if (tabName === "machines") return canManageMachines;
     if (tabName === "events") return canManageEvents;
     // Organizer authority is per event and cross-venue; selected-space actions cannot

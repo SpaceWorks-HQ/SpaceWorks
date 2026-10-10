@@ -79,7 +79,9 @@ def _audit_activity(space_id, date_range):
             continue
         states[module]["count"] += row["count"]
         states[module]["last"] = max(filter(None, (states[module]["last"], row["last"])), default=None)
-        if any(token in row["action"] for token in ("failed", "rejected", "denied")):
+        if row["action"] == "devices.offline_detected" or any(
+            token in row["action"] for token in ("failed", "rejected", "denied")
+        ):
             states[module]["failures"] += row["count"]
     return states
 

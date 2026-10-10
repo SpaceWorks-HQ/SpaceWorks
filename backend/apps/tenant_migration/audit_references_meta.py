@@ -5,6 +5,7 @@ from .audit_references_targets import (
     AuditReferenceDisposition,
 )
 from .audit_references_meta_devices import DEVICE_AUDIT_EDGES
+from .audit_references_meta_devices_7d import DEVICE_7D_AUDIT_EDGES
 from .audit_references_meta_membership import MEMBERSHIP_AUDIT_EDGES
 from .audit_references_meta_payments import PAYMENT_AUDIT_EDGES
 from .audit_references_meta_phase5 import PHASE5_AUDIT_EDGES
@@ -279,3 +280,4 @@ AUDIT_META_REFERENCES.update(DEVICE_AUDIT_EDGES)
 from .audit_references_meta_7c import LABEL_AUDIT_EDGES
 
 AUDIT_META_REFERENCES.update(LABEL_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(DEVICE_7D_AUDIT_EDGES)

@@ -18,11 +18,13 @@ _FEATURE_ACTIONS = {
     "bookings": rbac.Action.MANAGE_BOOKINGS,
     "maintenance": rbac.Action.MANAGE_MACHINES,
     "members": rbac.Action.MANAGE_MAKERSPACE,
+    "devices": rbac.Action.MANAGE_DEVICES,
 }
 
 _FEATURE_STREAMS = {
     "hardware_requests": "hardware",
     "printing": "printing",
+    "devices": "devices",
 }
 _STREAM_FEATURES = {value: key for key, value in _FEATURE_STREAMS.items()}
 
@@ -62,6 +64,7 @@ def staff_emails_for_feature(makerspace, feature, event=None, scope=None) -> lis
         memberships = (
             MakerspaceMembership.objects.filter(
                 makerspace=makerspace,
+                status="active",
                 receives_notifications=True,
                 user__is_active=True,
                 user__access_status=User.AccessStatus.ACTIVE,

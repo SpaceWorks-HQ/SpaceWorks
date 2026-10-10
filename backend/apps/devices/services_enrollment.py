@@ -114,11 +114,17 @@ def complete_enrollment(enrollment_id, token, public_key, challenge, signature):
         device.status = Device.Status.ACTIVE
         device.revoked_at = None
         device.revoked_by = None
+        if enrollment.purpose != Purpose.ROTATE:
+            # A reactivation starts a fresh observation window, derived from its event.
+            device.last_seen_at = None
+            device.offline_since = None
+            device.offline_notified_at = None
         try:
             with transaction.atomic():
                 device.save(update_fields=[
                     "public_key", "key_fingerprint", "key_version", "status",
-                    "revoked_at", "revoked_by",
+                    "revoked_at", "revoked_by", "last_seen_at",
+                    "offline_since", "offline_notified_at",
                 ])
         except IntegrityError as exc:
             raise DeviceKeyConflict() from exc

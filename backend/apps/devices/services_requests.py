@@ -18,6 +18,7 @@ from apps.devices.models import Device, DeviceRequestNonce
 from apps.devices.principal import DevicePrincipal
 from apps.devices.services_events import EventType, record_device_event
 from apps.devices.services_locks import lock_tenant
+from apps.devices.services_offline import record_activity_locked
 from apps.ed25519 import Ed25519Error, verify_bytes
 
 
@@ -41,7 +42,6 @@ def claim_signed_request(*, device_id, makerspace_id, key_version, nonce, messag
                 )
         except IntegrityError as exc:
             raise AuthenticationFailed("Replayed device request.") from exc
-        DeviceRequestNonce.objects.filter(device=device, expires_at__lte=now).delete()
     return DevicePrincipal.from_device(device)
 
 
@@ -51,9 +51,7 @@ def record_heartbeat(principal, *, now):
         device = Device.objects.select_for_update().get(pk=principal.device_id)
         if device.status != Device.Status.ACTIVE or device.key_version != principal.key_version:
             raise PermissionDenied("Device authorization is no longer active.")
-        device.last_seen_at = now
-        device.offline_since = None
-        device.save(update_fields=["last_seen_at", "offline_since"])
+        record_activity_locked(makerspace, device, now=now)
         record_device_event(makerspace, device, EventType.HEARTBEAT)
     return device
 

@@ -20,6 +20,7 @@ from apps.machines import role_scope
 from apps.machines.models import MachineType
 from apps.machines.printer_capabilities import PRINTER_SLUG
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.guards import require_module
 
 from .serializers_email_templates import (
     EmailTemplateDetailSerializer,
@@ -37,6 +38,7 @@ STREAM_ACTIONS = {
     "bookings": (rbac.Action.MANAGE_BOOKINGS, rbac.Action.MANAGE_MAKERSPACE),
     "maintenance": (rbac.Action.MANAGE_MACHINES, rbac.Action.MANAGE_MAKERSPACE),
     "membership": (rbac.Action.MANAGE_MAKERSPACE,),
+    "devices": (rbac.Action.MANAGE_DEVICES,),
 }
 
 STREAM_MODULES = {
@@ -44,6 +46,7 @@ STREAM_MODULES = {
     "bookings": "bookings",
     "maintenance": "maintenance",
     "membership": "membership",
+    "devices": "devices",
 }
 
 def _stream_module_available(makerspace, stream):
@@ -67,7 +70,11 @@ def _resolve_makerspace(actor, makerspace_id, stream):
     if scope is not rbac.ALL:
         qs = qs.filter(id__in=scope) if scope else qs.none()
     makerspace = qs.first()
-    if makerspace is None or not _stream_module_available(makerspace, stream):
+    if makerspace is None:
+        raise Http404
+    if stream == "devices":
+        require_module(makerspace, "devices")
+    elif not _stream_module_available(makerspace, stream):
         raise Http404
     return makerspace
 def email_template_type_scope(actor, makerspace_id, stream):
@@ -134,7 +141,7 @@ def _visible_streams(actor, makerspace_id):
     for stream in STREAM_ACTIONS:
         try:
             makerspace = _resolve_makerspace(actor, makerspace_id, stream)
-        except Http404:
+        except (Http404, serializers.ValidationError):
             continue
         type_scope = email_template_type_scope(actor, makerspace_id, stream)
         if type_scope is not None and not any(

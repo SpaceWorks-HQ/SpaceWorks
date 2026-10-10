@@ -21,6 +21,7 @@ class NotificationFeature(models.TextChoices):
     BOOKINGS = "bookings", "Bookings"
     MAINTENANCE = "maintenance", "Maintenance"
     MEMBERS = "members", "Members"
+    DEVICES = "devices", "Devices"
 
 
 class NotificationChannel(models.TextChoices):

@@ -544,6 +544,11 @@ Opt-in, no dependencies; installed only by the `full`/`everything` profiles.
   disable bindings and automatic application, cancel commands, clear delivery credentials and turn
   unprocessed work into inert review. Device keys, enrollments and nonces never travel.
 
+- **Monitoring** - both scheduler topologies check offline state once a minute. Offline/recovery
+  history appears in module operational health. Device alerts have their own notification feature;
+  every channel is opt-in and initially off. The Devices console exposes identity/status/enrollment
+  to device managers. Printer jobs and label delivery controls arrive with their adapter lanes.
+
 ---
 
 ## Updates

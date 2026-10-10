@@ -1,53 +1,13 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 
 import { Skeleton } from "../../components/ui";
 import type { StaffAuthUser } from "../../lib/api";
 import { featureEnabled } from "../../lib/features";
+import { StaffPlatformTabContent } from "./StaffPlatformTabContent";
 import { Panel, type Makerspace } from "./panels/shared";
 import { StaffPanelErrorBoundary } from "./StaffPanelErrorBoundary";
 
-const DashboardPanel = lazy(() => import("./panels/DashboardPanel").then((m) => ({ default: m.DashboardPanel })));
-const NotificationInbox = lazy(() => import("./panels/NotificationInbox").then((m) => ({ default: m.NotificationInbox })));
-const DirectLoans = lazy(() => import("./DirectLoans").then((m) => ({ default: m.DirectLoans })));
-const Inventory = lazy(() => import("./panels/Inventory").then((m) => ({ default: m.Inventory })));
-const Ledger = lazy(() => import("./panels/Ledger").then((m) => ({ default: m.Ledger })));
-const MachinesPanel = lazy(() => import("./panels/MachinesPanel").then((m) => ({ default: m.MachinesPanel })));
-const EventsPanel = lazy(() => import("./EventsPanel").then((m) => ({ default: m.EventsPanel })));
-const OrganizedEventsPanel = lazy(() => import("./panels/OrganizedEventsPanel").then((m) => ({ default: m.OrganizedEventsPanel })));
-const OrganizationAnalyticsPanel = lazy(() => import("./panels/OrganizationAnalyticsPanel").then((m) => ({ default: m.OrganizationAnalyticsPanel })));
-const OrganizationsPanel = lazy(() => import("./panels/OrganizationsPanel").then((m) => ({ default: m.OrganizationsPanel })));
-const BookingsPanel = lazy(() => import("./BookingsPanel").then((m) => ({ default: m.BookingsPanel })));
-const MembersPanel = lazy(() => import("./MembersPanel").then((m) => ({ default: m.MembersPanel })));
-const MemberCardsPanel = lazy(() => import("./panels/MemberCardsPanel").then((m) => ({ default: m.MemberCardsPanel })));
-const QrTools = lazy(() => import("./panels/QrTools").then((m) => ({ default: m.QrTools })));
-const RequestsPanel = lazy(() => import("./panels/RequestsPanel").then((m) => ({ default: m.RequestsPanel })));
-const Users = lazy(() => import("./panels/Users").then((m) => ({ default: m.Users })));
-const OperationsReports = lazy(() => import("./panels/OperationsReports").then((m) => ({ default: m.OperationsReports })));
-const AuditLog = lazy(() => import("./panels/AuditLog").then((m) => ({ default: m.AuditLog })));
-const BulkImport = lazy(() => import("./panels/BulkImport").then((m) => ({ default: m.BulkImport })));
-const ScannerPanel = lazy(() => import("./panels/ScannerPanel").then((m) => ({ default: m.ScannerPanel })));
-const EmailTemplatesPanel = lazy(() => import("./panels/EmailTemplatesPanel").then((m) => ({ default: m.EmailTemplatesPanel })));
-const ContainersPanel = lazy(() => import("./panels/ContainersPanel").then((m) => ({ default: m.ContainersPanel })));
-const StocktakePanel = lazy(() => import("./panels/StocktakePanel").then((m) => ({ default: m.StocktakePanel })));
-const StockTransferPanel = lazy(() => import("./panels/StockTransferPanel").then((m) => ({ default: m.StockTransferPanel })));
-const ProcurementPanel = lazy(() => import("./panels/ProcurementPanel").then((m) => ({ default: m.ProcurementPanel })));
-const EmailLogPanel = lazy(() => import("./panels/EmailLogPanel").then((m) => ({ default: m.EmailLogPanel })));
-const WarrantyPanel = lazy(() => import("./panels/WarrantyPanel").then((m) => ({ default: m.WarrantyPanel })));
-const AccountabilityPanel = lazy(() => import("./panels/AccountabilityPanel").then((m) => ({ default: m.AccountabilityPanel })));
-const Categories = lazy(() => import("./panels/Categories").then((m) => ({ default: m.Categories })));
-const NeedsFixShelf = lazy(() => import("./panels/NeedsFixShelf").then((m) => ({ default: m.NeedsFixShelf })));
-const ApiClientsPanel = lazy(() => import("./ApiClientsPanel").then((m) => ({ default: m.ApiClientsPanel })));
-const PlatformEmailPanel = lazy(() => import("./PlatformEmailPanel").then((m) => ({ default: m.PlatformEmailPanel })));
-const PlatformUpdatePanel = lazy(() => import("./PlatformUpdatePanel").then((m) => ({ default: m.PlatformUpdatePanel })));
-const PlatformStripeConnectPanel = lazy(() => import("./PlatformStripeConnectPanel").then((m) => ({ default: m.PlatformStripeConnectPanel })));
-const PlatformSocialAuthPanel = lazy(() => import("./PlatformSocialAuthPanel").then((m) => ({ default: m.PlatformSocialAuthPanel })));
-const MakerspaceSettingsPanel = lazy(() => import("./MakerspaceSettingsPanel").then((m) => ({ default: m.MakerspaceSettingsPanel })));
-const ModulesPanel = lazy(() => import("./ModulesPanel").then((m) => ({ default: m.ModulesPanel })));
-const PaymentsPanel = lazy(() => import("./PaymentsPanel").then((m) => ({ default: m.PaymentsPanel })));
-const HandoverConsole = lazy(() => import("./panels/machine/HandoverConsole").then((m) => ({ default: m.HandoverConsole })));
-const DataExportsPanel = lazy(() => import("./DataExportsPanel").then((m) => ({ default: m.DataExportsPanel })));
-const BackupRestorePanel = lazy(() => import("./BackupRestorePanel").then((m) => ({ default: m.BackupRestorePanel })));
-const TenantMigrationPanel = lazy(() => import("./TenantMigrationPanel").then((m) => ({ default: m.TenantMigrationPanel })));
+import { PaymentsPanel, DevicesPanel, DashboardPanel, NotificationInbox, DirectLoans, Inventory, Ledger, MachinesPanel, EventsPanel, OrganizedEventsPanel, OrganizationAnalyticsPanel, OrganizationsPanel, BookingsPanel, MembersPanel, MemberCardsPanel, QrTools, RequestsPanel, OperationsReports, AuditLog, BulkImport, ScannerPanel, ContainersPanel, StocktakePanel, StockTransferPanel, ProcurementPanel, WarrantyPanel, AccountabilityPanel, Categories, NeedsFixShelf, HandoverConsole } from "./StaffTabLoaders";
 
 export function StaffTabContent({
   activeMakerspace,
@@ -113,6 +73,11 @@ export function StaffTabContent({
   return (
     <StaffPanelErrorBoundary resetKey={`${makerspaceKey}:${activeTab}`}>
       <Suspense fallback={<div className="p-4"><Skeleton className="h-40 w-full" /></div>}>
+      {activeTab === "devices" && (isSuperadmin || currentUser.makerspaces.some(
+        (space) => space.id === makerspaceKey && space.actions.includes("manage_devices"),
+      )) && activeMakerspace.enabled_modules?.includes("devices") ? (
+        <DevicesPanel key={makerspaceKey} makerspaceId={makerspaceKey} />
+      ) : null}
       {activeTab === "dashboard" ? (
         <DashboardPanel key={makerspaceKey} makerspace={activeMakerspace} canManageMakerspace={canManageMakerspace} />
       ) : null}
@@ -238,51 +203,7 @@ export function StaffTabContent({
           makerspaces={makerspaces}
         />
       ) : null}
-      {activeTab === "api" ? (
-        <ApiClientsPanel
-          key={makerspaceKey}
-          makerspace={activeMakerspace}
-          isSuperadmin={isSuperadmin}
-          canManageMakerspace={canManageMakerspace}
-        />
-      ) : null}
-      {activeTab === "settings" ? (
-        <MakerspaceSettingsPanel
-          key={makerspaceKey}
-          makerspace={activeMakerspace}
-          isSuperadmin={isSuperadmin}
-          canManageMakerspace={canManageMakerspace}
-        />
-      ) : null}
-      {activeTab === "emailtemplates" ? (
-        <EmailTemplatesPanel key={makerspaceKey} makerspace={activeMakerspace} />
-      ) : null}
-      {activeTab === "email-logs" && canManageMakerspace ? (
-        <EmailLogPanel key={makerspaceKey} makerspace={activeMakerspace} />
-      ) : null}
-      {activeTab === "modules" && isSuperadmin ? (
-        <ModulesPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} />
-      ) : null}
-      {activeTab === "platform" ? (
-        <>
-          <PlatformUpdatePanel />
-          <PlatformEmailPanel />
-          <PlatformSocialAuthPanel />
-          {activeMakerspace.platform_hosting ? <PlatformStripeConnectPanel /> : null}
-        </>
-      ) : null}
-      {activeTab === "users" && canManageMakerspace ? (
-        <Users makerspaces={makerspaces} isSuperadmin={isSuperadmin} currentUser={currentUser} onAuthRefresh={onAuthRefresh} />
-      ) : null}
-      {activeTab === "exports" && canManageMakerspace ? (
-        <DataExportsPanel key={makerspaceKey} makerspaceId={makerspaceKey} />
-      ) : null}
-      {activeTab === "backups" && canManageMakerspace ? (
-        <BackupRestorePanel key={makerspaceKey} makerspaceId={makerspaceKey} isSuperadmin={isSuperadmin} />
-      ) : null}
-      {activeTab === "migration" && isSuperadmin ? (
-        <TenantMigrationPanel key={makerspaceKey} makerspace={activeMakerspace} />
-      ) : null}
+      <StaffPlatformTabContent activeTab={activeTab} activeMakerspace={activeMakerspace} makerspaces={makerspaces} isSuperadmin={isSuperadmin} canManageMakerspace={canManageMakerspace} currentUser={currentUser} onAuthRefresh={onAuthRefresh} />
       {activeTab === "audit" && canViewAudit ? <AuditLog /> : null}
       </Suspense>
     </StaffPanelErrorBoundary>

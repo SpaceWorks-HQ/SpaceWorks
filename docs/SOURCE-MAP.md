@@ -230,3 +230,18 @@
   `OrganizationInvitationRedeemPage.tsx` binds a single-use invitation after member sign-in, and
   `publicOrganizationsApi.ts` owns their TanStack Query keys and public API calls. Staff profile,
   membership, invitation and event-organizer controls remain under `frontend/src/features/staff/`.
+
+
+## Connected device monitoring (phase 7d lane)
+
+`apps/devices/services_offline.py` owns the per-tenant offline/retention scan and the locked
+activity/recovery hook. `tasks.py` exposes its one-minute scheduled entry; `notifications.py`
+builds immutable edge-time snapshots for the existing staff notification fan-out.
+`integrations/email_templates_registry_devices*.py` owns the staff-only devices stream.
+`tenant_migration/gate_policy.py` re-exports HTTP, task and object catalogs from the corresponding
+`gate_policy_http.py`, `gate_policy_tasks.py` and `gate_policy_objects.py` siblings.
+
+Frontend `StaffTabLoaders.tsx` holds lazy imports; `StaffPlatformTabContent.tsx` composes platform/admin
+panels. `panels/DevicesPanel.tsx`, `DeviceIdentitySection.tsx` and `DeviceEnrollmentModal.tsx` render
+7a identity/status/enrollment controls through `devicesApi.ts` and `deviceQueryKeys.ts`.
+Printer adapter and label-command controls require the sibling 7b/7c lanes and are not present here.
