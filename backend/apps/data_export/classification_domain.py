@@ -5,6 +5,7 @@ literal: a new column must be classified here before it can export.
 """
 
 EXPORTED_MODEL_FIELDS = {
+    "makerspaces.MakerspaceLoanPolicy": "id makerspace default_loan_days loan_renewal_mode loan_max_renewals loan_renewal_days loan_max_active loan_max_items loan_reminder_offsets_hours loan_escalate_overdue_days updated_at",
     "apiclients.ApiClient": "id label client_id secret_encrypted previous_secret_encrypted previous_secret_valid_until client_type scopes rate_limit_tier makerspace allowed_origins is_active last_seen_at last_seen_ip import_provenance_digest credential_delivered_at created_by created_at updated_at",
     "apiclients.ApiKeyRequest": "id makerspace requester label reason allowed_origins status resolution_note resolved_by resolved_at created_at updated_at",
     "audit.AuditLog": "id actor action target_type target_id makerspace meta event_uuid row_mac created_at",
@@ -28,7 +29,7 @@ EXPORTED_MODEL_FIELDS = {
     "evidence.EvidencePhoto": "id makerspace evidence_type object_key content_type size_bytes uploaded_by consumption_state created_at",
     "evidence.EvidenceObjectRetentionState": "id evidence status claim_token claimed_at object_expired_at expired_size_bytes last_error updated_at",
     "evidence.EvidenceRetentionPolicy": "id makerspace object_retention_days abandoned_upload_cleanup_enabled abandoned_upload_retention_days updated_at",
-    "hardware_requests.HardwareRequest": "id makerspace requester requester_username requester_name requester_contact_email requester_contact_phone requester_contact_verified anonymous_idempotency_key_fingerprint anonymous_payload_fingerprint status requested_for rejection_reason accepted_by accepted_at assigned_box issued_by issued_at return_due_at return_reminder_sent_at issue_evidence issue_remark closed_by closed_at public_token created_at updated_at",
+    "hardware_requests.HardwareRequest": "id makerspace requester requester_username requester_name requester_contact_email requester_contact_phone requester_contact_verified anonymous_idempotency_key_fingerprint anonymous_payload_fingerprint status requested_for rejection_reason accepted_by accepted_at assigned_box issued_by issued_at return_due_at return_reminder_sent_at renewal_count issue_evidence issue_remark closed_by closed_at public_token created_at updated_at",
     "hardware_requests.HardwareRequestItem": "id request product requested_quantity accepted_quantity issued_quantity returned_quantity damaged_quantity missing_quantity needs_fix_quantity",
     "hardware_requests.HardwareRequestItemAsset": "id request_item asset outcome issued_at returned_at return_event",
     "hardware_requests.PublicProblemReport": "id makerspace loan request requester note outcome triage_note created_at resolved_at resolved_by",
@@ -48,9 +49,9 @@ EXPORTED_MODEL_FIELDS = {
     "integrations.RecipientCategoryScope": "id recipient category",
     "integrations.RecipientMachineScope": "id recipient machine",
     "integrations.RecipientMachineTypeScope": "id recipient machine_type",
-    "inventory.Category": "id makerspace name slug display_order icon created_at updated_at",
+    "inventory.Category": "loan_days max_renewals id makerspace name slug display_order icon created_at updated_at",
     "inventory.InventoryAsset": "id makerspace product box asset_tag serial_number status public_self_checkout_enabled notes created_at updated_at",
-    "inventory.InventoryProduct": "id makerspace box category name description image_key tracking_mode total_quantity available_quantity reserved_quantity issued_quantity damaged_quantity lost_quantity needs_fix_quantity is_public public_self_checkout_enabled show_public_count public_availability_mode storage_location deposit_amount is_archived created_at updated_at search_vector",
+    "inventory.InventoryProduct": "loan_days max_renewals id makerspace box category name description image_key tracking_mode total_quantity available_quantity reserved_quantity issued_quantity damaged_quantity lost_quantity needs_fix_quantity is_public public_self_checkout_enabled show_public_count public_availability_mode storage_location deposit_amount is_archived created_at updated_at search_vector",
     "machines.Machine": "id makerspace machine_type name location notes status firmware_version camera_feed_url image_key is_public is_active service_file_policy type_payload legacy_print_printer_id created_at updated_at created_by search_vector",
     "machines.MachineConsumable": "id machine measurement product label remaining low_threshold note created_by created_at",
     "machines.MachineConsumableAdjustment": "id consumable_pool makerspace kind quantity_delta metering_unit consumed_quantity service_request usage_entry reason created_by created_at legacy_filament_adjustment_id",
@@ -81,7 +82,7 @@ EXPORTED_MODEL_FIELDS = {
     "makerspaces.MemberProfile": "id membership is_visible show_attended_events show_certifications headline institution bio avatar_key interests languages education github_username github_contributions github_synced_at created_at updated_at",
     "makerspaces.MemberProject": "id profile title description image_key links position created_at updated_at",
     "makerspaces.MembershipRequest": "id makerspace user invite_email kind state requested_by invited_by decided_by assigned_role auto_activate_on_claim decision_note created_at decided_at updated_at",
-    "makerspaces.MembershipPlan": "id makerspace name interval custom_days amount currency is_active created_at updated_at",
+    "makerspaces.MembershipPlan": "loan_max_active loan_max_items id makerspace name interval custom_days amount currency is_active created_at updated_at",
     "makerspaces.MembershipTerm": "id membership plan starts_at ends_at status renewal_payment created_by created_at",
     "makerspaces.InvitationRequest": "id makerspace name email phone message status handled_by handled_at created_at",
     "makerspaces.Station": "id makerspace kind name created_by created_at updated_at",

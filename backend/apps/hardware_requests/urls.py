@@ -5,7 +5,11 @@ from apps.hardware_requests import replay_recovery_views as recovery
 
 app_name = "hardware_requests"
 
+from apps.hardware_requests.renewal_views import MemberLoanRenewView, StaffLoanRenewView
+
 urlpatterns = [
+    path("member/makerspaces/<int:makerspace_id>/loans/<int:pk>/renew", MemberLoanRenewView.as_view(), name="member-loan-renew"),
+    path("admin/makerspace/<int:makerspace_id>/loans/<int:pk>/renew", StaffLoanRenewView.as_view(), name="staff-loan-renew"),
     path("admin/makerspace/<int:makerspace_id>/kiosk-replays/", recovery.ReplayRecoveryListView.as_view(), name="admin-kiosk-replay-list"),
     path("admin/kiosk-replays/<uuid:pk>/", recovery.ReplayRecoveryDetailView.as_view(), name="admin-kiosk-replay-detail"),
     path("admin/kiosk-replays/<uuid:pk>/resolve/", recovery.ReplayRecoveryResolveView.as_view(), name="admin-kiosk-replay-resolve"),

@@ -9,6 +9,7 @@ from apps.makerspaces.platform import module_enabled
 from apps.makerspaces.servability import servable_queryset
 from apps.makerspaces.waiver_state import current_acceptance
 from apps.makerspaces import member_dashboard_service as dashboard
+from apps.makerspaces.member_loans import member_loans
 from apps.presence.models import PresenceSession
 from apps.separability.registry import runtime_active
 
@@ -53,7 +54,7 @@ def member_activity(membership):
     makerspace, member = membership.makerspace, membership.user
     now = timezone.now()
     payload = {
-        "active_hardware_loans": _loans(makerspace.id, member, now),
+        "active_hardware_loans": member_loans(makerspace, member, now, limit=ACTIVITY_LIMIT),
         "recent_presence_sessions": _presence(makerspace.id, member, now),
         "currently_checked_in": PresenceSession.objects.filter(
             makerspace_id=makerspace.id, member=member, ended_at__isnull=True,
@@ -81,19 +82,6 @@ def member_activity(membership):
     payload["membership_term"] = dashboard.membership_term(membership)
     payload["notices"] = dashboard.notices(membership, payload)
     return payload
-
-
-def _loans(makerspace_id, member, now):
-    rows = PublicToolLoan.objects.filter(
-        makerspace_id=makerspace_id, requester=member,
-        status=PublicToolLoan.Status.CHECKED_OUT,
-    ).only("target_label", "checked_out_at", "due_at").order_by("due_at", "checked_out_at")[:ACTIVITY_LIMIT]
-    return [{
-        "label": row.target_label,
-        "checked_out_at": row.checked_out_at,
-        "due_at": row.due_at,
-        "overdue": bool(row.due_at and row.due_at < now),
-    } for row in rows]
 
 
 def _bookings(makerspace_id, member, now):

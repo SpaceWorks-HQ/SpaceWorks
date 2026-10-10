@@ -4,6 +4,7 @@ from .tenant_dump_types import AuthorityDisposition as D
 from .tenant_dump_types import authority
 from .tenant_dump_authority_devices import DEVICE_AUTHORITY_ENTRIES
 from .tenant_dump_authority_7c import LABEL_AUTHORITY_ENTRIES
+from .tenant_dump_authority_loans import LOAN_AUTHORITY_ENTRIES
 
 
 def _same(label, names, disposition, reason):
@@ -13,6 +14,7 @@ def _same(label, names, disposition, reason):
 
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
+    *LOAN_AUTHORITY_ENTRIES,
     *_same(
         "makerspaces.Makerspace", "timezone country opening_hours", D.PRESERVE,
         "The tenant location and advisory wall-clock schedule travel unchanged.",

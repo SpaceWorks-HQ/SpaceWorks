@@ -1,15 +1,17 @@
 # Shared reminder schedules (research F1)
 
 `operations/reminder_sweeper.py` runs every five minutes in both Celery beat and
-`run_scheduled_tasks --due-only`. No production sources are registered by F1, so
-upgrading does not change notification behaviour. The existing hourly loan return
-reminder and membership renewal tasks keep their current schedules and semantics.
+`run_scheduled_tasks --due-only`. Wave 2 registers `loans.return` (borrower mail)
+and `loans.escalation` (staff notification family). Membership renewal tasks keep
+their current schedules. The existing hourly return-reminder task, management
+command and cron endpoint delegate policy-backed loans to these same F1 sources.
+Spaces without a loan-policy row retain their existing single overdue reminder.
 
 ## Registering a source
 
 Add a `ReminderSource` explicitly to `operations/reminder_registry.py:REMINDER_SOURCES`.
 Its module and optional feature must already exist in their canonical registries.
-The sweeper checks both plus the `notifications` module before discovery or claims;
+The sweeper checks both and, by default, the `notifications` module before discovery or claims;
 deployment tombstones are handled by `module_enabled` at the same boundary.
 Gates are read again after discovery and before dispatch, so disabling a source
 during a long scan suppresses its notices instead of using a stale settings object.
@@ -37,11 +39,13 @@ The source owns its query plan, cursor/fairness and future discovery horizon.
 `build(makerspace, reminder, now, local_tz)` must re-read the subject within that
 tenant and check current domain eligibility, policy offsets and due timestamp.
 Return `None` for a cancelled/returned/ineligible subject, disabled offset or stale
-due timestamp. Otherwise return a `ReminderMessage`. The sweeper sends it through
-`notifications.emit.emit_notification`, preserving the staff inbox module gate and
-fail-safe behaviour. This foundation adds no member delivery, matrix event families,
-dues, certifications, booking/event reminders or state transitions. Later consumer
-lanes own their notification matrix/recipient integration (research F2/F3).
+due timestamp. Otherwise return a `ReminderMessage`. The default dispatcher is
+`notifications.emit.emit_notification`. A source may supply a `dispatch` callback
+for domain delivery through the existing notification matrix. Borrower-only email
+uses `requires_notifications=False`: turning off a staff inbox does not suppress
+borrower duty mail. Email still respects its own module and matrix/mute settings.
+Staff escalation keeps the notifications gate. This seam does not change loan
+states or replace the shared claim/completion protocol.
 
 The runnable **test-only** example is
 `backend/tests/operations/reminder_example.py`; it must never be added to the
@@ -99,3 +103,30 @@ Full deployment backup/restore retains the database coordination rows as usual.
 `REMINDER_SWEEP_BATCH_SIZE` defaults to 200 and must be positive. Cadence is fixed at
 five minutes in both scheduler surfaces, with a parity test. No new endpoint or
 generated frontend/OpenAPI artifact is needed for this internal foundation.
+
+## Loan reminder ladder
+
+`MakerspaceLoanPolicy.loan_reminder_offsets_hours` contains signed whole hours:
+negative before due, zero at due, positive overdue. Defaults are `[0]`; an empty
+list disables borrower reminders. `loan_escalate_overdue_days=0` disables staff
+escalation; a positive value emits `hardware_requests/overdue_escalated` through
+F3 recipients/channels and a `loan.overdue_escalated` inbox event.
+
+Borrower mail goes only to the requester's own proven address, never an arbitrary
+contact or staff destination. Templates retain an aware local datetime for custom
+Django date filters, with an explicit timezone and UTC offset appended to borrower
+mail. Offsets remain elapsed UTC time across DST, using the F4 makerspace zone.
+
+Subject identity includes request ID and due instant. Renewal/manual rescheduling
+creates a new occurrence; old claims remain permanent and stale rows revalidate
+against the current request. The legacy sent marker suppresses duplicate zero-step
+delivery during opt-in. Discovery scans pages of claim tombstones and yields only
+currently due steps, so completed loans and future steps cannot starve newer due
+loans. Downtime catches up all eligible unsent offsets within the per-source batch.
+Portable dumps preserve the policy and zero-step marker, but drop F1 coordination;
+other historical offsets may dispatch again at the target, as described above.
+Failed channel delivery records a terminal failed F1 claim; it is never retried
+automatically. The legacy zero-step sent marker is written only after borrower
+email delivery, so a suppressed/failed attempt does not become delivery proof if
+the policy is later removed. The legacy path revalidates active status, current
+due time and absence of a policy after discovery, before it claims a reminder.

@@ -71,6 +71,7 @@ class HardwareRequest(ScopedPiiModelMixin, models.Model):
     issued_at = models.DateTimeField(null=True)
     return_due_at = models.DateTimeField(null=True, blank=True, db_index=True)
     return_reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    renewal_count = models.PositiveIntegerField(default=0)
     issue_evidence = models.OneToOneField(
         "evidence.EvidencePhoto",
         null=True,

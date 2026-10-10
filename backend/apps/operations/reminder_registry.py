@@ -1,48 +1,11 @@
-"""Explicit registrations only. F1 ships no production consumers.
+"""Explicit registrations of scoped, live-revalidated reminder sources."""
 
-Sources discover scoped domain subjects and rebuild messages at dispatch time so
-cancelled/returned subjects do not receive stale notifications. See the test-only
-example in tests/operations/reminder_example.py and docs/reminder-schedules.md.
-"""
+from .reminder_types import ReminderMessage, ReminderSource, ReminderSubject
 
-from dataclasses import dataclass
-from datetime import datetime, tzinfo
-from typing import Callable, Iterable
+# Consumer lanes add sources explicitly; there is no dynamic autodiscovery.
+from apps.hardware_requests.loan_reminders import LOAN_REMINDER_SOURCES  # noqa: E402
 
-from apps.makerspaces.models import Makerspace
-from apps.operations.models_reminders import ReminderSchedule
-
-
-@dataclass(frozen=True)
-class ReminderSubject:
-    subject: str
-    kind: str
-    due_at: datetime
-    # Signed integral seconds; callers translate their policy's hours/days once.
-    offsets: tuple[int, ...] = (0,)
-
-
-@dataclass(frozen=True)
-class ReminderMessage:
-    title: str
-    event: str
-    body: str = ""
-    level: str = "info"
-    url_path: str = ""
-
-
-@dataclass(frozen=True)
-class ReminderSource:
-    key: str
-    module: str
-    discover: Callable[[Makerspace, datetime, int, tzinfo], Iterable[ReminderSubject]]
-    build: Callable[[Makerspace, ReminderSchedule, datetime, tzinfo], ReminderMessage | None]
-    feature: str | None = None
-
-
-# Later lanes add their source explicitly here, with existing module/feature gates.
-# No AppConfig hooks, autodiscovery, dynamic imports, or consumers in this foundation.
-REMINDER_SOURCES: tuple[ReminderSource, ...] = ()
+REMINDER_SOURCES: tuple[ReminderSource, ...] = LOAN_REMINDER_SOURCES
 
 
 def registered_sources():
@@ -61,5 +24,9 @@ def registered_sources():
             raise ValueError(f"Unknown reminder source gate: {source.key}")
         if not callable(source.discover) or not callable(source.build):
             raise ValueError(f"Reminder source callbacks are required: {source.key}")
+        if source.dispatch is not None and not callable(source.dispatch):
+            raise ValueError(f"Reminder source dispatcher must be callable: {source.key}")
+        if type(source.requires_notifications) is not bool:
+            raise ValueError(f"Reminder notifications gate must be boolean: {source.key}")
         seen.add(source.key)
     return REMINDER_SOURCES

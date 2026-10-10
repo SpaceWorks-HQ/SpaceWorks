@@ -23,6 +23,7 @@ from django.apps import apps
 from apps.data_export.models import EXPORTED_MODEL_FIELDS
 
 from .target_projection import TARGET_FIELD_PROJECTION
+from .tenant_dump_authority_loans import LOAN_AUTHORITY_FIELDS
 
 
 class AuthorityRegistryError(AssertionError):
@@ -34,6 +35,7 @@ AUTHORIZATION_SOURCES = (
     APPS_DIR / "accounts" / "rbac.py",
     APPS_DIR / "accounts" / "rbac_actions.py",
     APPS_DIR / "accounts" / "rbac_memberships.py",
+    APPS_DIR / "accounts" / "rbac_borrowers.py",
     APPS_DIR / "accounts" / "rbac_organizations.py",
     APPS_DIR / "accounts" / "rbac_superadmin.py",
     APPS_DIR / "makerspaces" / "role_authority.py",
@@ -52,6 +54,7 @@ SCANNED_MODEL_LABELS = frozenset({
 
 
 EXPLICIT_AUTHORITY_FIELDS = {
+    **LOAN_AUTHORITY_FIELDS,
     ("makerspaces.Makerspace", "lifecycle_state"): (
         "Scheduled-work visibility is target-owned; Lane D resets lifecycle state."
     ),

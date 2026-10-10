@@ -13,7 +13,7 @@ class MembershipPlanSerializer(serializers.ModelSerializer):
         model = MembershipPlan
         fields = [
             "id", "name", "interval", "custom_days", "amount", "currency", "is_active",
-            "created_at", "updated_at",
+            "created_at", "updated_at", "loan_max_active", "loan_max_items",
         ]
         # `makerspace` comes from the URL, never the body: accepting it would let a
         # manager in one space price memberships in another.

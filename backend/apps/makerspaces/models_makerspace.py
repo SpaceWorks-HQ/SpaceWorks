@@ -3,7 +3,7 @@ from urllib.parse import urlsplit
 from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils.crypto import get_random_string
@@ -242,6 +242,8 @@ class Makerspace(MakerspaceSecretsMixin, models.Model):
         return bool(self.geofence_enabled and self.geofence_latitude is not None and self.geofence_longitude is not None)
 
     def save(self, *args, **kwargs):
+        fields = kwargs.get("update_fields")
+        sync_loan_policy = bool(self.pk) and (fields is None or "default_loan_days" in fields)
         self.public_code = (self.public_code or "").upper()
         self.frontend_domain = normalize_frontend_domain(self.frontend_domain)
         # Membership and account-less requests are mutually exclusive, and this is the
@@ -260,7 +262,15 @@ class Makerspace(MakerspaceSecretsMixin, models.Model):
             update_fields = kwargs.get("update_fields")
             if update_fields is not None:
                 kwargs["update_fields"] = [*update_fields, "anonymous_requests_enabled"]
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if sync_loan_policy:
+                # Keep the maker row lock through the mirror update. Otherwise a
+                # concurrent policy edit could commit between these two writes.
+                # Never create a policy or opt into the ladder during a legacy edit.
+                from .models_loan_policy import MakerspaceLoanPolicy
+
+                MakerspaceLoanPolicy.objects.filter(makerspace=self).update(default_loan_days=self.default_loan_days)
 
     def clean(self):
         clean_makerspace(self)

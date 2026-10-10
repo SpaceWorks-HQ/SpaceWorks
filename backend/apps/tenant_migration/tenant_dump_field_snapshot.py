@@ -6,6 +6,7 @@ override in tenant_dump_authority.py before the catalog guard will pass.
 """
 
 FIRST_PARTY_FIELD_NAMES = {
+    "makerspaces.MakerspaceLoanPolicy": frozenset("id makerspace default_loan_days loan_renewal_mode loan_max_renewals loan_renewal_days loan_max_active loan_max_items loan_reminder_offsets_hours loan_escalate_overdue_days updated_at".split()),
     'operations.ReminderSchedule': frozenset('id makerspace source subject kind offset_seconds due_at remind_at state claim_token claimed_at completed_at created_at'.split()),
     "accounts.UserMFA": frozenset("id user secret enabled_at last_step recovery_digests version".split()),
     "accounts.MFAChallenge": frozenset("id user token_digest credential_fingerprint auth_generation mfa_version context pending_secret expires_at consumed_at attempts created_at".split()),
@@ -37,7 +38,7 @@ FIRST_PARTY_FIELD_NAMES = {
     'makerspaces.MemberCard': frozenset('card_number created_at id issued_at last_printed_at makerspace membership photo_consent_at photo_consent_version photo_content_type photo_object_key photo_size_bytes print_count printed_name revoked_at revoked_reason template_version_at_issue updated_at'.split()),
     'makerspaces.MemberProfile': frozenset('avatar_key bio created_at education github_contributions github_synced_at github_username headline id institution interests is_visible languages membership show_attended_events show_certifications updated_at'.split()),
     'makerspaces.MemberProject': frozenset('created_at description id image_key links position profile title updated_at'.split()),
-    'makerspaces.MembershipPlan': frozenset('amount created_at currency custom_days id interval is_active makerspace name updated_at'.split()),
+    'makerspaces.MembershipPlan': frozenset('amount created_at currency custom_days loan_max_active loan_max_items id interval is_active makerspace name updated_at'.split()),
     'makerspaces.MembershipTerm': frozenset('created_at created_by ends_at id membership plan renewal_payment starts_at status'.split()),
     'makerspaces.InvitationRequest': frozenset('created_at email handled_at handled_by id makerspace message name phone status'.split()),
     'makerspaces.Station': frozenset('created_at created_by id kind makerspace name updated_at'.split()),
@@ -75,10 +76,10 @@ FIRST_PARTY_FIELD_NAMES = {
     'boxes.BoxScan': frozenset('actor box context created_at id makerspace request'.split()),
     'boxes.QrCode': frozenset('created_at created_by id makerspace payload revoked_at status target_id target_type updated_at'.split()),
     'boxes.QrScanEvent': frozenset('actor context created_at id makerspace qr_code request'.split()),
-    'inventory.Category': frozenset('created_at display_order icon id makerspace name slug updated_at'.split()),
-    'inventory.InventoryProduct': frozenset('available_quantity box category created_at damaged_quantity deposit_amount description id image_key is_archived is_public issued_quantity lost_quantity makerspace name needs_fix_quantity public_availability_mode public_self_checkout_enabled reserved_quantity search_vector show_public_count storage_location total_quantity tracking_mode updated_at'.split()),
+    'inventory.Category': frozenset('created_at display_order icon loan_days max_renewals id makerspace name slug updated_at'.split()),
+    'inventory.InventoryProduct': frozenset('available_quantity box category created_at damaged_quantity deposit_amount description loan_days max_renewals id image_key is_archived is_public issued_quantity lost_quantity makerspace name needs_fix_quantity public_availability_mode public_self_checkout_enabled reserved_quantity search_vector show_public_count storage_location total_quantity tracking_mode updated_at'.split()),
     'inventory.InventoryAsset': frozenset('asset_tag box created_at id makerspace notes product public_self_checkout_enabled serial_number status updated_at'.split()),
-    'hardware_requests.HardwareRequest': frozenset('accepted_at accepted_by anonymous_idempotency_key_fingerprint anonymous_payload_fingerprint assigned_box closed_at closed_by created_at id issue_evidence issue_remark issued_at issued_by makerspace public_token rejection_reason requested_for requester requester_contact_email requester_contact_phone requester_contact_verified requester_name requester_username return_due_at return_reminder_sent_at status updated_at'.split()),
+    'hardware_requests.HardwareRequest': frozenset('accepted_at accepted_by anonymous_idempotency_key_fingerprint anonymous_payload_fingerprint assigned_box closed_at closed_by created_at id issue_evidence issue_remark issued_at issued_by makerspace public_token rejection_reason requested_for requester requester_contact_email requester_contact_phone requester_contact_verified requester_name requester_username return_due_at return_reminder_sent_at renewal_count status updated_at'.split()),
     'hardware_requests.HardwareRequestItem': frozenset('accepted_quantity damaged_quantity id issued_quantity missing_quantity needs_fix_quantity product request requested_quantity returned_quantity'.split()),
     'hardware_requests.ReturnEvent': frozenset('actor box created_at evidence id makerspace remark request'.split()),
     'hardware_requests.RequesterAccountability': frozenset('created_at created_by description evidence_photo id issue_type makerspace quantity request request_item requester'.split()),

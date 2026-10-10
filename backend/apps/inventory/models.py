@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVectorField
 from django.db import models
@@ -18,6 +19,8 @@ class TrackingMode(models.TextChoices):
 
 
 class Category(models.Model):
+    loan_days = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(365)])
+    max_renewals = models.PositiveIntegerField(null=True, blank=True, validators=[MaxValueValidator(100)])
     makerspace = models.ForeignKey(
         Makerspace,
         on_delete=models.CASCADE,
@@ -45,6 +48,8 @@ class Category(models.Model):
 
 
 class InventoryProduct(models.Model):
+    loan_days = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(365)])
+    max_renewals = models.PositiveIntegerField(null=True, blank=True, validators=[MaxValueValidator(100)])
     makerspace = models.ForeignKey(
         Makerspace,
         on_delete=models.CASCADE,

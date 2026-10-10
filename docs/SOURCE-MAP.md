@@ -14,10 +14,25 @@ verification/error helpers in `views_social_helpers.py`. `integrations/health.py
 `health_status.py` rollups and `health_chat.py` destination/legacy delivery summaries. The
 read-only scheduler control page lives in `operations/admin_scheduling.py`.
 The shared reminder foundation is `operations/models_reminders.py`,
-`reminder_registry.py`, `reminder_services.py`, `reminder_sweeper.py` and
-`tasks_reminders.py`; consumer registrations are explicit and initially empty.
+`reminder_types.py`, `reminder_registry.py`, `reminder_services.py`, `reminder_sweeper.py` and
+`tasks_reminders.py`; loan borrower/staff registrations are explicit.
 Queries use `accounts/rbac.py:scope_for_scheduled_work`; see
 [reminder-schedules.md](reminder-schedules.md) for UTC, claims and migration rules.
+
+Loan policy lives in `makerspaces/models_loan_policy.py` and `loan_policy.py`;
+`admin_api/views_loan_policy.py` / `serializers_loan_policy.py` extend the existing
+return-policy route. `hardware_requests/workflow.py` exports `renewal_workflow.py`
+for policy-bound extensions; `renewal_views.py` serves member/staff actions.
+`loan_reminders.py` and `loan_reminder_notifications.py` adapt F1 claims to borrower
+mail and F3 escalation. `inventory/availability_loan_limits.py` owns borrower quantity
+ceilings; `accounts/rbac_borrowers.py` scopes owned rows even without membership.
+`makerspaces/member_loans.py` includes reviewed and direct loans in member activity.
+See [loan-policy.md](loan-policy.md) for defaults, inheritance, gates and routes.
+`tenant_migration/tenant_dump_authority_loans.py` declares portable loan terms and
+renewal history; the fan-out gate registry names the legacy reminder helper that
+actually holds the boundary.
+Frontend loan controls are `staff/MakerspaceLoanPolicySettings.tsx`,
+`staff/StaffLoanRenew.tsx` and `members/MemberLoanRenew.tsx` under features/.
 
 - `backend/config/` — Django project (`settings.py`, `urls.py`, wsgi/asgi). All API routes under `/api/`.
   `config/admin_access.py` holds the `/control/` gating, CSP middleware, and the hidden-scope drift-guard

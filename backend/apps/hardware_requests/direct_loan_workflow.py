@@ -11,6 +11,7 @@ from apps.evidence.models import EvidencePhoto
 from apps.evidence.consumption import mark_consumed
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.hardware_requests.models import HardwareRequest, PublicToolLoan
+from apps.makerspaces.loan_policy import loan_days
 from apps.hardware_requests.direct_loan_audit import record_item_logs
 from apps.hardware_requests.direct_loan_returns import return_direct_loan, validate_evidence_upload
 from apps.hardware_requests.self_checkout_workflow import (
@@ -24,6 +25,8 @@ from apps.hardware_requests.workflow_errors import (
     RequestValidationError,
 )
 from apps.inventory.models import InventoryAsset, InventoryProduct, TrackingMode
+from apps.inventory import availability
+from apps.makerspaces.models import Makerspace
 from apps.makerspaces.request_access import require_current_term
 from apps.presence.guard import require_active_member_presence
 
@@ -53,8 +56,8 @@ def issue_direct_loan(
     if container_id is None and not qr_payloads and not items:
         raise RequestValidationError("Provide qr_payloads, items, or a container.")
     finalized = validate_evidence_upload(evidence, label="Issue")
-    due_at = timezone.now() + timedelta(days=(makerspace.default_loan_days or 7))
     with transaction.atomic():
+        makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
         if not lock_evidence_for_attachment(evidence.pk):
             raise RequestValidationError("Evidence has expired under the retention policy.")
         if HardwareRequest.objects.filter(issue_evidence=evidence).exists():
@@ -143,6 +146,8 @@ def issue_direct_loan(
             product_quantities[product] += quantity
             labels.append(product.name)
 
+        availability.enforce_product_borrow_limits(makerspace, requester, product_quantities)
+        due_at = timezone.now() + timedelta(days=loan_days(makerspace, product_quantities))
         request = _issued_request(
             makerspace,
             requester,

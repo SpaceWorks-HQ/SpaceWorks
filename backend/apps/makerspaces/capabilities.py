@@ -29,6 +29,10 @@ class FeatureDefinition:
 
 
 FEATURE_DEFINITIONS = (
+    FeatureDefinition("loans.renewals", "request_workflow", "Loan renewals",
+                      "Allow policy-bound extensions of issued loans."),
+    FeatureDefinition("loans.limits", "request_workflow", "Borrow limits",
+                      "Limit active loans and outstanding items per borrower."),
     FeatureDefinition("staff.invitations", None, "Staff invitations",
                       "Invite staff with a single-use email link.", default_enabled=True),
     FeatureDefinition("security.staff_mfa_required", None, "Require MFA for staff",

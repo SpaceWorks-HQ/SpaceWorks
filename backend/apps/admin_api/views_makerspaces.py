@@ -217,41 +217,4 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
                 )
 
 
-@extend_schema_view(
-    get=extend_schema(
-        tags=["Admin makerspaces"],
-        summary="Retrieve the return policy",
-        responses={200: ReturnPolicySerializer, 404: _NOT_FOUND},
-    ),
-    patch=extend_schema(
-        tags=["Admin makerspaces"],
-        summary="Update the return policy",
-        responses={200: ReturnPolicySerializer, 400: _INVALID, 404: _NOT_FOUND},
-    ),
-)
-class ReturnPolicyView(generics.RetrieveUpdateAPIView):
-    serializer_class = ReturnPolicySerializer
-    permission_classes = [IsActiveStaff]
-    http_method_names = ["get", "patch", "head", "options"]
-
-    def get_object(self):
-        makerspace_id = self.kwargs["makerspace_id"]
-        return get_object_or_404(
-            rbac.scope_by_action(
-                self.request.user,
-                rbac.Action.MANAGE_MAKERSPACE,
-                servable_queryset(),
-                field="id",
-            ),
-            pk=makerspace_id,
-        )
-
-    def perform_update(self, serializer):
-        instance = serializer.save()
-        audit.record(
-            self.request.user,
-            "makerspace.return_policy_updated",
-            makerspace=instance,
-            target=instance,
-            meta={"default_loan_days": instance.default_loan_days},
-        )
+from apps.admin_api.views_loan_policy import ReturnPolicyView  # noqa: E402,F401

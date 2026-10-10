@@ -26,6 +26,7 @@ from apps.hardware_requests.workflow_errors import (
 )
 from apps.hardware_requests.workflow_utils import locked_request
 from apps.inventory import availability
+from apps.makerspaces.models import Makerspace
 
 
 def return_items(actor, request, evidence_id, remark, box_code, resolutions):
@@ -47,6 +48,7 @@ def return_items(actor, request, evidence_id, remark, box_code, resolutions):
         raise EvidenceNotUploaded("Return evidence has not been uploaded.")
 
     with transaction.atomic():
+        Makerspace.objects.select_for_update().get(pk=request.makerspace_id)
         locked = locked_request(request)
         _require_returnable(locked)
         # Lock the evidence row + reject a photo already consumed by a direct-loan

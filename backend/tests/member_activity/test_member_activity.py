@@ -42,20 +42,22 @@ def activity_url(space):
 
 
 def make_loan(space, user, label="Own loan"):
+    due = timezone.now() - timedelta(hours=1)
     request = HardwareRequest.objects.create(
         makerspace=space, requester=user, requester_username=user.username,
-        requester_name=user.display_name,
+        requester_name=user.display_name, status="issued", return_due_at=due,
+        issued_at=timezone.now() - timedelta(days=1),
     )
     return PublicToolLoan.objects.create(
         makerspace=space, request=request, requester=user, target_type="product",
-        target_id=1, target_label=label, due_at=timezone.now() - timedelta(hours=1),
+        target_id=1, target_label=label, due_at=due,
     )
 
 
 def test_activity_is_member_owned_and_has_safe_projections_without_presence():
     space = Makerspace.objects.create(name="Activity", slug="activity")
     user, other = member(space, "activity-owner"), member(space, "activity-other")
-    make_loan(space, user)
+    own_loan = make_loan(space, user)
     make_loan(space, other, "Other loan")
     printer_type = MachineType.objects.get(makerspace__isnull=True, slug="3d_printer")
     print_queue = ServiceQueue.objects.create(makerspace=space, machine_type=printer_type, name="Public")
@@ -89,6 +91,8 @@ def test_activity_is_member_owned_and_has_safe_projections_without_presence():
     assert response.data["active_hardware_loans"] == [{
         "label": "Own loan", "checked_out_at": response.data["active_hardware_loans"][0]["checked_out_at"],
         "due_at": response.data["active_hardware_loans"][0]["due_at"], "overdue": True,
+        "request_id": own_loan.request_id, "renewal_count": 0,
+        "can_renew": False, "renewal_refusal": "renewals_off",
     }]
     assert [item["title"] for item in response.data["print_requests"]] == ["Own print"]
     assert [item["space_name"] for item in response.data["bookings"]["upcoming"]] == ["Bench"]

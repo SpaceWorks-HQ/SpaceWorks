@@ -24,7 +24,7 @@ from apps.tenant_migration.gate_runtime import fanout_tenant_write
 logger = logging.getLogger(__name__)
 
 
-def run_reminder_sweep(*, now=None, limit=None, tz_resolver=None):
+def run_reminder_sweep(*, now=None, limit=None, tz_resolver=None, source_keys=None):
     """A limit per tenant/source keeps busy tenants from starving their neighbours.
 
     tz_resolver(makerspace) returns a ZoneInfo name or tzinfo; only presentation/source
@@ -33,6 +33,8 @@ def run_reminder_sweep(*, now=None, limit=None, tz_resolver=None):
     not-restored tenants reach the gate so they are counted, rather than filtered out.
     """
     sources = reminder_registry.registered_sources()
+    if source_keys is not None:
+        sources = tuple(source for source in sources if source.key in source_keys)
     if not sources:
         return {"dispatched": 0, "skipped": 0, "failed": 0}
     if transaction.get_connection().in_atomic_block or not transaction.get_autocommit():
@@ -73,7 +75,7 @@ def _source_enabled(makerspace, source):
     return (
         makerspace is not None
         and module_enabled(makerspace, source.module)
-        and module_enabled(makerspace, "notifications")
+        and (not source.requires_notifications or module_enabled(makerspace, "notifications"))
         and (not source.feature or feature_enabled(makerspace, source.feature))
     )
 
@@ -105,7 +107,10 @@ def _run_source(makerspace, source, now, local_tz, limit, counts):
             if message is None or not _source_enabled(current, source):
                 counts["skipped"] += 1
             else:
-                emit_notification(current, **asdict(message))
+                if source.dispatch:
+                    source.dispatch(current, row, message, now, local_tz)
+                else:
+                    emit_notification(current, **asdict(message))
                 # The existing emitter is deliberately fail-safe and returns no receipt.
                 # This counts dispatch attempts, not proven delivery to a recipient.
                 counts["dispatched"] += 1
