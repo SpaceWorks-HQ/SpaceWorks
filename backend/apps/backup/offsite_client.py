@@ -12,6 +12,8 @@ import json
 import boto3
 from botocore.client import Config
 from botocore.exceptions import BotoCoreError, ClientError
+from cryptography.fernet import InvalidToken
+from django.core.exceptions import ImproperlyConfigured
 
 from apps.object_storage import delete_all_versions
 
@@ -28,19 +30,25 @@ class OffsiteDestinationError(RuntimeError):
 
 
 def destination_client(destination):
-    access_key = destination.get_access_key_id()
-    secret_key = destination.get_secret_access_key()
+    try:
+        access_key = destination.get_access_key_id()
+        secret_key = destination.get_secret_access_key()
+    except (InvalidToken, ValueError, ImproperlyConfigured) as exc:
+        raise OffsiteDestinationError("credentials_unreadable") from exc
     if not access_key or not secret_key:
         raise OffsiteDestinationError(
             "credentials_missing", "The destination has no stored credentials."
         )
-    return client_for(
-        endpoint_url=destination.endpoint_url,
-        region=destination.region,
-        addressing_style=destination.addressing_style,
-        access_key_id=access_key,
-        secret_access_key=secret_key,
-    )
+    try:
+        return client_for(
+            endpoint_url=destination.endpoint_url,
+            region=destination.region,
+            addressing_style=destination.addressing_style,
+            access_key_id=access_key,
+            secret_access_key=secret_key,
+        )
+    except (BotoCoreError, ValueError) as exc:
+        raise OffsiteDestinationError("client_unavailable") from exc
 
 
 def client_for(
@@ -152,9 +160,14 @@ def open_remote(s3, bucket, locator):
 def read_index(s3, bucket, locator):
     body = open_remote(s3, bucket, index_locator(locator))
     try:
-        return json.loads(body.read(64 * 1024).decode())
+        value = json.loads(body.read(64 * 1024).decode())
+        if not isinstance(value, dict):
+            raise OffsiteDestinationError("index_invalid")
+        return value
     except (ValueError, UnicodeDecodeError) as exc:
         raise OffsiteDestinationError("index_invalid") from exc
+    except (BotoCoreError, ClientError, OSError) as exc:
+        raise OffsiteDestinationError("index_read_failed") from exc
     finally:
         body.close()
 

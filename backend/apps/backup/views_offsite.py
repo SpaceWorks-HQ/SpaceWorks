@@ -1,40 +1,48 @@
 """Superadmin API for offsite backup destinations. Deployment-level; never module-gated."""
 
-import uuid
-
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.admin_api.permissions import IsActiveSuperAdmin
 from apps.audit import services as audit
-from apps.backup import offsite_client
 from apps.backup.models import BackupArchive, BackupDestination, BackupDestinationUpload
 from apps.backup.offsite_restore import validate_rehydration
 from apps.backup.serializers_offsite import (
     BackupDestinationSerializer,
     BackupDestinationUploadSerializer,
+    BackupDestinationPageSerializer,
+    BackupDestinationUploadPageSerializer,
+    DestinationDispatchSerializer,
     DestinationProbeSerializer,
     RehydrateSerializer,
     audit_meta,
 )
+from apps.backup.services_offsite import probe_destination, retire_destination
 from apps.backup.tasks_offsite import dispatch_offsite_push, rehydrate_backup_archive_task
 from apps.backup.views_common import AUTH_ERRORS, NOT_FOUND, VALIDATION_ERROR
 
 TAGS = ["Backup destinations"]
+PAGE = [OpenApiParameter("page", int, description="Page number (24 rows per page).")]
+
+
+def _page(rows, request, serializer):
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(rows, request)
+    return paginator.get_paginated_response(serializer(page, many=True).data)
 
 
 class BackupDestinationListCreateView(APIView):
     permission_classes = [IsActiveSuperAdmin]
 
-    @extend_schema(tags=TAGS, summary="List offsite backup destinations", responses={200: BackupDestinationSerializer(many=True), **AUTH_ERRORS})
+    @extend_schema(tags=TAGS, summary="List offsite backup destinations", parameters=PAGE, responses={200: BackupDestinationPageSerializer, 404: NOT_FOUND, **AUTH_ERRORS})
     def get(self, request):
         rows = BackupDestination.objects.all()
-        return Response(BackupDestinationSerializer(rows, many=True).data)
+        return _page(rows, request, BackupDestinationSerializer)
 
     @extend_schema(tags=TAGS, summary="Register an S3-compatible offsite backup destination", request=BackupDestinationSerializer, responses={201: BackupDestinationSerializer, 400: VALIDATION_ERROR, **AUTH_ERRORS})
     def post(self, request):
@@ -77,23 +85,8 @@ class BackupDestinationRetireView(APIView):
 
     @extend_schema(tags=TAGS, summary="Retire a destination: stop pushing and wipe its stored credentials", request=None, responses={200: BackupDestinationSerializer, 400: VALIDATION_ERROR, 404: NOT_FOUND, **AUTH_ERRORS})
     def post(self, request, destination_id):
-        with transaction.atomic():
-            destination = get_object_or_404(
-                BackupDestination.objects.select_for_update(), pk=destination_id
-            )
-            if destination.retired_at is not None:
-                return Response({"detail": "The destination is already retired."}, status=400)
-            destination.enabled = False
-            destination.retired_at = timezone.now()
-            destination.set_access_key_id("")
-            destination.set_secret_access_key("")
-            destination.save()
-            # The journal is history and stays; copies already on the destination are
-            # outside this deployment's control once its credentials are gone.
-            audit.record(
-                request.user, "backup.destination_retired", target=destination,
-                meta={"name": destination.name, "archives_outside_purge_guarantee": True},
-            )
+        get_object_or_404(BackupDestination, pk=destination_id)
+        destination = retire_destination(destination_id, request.user)
         return Response(BackupDestinationSerializer(destination).data)
 
 
@@ -105,42 +98,34 @@ class BackupDestinationProbeView(APIView):
         destination = get_object_or_404(
             BackupDestination, pk=destination_id, retired_at__isnull=True
         )
-        error_code = ""
-        try:
-            offsite_client.probe(destination, nonce=uuid.uuid4().hex)
-        except offsite_client.OffsiteDestinationError as exc:
-            error_code = exc.code
-        audit.record(
-            request.user, "backup.destination_probed", target=destination,
-            meta={"ok": not error_code, "error_code": error_code},
-        )
-        return Response({"ok": not error_code, "error_code": error_code})
+        return Response(probe_destination(destination, request.user))
 
 
 class BackupDestinationUploadListView(APIView):
     permission_classes = [IsActiveSuperAdmin]
 
-    @extend_schema(tags=TAGS, summary="List the upload journal of one destination", responses={200: BackupDestinationUploadSerializer(many=True), 404: NOT_FOUND, **AUTH_ERRORS})
+    @extend_schema(tags=TAGS, summary="List the upload journal of one destination", parameters=PAGE, responses={200: BackupDestinationUploadPageSerializer, 404: NOT_FOUND, **AUTH_ERRORS})
     def get(self, request, destination_id):
         destination = get_object_or_404(BackupDestination, pk=destination_id)
-        rows = BackupDestinationUpload.objects.filter(destination=destination).select_related("destination")[:100]
-        return Response(BackupDestinationUploadSerializer(rows, many=True).data)
+        rows = BackupDestinationUpload.objects.filter(destination=destination).select_related("destination").order_by("-created_at", "-pk")
+        return _page(rows, request, BackupDestinationUploadSerializer)
 
 
 class BackupDestinationPushView(APIView):
     permission_classes = [IsActiveSuperAdmin]
 
-    @extend_schema(tags=TAGS, summary="Start an offsite push now instead of waiting for the schedule", request=None, responses={202: OpenApiResponse(description="Push dispatched."), **AUTH_ERRORS})
+    @extend_schema(tags=TAGS, summary="Start an offsite push now instead of waiting for the schedule", request=None, responses={202: DestinationDispatchSerializer, 503: OpenApiResponse(description="The backup worker is unavailable."), **AUTH_ERRORS})
     def post(self, request):
         audit.record(request.user, "backup.offsite_push_requested", target=None, meta={})
-        dispatch_offsite_push()
+        if not dispatch_offsite_push():
+            return Response({"detail": "The backup worker is unavailable."}, status=503)
         return Response({"detail": "Offsite push dispatched."}, status=status.HTTP_202_ACCEPTED)
 
 
 class BackupArchiveRehydrateView(APIView):
     permission_classes = [IsActiveSuperAdmin]
 
-    @extend_schema(tags=TAGS, summary="Restore an archive's primary bytes from a verified offsite copy", request=RehydrateSerializer, responses={202: OpenApiResponse(description="Rehydration dispatched."), 400: VALIDATION_ERROR, 404: NOT_FOUND, 503: OpenApiResponse(description="The backup worker is unavailable."), **AUTH_ERRORS})
+    @extend_schema(tags=TAGS, summary="Restore an archive's primary bytes from a verified offsite copy", request=RehydrateSerializer, responses={202: DestinationDispatchSerializer, 400: VALIDATION_ERROR, 404: NOT_FOUND, 503: OpenApiResponse(description="The backup worker is unavailable."), **AUTH_ERRORS})
     def post(self, request, archive_id):
         archive = get_object_or_404(BackupArchive, pk=archive_id)
         serializer = RehydrateSerializer(data=request.data)

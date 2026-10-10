@@ -51,5 +51,7 @@ def dispatch_offsite_push():
     """Kick a push after a backup finished. Failure to enqueue is logged, never raised."""
     try:
         push_offsite_backups_task.delay()
+        return True
     except Exception:
         logger.exception("backup_offsite_dispatch_failed")
+        return False

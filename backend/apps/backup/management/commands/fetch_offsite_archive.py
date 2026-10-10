@@ -61,6 +61,8 @@ def load_credentials_file(path):
         raise CommandError("The credentials file is not valid JSON.") from exc
     if not isinstance(values, dict) or set(values) - set(CREDENTIAL_FIELDS):
         raise CommandError(f"The credentials file may contain only: {', '.join(CREDENTIAL_FIELDS)}.")
+    if any(not isinstance(value, str) for value in values.values()):
+        raise CommandError("Every credentials-file value must be a string.")
     for required in ("bucket", "access_key_id", "secret_access_key"):
         if not values.get(required):
             raise CommandError(f"The credentials file needs {required}.")
@@ -98,8 +100,14 @@ class Command(BaseCommand):
         expected_size, expected_sha256 = self._expected(
             s3, destination, locator, archive_id, journal, options["expected_sha256"]
         )
-        self._download(s3, destination, locator, options["output"], expected_size, expected_sha256)
+        self._download(
+            s3, destination, locator, options["output"], expected_size, expected_sha256,
+            archive_id=archive_id, scope=options["scope"],
+        )
         self.stdout.write(f"{expected_sha256}  {options['output']}")
+        self.stdout.write(
+            "The local index records byte integrity; import preflight establishes authenticity."
+        )
         self.stdout.write(
             "Verified. Next: scripts/import-backup.sh with --expected-sha256 "
             f"{expected_sha256}; its preflight checks the archive signature."
@@ -141,22 +149,37 @@ class Command(BaseCommand):
             raise CommandError("No trustworthy sha256 is available for this archive.")
         if size is None:
             raise CommandError("The archive size is unknown; the index sidecar is missing it.")
-        return int(size), sha256
+        if type(size) is not int or size <= 0:
+            raise CommandError("The index sidecar size must be a positive integer.")
+        return size, sha256
 
-    def _download(self, s3, destination, locator, output, expected_size, expected_sha256):
+    def _download(self, s3, destination, locator, output, expected_size, expected_sha256,
+                  *, archive_id, scope):
         try:
             fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         except OSError as exc:
             raise CommandError("The output path must not already exist.") from exc
+        index_path = f"{output}.index.json"
+        index_created = False
         try:
             with os.fdopen(fd, "wb") as sink:
                 offsite_client.read_back(
                     s3, destination.bucket, locator,
                     expected_size=expected_size, expected_sha256=expected_sha256, sink=sink,
                 )
-        except offsite_client.OffsiteDestinationError as exc:
+            # Persist only the verified facts, never credentials or unvalidated
+            # provider metadata. This local sidecar has the same trust as the source.
+            index_fd = os.open(index_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            index_created = True
+            with os.fdopen(index_fd, "w", encoding="utf-8") as index:
+                json.dump({"archive_id": str(archive_id), "scope": scope,
+                           "size_bytes": expected_size, "sha256": expected_sha256}, index)
+        except (offsite_client.OffsiteDestinationError, OSError) as exc:
             os.unlink(output)
-            raise CommandError(f"Fetch refused [{exc.code}]; the partial file was removed.") from exc
+            if index_created:
+                os.unlink(index_path)
+            code = getattr(exc, "code", "local_write_failed")
+            raise CommandError(f"Fetch refused [{code}]; the partial file was removed.") from exc
 
     def _list(self, s3, destination):
         prefix = offsite_client.remote_locator(destination, "x", "x").rsplit("/", 2)[0] + "/"

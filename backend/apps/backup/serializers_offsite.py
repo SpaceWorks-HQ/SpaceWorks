@@ -53,6 +53,14 @@ class BackupDestinationSerializer(serializers.ModelSerializer):
             )
         if self.instance is not None and self.instance.retired_at is not None:
             raise serializers.ValidationError("A retired destination cannot be changed.")
+        if self.instance is not None and self.instance.uploads.exists():
+            # Journal locators address this bucket/endpoint. Moving it would strand
+            # every recorded copy and send retention deletes to the wrong store.
+            for field in ("endpoint_url", "bucket", "region", "prefix", "addressing_style"):
+                if field in attrs and attrs[field] != getattr(self.instance, field):
+                    raise serializers.ValidationError({
+                        field: "This destination already has a journal; register a new destination to change its location.",
+                    })
         return attrs
 
     def create(self, validated_data):
@@ -113,3 +121,21 @@ class RehydrateSerializer(serializers.Serializer):
 class DestinationProbeSerializer(serializers.Serializer):
     ok = serializers.BooleanField()
     error_code = serializers.CharField(allow_blank=True)
+
+
+class DestinationDispatchSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+
+
+class BackupDestinationPageSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    results = BackupDestinationSerializer(many=True)
+
+
+class BackupDestinationUploadPageSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    results = BackupDestinationUploadSerializer(many=True)

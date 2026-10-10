@@ -127,7 +127,9 @@ def test_purge_deletes_only_ad_hoc_tenant_archives(monkeypatch):
     assert not BackupArchive.objects.filter(pk=ad_hoc.pk).exists()
     assert BackupArchive.objects.filter(pk=run_made.pk).exists()
     assert MakerspaceArchiveRecipient.objects.filter(pk=recipient.pk).exists()
-    assert deleted_keys == [ad_hoc.object_key]
+    assert set(deleted_keys) == {
+        ad_hoc.object_key, f"backup-archives/staging/{ad_hoc.pk}.tar.age",
+    }
 
 
 def test_backfill_migration_adds_the_key_to_existing_rows():

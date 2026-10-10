@@ -85,8 +85,17 @@ def purge_expired_archives(limit=100):
     for archive in archives:
         if not storage.delete_archive(archive.object_key):
             continue
-        storage.delete_archive_prefix(f"backup-archives/staging/{archive.pk}/")
+        # Single archives use a per-attempt directory; compound artifacts use one
+        # file. Keep the row retryable until both staging layouts are gone.
+        if not storage.delete_archive_prefix(f"backup-archives/staging/{archive.pk}/"):
+            continue
+        if not storage.delete_archive(storage.staging_locator(archive.pk)):
+            continue
+        if archive.staging_object_key and not storage.delete_archive(archive.staging_object_key):
+            continue
         ledger = BackupArtifactLedger.objects.filter(pk=archive.pk).first()
+        if ledger and ledger.staging_locator and not storage.delete_archive(ledger.staging_locator):
+            continue
         if ledger and ledger.state in {
             BackupArtifactLedger.State.AVAILABLE,
             BackupArtifactLedger.State.SUPERSEDED,

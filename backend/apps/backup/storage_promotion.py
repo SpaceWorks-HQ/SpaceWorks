@@ -73,11 +73,15 @@ def create_final_from_staging(staging_key, final_key):
             )["Body"]
             while chunk := source.read(CHUNK_SIZE):
                 spool.write(chunk)
+            size = spool.tell()
+            source.close()
+            source = None
             spool.seek(0)
             s3.put_object(
                 Bucket=settings.AWS_STORAGE_BUCKET_NAME,
                 Key=final_key,
                 Body=spool,
+                ContentLength=size,
                 ContentType="application/octet-stream",
                 IfNoneMatch="*",
             )

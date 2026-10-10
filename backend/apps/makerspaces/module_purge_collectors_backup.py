@@ -33,7 +33,9 @@ def _ad_hoc_archives(makerspace):
 
 def backup_delete(makerspace, cursor):
     from django.core.exceptions import ValidationError
+    from django.db import transaction
 
+    from apps.backup import storage
     from apps.backup.models import BackupArchive
 
     if BackupArchive.objects.filter(
@@ -41,10 +43,26 @@ def backup_delete(makerspace, cursor):
         status__in=("pending", "running", "promoting"),
     ).exists():
         raise ValidationError("A makerspace archive is still being built; purge after it finishes.")
-    deleted, labels = _delete(_ad_hoc_archives(makerspace))
+    rows = _ad_hoc_archives(makerspace)
+    archive_ids = list(rows.values_list("pk", flat=True))
+    deleted, labels = _delete(rows)
+    # A crashed builder can leave objects that are absent from the row's current
+    # staging key. Prefix I/O belongs after commit, outside the makerspace lock.
+    def cleanup_staging():
+        for archive_id in archive_ids:
+            storage.delete_archive_prefix(f"backup-archives/staging/{archive_id}/")
+
+    transaction.on_commit(cleanup_staging, robust=True)
     return _counts(model_labels=labels, backup_archives=deleted)
 
 
 def backup_private_keys(makerspace, add):
-    for key in _ad_hoc_archives(makerspace).values_list("object_key", flat=True):
+    from apps.backup.storage_promotion import staging_locator
+
+    for archive_id, key, staging in _ad_hoc_archives(makerspace).values_list(
+        "pk", "object_key", "staging_object_key",
+    ):
         add(key)
+        add(staging_locator(archive_id))
+        if staging:
+            add(staging)

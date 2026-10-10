@@ -2,8 +2,9 @@
 
 Rehydration is for a deployment whose database survived but whose primary bucket did
 not: the archive row is still `AVAILABLE`, its bytes are gone, and an offsite copy
-was read back and verified. The copy is fetched and verified locally, written
-create-only to the archive's own locator (never overwriting) and verified again. Nothing about restore itself changes -- `request_restore` and the host
+was read back and verified. The copy is fetched and verified locally, uploaded to a
+fresh staging key, verified there, promoted create-only to the archive's own locator
+and verified again. `request_restore` and the host
 preflight (signature, format, compatibility) run exactly as for any other archive.
 
 A fresh host with no surviving database uses `manage.py fetch_offsite_archive` and the
@@ -13,9 +14,8 @@ existing `scripts/import-backup.sh` instead.
 import logging
 import os
 import tempfile
+import uuid
 
-from botocore.exceptions import BotoCoreError, ClientError
-from django.conf import settings
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -62,8 +62,8 @@ def rehydrate_archive(archive_id, destination_id, actor=None):
     """Fetch, verify and create-only promote one offsite copy. Returns True on success.
 
     The copy is spooled to a private temporary file and verified there first: the
-    primary write then uses a seekable body, and nothing unverified ever reaches the
-    primary bucket. `If-None-Match: *` makes the write create-only, so a copy that
+    staging and final writes use seekable bodies. `If-None-Match: *` makes the final
+    write create-only, so a copy that
     reappeared meanwhile is never overwritten.
     """
     archive = BackupArchive.objects.get(pk=archive_id)
@@ -73,6 +73,7 @@ def rehydrate_archive(archive_id, destination_id, actor=None):
         "expected_size": upload.expected_size_bytes,
         "expected_sha256": upload.expected_sha256,
     }
+    staging = f"backup-archives/staging/{archive.pk}/rehydrate-{uuid.uuid4()}.tar.age"
     with tempfile.TemporaryDirectory(prefix="spaceworks-rehydrate-") as workdir:
         path = os.path.join(workdir, "archive.tar.age")
         try:
@@ -81,12 +82,14 @@ def rehydrate_archive(archive_id, destination_id, actor=None):
                 offsite_client.read_back(
                     s3, destination.bucket, upload.remote_locator, sink=sink, **expected
                 )
-            _create_only_put(path, archive.object_key)
+            storage.upload_staging(staging, path)
+            storage.stream_verify(staging, **expected)
+            storage.create_final_from_staging(staging, archive.object_key)
             storage.stream_verify(archive.object_key, **expected)
         except (offsite_client.OffsiteDestinationError, storage.BackupStorageError) as exc:
             code = getattr(exc, "code", type(exc).__name__)
             logger.error(
-                "backup_offsite_rehydrate_failed", exc_info=True,
+                "backup_offsite_rehydrate_failed",
                 extra={"archive_id": str(archive.pk), "destination_id": destination.pk,
                        "error_code": code},
             )
@@ -95,6 +98,10 @@ def rehydrate_archive(archive_id, destination_id, actor=None):
                 meta={"destination_id": destination.pk, "error_code": str(code)[:64]},
             )
             return False
+        finally:
+            # A crash leaves this attempt under the archive's retention prefix.
+            # Cleanup failure must never demote a verified immutable final copy.
+            storage.delete_archive(staging)
     audit.record(
         actor,
         "backup.archive_rehydrated",
@@ -106,22 +113,3 @@ def rehydrate_archive(archive_id, destination_id, actor=None):
         },
     )
     return True
-
-
-def _create_only_put(path, key):
-    try:
-        with open(path, "rb") as handle:
-            storage.client().put_object(
-                Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-                Key=key,
-                Body=handle,
-                ContentType="application/octet-stream",
-                IfNoneMatch="*",
-            )
-    except ClientError as exc:
-        status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
-        if status in {409, 412}:
-            raise storage.BackupStorageError("The primary locator already exists.") from exc
-        raise storage.BackupStorageError("The primary copy could not be written.") from exc
-    except (BotoCoreError, OSError) as exc:
-        raise storage.BackupStorageError("The primary copy could not be written.") from exc
