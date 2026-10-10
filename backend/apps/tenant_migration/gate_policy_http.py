@@ -85,6 +85,9 @@ HTTP_ANONYMOUS_EXEMPTIONS = {
 
 
 HTTP_ANONYMOUS_PARTICIPANTS = {
+    "apps.notifications.views_preferences.OneClickUnsubscribeView.post": (
+        "Signed token resolves one tenant; save_preference holds tenant_write through its audited commit."
+    ),
     "apps.accounts.views_staff_invitations.StaffInvitationAcceptView.post": (
         "Token resolves one tenant; acceptance takes tenant_write before account or membership writes."
     ),

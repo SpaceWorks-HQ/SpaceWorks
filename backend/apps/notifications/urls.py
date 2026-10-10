@@ -9,7 +9,16 @@ from apps.notifications.views import (
 
 app_name = "notifications"
 
+from .views_inbox import InboxListView, InboxReadAllView, InboxReadView, InboxUnreadView
+from .views_preferences import MemberPreferenceView, OneClickUnsubscribeView
+
 urlpatterns = [
+    path("inbox/<int:makerspace_id>", InboxListView.as_view(), name="inbox-list"),
+    path("inbox/<int:makerspace_id>/unread-count", InboxUnreadView.as_view(), name="inbox-count"),
+    path("inbox/<int:makerspace_id>/read-all", InboxReadAllView.as_view(), name="inbox-read-all"),
+    path("inbox/<int:makerspace_id>/<int:pk>/read", InboxReadView.as_view(), name="inbox-read"),
+    path("preferences/<int:makerspace_id>", MemberPreferenceView.as_view(), name="member-preferences"),
+    path("unsubscribe/<str:token>", OneClickUnsubscribeView.as_view(), name="one-click-unsubscribe"),
     path(
         "makerspace/<int:makerspace_id>",
         NotificationListView.as_view(),

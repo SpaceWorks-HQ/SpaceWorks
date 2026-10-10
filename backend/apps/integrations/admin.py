@@ -12,6 +12,7 @@ from apps.integrations import admin_notifications  # noqa: F401
 from apps.integrations import admin_push  # noqa: F401
 from apps.integrations import admin_recipients  # noqa: F401
 from apps.integrations import admin_sms  # noqa: F401
+from apps.integrations import admin_suppression  # noqa: F401
 from apps.integrations.models import PlatformEmailSettings
 from apps.integrations.smtp_validation import validate_smtp_settings
 
@@ -35,4 +36,3 @@ class PlatformEmailSettingsAdmin(AuditedControlChangeMixin, SuperuserOnlyModelAd
     # in the admin. The React superadmin Platform Email panel is the write surface.
     exclude = ("smtp_password",)
     readonly_fields = ("updated_at",)
-

@@ -83,6 +83,7 @@ class NotificationDeliveryLog(models.Model):
     )
     error = models.TextField(blank=True)
     attempts = models.PositiveIntegerField(default=0)
+    retry_generation = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     sent_at = models.DateTimeField(null=True, blank=True)

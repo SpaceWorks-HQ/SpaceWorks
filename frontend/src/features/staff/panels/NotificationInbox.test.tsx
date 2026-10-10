@@ -7,12 +7,12 @@ import { NotificationInbox } from "./NotificationInbox";
 import type { Makerspace } from "./shared";
 
 const { staffRequest } = vi.hoisted(() => ({ staffRequest: vi.fn() }));
-vi.mock("../../../lib/api", () => ({ staffRequest }));
+vi.mock("../../../lib/api", () => ({ staffRequest, getAccessToken: () => null }));
 
 const makerspace = { id: 7, name: "Forge" } as Makerspace;
 const notification = {
-  id: 12, level: "info", event: "submitted", title: "New request", body: "",
-  url_path: "", read_at: null, created_at: "2026-10-10T00:00:00Z",
+  id: 12, feature: "hardware_requests", event: "submitted", title: "New request", summary: "",
+  link: "", read_at: null, created_at: "2026-10-10T00:00:00Z",
 };
 
 function Badge({ id }: { id: number }) {
@@ -45,8 +45,8 @@ describe("NotificationInbox unread badge", () => {
       await waitFor(() => expect(screen.getByLabelText("Unread 8")).toHaveTextContent("3"));
       fireEvent.click(await screen.findByRole("button", { name: button }));
       await waitFor(() => expect(screen.getByLabelText("Unread 7")).toHaveTextContent("0"));
-      expect(staffRequest.mock.calls.filter(([path]) => path === "/notifications/makerspace/7/unread-count")).toHaveLength(2);
-      expect(staffRequest.mock.calls.filter(([path]) => path === "/notifications/makerspace/8/unread-count")).toHaveLength(1);
+      expect(staffRequest.mock.calls.filter(([path]) => path === "/notifications/inbox/7/unread-count")).toHaveLength(2);
+      expect(staffRequest.mock.calls.filter(([path]) => path === "/notifications/inbox/8/unread-count")).toHaveLength(1);
       expect(screen.getByLabelText("Unread 8")).toHaveTextContent("3");
     } finally {
       unmount();

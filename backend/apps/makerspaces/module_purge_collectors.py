@@ -237,9 +237,16 @@ def procurement_private_keys(makerspace, add):
 
 
 def notifications_delete(makerspace, cursor):
-    from apps.notifications.models import Notification
+    from apps.accounts import rbac
+    from apps.notifications.models import MemberNotificationPreference, Notification, NotificationInboxRow
 
-    deleted, labels = _delete(Notification.objects.filter(makerspace=makerspace))
+    deleted, labels = 0, []
+    for model in (NotificationInboxRow, MemberNotificationPreference, Notification):
+        count, model_labels = _delete(rbac.scope_notification_policy(
+            model.objects.all(), makerspace_id=makerspace.pk,
+        ))
+        deleted += count
+        labels.extend(model_labels)
     return _counts(model_labels=labels, notifications=deleted)
 
 

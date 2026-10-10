@@ -32,15 +32,17 @@ def run_reminder_sweep(*, now=None, limit=None, tz_resolver=None):
     Due instants, offsets and comparisons always use UTC. Frozen and
     not-restored tenants reach the gate so they are counted, rather than filtered out.
     """
-    sources = reminder_registry.registered_sources()
-    if not sources:
-        return {"dispatched": 0, "skipped": 0, "failed": 0}
     if transaction.get_connection().in_atomic_block or not transaction.get_autocommit():
         raise RuntimeError("Reminder sweeps require autocommit.")
     now = utc_time(timezone.now() if now is None else now)
     limit = settings.REMINDER_SWEEP_BATCH_SIZE if limit is None else limit
     if type(limit) is not int or limit < 1:
         raise ValueError("Reminder sweep batch size must be a positive integer.")
+    from apps.notifications.retention import run_notification_retention
+    run_notification_retention(now=now, limit=limit)
+    sources = reminder_registry.registered_sources()
+    if not sources:
+        return {"dispatched": 0, "skipped": 0, "failed": 0}
     counts = {"dispatched": 0, "skipped": 0, "failed": 0}
     tenants = rbac.scope_for_scheduled_work(Makerspace.objects.all(), field="pk").order_by("pk")
     for makerspace in tenants.iterator(chunk_size=100):

@@ -45,6 +45,9 @@ from .rbac_superadmin import (
     superadmin_hidden_block_applies,
     superadmin_hidden_makerspace_ids,
 )
+from .rbac_notifications import (
+    personal_notification_membership_refused, scope_notification_policy, scope_personal_notifications,
+)
 
 
 def resolve_scope(actor):

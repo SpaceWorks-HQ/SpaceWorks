@@ -32,6 +32,7 @@ class NotificationDestinationSerializer(serializers.ModelSerializer):
             "label",
             "telegram_chat_id",
             "is_active",
+            "payload_version",
             "credential_set",
             "signing_secret_set",
             "scope",
@@ -71,6 +72,7 @@ class NotificationDestinationWriteSerializer(serializers.Serializer):
         trim_whitespace=False,
     )
     is_active = serializers.BooleanField(required=False, default=True)
+    payload_version = serializers.ChoiceField(choices=(1, 2), required=False)
     scope = DestinationScopeSerializer(required=False)
 
     def validate(self, attrs):
@@ -78,6 +80,7 @@ class NotificationDestinationWriteSerializer(serializers.Serializer):
         chat_id = (attrs.get("telegram_chat_id") or "").strip()
         webhook = (attrs.get("webhook_url") or "").strip()
         existing = self.context.get("instance")
+        attrs.setdefault("payload_version", existing.payload_version if existing else 1)
         has_stored_webhook = bool(existing.webhook_url) if existing else False
 
         if channel == ChatNotificationChannel.TELEGRAM:

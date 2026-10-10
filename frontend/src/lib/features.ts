@@ -28,6 +28,8 @@ export const FEATURE_DEFINITIONS: readonly FeatureDefinition[] = [
   { key: "mobile.push", parent_module: "mobile", label: "Native push" },
   { key: "presence.geofence", parent_module: null, label: "Presence geofence" },
   { key: "notifications.delegated_recipients", parent_module: "notifications", label: "Delegated maintenance recipients" },
+  { key: "notifications.member_inbox", parent_module: "notifications", label: "Member inbox" },
+  { key: "notifications.member_preferences", parent_module: "notifications", label: "Member communication preferences" },
   { key: "events.offline_checkin", parent_module: "events", label: "Offline & station check-in" },
   { key: "machines.certifications", parent_module: "machines", label: "Certification gating" },
   { key: "inventory.kiosk", parent_module: null, label: "Kiosk" },

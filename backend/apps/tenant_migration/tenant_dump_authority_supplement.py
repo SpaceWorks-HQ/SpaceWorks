@@ -13,6 +13,18 @@ def _same(label, names, disposition, reason):
 
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
+    *_same("notifications.MemberNotificationPreference", "makerspace user feature channel enabled", D.DROP,
+           "Source personal delivery policy never becomes target disclosure authority."),
+    *_same("notifications.NotificationInboxRow", "makerspace user feature event event_key title summary link read_at", D.DROP,
+           "Personal inbox delivery text and read telemetry are omitted from portable artifacts."),
+    *_same("integrations.EmailSuppression", "makerspace address_hash reason created_by", D.DROP,
+           "Deployment-keyed delivery suppression is re-established on the target."),
+    *_same("integrations.EmailLog", "recipient feature retry_generation", D.DROP,
+           "Email delivery state does not travel."),
+    *_same("integrations.NotificationDeliveryLog", "retry_generation", D.DROP,
+           "Retry generations are source delivery state."),
+    *_same("integrations.NotificationDestination", "payload_version", D.PRESERVE,
+           "An opted-in wire format grants no delivery authority; target destination activation remains separate."),
     *_same("operations.SavedView", "shared state", D.RESET,
            "Target publication and filter identifiers must be authorized anew."),
     *_same(

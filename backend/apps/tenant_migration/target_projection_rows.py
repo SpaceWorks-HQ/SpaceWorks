@@ -4,6 +4,9 @@ from .target_projection_types import RowDisposition, RowPolicy
 
 
 ROW_POLICIES = {
+    "notifications.MemberNotificationPreference": RowPolicy(RowDisposition.DROP, "Personal delivery policy is target-owned."),
+    "notifications.NotificationInboxRow": RowPolicy(RowDisposition.DROP, "Source inbox text and read state are delivery telemetry."),
+    "integrations.EmailSuppression": RowPolicy(RowDisposition.DROP, "Deployment-keyed suppressed addresses do not travel."),
     "operations.ReminderSchedule": RowPolicy(
         RowDisposition.DROP,
         "Source-local reminder coordination is rebuilt by target sources; claims never travel.",
@@ -38,5 +41,4 @@ ROW_POLICIES = {
         condition=("state", frozenset({"requested", "invited"})),
     ),
 }
-
 

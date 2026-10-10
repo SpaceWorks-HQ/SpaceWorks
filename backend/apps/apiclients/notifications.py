@@ -1,7 +1,9 @@
 """API-access notices use the same matrix, module gates, quotas and logs as loans."""
 
 from apps.apiclients.models import ApiKeyRequest
+from apps.accounts import rbac
 from apps.integrations.notify import EmailDelivery, LifecyclePayload, notify_lifecycle
+from apps.notifications.inbox import InboxDelivery
 
 
 def notify_api_key_request_resolved(api_key_request, *, sync=False):
@@ -9,7 +11,9 @@ def notify_api_key_request_resolved(api_key_request, *, sync=False):
     makerspace = api_key_request.makerspace
 
     def build():
-        row = ApiKeyRequest.objects.select_related("requester").get(
+        row = rbac.scope_notification_policy(
+            ApiKeyRequest.objects.all(), makerspace_id=makerspace.pk,
+        ).select_related("requester").get(
             pk=request_id, makerspace=makerspace
         )
         subject = f"{makerspace.name} API access request {row.status}"
@@ -27,12 +31,15 @@ def notify_api_key_request_resolved(api_key_request, *, sync=False):
                 mute_event="api_key_request_resolved",
                 audience="requester",
                 target="requester",
+                user_id=row.requester_id,
             ),)
         return LifecyclePayload(
             text=f"API access request #{row.pk} '{row.label}' was {row.status}.",
             emails=emails,
             data={"api_key_request_id": row.pk},
             staff_channels_enabled=makerspace.staff_notifications_enabled,
+            inbox=(InboxDelivery(row.requester_id, subject, body, f"/m/{makerspace.slug}/member"),)
+            if row.requester_id else (),
         )
 
     return notify_lifecycle(

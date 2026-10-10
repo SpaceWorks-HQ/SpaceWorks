@@ -59,6 +59,7 @@ class NotificationDestination(models.Model):
     # `X-SpaceWorks-Signature` with it. Never echoed; the API exposes `signing_secret_set`.
     signing_secret = models.TextField(blank=True, default="")
     is_active = models.BooleanField(default=True)
+    payload_version = models.PositiveSmallIntegerField(default=1, choices=[(1, "Legacy"), (2, "Structured")])
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

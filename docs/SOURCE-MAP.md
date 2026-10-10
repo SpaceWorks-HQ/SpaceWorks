@@ -132,10 +132,21 @@ Tenant counters and allowances are read by `makerspaces/usage_snapshot.py`.
   cross-makerspace), stocktake, adjustments, ledger, `report_registry.py` + `report_scope.py` + `reports_*`
   builders, CSV/XLSX exports, container APIs, QR print batches (`qr_zip.py`), dashboard, accountability.
   `views.py`/`services.py` are thin re-export barrels over `views_*`/`services_*`.
+- `backend/apps/notifications/` - legacy shared feed plus `models_inbox.py` personal rows;
+  `inbox.py` matrix fan-out, `legacy_inbox.py` legacy-only staff snapshots,
+  `preferences.py` opt-out policy, `views_inbox.py`/`views_preferences.py` personal APIs,
+  `retention.py` F1 bounded cleanup. See `docs/notification-inbox.md`.
+  `accounts/rbac_notifications.py` owns personal history scope and trusted tenant policy reads;
+  `backup/archive_objects.py` declares the inbox event UUID as a non-object key.
 - `backend/apps/integrations/` — Telegram/email/Slack/Mattermost/native-push delivery, encrypted FCM/APNs
   credentials + device registrations, `dispatch_email` choke point + `EmailLog` outbox + Celery task,
   webhook (auth via `X-Telegram-Bot-Api-Secret-Token` vs `TELEGRAM_WEBHOOK_SECRET`, fail-closed),
   `PlatformEmailSettings`, `DailyEmailCounter`, staff-notification recipient matrix.
+  Email `dispatch.py` explicitly exports `dispatch_policy.py`, `dispatch_outbox.py` and
+  `dispatch_delivery.py`; `email_preferences.py` owns unsubscribe/suppression checks.
+  `delivery_views.py` and `suppression_views.py` expose audited scoped delivery controls;
+  `admin_suppression.py` provides superadmin-only, platform-mail suppression.
+  `webhook_schema.py` owns v2 event schemas (`docs/webhooks-v2.md`).
   F3's bounded templates live in `email_templates_registry_research.py`; domain
   adapters use `notifications_research.py` for on-commit staff and owner email delivery.
 - `backend/apps/updates/` — singleton platform update state, audited superadmin controls, and the
@@ -262,6 +273,8 @@ See also [SOURCE-MAP-CLIENT.md](SOURCE-MAP-CLIENT.md) for the standalone
 frontend directory and browser/kiosk flow map.
 See [SOURCE-MAP-CONSOLES.md](SOURCE-MAP-CONSOLES.md) for staff lists, saved views,
 command-palette discovery and the connected-device console map.
+Personal inbox, preferences, delivery history and suppression controls live in
+`frontend/src/features/notifications/`; staff panel wrappers and MemberArea mount them.
 
 Staff list preferences live in `operations/models_saved_views.py`, `serializers_saved_views.py` and
 `views_saved_views.py`; cross-entity discovery is `admin_api/search.py`. Shared pagination/ordering

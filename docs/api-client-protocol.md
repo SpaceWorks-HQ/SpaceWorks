@@ -128,7 +128,13 @@ The inbound protocol above lets your system call SpaceWorks. The `webhook` notif
 other direction: SpaceWorks calls **your** HTTPS endpoint whenever the notification matrix routes an event
 to a signed-webhook destination.
 
-**Request.** `POST` with `Content-Type: application/json`, `User-Agent: SpaceWorks-Webhook/1`, and:
+Destinations default to `payload_version=1`, preserving the envelope below. Opting a
+destination into version 2 sends the bounded event envelope and per-event schemas in
+[Signed webhook v2](webhooks-v2.md). In version 2 the event header is qualified, for
+example `hardware_requests.accepted`, and User-Agent is `SpaceWorks-Webhook/2`.
+The HMAC signature contract is the same for both payload versions.
+
+**Version 1 request.** `POST` with `Content-Type: application/json`, `User-Agent: SpaceWorks-Webhook/1`, and:
 
 | Header | Value |
 |---|---|
@@ -187,7 +193,7 @@ retries. Direct destination sends use `created_at`; rows queued before this chan
 fall back to their `created_at`, and can have empty
 `ids` because historical subject IDs cannot be reconstructed safely. The text remains the
 existing staff message; consumers should use `structured.event` and `structured.ids` for
-automation. An incompatible replacement of the original envelope is outside this change.
+automation. Version 2 is a deliberate per-destination opt-in; the version 1 envelope remains available.
 
 API-access resolution now follows the `api_access` matrix row: email and Telegram default
 on to preserve existing delivery; the other channels default off. Channel preferences,
@@ -211,5 +217,5 @@ def verify(headers, raw_body: bytes, secret: str, tolerance=300) -> bool:
 ```
 
 Respond with any 2xx. Anything else, or a timeout, is retried by the delivery worker; after the retries a
-superadmin can re-queue the failed delivery from `/control/`. Endpoints must be public HTTPS — private and
+space manager can retry from Delivery logs, or a superadmin from `/control/`. Endpoints must be public HTTPS — private and
 loopback addresses are refused when the destination is saved and again at send time.

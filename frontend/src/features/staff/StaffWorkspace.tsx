@@ -105,13 +105,8 @@ export function StaffWorkspace({
     ? "Super Admin"
     : user.makerspaces.find((item) => item.id === selected)?.role_name;
 
-  // Tabs OMITTED by design rather than genuinely forbidden: `requests` holds hardware rows
-  // a machine-only actor never has, and `notifications` is withheld from that same actor
-  // because the inbox cannot be machine-scoped. Both are absent from the sidebar, so a
-  // stored or deep-linked route to one is a stale bookmark, not an attempt to reach
-  // something restricted — it should land on the actor's first allowed tab rather than an
-  // access-denied page. Genuinely denied tabs still render the denial.
-  const normalizedDeniedTabs = new Set(["requests", "notifications"]);
+  // A stale hardware bookmark for a machine-only actor returns to their allowed tab.
+  const normalizedDeniedTabs = new Set(["requests"]);
   const normalizeDenied = routeTabDenied && !!routeTab && normalizedDeniedTabs.has(routeTab);
   if ((!routeTabDenied || normalizeDenied) && location.pathname !== activeTabPath) {
     return <Navigate replace to={activeTabPath + location.search} />;

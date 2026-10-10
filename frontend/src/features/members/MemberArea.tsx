@@ -22,6 +22,7 @@ import { MemberPaymentRows, type MemberPayment } from "./MemberPayments";
 import { MemberVerifierPanel } from "./MemberVerifierPanel";
 import { MemberClaimRedemption } from "./MemberClaimRedemption";
 import { hasClaimSession, MemberClaimSession } from "./MemberClaimSession";
+import { MemberNotifications } from "../notifications/MemberNotifications";
 
 type Membership = { makerspace: { slug: string; name: string }; membership_status: string; role: string; waiver_acceptance_required: boolean; can_refer: boolean; can_verify: boolean; verified_at: string | null; referrals_enabled: boolean };
 type Memberships = { memberships: Membership[]; requests: { makerspace: { slug: string; name: string }; state: string; kind: string }[] };
@@ -116,6 +117,7 @@ export function MemberArea() {
       <section className={`desk-panel ${presence.data?.active ? "border-success" : "border-secondary"} p-5`}><h2 className="title-panel">Presence</h2><p className="mt-1 text-sm text-muted">{presence.data?.active ? <>Active until <span className="font-mono">{new Date(presence.data.session?.expires_at ?? "").toLocaleTimeString()}</span></> : "No active session."}</p><button className="desk-button-secondary mt-4" disabled={start.isPending || end.isPending || (!presence.data?.active && !bootstrap.data)} onClick={() => presence.data?.active ? end.mutate() : start.mutate()}>{presence.data?.active ? "End presence" : "Start 2-hour presence"}</button></section>
       {/* Notices first: they are the reason to open a dashboard at all. */}
       {activity.data ? <MemberNotices notices={activity.data.notices} /> : null}
+      {membership.membership_status === "active" && bootstrap.data?.modules.includes("notifications") ? <MemberNotifications makerspaceId={makerspaceId} features={bootstrap.data.features} /> : null}
       {activity.data ? <MemberActivityPanel activity={activity.data} makerspaceId={makerspaceId} makerspaceSlug={resolvedSlug} /> : null}
       {activity.data ? <MemberTerm term={activity.data.membership_term} /> : null}
       {activity.data ? <MemberDues dues={activity.data.membership_dues} /> : null}

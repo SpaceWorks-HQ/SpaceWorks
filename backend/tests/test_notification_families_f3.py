@@ -50,7 +50,7 @@ def capture_delivery(monkeypatch):
     return emails, channels
 
 
-def test_catalog_extends_stable_families_and_every_new_cell_is_default_off():
+def test_catalog_extends_stable_families_with_external_channels_off_and_personal_inbox_on():
     assert set(FEATURE_EVENTS) == set(NotificationFeature.values)
     assert set(DEFAULT_CHANNEL_STATE) == set(NotificationFeature.values)
     assert {"request_pending", "member_joined"} <= set(FEATURE_EVENTS["members"])
@@ -61,7 +61,8 @@ def test_catalog_extends_stable_families_and_every_new_cell_is_default_off():
         assert set(events) <= set(FEATURE_EVENTS[feature])
         assert feature in SELECTABLE_FEATURES and feature in FEATURE_MODULES
         assert set(DEFAULT_CHANNEL_STATE[feature]) == set(NotificationChannel.values)
-        assert not any(DEFAULT_CHANNEL_STATE[feature].values())
+        assert DEFAULT_CHANNEL_STATE[feature]["in_app"] is True
+        assert not any(enabled for channel, enabled in DEFAULT_CHANNEL_STATE[feature].items() if channel != "in_app")
     assert DEFAULT_CHANNEL_STATE["hardware_requests"]["email"] is True
     assert DEFAULT_CHANNEL_STATE["bookings"]["telegram"] is True
 

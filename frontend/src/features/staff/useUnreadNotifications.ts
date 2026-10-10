@@ -1,14 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { staffRequest } from "../../lib/api";
+import { inboxUnreadKey } from "../notifications/PersonalInbox";
 
 export const notificationsUnreadQueryKey = (makerspaceId: number | undefined) =>
-  ["notifications-unread", makerspaceId] as const;
+  inboxUnreadKey(makerspaceId);
 
 export function useUnreadNotifications(makerspaceId: number | undefined, enabled: boolean) {
   const query = useQuery({
     queryKey: notificationsUnreadQueryKey(makerspaceId),
-    queryFn: () => staffRequest<{ count: number }>(`/notifications/makerspace/${makerspaceId}/unread-count`),
+    queryFn: () => staffRequest<{ count: number }>(`/notifications/inbox/${makerspaceId}/unread-count`),
     enabled: enabled && Boolean(makerspaceId),
     refetchInterval: 60_000,
     retry: false,

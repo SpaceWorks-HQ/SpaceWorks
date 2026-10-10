@@ -42,7 +42,7 @@ export const TAB_LABELS: Record<string, string> = {
   users: "Users",
   settings: "Settings",
   emailtemplates: "Email templates",
-  "email-logs": "Email log",
+  "email-logs": "Delivery logs",
   api: "API access",
   platform: "Platform settings",
   payments: "Payments",
@@ -78,7 +78,7 @@ export function getStaffAccess(
   actions: readonly string[],
   isSuperadmin: boolean,
   singleTenantLocked: boolean,
-  isMachineOnly = false,
+  _isMachineOnly = false,
 ) {
   const has = (action: string) => isSuperadmin || actions.includes(action);
   const canEditInventory = has("edit_inventory");
@@ -114,15 +114,13 @@ export function getStaffAccess(
   // finished work over, so a manager needs no separate grant.
   const canCollectServiceRequests = has("collect_service_request") || canManageMachines;
   const printingOnly = canSeePrinting && !canEditInventory && !canManageMakerspace;
-  const baseTabs = handoutOnly ? (["requests", "direct", "handover", "payments"] as const) : ALL_TABS;
+  const baseTabs = handoutOnly ? (["requests", "direct", "handover", "payments", "notifications"] as const) : ALL_TABS;
   const allowedTabs: readonly string[] = governanceOnly ? ["organizations"] : baseTabs.filter((tabName) => {
     if (tabName === "platform-dashboard") return isSuperadmin && !singleTenantLocked;
     if (tabName === "usage") return canManageMakerspace;
     if (tabName === "dashboard") return !handoutOnly && (isSuperadmin || canSeeDashboard);
-    // The inbox has no machine provenance and its read state is makerspace-wide, so the
-    // backend withholds it from a per-type maintainer entirely. Omit the tab rather than
-    // render one that 403s — the same reason a tombstoned app's sidebar entry is dropped.
-    if (tabName === "notifications") return !handoutOnly && !isMachineOnly;
+    // Personal rows and read state admit machine-only and handover staff.
+    if (tabName === "notifications") return isSuperadmin || actions.length > 0;
     if (tabName === "tobuy") return canUseToBuy;
     if (tabName === "needsfix") return canEditInventory;
     if (tabName === "categories") return canEditInventory;

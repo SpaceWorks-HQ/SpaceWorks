@@ -75,6 +75,7 @@ PROJECTED_MODEL_LABELS |= LABEL_PROJECTED_MODELS
 PRESERVE_LIVE_MODEL_LABELS = frozenset({"machines.MachineOperator"})
 
 EXPLICIT_DROP_MODEL_REASONS = {
+    "notifications.MemberNotificationPreference": "Target users re-establish personal communication preferences; no source disclosure controls become live.",
     "apiclients.ApiClient": "Source clients and their bearer secrets never become target authority.",
     "events.EventCollaborator": "Cross-tenant collaboration grants have no target counterpart.",
     "events.EventSeriesCollaborator": "Cross-tenant series collaboration grants have no target counterpart.",

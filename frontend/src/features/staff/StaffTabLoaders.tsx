@@ -29,7 +29,7 @@ export const ContainersPanel = lazy(() => import("./panels/ContainersPanel").the
 export const StocktakePanel = lazy(() => import("./panels/StocktakePanel").then((m) => ({ default: m.StocktakePanel })));
 export const StockTransferPanel = lazy(() => import("./panels/StockTransferPanel").then((m) => ({ default: m.StockTransferPanel })));
 export const ProcurementPanel = lazy(() => import("./panels/ProcurementPanel").then((m) => ({ default: m.ProcurementPanel })));
-export const EmailLogPanel = lazy(() => import("./panels/EmailLogPanel").then((m) => ({ default: m.EmailLogPanel })));
+export const EmailLogPanel = lazy(() => import("./panels/DeliveryLogPanel").then((m) => ({ default: m.DeliveryLogPanel })));
 export const WarrantyPanel = lazy(() => import("./panels/WarrantyPanel").then((m) => ({ default: m.WarrantyPanel })));
 export const AccountabilityPanel = lazy(() => import("./panels/AccountabilityPanel").then((m) => ({ default: m.AccountabilityPanel })));
 export const Categories = lazy(() => import("./panels/Categories").then((m) => ({ default: m.Categories })));
@@ -46,4 +46,3 @@ export const HandoverConsole = lazy(() => import("./panels/machine/HandoverConso
 export const DataExportsPanel = lazy(() => import("./DataExportsPanel").then((m) => ({ default: m.DataExportsPanel })));
 export const BackupRestorePanel = lazy(() => import("./BackupRestorePanel").then((m) => ({ default: m.BackupRestorePanel })));
 export const TenantMigrationPanel = lazy(() => import("./TenantMigrationPanel").then((m) => ({ default: m.TenantMigrationPanel })));
-
