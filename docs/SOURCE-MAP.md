@@ -258,7 +258,7 @@ Tenant counters and allowances are read by `makerspaces/usage_snapshot.py`.
 
 See [SOURCE-MAP-DOMAINS.md](SOURCE-MAP-DOMAINS.md) for hardware loans, payments,
 printing, events, the frontend directories and connected device monitoring.
-See also [SOURCE-MAP-FRONTEND.md](SOURCE-MAP-FRONTEND.md) for the standalone
+See also [SOURCE-MAP-CLIENT.md](SOURCE-MAP-CLIENT.md) for the standalone
 frontend directory and browser/kiosk flow map.
 See [SOURCE-MAP-CONSOLES.md](SOURCE-MAP-CONSOLES.md) for staff lists, saved views,
 command-palette discovery and the connected-device console map.

@@ -90,7 +90,7 @@ Continued from [SOURCE-MAP.md](SOURCE-MAP.md); paths are relative to the reposit
 
 Tenant branding lives in `frontend/src/lib/brandColours.ts` (WCAG checks and
 light/dark palette derivation) and `useTenantBranding.ts` (page-scoped variables).
-See [SOURCE-MAP-FRONTEND.md](SOURCE-MAP-FRONTEND.md) for the theme settings preview,
+See [SOURCE-MAP-CLIENT.md](SOURCE-MAP-CLIENT.md) for the theme settings preview,
 shared component styles, browser theme preference and tenant support links.
 
 ## Connected device monitoring (phase 7d lane)
