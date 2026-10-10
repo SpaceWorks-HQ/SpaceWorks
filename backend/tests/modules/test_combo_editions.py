@@ -119,3 +119,37 @@ def test_print_status_lookup_follows_the_printing_module_and_the_edition(setting
     response = APIClient().get(url)
     assert response.status_code == 400
     assert "printing" in str(response.data)
+
+
+def test_events_edition_hides_the_item_detail_and_the_public_stats_page(settings):
+    """I5: every section of the stats page (loans, machines, printing) is edition-hidden."""
+    from apps.inventory.models import InventoryProduct
+
+    space = make_space("combo-edition-detail-stats")
+    space.public_inventory_enabled = True
+    space.public_stats_enabled = True
+    space.save(update_fields=["public_inventory_enabled", "public_stats_enabled"])
+    product = InventoryProduct.objects.create(
+        makerspace=space, name="Listed drill", total_quantity=1, available_quantity=1, is_public=True,
+    )
+    detail = reverse("inventory:public-inventory-detail", args=[space.slug, product.pk])
+    stats = reverse("inventory:public-makerspace-stats", args=[space.slug])
+
+    settings.SPACEWORKS_EDITION = "makerspace"
+    assert APIClient().get(detail).status_code == 200
+    assert APIClient().get(stats).status_code == 200
+    settings.SPACEWORKS_EDITION = "events"
+    assert APIClient().get(detail).status_code == 404
+    assert APIClient().get(stats).status_code == 404
+
+
+def test_the_public_pool_list_carries_material_and_colour_only():
+    """M7: never the hex swatch, the lot code or the remaining grams."""
+    from tests.machines.test_consumable_public_eligibility import _public_pool_setup
+
+    space, _queue, _excluded, _included = _public_pool_setup("combo-public-pool-fields")
+
+    rows = APIClient().get(reverse("public-printer-service-pools", args=[space.slug])).data
+
+    assert rows
+    assert all(set(row) == {"id", "material", "color"} for row in rows)

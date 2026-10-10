@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from apps.apiclients.throttling import ClientTierRateThrottle
 from apps.inventory.public_stats import build_public_stats
 from apps.inventory.serializers import PublicStatsSerializer
+from apps.makerspaces.editions import public_surface_available
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.platform import module_enabled
 from apps.openapi import PUBLIC_API_AUTH_PARAMETERS
@@ -35,7 +36,10 @@ class PublicMakerspaceStatsView(APIView):
     def get(self, request, makerspace_slug):
         makerspace = get_public_makerspace(makerspace_slug)
         if (
-            not makerspace.public_inventory_enabled
+            # Every section (loans, machines, printing) belongs to a module the
+            # events/bookings editions hide, so the page is hidden with them.
+            not public_surface_available("public_inventory")
+            or not makerspace.public_inventory_enabled
             or not makerspace.public_stats_enabled
             or not module_enabled(
                 makerspace,
