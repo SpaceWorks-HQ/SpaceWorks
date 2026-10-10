@@ -35,6 +35,41 @@ def test_matrix_suppression_counts_as_skipped_and_stays_terminal(attendance, mai
     assert not mailoutbox
 
 
+def test_personal_email_opt_out_suppresses_attendance_reminder(attendance, mailoutbox):
+    from apps.notifications.models import MemberNotificationPreference
+
+    space, member, row, source, now, domain = attendance
+    MemberNotificationPreference.objects.create(
+        makerspace=space, user=member, feature=domain, channel="email", enabled=False,
+    )
+    counts = run_reminder_sweep(now=now)
+    assert counts["dispatched"] == 0 and counts["failed"] == 0
+    log = EmailLog.objects.get(makerspace=space, event="reminder")
+    assert log.recipient_id == member.pk
+    assert log.status == EmailLog.Status.SKIPPED
+    assert log.error == "email_member_opted_out"
+    assert ReminderSchedule.objects.get(makerspace=space).state == ReminderSchedule.State.COMPLETED
+    assert not mailoutbox
+
+
+def test_attendance_reminder_reaches_only_owners_personal_inbox(attendance, mailoutbox):
+    from apps.notifications.models import NotificationInboxRow
+
+    space, member, row, source, now, domain = attendance
+    space.enabled_features = [*space.enabled_features, "notifications.member_inbox"]
+    space.save(update_fields=["enabled_features"])
+    NotificationPreference.objects.update_or_create(
+        makerspace=space, feature=domain, channel="in_app", defaults={"enabled": True},
+    )
+    assert run_reminder_sweep(now=now)["dispatched"] == 1
+    inbox = NotificationInboxRow.objects.get(makerspace=space)
+    assert inbox.user_id == member.pk
+    assert inbox.feature == domain and inbox.event == "reminder"
+    assert run_reminder_sweep(now=now)["dispatched"] == 0
+    assert NotificationInboxRow.objects.filter(makerspace=space).count() == 1
+    assert len(mailoutbox) == 1
+
+
 def test_future_second_step_cannot_starve_later_members_first_step(attendance, mailoutbox):
     from apps.bookings.models import Booking
     from tests.events.checkin_helpers import make_member, register

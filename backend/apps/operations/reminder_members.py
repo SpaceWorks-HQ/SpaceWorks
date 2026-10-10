@@ -69,7 +69,7 @@ def dispatch_member_reminder(makerspace, *, feature, member, context, data):
     delivery = EmailDelivery(
         to_email=member.email, subject=template["subject"],
         text_body=template["text_body"], html_body=template["html_body"],
-        audience="requester", stream=feature, mute_event="reminder",
+        audience="requester", stream=feature, mute_event="reminder", user_id=member.pk,
     )
     return notify_lifecycle(
         makerspace, feature=feature, event="reminder", sync=True,

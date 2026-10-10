@@ -25,14 +25,17 @@ from apps.openapi_errors import errors
 from apps.tenant_migration.gate_runtime import tenant_write
 
 
-def save_preference(user, space, data, *, action="notification.preference_updated"):
+def save_preference(user, space, data, *, unsubscribe=False):
     # Signed links resolve their tenant after HTTP middleware, so hold the late gate.
     with tenant_write(space.pk):
         rbac.scope_notification_policy(MemberNotificationPreference.objects.all(), makerspace_id=space.pk).update_or_create(
             user=user, makerspace=space, feature=data["feature"], channel=data["channel"],
             defaults={"enabled": data["enabled"]},
         )
-        audit.record(user, action, makerspace=space, target=space, meta=data)
+        audit.record(
+            user, "notification.unsubscribed" if unsubscribe else "notification.preference_updated",
+            makerspace=space, target=space, meta=data,
+        )
 
 
 class MemberPreferenceView(APIView):
@@ -83,5 +86,5 @@ class OneClickUnsubscribeView(APIView):
         # The signature is the authority here; no browser login and no CSRF cookie.
         # Actor is the user who received the capability, never a provider/device.
         save_preference(user, space, {"feature": data["feature"], "channel": "email", "enabled": False},
-                        action="notification.unsubscribed")
+                        unsubscribe=True)
         return Response({"detail": "Optional emails for this family are disabled. Safety emails remain enabled."})

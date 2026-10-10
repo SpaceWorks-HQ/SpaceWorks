@@ -26,7 +26,7 @@ describe("member and finance delegation", () => {
     const actions = ["record_payment", "view_inventory", "assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence", "collect_service_request"];
     const access = getStaffAccess(actions, false, false);
     expect(access.handoutOnly).toBe(true);
-    expect(access.allowedTabs).toEqual(["requests", "direct", "handover", "payments"]);
+    expect(access.allowedTabs).toEqual(["requests", "direct", "handover", "payments", "notifications"]);
     expect(getStaffAccess(["record_payment"], false, false).defaultTab).toBe("payments");
   });
 
