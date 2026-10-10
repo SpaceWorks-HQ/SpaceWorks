@@ -11,6 +11,7 @@ pytestmark = pytest.mark.django_db
 
 def test_seed_e2e_creates_a_fresh_makerspace_with_both_requests(settings, tmp_path, monkeypatch):
     settings.DEBUG = True
+    settings.EVENT_STATION_PIN_PEPPER = "test-only-independent-station-pepper"
     monkeypatch.delenv("E2E_SEED_ALLOWED", raising=False)
     out = tmp_path / "seed.json"
     call_command("seed_e2e", "--write-json", str(out), "--password", "pw-for-test")
@@ -22,7 +23,7 @@ def test_seed_e2e_creates_a_fresh_makerspace_with_both_requests(settings, tmp_pa
     probe = HardwareRequest.objects.get(pk=seeded["probe_request_id"])
     assert pending.status == HardwareRequest.Status.PENDING_APPROVAL
     assert probe.status == HardwareRequest.Status.ACCEPTED
-    assert seeded["box_code"] == space.boxes.get().code if hasattr(space, "boxes") else True
+    assert space.boxes.filter(code=seeded["box_code"]).exists()
     # Two runs never collide: fresh slug, fresh users, fresh box code.
     out2 = tmp_path / "seed2.json"
     call_command("seed_e2e", "--write-json", str(out2), "--password", "pw-for-test")
@@ -33,6 +34,7 @@ def test_seed_e2e_creates_a_fresh_makerspace_with_both_requests(settings, tmp_pa
 
 def test_seed_e2e_refuses_outside_development(settings, monkeypatch):
     settings.DEBUG = False
+    settings.EVENT_STATION_PIN_PEPPER = "test-only-independent-station-pepper"
     monkeypatch.delenv("E2E_SEED_ALLOWED", raising=False)
     before = Makerspace.objects.count()
     with pytest.raises(CommandError):

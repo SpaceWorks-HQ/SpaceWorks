@@ -98,6 +98,13 @@ def copy_object(source_key, dest_key):
 
 
 def finalize_upload(evidence, max_bytes):
+    from django.db import transaction
+    from apps.evidence.finalization_completed import completed_result
+
+    if transaction.get_connection().in_atomic_block:
+        completed = completed_result(evidence)
+        if completed is not None:
+            return completed
     from apps.evidence.finalization import FinalizationInProgress
     from apps.evidence.finalization import finalize_upload as finalize_evidence_upload
 

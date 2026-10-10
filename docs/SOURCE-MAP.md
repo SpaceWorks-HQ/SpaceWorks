@@ -32,6 +32,17 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
   `models_makerspace_validation.py` owns model clean checks; `theme_validation.py` validates
   the closed theme JSON for control forms and API writes.
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
+  `models_stations.py` owns shared inert `Station` metadata plus the complete live
+  `StationCredential` envelope; `station_credentials.py`, `station_sessions.py`, `station_security.py` and
+  `station_throttles.py` own reusable rotation/reveal/disable, signing, PIN/origin and throttle mechanics
+  without importing event policy.
+  Phase 9b kiosk Stations: `models_station_leases.py` (`StationOperatorLease`, `StationSessionRevocation`),
+  `kiosk_station_services.py` (scanner/handover lifecycle + PIN session), `station_operator_leases.py`
+  (lease issue/resolve/narrow/revoke), `station_views_admin.py`/`station_views_public.py`/`station_urls.py`
+  (routes), `station_lease_cleanup.py` + `tasks_station.py` (daily cleanup), `checks_station.py` (timing).
+  The handover side owns `hardware_requests/kiosk_command_policy.py` (the literal operation table),
+  `kiosk_online_commands.py` (work package + dispatch into existing workflows) and `kiosk_views.py`;
+  `evidence/services_upload.py` is the shared row+staging-presign service.
 - `backend/apps/organizations/` — `Organization` (platform entity, creatable before any makerspace, NOT a
   module_registry key), its opt-in public profile and cross-makerspace event catalogue,
   `OrganizationMakerspace` (the many-to-many link, at most one `owner` per space),
@@ -224,6 +235,16 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
   and `self_checkout_returns.py`, with shared evidence checks in `self_checkout_evidence.py`.
   All return paths use `return_helpers.finalize_return_status`, which schedules the post-commit
   loan charge seam in `loan_payments.py` only when the request closes.
+  Phase 9c replay: `models_replay.py` owns omitted command coordination; `replay_authorization.py`
+  reloads the human lease and live policy; `replay_serializers.py`/`replay_payload_serializers.py` and
+  `replay_fingerprint.py` normalize the protocol; `replay_prepare.py` establishes evidence/ownership;
+  `replay_claims.py` fences claims; `replay_execute.py`/`replay_dispatch.py` wrap the shared online
+  dispatcher and workflow transaction. `replay_views.py` is mounted by makerspaces/station_urls.py;
+  `replay_cleanup.py`/`tasks_replay.py` implement bounded daily cleanup, with settings checks in checks.py.
+  `evidence/finalization_completed.py` supplies database-only finalized reuse under domain locks.
+  `frontend/src/features/kiosk/kioskReplayApi.ts` hand-writes typed prepare/execute calls using only
+  Station cookie + human lease; `kioskReplayClient.ts` now owns encrypted foreground/SW replay.
+  The staff recovery screen remains phase 9e.
 - `backend/apps/payments/` — immutable multi-subject Payment authority, per-space raw credentials + managed
   Stripe Connect resolution, checkout/webhook settlement, reconciliation, native PaymentSheet intents.
 - `backend/apps/printing/` — **TOMBSTONED** (Project B): only an `AppConfig` and an empty `models.py`, kept
@@ -237,14 +258,16 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
   in `role_scope_services.py`.
 - `backend/apps/events/` — the separable events module. `models.py` is the stable explicit re-export barrel
   over `models_event.py`, `models_registration.py`, `models_attendance.py`, `models_feedback.py`,
-  `models_certificates.py`, `models_series.py`, `models_calendar.py`, `models_collaborators.py` and
+  `models_station.py`, `models_certificates.py`, `models_series.py`, `models_calendar.py`, `models_collaborators.py` and
   `organizer_models.py`; those focused files are the schema sources for events/occurrences, approval and
-  waitlist registrations, immutable check-in history and PIN credentials, feedback, certificate artifacts,
+  waitlist registrations, immutable check-in history and the event-owned `EventStationBinding`, feedback,
+  certificate artifacts,
   recurring series, member feed credentials, makerspace collaboration and organization attribution.
   `services.py` remains the audited transactional boundary for one-off event and registration mutations,
   delegating lifecycle and registration-state transitions to `services_lifecycle.py`,
   `services_registration.py` and `services_registration_state.py`. The other `services_*` modules own the
-  corresponding series/recurrence/collaboration, calendar/feed, badge, check-in/offline-sync/station,
+  corresponding series/recurrence/collaboration, calendar/feed, badge, check-in/offline-sync and the event
+  policy adapter over the makerspaces Station core,
   feedback/certificate, image and organizer workflows; `urls_admin.py`, `urls_member.py`, `urls_public.py`
   and `urls_station.py` divide the staff, authenticated-member, public and anonymous-station surfaces.
 - `backend/apps/warranty/`, `apps/maintenance/`, `apps/events/`, `apps/bookings/`, `apps/forms_schema/`,
@@ -263,6 +286,20 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
   `EventCheckInStationPage.tsx` exchanges the event-scoped PIN, then reuses the offline roster/sync API,
   IndexedDB state and operator UI owned by `features/staff/eventCheckInOfflineApi.ts`,
   `eventCheckInOfflineStore.ts` and `OfflineCheckInOperator.tsx`.
+- `frontend/src/features/kiosk/` — Station shell, selected offline handover and queue status.
+  `offlineQueueStore.ts`/`offlineQueueDb.ts` own atomic encrypted work/commands/evidence,
+  cross-context locks, caps and expiry; `offlineEvidence.ts` owns pixel normalization.
+  `replayPolicy.ts` owns scheduling/backoff and typed authority/domain distinctions.
+  `frontend/src/lib/encryptedIndexedDb.ts` supplies storage/crypto mechanics shared
+  with the legacy event adapter, whose database/wire format remains unchanged.
+  `frontend/src/sw.ts` owns kiosk app-shell fetch policy and opportunistic encrypted
+  Background Sync. `frontend/scripts/kiosk-pwa.ts` bundles it through Vite and injects
+  final asset revisions; `verify-pwa-build.mjs` checks emitted artifacts. Static
+  `public/sw.js` is removed. The offline rules live in `docs/KIOSK-OFFLINE.md`.
+  Failed handover recovery lives in `hardware_requests/replay_recovery_*` and
+  `features/kiosk/KioskReplay*`; its review, correction and retention contract is
+  documented in `docs/KIOSK-RECOVERY.md`. `operations/e2e_kiosk_seed.py` supplies
+  isolated real-workflow fixtures; `dev.sh e2e` runs Playwright against a production preview.
 - `frontend/src/features/organizations/` — public organization presentation and invitation redemption:
   `PublicOrganizationPage.tsx` renders the public profile and paginated cross-makerspace event catalogue,
   `OrganizationInvitationRedeemPage.tsx` binds a single-use invitation after member sign-in, and

@@ -34,6 +34,15 @@ def test_complete_reference_registry_is_valid():
     validate_reference_registry()
 
 
+def test_replay_audit_paths_have_exact_portable_or_source_local_dispositions():
+    for action in ("kiosk.replay_prepared", "kiosk.replay_claimed", "kiosk.replay_succeeded", "kiosk.replay_failed"):
+        for field in ("station_id", "evidence_id", "subject_request_id", "subject_loan_id",
+                      "result_request_id", "result_loan_id", "result_return_event_id"):
+            assert AUDIT_META_REFERENCES[(action, field)].disposition is AuditReferenceDisposition.REMAP
+        for field in ("replay_id", "operator_lease_id", "station_session_id", "aggregate_id"):
+            assert AUDIT_META_REFERENCES[(action, field)].disposition is AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT
+
+
 def test_every_storable_discriminator_value_is_model_specific():
     qr_values = set(QrCode.TargetType.values)
     qr_targets = DISCRIMINATOR_REFERENCES[

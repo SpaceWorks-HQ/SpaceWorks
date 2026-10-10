@@ -40,15 +40,16 @@ def events_delete(makerspace, cursor):
         Event,
         EventAttendanceCertificate,
         EventCheckInEvent,
-        EventCheckInStationCredential,
         EventCollaborator,
         EventFeedbackResponse,
         EventFeedbackSurvey,
         EventRegistration,
         EventSeries,
         EventSeriesCollaborator,
+        EventStationBinding,
         MemberCalendarFeed,
     )
+    from apps.makerspaces.models import Station, StationCredential
 
     feeds, feed_labels = _delete(
         MemberCalendarFeed.objects.filter(membership__makerspace=makerspace)
@@ -70,8 +71,19 @@ def events_delete(makerspace, cursor):
     provenance_cleared = EventRegistration.objects.filter(
         registered_via_makerspace=makerspace,
     ).exclude(event__makerspace=makerspace).update(registered_via_makerspace=None)
+    station_ids = list(
+        EventStationBinding.objects.select_for_update()
+        .filter(event__makerspace=makerspace)
+        .values_list("station_id", flat=True)
+    )
     station_credentials, station_credential_labels = _delete(
-        EventCheckInStationCredential.objects.filter(event__makerspace=makerspace)
+        StationCredential.objects.filter(station_id__in=station_ids)
+    )
+    station_bindings, station_binding_labels = _delete(
+        EventStationBinding.objects.filter(station_id__in=station_ids)
+    )
+    stations, station_labels = _delete(
+        Station.objects.filter(pk__in=station_ids)
     )
     certificates, certificate_labels = _delete(
         EventAttendanceCertificate.objects.filter(
@@ -97,7 +109,8 @@ def events_delete(makerspace, cursor):
             collaboration_labels | certificate_labels | response_labels
             | survey_labels | checkin_labels | registration_labels | event_labels
             | projected_collaboration_labels | series_collaboration_labels | series_labels
-            | feed_labels | station_credential_labels
+            | feed_labels | station_credential_labels | station_binding_labels
+            | station_labels
         ),
         event_series_collaboration_projections=projected_collaborations,
         event_series_collaborations=series_collaborations,
@@ -107,6 +120,8 @@ def events_delete(makerspace, cursor):
         event_feedback_surveys=surveys,
         event_check_in_events=checkins,
         event_check_in_station_credentials=station_credentials,
+        event_station_bindings=station_bindings,
+        event_stations=stations,
         event_registration_provenance_cleared=provenance_cleared,
         event_registrations=registrations,
         events=events,

@@ -14,6 +14,43 @@ def _same(label, names, disposition, reason):
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
     *_same(
+        "hardware_requests.ReplayCommand",
+        "id makerspace station actor operator_lease_id station_session_id station_version "
+        "client_command_id payload_fingerprint operation_kind operation_version aggregate_id "
+        "sequence predecessor state claim_token claimed_at claim_attempts client_created_at "
+        "expires_at created_at updated_at completed_at failure_code failure_detail "
+        "subject_request subject_loan evidence result_request result_loan result_return_event "
+        "resolution_code resolved_by resolved_at replacement_command",
+        D.DROP,
+        "Replay ownership and claims are source-local coordination and never travel.",
+    ),
+    *_same(
+        "makerspaces.Station",
+        "created_by",
+        D.RESET,
+        "Source provisioning provenance cannot assign a target User.",
+    ),
+    *_same(
+        "makerspaces.StationCredential",
+        "id station public_token pin_digest pin_ciphertext version is_enabled rotated_at "
+        "disabled_at created_at updated_at",
+        D.DROP,
+        "Live Station credentials never travel in a portable tenant archive.",
+    ),
+    *_same(
+        "makerspaces.StationOperatorLease",
+        "id makerspace station actor station_session_id station_version allowed_actions "
+        "issued_at expires_at revoked_at",
+        D.DROP,
+        "Kiosk operator leases are live session authority and never travel.",
+    ),
+    *_same(
+        "makerspaces.StationSessionRevocation",
+        "session_id station expires_at created_at",
+        D.DROP,
+        "Session revocations only deny source-local sessions that cannot travel.",
+    ),
+    *_same(
         "bookings.Booking",
         "public_token",
         D.RESET,

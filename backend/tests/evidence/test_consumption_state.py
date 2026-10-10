@@ -113,7 +113,9 @@ CONSUMERS = {
     "hardware_requests/return_workflow.py": ("return_items",),
     "hardware_requests/direct_loan_workflow.py": ("issue_direct_loan",),
     "hardware_requests/direct_loan_returns.py": ("return_direct_loan",),
-    "hardware_requests/self_checkout_workflow.py": ("checkout_tool", "return_tool"),
+    # self_checkout_workflow.py is a re-export barrel over these two since the 9b split.
+    "hardware_requests/self_checkout_issue.py": ("checkout_tool",),
+    "hardware_requests/self_checkout_returns.py": ("return_tool",),
     "hardware_requests/problem_report_workflow.py": ("triage_problem_report",),
 }
 
@@ -148,7 +150,10 @@ def _creates_unconsumed(path):
     tree = ast.parse(path.read_text(encoding="utf-8"))
     return any(
         isinstance(node, ast.Call)
-        and getattr(node.func, "attr", None) == "create"
+        # The staff presign reaches the row through the shared issue_upload service,
+        # whose own default is legacy_unknown; only the caller's opt-in counts.
+        and (getattr(node.func, "attr", None) or getattr(node.func, "id", None))
+        in {"create", "issue_upload"}
         and any(
             item.arg == "consumption_state" and "UNCONSUMED" in ast.unparse(item.value)
             for item in node.keywords

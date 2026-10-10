@@ -5,7 +5,10 @@ from apps.makerspaces.origin_scope_model_lookups import (
     TARGET_SET_LOOKUPS,
 )
 
+REPLAY_TOKEN_ROUTES = {"kiosk-replay-prepare", "kiosk-replay-execute"}
+
 MAKERSPACE_KWARG_ROUTES = {
+    'admin-kiosk-replay-list': 'makerspace_id',
     'admin-maintenance-schedule-list-create': 'makerspace_id',
     'admin-maintenance-log-list-create': 'makerspace_id',
     'admin-bookable-space-list-create': 'makerspace_id',
@@ -25,6 +28,7 @@ MAKERSPACE_KWARG_ROUTES = {
     'admin-machine-service-request-list-create': 'makerspace_id',
     'admin-audit-verifications': 'makerspace_id',
     'admin-audit-verification-detail': 'makerspace_id',
+    'admin-kiosk-station-list-create': 'makerspace_id',
 }
 from .origin_scope_routes_7b import PRINTER_MAKERSPACE_ROUTES
 
@@ -135,7 +139,17 @@ def _authoritative_route_targets(request, view=None):
         registered or 'makerspace_id' in kwargs
         or (url_name == 'admin-makerspace' and 'pk' in kwargs)
         or url_name in MODEL_LOOKUPS or url_name in TARGET_SET_LOOKUPS
-        or url_name in QUERY_SCOPED_ROUTES or url_name in NATIVE_HEADER_GLOBAL_ROUTES)
+        or url_name in QUERY_SCOPED_ROUTES or url_name in NATIVE_HEADER_GLOBAL_ROUTES
+        or url_name in REPLAY_TOKEN_ROUTES)
+    if url_name in REPLAY_TOKEN_ROUTES:
+        token = kwargs.get("public_token")
+        resolved = apps.get_model("makerspaces.StationCredential").objects.filter(
+            public_token=token,
+        ).values_list("station__makerspace_id", flat=True).first() if token else None
+        if resolved is not None:
+            targets.add(resolved)
+        else:
+            invalid = True
     route_value = None
     if registered:
         route_value = kwargs.get(registered)

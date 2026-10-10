@@ -1,5 +1,8 @@
 """Explicit source-gate tasks participation declarations."""
 
+from .gate_policy_replay import REPLAY_TASK_PARTICIPANTS, REPLAY_FANOUT_PARTICIPANTS
+
+
 TASK_EXEMPTIONS = {
     "apps.accounts.tasks.purge_auth_challenges_task": "Platform-global auth retention.",
     "apps.accounts.tasks.drain_password_reset_envelopes_task": "Platform-global account recovery.",
@@ -62,6 +65,7 @@ TASK_TENANT_RESOLVERS = {
 
 
 TASK_INTERNAL_PARTICIPANTS = {
+    **REPLAY_TASK_PARTICIPANTS,
     "apps.devices.tasks.scan_offline_devices_task": "Offline/retention service gates each tenant separately.",
     "apps.tenant_migration.tasks.run_migration_export_job_task": (
         "The source export claims and holds source_archive_write for its full lifecycle."
@@ -101,10 +105,14 @@ TASK_INTERNAL_PARTICIPANTS = {
         "Writes only deployment-local last-seen telemetry on ApiClient rows; it moves no "
         "tenant data and so needs no per-tenant gate."
     ),
+    "apps.makerspaces.tasks_station.purge_expired_operator_leases_task": (
+        "Each tenant's expired kiosk leases use the skip-and-count tenant boundary."
+    ),
 }
 
 
 FANOUT_GATE_PARTICIPANTS = {
+    **REPLAY_FANOUT_PARTICIPANTS,
     "apps.devices.services_offline.scan_offline_devices": "Device offline edges and auth-artifact retention.",
     "apps.data_export.tasks.purge_expired_exports_task": "Expired export cleanup.",
     "apps.evidence.abandoned_upload_cleanup.sweep_abandoned_evidence_uploads": (
@@ -121,5 +129,8 @@ FANOUT_GATE_PARTICIPANTS = {
         "Membership term expiry and renewal charges."
     ),
     "apps.operations.report_schedule_services.run_report_schedules": "Due scheduled report deliveries.",
+    "apps.makerspaces.station_lease_cleanup.purge_expired_operator_leases": (
+        "Expired kiosk operator lease cleanup."
+    ),
 }
 

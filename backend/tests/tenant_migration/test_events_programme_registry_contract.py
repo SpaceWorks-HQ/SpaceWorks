@@ -18,6 +18,7 @@ PROJECT = {
     "events.Event",
     "events.EventRegistration",
     "events.EventCheckInEvent",
+    "events.EventStationBinding",
     "events.EventFeedbackSurvey",
     "events.EventFeedbackResponse",
     "events.EventAttendanceCertificate",
@@ -25,6 +26,7 @@ PROJECT = {
     "evidence.EvidenceRetentionPolicy",
     "evidence.EvidenceObjectRetentionState",
     "operations.ReportMetricRollup",
+    "makerspaces.Station",
 }
 
 DROP = {
@@ -33,7 +35,7 @@ DROP = {
     "events.EventSeriesOrganizer",
     "events.EventOrganizer",
     "events.MemberCalendarFeed",
-    "events.EventCheckInStationCredential",
+    "makerspaces.StationCredential",
     "organizations.Organization",
     "organizations.OrganizationMakerspace",
     "organizations.OrganizationMembership",

@@ -2210,6 +2210,72 @@ Load-bearing details that carried over unchanged:
 
 ## Events program invariants (four phases, `f16896f`..`dab0354`)
 
+- **The event venue Station is a public bearer channel with a fixed compatibility contract.** Its public
+  token stays in `/api/v1/event-checkin-stations/<public_token>/...`; the signed HttpOnly cookie is named
+  `sw_event_station`, is scoped to that token's API prefix, uses salt
+  `spaceworks.events.station-cookie.v1`, and contains exactly `public_token`, `version`, `session_id` and
+  `expires_at`. PINs are eight digits and their HMAC input remains
+  `spaceworks:event-station-pin:v1:<event_id>:<version>:<pin>` under `EVENT_STATION_PIN_PEPPER`; rotation
+  increments the version and invalidates earlier cookies. Public failures are deliberately uniform, and every
+  success response is no-store. PIN exchange requires the exact allowed Origin/Referer plus
+  `X-Station-CSRF`; the existing token/IP/session/reveal throttle scopes, event window/status checks,
+  `events.offline_checkin` feature gate and tenant source-migration gate are part of the protocol.
+- **Shared Station metadata is inert; credentials are the complete live authority envelope.**
+  `makerspaces.Station` holds only tenant, kind, name and provisioning provenance;
+  `makerspaces.StationCredential` holds the public token, encrypted/revealable PIN, digest, rotation version,
+  enabled state and timestamps. Portable export/import carries Station metadata without `created_by` and
+  without any credential, so it arrives inert. Deployment `database.dump` recovery is different: it preserves
+  Station, binding and every credential field byte-for-byte, so an enabled URL/PIN remains usable and a
+  disabled credential remains disabled.
+- **Event Station authority remains owned by events through `events.EventStationBinding`.** The binding is
+  one-to-one on both event and Station, and services require the same makerspace plus kind `event_checkin`.
+  Events purge locks and collects those Station IDs, then removes their credentials, bindings and Stations;
+  scanner/handover Stations survive an events-only purge, while whole-tenant purge removes every kind. A
+  tombstoned events app mounts no event Station URL. Disabling a credential blocks sessions, while PIN reveal
+  requires a usable-password step-up and keeps the existing audit actions. Roster and synchronization stay
+  event services, and station attendance remains anonymous (`actor=None`, source `venue_station`), distinct
+  from authenticated staff offline check-in.
+- **A kiosk Station PIN opens a channel; it never authorizes a handover (phase 9b, `inventory.kiosk`).**
+  Scanner/handover Stations are managed under `MANAGE_MAKERSPACE` (`station_views_admin.py`; the event kind
+  is refused). The PIN (`spaceworks:kiosk-station-pin:v1:<station_id>:<version>:<pin>` under the existing
+  `EVENT_STATION_PIN_PEPPER`) buys only the `sw_kiosk_station` cookie, path
+  `/api/v1/kiosk-stations/<token>/`, which is session-bound bearer material, never device-bound. Every
+  cookie-accepting route runs the exact Origin/Referer + `X-Station-CSRF` check and the
+  `StationSessionRevocation` lookup; session DELETE records the revocation before clearing the cookie, so a
+  copied cookie is dead for the rest of its signed life. Rotation and disable revoke every lease.
+- **Kiosk work is attributed to a real User through a `StationOperatorLease`.** A lease needs a normal login
+  AND the Station cookie; it stores `station-kind allow-list ∩ rbac.effective_actions ∩ live capability
+  conjunctions` (local membership or organization grant -- never a second membership-only gate), is clamped
+  to the session expiry, and holds no bearer token. Every work/evidence/command call re-checks the signed
+  token, row, Station/session/version, active user, live RBAC, source gate and the literal operation in
+  `hardware_requests/kiosk_command_policy.py`; the stored snapshot only narrows. The Station is never an
+  audit actor: existing services write their normal rows with the User, plus one companion
+  `kiosk.online_command_executed` row carrying station/session/version/lease identity. Capability off
+  answers 400, missing authority 403, `inventory.kiosk` off refuses the session uniformly. Deployment
+  quarantine revokes every lease; leases and revocations are omitted from tenant archives.
+- **Handover replay is ordered, token-fenced coordination over the existing workflows (phase 9c).**
+  `hardware_requests.ReplayCommand` stores only canonical SHA-256 identity, Station/session/human lease,
+  aggregate sequence/predecessor, claim state, catalogued failure and stable domain/evidence references.
+  It never stores payload/response JSON, raw QR or borrower PII. Prepare and execute require the same
+  signed Station cookie, exact Origin/Referer and `X-Station-CSRF`, plus `X-Kiosk-Operator-Lease`.
+  Replay reloads the lease's real User without requiring their normal browser login to remain live;
+  current account, membership/organization RBAC, Station version/revocation and operation capabilities
+  are checked before claim and again before the domain effect. Module/feature off is 400.
+  Prepare establishes one immutable evidence identity and presigns staging only. Execute commits a
+  short claim plus `kiosk.replay_claimed` audit before S3, then commits workflow effects, stable results and `kiosk.replay_succeeded`
+  together in one outer transaction. Nested workflows reuse finalized evidence from database state,
+  so their domain locks never span completed-evidence S3 cleanup. Stale claims are reclaimed after
+  five minutes with a new token; an old executor cannot release or complete a newer claim.
+  Duplicate success has no second physical effect; changed canonical identity conflicts. Expected
+  domain refusals become terminal typed failures with `kiosk.replay_failed`; storage/unknown faults
+  stay retryable. Failed evidence stays immutable and readable under existing evidence permissions
+  and retention. Maximum command age (eight hours) cannot exceed coordination retention (seven days),
+  and server timestamp validation prevents cleanup from reopening old ownership keys. Daily bounded
+  cleanup expires prepared/stale-claimed work and deletes retained terminal leaves, preserving any
+  predecessor still referenced by a descendant. Whole-tenant purge removes all replay links first.
+  Coordination and its actor edge never travel in portable tenant exports. Direct return may resolve
+  the loan from its succeeded predecessor chain; per-item resolutions keep the existing staff contract.
+  Browser queue and recovery UI are separate slices.
 - **Registering for an event does NOT require a `PresenceSession`; check-in does.**
   `require_active_member` (identity + membership + waiver) was split out of
   `require_active_member_presence`, and **only** `PublicEventRegistrationView` switched wholesale. The

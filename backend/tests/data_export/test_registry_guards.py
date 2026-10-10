@@ -5,7 +5,7 @@ import pytest
 
 from apps.data_export import guards
 from apps.data_export.datasets import DATASETS
-from apps.data_export.fields import FIELDS, USER_PROJECTIONS
+from apps.data_export.fields import ALWAYS_OMITTED, FIELDS, USER_PROJECTIONS
 from apps.data_export.guards import (
     RegistryError,
     resolve_source_path,
@@ -32,6 +32,16 @@ def _replace_dataset(registry, dataset):
 
 def test_complete_registry_is_valid():
     validate_all()
+
+
+def test_replay_coordination_is_omitted_and_actor_never_expands_user_closure():
+    from apps.data_export.models import OMITTED_MODELS
+    from apps.data_export.references import USER_EDGES
+    from apps.data_export.types import Fidelity
+    assert "hardware_requests.ReplayCommand" in OMITTED_MODELS
+    for fidelity in Fidelity:
+        edge = USER_EDGES[(fidelity, "hardware_requests.ReplayCommand", "actor")]
+        assert not edge.included and not edge.raw
 
 
 def test_field_disposition_guard_detects_missing_field():
@@ -174,6 +184,24 @@ def test_user_edge_completeness_detects_silent_edge():
 
     with pytest.raises(RegistryError, match="user-edge decisions"):
         validate_user_edges(changed)
+
+
+def test_station_metadata_exports_without_creator_or_credential_authority():
+    for fidelity in Fidelity:
+        station = _dataset(fidelity, "makerspace/stations.csv")
+        binding = _dataset(fidelity, "events/station_bindings.csv")
+        assert station.model == "makerspaces.Station"
+        assert binding.model == "events.EventStationBinding"
+        assert {column.name for column in station.columns} == {
+            "id", "makerspace_id", "kind", "name", "created_at", "updated_at",
+        }
+        assert {column.name for column in binding.columns} == {
+            "id", "event_id", "station_id", "created_at",
+        }
+        edge = USER_EDGES[(fidelity, "makerspaces.Station", "created_by")]
+        assert edge.included is False
+    assert ("makerspaces.Station", "created_by") in ALWAYS_OMITTED
+    assert all(dataset.model != "makerspaces.StationCredential" for dataset in DATASETS.values())
 
 
 def test_user_edge_discovery_includes_many_to_many_and_through_fk(monkeypatch):

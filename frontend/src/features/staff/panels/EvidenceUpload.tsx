@@ -3,7 +3,7 @@ import { useId, useState } from "react";
 import { CameraCapture } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 
-type UploadResponse = {
+export type UploadResponse = {
   evidence_id: number;
   upload_url: string;
   fields: Record<string, string>;
@@ -25,12 +25,15 @@ export function EvidenceUpload({
   disabled = false,
   label,
   onUploaded,
+  presign,
 }: {
   makerspaceId: number;
   evidenceType: "issue" | "return";
   disabled?: boolean;
   label?: string;
   onUploaded: (evidenceId: number | null) => void;
+  /** Override step 1 (the kiosk Station presigns through its own lease-checked route). */
+  presign?: (body: { evidence_type: string; content_type: string; size_bytes: number }) => Promise<UploadResponse>;
 }) {
   const inputId = useId();
   const [status, setStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
@@ -47,13 +50,13 @@ export function EvidenceUpload({
     setFileName(file.name);
     onUploaded(null); // invalidate any prior upload until this one completes
     try {
-      const presigned = await staffRequest<UploadResponse>(
-        `/admin/makerspaces/${makerspaceId}/uploads/evidence-url`,
-        {
-          method: "POST",
-          body: JSON.stringify({ evidence_type: evidenceType, content_type: file.type, size_bytes: file.size }),
-        },
-      );
+      const body = { evidence_type: evidenceType, content_type: file.type, size_bytes: file.size };
+      const presigned = presign
+        ? await presign(body)
+        : await staffRequest<UploadResponse>(
+          `/admin/makerspaces/${makerspaceId}/uploads/evidence-url`,
+          { method: "POST", body: JSON.stringify(body) },
+        );
       if (presigned.method === "PUT") {
         const upload = await fetch(presigned.upload_url, {
           method: "PUT",

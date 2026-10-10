@@ -39,3 +39,8 @@ def refresh_github_contributions_task():
             else:
                 counts["unavailable"] += 1
     return {"configured": True, **counts}
+
+
+# Celery autodiscovery imports only `tasks.py`; import the sibling so the worker
+# registers the kiosk lease cleanup task named in CELERY_BEAT_SCHEDULE.
+from apps.makerspaces import tasks_station  # noqa: E402,F401

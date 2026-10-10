@@ -74,7 +74,6 @@ def _delete_object_graph(makerspace):
         Event,
         EventAttendanceCertificate,
         EventCheckInEvent,
-        EventCheckInStationCredential,
         EventCollaborator,
         EventFeedbackResponse,
         EventFeedbackSurvey,
@@ -82,14 +81,15 @@ def _delete_object_graph(makerspace):
         EventRegistration,
         EventSeries,
         EventSeriesCollaborator,
+        EventStationBinding,
     )
-    from apps.hardware_requests.models import HardwareRequest
+    from apps.hardware_requests.models import HardwareRequest, ReplayCommand
     from apps.hardware_requests.models import PublicToolLoan, RequesterAccountability
     from apps.hardware_requests.models import ReturnEvent
     from apps.hardware_requests.asset_link_models import HardwareRequestItemAsset
     from apps.integrations.models import EmailTemplate, MachineTypeEmailTemplate
     from apps.inventory.models import Category, InventoryAsset, InventoryProduct
-    from apps.makerspaces.models import MakerspaceMembership
+    from apps.makerspaces.models import MakerspaceMembership, Station, StationCredential
     from apps.operations.models import InventoryAdjustment, QrPrintBatch
     from apps.operations.models import StocktakeSession, StockTransfer
     from apps.organizations.models import OrganizationMakerspace
@@ -99,6 +99,10 @@ def _delete_object_graph(makerspace):
     from apps.tenant_migration.models import ExternalTenantReference, TenantImportJob
 
     with connection.cursor() as cursor:
+        ReplayCommand.objects.filter(makerspace=makerspace).update(
+            predecessor=None, replacement_command=None, resolution_code=None, resolved_by=None, resolved_at=None,
+        )
+        ReplayCommand.objects.filter(makerspace=makerspace).delete()
         # Suspend triggers for this transaction only. Postgres resets the setting
         # on commit/rollback, so a crash cannot leave immutability triggers disabled.
         # ALTER TABLE DISABLE TRIGGER cannot be re-enabled after modifying the table
@@ -225,9 +229,8 @@ def _delete_object_graph(makerspace):
             survey__event__makerspace=makerspace
         ).delete()
         EventFeedbackSurvey.objects.filter(event__makerspace=makerspace).delete()
-        EventCheckInStationCredential.objects.filter(
-            event__makerspace=makerspace
-        ).delete()
+        StationCredential.objects.filter(station__makerspace=makerspace).delete()
+        EventStationBinding.objects.filter(station__makerspace=makerspace).delete()
         EventCheckInEvent.objects.filter(makerspace=makerspace).delete()
         # Registrations otherwise survive until the final makerspace cascade. Delete
         # hosted rows explicitly so any PROTECT FK they gain cannot fail that cascade;
@@ -239,6 +242,9 @@ def _delete_object_graph(makerspace):
         EventSeriesCollaborator.objects.filter(makerspace=makerspace).delete()
         Event.objects.filter(makerspace=makerspace).delete()
         EventSeries.objects.filter(makerspace=makerspace).delete()
+        # Credentials and event bindings are already gone. Delete every Station kind so
+        # scanner/handover metadata cannot outlive a whole-tenant purge either.
+        Station.objects.filter(makerspace=makerspace).delete()
         # Encryption key rows carry a PROTECT FK + a no-delete ORM guard/trigger, so
         # raw-delete them inside this authorized purge context (session_replication_role
         # =replica self-host, or app.allow_immutable_delete GUC managed) before the

@@ -1,4 +1,5 @@
 from celery import shared_task
+from .tasks_replay import cleanup_replay_commands_task
 
 from apps.hardware_requests.services_return_reminders import run_return_reminders
 

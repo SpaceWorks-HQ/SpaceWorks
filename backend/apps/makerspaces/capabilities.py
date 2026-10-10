@@ -159,6 +159,12 @@ FEATURE_DEFINITIONS = (
         "PIN stations.",
         default_enabled=False,
     ),
+    FeatureDefinition(
+        "inventory.kiosk", None, "Kiosk",
+        "Scanner and handover Stations: a Station PIN opens the channel and a signed-in "
+        "staff operator lease attributes every handover to a real person.",
+        default_enabled=False,
+    ),
 )
 FEATURES = {definition.key: definition for definition in FEATURE_DEFINITIONS}
 # A feature's parent/required modules are validated against the module registry

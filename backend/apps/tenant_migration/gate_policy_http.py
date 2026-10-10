@@ -1,5 +1,8 @@
 """Explicit source-gate http participation declarations."""
 
+from .gate_policy_replay import REPLAY_HTTP_PARTICIPANTS
+
+
 HTTP_EXEMPTIONS = {
     "tenant-migration-source-quiesce": (
         "A completed export has already quiesced the source; reasserting its fenced "
@@ -62,8 +65,8 @@ HTTP_ANONYMOUS_EXEMPTIONS = {
     "apps.accounts.views_registration.MemberSignUpView.post": "Global user registration state.",
     "apps.accounts.views_session.LoginView.post": "Global user session state.",
     "apps.accounts.views_session.LogoutView.post": "Global user session state.",
-    "apps.accounts.views_social.SocialNonceView.post": "Global social-login nonce state.",
-    "apps.accounts.views_social.SocialLoginView.post": "Global social identity and session state.",
+    "apps.accounts.views_social_login.SocialNonceView.post": "Global social-login nonce state.",
+    "apps.accounts.views_social_login.SocialLoginView.post": "Global social identity and session state.",
     "apps.payments_rail.views_connect.StripeConnectWebhookView.post": "Platform Connect routing state.",
     "apps.integrations.views.TelegramWebhookView.post": (
         "Writes nothing at all: the callback route was removed when chat stopped being an "
@@ -74,6 +77,7 @@ HTTP_ANONYMOUS_EXEMPTIONS = {
 
 
 HTTP_ANONYMOUS_PARTICIPANTS = {
+    **REPLAY_HTTP_PARTICIPANTS,
     "apps.hardware_requests.cron_views.ReturnReminderCronView.post": (
         "The fan-out reminder service takes the skip-and-count gate once per request."
     ),

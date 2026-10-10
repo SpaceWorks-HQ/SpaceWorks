@@ -96,7 +96,7 @@ def test_inventory_manager_requester_can_assign_issue_upload_evidence_and_return
     box = Box.objects.create(makerspace=makerspace, label="Return Bin")
     client = authenticated_client(inventory_manager)
     monkeypatch.setattr(
-        "apps.evidence.views.presigned_upload",
+        "apps.evidence.services_upload.presigned_upload",
         lambda object_key, content_type: {
             "url": "http://minio/evidence",
             "fields": {"key": object_key, "Content-Type": content_type},

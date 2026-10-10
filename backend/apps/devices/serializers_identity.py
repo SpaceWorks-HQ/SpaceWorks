@@ -5,6 +5,7 @@ read-only everywhere. ``kind`` is set once at creation. Unknown fields are rejec
 rather than ignored, so a client cannot believe it changed something it did not.
 """
 
+from drf_spectacular.utils import extend_schema_serializer
 from rest_framework import serializers
 
 from apps.devices.models import Device, DeviceEnrollment
@@ -95,6 +96,9 @@ class CompleteRequestSerializer(ChallengeRequestSerializer):
     signature = serializers.CharField(max_length=128)
 
 
+# accounts.DeviceIdentitySerializer (mobile device sessions) already owns the
+# "DeviceIdentity" component; without its own name one would shadow the other.
+@extend_schema_serializer(component_name="ConnectedDeviceIdentity")
 class DeviceIdentitySerializer(serializers.Serializer):
     device_id = serializers.UUIDField(source="pk")
     makerspace_id = serializers.IntegerField()

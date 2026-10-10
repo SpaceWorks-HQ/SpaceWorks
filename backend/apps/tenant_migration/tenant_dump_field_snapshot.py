@@ -6,6 +6,7 @@ override in tenant_dump_authority.py before the catalog guard will pass.
 """
 
 FIRST_PARTY_FIELD_NAMES = {
+    'hardware_requests.ReplayCommand': frozenset('id makerspace station actor operator_lease_id station_session_id station_version client_command_id payload_fingerprint operation_kind operation_version aggregate_id sequence predecessor state claim_token claimed_at claim_attempts client_created_at expires_at created_at updated_at completed_at failure_code failure_detail subject_request subject_loan evidence result_request result_loan result_return_event resolution_code resolved_by resolved_at replacement_command'.split()),
     'accounts.User': frozenset('access_status date_joined display_name email email_verified_at external_checkin_user_id first_name groups id is_active is_staff is_superuser is_tenant_dump_stub is_walk_in last_login last_name must_change_password password phone phone_e164 phone_verified_at restriction_reason role self_registered_at telegram_user_id user_permissions username'.split()),
     'accounts.EmailVerificationChallenge': frozenset('code_digest consumed_at created_at email expires_at failed_attempts id last_sent_at user'.split()),
     'accounts.DailyOtpEmailCounter': frozenset('count day id'.split()),
@@ -35,6 +36,10 @@ FIRST_PARTY_FIELD_NAMES = {
     'makerspaces.MembershipPlan': frozenset('amount created_at currency custom_days id interval is_active makerspace name updated_at'.split()),
     'makerspaces.MembershipTerm': frozenset('created_at created_by ends_at id membership plan renewal_payment starts_at status'.split()),
     'makerspaces.InvitationRequest': frozenset('created_at email handled_at handled_by id makerspace message name phone status'.split()),
+    'makerspaces.Station': frozenset('created_at created_by id kind makerspace name updated_at'.split()),
+    'makerspaces.StationCredential': frozenset('created_at disabled_at id is_enabled pin_ciphertext pin_digest public_token rotated_at station updated_at version'.split()),
+    'makerspaces.StationOperatorLease': frozenset('actor allowed_actions expires_at id issued_at makerspace revoked_at station station_session_id station_version'.split()),
+    'makerspaces.StationSessionRevocation': frozenset('created_at expires_at session_id station'.split()),
     'makerspaces.MakerspaceArchiveRequest': frozenset('id makerspace reason requested_at requested_by resolution_note resolved_at resolved_by status'.split()),
     'makerspaces.ImportedUserReconciliation': frozenset('created_at id makerspace source_user_id source_username target_user'.split()),
     'makerspaces.PendingImportedMembership': frozenset('accepted_waiver activated_actor_snapshot activated_at adopted_at adopted_membership archived_role_label can_refer can_verify created_at email id makerspace receives_notifications revocation_reason revoked_actor_snapshot revoked_at source_membership_id status unresolved_reason verified_actor_snapshot verified_at waiver_accepted_at waiver_version_accepted witnessed_actor_snapshot witnessed_at witnessed_waiver witnessed_waiver_version'.split()),
@@ -188,7 +193,7 @@ FIRST_PARTY_FIELD_NAMES = {
     'events.EventRegistration': frozenset('calendar_sequence calendar_updated_at checkin_token created_at custom_answers email email_exact_hash email_hash_generation event host_waiver host_waiver_accepted_at host_waiver_version_accepted id member name payment_via_makerspace phone registered_via_makerspace status'.split()),
     'events.MemberCalendarFeed': frozenset('created_at id membership revoked_at rotated_at token_digest token_hint'.split()),
     'events.EventCheckInEvent': frozenset('actor attended_at event id makerspace operation_id recorded_at registration session_id source station_version'.split()),
-    'events.EventCheckInStationCredential': frozenset('created_at disabled_at event id is_enabled pin_ciphertext pin_digest public_token rotated_at updated_at version'.split()),
+    'events.EventStationBinding': frozenset('created_at event id station'.split()),
     'events.EventFeedbackSurvey': frozenset('answered_question_ids certificate_enabled closed_at created_at event id is_open opened_at questions thank_you_text title updated_at'.split()),
     'events.EventFeedbackResponse': frozenset('answers_snapshot certificate_requested created_at id registration survey'.split()),
     'events.EventAttendanceCertificate': frozenset('content_type event_ends_at event_starts_at event_title id issued_at issuer_name object_key recipient_name registration rendered_at response revision revocation_reason revoked_at revoked_by serial sha256 size_bytes status'.split()),

@@ -12,6 +12,15 @@ def test_complete_authority_registry_is_valid():
     validate_authority_registry()
 
 
+def test_every_replay_field_has_an_explicit_drop_override():
+    from apps.tenant_migration.tenant_dump_authority import AUTHORITY_FIELD_OVERRIDES
+    from apps.tenant_migration.tenant_dump_field_snapshot import FIRST_PARTY_FIELD_NAMES
+    from apps.tenant_migration.tenant_dump_types import AuthorityDisposition
+    label = "hardware_requests.ReplayCommand"
+    for name in FIRST_PARTY_FIELD_NAMES[label]:
+        assert AUTHORITY_FIELD_OVERRIDES[(label, name)].dispositions == (AuthorityDisposition.DROP,)
+
+
 def test_mechanically_discovered_authority_inputs_are_explicit():
     assert discover_exported_authority_fields() <= set(DECLARED_AUTHORITY_FIELDS)
 
@@ -38,6 +47,7 @@ def test_declared_relational_and_discriminator_authority_inputs():
         ("integrations.NotificationRecipient", "user"),
         ("makerspaces.MembershipRequest", "assigned_role"),
         ("makerspaces.MembershipRequest", "auto_activate_on_claim"),
+        ("makerspaces.Station", "created_by"),
     }
     assert required <= set(DECLARED_AUTHORITY_FIELDS)
 

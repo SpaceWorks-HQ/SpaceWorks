@@ -156,6 +156,8 @@ urlpatterns = [
     # Staff device admin under api/v1/admin/ plus the signed device protocol under
     # api/v1/device/ (covered exactly by apps.devices.route_registry).
     *separable("devices", "api/v1/", "apps.devices.urls"),
+    # Phase 9b kiosk Stations: admin lifecycle plus the Station-token session/lease.
+    path("api/v1/", include("apps.makerspaces.station_urls")),
     path("api/v1/admin/", include("apps.boxes.urls")),
     path("api/v1/admin/", include("apps.evidence.urls")),
     path("api/v1/", include("apps.operations.urls")),

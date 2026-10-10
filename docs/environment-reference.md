@@ -284,7 +284,7 @@ Host-orchestration paths and timing knobs; see `docs/self-hosting.md` and the re
 | `DEVICE_NONCE_TTL_SECONDS` | `86400` | Replay-nonce retention for device-signed requests. |
 | `DEVICE_SIGNATURE_MAX_SKEW_SECONDS` | `300` | Accepted clock skew on a device request signature. |
 
-## Events, bookings and anonymous requests
+## Events, bookings, kiosk stations and anonymous requests
 
 | Variable | Default | Notes |
 |---|---|---|
@@ -297,6 +297,13 @@ Host-orchestration paths and timing knobs; see `docs/self-hosting.md` and the re
 | `EVENT_CHECKIN_WINDOW_AFTER_HOURS` | `2` |  |
 | `EVENT_CHECKIN_WINDOW_BEFORE_HOURS` | `24` |  |
 | `EVENT_STATION_PIN_PEPPER` | `''` |  |
+| `KIOSK_COMMAND_MAX_AGE_SECONDS` | `8 * 60 * 60` | Oldest offline kiosk command a replay still accepts. |
+| `KIOSK_OPERATOR_LEASE_RETENTION_SECONDS` | `7 * 24 * 60 * 60` | How long ended operator leases are kept before cleanup. |
+| `KIOSK_OPERATOR_LEASE_TTL_SECONDS` | `8 * 60 * 60` | Lifetime of one staff operator lease on a kiosk Station. |
+| `KIOSK_REPLAY_CLAIM_TIMEOUT_SECONDS` | `5 * 60` | A claimed replay is released for retry after this long. |
+| `KIOSK_REPLAY_CLEANUP_BATCH_SIZE` | `500` | Rows per batch in the nightly replay cleanup. |
+| `KIOSK_REPLAY_RETENTION_SECONDS` | `7 * 24 * 60 * 60` | Retention of completed replay commands, unless a review still references them. |
+| `KIOSK_STATION_SESSION_TTL_SECONDS` | `12 * 60 * 60` | Lifetime of a kiosk Station session. |
 
 ## Rate limits
 
@@ -328,6 +335,12 @@ Every `THROTTLE_*` value is a DRF rate string (`<n>/<second|minute|hour|day>`). 
 | `THROTTLE_EVENT_STATION_PIN_TOKEN` | `'10/hour'` |  |
 | `THROTTLE_EVENT_STATION_REVEAL` | `'5/hour'` |  |
 | `THROTTLE_EVENT_STATION_SESSION` | `'120/hour'` |  |
+| `THROTTLE_KIOSK_OPERATOR_LEASE` | `'30/hour'` |  |
+| `THROTTLE_KIOSK_REPLAY_EXECUTE` | `'240/hour'` |  |
+| `THROTTLE_KIOSK_REPLAY_PREPARE` | `'60/hour'` |  |
+| `THROTTLE_KIOSK_STATION_PIN_IP` | `'30/hour'` |  |
+| `THROTTLE_KIOSK_STATION_PIN_TOKEN` | `'10/hour'` |  |
+| `THROTTLE_KIOSK_STATION_SESSION` | `'120/hour'` |  |
 | `THROTTLE_LOGIN` | `'10/min'` |  |
 | `THROTTLE_MEMBERSHIP_REQUEST` | `'10/hour'` |  |
 | `THROTTLE_MEMBER_CLAIM_ISSUE` | `'10/hour'` |  |

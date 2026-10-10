@@ -13,6 +13,7 @@ export const API_URL = process.env.E2E_API_URL ?? "http://localhost:8100";
 type SeedFile = {
   event_title?: string;
   bookable_space?: string;
+  kiosk: KioskSeed;
   slug: string;
   makerspace_id: number;
   makerspace_name: string;
@@ -24,6 +25,12 @@ type SeedFile = {
   secret_location: string;
   pending_request_for: string;
   probe_request_for: string;
+};
+
+type KioskSeed = {
+  station_token: string; station_pin: string; station_id: number;
+  success: { request_id: number; box_code: string; qr_id: null; qr_payload: null };
+  revoked: { request_id: number; box_code: string; qr_id: number; qr_payload: string };
 };
 
 function loadSeed(): SeedFile | null {
@@ -40,6 +47,7 @@ const seedFile = loadSeed();
 export const SEED = {
   eventTitle: seedFile?.event_title ?? "E2E Public Workshop",
   bookableSpace: seedFile?.bookable_space ?? "E2E Public Bench",
+  kiosk: seedFile?.kiosk,
   slug: seedFile?.slug ?? "e2e-space",
   makerspaceId: seedFile?.makerspace_id ?? 0,
   makerspaceName: seedFile?.makerspace_name ?? "E2E Makerspace",

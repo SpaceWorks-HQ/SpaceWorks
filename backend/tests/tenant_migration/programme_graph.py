@@ -15,7 +15,7 @@ from apps.evidence.models import (
 from apps.events.models import (
     EventAttendanceCertificate,
     EventCheckInEvent,
-    EventCheckInStationCredential,
+    EventStationBinding,
     EventFeedbackResponse,
     EventFeedbackSurvey,
     EventOrganizer,
@@ -31,6 +31,7 @@ from apps.organizations.models import (
     OrganizationMembership,
 )
 from apps.payments.models import Payment
+from apps.makerspaces.models import Station, StationCredential
 
 
 QUESTION = {
@@ -188,8 +189,18 @@ def create_programme_graph(space, user, _request):
         token_digest=hashlib.sha256(f"calendar-token:{space.pk}".encode()).digest(),
         token_hint="deadbeef",
     )
-    EventCheckInStationCredential.objects.create(
-        event=event, pin_digest="pbkdf2$fixture", pin_ciphertext=b"ciphertext", version=3
+    station = Station.objects.create(
+        makerspace=space,
+        kind=Station.Kind.EVENT_CHECKIN,
+        name=f"event-{event.pk}",
+        created_by=user,
+    )
+    binding = EventStationBinding.objects.create(event=event, station=station)
+    credential = StationCredential.objects.create(
+        station=station,
+        pin_digest="pbkdf2$fixture",
+        pin_ciphertext=b"ciphertext",
+        version=3,
     )
     audit_row = audit.record(
         user, "events.programme_fixture_created", makerspace=space,
@@ -200,5 +211,6 @@ def create_programme_graph(space, user, _request):
         "check_in": check_in, "survey": survey, "response": response,
         "certificate": certificate, "payment": payment, "photo": photo,
         "expired": expired, "rollup": rollup, "organization": organization,
+        "station": station, "binding": binding, "credential": credential,
         "audit": audit_row,
     }

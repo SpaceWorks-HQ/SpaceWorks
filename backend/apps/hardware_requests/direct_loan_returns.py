@@ -224,6 +224,8 @@ def _return_scan_qr(loan, qr_payload):
         )
         if qr is None:
             raise RequestValidationError("Scanned QR does not match this direct loan.")
+        if qr.status != QrCode.Status.ACTIVE:
+            raise RequestValidationError("QR code is not active for this makerspace.")
         return qr
 
     if not qr_payload:

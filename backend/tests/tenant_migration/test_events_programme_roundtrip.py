@@ -11,7 +11,7 @@ from apps.evidence.models import EvidenceObjectRetentionState, EvidencePhoto, Ev
 from apps.events.models import (
     EventAttendanceCertificate,
     EventCheckInEvent,
-    EventCheckInStationCredential,
+    EventStationBinding,
     EventFeedbackResponse,
     EventFeedbackSurvey,
     EventOrganizer,
@@ -19,7 +19,12 @@ from apps.events.models import (
     EventSeriesOrganizer,
     MemberCalendarFeed,
 )
-from apps.makerspaces.models import Makerspace, default_enabled_modules
+from apps.makerspaces.models import (
+    Makerspace,
+    Station,
+    StationCredential,
+    default_enabled_modules,
+)
 from apps.operations.models import ReportMetricRollup, ReportRollupCursor
 from apps.organizations.models import OrganizationMakerspace
 from apps.payments.models import Payment
@@ -96,6 +101,8 @@ def test_complete_programme_graph_round_trips_with_target_pii_and_expiry(
         survey = EventFeedbackSurvey.objects.get(event=event)
         response = EventFeedbackResponse.objects.get(survey=survey)
         certificate = EventAttendanceCertificate.objects.get(registration=registration)
+        station = Station.objects.get(makerspace=target)
+        binding = EventStationBinding.objects.get(event=event)
 
         # The programme's DATA travels; its module installation does not. Enabling a
         # module is target superadmin policy (TARGET_FIELD_PROJECTION resolves
@@ -133,6 +140,12 @@ def test_complete_programme_graph_round_trips_with_target_pii_and_expiry(
         # the serial is printed inside. Only an actual target collision regenerates it.
         assert certificate.object_key == graph["certificate"].object_key
         assert memory_objects["private"][certificate.object_key] == CERTIFICATE_BYTES
+        assert (station.kind, station.name, station.created_by_id) == (
+            Station.Kind.EVENT_CHECKIN,
+            graph["station"].name,
+            None,
+        )
+        assert binding.station_id == station.pk
 
         payment = Payment.objects.get(makerspace=target)
         assert payment.subject_type == Payment.SubjectType.EVENT_REGISTRATION
@@ -168,7 +181,7 @@ def test_complete_programme_graph_round_trips_with_target_pii_and_expiry(
 
         # Mutable/bearer/global authority is intentionally reissued, never resurrected.
         assert not MemberCalendarFeed.objects.filter(membership__makerspace=target).exists()
-        assert not EventCheckInStationCredential.objects.filter(event=event).exists()
+        assert not StationCredential.objects.filter(station=station).exists()
         assert not EventSeriesOrganizer.objects.filter(series=series).exists()
         assert not EventOrganizer.objects.filter(event=event).exists()
         assert not OrganizationMakerspace.objects.filter(makerspace=target).exists()

@@ -53,6 +53,9 @@ def test_the_app_is_registered_as_inactive():
         "/api/v1/admin/events/1/complete/",
         "/api/v1/admin/events/1/registrations/",
         "/api/v1/admin/event-registrations/1/mark-attended/",
+        "/api/v1/admin/events/1/check-in/station/",
+        "/api/v1/admin/events/1/check-in/station/rotate/",
+        "/api/v1/admin/events/1/check-in/station/reveal/",
     ],
 )
 def test_no_staff_event_route_resolves(path):
@@ -65,6 +68,9 @@ def test_no_staff_event_route_resolves(path):
     [
         "/api/v1/public/demo/events/",
         "/api/v1/public/demo/events/0e2b1c94-1f5a-4a0b-8f2a-2f1d3c4b5a60/register/",
+        "/api/v1/event-checkin-stations/0e2b1c94-1f5a-4a0b-8f2a-2f1d3c4b5a60/session/",
+        "/api/v1/event-checkin-stations/0e2b1c94-1f5a-4a0b-8f2a-2f1d3c4b5a60/roster/",
+        "/api/v1/event-checkin-stations/0e2b1c94-1f5a-4a0b-8f2a-2f1d3c4b5a60/sync/",
     ],
 )
 def test_no_public_event_route_resolves(path):

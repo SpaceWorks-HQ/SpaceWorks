@@ -69,5 +69,16 @@ OBJECT_MUTATION_PARTICIPANTS = {
     "apps.tenant_migration.services_export_job.run_migration_export_job": (
         "The migration export lifecycle owns source_archive_write while uploading."
     ),
+    "apps.hardware_requests.replay_execute.execute": (
+        "Replay Station boundary spans external finalization; live checks assert the gate in "
+        "both transactions."
+    ),
+    "apps.hardware_requests.replay_prepare._upload_again": (
+        "Called inside replay prepare's Station-resolved source-gate boundary."
+    ),
+    "apps.evidence.services_upload.issue_upload": (
+        "Called only by the staff upload-URL and kiosk evidence-prepare views, both behind "
+        "the authenticated late source-gate assertion; the kiosk view also asserts it."
+    ),
 }
 

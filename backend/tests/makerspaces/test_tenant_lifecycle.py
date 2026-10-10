@@ -11,9 +11,15 @@ from apps.boxes.models import QrCode, QrScanEvent
 from apps.evidence.models import EvidencePhoto
 from apps.hardware_requests.models import HardwareRequest, PublicToolLoan
 from apps.inventory.models import InventoryProduct
-from apps.makerspaces import import_lifecycle
+from apps.makerspaces import import_lifecycle, lifecycle
 from apps.makerspaces.lookup import get_public_makerspace
-from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
+from apps.makerspaces.models import (
+    Makerspace,
+    MakerspaceMembership,
+    MakerspaceRole,
+    Station,
+    StationCredential,
+)
 from apps.makerspaces.servability import is_servable, servable_queryset
 from apps.presence import services as presence
 from apps.presence.guard import MemberPresenceRequired, require_active_member
@@ -184,6 +190,56 @@ def test_active_tenant_public_authorization_and_checkout_are_unchanged():
     assert AuditLog.objects.filter(
         makerspace=space, action="public_tool.checked_out"
     ).count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_whole_tenant_purge_removes_every_station_kind():
+    space = _space("purge-all-stations")
+    actor = User.objects.create_superuser(username="station-purge-admin")
+    station_ids = []
+    credential_ids = []
+    for kind in Station.Kind.values:
+        station = Station.objects.create(
+            makerspace=space, kind=kind, name=f"{kind} station"
+        )
+        credential = StationCredential.objects.create(
+            station=station, pin_digest="digest", pin_ciphertext=b"ciphertext"
+        )
+        station_ids.append(station.pk)
+        credential_ids.append(credential.pk)
+
+    lifecycle.purge(lifecycle.archive(space, actor), actor)
+
+    assert not Station.objects.filter(pk__in=station_ids).exists()
+    assert not StationCredential.objects.filter(pk__in=credential_ids).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_whole_tenant_purge_removes_protected_replay_chain_before_domain_and_evidence(monkeypatch):
+    from datetime import timedelta
+    from uuid import uuid4
+    from django.utils import timezone
+    from apps.hardware_requests.models import ReplayCommand
+    monkeypatch.setattr(lifecycle, "_delete_storage_keys", lambda keys: None)
+    space = _space("purge-replay-chain")
+    actor = User.objects.create_superuser(username="replay-purge-admin")
+    station = Station.objects.create(makerspace=space, kind="handover", name="Replay desk")
+    photo = EvidencePhoto.objects.create(makerspace=space, evidence_type="issue",
+                                        object_key="purge/replay/photo", uploaded_by=actor)
+    request = HardwareRequest.objects.create(makerspace=space, requester=actor, requester_username=actor.username)
+    fields = dict(makerspace=space, station=station, actor=actor, operator_lease_id=uuid4(),
+                  station_session_id=uuid4(), station_version=1, payload_fingerprint="0" * 64,
+                  operation_kind="reviewed_issue", operation_version=1, aggregate_id=uuid4(),
+                  client_created_at=timezone.now(), expires_at=timezone.now() + timedelta(hours=1),
+                  subject_request=request, evidence=photo)
+    first = ReplayCommand.objects.create(**fields, client_command_id=uuid4(), sequence=1)
+    second = ReplayCommand.objects.create(**fields, client_command_id=uuid4(), sequence=2, predecessor=first)
+    ids = (first.pk, second.pk)
+    lifecycle.purge(lifecycle.archive(space, actor), actor)
+    assert not ReplayCommand.objects.filter(pk__in=ids).exists()
+    assert not EvidencePhoto.objects.filter(pk=photo.pk).exists()
+    assert not HardwareRequest.objects.filter(pk=request.pk).exists()
+    assert not Station.objects.filter(pk=station.pk).exists()
 
 
 @pytest.mark.django_db(transaction=True)

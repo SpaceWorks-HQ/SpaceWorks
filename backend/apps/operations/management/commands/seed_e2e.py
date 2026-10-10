@@ -28,6 +28,7 @@ from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.makerspaces.module_install import apply_profile
 from apps.makerspaces.module_profiles import RECOMMENDED
 from ._seed_e2e_discovery import seed_discovery
+from apps.operations.e2e_kiosk_seed import seed_kiosk
 
 DEFAULT_PASSWORD = "e2e-pass-12345"
 SECRET_LOCATION = "E2E SECRET SHELF 42"
@@ -59,7 +60,8 @@ class Command(BaseCommand):
         payload = json.dumps(seeded, indent=2)
         if options["write_json"]:
             Path(options["write_json"]).write_text(payload + "\n")
-        self.stdout.write(payload)
+        # Station PIN and public bearer token belong only in the ignored seed file.
+        self.stdout.write(json.dumps({key: value for key, value in seeded.items() if key != "kiosk"}, indent=2))
 
     def _user(self, username, role, password, **flags):
         user = User.objects.create_user(
@@ -115,8 +117,10 @@ class Command(BaseCommand):
         )
         request_workflow.accept_request(manager, probe)
         discovery = seed_discovery(makerspace, superadmin, member)
+        kiosk = seed_kiosk(makerspace, manager, member, token)
         return {
             **discovery,
+            "kiosk": kiosk,
             "slug": slug,
             "makerspace_id": makerspace.pk,
             "makerspace_name": makerspace.name,

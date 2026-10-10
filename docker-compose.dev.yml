@@ -39,6 +39,9 @@ services:
       # staff-console refresh/logout CSRF check 403s and a page reload drops the
       # session back to the login screen.
       CORS_ALLOWED_ORIGINS: http://localhost:5000,http://localhost:5173
+      # Kiosk and event check-in stations hash their PINs with this pepper; `dev.sh e2e`
+      # seeds a kiosk station. A dev-only value: production must set its own secret.
+      EVENT_STATION_PIN_PEPPER: ${EVENT_STATION_PIN_PEPPER:-dev-only-station-pepper-not-for-production}
     ports: !override
       - "8000:8000"
     volumes:

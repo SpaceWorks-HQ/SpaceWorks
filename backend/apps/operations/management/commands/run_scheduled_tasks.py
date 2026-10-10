@@ -33,6 +33,7 @@ from django.utils import timezone
 # from the beat-less one.
 SCHEDULED_TASKS = (
     ("scan-offline-devices", "apps.devices.tasks.scan_offline_devices_task", 1),
+    ("cleanup-kiosk-replay-commands", "apps.hardware_requests.tasks_replay.cleanup_replay_commands_task", 24 * 60),
     (
         "flush-api-client-usage",
         "apps.apiclients.tasks.flush_api_client_usage_task",
@@ -74,6 +75,12 @@ SCHEDULED_TASKS = (
         "membership-renewals",
         "apps.makerspaces.tasks_membership.run_membership_renewals_task",
         60,
+    ),
+    # Phase 9b: expired kiosk operator leases and session revocations. Daily.
+    (
+        "purge-expired-kiosk-operator-leases",
+        "apps.makerspaces.tasks_station.purge_expired_operator_leases_task",
+        24 * 60,
     ),
     # Same fixed-hour-versus-interval reasoning as above. Without this entry a beat-less
     # cloud deployment would retain expired export archives -- and the download bearer

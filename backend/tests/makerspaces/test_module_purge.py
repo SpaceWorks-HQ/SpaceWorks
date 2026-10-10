@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.bookings.models import BookableSpace, Booking
-from apps.events.models import Event, EventRegistration
+from apps.events.models import Event, EventRegistration, EventStationBinding
 from apps.makerspaces.models import (
     Makerspace,
     MakerspaceMembership,
@@ -20,6 +20,8 @@ from apps.makerspaces.models import (
     MemberProfile,
     MemberProject,
     MembershipRequest,
+    Station,
+    StationCredential,
 )
 from apps.makerspaces.module_install import install_module, uninstall_module
 from tests.module_helpers import disable_module
@@ -108,6 +110,19 @@ def test_purging_events_removes_events_and_registrations_but_keeps_the_payment()
     registration = EventRegistration.objects.create(
         event=event, name="Ada", email="ada@example.test", phone="+10000000000"
     )
+    event_station = Station.objects.create(
+        makerspace=makerspace, kind=Station.Kind.EVENT_CHECKIN, name="Event desk"
+    )
+    EventStationBinding.objects.create(event=event, station=event_station)
+    event_credential = StationCredential.objects.create(
+        station=event_station, pin_digest="digest", pin_ciphertext=b"ciphertext"
+    )
+    scanner = Station.objects.create(
+        makerspace=makerspace, kind=Station.Kind.SCANNER, name="Inventory scanner"
+    )
+    scanner_credential = StationCredential.objects.create(
+        station=scanner, pin_digest="digest", pin_ciphertext=b"ciphertext"
+    )
     payment = Payment.objects.create(
         makerspace=makerspace, subject_type=Payment.SubjectType.EVENT_REGISTRATION,
         subject_id=registration.pk, amount=10, currency="usd",
@@ -120,6 +135,13 @@ def test_purging_events_removes_events_and_registrations_but_keeps_the_payment()
 
     assert not Event.objects.filter(makerspace=makerspace).exists()
     assert not EventRegistration.objects.filter(event__makerspace=makerspace).exists()
+    assert not Station.objects.filter(pk=event_station.pk).exists()
+    assert not StationCredential.objects.filter(pk=event_credential.pk).exists()
+    assert Station.objects.filter(pk=scanner.pk).exists()
+    assert StationCredential.objects.filter(pk=scanner_credential.pk).exists()
+    assert counts["event_stations"] == 1
+    assert counts["event_station_bindings"] == 1
+    assert counts["event_check_in_station_credentials"] == 1
     # REVERSED DELIBERATELY. This used to assert the payment was destroyed with its
     # subject, on the reasoning that it would otherwise dangle. Switching a module off and
     # purging its rows is not a reason to destroy the record of money that really changed
