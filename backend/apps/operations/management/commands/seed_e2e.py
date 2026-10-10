@@ -27,6 +27,7 @@ from apps.inventory.models import InventoryProduct, PublicAvailabilityMode, Trac
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.makerspaces.module_install import apply_profile
 from apps.makerspaces.module_profiles import RECOMMENDED
+from ._seed_e2e_discovery import seed_discovery
 
 DEFAULT_PASSWORD = "e2e-pass-12345"
 SECRET_LOCATION = "E2E SECRET SHELF 42"
@@ -113,7 +114,9 @@ class Command(BaseCommand):
             requester_principal=member, contact_snapshot=snapshot, audit_actor=member,
         )
         request_workflow.accept_request(manager, probe)
+        discovery = seed_discovery(makerspace, superadmin, member)
         return {
+            **discovery,
             "slug": slug,
             "makerspace_id": makerspace.pk,
             "makerspace_name": makerspace.name,

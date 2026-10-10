@@ -11,7 +11,7 @@ type ChangePasswordGateProps = {
 };
 
 // Shown after login when the account still carries must_change_password (the
-// default super123 seed). It blocks the console until the password is rotated.
+// generated first-run credential). It blocks the console until the password is rotated.
 export function ChangePasswordGate({ username, onChanged, onSignOut }: ChangePasswordGateProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");

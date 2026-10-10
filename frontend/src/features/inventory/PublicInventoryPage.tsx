@@ -1,3 +1,5 @@
+import { SiteFooter } from "../../components/SiteFooter";
+import { useTenantBranding } from "../../lib/useTenantBranding";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useParams } from "react-router-dom";
@@ -46,6 +48,7 @@ export function PublicInventoryPage() {
     sortParam,
   );
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
+  const brandStyle = useTenantBranding(bootstrap);
   const displayName =
     bootstrap?.branding.display_name ||
     bootstrap?.makerspace.name ||
@@ -72,7 +75,7 @@ export function PublicInventoryPage() {
   }
 
   return (
-    <main className="desk-shell">
+    <main style={brandStyle} className="desk-shell">
       <SkipLink />
       <PublicInventoryHeader
         displayName={displayName}
@@ -189,6 +192,7 @@ export function PublicInventoryPage() {
         open={Boolean(selectedProduct)}
         onClose={() => setSelectedProduct(null)}
       />
+      <SiteFooter branding={bootstrap?.branding} />
     </main>
   );
 }

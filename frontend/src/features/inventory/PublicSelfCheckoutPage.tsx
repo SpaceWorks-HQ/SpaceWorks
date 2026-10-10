@@ -1,3 +1,5 @@
+import { SiteFooter } from "../../components/SiteFooter";
+import { useTenantBranding } from "../../lib/useTenantBranding";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -65,6 +67,7 @@ export function PublicSelfCheckoutPage() {
 
   const bootstrapQuery = useTenantBootstrap(makerspaceSlug, tenant.mode === "central");
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
+  const brandStyle = useTenantBranding(bootstrap);
   const features = tenant.mode === "single" ? tenant.bootstrap?.features ?? [] : bootstrap?.features ?? [];
   const displayName =
     bootstrap?.branding.display_name ||
@@ -111,7 +114,7 @@ export function PublicSelfCheckoutPage() {
   }
 
   return (
-    <main className="desk-shell">
+    <main style={brandStyle} className="desk-shell">
       <header className="border-b border-line bg-panel">
         <div className="mx-auto flex max-w-screen-xl flex-col gap-4 px-5 py-6 sm:px-8">
           <p className="eyebrow text-secondary-ink">
@@ -258,6 +261,6 @@ export function PublicSelfCheckoutPage() {
       {scannerOpen ? (
         <QrScanner onClose={() => setScannerOpen(false)} onScan={scanTool} />
       ) : null}
-    </main>
+    <SiteFooter branding={bootstrap?.branding} /></main>
   );
 }

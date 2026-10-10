@@ -13,6 +13,7 @@ from apps.integrations.webhook_validation import validate_webhook_url
 from apps.makerspaces import domain_verification, limits
 from apps.makerspaces.capabilities import prune_features, validate_capabilities
 from apps.makerspaces.platform import available_modules
+from apps.makerspaces.theme_validation import validate_theme_config
 from apps.makerspaces.validators import (
     validate_google_maps_url,
     validate_presence_presets,
@@ -109,6 +110,12 @@ class MakerspaceValidationMixin:
             and domain_verification._is_platform_managed(obj.frontend_domain)
             and obj.frontend_domain_status == obj.DomainStatus.VERIFIED
         )
+
+    def validate_theme_config(self, value):
+        try:
+            return validate_theme_config(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
 
     def validate_public_code(self, value):
         return value.upper()

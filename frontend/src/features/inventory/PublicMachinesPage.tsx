@@ -1,3 +1,4 @@
+import { useTenantBranding } from "../../lib/useTenantBranding";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
@@ -44,6 +45,7 @@ export function PublicMachinesPage() {
   const tenantPath = useTenantPath(makerspaceSlug);
   const bootstrapQuery = useTenantBootstrap(makerspaceSlug, tenant.mode === "central");
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
+  const brandStyle = useTenantBranding(bootstrap);
   const machines = useQuery({
     queryKey: ["public-machines", makerspaceSlug],
     queryFn: () => tenantPublicRequest<PaginatedMachines>(
@@ -77,7 +79,7 @@ export function PublicMachinesPage() {
   const missing = apiError?.status === 404;
   const throttled = apiError?.status === 429;
 
-  return <main className="desk-shell flex min-h-screen flex-col">
+  return <main style={brandStyle} className="desk-shell flex min-h-screen flex-col">
     <SkipLink />
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -117,6 +119,6 @@ export function PublicMachinesPage() {
         </CollapsibleSection>
       ))}</div> : null}
     </section>
-    <SiteFooter />
+    <SiteFooter branding={bootstrap?.branding} />
   </main>;
 }

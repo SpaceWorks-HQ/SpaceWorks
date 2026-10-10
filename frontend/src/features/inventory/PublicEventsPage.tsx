@@ -1,3 +1,4 @@
+import { useTenantBranding } from "../../lib/useTenantBranding";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
@@ -55,6 +56,7 @@ export function PublicEventsPage() {
   const tenantPath = useTenantPath(makerspaceSlug);
   const bootstrapQuery = useTenantBootstrap(makerspaceSlug, tenant.mode === "central");
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
+  const brandStyle = useTenantBranding(bootstrap);
   const [activeToken, setActiveToken] = useState<string | null>(null);
   const [calendarToken, setCalendarToken] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<{ token: string; message: string } | null>(null);
@@ -97,7 +99,7 @@ export function PublicEventsPage() {
     }
   }
 
-  return <main className="desk-shell flex min-h-screen flex-col">
+  return <main style={brandStyle} className="desk-shell flex min-h-screen flex-col">
     <SkipLink />
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -139,6 +141,6 @@ export function PublicEventsPage() {
         </article>;
       })}</div></section>)}</div> : null}
     </section>
-    <SiteFooter />
+    <SiteFooter branding={bootstrap?.branding} />
   </main>;
 }

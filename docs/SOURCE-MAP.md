@@ -29,6 +29,8 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
   it; the `ModuleDefinition` tuple itself lives in `module_registry_catalog.py`, the import-time checks in
   `module_registry_validation.py`, so add a module to the catalogue), `platform.py` (origin helpers), `limits.py` (fair-use quotas), `lifecycle.py` (archive/purge barrel
   over `lifecycle_archive.py`, `lifecycle_purge.py` and `lifecycle_storage.py`),
+  `models_makerspace_validation.py` owns model clean checks; `theme_validation.py` validates
+  the closed theme JSON for control forms and API writes.
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
 - `backend/apps/organizations/` — `Organization` (platform entity, creatable before any makerspace, NOT a
   module_registry key), its opt-in public profile and cross-makerspace event catalogue,
@@ -244,3 +246,7 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
   `OrganizationInvitationRedeemPage.tsx` binds a single-use invitation after member sign-in, and
   `publicOrganizationsApi.ts` owns their TanStack Query keys and public API calls. Staff profile,
   membership, invitation and event-organizer controls remain under `frontend/src/features/staff/`.
+
+Tenant branding lives in `frontend/src/lib/brandColours.ts` (AA checks) and
+`useTenantBranding.ts` (page-scoped variables). `lib/theme.ts` owns the browser theme preference;
+`components/SupportContact.tsx` renders safe tenant support links.

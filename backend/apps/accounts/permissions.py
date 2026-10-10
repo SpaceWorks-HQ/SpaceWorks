@@ -25,7 +25,7 @@ class IsSuperadmin(BasePermission):
         # re-review fix: a suspended/restricted superadmin must also be blocked.
         if u.access_status != User.AccessStatus.ACTIVE:
             return False
-        # Default super123 seed must rotate before using protected endpoints.
+        # Generated first-run credentials must rotate before using protected endpoints.
         if getattr(u, "must_change_password", False):
             return False
         return u.is_superuser or u.role == User.Role.SUPERADMIN

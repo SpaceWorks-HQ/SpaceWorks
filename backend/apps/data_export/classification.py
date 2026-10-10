@@ -7,7 +7,6 @@ database column export itself before a security review could classify it.
 from .types import Exported, GlobalReference, NotTenantData, OmittedModel
 from .classification_domain import EXPORTED_MODEL_FIELDS
 from .classification_platform import GLOBAL_MODELS, OMITTED_MODELS
-from .types import Exported, NotTenantData, OmittedModel
 
 EXPORTED_MODELS = frozenset(EXPORTED_MODEL_FIELDS)
 

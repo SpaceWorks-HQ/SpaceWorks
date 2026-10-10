@@ -1,3 +1,6 @@
+import { SupportContact } from "../../components/SupportContact";
+import { ThemeToggle } from "../../components/ThemeToggle";
+import { useTenantBranding } from "../../lib/useTenantBranding";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
@@ -43,6 +46,7 @@ export function MemberArea() {
     refreshAccessToken().then(() => { setClaimSession(hasClaimSession()); return client.invalidateQueries({ queryKey: ["member"] }); }).finally(() => setRestoring(false));
   }, [client]);
   const bootstrap = useQuery({ queryKey: ["member", slug, "bootstrap"], queryFn: () => bootstrapTenant({ slug: slug || undefined }), retry: false });
+  const brandStyle = useTenantBranding(bootstrap.data);
   const resolvedSlug = slug || bootstrap.data?.makerspace.slug || "";
   const makerspaceId = bootstrap.data?.makerspace.id ?? -1;
   const memberships = useQuery({ queryKey: ["member", "memberships"], queryFn: () => memberRequest<Memberships>("/memberships/me"), enabled: !claimSession && !restoring, retry: false });
@@ -93,9 +97,9 @@ export function MemberArea() {
 
   if (restoring) return <main className="desk-shell grid place-items-center px-5 text-sm text-muted">Restoring session…</main>;
   if (claimSession && bootstrap.data) return <MemberClaimSession slug={resolvedSlug} makerspaceId={makerspaceId} modules={bootstrap.data.modules} geofenceEnabled={bootstrap.data.makerspace.geofence_enabled} />;
-  if (showSignIn) return <MemberAuthPanel makerspaceSlug={resolvedSlug} onAuthenticated={() => { setShowSignIn(false); void client.invalidateQueries({ queryKey: ["member"] }); }} />;
+  if (showSignIn) return <div style={brandStyle}><MemberAuthPanel makerspaceSlug={resolvedSlug} onAuthenticated={() => { setShowSignIn(false); void client.invalidateQueries({ queryKey: ["member"] }); }} /><div className="px-5 pb-5"><SupportContact branding={bootstrap.data?.branding} /></div></div>;
 
-  return <main className="desk-shell mx-auto max-w-3xl space-y-5 px-5 py-8"><header><p className="eyebrow text-secondary-ink">Member area</p><h1 className="title-page mt-2">Your makerspace access</h1></header>
+  return <main style={brandStyle} className="desk-shell mx-auto max-w-3xl space-y-5 px-5 py-8"><header><p className="eyebrow text-secondary-ink">Member area</p><h1 className="title-page mt-2">Your makerspace access</h1><ThemeToggle /></header>
     {archivedPayments.data?.length ? <section className="desk-panel p-5"><h2 className="title-panel">Payments from closed makerspaces</h2><p className="mt-1 text-sm text-muted">Receipts and outstanding charges remain available after a makerspace closes.</p><Link className="desk-button-secondary mt-4 inline-flex" to="/member/archived">View archived payments</Link></section> : null}
     {archivedUnknown ? <section className="desk-panel p-5"><h2 className="title-panel">Closed makerspace?</h2><p className="mt-1 text-sm text-muted">If a makerspace you belonged to has closed, its receipts and any outstanding charges are still reachable. You may need to sign in there.</p><Link className="desk-button-secondary mt-4 inline-flex" to="/member/archived">View archived payments</Link></section> : null}
     {bootstrap.isLoading ? <section className="desk-panel p-5 text-sm text-muted">Loading makerspace joining options…</section> : null}
@@ -140,5 +144,6 @@ export function MemberArea() {
     {unauthenticated && !showSignIn && policy?.startsWith("invite") ? <p className="text-sm text-muted">Sign in to view memberships or claim an invitation.</p> : null}
     {error ? <p className="text-sm text-danger" role="alert">{message(error)}</p> : null}
     {memberships.isError && !unauthenticated ? <Link className="desk-button-secondary inline-flex" to="/admin">Sign in</Link> : null}
+    <SupportContact branding={bootstrap.data?.branding} />
   </main>;
 }
