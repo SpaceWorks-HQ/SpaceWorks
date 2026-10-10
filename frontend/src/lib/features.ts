@@ -29,6 +29,8 @@ export const FEATURE_DEFINITIONS: readonly FeatureDefinition[] = [
   { key: "presence.geofence", parent_module: null, label: "Presence geofence" },
   { key: "notifications.delegated_recipients", parent_module: "notifications", label: "Delegated maintenance recipients" },
   { key: "events.offline_checkin", parent_module: "events", label: "Offline & station check-in" },
+  { key: "machines.certification_reminders", parent_module: "machines", label: "Certification reminders" },
+  { key: "maintenance.reminders", parent_module: "maintenance", label: "Maintenance reminders" },
   { key: "machines.certifications", parent_module: "machines", label: "Certification gating" },
   { key: "inventory.kiosk", parent_module: null, label: "Kiosk" },
 ];

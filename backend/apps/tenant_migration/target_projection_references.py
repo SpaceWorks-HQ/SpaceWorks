@@ -31,6 +31,7 @@ FK_POLICIES = {
     ("machines.MachineConsumablePool", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("machines.MakerspaceMachineTypePricing", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("machines.ServiceQueue", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
+    ("machines.MakerspaceMachineTypePolicy", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("machines.CertificationType", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("bookings.BookableSpace", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),
     ("procurement.ToBuyItem", "machine_type"): ForeignKeyPolicy(ReferenceDisposition.REMAP_RESOLVED, "Use the built-in/custom machine type map."),

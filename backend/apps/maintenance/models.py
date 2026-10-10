@@ -9,6 +9,11 @@ class MaintenanceLogImmutableError(RuntimeError):
 
 
 class MaintenanceSchedule(models.Model):
+    class Anchor(models.TextChoices):
+        COMPLETION = "completion", "Completion date"
+        CALENDAR = "calendar", "Fixed calendar"
+
+    anchor = models.CharField(max_length=16, choices=Anchor.choices, default=Anchor.COMPLETION)
     machine = models.ForeignKey(
         "machines.Machine",
         on_delete=models.CASCADE,
@@ -28,6 +33,8 @@ class MaintenanceSchedule(models.Model):
     class Meta:
         ordering = ["next_due", "id"]
         constraints = [
+            models.CheckConstraint(condition=Q(anchor__in=["completion", "calendar"]),
+                                   name="maintenance_anchor_valid"),
             models.CheckConstraint(
                 condition=Q(interval_days__gt=0),
                 name="maintenance_interval_days_positive",

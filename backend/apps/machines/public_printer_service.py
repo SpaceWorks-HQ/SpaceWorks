@@ -133,7 +133,7 @@ def submit_request(makerspace, data, actor, *, compatibility=False):
     queue = resolve_queue(makerspace, data.get("queue_id"), compatibility=compatibility)
     with transaction.atomic():
         limits.check_quota(makerspace, "print", adding=1)
-        row = submit(queue, actor, member=actor, actor=actor, requester_name=actor.display_name or "", contact_email=actor.email or "", contact_phone=actor.phone or "", title=data["title"], description=data.get("description", ""), source_link=data.get("source_link", ""), capability_payload=_kernel_payload(queue, data))
+        row = submit(queue, actor, member=actor, actor=actor, requester_name=actor.display_name or "", contact_email=actor.email or "", contact_phone=actor.phone or "", title=data["title"], description=data.get("description", ""), source_link=data.get("source_link", ""), capability_payload=_kernel_payload(queue, data), certification_override_reason=data.get("certification_override_reason", ""))
         ids = data.get("file_ids") or []
         files = list(ServiceRequestFile.objects.select_for_update().filter(id__in=ids, makerspace=makerspace, queue=queue, owner_user_id=actor.pk, service_request__isnull=True, attached_at__isnull=True))
         if len(files) != len(set(ids)):

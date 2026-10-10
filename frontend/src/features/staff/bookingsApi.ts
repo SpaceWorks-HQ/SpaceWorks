@@ -23,6 +23,7 @@ export type BookableSpace = {
   payment_amount: string;
   custom_form: CustomFormSchema;
   requester_notifications_enabled: boolean | null;
+  machine_type?: number | null;
   effective_requester_notifications_enabled: boolean;
   is_active: boolean;
   created_by_id: number | null;
@@ -33,7 +34,7 @@ export type BookableSpace = {
 export type BookableSpacePayload = Pick<BookableSpace,
   "name" | "kind" | "description" | "capacity" | "location" | "is_public" |
   "show_public_availability" | "show_public_booker_names" | "approval_mode" |
-  "custom_form" | "requester_notifications_enabled" | "payment_amount"
+  "custom_form" | "requester_notifications_enabled" | "payment_amount" | "machine_type"
 >;
 
 export type Booking = {

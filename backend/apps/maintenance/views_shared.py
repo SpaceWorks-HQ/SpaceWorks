@@ -2,6 +2,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from apps.accounts import rbac
 
 from apps.accounts import rbac
 from apps.machines import access
@@ -37,6 +38,7 @@ def resolve_collection(actor, makerspace_id, machine_id, *, manage=False):
         makerspace=makerspace,
     )
     require_module(makerspace, "maintenance")
+    require_module(makerspace, "machines")
     require_machine_access(actor, machine, manage=manage)
     return machine
 
@@ -46,12 +48,13 @@ def resolve_schedule(actor, pk, *, manage=True):
         actor, Machine.objects.select_related("makerspace", "machine_type"),
     )
     schedule = get_object_or_404(
-        MaintenanceSchedule.objects.select_related(
+        rbac.scope_by_makerspace(actor, MaintenanceSchedule.objects.select_related(
             "machine", "machine__makerspace", "machine__machine_type",
-        ).filter(machine__in=machines),
+        ), makerspace_field="machine__makerspace_id").filter(machine__in=machines),
         pk=pk,
     )
     require_module(schedule.machine.makerspace, "maintenance")
+    require_module(schedule.machine.makerspace, "machines")
     require_machine_access(actor, schedule.machine, manage=manage)
     return schedule
 
@@ -59,12 +62,13 @@ def resolve_schedule(actor, pk, *, manage=True):
 def resolve_log(actor, pk):
     machines = access.scope_machines_for_actor(actor, Machine.objects.all())
     log = get_object_or_404(
-        MaintenanceLog.objects.select_related(
+        rbac.scope_by_makerspace(actor, MaintenanceLog.objects.select_related(
             "machine", "machine__makerspace", "machine__machine_type",
-        ).filter(machine__in=machines),
+        ), makerspace_field="machine__makerspace_id").filter(machine__in=machines),
         pk=pk,
     )
     require_module(log.machine.makerspace, "maintenance")
+    require_module(log.machine.makerspace, "machines")
     require_machine_access(actor, log.machine, manage=False)
     return log
 
@@ -72,13 +76,14 @@ def resolve_log(actor, pk):
 def resolve_document(actor, pk, *, manage=False):
     machines = access.scope_machines_for_actor(actor, Machine.objects.all())
     document = get_object_or_404(
-        MaintenanceLogDocument.objects.select_related(
+        rbac.scope_by_makerspace(actor, MaintenanceLogDocument.objects.select_related(
             "log", "log__machine", "log__machine__makerspace",
             "log__machine__machine_type",
-        ).filter(log__machine__in=machines),
+        ), makerspace_field="log__machine__makerspace_id").filter(log__machine__in=machines),
         pk=pk,
     )
     require_module(document.log.machine.makerspace, "maintenance")
+    require_module(document.log.machine.makerspace, "machines")
     require_machine_access(actor, document.log.machine, manage=manage)
     return document
 

@@ -1,6 +1,7 @@
 """Lifecycle notification adapter for machine maintenance."""
 
 from apps.integrations.destinations import NotificationScope
+from apps.accounts import rbac
 from apps.integrations.email_templates import render
 from apps.integrations.email_templates_fablab import maintenance_context
 from apps.integrations.email_templates_registry_fablab_defaults import (
@@ -22,17 +23,24 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
         makerspace.refresh_from_db()
         if not is_servable(makerspace) or not feature_available(makerspace, "maintenance"):
             raise ValueError("Maintenance notifications are unavailable.")
+        def rows(model):
+            queryset = model.objects.all()
+            if event_name in ("due_soon", "overdue"):
+                return rbac.scope_for_scheduled_work(
+                    queryset, makerspace_id=makerspace.pk, field="machine__makerspace_id",
+                )
+            return queryset
         schedule = None
         log = None
         if is_schedule:
-            schedule = MaintenanceSchedule.objects.select_related(
+            schedule = rows(MaintenanceSchedule).select_related(
                 "machine__makerspace", "machine__machine_type"
             ).get(pk=object_id)
             machine = schedule.machine
             if log_id is not None:
-                log = MaintenanceLog.objects.get(pk=log_id, machine=machine)
+                log = rows(MaintenanceLog).get(pk=log_id, machine=machine)
         else:
-            log = MaintenanceLog.objects.select_related(
+            log = rows(MaintenanceLog).select_related(
                 "machine__makerspace", "machine__machine_type"
             ).get(
                 pk=object_id

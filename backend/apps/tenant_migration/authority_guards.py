@@ -52,6 +52,12 @@ SCANNED_MODEL_LABELS = frozenset({
 
 
 EXPLICIT_AUTHORITY_FIELDS = {
+    ("machines.MakerspaceMachineTypePolicy", "makerspace"): "Tenant boundary for reminder policy; preserved data does not grant staff authority.",
+    ("machines.MakerspaceMachineTypePolicy", "machine_type"): "Remapped type boundary for reminder policy, never an authorization scope grant.",
+    ("machines.MakerspaceMachineTypePolicy", "cert_reminder_days"): "Portable certification disclosure timing; target-owned feature and channel gates still apply.",
+    ("machines.MakerspaceMachineTypePolicy", "reminder_lead_days"): "Portable maintenance disclosure timing; recipients require live target machine authority.",
+    ("machines.MakerspaceMachineTypePolicy", "grace_days"): "Portable overdue disclosure timing; grants no access or automatic lockout bypass.",
+    ("maintenance.MaintenanceSchedule", "anchor"): "Portable recurrence preference; completion still requires target actor authority.",
     ("makerspaces.Makerspace", "lifecycle_state"): (
         "Scheduled-work visibility is target-owned; Lane D resets lifecycle state."
     ),

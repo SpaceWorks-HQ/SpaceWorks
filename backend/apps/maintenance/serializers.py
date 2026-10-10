@@ -22,6 +22,7 @@ class MaintenanceScheduleWriteSerializer(StrictFieldsSerializer):
     description = serializers.CharField()
     interval_days = serializers.IntegerField(min_value=1)
     next_due = serializers.DateField()
+    anchor = serializers.ChoiceField(choices=MaintenanceSchedule.Anchor.choices, required=False)
 
 
 class MaintenanceScheduleSerializer(serializers.ModelSerializer):
@@ -32,7 +33,7 @@ class MaintenanceScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaintenanceSchedule
         fields = (
-            "id", "machine_id", "description", "interval_days", "next_due",
+            "id", "machine_id", "description", "interval_days", "next_due", "anchor",
             "is_active", "created_by_id", "created_at", "updated_at", "overdue",
         )
         read_only_fields = fields

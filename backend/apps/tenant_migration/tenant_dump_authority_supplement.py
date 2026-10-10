@@ -14,6 +14,17 @@ def _same(label, names, disposition, reason):
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
     *_same(
+        "machines.MakerspaceMachineTypePolicy",
+        "id makerspace machine_type cert_reminder_days reminder_lead_days grace_days",
+        D.PRESERVE,
+        "Tenant/type timing preferences travel with remapped references; target-owned "
+        "feature/channel gates and live recipient authority still control disclosure.",
+    ),
+    *_same(
+        "maintenance.MaintenanceSchedule", "anchor", D.PRESERVE,
+        "The recurrence preference travels; target-authorized completion alone advances it.",
+    ),
+    *_same(
         "makerspaces.Makerspace", "timezone country opening_hours", D.PRESERVE,
         "The tenant location and advisory wall-clock schedule travel unchanged.",
     ),

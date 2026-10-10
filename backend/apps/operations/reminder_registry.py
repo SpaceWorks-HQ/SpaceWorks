@@ -1,4 +1,4 @@
-"""Explicit registrations only. F1 ships no production consumers.
+"""Explicit registrations; domain adapters are lazy for tombstone compatibility.
 
 Sources discover scoped domain subjects and rebuild messages at dispatch time so
 cancelled/returned subjects do not receive stale notifications. See the test-only
@@ -38,11 +38,21 @@ class ReminderSource:
     discover: Callable[[Makerspace, datetime, int, tzinfo], Iterable[ReminderSubject]]
     build: Callable[[Makerspace, ReminderSchedule, datetime, tzinfo], ReminderMessage | None]
     feature: str | None = None
+    # Domain consumers may dispatch through a member/scoped notification family.
+    dispatch: Callable | None = None
 
 
-# Later lanes add their source explicitly here, with existing module/feature gates.
-# No AppConfig hooks, autodiscovery, dynamic imports, or consumers in this foundation.
-REMINDER_SOURCES: tuple[ReminderSource, ...] = ()
+# Consumer registration is explicit, with canonical module/feature gates.
+from . import reminder_machine_sources as machines
+
+REMINDER_SOURCES: tuple[ReminderSource, ...] = (
+    ReminderSource("machines.certification_expiry", "machines", machines.discover_certifications,
+                   machines.build_certification, "machines.certification_reminders", machines.dispatch_certification),
+    ReminderSource("machines.certification_digest", "machines", machines.discover_digest,
+                   machines.build_digest, "machines.certification_reminders", machines.dispatch_digest),
+    ReminderSource("maintenance.due", "maintenance", machines.discover_maintenance,
+                   machines.build_maintenance, "maintenance.reminders", machines.dispatch_maintenance),
+)
 
 
 def registered_sources():
@@ -61,5 +71,7 @@ def registered_sources():
             raise ValueError(f"Unknown reminder source gate: {source.key}")
         if not callable(source.discover) or not callable(source.build):
             raise ValueError(f"Reminder source callbacks are required: {source.key}")
+        if source.dispatch is not None and not callable(source.dispatch):
+            raise ValueError(f"Reminder dispatch callback is invalid: {source.key}")
         seen.add(source.key)
     return REMINDER_SOURCES

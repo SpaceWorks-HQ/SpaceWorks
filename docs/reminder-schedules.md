@@ -1,8 +1,9 @@
 # Shared reminder schedules (research F1)
 
 `operations/reminder_sweeper.py` runs every five minutes in both Celery beat and
-`run_scheduled_tasks --due-only`. No production sources are registered by F1, so
-upgrading does not change notification behaviour. The existing hourly loan return
+`run_scheduled_tasks --due-only`. F1 initially registered no production sources. Wave 2 registers opt-in certification
+expiry/digest and maintenance consumers; see [machine-training-maintenance.md](machine-training-maintenance.md).
+Upgrading still leaves these features and their external notification channels off. The existing hourly loan return
 reminder and membership renewal tasks keep their current schedules and semantics.
 
 ## Registering a source
@@ -37,9 +38,13 @@ The source owns its query plan, cursor/fairness and future discovery horizon.
 `build(makerspace, reminder, now, local_tz)` must re-read the subject within that
 tenant and check current domain eligibility, policy offsets and due timestamp.
 Return `None` for a cancelled/returned/ineligible subject, disabled offset or stale
-due timestamp. Otherwise return a `ReminderMessage`. The sweeper sends it through
+due timestamp. Otherwise return a `ReminderMessage`. A source may supply
+`dispatch(makerspace, reminder, message)` to use its scoped notification family after
+claiming and revalidation. It must not perform workflow state transitions. Sources
+without a dispatch callback send the message through
 `notifications.emit.emit_notification`, preserving the staff inbox module gate and
-fail-safe behaviour. This foundation adds no member delivery, matrix event families,
+fail-safe behaviour. The default emitter adds no member delivery or matrix event families; domain consumers
+own those via their dispatch callbacks. F1 itself added no
 dues, certifications, booking/event reminders or state transitions. Later consumer
 lanes own their notification matrix/recipient integration (research F2/F3).
 

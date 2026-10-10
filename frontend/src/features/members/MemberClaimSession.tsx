@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAccessToken, memberRequest } from "../../lib/api";
+import { MemberCertifications } from "./MemberCertifications";
 import { MemberActivityPanel, type MemberActivity } from "./MemberActivity";
 import { presenceStartLocation } from "./geolocation";
 
@@ -36,6 +37,7 @@ export function MemberClaimSession({ slug, makerspaceId, modules, geofenceEnable
       {presence.data ? <button className="desk-button-secondary mt-3" disabled={togglePresence.isPending} onClick={() => togglePresence.mutate()}>{togglePresence.isPending ? "Updating…" : presence.data.active ? "End presence" : "Start presence"}</button> : null}
     </section>
     {activity.isLoading ? <p className="text-sm text-muted">Loading your activity…</p> : null}
+    {modules.includes("machines") ? <MemberCertifications makerspaceId={makerspaceId} /> : null}
     {activity.data ? <MemberActivityPanel activity={activity.data} makerspaceId={makerspaceId} makerspaceSlug={slug} /> : null}
     {error ? <p role="alert" className="text-sm text-danger">{error.message}</p> : null}
   </main>;

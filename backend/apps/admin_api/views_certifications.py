@@ -5,11 +5,11 @@ from .views_certification_types import (
     _resolved_type, _scoped_types,
 )
 from .views_certification_grants import (
-    CertificationGrantListCreateView, CertificationGrantRevokeView,
+    CertificationGrantListCreateView, CertificationGrantRevokeView, CertificationGrantRenewView,
 )
 
 __all__ = [
     "CertificationTypeDetailView", "CertificationTypeListCreateView",
-    "CertificationGrantListCreateView", "CertificationGrantRevokeView",
+    "CertificationGrantListCreateView", "CertificationGrantRevokeView", "CertificationGrantRenewView",
     "_resolved_type", "_scoped_types",
 ]

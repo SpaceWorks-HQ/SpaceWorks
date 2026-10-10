@@ -1,3 +1,5 @@
+import { CertificationsPanel } from "./CertificationsPanel";
+import { MachineReminderPolicy } from "./MachineReminderPolicy";
 import { Skeleton, StatusBadge } from "../../../../components/ui";
 import { ImageThumbnail } from "../../../../components/ui/ImageThumbnail";
 import type { PrinterPool } from "../../../../generated/api";
@@ -13,6 +15,7 @@ import type { ServiceDraft } from "./serviceDrafts";
 type Props = {
   makerspaceId: number;
   canManage: boolean;
+  canConfigureMachineTypes?: boolean;
   machineServiceEnabled: boolean;
   printingEnabled: boolean;
   reportsEnabled?: boolean;
@@ -42,6 +45,7 @@ const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-
 export function MachineTypePage({
   makerspaceId,
   canManage,
+  canConfigureMachineTypes = false,
   machineServiceEnabled,
   printingEnabled,
   reportsEnabled = true,
@@ -105,6 +109,9 @@ export function MachineTypePage({
           </button>
         ))}
       </section>
+
+      {machineType.can_create_machine === true ? <CertificationsPanel makerspaceId={makerspaceId} machineTypeId={machineType.id} /> : null}
+      {canConfigureMachineTypes ? <MachineReminderPolicy makerspaceId={makerspaceId} machineTypeId={machineType.id} /> : null}
 
       {machineServiceEnabled && canManage ? (
         <>

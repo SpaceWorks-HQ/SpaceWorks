@@ -1,6 +1,7 @@
 from django.urls import path
 
 from apps.machines.views_public import PublicMachineListView
+from apps.machines.views_member_certifications import MemberCertificationsView
 from apps.machines.views_public_service import PublicMachineServiceSubmitView
 from apps.machines.views_public_printer_service import (
     PublicPrinterPoolsView, PublicPrinterQueuesView, PublicPrinterRequestView,
@@ -9,6 +10,7 @@ from apps.machines.views_public_printer_service import (
 
 
 urlpatterns = [
+    path("member/makerspaces/<int:makerspace_id>/certifications", MemberCertificationsView.as_view(), name="member-certifications"),
     path(
         'public/<slug:makerspace_slug>/machines',
         PublicMachineListView.as_view(),

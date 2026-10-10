@@ -158,6 +158,16 @@ FEATURE_DEFINITIONS = (
         default_enabled=False,
     ),
     FeatureDefinition(
+        "machines.certification_reminders", "machines", "Certification reminders",
+        "Send member expiry notices and a scoped staff digest.",
+        requires_modules=("notifications",),
+    ),
+    FeatureDefinition(
+        "maintenance.reminders", "maintenance", "Maintenance reminders",
+        "Notify scoped maintainers before and after maintenance is due.",
+        requires_modules=("machines", "notifications"),
+    ),
+    FeatureDefinition(
         "events.offline_checkin", "events", "Offline & station check-in",
         "Store a minimal expiring roster on event devices and enable event-scoped "
         "PIN stations.",

@@ -15,7 +15,21 @@ verification/error helpers in `views_social_helpers.py`. `integrations/health.py
 read-only scheduler control page lives in `operations/admin_scheduling.py`.
 The shared reminder foundation is `operations/models_reminders.py`,
 `reminder_registry.py`, `reminder_services.py`, `reminder_sweeper.py` and
-`tasks_reminders.py`; consumer registrations are explicit and initially empty.
+`tasks_reminders.py`; explicit lazy machine/maintenance adapters live in
+`reminder_machine_sources.py`. Certification expiry and staff digests live in
+`machines/reminders_certifications.py` and `reminders_certification_digest.py`;
+maintenance reminders and anchor maths live in `maintenance/reminders.py` and
+`recurrence.py`. `machines/models_policy.py` owns tenant/type numeric settings.
+`admin_api/views_certification_types.py` and `views_certification_grants.py` own
+paginated trainer rosters; `serializers_certifications.py` validates type names and
+maps concurrent unique-name collisions to field errors. The member history lives in
+`machines/views_member_certifications.py`; `views_machine_type_policy.py` owns policy edits.
+Frontend trainer controls live in `staff/panels/machine/CertificationsPanel.tsx`,
+`CertificationGrants.tsx` and `MachineReminderPolicy.tsx`; `staff/certificationsApi.ts`
+owns paging. `members/MemberCertifications.tsx` owns private history and
+`staff/BookableSpaceMachineType.tsx` owns the optional booking training link.
+Staff/member API and UI behavior is described in
+[machine-training-maintenance.md](machine-training-maintenance.md).
 Queries use `accounts/rbac.py:scope_for_scheduled_work`; see
 [reminder-schedules.md](reminder-schedules.md) for UTC, claims and migration rules.
 

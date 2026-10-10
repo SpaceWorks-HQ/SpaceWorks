@@ -39,3 +39,10 @@ PHASE5_AUDIT_EDGES.update(
 PHASE5_AUDIT_EDGES.update(
     _reference(R, "machines.MachineType", ("certification_type.created", "machine_type_id"))
 )
+
+PHASE5_AUDIT_EDGES.update(_reference(R, "machines.CertificationType",
+                                   ("certification.renewed", "certification_type_id")))
+PHASE5_AUDIT_EDGES.update(_reference(R, "makerspaces.MakerspaceMembership",
+                                   ("certification.renewed", "membership_id")))
+PHASE5_AUDIT_EDGES.update(_reference(R, "machines.CertificationGrant",
+                                   ("certification.renewed", "previous_grant_id")))

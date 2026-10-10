@@ -4,6 +4,8 @@ from .target_projection_types import RowDisposition, RowPolicy
 
 
 ROW_POLICIES = {
+    # machines.MakerspaceMachineTypePolicy uses the ordinary data projection;
+    # numeric preferences carry no actor or authority grants.
     "operations.ReminderSchedule": RowPolicy(
         RowDisposition.DROP,
         "Source-local reminder coordination is rebuilt by target sources; claims never travel.",
