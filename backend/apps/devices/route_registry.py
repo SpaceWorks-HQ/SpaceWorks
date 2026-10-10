@@ -43,6 +43,10 @@ from .route_registry_7b import printer_routes
 
 DEVICE_ROUTES.update(printer_routes(DeviceRoute, DEVICE_SIGNATURE, ALL_KINDS))
 
+from .route_registry_7c import label_routes
+
+DEVICE_ROUTES.update(label_routes(DeviceRoute, DEVICE_SIGNATURE))
+
 
 def entry_for(request):
     match = getattr(request, "resolver_match", None)

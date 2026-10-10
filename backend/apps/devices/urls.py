@@ -45,3 +45,7 @@ urlpatterns = [
 from .urls_7b import urlpatterns as printer_urlpatterns
 
 urlpatterns += printer_urlpatterns
+
+from .urls_7c import label_urlpatterns
+
+urlpatterns += label_urlpatterns

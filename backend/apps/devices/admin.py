@@ -50,3 +50,5 @@ if not app_is_tombstoned("devices"):
     admin.site.register(DeviceEvent, DeviceEventAdmin)
 
 from . import admin_printers  # noqa: F401 -- read-only registration side effects
+
+from . import admin_labels  # noqa: F401 -- read-only registration side effects

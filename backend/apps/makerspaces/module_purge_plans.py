@@ -190,7 +190,7 @@ PLANS = (
     ModulePurgePlan("qr_print_batches", "QR print batches and their items.", qr_print_batches_delete),
     ModulePurgePlan(
         "devices",
-        "Devices, printer bindings, commands, measured reports and device event history.",
+        "Devices, printer bindings, commands, measured reports, label receipts and device event history.",
         devices_delete,
     ),
 )

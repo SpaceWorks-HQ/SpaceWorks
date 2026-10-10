@@ -75,6 +75,8 @@ EXPECTED_TARGET_VALUES = {
     ("devices.PrinterDeviceBinding", "enabled"): False,
     ("devices.PrinterDeviceBinding", "auto_apply_terminal"): False,
     ("devices.PrinterJob", "state"): "needs_review",
+    # Phase 7c: acknowledged delivery ownership cannot travel.
+    ("devices.DeviceCommand", "acknowledged_at"): None,
 }
 
 

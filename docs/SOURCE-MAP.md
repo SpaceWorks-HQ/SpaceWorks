@@ -112,6 +112,11 @@
   Binding and creation services are separate siblings; `printer_state.py` derives advisory staff
   state. `urls_7b.py`/`route_registry_7b.py` extend the exact protocol and staff surfaces.
   Shared export, PII, purge, origin and tenant-migration registries compose `*_7b.py` siblings.
+  Phase 7c adds `models_labels.py` (LabelPrintCommand and immutable LabelPrintResult),
+  `services_label_*`, `label_access.py`, `serializers_labels.py` and `views_labels.py`.
+  Labels reuse `services_commands.py` lease/ack/backoff and the operations ZIP renderer;
+  `*_7c.py` siblings compose the shared catalogs. The first send freezes a QR batch.
+  The full contract and invariants live in [device-label-commands.md](device-label-commands.md).
 - `backend/apps/data_export/` — Space-Manager data export (Phase 4). Per-fidelity (`REDACTED`/`PORTABLE`)
   disposition registry over models, fields, datasets, traversals and the global-user reference closure, with
   **drift guards that refuse an unclassified model or field**. `classification.py` and `references.py`

@@ -1,231 +1,221 @@
-# Lane 7b handoff — implementation complete, runtime verification pending
+# Lane 7c handoff ? implementation complete, runtime verification pending
 
-Implemented durable printer bindings, command delivery, typed measured reports, scoped staff approval, telemetry precedence, provenance and movement/purge support. No state-changing git commands were used; all changes are unstaged, and the index is empty. AGENTS.md/CLAUDE.md were not edited.
-
-The key Django/DRF boundary is two transactions: claim immutable validated measurements first, then invoke the existing machine workflow with its stock/charging behavior and commit the applied marker plus provenance together. A failed application rolls back effects and records review separately. Device effects have actor=None; approving staff supply their User. Staff query scope combines MANAGE_DEVICES with the existing machine scope. Automatic application defaults false.
+Built on the existing 7b ledger; all changes remain unstaged. No state-changing git
+commands or database tests were run. AGENTS.md/CLAUDE.md remain byte-identical.
 
 ## Completed
-
-- Reviewed the named phase/overview/review/handover documents and actual 7a tree; the corrected review is stage1-p7b.md.
-- Four models, field/uniqueness/measurement constraints, report immutability and PII fence triggers; model/admin barrels.
-- Signed exact lease/ack/telemetry/result registry and nine OpenAPI-documented device/staff routes; paginated lists and matching detail scope.
-- Key-version pins, bounded expiry/backoff, durable ack, replay hashing, manual/automatic application and full rollback of effect/marker/provenance failures.
-- New *_7b registry siblings for export/User closure, PII, origin scope, purge, tenant catalog/projection/uniqueness/snapshots/typed audit IDs. Both portable and raw dump conditional resets work.
-- Operator and server protocol documentation; default settings 60 seconds / 10 attempts.
-- 50 new test functions (parameterized cases add coverage), plus independent authority expectations and existing encryption count/authority guard assertions.
-
-## Validation actually performed
-
-- AST parsing, changed-file project import-name resolution, migration expression-name checks, and <=300 lines for every touched Python file except the accepted settings.py exception. No Django/database imports in these static checks.
-- Pure registry construction: nine authority entries, two uniqueness rules, 25 source PII fields / 29 total.
-- Reconstructed the literal catalog graph and reproduced the original pin ecf31fe141aba2bf4c273a1043b2cac9440e8ceff9519bc8d3a7218f200efb02 before adding the four independent schemas; resulting pin 5d28998a7fa761b7c83e1d2041ca621fa9d707bffb21337cfe6d82dbb74617e9. Coordinator must verify it against Django models.
-- git diff --check completed cleanly; index inspection showed no staged changes.
-- No tests were run. Django is not installed in this lane, Docker/Postgres are unavailable, and codex doctor reports unavailable configuration/home and unreachable inference. No test is claimed passing. Temporary lane-only verification scripts are removed from the handoff.
-
-## Migration
-
-- backend/apps/devices/migrations/0002_printer_jobs.py (manually authored historical schema; coordinator must run migration drift checks).
-- Dependencies: devices.0001_device_identity; machines.0024_certifications; encryption.0007_tenant_import_fence_operation; migrations.swappable_dependency(settings.AUTH_USER_MODEL). Actual leaves were listed before writing.
-- _printer_claim_guards.py is a SQL helper imported by 0002, not another migration.
+- Read root instructions, global workflow, phase 7c plan/review/reference diff,
+  relevant invariants and actual 7b/QR/export/movement implementations.
+- LabelPrintCommand and immutable LabelPrintResult receipt models; 0003 migration
+  with request/operation uniqueness, completion constraints and SQL claim guards.
+- MANAGE_QR send/reprint and paginated history; same-tenant active label devices;
+  transactional DRAFT-to-PRINTED freeze and payload-sensitive staff idempotency.
+- Extended 7b services_commands, serializer and URLs for labels. Shared leases,
+  acknowledgements, key-version ownership and one extracted backoff calculation.
+- Signed content/result endpoints use canonical in-memory ZIP of SVGs. Fixed result
+  code/messages, immutable operation receipts and bounded retries preserve replay.
+- Audit uses User for staff and None for devices with typed IDs and DeviceEvents;
+  shared lease/ack provenance also carries label/batch IDs. No QR contents or bytes.
+- Frozen batch service and /control/ editor; admin domain split retains explicit
+  re-exports. Asset generation takes tenant lock before product/batch/quota locks.
+- New *_7c siblings unioned into export/User/dataset/origin/purge/catalog/snapshot/
+  authority/projection/uniqueness/audit registries. Import cancels shared commands,
+  clears lease/ack ownership and preserves receipt/source snapshot history.
+- Combined catalog pin reconstructed after reproducing 7b baseline exactly:
+  d491cbdde52737edca2e8c014688c2883729d0686e6d1bac798d12cd905d2b4b.
+- Protocol/invariant documentation in docs/device-label-commands.md; SOURCE-MAP link.
 
 ## Coordinator work remaining
+- Run focused label/device and QR operations tests below, including concurrency;
+  then existing tests/devices, tests/operations, tests/data_export,
+  tests/tenant_migration, tests/makerspaces, tests/backup and registry guards.
+- Run the full isolated suite via scripts/dev.sh test and the existing eleven-app
+  tombstone profile separately. Never share a DB between pytest processes.
+- Run manage.py check, makemigrations --check --dry-run, schema validation and
+  validate_catalog against loaded Django models to verify the reconstructed pin.
+- Regenerate frontend/openapi-schema.json and frontend/src/generated/api.ts.
+- Complete independent coordinator review/QA and commit; lane performed no staging.
 
-1. Copy stage1-p7b.md to C:/Users/shaan/Music/SpaceWorks/SpaceWorks/docs/plans/2026-09-03-forward-plan/reviews/stage1-p7b.md. The lane-only write rule forbids writing the requested main-checkout path here.
-2. Run python manage.py check and python manage.py makemigrations --check --dry-run in the configured backend environment; validate the actual tenant dump catalog digest.
-3. Use ./scripts/dev.sh test tests/devices for the focused tests. Run existing machine workflow/consumption/metering/payment tests and tests/data_export, tests/tenant_migration, tests/encryption, tests/makerspaces, tests/backup and tests/test_env_surface_drift.py, then the prescribed full isolated suite. Never share a database between pytest processes or run full pytest concurrently with Codex review.
-4. Run tests/tombstone under the existing full eleven-app tombstone profile; it includes the new test_printer_devices_7b.py.
-5. Regenerate frontend/openapi-schema.json and frontend/src/generated/api.ts (deliberately untouched here), perform the independent review/QA gates, resolve any runtime findings, and coordinate sibling-lane migration/registry integration.
+## Verification performed (no tests run)
+- codex doctor: home/config unavailable and required inference endpoint unreachable;
+  nested CLI review remains blocked, not claimed complete.
+- Python Django import: package unavailable. Docker/Postgres inaccessible as stated.
+- AST parse, project import/symbol resolution and <=300-line checks: no findings.
+- New model/migration/export/tenant-catalog field sets agree; mirror drift guard empty.
+- Static catalog reconstruction reproduced the 7b baseline pin before adding 7c.
+- Read-only git diff/status/index checks; git diff --check had no whitespace errors.
 
-## Skips, decisions and outside defects
+## Migration
+- backend/apps/devices/migrations/0003_label_commands.py depends on the actual
+  devices.0002_printer_jobs and operations.0009_report_schedules leaves, plus
+  migrations.swappable_dependency(settings.AUTH_USER_MODEL).
+- _label_guards.py is its SQL helper, not an additional migration.
 
-- No owner product decision is needed. The plan default is manual review with auto-application false.
-- Frontend UI, scheduler/offline work, OctoPrint/Moonraker packaging, label commands and public status remain outside 7b as stated in the plan. No module, feature or role keys were added.
-- test_env_surface_drift.py already has 299 lines and no literal device-key pin. New exact default/policy/env-example assertions live in test_printer_settings.py; the existing scanner still covers policy drift.
-- No API-client registry, report schema, storage-object catalog or existing machine workflow code was changed. New live FKs use ordinary tenant remapping; only the source snapshot columns need extra semantic declarations.
-- Existing Compose maps do not forward device tuning keys, including 7a settings. Shipped defaults and direct backend process environment overrides work; root .env tuning alone is not forwarded. Compose wiring is outside this plan table and remains coordinator work.
-- Existing MachineServiceRequest.reason and reserved-pool adjustment reason storage are plaintext. The reused fail workflow keeps that behavior; the new PrinterJob failure copy is encrypted and adapter audit/log metadata contains no free-text reason.
+## Deliberate skips / owner decisions / observations
+- No owner product decisions needed; the reviewed plan defaults were used.
+- Staff UI (7d), PDF/raster/CUPS/IPP/agent packaging and generated API artifacts
+  remain deferred by task scope. No module, feature, role or action key was added.
+- No edits to >300-line docs/INVARIANTS.md or docs/MODULES.md: this lane's hard
+  ceiling prevents touching them. Standalone label documentation and SOURCE-MAP
+  carry the complete contract; no new module key requires a MODULES entry.
+- Archive/object ownership/storage/encryption/reference closure registries reviewed
+  without label changes: no persisted bytes, object fields, free-form PII, movable
+  cross-tenant target or semantic raw User IDs exist in the new models.
+- Found and fixed the existing QR admin inline/status bypass of post-send freeze.
+- Runtime suites, migration/schema checks and independent review remain unverified.
+- Existing qr_zip has no batch size limit; preserves that behavior. This is an
+  outside-scope resource-bound observation, not a newly claimed protection.
+- Existing shared delivery locks enter the printer PII fence for label polling too;
+  preserved 7b's ownership boundary. Label reports/content hold no new PII.
 
-## Every created/modified file
+## Every created or modified file
+- LANE-PROGRESS.md
+- backend/apps/data_export/classification.py
+- backend/apps/data_export/classification_7c.py
+- backend/apps/data_export/datasets.py
+- backend/apps/data_export/datasets_7c.py
+- backend/apps/data_export/references.py
+- backend/apps/data_export/references_7c.py
+- backend/apps/devices/admin.py
+- backend/apps/devices/admin_labels.py
+- backend/apps/devices/errors_labels.py
+- backend/apps/devices/label_access.py
+- backend/apps/devices/migrations/0003_label_commands.py
+- backend/apps/devices/migrations/_label_guards.py
+- backend/apps/devices/models.py
+- backend/apps/devices/models_events.py
+- backend/apps/devices/models_labels.py
+- backend/apps/devices/route_registry.py
+- backend/apps/devices/route_registry_7c.py
+- backend/apps/devices/serializers_commands.py
+- backend/apps/devices/serializers_labels.py
+- backend/apps/devices/services_commands.py
+- backend/apps/devices/services_label_commands.py
+- backend/apps/devices/services_label_delivery.py
+- backend/apps/devices/services_label_events.py
+- backend/apps/devices/services_label_results.py
+- backend/apps/devices/services_printer_events.py
+- backend/apps/devices/urls.py
+- backend/apps/devices/urls_7c.py
+- backend/apps/devices/views_labels.py
+- backend/apps/makerspaces/module_purge_collectors_7c.py
+- backend/apps/makerspaces/module_purge_collectors_devices.py
+- backend/apps/makerspaces/module_purge_plans.py
+- backend/apps/makerspaces/origin_scope_model_lookups.py
+- backend/apps/makerspaces/origin_scope_routes_7c.py
+- backend/apps/operations/admin.py
+- backend/apps/operations/admin_qr_batches.py
+- backend/apps/operations/services_qr_assets.py
+- backend/apps/operations/views_qr_batches.py
+- backend/apps/tenant_migration/audit_references_meta.py
+- backend/apps/tenant_migration/audit_references_meta_7c.py
+- backend/apps/tenant_migration/catalog_7c.py
+- backend/apps/tenant_migration/references_7c.py
+- backend/apps/tenant_migration/references_devices.py
+- backend/apps/tenant_migration/target_projection.py
+- backend/apps/tenant_migration/target_projection_7c.py
+- backend/apps/tenant_migration/tenant_dump_authority_7c.py
+- backend/apps/tenant_migration/tenant_dump_authority_supplement.py
+- backend/apps/tenant_migration/tenant_dump_catalog.py
+- backend/apps/tenant_migration/tenant_dump_field_snapshot.py
+- backend/apps/tenant_migration/tenant_dump_model_catalog.py
+- backend/apps/tenant_migration/unique_values.py
+- backend/apps/tenant_migration/unique_values_7c.py
+- backend/tests/devices/helpers_labels.py
+- backend/tests/devices/test_label_commands.py
+- backend/tests/devices/test_label_concurrency.py
+- backend/tests/devices/test_label_data_export.py
+- backend/tests/devices/test_label_delivery.py
+- backend/tests/devices/test_label_gates.py
+- backend/tests/devices/test_label_tenant_migration.py
+- backend/tests/operations/test_qr_batch_freeze.py
+- backend/tests/tenant_migration/authority_expectations_7c.py
+- backend/tests/tenant_migration/test_authority_dispositions_d8.py
+- backend/tests/tenant_migration/test_target_projection.py
+- backend/tests/tombstone/test_label_devices_7c.py
+- docs/SOURCE-MAP.md
+- docs/device-label-commands.md
 
-- modified: .env.example
-- modified: .env.production.example
-- modified: LANE-PROGRESS.md
-- modified: backend/.env.example
-- modified: backend/apps/backup/settings_policy.py
-- modified: backend/apps/data_export/classification.py
-- modified: backend/apps/data_export/datasets.py
-- modified: backend/apps/data_export/fields.py
-- modified: backend/apps/data_export/guards.py
-- modified: backend/apps/data_export/references.py
-- modified: backend/apps/devices/admin.py
-- modified: backend/apps/devices/checks.py
-- modified: backend/apps/devices/models.py
-- modified: backend/apps/devices/models_events.py
-- modified: backend/apps/devices/route_registry.py
-- modified: backend/apps/devices/urls.py
-- modified: backend/apps/encryption/registry.py
-- modified: backend/apps/makerspaces/module_purge_collectors_devices.py
-- modified: backend/apps/makerspaces/module_purge_plans.py
-- modified: backend/apps/makerspaces/origin_scope_model_lookups.py
-- modified: backend/apps/makerspaces/origin_scope_routes.py
-- modified: backend/apps/tenant_migration/audit_references_meta_devices.py
-- modified: backend/apps/tenant_migration/omitted_fields.py
-- modified: backend/apps/tenant_migration/references_devices.py
-- modified: backend/apps/tenant_migration/row_planning.py
-- modified: backend/apps/tenant_migration/target_projection.py
-- modified: backend/apps/tenant_migration/tenant_dump_authority_devices.py
-- modified: backend/apps/tenant_migration/tenant_dump_catalog.py
-- modified: backend/apps/tenant_migration/tenant_dump_field_snapshot.py
-- modified: backend/apps/tenant_migration/tenant_dump_model_catalog.py
-- modified: backend/apps/tenant_migration/tenant_dump_raw.py
-- modified: backend/apps/tenant_migration/unique_values.py
-- modified: backend/config/settings.py
-- modified: backend/tests/encryption/test_mappers.py
-- modified: backend/tests/tenant_migration/test_authority_dispositions_d8.py
-- modified: docs/INVARIANTS.md
-- modified: docs/MODULES.md
-- modified: docs/SOURCE-MAP.md
-- modified: docs/deploy-production.md
-- modified: docs/self-hosting.md
-- created: backend/apps/data_export/classification_7b.py
-- created: backend/apps/data_export/credentials_7b.py
-- created: backend/apps/data_export/datasets_7b.py
-- created: backend/apps/data_export/guards_credentials.py
-- created: backend/apps/data_export/references_7b.py
-- created: backend/apps/devices/admin_printers.py
-- created: backend/apps/devices/errors_printers.py
-- created: backend/apps/devices/migrations/0002_printer_jobs.py
-- created: backend/apps/devices/migrations/_printer_claim_guards.py
-- created: backend/apps/devices/models_commands.py
-- created: backend/apps/devices/models_printers.py
-- created: backend/apps/devices/printer_access.py
-- created: backend/apps/devices/printer_state.py
-- created: backend/apps/devices/route_registry_7b.py
-- created: backend/apps/devices/serializers_commands.py
-- created: backend/apps/devices/serializers_printers.py
-- created: backend/apps/devices/services_commands.py
-- created: backend/apps/devices/services_printer_apply.py
-- created: backend/apps/devices/services_printer_bindings.py
-- created: backend/apps/devices/services_printer_events.py
-- created: backend/apps/devices/services_printer_jobs.py
-- created: backend/apps/devices/services_printer_reports.py
-- created: backend/apps/devices/urls_7b.py
-- created: backend/apps/devices/views_commands.py
-- created: backend/apps/devices/views_printer_common.py
-- created: backend/apps/devices/views_printer_protocol.py
-- created: backend/apps/devices/views_printers.py
-- created: backend/apps/encryption/registry_7b.py
-- created: backend/apps/makerspaces/module_purge_collectors_7b.py
-- created: backend/apps/makerspaces/origin_scope_routes_7b.py
-- created: backend/apps/tenant_migration/audit_references_meta_7b.py
-- created: backend/apps/tenant_migration/catalog_7b.py
-- created: backend/apps/tenant_migration/references_7b.py
-- created: backend/apps/tenant_migration/target_projection_7b.py
-- created: backend/apps/tenant_migration/tenant_dump_authority_7b.py
-- created: backend/apps/tenant_migration/unique_values_7b.py
-- created: backend/tests/devices/printer_helpers.py
-- created: backend/tests/devices/test_command_leases.py
-- created: backend/tests/devices/test_printer_bindings.py
-- created: backend/tests/devices/test_printer_boundaries.py
-- created: backend/tests/devices/test_printer_data_export.py
-- created: backend/tests/devices/test_printer_dump_projection.py
-- created: backend/tests/devices/test_printer_jobs.py
-- created: backend/tests/devices/test_printer_reconciliation.py
-- created: backend/tests/devices/test_printer_results.py
-- created: backend/tests/devices/test_printer_settings.py
-- created: backend/tests/devices/test_printer_state.py
-- created: backend/tests/devices/test_printer_tenant_migration.py
-- created: backend/tests/tenant_migration/authority_expectations_7b.py
-- created: backend/tests/tombstone/test_printer_devices_7b.py
-- created: docs/device-printer-protocol.md
-- created: stage1-p7b.md
+## Every new test function (coordinator must run)
 
-## Every new test function
+backend/tests/devices/helpers_labels.py
+- Helper/independent authority expectation module; no test function.
 
-### backend/tests/devices/test_command_leases.py
+backend/tests/devices/test_label_commands.py
+- test_first_send_freezes_batch_and_matching_replay_creates_no_second_command
+- test_printed_batch_reprint_uses_new_request_id_and_paginated_listing
+- test_invalid_batch_does_not_queue
+- test_device_kind_and_status_are_enforced
+- test_request_id_conflict_for_another_batch
+- test_request_id_conflict_for_another_active_label_device
+- test_manage_qr_without_manage_devices_can_send_but_device_only_role_cannot
+- test_cross_tenant_device_and_batch_are_not_disclosed
+- test_request_claim_cannot_be_rewritten_by_queryset_update
+- test_unknown_fields_are_rejected_at_staff_boundary
+- test_first_send_rolls_back_command_and_freeze_on_failure
+- test_batch_claim_cannot_rebind_or_delete_but_requester_fk_may_null
 
-- test_lease_returns_token_once_stores_digest_and_acks_after_long_print
-- test_expired_ack_commits_requeue_backoff_and_old_token_cannot_ack_new_lease
-- test_final_expired_attempt_marks_delivery_failed
-- test_cross_device_and_revoked_principals_cannot_claim_or_ack
-- test_adapter_off_or_missing_target_cancels_delivery_permanently
-- test_rotation_does_not_transfer_command_to_new_key
-- test_two_pollers_lease_one_command_exactly_once
+backend/tests/devices/test_label_concurrency.py
+- test_concurrent_duplicate_staff_request_creates_one_command
+- test_first_send_serializes_against_relabel
+- test_concurrent_same_result_writes_one_receipt_and_one_effect
+- test_send_and_asset_generation_keep_tenant_before_batch_lock_order
 
-### backend/tests/devices/test_printer_bindings.py
+backend/tests/devices/test_label_data_export.py
+- test_label_model_field_dataset_user_and_reference_catalogs_are_complete
+- test_export_contains_label_receipts_and_history_without_stored_bytes
+- test_label_purge_deletes_immutable_receipts_before_parents_and_keeps_qr_batch
+- test_devices_module_purge_removes_labels_before_shared_commands
+- test_qr_batch_module_purge_preserves_command_and_receipt_history
 
-- test_bindings_default_to_manual_review_and_reject_cross_tenant_wrong_kind
-- test_manage_devices_alone_never_widens_machine_scope
-- test_disabling_or_deleting_binding_cancels_acknowledged_work_and_preserves_history
-- test_binding_service_denies_missing_device_authority
-- test_explicit_unbind_retires_inert_imported_review_without_workflow_effect
+backend/tests/devices/test_label_delivery.py
+- test_zip_is_exact_existing_svg_batch_with_safe_private_headers
+- test_unacknowledged_content_result_and_wrong_token_are_refused
+- test_acknowledged_long_print_survives_short_delivery_lease_expiry
+- test_success_replay_is_identical_and_conflicting_operation_cannot_finish_twice
+- test_retry_receipt_replay_does_not_requeue_or_overwrite_a_later_success
+- test_permanent_or_exhausted_failure_is_terminal
+- test_late_ack_cannot_cancel_permanent_failure_or_break_result_replay
+- test_key_rotation_cannot_reuse_a_previously_acknowledged_label_command
+- test_expired_unacknowledged_lease_requeues_then_exhausts
+- test_another_signed_device_cannot_fetch_or_report_and_revocation_is_rechecked
+- test_purged_batch_cancels_delivery_and_snapshots_cannot_restore_it
+- test_purged_acknowledged_batch_commits_cancellation_before_410
+- test_result_text_and_unknown_fields_never_enter_receipts_or_logs
+- test_result_receipt_is_database_immutable
+- test_terminal_label_outcome_is_database_immutable_but_batch_purge_can_null_fk
+- test_purged_batch_result_commits_cancellation_without_receipt
+- test_generic_lease_and_ack_keep_typed_label_provenance
+- test_operation_identity_cannot_be_reused_for_another_label_command
+- test_result_provenance_failure_rolls_back_receipt_and_retry
+- test_rotated_device_cannot_replay_a_receipt_from_its_previous_key
 
-### backend/tests/devices/test_printer_boundaries.py
+backend/tests/devices/test_label_gates.py
+- test_module_off_returns_400_on_staff_content_and_results
+- test_disabled_label_adapter_is_cancelled_by_generic_poll_and_never_resurrects
+- test_source_gate_refuses_all_label_writes_without_creating_receipts
+- test_staff_origin_scope_reads_batch_pk_and_device_registry_is_exact
+- test_openapi_documents_staff_send_signed_zip_and_idempotent_result
 
-- test_applied_marker_or_provenance_failure_rolls_back_stock_money_and_workflow
-- test_claim_provenance_failure_rolls_back_whole_claim
-- test_wrong_machine_duplicate_and_fractional_count_consumptions_are_rejected
-- test_canonical_consumption_order_replays_and_operation_id_cannot_bind_another_job
-- test_staff_approval_rechecks_machine_scope_and_device_kind_is_checked_per_report
+backend/tests/devices/test_label_tenant_migration.py
+- test_label_tenant_catalog_projection_references_and_unique_rules_are_complete
+- test_every_imported_command_is_cancelled_and_lease_ownership_cleared
+- test_portable_label_history_remaps_live_edges_preserves_receipts_and_never_prints
+- test_raw_dump_cancels_label_parent_but_preserves_terminal_receipt_history
 
-### backend/tests/devices/test_printer_data_export.py
+backend/tests/operations/test_qr_batch_freeze.py
+- test_non_draft_batch_cannot_add_or_relabel_even_with_a_stale_instance
+- test_manual_mark_printed_uses_the_same_freeze_boundary_as_device_send
+- test_control_admin_cannot_edit_or_reopen_sent_batch
+- test_item_endpoint_emits_audit_only_when_draft_mutation_commits
 
-- test_printer_models_fields_user_edges_and_no_lease_credentials_are_exported
-- test_failure_note_is_encrypted_and_not_copied_into_audit
-- test_device_purge_removes_all_printer_rows_and_retains_machine_workflow
-- test_adapter_deletion_nulls_live_links_without_erasing_printer_history
-- test_mapped_report_write_is_fenced_in_service_and_raw_sql
+backend/tests/tenant_migration/authority_expectations_7c.py
+- Helper/independent authority expectation module; no test function.
 
-### backend/tests/devices/test_printer_dump_projection.py
+backend/tests/tombstone/test_label_devices_7c.py
+- test_label_routes_are_absent_when_devices_are_tombstoned
+- test_label_schema_and_admin_are_absent_but_history_tables_remain
 
-- test_raw_dump_selects_conditional_printer_job_reset
-
-### backend/tests/devices/test_printer_jobs.py
-
-- test_job_identity_is_explicit_unique_and_request_title_is_not_snapshotted
-- test_telemetry_after_short_lease_expiry_is_advisory_and_audited_without_user_actor
-- test_staff_lists_are_paginated_and_details_follow_tenant_scope
-- test_adapter_module_off_is_400_and_source_gate_refuses_delivery_and_results
-
-### backend/tests/devices/test_printer_reconciliation.py
-
-- test_actual_weight_reconciles_reserved_pool_once
-- test_reserved_pool_requires_explicit_matching_measurement
-- test_same_terminal_report_from_concurrent_workers_has_one_workflow_effect
-- test_failed_generic_quantity_reconciles_actual_use_without_payment
-
-### backend/tests/devices/test_printer_results.py
-
-- test_manual_review_is_default_and_matching_retry_and_staff_approval_apply_once
-- test_auto_apply_debits_consumptions_and_authoritative_charge_exactly_once
-- test_failed_result_passes_reason_percentage_and_never_creates_payment
-- test_conflicting_report_payload_operation_or_external_identity_is_409
-- test_invalid_or_device_pricing_input_is_rejected_before_claim
-- test_workflow_failure_rolls_back_effects_keeps_claim_and_never_retries_automatically
-- test_crash_between_claim_and_apply_resumes_from_durable_report
-- test_report_cannot_finish_unacknowledged_or_rotated_command
-- test_signed_result_api_uses_device_principal_and_keeps_actor_null
-- test_claimed_report_is_immutable_in_database_including_consumption_rows
-
-### backend/tests/devices/test_printer_settings.py
-
-- test_command_defaults_are_declared_in_every_env_example_and_excluded_from_restore_compatibility
-- test_nonpositive_command_tuning_is_rejected_by_system_checks
-
-### backend/tests/devices/test_printer_state.py
-
-- test_effective_printer_state_precedence
-- test_old_or_terminal_telemetry_never_overrides_idle
-
-### backend/tests/devices/test_printer_tenant_migration.py
-
-- test_printer_catalog_projection_references_and_uniqueness_are_complete
-- test_conditional_field_projection_inerts_unprocessed_work_and_preserves_history
-- test_portable_printer_history_imports_with_no_remote_authority_and_no_workflow_replay
-
-### backend/tests/tombstone/test_printer_devices_7b.py
-
-- test_printer_routes_are_absent_when_devices_are_tombstoned
-- test_printer_admin_and_schema_are_absent_but_tables_remain
-
-Existing test files modified: backend/tests/encryption/test_mappers.py updates the deliberate source/total PII counts and explanation; backend/tests/tenant_migration/test_authority_dispositions_d8.py includes the independent nine-entry authority fixture. Helpers/fixtures added: printer_helpers.py and authority_expectations_7b.py.
+Existing tests/tenant_migration/test_authority_dispositions_d8.py and
+test_target_projection.py now include the 7c authority/projection expectations;
+their existing tests are retained, not newly written.

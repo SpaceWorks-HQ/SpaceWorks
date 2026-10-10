@@ -1,7 +1,8 @@
 from django.http import HttpResponse
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -27,6 +28,18 @@ from apps.operations.serializers import (
     QrPrintBatchItemResultSerializer,
     QrPrintBatchSerializer,
 )
+
+QR_MUTATION_ERRORS = {
+    code: OpenApiResponse(response={
+        "oneOf": [{"type": "object", "additionalProperties": True},
+                  {"type": "array", "items": {"type": "string"}}],
+    }, description=description)
+    for code, description in (
+        (400, "Invalid input, disabled module, or non-draft print batch."),
+        (401, "Authentication required."), (403, "QR management permission required."),
+        (404, "Batch or inventory target not in scope."), (423, "Tenant frozen for migration."),
+    )
+}
 
 
 @extend_schema_view(
@@ -71,7 +84,8 @@ class QrPrintBatchItemView(APIView):
     permission_classes = [IsActiveStaff]
     serializer_class = QrPrintBatchItemCreateSerializer
 
-    @extend_schema(tags=["QR print batches"], summary="Add QR code to print batch", request=QrPrintBatchItemCreateSerializer, responses={201: QrPrintBatchItemResultSerializer})
+    @extend_schema(tags=["QR print batches"], summary="Add QR code to draft print batch", request=QrPrintBatchItemCreateSerializer, responses={201: QrPrintBatchItemResultSerializer, **QR_MUTATION_ERRORS})
+    @transaction.atomic
     def post(self, request, pk, *args, **kwargs):
         batch = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_QR, QrPrintBatch.objects.all()), pk=pk)
         require_module(batch.makerspace, "qr_print_batches")
@@ -86,6 +100,8 @@ class QrPrintBatchItemView(APIView):
             serializer.validated_data.get("label_text", ""),
             serializer.validated_data.get("sort_order"),
         )
+        audit.record(request.user, "qr_print_batch.item_saved", makerspace=batch.makerspace,
+                     target=batch, meta={"item_count": batch.items.count()})
         return Response({"id": item.id}, status=status.HTTP_201_CREATED)
 
 
@@ -112,7 +128,7 @@ class AssetGenerateView(APIView):
     permission_classes = [IsActiveStaff]
     serializer_class = AssetGenerateSerializer
 
-    @extend_schema(tags=["Asset units"], summary="Generate asset units", request=AssetGenerateSerializer, responses={201: AssetGenerateResultSerializer})
+    @extend_schema(tags=["Asset units"], summary="Generate asset units", request=AssetGenerateSerializer, responses={201: AssetGenerateResultSerializer, **QR_MUTATION_ERRORS})
     def post(self, request, pk, *args, **kwargs):
         product = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_QR, InventoryProduct.objects.all()), pk=pk)
         require_module(product.makerspace, "asset_units")

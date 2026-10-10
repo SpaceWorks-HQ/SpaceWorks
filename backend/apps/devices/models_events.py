@@ -36,6 +36,11 @@ class DeviceEvent(models.Model):
         PRINTER_RESULT_APPLIED = "printer_result_applied", "printer result applied"
         PRINTER_RESULT_NEEDS_REVIEW = "printer_result_needs_review", "printer result needs review"
         PRINTER_JOB_CANCELLED = "printer_job_cancelled", "printer job cancelled"
+        LABEL_COMMAND_CREATED = "label_command_created", "Label command created"
+        LABEL_CONTENT_DOWNLOADED = "label_content_downloaded", "Label content downloaded"
+        LABEL_COMMAND_SUCCEEDED = "label_command_succeeded", "Label command succeeded"
+        LABEL_COMMAND_RETRY_SCHEDULED = "label_command_retry_scheduled", "Label command retry scheduled"
+        LABEL_COMMAND_FAILED = "label_command_failed", "Label command failed"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     makerspace = models.ForeignKey(

@@ -10,7 +10,7 @@ PRINTER_ACTIONS = (
 )
 
 
-def record(makerspace, device, action, *, actor=None, command=None, job=None, machine=None, outcome="ok"):
+def record(makerspace, device, action, *, actor=None, command=None, job=None, label=None, machine=None, outcome="ok"):
     if action not in PRINTER_ACTIONS:
         raise ValueError("Unknown printer audit action.")
     command = command or (job.command if job else None)
@@ -22,11 +22,13 @@ def record(makerspace, device, action, *, actor=None, command=None, job=None, ma
         event_type=action, outcome=outcome,
         command_id_snapshot=getattr(command, "pk", None),
         machine_id_snapshot=machine_id, service_request_id_snapshot=request_id,
+        qr_batch_id_snapshot=label.batch_id_snapshot if label else None,
     )
+    label_meta = {"label_command_id": str(label.pk), "qr_batch_id": label.batch_id} if label else {}
     audit.record(actor, f"devices.{action}", makerspace=makerspace, target=job or command or device,
                  meta={"device_id": str(device.pk), "device_key_version": device.key_version,
                        "operation_id": str(event.operation_id), "outcome": outcome,
                        "command_id": str(command.pk) if command else None,
                        "printer_job_id": str(job.pk) if job else None,
-                       "machine_id": machine_id, "service_request_id": request_id})
+                       "machine_id": machine_id, "service_request_id": request_id, **label_meta})
     return event

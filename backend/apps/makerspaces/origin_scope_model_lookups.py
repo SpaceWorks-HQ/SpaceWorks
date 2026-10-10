@@ -145,3 +145,7 @@ TARGET_SET_LOOKUPS = {
 from .origin_scope_routes_7b import PRINTER_MODEL_LOOKUPS
 
 BASE_MODEL_LOOKUPS.update(PRINTER_MODEL_LOOKUPS)
+
+from .origin_scope_routes_7c import LABEL_MODEL_LOOKUPS
+
+BASE_MODEL_LOOKUPS.update(LABEL_MODEL_LOOKUPS)

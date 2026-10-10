@@ -193,6 +193,10 @@ from .target_projection_7b import printer_projections
 
 TARGET_FIELD_PROJECTION.update(printer_projections(TargetField))
 
+from .target_projection_7c import label_projections
+
+TARGET_FIELD_PROJECTION.update(label_projections(TargetField))
+
 ROW_POLICIES = {
     "machines.MachineOperator": RowPolicy(
         RowDisposition.PRESERVE_LIVE,

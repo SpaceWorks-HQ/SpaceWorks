@@ -128,6 +128,10 @@ from .datasets_7b import printer_dataset_specs
 
 DATASET_SPECS.update(printer_dataset_specs(P))
 
+from .datasets_7c import LABEL_DATASET_SPECS
+
+DATASET_SPECS.update(LABEL_DATASET_SPECS)
+
 
 def _columns(fidelity, label):
     model = apps.get_model(label)

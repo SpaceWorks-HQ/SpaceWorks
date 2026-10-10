@@ -11,9 +11,12 @@ class CommandLeaseSerializer(serializers.Serializer):
     kind = serializers.CharField()
     lease_token = serializers.CharField()
     lease_expires_at = serializers.DateTimeField()
-    printer_job_id = serializers.UUIDField()
-    external_job_id = serializers.CharField()
-    service_request_id = serializers.IntegerField()
+    printer_job_id = serializers.UUIDField(required=False)
+    external_job_id = serializers.CharField(required=False)
+    service_request_id = serializers.IntegerField(required=False)
+    label_command_id = serializers.UUIDField(required=False)
+    qr_batch_id = serializers.IntegerField(required=False)
+    item_count = serializers.IntegerField(required=False)
 
 
 class LeaseResponseSerializer(serializers.Serializer):
