@@ -91,3 +91,27 @@ def test_a_space_keeping_its_machine_type_books_ungated_once_machines_is_gone():
     uninstall_module(space, "machines")
     booking = cert._book(room, member)
     assert Booking.objects.filter(pk=booking.pk).exists()
+
+
+def test_dashboard_print_tiles_follow_the_printing_module():
+    """M11: with `printing` uninstalled the print tiles read zero, like maintenance does."""
+    from apps.machines.models import MachineServiceRequest, MachineType, ServiceQueue
+
+    space = make_space("combo-dashboard-prints")
+    manager = make_member("combo-dashboard-prints-mgr", space)
+    printer_type = MachineType.objects.get(makerspace__isnull=True, slug="3d_printer")
+    queue = ServiceQueue.objects.create(makerspace=space, machine_type=printer_type, name="Prints")
+    MachineServiceRequest.objects.create(
+        makerspace=space, queue=queue, requester=manager, requester_name=manager.username,
+        title="Queued print", status=MachineServiceRequest.Status.PENDING,
+    )
+    url = f"/api/v1/admin/makerspace/{space.pk}/dashboard"
+    client = authenticated_client(manager)
+
+    assert client.get(url).data["pending_prints"] == 1
+    uninstall_module(space, "printing")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert response.data["pending_prints"] == 0
+    assert response.data["active_prints"] == 0
