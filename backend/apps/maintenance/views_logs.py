@@ -50,6 +50,11 @@ class MaintenanceLogListCreateView(APIView):
     @extend_schema(
         tags=["Admin maintenance"],
         summary="Record completed machine maintenance",
+        description=(
+            "When schedule_id is supplied, complete that schedule and set its next due "
+            "date to the local date of performed_at plus interval_days. performed_at "
+            "defaults to now; backdated entries use their recorded completion date."
+        ),
         request=MaintenanceLogWriteSerializer,
         responses={201: MaintenanceLogSerializer, **MUTATION},
     )

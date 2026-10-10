@@ -127,11 +127,13 @@ a custom per-makerspace role, so each space must choose and assign the actions i
 - Accept machine service requests, collect uploaded job files and manage a staff work queue.
 - Record which machine ran a job, who operated it, material consumption and the resulting usage entry.
 - Narrow machine access per staff role rather than exposing every machine to every maintainer.
-- Schedule preventive maintenance and record reactive work orders, logs and supporting documents.
+- Schedule preventive maintenance and record completed repairs in maintenance logs with supporting documents.
 - Hand completed machine jobs back to their owners through the scoped handover workflow.
 
 **Honest limits:** without the Machine service module, machines are records rather than a job queue. The
 system records machine work but does not read live state from printers, CNC controllers or other hardware.
+Machine time bookings and reactive work orders are not available. The machine-type booking flag is not
+yet enforced and does not block service requests or job starts.
 
 ## 3D printing and filament
 
@@ -287,7 +289,7 @@ supported installation without them.
 | Machines | Machine registry, operators, documents, usage, warranty and consumables | The machine side of the product disappears |
 | Machine service | Member job requests, staff queue, files, consumption and usage | Machines remain records, but SpaceWorks does not manage work on them |
 | Printing | Print-specific request intake, files and queue views | 3D printers can use the generic service queue, without print-specific handling |
-| Maintenance | Preventive schedules, reactive work orders, logs and files | No in-app maintenance schedule or history |
+| Maintenance | Preventive schedules, completed-maintenance logs and files | No in-app maintenance schedule or history |
 | Events | Public events, registration, staff registration, QR check-in and collaboration | No event listing, registration, attendance history or event payments |
 | Bookings | Resources, booking rules, staff booking and public self-booking | No time-slot reservation workflow or booking payments |
 | Membership | Join requests, waivers, referrals, profiles, directory and activity | People can still borrow, but enrolment and community features disappear |

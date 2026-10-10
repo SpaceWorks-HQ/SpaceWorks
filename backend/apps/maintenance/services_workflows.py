@@ -147,7 +147,10 @@ def complete_due(
     )
     old_due = schedule.next_due
     log = _append_log(machine, actor, values)
-    schedule.next_due = old_due + timedelta(days=schedule.interval_days)
+    # A completed service starts a fresh interval, even if several were missed.
+    schedule.next_due = timezone.localdate(log.performed_at) + timedelta(
+        days=schedule.interval_days,
+    )
     schedule.save(update_fields=["next_due", "updated_at"])
     record(
         actor, "maintenance.schedule_completed",

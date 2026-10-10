@@ -240,6 +240,9 @@ thirteen modules under it are optional.
   memberships; an uncertified member is refused when booking a linked space or requesting work, and an
   override needs machine-type authority plus a recorded, audited reason. The `certification-coverage`
   report shows trained members per type.
+- **Booking limit** — machine time bookings are not available. The machine-type `requires_booking`
+  flag is stored and validated but **not yet enforced**, including on the built-in laser/CNC types
+  where it is true. It does not block service requests or job starts. Space bookings remain separate.
 - **Without it** — the whole machine side of the product disappears: no registry, no service queue
   (which needs machines to point at), no maintenance schedules, no per-machine consumables. A pure tool
   library runs exactly like this — see the `lending` profile.
@@ -275,9 +278,11 @@ Required by `printing`.
 
 ### maintenance
 
-- **What it is** — scheduled and reactive maintenance: schedules, work orders and their logs.
+- **What it is** — preventive maintenance schedules and immutable logs of completed maintenance,
+  including reactive repairs. Work orders with status, assignee and priority are not available.
 - **What it adds** — the `maintenance` workflow, the maintenance section of the dashboard, and log
-  documents.
+  documents. Completing a schedule sets its next due date to the recorded completion date plus its
+  interval; a late completion starts a fresh interval. Backdated logs use their recorded date.
 - **Without it** — machines have no maintenance history and nothing schedules preventive work; a broken
   machine is handled as a service request or out of band.
 - **Data** — purgeable: maintenance schedules, logs and log documents (including uploaded files).

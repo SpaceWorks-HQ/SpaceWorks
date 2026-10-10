@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db import models
 
 from unfold.admin import ModelAdmin
 
@@ -33,6 +34,14 @@ class MachineTypeAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     search_fields = ("slug", "name", "makerspace__name")
     raw_id_fields = ("makerspace",)
     readonly_fields = ("is_builtin", "managing_action")
+    formfield_overrides = {
+        models.JSONField: {
+            "help_text": (
+                "requires_booking is not yet enforced. Machine time bookings are "
+                "not available; this flag does not block service requests or job starts."
+            ),
+        },
+    }
 
     # Built-in global types are load-bearing (printer auto-link resolves 3d_printer)
     # and are only restored by the seed migration — never let the admin delete them.
