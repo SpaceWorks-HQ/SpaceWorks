@@ -118,3 +118,15 @@ def _try_exclusive(db_connection, makerspace_id):
             [SOURCE_GATE_LOCK_NAMESPACE, makerspace_id],
         )
         return bool(cursor.fetchone()[0])
+
+
+
+def test_audit_verification_task_has_its_exact_tenant_resolver():
+    from apps.audit.tasks import run_audit_verification
+
+    assert run_audit_verification.name == "apps.audit.tasks.run_audit_verification"
+    assert gate_policy.TASK_TENANT_RESOLVERS[run_audit_verification.name] == (
+        "audit.AuditVerificationRun", 0, "makerspace_id",
+    )
+    participants = getattr(gate_policy, "OBJECT_MUTATION_PARTICIPANTS", {})
+    assert not any("verification" in str(name) for name in participants)
