@@ -237,6 +237,10 @@ OBJECT_MUTATION_PARTICIPANTS = {
     "apps.data_export.services.run_export_job": (
         "The export task resolves and holds the tenant gate for this lifecycle."
     ),
+    "apps.evidence.services_upload.issue_upload": (
+        "Called only by the staff upload-URL and kiosk evidence-prepare views, both behind "
+        "the authenticated late source-gate assertion; the kiosk view also asserts it."
+    ),
     "apps.evidence.finalization.finalize_upload": "Reached only through the already-declared handover, return and direct-loan entry points.",
     "apps.evidence.services_retention._sweep_makerspace": (
         "The fan-out service owns one tenant source-gate boundary at a time."

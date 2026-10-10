@@ -48,6 +48,17 @@ EXPECTED = dict(
             "rotated_at disabled_at created_at updated_at",
             D.DROP,
         ),
+        *_fields(
+            "makerspaces.StationOperatorLease",
+            "id makerspace station actor station_session_id station_version "
+            "allowed_actions issued_at expires_at revoked_at",
+            D.DROP,
+        ),
+        *_fields(
+            "makerspaces.StationSessionRevocation",
+            "session_id station expires_at created_at",
+            D.DROP,
+        ),
         *_fields("makerspaces.MembershipRequest", "state", (D.PRESERVE, D.DROP)),
         *_fields(
             "makerspaces.MembershipRequest",

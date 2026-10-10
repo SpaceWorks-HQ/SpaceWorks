@@ -57,7 +57,9 @@ class TenantDumpCatalogError(AssertionError):
 # has since moved past.
 # Re-blessed for phase 9a after replacing the event credential table with shared
 # Station/StationCredential metadata plus the explicit event-owned binding.
-CATALOG_SCHEMA_SHA256 = "154297ac768c9746857551133c8de1176b2d56ad7189ad1b9fe7f201d2fea954"
+# Re-blessed for phase 9b after adding the omitted, all-DROP kiosk
+# StationOperatorLease and StationSessionRevocation tables.
+CATALOG_SCHEMA_SHA256 = "7cb4c27597b7900aed159ae34a2a91f492f7a57b33387ab553b8e8a06246fa51"
 
 
 def catalog_models(apps_registry=apps):
