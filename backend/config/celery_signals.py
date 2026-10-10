@@ -48,3 +48,10 @@ def unbind_request_id(task=None, **_kwargs):
     if token is not None:
         reset_request_id(token)
         delattr(request, _TOKEN_ATTR)
+
+
+@task_postrun.connect
+def record_scheduled_completion(task=None, state=None, **_kwargs):
+    from apps.operations.scheduler_telemetry import record_periodic_completion
+
+    record_periodic_completion(getattr(task, "name", None), state)

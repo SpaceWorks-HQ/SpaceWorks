@@ -1,5 +1,9 @@
 from django.urls import path
 
+from apps.admin_api.views_platform_monitoring import (
+    MakerspaceUsageView, PlatformDashboardView, PlatformProblemsView,
+)
+
 from apps.admin_api.views_modules import (
     ModuleGroupListView,
     ModuleInstallView,
@@ -75,6 +79,9 @@ from .urls_utils import _separable
 
 
 urlpatterns = [
+    path("platform/dashboard", PlatformDashboardView.as_view(), name="admin-platform-dashboard"),
+    path("platform/problems", PlatformProblemsView.as_view(), name="admin-platform-problems"),
+    path("makerspace/<int:makerspace_id>/usage", MakerspaceUsageView.as_view(), name="admin-makerspace-usage"),
     path(
         "platform/backup-settings",
         PlatformBackupSettingsView.as_view(),

@@ -1,5 +1,8 @@
 import { lazy } from "react";
 
+export const PlatformDashboardPanel = lazy(() => import("./PlatformDashboardPanel").then((m) => ({ default: m.PlatformDashboardPanel })));
+export const TenantUsagePanel = lazy(() => import("./TenantUsagePanel").then((m) => ({ default: m.TenantUsagePanel })));
+
 export const DevicesPanel = lazy(() => import("./panels/DevicesPanel").then((m) => ({ default: m.DevicesPanel })));
 export const DashboardPanel = lazy(() => import("./panels/DashboardPanel").then((m) => ({ default: m.DashboardPanel })));
 export const NotificationInbox = lazy(() => import("./panels/NotificationInbox").then((m) => ({ default: m.NotificationInbox })));

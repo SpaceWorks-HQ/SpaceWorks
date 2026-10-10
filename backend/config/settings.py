@@ -587,6 +587,10 @@ TENANT_DUMP_STAGING_MAX_AGE_SECONDS = env.int(
 )
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
 CELERY_BEAT_SCHEDULE = {
+    "platform-problem-checks": {
+        "task": "apps.operations.tasks_platform.run_platform_problem_checks_task",
+        "schedule": crontab(minute="*/15"),
+    },
     "scan-offline-devices": {
         "task": "apps.devices.tasks.scan_offline_devices_task",
         "schedule": crontab(minute="*"),
