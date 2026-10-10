@@ -39,6 +39,9 @@ STREAM_ACTIONS = {
     "maintenance": (rbac.Action.MANAGE_MACHINES, rbac.Action.MANAGE_MAKERSPACE),
     "membership": (rbac.Action.MANAGE_MAKERSPACE,),
     "devices": (rbac.Action.MANAGE_DEVICES,),
+    "payments": (rbac.Action.MANAGE_MAKERSPACE,),
+    "stock": (rbac.Action.EDIT_INVENTORY, rbac.Action.MANAGE_PRINTING, rbac.Action.MANAGE_MAKERSPACE),
+    "certifications": (rbac.Action.MANAGE_MACHINES, rbac.Action.MANAGE_MAKERSPACE),
 }
 
 STREAM_MODULES = {
@@ -47,6 +50,9 @@ STREAM_MODULES = {
     "maintenance": "maintenance",
     "membership": "membership",
     "devices": "devices",
+    "payments": "payments",
+    "stock": "procurement",
+    "certifications": "machines",
 }
 
 def _stream_module_available(makerspace, stream):
@@ -72,10 +78,9 @@ def _resolve_makerspace(actor, makerspace_id, stream):
     makerspace = qs.first()
     if makerspace is None:
         raise Http404
-    if stream == "devices":
-        require_module(makerspace, "devices")
-    elif not _stream_module_available(makerspace, stream):
-        raise Http404
+    module_key = STREAM_MODULES.get(stream)
+    if module_key is not None:
+        require_module(makerspace, module_key)
     return makerspace
 def email_template_type_scope(actor, makerspace_id, stream):
     """None is unrestricted; a set (including empty) is narrowed type authority.

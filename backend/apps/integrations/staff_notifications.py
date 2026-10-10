@@ -20,6 +20,10 @@ _FEATURE_ACTIONS = {
     "members": rbac.Action.MANAGE_MAKERSPACE,
     "api_access": rbac.Action.MANAGE_MAKERSPACE,
     "devices": rbac.Action.MANAGE_DEVICES,
+    # Existing finance list authority; w1-rbac will introduce VIEW_FINANCE.
+    "payments": rbac.Action.MANAGE_MAKERSPACE,
+    "stock": (rbac.Action.EDIT_INVENTORY, rbac.Action.MANAGE_PRINTING),
+    "certifications": rbac.Action.MANAGE_MACHINES,
 }
 
 _FEATURE_STREAMS = {
@@ -28,6 +32,11 @@ _FEATURE_STREAMS = {
     "devices": "devices",
 }
 _STREAM_FEATURES = {value: key for key, value in _FEATURE_STREAMS.items()}
+
+
+def _holds_feature_action(membership, required_action):
+    required = required_action if isinstance(required_action, tuple) else (required_action,)
+    return bool(set(required) & set(rbac.actions_for_membership(membership)))
 
 
 def staff_emails_for_feature(makerspace, feature, event=None, scope=None) -> list[str]:
@@ -82,7 +91,7 @@ def staff_emails_for_feature(makerspace, feature, event=None, scope=None) -> lis
         # a machine must not mail a maintainer whose role cannot reach it.
         admits = recipient_selection.reach_filter_for(memberships, scope)
         for membership in memberships:
-            if required_action not in rbac.actions_for_membership(membership):
+            if not _holds_feature_action(membership, required_action):
                 continue
             if not admits(membership):
                 continue
@@ -150,7 +159,7 @@ def staff_user_ids_for_feature(makerspace, feature, event=None, scope=None) -> l
         result = []
         admits = recipient_selection.reach_filter_for(memberships, scope)
         for membership in memberships:
-            if required_action not in rbac.actions_for_membership(membership):
+            if not _holds_feature_action(membership, required_action):
                 continue
             if not admits(membership):
                 continue

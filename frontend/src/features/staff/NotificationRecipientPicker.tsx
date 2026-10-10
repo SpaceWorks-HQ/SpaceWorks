@@ -12,6 +12,9 @@ const FEATURE_LABELS: Record<string, string> = {
   maintenance: "Maintenance",
   devices: "Devices",
   members: "Members",
+  payments: "Payments",
+  stock: "Stock and procurement",
+  certifications: "Certifications",
 };
 
 const RECIPIENTS_KEY = (makerspaceId: number) =>

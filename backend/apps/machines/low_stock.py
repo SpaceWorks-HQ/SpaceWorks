@@ -59,6 +59,8 @@ def maybe_flag_low_stock(actor, pool):
                 status=ToBuyItem.Status.REQUESTED,
             )
             audit.record(created_by, "procurement.low_stock_flagged", makerspace=locked.makerspace, target=item, meta={"pool_id": locked.pk, "remaining": str(locked.remaining_grams), "threshold": str(threshold), "to_buy_item_id": item.pk})
+            from apps.procurement.notifications import notify_stock
+            notify_stock(item, "low_stock")
             return item
     except Exception:
         logger.exception("Failed to flag low-stock machine consumable pool %s", getattr(pool, "pk", None))

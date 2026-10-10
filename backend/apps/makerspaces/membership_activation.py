@@ -103,6 +103,8 @@ def _activate_membership(actor, makerspace, user, role, *, request=None, source)
             if source == "approval":
                 audit.record(actor, "membership.role_changed", makerspace=makerspace,
                              target=membership, meta={"role_id": role.id})
+                from apps.makerspaces.membership_notifications_research import notify_membership_decision
+                notify_membership_decision(membership, "approved")
         if adding:
             from apps.makerspaces.membership_notifications import (
                 notify_member_joined,

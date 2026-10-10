@@ -56,4 +56,6 @@ def record_offline_refund(payment, *, amount, reason, receipt, actor):
         meta={"payment_id": locked.pk, "refund_id": refund.pk, "amount": str(refund.amount),
               "method": refund.method},
     )
+    from apps.payments.notifications import notify_payment
+    notify_payment(locked, "refund_issued", refund=refund)
     return refund

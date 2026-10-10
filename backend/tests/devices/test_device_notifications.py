@@ -129,7 +129,7 @@ def test_choice_migrations_match_runtime_fields():
     from importlib import import_module
     from django.apps import apps
     for module_path, app_label in (
-        ("apps.integrations.migrations.0027_device_notifications", "integrations"),
+        ("apps.integrations.migrations.0028_research_notification_families", "integrations"),
         ("apps.devices.migrations.0004_offline_event_choices", "devices"),
     ):
         migration = import_module(module_path).Migration

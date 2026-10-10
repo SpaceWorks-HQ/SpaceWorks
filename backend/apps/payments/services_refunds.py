@@ -135,4 +135,7 @@ def settle_refund(refund, *, external_refund_id, status, actor):
             makerspace=locked.payment.makerspace, target=locked.payment,
             meta={"payment_id": locked.payment_id, "refund_id": locked.pk, "amount": str(locked.amount)},
         )
+        if status == Refund.Status.SUCCEEDED:
+            from apps.payments.notifications import notify_payment
+            notify_payment(locked.payment, "refund_issued", refund=locked)
         return locked

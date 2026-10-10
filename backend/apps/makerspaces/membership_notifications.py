@@ -54,6 +54,11 @@ def send_member_verified(membership):
 
 
 def _staff_payload(makerspace, event, context, data):
+    from apps.integrations.recipients import feature_available
+    from apps.makerspaces.servability import is_servable
+    makerspace.refresh_from_db()
+    if not is_servable(makerspace) or not feature_available(makerspace, "members"):
+        raise ValueError("Membership notifications are unavailable.")
     # Streams and features differ by name for membership alone (`membership` vs
     # `members`), so the render call spells the stream out rather than reusing the feature.
     staff = render(makerspace, "membership", "staff", event, context)

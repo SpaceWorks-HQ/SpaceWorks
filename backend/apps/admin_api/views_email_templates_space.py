@@ -74,7 +74,7 @@ class EmailTemplateDetailView(SpaceTemplateMixin, APIView):
     permission_classes = [IsActiveStaff]
     http_method_names = ["get", "patch", "head", "options"]
 
-    @extend_schema(responses={200: EmailTemplateDetailSerializer, **errors(401, 403, 404)})
+    @extend_schema(responses={200: EmailTemplateDetailSerializer, **errors(400, 401, 403, 404)})
     def get(self, request, makerspace_id, stream, audience, key, *args, **kwargs):
         makerspace = self._resolve_template(request, makerspace_id, stream, audience, key)
         return Response(EmailTemplateDetailSerializer(
@@ -109,7 +109,7 @@ class EmailTemplateResetView(SpaceTemplateMixin, APIView):
 
     @extend_schema(
         request=None,
-        responses={200: EmailTemplateDetailSerializer, **errors(401, 403, 404)},
+        responses={200: EmailTemplateDetailSerializer, **errors(400, 401, 403, 404)},
     )
     def post(self, request, makerspace_id, stream, audience, key, *args, **kwargs):
         makerspace = self._resolve_template(request, makerspace_id, stream, audience, key)

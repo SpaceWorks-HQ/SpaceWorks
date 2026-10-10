@@ -93,4 +93,6 @@ def promote_waived_to_paid_online(payment, *, intent_id=None):
     payment.updated_at = updates["updated_at"]
     if intent_id:
         payment.stripe_payment_intent_id = intent_id
+    from apps.payments.notifications import notify_payment
+    notify_payment(payment, "payment_received")
     return payment

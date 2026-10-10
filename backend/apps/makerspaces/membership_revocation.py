@@ -63,10 +63,14 @@ def revoke_request(actor, request, reason=""):
             membership = MakerspaceMembership.objects.filter(makerspace=makerspace, user=request.user).first()
             if membership:
                 return revoke_membership(actor, membership, reason)
+        was_requested = request.state == MembershipRequest.State.REQUESTED
         request.state = MembershipRequest.State.REVOKED
         request.decided_by = actor
         request.decided_at = timezone.now()
         request.decision_note = reason or request.decision_note
         request.save()
         audit.record(actor, "membership.revoked", makerspace=makerspace, target=request)
+        if was_requested:
+            from apps.makerspaces.membership_notifications_research import notify_membership_decision
+            notify_membership_decision(request, "declined")
         return request

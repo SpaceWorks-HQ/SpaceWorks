@@ -188,6 +188,9 @@ def reconcile_payments(
         audit.record(
             actor, action, makerspace=payment.makerspace, target=payment, meta=meta
         )
+        if target_status == Payment.Status.PAID_OFFLINE:
+            from apps.payments.notifications import notify_payment
+            notify_payment(payment, "payment_received")
     return [by_id[payment_id] for payment_id in requested_ids]
 
 

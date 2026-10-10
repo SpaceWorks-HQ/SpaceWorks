@@ -11,6 +11,7 @@ from .email_templates_registry_helpers import (
 )
 from .email_templates_registry_fablab import build_entries as _build_fablab_entries
 from .email_templates_registry_devices import build_entries as _build_device_entries
+from .email_templates_registry_research import build_entries as _build_research_entries
 from .email_templates_registry_defaults import (
     HARDWARE_REQUESTER_DEFAULTS,
     HARDWARE_STAFF_DEFAULTS,
@@ -21,7 +22,8 @@ from .email_templates_registry_defaults import (
     PRINTING_STAFF_TEXT,
 )
 
-STREAMS = {"hardware", "printing", "events", "bookings", "maintenance", "membership", "devices"}
+STREAMS = {"hardware", "printing", "events", "bookings", "maintenance", "membership",
+           "devices", "payments", "stock", "certifications"}
 AUDIENCES = {"requester", "staff"}
 
 
@@ -182,6 +184,7 @@ REGISTRY = {
     # ones above and go through the same validator.
     **_build_fablab_entries(EmailTemplateRegistryEntry, bag, _label),
     **_build_device_entries(),
+    **_build_research_entries(),
 }
 
 
