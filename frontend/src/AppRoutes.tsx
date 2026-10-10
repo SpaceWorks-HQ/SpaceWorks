@@ -3,7 +3,9 @@ import { Route, Routes, useLocation, useParams } from "react-router-dom";
 
 import { PublicInventoryPage } from "./features/inventory/PublicInventoryPage";
 import { useTenantBootstrap } from "./features/inventory/usePublicInventory";
-import { KioskPage, ScannerPage, SuperadminPage } from "./features/staff/PlatformApps";
+import { PublicDeskKioskPage } from "./features/kiosk/PublicDeskKioskPage";
+import { ScannerPage } from "./features/kiosk/ScannerPage";
+import { SuperadminPage } from "./features/staff/PlatformApps";
 import { StaffApp } from "./features/staff/StaffApp";
 import { useTenant } from "./lib/tenant";
 
@@ -94,7 +96,7 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
       <Route path="/member" element={<MemberArea />} />
       <Route path="/m/:slug/stats" element={<PublicStatsPage />} />
       <Route path="/m/:slug/kiosk/:stationToken" element={<KioskStationPage />} />
-      <Route path="/kiosk/:slug" element={<KioskPage />} />
+      <Route path="/kiosk/:slug" element={<PublicDeskKioskPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/admin/*" element={<StaffApp />} />
       <Route path="/guest-admin/*" element={<StaffApp guestOnly />} />

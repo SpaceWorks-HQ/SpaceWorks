@@ -25,6 +25,8 @@ export function KioskStationSettings({ makerspace }: { makerspace: Makerspace })
   const [name, setName] = useState("");
   const [kind, setKind] = useState<KioskStation["kind"]>("handover");
   const [secret, setSecret] = useState<KioskStation | null>(null);
+  const [revealFor, setRevealFor] = useState<KioskStation | null>(null);
+  const [password, setPassword] = useState("");
   const refresh = () => queryClient.invalidateQueries({ queryKey: key });
 
   const create = useMutation({
@@ -40,6 +42,13 @@ export function KioskStationSettings({ makerspace }: { makerspace: Makerspace })
   const disable = useMutation({
     mutationFn: (id: number) => staffRequest<KioskStation>(`/admin/kiosk-stations/${id}/`, { method: "DELETE" }),
     onSuccess: () => { setSecret(null); refresh(); },
+  });
+
+  const reveal = useMutation({
+    mutationFn: (station: KioskStation) => staffRequest<{ pin: string; version: number }>(`/admin/kiosk-stations/${station.id}/reveal/`, {
+      method: "POST", body: JSON.stringify({ current_password: password }),
+    }),
+    onSuccess: (data, station) => { setSecret({ ...station, pin: data.pin }); setRevealFor(null); setPassword(""); },
   });
 
   function submit(event: FormEvent) {
@@ -71,8 +80,15 @@ export function KioskStationSettings({ makerspace }: { makerspace: Makerspace })
         <Badge tone="neutral">{station.kind}</Badge>
         <Badge tone={station.enabled ? "success" : "warn"}>{station.enabled ? "enabled" : "disabled"}</Badge>
         <button className="desk-button-secondary" type="button" onClick={() => rotate.mutate(station.id)}>{station.enabled ? "Rotate PIN" : "Re-enable with new PIN"}</button>
+        {station.enabled ? <button className="desk-button-secondary" type="button" onClick={() => { setRevealFor(station); setPassword(""); }}>Reveal PIN</button> : null}
         {station.enabled ? <button className="desk-button-danger" type="button" onClick={() => disable.mutate(station.id)}>Disable</button> : null}
       </li>)}
     </ul>
+    {revealFor ? <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); reveal.mutate(revealFor); }}>
+      <label className="grid gap-1 text-sm">Your current password to reveal {revealFor.name}<input className="desk-input" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+      <button className="desk-button-primary" type="submit" disabled={reveal.isPending || !password}>Reveal</button>
+      <button className="desk-button-secondary" type="button" onClick={() => setRevealFor(null)}>Cancel</button>
+      {reveal.isError ? <p className="text-sm text-danger" role="alert">The PIN could not be revealed. Check your password, or rotate the PIN instead.</p> : null}
+    </form> : null}
   </div>;
 }
