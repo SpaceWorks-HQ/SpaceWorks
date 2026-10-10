@@ -169,3 +169,29 @@ def test_recovery_state_is_limited_to_superadmin_or_recovery_principal():
     )
     assert acknowledged.status_code == 200
     assert acknowledged.data["mode"] == DeploymentRecoveryState.Mode.NORMAL
+
+
+def test_quarantine_kills_restored_device_authority_even_after_acknowledgement():
+    from apps.devices.models import Device, DeviceEnrollment, DeviceRequestNonce
+    from tests.devices.helpers import active_device, heartbeat, signed_headers
+
+    _space, _manager, client, device_id, private_key = active_device("recovery-device")
+    assert heartbeat(signed_headers(device_id, 1, private_key)).status_code == 200
+    client.post(reverse("devices:admin-device-enrollment-create", args=[device_id]))
+    captured = signed_headers(device_id, 1, private_key)  # signed before the "backup"
+    admin, _other, restore = recovery_fixture()
+
+    enter_quarantine(restore, "disaster restore")
+
+    device = Device.objects.get(pk=device_id)
+    assert (device.status, device.public_key, device.key_fingerprint, device.key_version) == (
+        "pending", None, None, 2,
+    )
+    assert not DeviceRequestNonce.objects.exists()
+    assert not DeviceEnrollment.objects.filter(
+        used_at__isnull=True, revoked_at__isnull=True
+    ).exists()
+    recovered = set_recovery_principal(admin, "one-time-recovery-password")
+    acknowledge_quarantine(recovered, RESIDUAL_RISK)
+    assert heartbeat(captured).status_code == 401
+    assert heartbeat(signed_headers(device_id, 2, private_key)).status_code == 401

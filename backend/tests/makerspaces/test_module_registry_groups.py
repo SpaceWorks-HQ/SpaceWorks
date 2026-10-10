@@ -110,3 +110,16 @@ def test_payments_features_require_both_the_domain_and_the_payments_module():
         assert "payments" in by_key[key].requires_modules
     assert by_key["payments.enabled"].parent_module == "payments"
     assert by_key["mobile.push"].parent_module == "mobile"
+
+
+def test_devices_is_its_own_dependency_free_group_reached_only_by_full_profiles():
+    from apps.makerspaces.editions import EDITIONS
+    from apps.makerspaces.module_profiles import EVERYTHING, FULL, PROFILES, profile_modules
+
+    assert module_registry.group_for("devices") == module_registry.GROUP_DEVICES
+    assert module_registry.module_dependencies().get("devices", ()) == ()
+    assert not module_registry.BY_KEY["devices"].default_enabled
+    for profile in PROFILES:
+        assert ("devices" in profile_modules(profile)) == (profile in (FULL, EVERYTHING)), profile
+    assert "devices" in EDITIONS["events"].hidden_module_keys
+    assert "devices" in EDITIONS["bookings"].hidden_module_keys
