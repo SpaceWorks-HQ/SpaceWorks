@@ -82,8 +82,9 @@ def test_enable_https_turns_the_whole_tls_posture_on_and_keeps_the_exemption():
     )
     result = subprocess.run(
         [sys.executable, "-c", script], cwd=BACKEND, env=env,
-        capture_output=True, text=True, timeout=120, check=True,
+        capture_output=True, text=True, timeout=120,
     )
+    assert result.returncode == 0, result.stderr[-2000:]
     values = json.loads(result.stdout.strip().splitlines()[-1])
 
     assert values["SECURE_SSL_REDIRECT"] is True
