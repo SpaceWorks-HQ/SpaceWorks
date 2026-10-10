@@ -99,6 +99,11 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
     **_rules(
         NULL,
         ("backup.MakerspaceArchiveRecipient", "verified_at"),
+        # A device key is proven per deployment; the imported device arrives pending
+        # and re-enrolls (target_projection_devices), so no key travels.
+        ("devices.Device", "public_key"),
+        ("devices.Device", "key_fingerprint"),
+        ("devices.DeviceCommand", "lease_token_digest"),
         # Projection provenance only: the target rebuilds the link from the canonical
         # series collaboration, and a carried-over id would point at a source row.
         ("events.EventCollaborator", "source_series_collaboration"),

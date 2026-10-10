@@ -18,6 +18,7 @@ from .insertion_errors import ImportVerificationError, PrimaryKeyMapUnavailable
 from .identity_resolution import linked_authority_fingerprint
 from .references import (
     AUDIT_TARGET_DISPOSITIONS,
+    SOURCE_LOCAL_SNAPSHOT_FIELDS,
     DISCRIMINATOR_REFERENCES,
     PAYMENT_SUBJECT_REFERENCES,
     normalize_audit_target_type,
@@ -212,10 +213,15 @@ def _semantic_field_names(label):
         names.append("url_path")
     elif label == "hardware_requests.PublicToolLoan":
         names.extend(("asset_ids", "qr_ids"))
+    names.extend(name for model, name in sorted(SOURCE_LOCAL_SNAPSHOT_FIELDS) if model == label)
     return list(dict.fromkeys(names))
 
 
 def _verify_semantic_row(label, source, actual, pk_map, references):
+    for model_label, name in SOURCE_LOCAL_SNAPSHOT_FIELDS:
+        # Source-local history must arrive byte-for-byte, never rebound to a target id.
+        if model_label == label and _snapshot_text(actual[name]) != _snapshot_text(source[name]):
+            raise ImportVerificationError(f"A source-local snapshot changed for {label}.{name}.")
     edge = (label, "target_type", "target_id")
     if edge in DISCRIMINATOR_REFERENCES:
         external = references.get(label, source["id"], "target_type+target_id")
@@ -280,3 +286,7 @@ def _verify_loan_reference_list(source, actual, pk_map, references, field_name, 
     ]
     if actual[field_name] != expected:
         raise ImportVerificationError(f"Loan {field_name} contains an unresolved id.")
+
+
+def _snapshot_text(value):
+    return "" if value is None else str(value)

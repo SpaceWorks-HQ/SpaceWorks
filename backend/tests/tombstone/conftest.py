@@ -31,7 +31,7 @@ from apps.separability.tombstones import tombstoned_app_labels
 # while the profile resolves to `payments_rail`.
 TOMBSTONE_PROFILE_APPS = frozenset({
     "procurement", "notifications", "warranty", "maintenance", "presence", "events", "bookings",
-    "payments_rail", "tenant_migration", "updates",
+    "payments_rail", "tenant_migration", "updates", "devices",
 })
 
 _PROFILE_ACTIVE = tombstoned_app_labels() == TOMBSTONE_PROFILE_APPS

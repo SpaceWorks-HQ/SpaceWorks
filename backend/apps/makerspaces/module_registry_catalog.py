@@ -9,6 +9,7 @@ from apps.makerspaces.module_registry_definitions import (
     FEATURE_PARENT,
     GROUP_BACKUP,
     GROUP_BOOKINGS,
+    GROUP_DEVICES,
     GROUP_EVENTS,
     GROUP_INVENTORY,
     GROUP_MACHINES,
@@ -219,6 +220,14 @@ MODULES = (
         "Makerspace archive requests and downloads, archive-recipient keys and custody "
         "status. Deployment backups still cover this makerspace without it.",
         "backup", GUARD, group=GROUP_BACKUP, default_enabled=True,
+    ),
+    # Opt-in and dependency-free: device identity is a trust boundary that printer and
+    # label adapters build on, so it must not force `machines` onto a label-only space.
+    # Each later adapter guards its own module instead of widening this tuple.
+    ModuleDefinition(
+        "devices", "Connected devices",
+        "Enrolled printers and label printers that authenticate with an Ed25519 key.",
+        "devices", GUARD, group=GROUP_DEVICES,
     ),
     ModuleDefinition(
         "updates", "Updates", "In-app platform release checks and controlled updates.",

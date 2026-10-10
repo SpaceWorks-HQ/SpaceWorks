@@ -237,3 +237,22 @@ def test_an_unknown_task_name_is_an_error_not_a_silent_success():
     with pytest.raises(CommandError, match="Unknown task 'return-reminder'"):
         call_command("run_scheduled_tasks", "--task", "return-reminder", stdout=StringIO())
     assert not PeriodicTaskRun.objects.exists()
+
+
+def test_device_offline_scan_has_equal_one_minute_cadence():
+    from django.conf import settings
+    task = "apps.devices.tasks.scan_offline_devices_task"
+    entry = settings.CELERY_BEAT_SCHEDULE["scan-offline-devices"]
+    assert entry["task"] == task
+    assert entry["schedule"]._orig_minute == "*"
+    assert ("scan-offline-devices", task, 1) in SCHEDULED_TASKS
+
+
+def test_device_scan_due_only_is_once_per_minute(monkeypatch):
+    import apps.operations.management.commands.run_scheduled_tasks as module
+    calls = []
+    monkeypatch.setattr(module, "_import_task", lambda _path: lambda: calls.append(True))
+    PeriodicTaskRun.objects.create(name="scan-offline-devices", last_run_at=timezone.now()-timedelta(minutes=2))
+    call_command("run_scheduled_tasks", "--task", "scan-offline-devices", "--due-only", stdout=StringIO())
+    call_command("run_scheduled_tasks", "--task", "scan-offline-devices", "--due-only", stdout=StringIO())
+    assert calls == [True]

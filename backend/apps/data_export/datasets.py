@@ -24,6 +24,8 @@ DATASET_SPECS = {
     "boxes.BoxScan": ("lending/box_scans.csv", P(("makerspace",), ("box__makerspace",))),
     "boxes.QrCode": ("inventory/qr_mappings.csv", P(("makerspace",))),
     "boxes.QrScanEvent": ("lending/qr_scan_events.csv", P(("makerspace",), ("qr_code__makerspace",))),
+    "devices.Device": ("devices/devices.csv", P(("makerspace",))),
+    "devices.DeviceEvent": ("devices/events.csv", P(("makerspace",), ("device__makerspace",))),
     "events.Event": ("events/events.csv", P(("makerspace",))),
     "events.EventSeries": ("events/series.csv", P(("makerspace",))),
     "events.EventSeriesCollaborator": ("events/series_collaborators.csv", P(("series__makerspace", "makerspace"))),
@@ -120,6 +122,15 @@ DATASET_SPECS = {
     "warranty.Warranty": ("warranty/warranties.csv", P(("makerspace",), ("asset__makerspace", "machine__makerspace"))),
     "warranty.WarrantyDocument": ("warranty/documents.csv", P(("warranty__makerspace",))),
 }
+
+
+from .datasets_7b import printer_dataset_specs
+
+DATASET_SPECS.update(printer_dataset_specs(P))
+
+from .datasets_7c import LABEL_DATASET_SPECS
+
+DATASET_SPECS.update(LABEL_DATASET_SPECS)
 
 
 def _columns(fidelity, label):

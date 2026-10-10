@@ -6,7 +6,7 @@ from .tenant_dump_types import ModelDisposition, ModelRule, TableRule
 
 
 FIRST_PARTY_APP_LABELS = frozenset(
-    """accounts admin_api apiclients audit backup bookings boxes data_export
+    """accounts admin_api apiclients audit backup bookings boxes data_export devices
     encryption events evidence hardware_requests integrations inventory machines
     maintenance makerspaces notifications operations organizations payments payments_rail
     presence
@@ -27,7 +27,8 @@ THIRD_PARTY_INSTALLED_APP_LABELS = frozenset(
 PROJECTED_MODEL_LABELS = frozenset(
     """accounts.User apiclients.ApiKeyRequest audit.AuditLog
     backup.MakerspaceArchiveRecipient bookings.BookableSpace bookings.Booking boxes.Box
-    boxes.BoxScan boxes.QrCode boxes.QrScanEvent events.EventSeries events.Event events.EventRegistration
+    boxes.BoxScan boxes.QrCode boxes.QrScanEvent devices.Device devices.DeviceEvent
+    events.EventSeries events.Event events.EventRegistration
     events.EventCheckInEvent events.EventFeedbackSurvey events.EventFeedbackResponse
     events.EventAttendanceCertificate
     evidence.EvidencePhoto evidence.EvidenceObjectRetentionState
@@ -62,6 +63,14 @@ PROJECTED_MODEL_LABELS = frozenset(
     tenant_migration.ExternalTenantReference warranty.Warranty
     warranty.WarrantyDocument""".split()
 )
+
+from .catalog_7b import PRINTER_PROJECTED_LABELS
+
+PROJECTED_MODEL_LABELS |= PRINTER_PROJECTED_LABELS
+
+from .catalog_7c import LABEL_PROJECTED_MODELS
+
+PROJECTED_MODEL_LABELS |= LABEL_PROJECTED_MODELS
 
 PRESERVE_LIVE_MODEL_LABELS = frozenset({"machines.MachineOperator"})
 

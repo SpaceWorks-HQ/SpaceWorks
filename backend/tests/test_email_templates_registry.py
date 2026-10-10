@@ -25,6 +25,7 @@ def test_registry_declares_all_send_path_keys():
         *{("hardware", "staff", key) for key in HARDWARE_STAFF_KEYS},
         *{("printing", "requester", key) for key in PRINTING_REQUESTER_KEYS},
         *{("printing", "staff", key) for key in PRINTING_STAFF_KEYS},
+        ("devices", "staff", "offline"), ("devices", "staff", "recovered"),
         # The four FabLab streams cover both audiences for every event (24 x 2 = 48;
         # events 11, bookings 6, maintenance 5, membership 2). Derived from the same
         # table the registry builds from, so this stays a guard against a key existing
@@ -37,7 +38,7 @@ def test_registry_declares_all_send_path_keys():
         },
     }
 
-    assert len(REGISTRY) == 27 + 48
+    assert len(REGISTRY) == 27 + 48 + 2
     assert all_send_keys() == expected
 
 

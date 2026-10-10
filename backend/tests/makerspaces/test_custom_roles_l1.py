@@ -130,6 +130,7 @@ def test_seed_and_backfill_migration_round_trip():
             assert membership.assigned_role_id == role.id
         # Seed + every later backfill must land exactly on today's definitions.
         import_module("apps.makerspaces.migrations.0069_member_card_actions").forwards(new_apps, None)
+        import_module("apps.makerspaces.migrations.0074_manage_devices_action").forwards(new_apps, None)
         for legacy_role, name, granted_actions in roles.DEFAULT_ROLE_DEFINITIONS:
             role = NewMakerspaceRole.objects.get(makerspace_id=makerspace.id, legacy_role=legacy_role)
             assert role.granted_actions == sorted(granted_actions)

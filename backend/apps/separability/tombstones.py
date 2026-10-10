@@ -45,6 +45,8 @@ SEPARABLE_APPS = frozenset({
     # Deployments that never move tenants between servers ship none of these surfaces;
     # retained provenance rows remain readable and purgeable.
     "tenant_migration",
+    # Enrolled printers/label printers: identity rows stay readable and purgeable.
+    "devices",
 })
 
 

@@ -4,7 +4,7 @@ Companion to the [feature inventory](LANDING-PAGE-FEATURES.md).
 
 ## Optional modules: landing-page comparison source
 
-This table contains the **26 non-core modules counted from the registry**. “Default-on” still means optional:
+This table contains the **29 non-core modules counted from the registry**. “Default-on” still means optional:
 an operator can disable it. Every other row is opt-in. The six core modules are omitted because there is no
 supported installation without them.
 
@@ -31,10 +31,13 @@ supported installation without them.
 | Slack | Slack incoming-webhook destination | No Slack notification surface |
 | Mattermost | Mattermost incoming-webhook destination | No Mattermost notification surface |
 | Discord | Discord incoming-webhook destination | No Discord notification surface |
+| Signed webhooks | HMAC-signed outbound event deliveries to an operator-chosen URL | Integrations must poll the API instead of receiving events |
 | Reports | Dashboards, ledger, registered reports and CSV/XLSX export | No analytics or report-export screens |
-| Payments (default-on) | Stripe/Razorpay checkout, charges, receipts and reconciliation | Money is handled outside SpaceWorks |
-| Member accounts (default-on) | Self-sign-up, member area, password, Google/Apple and phone login | Staff sign-in and external OIDC remain; members become staff-created walk-ins |
-| Mobile apps (default-on) | Attested device sessions, native push and PaymentSheet support | The web app works, but native clients cannot hold a session for the space |
+| Payments | Stripe/Razorpay checkout, charges, receipts and reconciliation | Money is handled outside SpaceWorks |
+| Member accounts | Self-sign-up, member area, password, Google/Apple and phone login | Staff sign-in and external OIDC remain; members become staff-created walk-ins |
+| Mobile apps | Attested device sessions, native push and PaymentSheet support | The web app works, but native clients cannot hold a session for the space |
+| Connected devices | Printers and label printers enrolled with an Ed25519 key; signed heartbeats, key rotation/revocation, printer jobs, label commands and offline alerts | No device enrollment or device-signed requests |
+| Backup & custody (default-on) | Makerspace archive requests and downloads, archive-recipient keys and custody status | Deployment backups still cover the space; a Space Manager cannot request or open its own archives |
 | Updates (default-on) | In-app version checks and controlled software updates | Updates must be run through host tooling or an external deployment pipeline |
 
 Two dependency rules also come directly from the registry: Printing requires Machine service, and Mobile

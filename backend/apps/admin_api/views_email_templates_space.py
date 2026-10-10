@@ -1,5 +1,5 @@
 from django.http import Http404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -9,6 +9,8 @@ from apps.integrations.email_templates import render_preview
 from apps.integrations.email_templates_registry import REGISTRY
 from apps.integrations.models import EmailTemplate
 from apps.openapi_errors import errors
+
+from .serializers_email_templates import EmailTemplateErrorSerializer
 
 from .views_email_templates_common import (
     EmailTemplateDetailSerializer,
@@ -23,6 +25,18 @@ from .views_email_templates_common import (
     _space_detail_payload,
     _visible_streams,
 )
+
+
+ERROR_RESPONSES = {
+    code: OpenApiResponse(EmailTemplateErrorSerializer, description=description)
+    for code, description in (
+        (400, "Invalid template or devices module disabled."),
+        (401, "Authentication required."),
+        (403, "Active staff authority required."),
+        (404, "Template or makerspace outside scope, or unknown template."),
+        (423, "Makerspace frozen for tenant migration."),
+    )
+}
 
 
 @extend_schema(tags=["Email templates"])

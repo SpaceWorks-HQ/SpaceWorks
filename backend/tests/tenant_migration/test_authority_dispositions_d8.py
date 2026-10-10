@@ -125,6 +125,14 @@ EXPECTED = dict(
         *_fields("makerspaces.MembershipPlan", "is_active", D.PRESERVE),
         *_fields("makerspaces.MembershipTerm", "status", D.PRESERVE),
         *_fields("makerspaces.Makerspace", "lapsed_members_cannot_borrow", D.PRESERVE),
+        # Device identity travels; its live authority resets (forward plan phase 7a).
+        *_fields(
+            "devices.Device",
+            "status public_key key_fingerprint last_seen_at offline_since offline_notified_at "
+            "revoked_at revoked_by",
+            D.RESET,
+        ),
+        *_fields("devices.Device", "key_version", D.PRESERVE),
         *_fields(
             "makerspaces.MemberProject",
             "id profile title description image_key links position created_at updated_at",
@@ -220,6 +228,14 @@ EXPECTED = dict(
     ]
 )
 
+
+from .authority_expectations_7b import PRINTER_EXPECTED
+
+EXPECTED.update(PRINTER_EXPECTED)
+
+from .authority_expectations_7c import LABEL_EXPECTED
+
+EXPECTED.update(LABEL_EXPECTED)
 
 @pytest.mark.parametrize("edge, expected", EXPECTED.items())
 def test_every_section_3a_field_has_its_exact_literal_disposition(edge, expected):

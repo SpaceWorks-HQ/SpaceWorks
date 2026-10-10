@@ -22,6 +22,7 @@ USER_PROJECTIONS = {
 }
 
 ALWAYS_OMITTED = {
+    ("devices.DeviceCommand", "lease_token_digest"): "Deployment-local command delivery credential.",
     # Trigger-maintained full-text vectors: derived from exported columns and rebuilt by
     # the search trigger on the target, so they never travel (apps/inventory/search.py).
     ("inventory.InventoryProduct", "search_vector"): "Derived search vector, rebuilt by trigger.",
@@ -49,6 +50,10 @@ ALWAYS_OMITTED = {
     ("backup.MakerspaceArchiveRecipient", "challenge_issued_at"): (
         "Source-deployment proof-of-possession challenge lifecycle."
     ),
+    # A device key proves possession on ONE deployment; elsewhere it must be re-proven,
+    # so the key travels nowhere and an imported device arrives pending (phase 7a).
+    ("devices.Device", "public_key"): "Deployment-local device key; re-enroll on the target.",
+    ("devices.Device", "key_fingerprint"): "Deployment-unique device key identity.",
     ("bookings.BookableSpace", "public_token"): "Source bearer/status token.",
     ("bookings.Booking", "public_token"): "Source bearer/status token.",
     ("events.Event", "public_token"): "Source bearer/status token.",

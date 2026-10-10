@@ -5,9 +5,15 @@ database column export itself before a security review could classify it.
 """
 
 from .types import Exported, GlobalReference, NotTenantData, OmittedModel
-from .classification_domain import EXPORTED_MODEL_FIELDS
-from .classification_platform import GLOBAL_MODELS, OMITTED_MODELS
+from .classification_7c import LABEL_EXPORTED_MODEL_FIELDS
+from .classification_7b import PRINTER_EXPORTED_MODEL_FIELDS
+from .classification_devices import DEVICE_EXPORTED_MODEL_FIELDS, DEVICE_OMITTED_MODELS
+from .classification_domain import EXPORTED_MODEL_FIELDS as _DOMAIN_EXPORTED_MODEL_FIELDS
+from .classification_platform import GLOBAL_MODELS
+from .classification_platform import OMITTED_MODELS as _PLATFORM_OMITTED_MODELS
 
+EXPORTED_MODEL_FIELDS = {**_DOMAIN_EXPORTED_MODEL_FIELDS, **DEVICE_EXPORTED_MODEL_FIELDS, **PRINTER_EXPORTED_MODEL_FIELDS, **LABEL_EXPORTED_MODEL_FIELDS}
+OMITTED_MODELS = {**_PLATFORM_OMITTED_MODELS, **DEVICE_OMITTED_MODELS}
 EXPORTED_MODELS = frozenset(EXPORTED_MODEL_FIELDS)
 
 NOT_TENANT_MODELS = {

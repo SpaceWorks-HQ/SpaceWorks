@@ -122,6 +122,8 @@ Redis backs the cache (rate limits, nonces, verified hosts), the Celery broker a
 
 | Variable | Default | Notes |
 |---|---|---|
+| `EVIDENCE_ABANDONED_UPLOAD_CLEANUP_ENABLED` | `False` | Deployment switch for deleting upload slots no workflow consumed; each makerspace must also opt in. |
+| `EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS` | `7` | Default age before an unconsumed upload slot is eligible. |
 | `EVIDENCE_MAX_BYTES` | `10485760` |  |
 | `EVIDENCE_OBJECT_EXPIRY_ENABLED` | `False` |  |
 | `EVIDENCE_OBJECT_RETENTION_DAYS` | `365` |  |
@@ -272,6 +274,16 @@ Host-orchestration paths and timing knobs; see `docs/self-hosting.md` and the re
 | `TENANT_MIGRATION_GATE_LEASE_SECONDS` | `2 * 60 * 60` |  |
 | `TENANT_MIGRATION_PRESIGN_DRAIN_SECONDS` | `max(EVIDENCE_URL_TTL_SECONDS, PUBLIC_IMAGE_URL_TTL_SECOND...` |  |
 
+## Connected devices
+
+| Variable | Default | Notes |
+|---|---|---|
+| `DEVICE_COMMAND_LEASE_SECONDS` | `60` | Delivery lease for a printer/label command; covers delivery, not print duration. |
+| `DEVICE_COMMAND_MAX_ATTEMPTS` | `10` | Bounded delivery retries before a command fails. |
+| `DEVICE_ENROLLMENT_TTL_SECONDS` | `900` | Lifetime of a one-time enrollment code. |
+| `DEVICE_NONCE_TTL_SECONDS` | `86400` | Replay-nonce retention for device-signed requests. |
+| `DEVICE_SIGNATURE_MAX_SKEW_SECONDS` | `300` | Accepted clock skew on a device request signature. |
+
 ## Events, bookings and anonymous requests
 
 | Variable | Default | Notes |
@@ -296,6 +308,7 @@ Every `THROTTLE_*` value is a DRF rate string (`<n>/<second|minute|hour|day>`). 
 | `THROTTLE_ANONYMOUS_REQUEST_IP_BURST` | `'2/min'` |  |
 | `THROTTLE_ANONYMOUS_REQUEST_IP_HOUR` | `'10/hour'` |  |
 | `THROTTLE_ARCHIVE_RECIPIENT_VERIFY` | `'10/min'` |  |
+| `THROTTLE_AUDIT_VERIFICATION` | `'6/hour'` | On-demand audit chain verification runs. |
 | `THROTTLE_BOOKING_SUBMIT` | `'10/hour'` |  |
 | `THROTTLE_DATA_EXPORT_CREATE` | `'3/hour'` |  |
 | `THROTTLE_DEVICE_ATTESTATION_CHALLENGE` | `'5/min'` |  |

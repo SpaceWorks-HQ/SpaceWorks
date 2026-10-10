@@ -30,6 +30,7 @@ GROUP_PAYMENTS = "payments"
 GROUP_MOBILE = "mobile"
 GROUP_UPDATES = "updates"
 GROUP_BACKUP = "backup"
+GROUP_DEVICES = "devices"
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,11 @@ GROUPS = (
         GROUP_BACKUP, "Backup & custody",
         "Makerspace archive requests, archive-recipient keys and custody status. The "
         "deployment's own backups cover every makerspace whether or not this is on.",
+    ),
+    GroupDefinition(
+        GROUP_DEVICES, "Connected devices",
+        "Printers and label printers enrolled with their own signing key. A device is "
+        "never a staff account: it proves possession of its key on every request.",
     ),
     GroupDefinition(
         GROUP_UPDATES, "Updates",

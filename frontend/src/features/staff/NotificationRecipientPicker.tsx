@@ -10,6 +10,7 @@ const FEATURE_LABELS: Record<string, string> = {
   events: "Events",
   bookings: "Bookings",
   maintenance: "Maintenance",
+  devices: "Devices",
   members: "Members",
 };
 

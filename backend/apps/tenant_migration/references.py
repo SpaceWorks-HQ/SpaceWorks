@@ -8,6 +8,7 @@ from .audit_references import (
     UNRECOGNISED_AUDIT_TARGET,
     normalize_audit_target_type,
 )
+from .references_devices import SOURCE_LOCAL_SNAPSHOT_FIELDS  # noqa: F401 -- re-exported
 
 
 @dataclass(frozen=True)

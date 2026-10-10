@@ -141,3 +141,10 @@ Stack (in use):
 - **Admin theme:** django-unfold; site name via `ADMIN_SITE_NAME` (default "Space Works").
 - **Telegram:** request alerts and test alerts. Outbound only — the webhook acknowledges and discards
   callbacks; decisions are made in the staff console or `/control/`.
+
+
+**Phase 7d lane (2026-10-10, uncommitted and awaiting coordinator DB verification).** Added tenant-gated
+one-minute offline detection, signed-heartbeat recovery, bounded auth retention, default-off devices
+notifications/templates, an identity Devices console and offline failure classification in module
+operational health. No public endpoint or report schema added. Printer/label UI requires 7b/7c,
+absent from this 7a-based lane. Generated API snapshots remain coordinator-owned.

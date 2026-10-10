@@ -32,6 +32,7 @@ from django.utils import timezone
 # counterpart here, so a task added for the Celery deployment cannot silently go missing
 # from the beat-less one.
 SCHEDULED_TASKS = (
+    ("scan-offline-devices", "apps.devices.tasks.scan_offline_devices_task", 1),
     (
         "flush-api-client-usage",
         "apps.apiclients.tasks.flush_api_client_usage_task",
@@ -158,6 +159,10 @@ if "tenant_migration" in settings.TOMBSTONED_APPS:
     )
 if "events" in settings.TOMBSTONED_APPS:
     SCHEDULED_TASKS = tuple(task for task in SCHEDULED_TASKS if ".events." not in task[1])
+
+
+if "devices" in settings.TOMBSTONED_APPS:
+    SCHEDULED_TASKS = tuple(task for task in SCHEDULED_TASKS if ".devices." not in task[1])
 
 
 def _import_task(dotted_path):

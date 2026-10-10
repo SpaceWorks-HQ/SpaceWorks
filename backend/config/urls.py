@@ -153,6 +153,9 @@ urlpatterns = [
     *separable("events", "api/v1/member/", "apps.events.urls_member"),
     *separable("events", "api/v1/", "apps.events.urls_station"),
     *separable("bookings", "api/v1/admin/", "apps.bookings.urls_admin"),
+    # Staff device admin under api/v1/admin/ plus the signed device protocol under
+    # api/v1/device/ (covered exactly by apps.devices.route_registry).
+    *separable("devices", "api/v1/", "apps.devices.urls"),
     path("api/v1/admin/", include("apps.boxes.urls")),
     path("api/v1/admin/", include("apps.evidence.urls")),
     path("api/v1/", include("apps.operations.urls")),

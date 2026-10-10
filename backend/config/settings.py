@@ -176,6 +176,8 @@ INSTALLED_APPS = [
     "apps.maintenance",
     "apps.roadmap",
     "apps.tenant_migration",
+    # Enrolled printers/label printers (phase 7a); separable.
+    "apps.devices",
     # Must stay LAST. Django calls ready() in this order, so being last is what
     # guarantees every other app has registered before finalize() freezes the
     # separability registries.
@@ -585,6 +587,10 @@ TENANT_DUMP_STAGING_MAX_AGE_SECONDS = env.int(
 )
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
 CELERY_BEAT_SCHEDULE = {
+    "scan-offline-devices": {
+        "task": "apps.devices.tasks.scan_offline_devices_task",
+        "schedule": crontab(minute="*"),
+    },
     "flush-api-client-usage": {
         "task": "apps.apiclients.tasks.flush_api_client_usage_task",
         "schedule": crontab(minute="*"),
@@ -705,6 +711,12 @@ if "events" in TOMBSTONED_APPS:
         if ".events." not in entry["task"]
     }
 
+if "devices" in TOMBSTONED_APPS:
+    CELERY_BEAT_SCHEDULE = {
+        name: entry for name, entry in CELERY_BEAT_SCHEDULE.items()
+        if ".devices." not in entry["task"]
+    }
+
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:5000", "http://localhost:5173"],
@@ -725,6 +737,13 @@ HMAC_CLIENT_ID = env("HMAC_CLIENT_ID", default="")
 HMAC_SECRET = env("HMAC_SECRET", default="")
 HMAC_MAX_CLOCK_SKEW_SECONDS = env.int("HMAC_MAX_CLOCK_SKEW_SECONDS", default=300)
 APICLIENT_REQUIRE_NONCE = env.bool("APICLIENT_REQUIRE_NONCE", default=False)
+# Enrolled devices (apps.devices, protocol v1). The nonce TTL must cover the whole
+# accepted timestamp window (2 x skew) -- devices.E003 refuses startup otherwise.
+DEVICE_SIGNATURE_MAX_SKEW_SECONDS = env.int("DEVICE_SIGNATURE_MAX_SKEW_SECONDS", default=300)
+DEVICE_ENROLLMENT_TTL_SECONDS = env.int("DEVICE_ENROLLMENT_TTL_SECONDS", default=900)
+DEVICE_NONCE_TTL_SECONDS = env.int("DEVICE_NONCE_TTL_SECONDS", default=86400)
+DEVICE_COMMAND_LEASE_SECONDS = env.int("DEVICE_COMMAND_LEASE_SECONDS", default=60)
+DEVICE_COMMAND_MAX_ATTEMPTS = env.int("DEVICE_COMMAND_MAX_ATTEMPTS", default=10)
 HMAC_PROTECTED_PATH_PREFIXES = env.list(
     "HMAC_PROTECTED_PATH_PREFIXES",
     default=["/api/public/", "/api/v1/public/"],

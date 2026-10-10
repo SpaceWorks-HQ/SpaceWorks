@@ -131,9 +131,22 @@ BASE_MODEL_LOOKUPS = {
     'admin-machine-service-request-reprint': ('machines.MachineServiceRequest', 'makerspace_id'),
     'admin-machine-service-payment-mark-offline': ('payments.Payment', 'makerspace_id'),
     'admin-machine-service-payment-waive': ('payments.Payment', 'makerspace_id'),
+    'admin-device-detail': ('devices.Device', 'makerspace_id'),
+    'admin-device-enrollment-create': ('devices.Device', 'makerspace_id'),
+    'admin-device-revoke': ('devices.Device', 'makerspace_id'),
+    'device-enrollment-challenge': ('devices.DeviceEnrollment', 'makerspace_id'),
+    'device-enrollment-complete': ('devices.DeviceEnrollment', 'makerspace_id'),
 }
 
 TARGET_SET_LOOKUPS = {
     'admin-user-reset-password': (
         'makerspaces.MakerspaceMembership', 'user_id', 'makerspace_id'),
 }
+
+from .origin_scope_routes_7b import PRINTER_MODEL_LOOKUPS
+
+BASE_MODEL_LOOKUPS.update(PRINTER_MODEL_LOOKUPS)
+
+from .origin_scope_routes_7c import LABEL_MODEL_LOOKUPS
+
+BASE_MODEL_LOOKUPS.update(LABEL_MODEL_LOOKUPS)

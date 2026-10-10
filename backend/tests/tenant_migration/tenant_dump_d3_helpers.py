@@ -7,7 +7,7 @@ from apps.backup.recipients_bech32 import convert_bits, encode
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 
 
-def makerspace(slug, *, superadmin_access=True, modules=("notifications",)):
+def makerspace(slug, *, superadmin_access=True, modules=("notifications", "backup")):
     return Makerspace.objects.create(
         name=slug,
         slug=slug,

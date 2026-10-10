@@ -1,7 +1,7 @@
 # SpaceWorks modules — what each one is, and what happens without it
 
-Space Works ships **33 modules**: 6 **core** ones that cannot be switched off, 1 that is **on by
-default** (`updates`), and the rest opt-in. This page is the per-module reference the README links into — one entry
+Space Works ships **35 modules**: 6 **core** ones that cannot be switched off, 2 that are **on by
+default** (`updates` and `backup`), and the rest opt-in. This page is the per-module reference the README links into — one entry
 per key, saying what it is, what it puts on screen, what disappears if you do not install it, and what
 happens to its data.
 
@@ -54,7 +54,8 @@ core modules cannot be uninstalled at all.
 **Notifications**: [notifications](#notifications) · [email](#email) · [telegram](#telegram) ·
 [slack](#slack) · [mattermost](#mattermost) · [discord](#discord) · [webhook](#webhook) — **Reports**: [reports](#reports) —
 **Payments**: [payments](#payments) — **Accounts**: [member_accounts](#member_accounts) —
-**Mobile apps**: [mobile](#mobile) — **Backup & custody**: [backup](#backup) — **Updates**: [updates](#updates)
+**Mobile apps**: [mobile](#mobile) · **Backup & custody**: [backup](#backup) · **Connected devices**: [devices](#devices) ·
+**Updates**: [updates](#updates)
 
 ---
 
@@ -572,6 +573,39 @@ placed in front of surfaces every makerspace already had).
   backup of this makerspace. **Archives are outside the purge guarantee**: a copy someone already
   downloaded, a deployment archive and an offsite copy are not deleted by any purge.
 
+## Connected devices
+
+### devices
+
+Opt-in, no dependencies; installed only by the `full`/`everything` profiles.
+
+- **What it is** — device identity for printers and label printers on the space's own network. A
+  device is **not** a staff account: it holds an Ed25519 key, proves possession of it once at
+  enrollment, and then signs every request (protocol in `docs/device-protocol.md`).
+- **What it adds** — staff device enrollment, rename, offline threshold, key rotation and revocation,
+  plus signed heartbeats. With `machines` and `machine_service` installed, staff holding
+  `MANAGE_DEVICES` and management scope for the selected machine can bind a printer and create a
+  command for its explicitly assigned in-progress request. Bounded delivery leases become durable
+  ownership after acknowledgement. Measurements pass through the existing completion/failure workflow.
+  Automatic application defaults off; scoped staff approval supplies the approving User. Charges use
+  current machine pricing, and failed jobs create no charge. Telemetry affects staff display only.
+  Every mutation leaves typed device provenance and an audit row. The server wire contract is in
+  [Printer protocol](device-printer-protocol.md).
+- **Without it** — device routes answer 400 and cannot enroll, authenticate or mutate. Printer routes
+  additionally require both machine modules and answer 400 when either is off. Tombstoning the devices
+  app removes its routes with 404.
+- **Data** — `purge_module_data devices` deletes printer consumption claims, jobs, commands and
+  bindings, then replay nonces, enrollments, device events and identities. Machine workflows and the
+  payment ledger survive. Purging a machine adapter nulls live printer links and retains history;
+  missing targets cannot deliver or finish. Tenant moves retain applied reports and source snapshots,
+  disable bindings and automatic application, cancel commands, clear delivery credentials and turn
+  unprocessed work into inert review. Device keys, enrollments and nonces never travel.
+
+- **Monitoring** - both scheduler topologies check offline state once a minute. Offline/recovery
+  history appears in module operational health. Device alerts have their own notification feature;
+  every channel is opt-in and initially off. The Devices console exposes identity/status/enrollment
+  to device managers. Printer jobs and label delivery controls arrive with their adapter lanes.
+
 ---
 
 ## Updates
@@ -655,23 +689,13 @@ modules.
 | Profile | Modules | For |
 |---|---|---|
 | `minimal` | 6 | Core only; nothing published publicly |
-| `workshop` | 14 | A machine shop: machines, service queue, maintenance — deliberately without `member_accounts` |
-| `lending` | 17 | A tool library: the full lending lifecycle, no machines |
-| `recommended` | 20 | Core plus the inventory lifecycle, reports and machines (the default) |
-| `cloud` | 24 | A managed box: everything that runs on a single Django process, no worker or beat |
-| `everything` / `full` | 33 | All modules |
-| `events` | 13 | An events programme: events, notifications, email, member accounts, membership, payments, reports (core is present but hidden by the `events` edition) |
-| `bookings` | 13 | Bookable rooms and resources: bookings, notifications, email, member accounts, membership, payments, reports (core hidden by the `bookings` edition) |
-
-**Installing without a profile** gives you **7 modules**: the six core ones plus `updates`
-(`payments` became opt-in when charge tracking moved out from under it). Member accounts and mobile apps are opt-in; installing `mobile` also installs its
 | `workshop` | 15 | A machine shop: machines, service queue, maintenance — deliberately without `member_accounts` |
 | `lending` | 18 | A tool library: the full lending lifecycle, no machines |
 | `recommended` | 21 | Core plus the inventory lifecycle, reports and machines (the default) |
 | `cloud` | 25 | A managed box: everything that runs on a single Django process, no worker or beat |
-| `everything` / `full` | 34 | All modules |
-| `events` | 12 | An events programme: events, notifications, email, member accounts, membership, payments, reports (core is present but hidden by the `events` edition) |
-| `bookings` | 12 | Bookable rooms and resources: bookings, notifications, email, member accounts, membership, payments, reports (core hidden by the `bookings` edition) |
+| `everything` / `full` | 35 | All modules |
+| `events` | 13 | An events programme: events, notifications, email, member accounts, membership, payments, reports (core is present but hidden by the `events` edition) |
+| `bookings` | 13 | Bookable rooms and resources: bookings, notifications, email, member accounts, membership, payments, reports (core hidden by the `bookings` edition) |
 
 **Installing without a profile** gives you **8 modules**: the six core ones plus `updates` and
 `backup`. Member accounts and mobile apps are opt-in; installing `mobile` also installs its
@@ -703,5 +727,6 @@ command tells you which. [`machines`](#machines) is the notable second case.
 Uninstalling switches a module off for one makerspace; the code still ships. A deployment that will never
 use an area can drop the app itself with `TOMBSTONED_APPS`, and `suggest_tombstones` reads the installed
 modules and names the apps that are safe to remove. The separable apps are `warranty`, `presence`,
-`payments`, `updates`, `events`, `bookings`, `maintenance` and `procurement`. That is a different axis
+`payments`, `updates`, `events`, `bookings`, `maintenance`, `procurement`, `notifications`,
+`tenant_migration` and `devices`. That is a different axis
 from modules — see **Separability and tombstoning** in `docs/INVARIANTS.md`.

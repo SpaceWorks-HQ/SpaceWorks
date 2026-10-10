@@ -38,6 +38,8 @@ export const openApiTags = [
   "Dashboard",
   "Data exports",
   "Device auth",
+  "Device protocol",
+  "Devices",
   "Email logs",
   "Email templates",
   "Event check-in stations",
@@ -107,6 +109,9 @@ export const openApiPaths = [
   "/api/v1/admin/containers/{id}/contents",
   "/api/v1/admin/containers/{id}/history",
   "/api/v1/admin/containers/{id}/move",
+  "/api/v1/admin/devices/{id}",
+  "/api/v1/admin/devices/{id}/enrollments",
+  "/api/v1/admin/devices/{id}/revoke",
   "/api/v1/admin/direct-loans/{id}/return",
   "/api/v1/admin/event-certificates/{id}/download/",
   "/api/v1/admin/event-certificates/{id}/reissue/",
@@ -249,6 +254,7 @@ export const openApiPaths = [
   "/api/v1/admin/makerspace/{makerspace_id}/data-exports",
   "/api/v1/admin/makerspace/{makerspace_id}/data-exports/{job_id}",
   "/api/v1/admin/makerspace/{makerspace_id}/data-exports/{job_id}/download-url",
+  "/api/v1/admin/makerspace/{makerspace_id}/devices",
   "/api/v1/admin/makerspace/{makerspace_id}/direct-loan-members",
   "/api/v1/admin/makerspace/{makerspace_id}/direct-loans",
   "/api/v1/admin/makerspace/{makerspace_id}/email-logs",
@@ -482,6 +488,9 @@ export const openApiPaths = [
   "/api/v1/bootstrap",
   "/api/v1/config",
   "/api/v1/data-exports/download/{job_id}/{token}",
+  "/api/v1/device/enrollments/{id}/challenge",
+  "/api/v1/device/enrollments/{id}/complete",
+  "/api/v1/device/heartbeat",
   "/api/v1/event-checkin-stations/{public_token}/roster/",
   "/api/v1/event-checkin-stations/{public_token}/session/",
   "/api/v1/event-checkin-stations/{public_token}/sync/",
@@ -1416,6 +1425,13 @@ export type CollaborativeEventRegistrationInput = {
   "host_waiver_accepted"?: boolean;
 };
 
+export type CompleteRequest = {
+  "token": string;
+  "public_key": string;
+  "challenge": string;
+  "signature": string;
+};
+
 export type ConditionEnum = "available" | "damaged" | "lost" | "unknown";
 
 export type ConnectStatusEnum = "unconnected" | "pending" | "active" | "restricted" | "disconnected";
@@ -1589,9 +1605,43 @@ export type DestinationScope = {
   "category_ids"?: Array<number>;
 };
 
+export type Device = {
+  "id": string;
+  "makerspace": number;
+  "kind": KindE45Enum;
+  "name": string;
+  "status": DeviceStatusEnum;
+  "public_key": string | null;
+  "key_fingerprint": string | null;
+  "key_version": number;
+  "last_seen_at": string | null;
+  "offline_threshold_seconds": number;
+  "offline_since": string | null;
+  "offline_notified_at": string | null;
+  "created_by": number | null;
+  "created_at": string;
+  "revoked_at": string | null;
+  "revoked_by": number | null;
+};
+
 export type DeviceChallengeResponse = {
   "challenge": string;
   "expires_in": number;
+};
+
+export type DeviceCreate = {
+  "kind": KindE45Enum;
+  "name": string;
+  "offline_threshold_seconds"?: number;
+};
+
+export type DeviceCreated = {
+  "device": Device;
+  "enrollment": EnrollmentGrant;
+};
+
+export type DeviceError = {
+  "detail": string;
 };
 
 export type DeviceGrant = {
@@ -1634,6 +1684,8 @@ export type DeviceRefreshResponse = {
   "refresh": string;
   "device_grant": DeviceGrant;
 };
+
+export type DeviceStatusEnum = "pending" | "active" | "revoked";
 
 export type DeviceTokenResponse = {
   "access": string;
@@ -1824,6 +1876,14 @@ export type EmailVerificationConfirm = {
 };
 
 export type EndReasonEnum = "superseded" | "membership_revoked" | "claim_revoked" | "user_ended";
+
+export type EnrollmentGrant = {
+  "enrollment_id": string;
+  "device_id": string;
+  "purpose": PurposeEnum;
+  "token": string;
+  "expires_at": string;
+};
 
 export type EnvironmentEnum = "development" | "production";
 
@@ -2634,6 +2694,8 @@ export type KeyD07Enum = "hardware_requests" | "printing" | "events" | "bookings
 export type Kind3bfEnum = "dev_room" | "bench" | "meeting" | "other";
 
 export type KindB02Enum = "rollback_in_place" | "disaster";
+
+export type KindE45Enum = "printer" | "label_printer" | "generic";
 
 export type KindE56Enum = "role" | "requester" | "members" | "user";
 
@@ -4181,6 +4243,13 @@ export type PaginatedCategoryAdminList = {
   "results": Array<CategoryAdmin>;
 };
 
+export type PaginatedDeviceList = {
+  "count": number;
+  "next"?: string | null;
+  "previous"?: string | null;
+  "results": Array<Device>;
+};
+
 export type PaginatedDirectLoanList = {
   "count": number;
   "next"?: string | null;
@@ -4463,6 +4532,11 @@ export type PatchedCertificationTypeUpdate = {
   "is_active"?: boolean;
   "created_at"?: string;
   "updated_at"?: string;
+};
+
+export type PatchedDeviceUpdate = {
+  "name"?: string;
+  "offline_threshold_seconds"?: number;
 };
 
 export type PatchedEmailTemplateUpdate = {
@@ -5621,6 +5695,8 @@ export type PublicToolScan = {
   "report_problem"?: boolean;
   "problem_note"?: string;
 };
+
+export type PurposeEnum = "enroll" | "rotate" | "reactivate";
 
 export type PushDevice = {
   "id": number;

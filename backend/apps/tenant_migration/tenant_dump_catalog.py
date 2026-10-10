@@ -55,9 +55,9 @@ class TenantDumpCatalogError(AssertionError):
 # Re-blessed again for `TenantDumpCapture.money_fingerprint_sha256`, which binds a
 # capture to the tenant's unsettled money so publication can refuse a dump the source
 # has since moved past.
-# Re-blessed on integration: phases 11 and 10, the backup lane and Wave-0 offline
-# refunds all changed the catalog; recomputed from the merged snapshot.
-CATALOG_SCHEMA_SHA256 = "9c9f649a8c4951cd35a175a50b3353cc4bf99def8542322b9d3152846d19187a"
+# Re-blessed on integration: phases 11 and 10, the backup lane, Wave-0 offline refunds
+# and the 7a-7d devices chain all changed the catalog; recomputed from the merged snapshot.
+CATALOG_SCHEMA_SHA256 = "5df91d806c2fd4a0b227f9bf962c33363a7c356dee9fe0b69ad8b61e1e29285b"
 
 
 def catalog_models(apps_registry=apps):

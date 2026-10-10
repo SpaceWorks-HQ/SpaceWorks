@@ -49,6 +49,10 @@ FIRST_PARTY_FIELD_NAMES = {
     'payments.StripeConnectOAuthState': frozenset('consumed_at created_at expires_at id initiated_by makerspace state_digest'.split()),
     'payments.Payment': frozenset('amount checkout_url created_at created_by currency external_order_id external_payment_id id makerspace member online_rail provider status stripe_application_fee_amount stripe_checkout_session_expired_at stripe_checkout_session_id stripe_checkout_url stripe_connected_account_id stripe_payment_intent_id stripe_provider subject_id subject_label subject_type updated_at via_makerspace'.split()),
     'payments.ProcessedStripeEvent': frozenset('created_at id makerspace provider stripe_event_id'.split()),
+    'devices.Device': frozenset('created_at created_by id key_fingerprint key_version kind last_seen_at makerspace name offline_notified_at offline_since offline_threshold_seconds public_key revoked_at revoked_by status'.split()),
+    'devices.DeviceEnrollment': frozenset('candidate_key_fingerprint challenge_digest challenge_issued_at created_at created_by device expires_at id makerspace purpose revoked_at revoked_by token_digest used_at'.split()),
+    'devices.DeviceRequestNonce': frozenset('claimed_at device expires_at id key_version nonce_digest'.split()),
+    'devices.DeviceEvent': frozenset('command_id_snapshot created_at details device device_id_snapshot device_key_version device_name event_type id machine_id_snapshot makerspace operation_id outcome qr_batch_id_snapshot service_request_id_snapshot'.split()),
     'presence.PresenceSession': frozenset('created_via_claim_session end_reason ended_at ended_by expires_at id makerspace member membership started_at'.split()),
     'encryption.MakerspaceEncryptionKey': frozenset('broker_backend broker_key_id created_at disabled_at id makerspace rotated_at status version wrapped_dek'.split()),
     'encryption.SearchKeyGeneration': frozenset('activated_at created_at generation key_fingerprint retired_at status'.split()),
@@ -208,6 +212,14 @@ FIRST_PARTY_FIELD_NAMES = {
     'tenant_migration.TenantDumpCapture': frozenset('artifact_sha256 artifact_size_bytes capture_completed_at catalog_digest content_ledger created_at database_image_sha256 database_snapshot_at derivation_policy_sha256 download_token_consumed_at download_token_digest download_token_expires_at frozen_tenant_recipients gate_fencing_token gate_owner_id id makerspace manifest money_fingerprint_sha256 object_key object_ledger object_ledger_sha256 parent_database_sha256 parent_object_ledger_sha256 published_at refusal_code refusal_detail requested_by source_deployment_identity source_encryption_mode source_makerspace_id source_makerspace_slug source_postgres_major status superadmin_access_at_decision unpublished_object_key updated_at'.split()),
     'tenant_migration.ExternalTenantReference': frozenset('created_at field_name id makerspace snapshot source_archive_digest source_model_label source_object_id target_model_label target_object_id'.split()),
 }
+
+from .catalog_7b import PRINTER_FIELD_NAMES
+
+FIRST_PARTY_FIELD_NAMES.update(PRINTER_FIELD_NAMES)
+
+from .catalog_7c import LABEL_FIELD_NAMES
+
+FIRST_PARTY_FIELD_NAMES.update(LABEL_FIELD_NAMES)
 
 AUTO_CREATED_FIELD_NAMES = {
     'auth.Group_permissions': frozenset('group id permission'.split()),

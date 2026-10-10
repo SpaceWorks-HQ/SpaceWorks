@@ -36,6 +36,10 @@ class Action:
     # VIEW_INVENTORY: an inventory-only role must never resolve a person from a QR.
     SCAN_MEMBER_CARDS = "scan_member_cards"
     MANAGE_MEMBER_CARDS = "manage_member_cards"
+    # Enrolled devices (phase 7a): enroll, rotate, revoke and rename printers/label
+    # printers. Space Manager by default; never organization-grantable, because a
+    # device key is physical trust inside ONE space and must be granted there.
+    MANAGE_DEVICES = "manage_devices"
     VIEW_AUDIT = "view_audit"
     TRANSFER_STOCK = "transfer_stock"        # superadmin only
     MANAGE_STAFF = "manage_staff"            # superadmin only
@@ -88,7 +92,7 @@ _SPACE_MANAGER_ACTIONS = {
     Action.ISSUE_DIRECT_LOAN, Action.RETURN_REQUEST, Action.UPLOAD_EVIDENCE,
     Action.MANAGE_QR, Action.MANAGE_PRINTING, Action.VIEW_AUDIT,
     Action.MANAGE_MAKERSPACE, Action.MANAGE_MACHINES, Action.MANAGE_EVENTS,
-    Action.MANAGE_BOOKINGS, Action.MANAGE_MEMBER_CARDS,
+    Action.MANAGE_BOOKINGS, Action.MANAGE_MEMBER_CARDS, Action.MANAGE_DEVICES,
 }
 _PRINT_MANAGER_ACTIONS = {
     Action.MANAGE_PRINTING,
@@ -129,7 +133,7 @@ ROLE_FORBIDDEN_ACTIONS = frozenset({
 })
 ROLE_GRANTABLE_ACTIONS = frozenset(ALL_ACTIONS - ROLE_FORBIDDEN_ACTIONS)
 ORGANIZATION_GRANTABLE_ACTIONS = frozenset(
-    ROLE_GRANTABLE_ACTIONS - {Action.MANAGE_MACHINES}
+    ROLE_GRANTABLE_ACTIONS - {Action.MANAGE_MACHINES, Action.MANAGE_DEVICES}
 )
 ROLE_SUPERADMIN_ASSIGNABLE_ACTIONS = frozenset({Action.MANAGE_MAKERSPACE})
 # What counts as handover-only work: taking an accepted request or a finished machine job

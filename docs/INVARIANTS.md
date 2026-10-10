@@ -468,18 +468,19 @@ issue photo to issue hardware. `tests/makerspaces/test_module_registry.py` is th
 AST-parses `apps/` and fails if a registered module has no real guard call site, if a guarded key is
 unregistered, if the derived lists change, or if a migration-referenced callable stops resolving.
 
-**Modules are OPT-IN.** `DEFAULT_ENABLED_MODULES` resolves to **7 keys** — the 6 core ones plus
-`updates`, which carries `default_enabled=True` because it was introduced as a *key over behaviour
+**Modules are OPT-IN.** `DEFAULT_ENABLED_MODULES` resolves to **8 keys** — the 6 core ones plus
+`updates` and `backup`. `updates` carries `default_enabled=True` because it was introduced as a *key over behaviour
 that already existed*, and an opt-in default would have switched that behaviour off for every
 deployment on upgrade (the `0050`/`0051` backfill reasoning, expressed in the registry instead of a
 migration). `member_accounts`, `mobile` and `payments` once carried it too and are now opt-in for new
 makerspaces (existing rows kept them through `0057`). Everything else is off, and a new makerspace
-installs core plus whatever profile the operator chose (`minimal` 6 / `workshop` 14 / `lending` 17 /
-`recommended` 20 / `cloud` 24 / `events` 13 / `bookings` 13 / `everything` = `full` 33 — pinned by
+installs core plus whatever profile the operator chose (`minimal` 6 / `workshop` 15 / `lending` 18 /
+`recommended` 21 / `cloud` 25 / `events` 13 / `bookings` 13 / `everything` = `full` 35 — pinned by
 `tests/modules/test_combo_profiles.py`).
 `ModuleDefinition.default_enabled` defaults to **False** and core must not set it (core is on by
-definition; two sources for one fact is the drift the registry exists to remove) — so `updates` is
-the only registry entry that sets it, and `default_enabled_module_keys()` is the one place to ask
+definition; two sources for one fact is the drift the registry exists to remove) — so `updates` and
+`backup` (whose key fronts surfaces every makerspace already had) are the only registry entries
+that set it, and `default_enabled_module_keys()` is the one place to ask
 rather than counting by hand. (This paragraph read "core only (6 keys)", then "10 keys"; it is the
 kind of count that goes stale silently, which is why the README table is generated from the registry
 rather than written out.) **Existing makerspaces
@@ -1526,6 +1527,29 @@ tenant-migration uniqueness policy moved from `field:membership` to that constra
   is CSV-only, export-only, unschedulable, excluded from organization and deployment aggregation, and its
   builder refuses `makerspace_id=None`.
 
+**Connected device monitoring (forward-plan phase 7d lane).** Both Celery beat and the beatless
+scheduler register `apps.devices.tasks.scan_offline_devices_task` every minute and omit it when
+`devices` is deployment-tombstoned. A beatless installation must invoke cron every minute to attain
+that latency. The scan iterates canonically servable, module-enabled tenants, takes one
+`fanout_tenant_write` boundary per tenant and uses Makerspace -> Device lock order. Offline/recovery
+edges append `DeviceEvent` and `devices.*` audit rows with a null User actor, once per edge.
+Never-seen active devices use their retained enrollment event as the activation time; pending and
+revoked devices are excluded. Reactivation starts a fresh observation window. Bounded cleanup removes
+only expired nonces and terminal expired enrollments; a one-second nonce grace protects the inclusive
+integer-second signature window. No event or audit history is retention-pruned.
+
+`devices` notification events `offline`/`recovered` are distinct from maintenance, selectable,
+module-gated and default-off on every channel. Active `MANAGE_DEVICES` staff form the fallback;
+explicit recipient rules retain existing opt-out, tenant and reach filters. Email and chat templates
+use a staff-only `devices` stream and credential-free edge snapshots. Notifications run after commit
+and cannot roll back a heartbeat or scan. `devices.offline_detected` counts as a failure in the existing
+module-health report; recovery is activity only and singular `device.*` remains native mobile activity.
+
+The identity-only Devices console requires `MANAGE_DEVICES` until 7b/7c adapter surfaces exist. Enrollment
+bearers live only in local modal state: secret requests return void to TanStack mutations, and closing
+the modal discards them. Shared query keys start with `["devices", makerspaceId]`; mutations invalidate
+both list and detail. Machine/QR-only adapter controls must wait for scoped sibling APIs.
+
 ## Handover roles and the retired Guest Admin
 
 **Guest Admin is no longer a built-in role** (migration `makerspaces/0052`); handover staff get a **custom
@@ -1646,12 +1670,78 @@ not module keys** (one app can own several keys — `printing`/`machines`/`machi
   has no urlconf to import.
 - **The tombstone suite is a separate pytest run** (`tests/tombstone/`), because import-time surfaces
   cannot be re-derived in-process and the all-active suite asserts the opposite for the same objects:
-  `TOMBSTONED_APPS=bookings,events,maintenance,notifications,payments,presence,procurement,tenant_migration,updates,warranty
-  pytest tests/tombstone` — the conftest demands the **whole ten-app profile** and names the exact
+  `TOMBSTONED_APPS=bookings,devices,events,maintenance,notifications,payments,presence,procurement,tenant_migration,updates,warranty
+  pytest tests/tombstone` — the conftest demands the **whole eleven-app profile** (`devices` joined in
+  phase 7a; `payments` is accepted for `payments_rail`) and names the exact
   string it wants, so a single app (this line said `procurement` alone until 2026-08-11) is a hard
   `UsageError`, not a partial run. A whole-tree run skips the directory; an
   explicit run without the profile is a hard `UsageError`, never a green no-op. `TOMBSTONE_PROFILE_APPS`
   in its conftest must stay in step with `SEPARABLE_APPS`.
+
+**Device identity (forward plan phase 7a, `apps/devices/`, module `devices`).**
+- **A device is NOT an actor.** `AuditLog.actor`, `EvidencePhoto.uploaded_by` and every scan actor stay
+  `accounts.User` FKs. Device-originated audit rows carry `actor=None` plus typed metadata
+  (`device_id`, `device_name`, `device_key_version`, `operation_id`, `outcome`, `enrollment_id`) and a
+  matching append-only `DeviceEvent` (ORM guard + `devices_event_append_only` trigger honouring only the
+  purge GUC). `DevicePrincipal` never reaches `accounts.rbac`.
+- **One lock order, makerspace first.** Every device mutation runs `services_locks.lock_tenant()` inside
+  its transaction — the tenant source gate (`assert_write_allowed`), `require_module_locked(..., "devices")`
+  (the row lock uninstall/purge take) and a locked `is_servable` re-check, because `module_enabled` answers
+  capability for archived tenants — then locks Device, then DeviceEnrollment.
+- **Replay authority is a DB INSERT, after signature verification.** `DeviceRequestNonce` is unique on
+  `(device, key_version, nonce_digest)`; an invalid signature, a closed gate or a module-off tenant claims
+  nothing. `DEVICE_NONCE_TTL_SECONDS` must be >= 2 x `DEVICE_SIGNATURE_MAX_SKEW_SECONDS` (`devices.E003`).
+  The signed target is the exact raw request target (`RAW_URI`/`REQUEST_URI`/ASGI `raw_path`); with none
+  available authentication fails closed — never a normalized fallback.
+- **The `/api/v1/device/` surface is covered exactly by `devices/route_registry.py`**, keyed by (qualified
+  URL name, method) with a closed auth mode (`ENROLLMENT_TOKEN` | `DEVICE_SIGNATURE`); `devices.E001`
+  refuses missing/stale/method-drifted entries or a view whose authenticators disagree with its mode, and
+  `DeviceRoutePermission` default-denies. It is NOT the API-client HMAC registry and must never be merged
+  into it. `source_gate_http_guards` admits the singleton `DeviceAuthentication` only while its
+  `authenticate` assigns `request.selected_makerspace_id` before `_assert_source_gate(request)`.
+- **No device authority travels or survives a restore.** Exports omit DeviceEnrollment/DeviceRequestNonce
+  and the device key/fingerprint; imports reserve fresh UUIDs, reset Device to pending (keeping the
+  monotonic `key_version`) and keep the five `DeviceEvent.*_snapshot` columns byte-for-byte as
+  source-local history (`tenant_migration/references_devices.py` guards them out of every remap path).
+  `backup.recovery.enter_quarantine()` resets every Device to pending, clears key material, bumps
+  `key_version`, revokes open enrollments and deletes nonces, so a pre-backup signature fails even after
+  acknowledgement. A remapped UUID audit reference is written to JSONB as a string
+  (`semantic_remap._json_pk`).
+- `MANAGE_DEVICES` is a Space Manager default (`makerspaces/0073` backfill) and is **never
+  organization-grantable**; Inventory/Machine Managers do not get it.
+
+**Printer commands and terminal reports (forward plan phase 7b).**
+
+- A binding requires `devices`, `machines` and `machine_service`, an active printer Device and
+  active Machine in the same tenant. Creation and approval require `MANAGE_DEVICES` and current
+  machine-specific management scope. A snapshot never supplies authority.
+- Commands pin the exact owning Device and key version. Random delivery tokens travel once and
+  their digest stays private. Bounded lazy expiry/backoff never grants simultaneous leases. After
+  acknowledgement, the signed owner can report through a long print without extending the delivery
+  lease. Revocation/key rotation refuses prior authority. Disabling/deleting a binding cancels
+  unprocessed commands and jobs.
+- Terminal measurements require a stable operation UUID, immutable external job ID, actual minutes
+  and explicit typed `MachineConsumable` quantities. Reserved pools use existing grams or quantity
+  reconciliation inputs. Failure additionally requires a reason and percentage. Unknown fields,
+  device-supplied money and ambiguous measurements are rejected before claim.
+- Claim and application are separate transactions. Identical operation plus canonical payload returns
+  the stored result; different payload/operation conflicts. Application calls only existing
+  `service_workflow_actions.complete/fail`, with `actor=None` for automatic effects or the approving
+  User for staff effects. Workflow failure rolls back consumption, charge and transition, retains
+  the claim and records review in a fresh transaction. Review never auto-retries.
+- Automatic application defaults false. The existing payment service reads current authoritative
+  pricing; the adapter accepts no pricing input. Failure retains the workflow's no-charge behavior.
+  Telemetry updates advisory job fields and last-seen only. Authoritative maintenance/reserved/offline
+  and running states take precedence; public machine output stays unchanged.
+- Free-text failure notes use scoped PII encryption and a database write fence. Services take the
+  source gate, then PII fence, then tenant/device/command/job/request/machine locks. Database guards
+  freeze claimed identities, measurements and consumptions while permitting adapter FK `SET_NULL`,
+  authorized purge and PII ciphertext maintenance. Application verifies the plaintext report hash.
+- Exports classify all four models and creator/processor User edges, omit lease digests and preserve
+  typed history. Portable import and raw dumps disable bindings, cancel commands, clear leases,
+  preserve applied/cancelled history and turn unprocessed jobs into review. Imported work stays inert
+  after re-enrollment. Device purge deletes printer rows first; adapter purge nulls live links and
+  retains device history.
 
 ## Machine scoping — `MANAGE_MACHINES` is per role, and fails CLOSED
 

@@ -130,12 +130,34 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
   PostgreSQL role boundary. `cloud_environment.py` captures host-rendered Cloud Compose interpolation into
   durable static configuration without consulting later ambient shells; only the root-only
   `scripts/init-cloud-environment.py` renderer invokes Compose.
+- `backend/apps/devices/` — device identity (phase 7a, separable, module `devices`). `models_identity.py`
+  (Device, DeviceEnrollment, DeviceRequestNonce) and `models_events.py` (append-only DeviceEvent, DB
+  trigger in `0001`); `protocol.py` owns the v1 canonical bytes and published vectors;
+  `authentication.py` (DeviceAuthentication -> `DevicePrincipal`, never a User) and
+  `route_registry.py` + `checks.py` (the exact `/api/v1/device/` route/action registry and its system
+  check); `services_locks.py` is the Makerspace -> Device -> Enrollment lock order every mutation takes;
+  `services_enrollment.py` (PoP enroll/rotate/reactivate), `services_identity.py` (create/PATCH/revoke),
+  `services_requests.py` (atomic nonce claim, heartbeat), `services_events.py` (DeviceEvent + typed
+  `devices.*` audit).
+  Phase 7b adds `models_commands.py` and `models_printers.py` for durable delivery, bindings
+  and typed immutable reports. `services_commands.py` owns lease/ack/backoff; `printer_access.py`
+  owns current adapter checks and scope; `services_printer_reports.py` claims measurements before
+  `services_printer_apply.py` invokes the existing machine workflow in a separate transaction.
+  Binding and creation services are separate siblings; `printer_state.py` derives advisory staff
+  state. `urls_7b.py`/`route_registry_7b.py` extend the exact protocol and staff surfaces.
+  Shared export, PII, purge, origin and tenant-migration registries compose `*_7b.py` siblings.
+  Phase 7c adds `models_labels.py` (LabelPrintCommand and immutable LabelPrintResult),
+  `services_label_*`, `label_access.py`, `serializers_labels.py` and `views_labels.py`.
+  Labels reuse `services_commands.py` lease/ack/backoff and the operations ZIP renderer;
+  `*_7c.py` siblings compose the shared catalogs. The first send freezes a QR batch.
+  The full contract and invariants live in [device-label-commands.md](device-label-commands.md).
 - `backend/apps/data_export/` — Space-Manager data export (Phase 4). Per-fidelity (`REDACTED`/`PORTABLE`)
   disposition registry over models, fields, datasets, traversals and the global-user reference closure, with
   **drift guards that refuse an unclassified model or field**. `classification.py` and `references.py`
   are thin barrels: the exported field lists live in `classification_domain.py`, the global/omitted
   model reasons in `classification_platform.py`, and the declared `accounts.User` edges in
-  `references_core.py` — classify a new model there. Its `guards._equal(subject, declared,
+  `references_core.py`; adapter extensions compose `classification_7b.py`/`references_7b.py`.
+  Credential omission checks live in `guards_credentials.py` behind the original `guards.py` exports. Its `guards._equal(subject, declared,
   actual)` is called with the *scanned* set passed as `declared`, so `extra=` in a failure means **scanned
   but not registered** — read the signature before deciding which side to fix.
 - `backend/apps/tenant_migration/` — per-makerspace migration, managed → self-host (Phase 5B), in
@@ -250,3 +272,17 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
 Tenant branding lives in `frontend/src/lib/brandColours.ts` (AA checks) and
 `useTenantBranding.ts` (page-scoped variables). `lib/theme.ts` owns the browser theme preference;
 `components/SupportContact.tsx` renders safe tenant support links.
+
+## Connected device monitoring (phase 7d lane)
+
+`apps/devices/services_offline.py` owns the per-tenant offline/retention scan and the locked
+activity/recovery hook. `tasks.py` exposes its one-minute scheduled entry; `notifications.py`
+builds immutable edge-time snapshots for the existing staff notification fan-out.
+`integrations/email_templates_registry_devices*.py` owns the staff-only devices stream.
+`tenant_migration/gate_policy.py` re-exports HTTP, task and object catalogs from the corresponding
+`gate_policy_http.py`, `gate_policy_tasks.py` and `gate_policy_objects.py` siblings.
+
+Frontend `StaffTabLoaders.tsx` holds lazy imports; `StaffPlatformTabContent.tsx` composes platform/admin
+panels. `panels/DevicesPanel.tsx`, `DeviceIdentitySection.tsx` and `DeviceEnrollmentModal.tsx` render
+7a identity/status/enrollment controls through `devicesApi.ts` and `deviceQueryKeys.ts`.
+Printer adapter and label-command controls require the sibling 7b/7c lanes and are not present here.

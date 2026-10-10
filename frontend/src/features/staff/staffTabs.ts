@@ -24,6 +24,7 @@ const TAB_MODULES: Record<string, string[]> = {
   notifications: ["notifications"],
   printing: ["printing"],
   machines: ["machines"],
+  devices: ["devices"],
   handover: ["machine_service"],
   events: ["events"],
   bookings: ["bookings"],

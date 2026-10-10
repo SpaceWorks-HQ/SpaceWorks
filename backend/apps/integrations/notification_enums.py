@@ -22,6 +22,7 @@ class NotificationFeature(models.TextChoices):
     MAINTENANCE = "maintenance", "Maintenance"
     MEMBERS = "members", "Members"
     API_ACCESS = "api_access", "API access"
+    DEVICES = "devices", "Devices"
 
 
 class NotificationChannel(models.TextChoices):

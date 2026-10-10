@@ -29,7 +29,7 @@ from .types import (
     Redacted,
 )
 
-from .guards_credentials import CREDENTIAL_NAME, REVIEWED_NON_CREDENTIAL
+from .guards_credentials import CREDENTIAL_NAME, REVIEWED_NON_CREDENTIAL, validate_credentials
 
 
 class RegistryError(AssertionError):
@@ -252,13 +252,6 @@ def validate_semantic_references(semantic_references=SEMANTIC_REFERENCES):
         _equal(f"{fidelity} semantic-reference decisions", declared, expected)
 
 
-def validate_credentials(fields=FIELDS):
-    for (fidelity, label, field_name), disposition in fields.items():
-        if not CREDENTIAL_NAME.search(field_name):
-            continue
-        if isinstance(disposition, Omitted) or (label, field_name) in REVIEWED_NON_CREDENTIAL:
-            continue
-        raise RegistryError(f"credential-like field not omitted: {fidelity} {label}.{field_name}")
 
 
 def validate_user_projection(datasets=DATASETS):

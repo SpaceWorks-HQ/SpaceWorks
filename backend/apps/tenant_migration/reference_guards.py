@@ -46,6 +46,15 @@ def validate_reference_registry(
     validate_omitted_target_relations(omitted_target_relations)
     validate_payment_subject_references(payment_subject_references)
     validate_notification_url_routes(notification_url_routes)
+    from apps.data_export.models import EXPORTED_MODEL_FIELDS
+
+    from .references_devices import validate_source_snapshot_fields
+
+    validate_source_snapshot_fields(
+        ReferenceRegistryError,
+        raw_scalar_references=raw_scalar_references,
+        exported_fields=EXPORTED_MODEL_FIELDS,
+    )
 
 
 def validate_audit_target_references(declarations=AUDIT_TARGET_DISPOSITIONS):

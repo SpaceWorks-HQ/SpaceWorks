@@ -16,15 +16,15 @@ from apps.makerspaces.module_registry import (
 )
 
 PUBLISHED_PROFILE_SIZES = {
-    "minimal": 6, "workshop": 14, "lending": 17, "recommended": 20, "cloud": 24,
-    "everything": 33, "full": 33, "events": 13, "bookings": 13,
+    "minimal": 6, "workshop": 15, "lending": 18, "recommended": 21, "cloud": 25,
+    "everything": 35, "full": 35, "events": 13, "bookings": 13,
 }
 
 
 def test_the_published_module_and_default_counts():
-    assert len(MODULE_KEYS) == 33
+    assert len(MODULE_KEYS) == 35
     assert len(core_module_keys()) == 6
-    assert set(default_enabled_module_keys()) == core_module_keys() | {"updates"}
+    assert set(default_enabled_module_keys()) == core_module_keys() | {"updates", "backup"}
 
 
 @pytest.mark.parametrize("profile", sorted(PROFILES))

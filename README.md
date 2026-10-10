@@ -158,7 +158,7 @@ Unticking a module hides its surfaces and calls `uninstall_module`; it does **no
 
 ## Modules
 
-A makerspace only carries the parts it uses. Space Works ships **32 modules**; **6 are core** and
+A makerspace only carries the parts it uses. Space Works ships **35 modules**; **6 are core** and
 always on (the public catalogue, request workflow, staff admin, evidence uploads, QR management and
 the scanner). The rest are **opt-in**.
 
@@ -168,7 +168,7 @@ QR scan *and* a photo, so a machines-only workshop still carries the request/QR/
 Per-module detail — what each key is and what you lose without it — is in
 [**docs/MODULES.md**](docs/MODULES.md).
 
-You do not have to think in 32 switches. They are grouped into **twelve areas**, which is what the
+You do not have to think in 34 switches. They are grouped into **twelve areas**, which is what the
 console shows you:
 
 | Area | Covers |
@@ -183,6 +183,7 @@ console shows you:
 | **Reports** | Analytics, the report registry and CSV/XLSX exports |
 | **Payments** | Taking money online, through Stripe or Razorpay |
 | **Mobile apps** | Attested device sessions, native push and the in-app payment sheet |
+| **Connected devices** | Printers and label printers enrolled with their own signing key |
 | **Updates** | In-app release control |
 
 **Pick modules at install time** — `setup.sh` reads the live registry and opens a tick list. Its initial
@@ -195,7 +196,7 @@ recommended state corresponds to this profile table; management commands can als
 | `lending` | 18 | A tool library: the full lending lifecycle, no machines |
 | `recommended` | 21 | Core plus the inventory lifecycle, reports and machines |
 | `cloud` | 25 | A managed box: everything a hosted deployment runs |
-| `everything` / `full` | 34 | All modules |
+| `everything` / `full` | 35 | All modules |
 
 **Change it later.** Uninstalling clears the capability and hides the surfaces; **your data is always
 retained** and reinstalling brings it back:
