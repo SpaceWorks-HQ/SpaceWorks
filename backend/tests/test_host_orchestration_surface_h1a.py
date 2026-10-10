@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 
 import pytest
 import yaml
@@ -245,9 +246,11 @@ def test_compose_wrapper_unsets_ambient_pointer_and_layers_pointer_last(tmp_path
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     (fake_bin / "python3").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    # The fake runs under this interpreter: `/usr/bin/python3` does not exist in the
+    # python:3.12 image `dev.sh test` uses, and `env python3` would hit the stub above.
     (fake_bin / "docker").write_text(
-        """#!/usr/bin/python3
-import json, os, pathlib, sys
+        f"#!{sys.executable}\n"
+        """import json, os, pathlib, sys
 files = [sys.argv[index + 1] for index, value in enumerate(sys.argv) if value == '--env-file']
 effective = {}
 for name in files:
