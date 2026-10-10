@@ -4,6 +4,9 @@ from .gate_policy_replay import REPLAY_TASK_PARTICIPANTS, REPLAY_FANOUT_PARTICIP
 
 
 TASK_EXEMPTIONS = {
+    "apps.operations.tasks_platform.run_platform_problem_checks_task": (
+        "Read-only platform monitoring; writes only a disposable deployment cache marker."
+    ),
     "apps.accounts.tasks.purge_auth_challenges_task": "Platform-global auth retention.",
     "apps.accounts.tasks.drain_password_reset_envelopes_task": "Platform-global account recovery.",
     "apps.audit.tasks.run_audit_attestation_task": (

@@ -18,6 +18,12 @@ The shared reminder foundation is `operations/models_reminders.py`,
 `tasks_reminders.py`; consumer registrations are explicit and initially empty.
 Queries use `accounts/rbac.py:scope_for_scheduled_work`; see
 [reminder-schedules.md](reminder-schedules.md) for UTC, claims and migration rules.
+Platform monitoring uses `admin_api/views_platform_monitoring.py` and its schema sibling;
+`operations/platform_dashboard.py` scopes tenants, `platform_signals.py` reads deployment state,
+`platform_checks.py` declares checks, and `platform_problems.py` isolates failures.
+`platform_integration_health.py` reads channels without creating settings; `tasks_platform.py`
+and `scheduler_telemetry.py` own scheduled checks and beat completion telemetry.
+Tenant counters and allowances are read by `makerspaces/usage_snapshot.py`.
 
 - `backend/config/` — Django project (`settings.py`, `urls.py`, wsgi/asgi). All API routes under `/api/`.
   `config/admin_access.py` holds the `/control/` gating, CSP middleware, and the hidden-scope drift-guard

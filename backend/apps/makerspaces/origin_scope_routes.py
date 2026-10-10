@@ -9,6 +9,7 @@ REPLAY_TOKEN_ROUTES = {"kiosk-replay-prepare", "kiosk-replay-execute"}
 
 MAKERSPACE_KWARG_ROUTES = {
     'admin-makerspace-profile': 'makerspace_id',
+    'admin-makerspace-usage': 'makerspace_id',
     'admin-kiosk-replay-list': 'makerspace_id',
     'admin-maintenance-schedule-list-create': 'makerspace_id',
     'admin-maintenance-log-list-create': 'makerspace_id',

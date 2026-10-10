@@ -6,6 +6,7 @@ import { featureEnabled } from "../../lib/features";
 import { StaffPlatformTabContent } from "./StaffPlatformTabContent";
 import { Panel, type Makerspace } from "./panels/shared";
 import { StaffPanelErrorBoundary } from "./StaffPanelErrorBoundary";
+import { PlatformDashboardPanel } from "./StaffTabLoaders";
 
 import { PaymentsPanel, DevicesPanel, DashboardPanel, NotificationInbox, DirectLoans, Inventory, Ledger, MachinesPanel, EventsPanel, OrganizedEventsPanel, OrganizationAnalyticsPanel, OrganizationsPanel, BookingsPanel, MembersPanel, MemberCardsPanel, QrTools, RequestsPanel, OperationsReports, AuditLog, BulkImport, ScannerPanel, ContainersPanel, StocktakePanel, StockTransferPanel, ProcurementPanel, WarrantyPanel, AccountabilityPanel, Categories, NeedsFixShelf, HandoverConsole } from "./StaffTabLoaders";
 
@@ -63,6 +64,9 @@ export function StaffTabContent({
   // Machines needs this for links; targetless organization panels need it as a mount gate.
   singleTenantLocked?: boolean;
 }) {
+  if (activeTab === "platform-dashboard" && isSuperadmin && !singleTenantLocked) {
+    return <StaffPanelErrorBoundary resetKey="platform-dashboard"><Suspense fallback={<Skeleton className="h-40 w-full" />}><PlatformDashboardPanel /></Suspense></StaffPanelErrorBoundary>;
+  }
   if (activeTab === "organizations") {
     return <StaffPanelErrorBoundary resetKey="organizations"><Suspense fallback={<Skeleton className="h-40 w-full" />}><OrganizationsPanel /></Suspense></StaffPanelErrorBoundary>;
   }

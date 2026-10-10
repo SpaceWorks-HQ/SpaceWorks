@@ -1,4 +1,5 @@
 const ALL_TABS = [
+  "platform-dashboard", "usage",
   "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "organized", "bookings", "members", "cards", "tobuy", "transfers",
   "stocktake", "containers", "ledger", "reports", "accountability", "warranty", "bulk", "qr", "scanner", "api", "settings", "emailtemplates", "users", "platform", "audit",
   "devices", "email-logs", "payments", "organizations", "organization-analytics", "modules", "exports", "backups", "migration",
@@ -7,6 +8,8 @@ const ALL_TABS = [
 export const STAFF_TAB_KEYS: readonly string[] = ALL_TABS;
 
 export const TAB_LABELS: Record<string, string> = {
+  "platform-dashboard": "Platform dashboard",
+  usage: "Usage & limits",
   dashboard: "Dashboard",
   notifications: "Notifications",
   requests: "Requests",
@@ -58,7 +61,7 @@ export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
   { label: "Members", tabs: ["members", "cards"] },
   { label: "Insights", tabs: ["reports", "organization-analytics", "accountability", "warranty", "audit"] },
   { label: "Organizations", tabs: ["organizations"] },
-  { label: "Admin", tabs: ["users", "settings", "emailtemplates", "email-logs", "api", "exports", "backups", "migration", "modules", "platform"] },
+  { label: "Admin", tabs: ["users", "settings", "usage", "emailtemplates", "email-logs", "api", "exports", "backups", "migration", "modules", "platform-dashboard", "platform"] },
 ];
 
 // Permissions only. Module availability is decided in exactly one place --
@@ -113,6 +116,8 @@ export function getStaffAccess(
   const printingOnly = canSeePrinting && !canEditInventory && !canManageMakerspace;
   const baseTabs = handoutOnly ? (["requests", "direct", "handover", "payments"] as const) : ALL_TABS;
   const allowedTabs: readonly string[] = governanceOnly ? ["organizations"] : baseTabs.filter((tabName) => {
+    if (tabName === "platform-dashboard") return isSuperadmin && !singleTenantLocked;
+    if (tabName === "usage") return canManageMakerspace;
     if (tabName === "dashboard") return !handoutOnly && (isSuperadmin || canSeeDashboard);
     // The inbox has no machine provenance and its read state is makerspace-wide, so the
     // backend withholds it from a per-type maintainer entirely. Omit the tab rather than

@@ -137,7 +137,7 @@ export function staffBasePath(guestOnly: boolean) {
 // on the inventory tab, not 404. Relaxing it globally would change how every existing
 // bookmark resolves, so the exception is opt-in and currently holds exactly one tab.
 const TABS_WITH_SUBPATHS = new Set(["machines"]);
-const GLOBAL_TABS = new Set(["organizations"]);
+const GLOBAL_TABS = new Set(["organizations", "platform-dashboard"]);
 
 export function staffTabPath(
   tab: string,

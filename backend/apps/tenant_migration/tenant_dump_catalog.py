@@ -65,6 +65,8 @@ class TenantDumpCatalogError(AssertionError):
 # Merge lane/w5-theme into integration/2026-10 (including lane/w5-lists);
 # the coordinator recomputes the digest after all lanes are integrated.
 # The security models are DROP in portable artifacts; the coordinator pins the digest.
+# Merge lane/w6-platform into integration/2026-10 (including lane/w5-lists and
+# lane/w5-theme); the coordinator recomputes the digest for the merged lanes.
 CATALOG_SCHEMA_SHA256 = "RECOMPUTE"
 
 

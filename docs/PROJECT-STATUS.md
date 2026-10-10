@@ -97,6 +97,13 @@ OAuth publishing, native apps, and physical label-printer control remain out of 
 
 ## Observability (phase 0 of the 2026-09-03 forward plan)
 
+**Wave 6 platform monitoring lane (uncommitted; coordinator verification pending).**
+The central staff console adds a superadmin-only platform dashboard and read-only
+problem checks, plus scoped Usage & limits for makerspace managers. Hidden tenants
+are excluded from platform monitoring. Checks run every 15 minutes in beat and
+cron; beat completion telemetry now shares the scheduler journal. Implementation,
+thresholds and unsupported MFA/TLS signals: [platform monitoring](platform-monitoring.md).
+
 Every request carries an `X-Request-ID` (honoured from a proxy when it is short plain ASCII, minted
 otherwise), bound in `config/request_id.py` and echoed on the response. Log lines are JSON in production
 (`config/log_setup.py`; `LOG_JSON` overrides), each stamped with that id, and Celery messages carry it into

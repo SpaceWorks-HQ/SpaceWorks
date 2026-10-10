@@ -83,7 +83,8 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
   }
 
   const isSuperadmin = user.is_superuser || user.role === "superadmin";
-  const globalOrganizationRoute = tabFromStaffPath(location.pathname, guestOnly) === "organizations";
+  const routeTab = tabFromStaffPath(location.pathname, guestOnly);
+  const globalRoute = routeTab === "organizations" || (isSuperadmin && routeTab === "platform-dashboard");
 
   if (isSuperadmin && recovery.data?.mode === "quarantined") {
     return (
@@ -125,7 +126,7 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
     return <StaffLoading message="Restoring makerspace..." />;
   }
 
-  if (!singleTenantLocked && isSuperadmin && selected !== null && !activeMakerspace && !globalOrganizationRoute) {
+  if (!singleTenantLocked && isSuperadmin && selected !== null && !activeMakerspace && !globalRoute) {
     return (
       <MakerspacePicker
         makerspaces={makerspaces.data ?? []}
@@ -137,7 +138,7 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
     );
   }
 
-  if (!singleTenantLocked && isSuperadmin && selected === null && !globalOrganizationRoute) {
+  if (!singleTenantLocked && isSuperadmin && selected === null && !globalRoute) {
     return (
       <MakerspacePicker
         makerspaces={makerspaces.data ?? []}
