@@ -83,8 +83,8 @@
   transaction. `services.py` is the stable barrel over archive/access/lease/run lifecycle modules;
   `models_runs.py` + `runs.py` own scheduled-run cohort and coverage proofs, while `services_runs.py`
   orchestrates their serialized builds. Offsite destinations: `models_offsite.py` (destination +
-  upload journal), `offsite_client.py` (S3 byte primitives), `offsite_push.py` (fan-out + read-back
-  verification), `offsite_retention.py`, `offsite_restore.py` (create-only rehydration),
+  upload journal), `offsite_client.py` (S3 byte primitives), `offsite_enqueue.py` (eligibility + journal rows), `offsite_push.py` (fan-out + read-back
+  verification), `offsite_retention.py`, `offsite_reverify.py` (periodic re-read), `offsite_restore.py` (create-only rehydration),
   `tasks_offsite.py`, `views_offsite.py` and the `fetch_offsite_archive` command. `module_gate.py` owns
   the `backup` module key; `views_custody.py` is its read-only custody status.
   `archive_metadata.py` owns stable build/settings manifest facts;

@@ -237,3 +237,42 @@ def test_scheduled_task_dispatches_push_and_survives_its_failure(monkeypatch):
 
     monkeypatch.setattr(tasks.push_offsite_backups_task, "delay", broken)
     assert tasks.scheduled_deployment_backup_task.apply().get() is False
+
+
+def test_reverify_requeues_a_copy_that_rotted_on_the_destination(offsite_bucket):
+    from apps.backup.offsite_reverify import REVERIFY_AFTER, reverify_offsite_copies
+
+    good = stored_archive()
+    rotten = stored_archive()
+    destination = make_destination(offsite_bucket)
+    enqueue_offsite_uploads()
+    push_due_uploads()
+    old = timezone.now() - REVERIFY_AFTER - timedelta(days=1)
+    BackupDestinationUpload.objects.update(verified_at=old)
+    rotten_row = BackupDestinationUpload.objects.get(archive_id_snapshot=rotten.pk)
+    storage.client().put_object(Bucket=destination.bucket, Key=rotten_row.remote_locator, Body=b"rot")
+
+    assert reverify_offsite_copies() == 1
+
+    rotten_row.refresh_from_db()
+    good_row = BackupDestinationUpload.objects.get(archive_id_snapshot=good.pk)
+    assert rotten_row.state == BackupDestinationUpload.State.PENDING
+    assert rotten_row.last_error_code == "reverify_digest_mismatch"
+    assert good_row.verified_at > old
+    assert AuditLog.objects.filter(action="backup.offsite_copy_corrupted").count() == 1
+    assert push_due_uploads() == 1
+    rotten_row.refresh_from_db()
+    assert rotten_row.state == BackupDestinationUpload.State.BYTES_VERIFIED
+
+
+def test_enqueue_skips_already_covered_archives_so_new_ones_are_not_starved(offsite_bucket):
+    first = stored_archive(completed_at=timezone.now() - timedelta(hours=2))
+    second = stored_archive()
+    make_destination(offsite_bucket)
+
+    assert enqueue_offsite_uploads(limit=1) == 1
+    assert enqueue_offsite_uploads(limit=1) == 1
+
+    assert set(BackupDestinationUpload.objects.values_list("archive_id_snapshot", flat=True)) == {
+        first.pk, second.pk,
+    }

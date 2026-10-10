@@ -75,6 +75,8 @@ SOURCE_LOCAL_AUDIT_EDGES = frozenset(
         ("backup.archive_rehydrate_requested", "destination_id"),
         ("backup.archive_rehydrated", "destination_id"),
         ("backup.offsite_copy_abandoned", "archive_id"),
+        ("backup.offsite_copy_corrupted", "archive_id"),
+        ("backup.offsite_copy_corrupted", "destination_id"),
         ("backup.offsite_copy_abandoned", "destination_id"),
         ("backup.offsite_copy_pruned", "archive_id"),
         ("backup.offsite_copy_pruned", "destination_id"),

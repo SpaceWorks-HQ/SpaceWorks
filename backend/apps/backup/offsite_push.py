@@ -13,15 +13,21 @@ from datetime import timedelta
 
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
 from apps.audit import services as audit
 from apps.backup import offsite_client, storage
+from apps.backup.offsite_enqueue import (  # noqa: F401  (stable import surface)
+    OffsiteIntegrityError,
+    active_destinations,
+    eligible_archives,
+    enqueue_offsite_uploads,
+    expected_facts,
+)
 from apps.backup.models import (
     BackupArchive,
-    BackupArtifactLedger,
     BackupDestination,
     BackupDestinationUpload,
 )
@@ -31,98 +37,6 @@ logger = logging.getLogger(__name__)
 BACKOFF_BASE_SECONDS = 300
 BACKOFF_CAP_SECONDS = 6 * 3600
 CLAIM_SECONDS = 6 * 3600
-
-
-class OffsiteIntegrityError(RuntimeError):
-    pass
-
-
-def active_destinations():
-    return BackupDestination.objects.filter(enabled=True, retired_at__isnull=True)
-
-
-def eligible_archives(now=None):
-    """Deployment archives plus run-produced tenant archives; never ad-hoc tenant ones."""
-    now = now or timezone.now()
-    return BackupArchive.objects.filter(
-        Q(scope=BackupArchive.Scope.DEPLOYMENT) | Q(backup_run__isnull=False),
-        status=BackupArchive.Status.AVAILABLE,
-        expires_at__gt=now,
-    ).order_by("completed_at", "pk")
-
-
-def expected_facts(archive):
-    """Return (size, sha256, source); the artifact ledger is authoritative when present."""
-    ledger = BackupArtifactLedger.objects.filter(pk=archive.pk).first()
-    if ledger is None:
-        if not archive.archive_sha256 or not archive.size_bytes:
-            raise OffsiteIntegrityError("The archive has no recorded size and digest.")
-        return (
-            archive.size_bytes,
-            archive.archive_sha256,
-            BackupDestinationUpload.IntegritySource.ARCHIVE_ROW,
-        )
-    if ledger.state != BackupArtifactLedger.State.AVAILABLE:
-        raise OffsiteIntegrityError("The artifact ledger does not mark the archive available.")
-    if (
-        ledger.outer_sha256 != archive.archive_sha256
-        or ledger.expected_size_bytes != archive.size_bytes
-    ):
-        raise OffsiteIntegrityError("The archive row and the artifact ledger disagree.")
-    return (
-        ledger.expected_size_bytes,
-        ledger.outer_sha256,
-        BackupDestinationUpload.IntegritySource.ARTIFACT_LEDGER,
-    )
-
-
-def enqueue_offsite_uploads(limit=200):
-    """Create one journal row per (active destination, eligible archive) pair."""
-    created = 0
-    destinations = list(active_destinations())
-    if not destinations:
-        return 0
-    now = timezone.now()
-    for archive in eligible_archives(now)[:limit]:
-        existing = set(
-            BackupDestinationUpload.objects.filter(archive_id_snapshot=archive.pk)
-            .values_list("destination_id", flat=True)
-        )
-        missing = [row for row in destinations if row.pk not in existing]
-        if not missing:
-            continue
-        try:
-            size, sha256, source = expected_facts(archive)
-        except OffsiteIntegrityError:
-            logger.critical(
-                "backup_offsite_integrity_refused", extra={"archive_id": str(archive.pk)}
-            )
-            continue
-        for destination in missing:
-            try:
-                with transaction.atomic():
-                    BackupDestinationUpload.objects.create(
-                        destination=destination,
-                        archive=archive,
-                        archive_id_snapshot=archive.pk,
-                        scope_snapshot=archive.scope,
-                        makerspace_id_snapshot=archive.makerspace_id,
-                        format_snapshot=str((archive.manifest or {}).get("format", ""))[:80],
-                        archive_completed_at_snapshot=archive.completed_at,
-                        expected_size_bytes=size,
-                        expected_sha256=sha256,
-                        integrity_source=source,
-                        remote_locator=offsite_client.remote_locator(
-                            destination, archive.pk, archive.scope
-                        ),
-                        next_attempt_at=now,
-                        expires_at=archive.completed_at
-                        + timedelta(days=destination.retention_days),
-                    )
-            except IntegrityError:
-                continue
-            created += 1
-    return created
 
 
 def push_due_uploads(limit=10):

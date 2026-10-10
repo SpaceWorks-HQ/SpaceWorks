@@ -2096,6 +2096,9 @@ Load-bearing details that carried over unchanged:
   state, and backs a journal row off `5 min × 2^attempts` capped at 6 h.
 - **Pushed:** every deployment archive and every run-produced tenant archive. **Not pushed:** ad hoc
   Space-Manager archives. Destinations are platform-held only (a tenant cannot register its own).
+- **Verified copies are re-read every 30 days** (`offsite_reverify`). A digest mismatch returns the
+  row to `pending` for a fresh upload and is audited `backup.offsite_copy_corrupted`; a transport
+  failure only records its code. This is byte integrity, not a restore drill.
 - **Retention never removes the newest verified copy** per destination (and per tenant), whatever its
   age. Retiring a destination wipes its credentials and keeps the journal.
 - **Credentials** are Fernet under `API_CLIENT_ENC_KEY` via `makerspaces.secrets`, write-only in API and
@@ -2106,9 +2109,12 @@ Load-bearing details that carried over unchanged:
 - **The `backup` module gates tenant surfaces only.** Recipient compromise and every deployment surface
   are never gated. `backup` cannot be uninstalled while superadmin access is off, and superadmin access
   cannot be switched off while `backup` is uninstalled. Its purge deletes only ad hoc tenant archives.
-- **Known defect, not fixed:** `storage_promotion.create_final_from_staging` passes a non-seekable
-  `StreamingBody` to `put_object`; against real MinIO with botocore 1.43 that raises
-  `io.UnsupportedOperation` (outside the caught exception types). Existing tests mock the call.
+- **Never hand a `StreamingBody` to `put_object`.** `create_final_from_staging` did, so against a real
+  store (botocore 1.43, MinIO) promotion raised `io.UnsupportedOperation` — outside its caught
+  exception types — because botocore seeks the body for checksums and, over http, reads it to sign
+  the payload. Every promotion test mocked the primitive, so nothing noticed. It now spools staging to a
+  private temporary file and puts that; `tests/backup/test_storage_promotion_real_store.py` runs it
+  against the harness MinIO.
 
 ### The SHAPE a projected model must have (catalog-driven, 2026-09-03)
 

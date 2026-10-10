@@ -16,12 +16,14 @@ logger = logging.getLogger(__name__)
 def push_offsite_backups_task(self):
     from apps.backup.offsite_push import enqueue_offsite_uploads, push_due_uploads
     from apps.backup.offsite_retention import prune_offsite_copies
+    from apps.backup.offsite_reverify import reverify_offsite_copies
 
-    result = {"enqueued": 0, "pushed": 0, "pruned": 0}
+    result = {"enqueued": 0, "pushed": 0, "pruned": 0, "reverified": 0}
     for name, step in (
         ("enqueued", enqueue_offsite_uploads),
         ("pushed", push_due_uploads),
         ("pruned", prune_offsite_copies),
+        ("reverified", reverify_offsite_copies),
     ):
         try:
             result[name] = step()
