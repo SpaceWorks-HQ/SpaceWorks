@@ -13,6 +13,12 @@ def _same(label, names, disposition, reason):
 
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
+    *_same("payments.MakerspaceBillingSettings", "payment_terms_days", D.PRESERVE,
+           "New-charge terms are tenant policy; imported charges keep their snapshotted due dates."),
+    *_same("payments.MakerspaceBillingSettings", "reminder_days_before reminder_days_after max_reminders", D.RESET,
+           "Automatic member mail requires target opt-in; a portable archive cannot enable reminders."),
+    *_same("payments.Payment", "due_at", D.PRESERVE,
+           "The original due date travels with the money owed."),
     *_same(
         "makerspaces.Makerspace", "timezone country opening_hours", D.PRESERVE,
         "The tenant location and advisory wall-clock schedule travel unchanged.",

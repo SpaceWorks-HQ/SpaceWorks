@@ -35,7 +35,7 @@ def family_world(slug):
     manager = make_member(f"{slug}-manager", space)
     member = make_member(f"{slug}-member", space, membership_role=MakerspaceMembership.Role.CUSTOM)
     payment = Payment.objects.create(
-        makerspace=space, member=member, subject_type="makerspace_membership",
+        makerspace=space, member=member, created_by=manager, subject_type="makerspace_membership",
         subject_id=MakerspaceMembership.objects.get(makerspace=space, user=member).pk,
         amount="9876.54", currency="usd", provider="unclaimed",
     )
@@ -155,10 +155,12 @@ def test_member_opt_out_and_revocation_win(monkeypatch, django_capture_on_commit
 
 
 def test_account_only_payment_owner_can_receive_own_email(monkeypatch, django_capture_on_commit_callbacks):
-    space, _manager, _member, _payment = family_world("f3-account")
+    space, manager, _member, _payment = family_world("f3-account")
     owner = make_user("f3-account-owner", access_status="active")
-    payment = Payment.objects.create(makerspace=space, member=owner, subject_type="loan_deposit",
-                                     subject_id=123, amount="5.00", currency="usd")
+    from apps.hardware_requests.models import HardwareRequest
+    loan = HardwareRequest.objects.create(makerspace=space, requester=owner, requester_username=owner.username)
+    payment = Payment.objects.create(makerspace=space, member=owner, created_by=manager, subject_type="loan_deposit",
+                                     subject_id=loan.pk, amount="5.00", currency="usd")
     NotificationPreference.objects.create(makerspace=space, feature="payments", channel="email", enabled=True)
     emails, _channels = capture_delivery(monkeypatch)
     with django_capture_on_commit_callbacks(execute=True):
@@ -193,14 +195,14 @@ def test_provider_failure_does_not_escape_on_commit(monkeypatch, django_capture_
         assert result.scheduled
 
 
-def test_disabled_before_commit_suppresses_even_enabled_matrix(monkeypatch, django_capture_on_commit_callbacks):
+def test_ledger_notifications_survive_rail_removal_before_commit(monkeypatch, django_capture_on_commit_callbacks):
     space, _staff, _member, payment = family_world("f3-module")
     NotificationPreference.objects.create(makerspace=space, feature="payments", channel="email", enabled=True)
     emails, channels = capture_delivery(monkeypatch)
     with django_capture_on_commit_callbacks(execute=True):
         notify_payment(payment, "charge_raised")
         disable_module(space, "payments")
-    assert emails == [] and channels == []
+    assert emails and channels == []
 
 
 def test_finance_fallback_matches_existing_finance_list_action():
@@ -226,7 +228,7 @@ def test_choice_migration_matches_all_runtime_fields():
         assert operation.field.max_length == runtime.max_length
 
 
-@pytest.mark.parametrize("stream", ["payments", "stock", "certifications", "maintenance", "membership"])
+@pytest.mark.parametrize("stream", ["stock", "certifications", "maintenance", "membership"])
 def test_new_template_stream_module_off_is_400(stream):
     from rest_framework.exceptions import ValidationError as ApiValidationError
     from apps.admin_api.views_email_templates_common import _resolve_makerspace, STREAM_MODULES
@@ -235,3 +237,10 @@ def test_new_template_stream_module_off_is_400(stream):
     with pytest.raises(ApiValidationError) as error:
         _resolve_makerspace(manager, space.pk, stream)
     assert error.value.status_code == 400
+
+
+def test_payment_templates_remain_available_without_online_rail():
+    from apps.admin_api.views_email_templates_common import _resolve_makerspace
+    space, manager, _, _ = family_world("f3-ledger-templates")
+    disable_module(space, "payments")
+    assert _resolve_makerspace(manager, space.pk, "payments").pk == space.pk

@@ -22,3 +22,7 @@ class ManualRefundReceiptSerializer(serializers.Serializer):
 
 class PaymentOfflineRefundSerializer(PaymentRefundRequestSerializer):
     receipt = ManualRefundReceiptSerializer()
+
+
+class PaymentRefundAmendSerializer(serializers.Serializer):
+    receipt = ManualRefundReceiptSerializer()

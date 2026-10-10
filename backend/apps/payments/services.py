@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 @transaction.atomic
 def create_payment(
     *, makerspace, subject_type, subject_id, member, amount, currency, created_by,
-    via_makerspace=None, subject_label="",
+    via_makerspace=None, subject_label="", due_at=None,
 ):
     # A missing source is NOT fatal any more. Recording what a member owes is separate
     # from being able to collect it online: a space that takes cash still needs the debt
@@ -51,6 +51,7 @@ def create_payment(
         provider = source.provider
         connected_account_id = source.connected_account_id
         fee_amount = _application_fee_amount(amount, source.application_fee_bps, currency)
+    from apps.payments.due_dates import default_due_at
     payment = Payment.objects.create(
         makerspace=makerspace,
         subject_type=subject_type,
@@ -61,6 +62,7 @@ def create_payment(
         amount=amount,
         currency=currency.lower(),
         created_by=created_by,
+        due_at=due_at if due_at is not None else default_due_at(makerspace, actor=created_by),
         # Stamped at creation from whatever resolved NOW, and immutable thereafter: a
         # space that switches vendor must still settle and expire the charges it raised
         # under the old one, and moving a row between vendors would point it at a

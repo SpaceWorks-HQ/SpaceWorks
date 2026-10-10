@@ -205,6 +205,7 @@ def _raise_renewal(term):
                     currency=plan.currency,
                     created_by=term.membership.user,
                     subject_label=f"Membership renewal: {plan.name}",
+                    due_at=term.ends_at,
                 )
             except IntegrityError:
                 # A previous run raised the charge but lost the race to record it.

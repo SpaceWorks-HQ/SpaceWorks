@@ -61,6 +61,7 @@ def _get_or_create(registration, created_by):
                 currency=currency,
                 created_by=created_by,
                 subject_label=event.title,
+                due_at=event.starts_at,
             )
     except IntegrityError:
         return Payment.objects.get(**lookup)

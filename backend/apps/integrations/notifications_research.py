@@ -34,7 +34,7 @@ def bounded(value, limit=160):
 
 
 def notify_family(makerspace, feature, event, subject, *, data, scope=None,
-                  member_id=None, requester_subject=None):
+                  member_id=None, requester_subject=None, requester_only=False):
     """Queue one edge; resolve fresh gates, recipients and templates after commit.
 
     subject/requester_subject are immutable bags built by domain adapters. Address
@@ -52,7 +52,7 @@ def notify_family(makerspace, feature, event, subject, *, data, scope=None,
         emails = [EmailDelivery(to_email=email, subject=staff["subject"],
                                 text_body=staff["text_body"], html_body=staff["html_body"],
                                 stream=stream, audience="staff")
-                  for email in staff_emails_for_feature(makerspace, feature, event=event, scope=scope)]
+                  for email in ([] if requester_only else staff_emails_for_feature(makerspace, feature, event=event, scope=scope))]
         if member_id and event in REQUESTER_EVENTS.get(stream, ()):
             owner = User.objects.filter(pk=member_id, is_active=True,
                                         access_status=User.AccessStatus.ACTIVE).first()
@@ -73,7 +73,7 @@ def notify_family(makerspace, feature, event, subject, *, data, scope=None,
                                             text_body=own["text_body"], html_body=own["html_body"],
                                             stream=stream, audience="requester"))
         return LifecyclePayload(text=staff["text_body"], context=context, emails=tuple(emails),
-                                scope=scope, data=data)
+                                scope=scope, data=data, staff_channels_enabled=not requester_only)
 
     try:
         return notify_lifecycle(makerspace, feature=feature, event=event, build=build)

@@ -15,6 +15,9 @@ def _default(reason, *, allow_superadmin_override=False):
 
 
 TARGET_FIELD_PROJECTION = {
+    ("payments.MakerspaceBillingSettings", "reminder_days_before"): TargetField([], reason="Target staff choose mail offsets."),
+    ("payments.MakerspaceBillingSettings", "reminder_days_after"): TargetField([], reason="Target staff choose mail offsets."),
+    ("payments.MakerspaceBillingSettings", "max_reminders"): TargetField(0, reason="Target staff explicitly enable automatic reminders."),
     ("makerspaces.Makerspace", "frontend_domain"): TargetField(
         None, reason="A source domain must not enter the target credentialed-origin allowlist."
     ),
@@ -132,4 +135,3 @@ TARGET_FIELD_PROJECTION.update(printer_projections(TargetField))
 from .target_projection_7c import label_projections
 
 TARGET_FIELD_PROJECTION.update(label_projections(TargetField))
-

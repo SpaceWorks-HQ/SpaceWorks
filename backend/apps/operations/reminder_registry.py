@@ -1,4 +1,4 @@
-"""Explicit registrations only. F1 ships no production consumers.
+"""Explicit reminder registrations; consumers own domain delivery and eligibility.
 
 Sources discover scoped domain subjects and rebuild messages at dispatch time so
 cancelled/returned subjects do not receive stale notifications. See the test-only
@@ -38,19 +38,28 @@ class ReminderSource:
     discover: Callable[[Makerspace, datetime, int, tzinfo], Iterable[ReminderSubject]]
     build: Callable[[Makerspace, ReminderSchedule, datetime, tzinfo], ReminderMessage | None]
     feature: str | None = None
+    dispatch: Callable | None = None
 
 
-# Later lanes add their source explicitly here, with existing module/feature gates.
-# No AppConfig hooks, autodiscovery, dynamic imports, or consumers in this foundation.
-REMINDER_SOURCES: tuple[ReminderSource, ...] = ()
+# No AppConfig hooks or autodiscovery. Tests can replace the explicit registry.
+def _production_sources():
+    from apps.payments.reminders import build_payment_message, discover_payments, dispatch_payment_message
+    return (ReminderSource(
+        key="payments.due", module="request_workflow", feature="billing.reminders",
+        discover=discover_payments, build=build_payment_message, dispatch=dispatch_payment_message,
+    ),)
+
+
+REMINDER_SOURCES: tuple[ReminderSource, ...] | None = None
 
 
 def registered_sources():
     from apps.makerspaces.capabilities import FEATURES
     from apps.makerspaces.module_registry import MODULE_KEYS
 
+    sources = _production_sources() if REMINDER_SOURCES is None else REMINDER_SOURCES
     seen = set()
-    for source in REMINDER_SOURCES:
+    for source in sources:
         if not isinstance(source.key, str) or not source.key.strip() or len(source.key) > 80:
             raise ValueError("Reminder source needs a nonempty key of at most 80 characters.")
         if source.key in seen:
@@ -61,5 +70,7 @@ def registered_sources():
             raise ValueError(f"Unknown reminder source gate: {source.key}")
         if not callable(source.discover) or not callable(source.build):
             raise ValueError(f"Reminder source callbacks are required: {source.key}")
+        if source.dispatch is not None and not callable(source.dispatch):
+            raise ValueError(f"Reminder source dispatch must be callable: {source.key}")
         seen.add(source.key)
-    return REMINDER_SOURCES
+    return sources

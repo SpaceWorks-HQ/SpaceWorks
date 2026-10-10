@@ -61,570 +61,169 @@ core modules cannot be uninstalled at all.
 
 ## Inventory
 
-The permanent heading. It absorbs all six core keys, so this area has no master switch — but nine of the
-thirteen modules under it are optional.
-
 ### public_inventory
 
-**Core — cannot be uninstalled.**
-
-- **What it is** — the public browse catalogue and item detail pages at `/m/<slug>`.
-- **What it adds** — the `catalog` workflow: the public product list and detail view.
-- **Without it** — not an option. It is the surface the whole system exists to publish. What you *can*
-  control is per item: `is_public` removes a product from the public list entirely, and
-  `public_availability_mode` (`exact_count` / `status_only` / `hidden`) decides how much of its stock
-  level a visitor sees. A space that wants no public catalogue publishes nothing.
-- **Data** — core; not separately purgeable.
+[Read the public_inventory module reference](MODULES-INVENTORY.md#public_inventory).
 
 ### request_workflow
 
-**Core — cannot be uninstalled.**
-
-- **What it is** — member hardware requests and the state machine behind them
-  (`draft → pending_approval → accepted → issued → returned`).
-- **What it adds** — the `request_submit` and `request_status` workflows: submitting a borrow request
-  and following it, plus the staff review queue.
-- **Without it** — not an option. Every handover in the system — staff issue, front-desk handout, member
-  self-checkout — records itself through this workflow, and it is the only place a request's status is
-  allowed to change.
-- **Who may submit is set by `membership`, not by this module.** Being core, this module is present in every
-  makerspace and therefore must work with `membership` uninstalled: members only when `membership` is on,
-  any signed-in account when it is off, and account-less strangers only when an operator has explicitly
-  opted in (`manage.py set_request_access --mode anyone`, which is refused while `membership` is installed).
-  See the `membership` module below, and **Who may submit a borrow request** in `docs/INVARIANTS.md`.
-- **Accept and reject are one request at a time.** There is no bulk accept or bulk reject anywhere —
-  `/control/` serves a per-request review page, and Telegram alerts carry no buttons.
-- **Data** — core; not separately purgeable.
+[Read the request_workflow module reference](MODULES-INVENTORY.md#request_workflow).
 
 ### staff_admin
 
-**Core — cannot be uninstalled.**
-
-- **What it is** — the staff console's inventory and request administration API.
-- **What it adds** — the `staff_inventory` and `staff_requests` workflows: products, categories, assets,
-  the needs-fixing queue, exports and the request review screens; plus the **audit explorer** (the
-  `VIEW_AUDIT`-scoped audit list with safely projected metadata, the request timeline's audit rows and
-  evidence-retention state, and asynchronous integrity verification runs). The `audit-trail` CSV export
-  additionally needs the `reports` module.
-- **Without it** — not an option; a space with no staff console cannot be run. Who sees what inside it is
-  a **roles** question, not a module one — see the role/action matrix.
-- **Data** — core; not separately purgeable.
+[Read the staff_admin module reference](MODULES-INVENTORY.md#staff_admin).
 
 ### evidence_uploads
 
-**Core — cannot be uninstalled.**
-
-- **What it is** — immutable issue and return evidence photos (once attached) in a private bucket.
-- **What it adds** — the `evidence_uploads` workflow: presigned upload, and the photo attached to every
-  issue and return.
-- **Without it** — not an option: hardware cannot be issued without an issue photo, nor returned without
-  a return photo and a remark. That is the accountability rule the product is built around.
-- **Data** — core; not separately purgeable. Attached evidence rows are immutable and only ever removed when the
-  whole makerspace is purged. The *object bytes* are a separate question: an optional per-makerspace
-  retention policy deletes the stored image once its window passes, keeping the immutable row, the
-  remarks, the QR scans and the audit trail. An expired photo then reads as a truthful expired state
-  (410) rather than a broken link, so the accountability record survives the picture.
-  Separately, a default-off abandoned-upload cleanup (deployment switch plus per-space opt-in) may
-  delete an old upload slot that no workflow ever consumed; it never touches attached evidence or rows
-  recorded before the feature, and it leaves a permanent receipt that keeps re-deleting a late upload.
+[Read the evidence_uploads module reference](MODULES-INVENTORY.md#evidence_uploads).
 
 ### qr_management
 
-**Core — cannot be uninstalled.**
-
-- **What it is** — generating, revoking and printing the QR codes for boxes, tools and asset units.
-- **What it adds** — the `qr_generate`, `qr_revoke` and `qr_print` workflows, plus QR rebinding.
-- **Without it** — not an option: issuing reviewed-request hardware requires a box QR scan, so a space
-  with no QR codes could not complete a handover.
-- **Data** — core; not separately purgeable. Scan records are immutable.
+[Read the qr_management module reference](MODULES-INVENTORY.md#qr_management).
 
 ### scanner
 
-**Core — cannot be uninstalled.**
-
-- **What it is** — the camera scanner and the container lookup it feeds.
-- **What it adds** — the `qr_scan` and `container_lookup` workflows.
-- **Without it** — not an option, for the same reason as `qr_management`: no scan, no handover.
-- **Data** — core; not separately purgeable.
+[Read the scanner module reference](MODULES-INVENTORY.md#scanner).
 
 ### asset_units
 
-- **What it is** — individually QR-tracked units of a product, so "drill #3" is a thing rather than "one
-  of four drills".
-- **What it adds** — per-unit QR generation and asset-level status tracking; asset units become
-  selectable at issue time.
-- **Without it** — products are tracked by **quantity only**. Availability maths, requests and handovers
-  all still work; you simply cannot say *which* physical unit went out, and per-unit QR labels are
-  unavailable.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately.
+[Read the asset_units module reference](MODULES-INVENTORY.md#asset_units).
 
 ### containers
 
-- **What it is** — the physical container hierarchy (boxes inside shelves inside rooms) and moves
-  between them.
-- **What it adds** — creating and listing containers, the parent/child hierarchy and container moves; a
-  direct handout can resolve a scanned container into the loan.
-- **Without it** — you cannot create, list or re-parent containers in the console, and a direct handout
-  will not accept one. Storage location stops being modelled as a hierarchy. Scanning a box QR still
-  resolves — that is [`scanner`](#scanner) — and containers that already exist keep their codes, so the
-  box-scan-at-issue rule is unaffected.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately.
+[Read the containers module reference](MODULES-INVENTORY.md#containers).
 
 ### bulk_import
 
-- **What it is** — spreadsheet import of inventory rows.
-- **What it adds** — the `bulk_import` workflow: upload a sheet, map columns, preview, commit.
-- **Without it** — inventory is created one product at a time in the console (or through the API). The
-  most common reason to install it is the first week of migrating from a spreadsheet.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately.
+[Read the bulk_import module reference](MODULES-INVENTORY.md#bulk_import).
 
 ### stock_transfers
 
-- **What it is** — moving stock between locations, including true movement **between makerspaces**.
-- **What it adds** — the `stock_transfer` workflow: raise a transfer, its lines, and the receiving side.
-- **Without it** — stock stays where it was booked in. A multi-space operator loses the only supported
-  way to move quantity across a tenant boundary without editing counts by hand.
-- **Data** — purgeable: transfers and their lines.
+[Read the stock_transfers module reference](MODULES-INVENTORY.md#stock_transfers).
 
 ### qr_print_batches
 
-- **What it is** — batched QR label generation as a downloadable ZIP.
-- **What it adds** — the `qr_print_batch` workflow: select items or asset units, generate a sheet, keep
-  the batch as a record.
-- **Without it** — QR codes still exist and still print one at a time from `qr_management`; what you
-  lose is generating and re-downloading a whole sheet at once.
-- **Data** — purgeable: print batches and their items.
+[Read the qr_print_batches module reference](MODULES-INVENTORY.md#qr_print_batches).
 
 ### guest_handover
 
-- **What it is** — the narrow front-desk console: hand out an accepted request, take it back, without
-  seeing the rest of the admin.
-- **What it adds** — the `guest_issue` and `guest_return` workflows, and direct handouts at the counter.
-- **Without it** — handovers happen in the full staff console instead. Front-desk volunteers then need a
-  role with wider access than they should have, which is the reason this module exists. The handover
-  **role** is a separate concept: a custom role holding the handout actions, editable per space.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately; the requests
-  and evidence it produced belong to the core loan spine.
+[Read the guest_handover module reference](MODULES-INVENTORY.md#guest_handover).
 
 ### procurement
 
-- **What it is** — the "to buy" list and the receipts attached to it.
-- **What it adds** — the `procurement` workflow: raise a to-buy item, track it, attach a receipt, and
-  move a purchased item into stock.
-- **Without it** — restocking is tracked outside the system. Low-stock signals still show in inventory;
-  there is just nowhere in-app to record what was ordered.
-- **Data** — purgeable: to-buy items and their receipts (including the uploaded receipt files).
-
----
+[Read the procurement module reference](MODULES-INVENTORY.md#procurement).
 
 ## Stocktake
 
 ### stocktake
 
-- **What it is** — scan-first stock counts and the variance they produce.
-- **What it adds** — the `stocktake` workflow: open a session, scan through the shelves, review variance,
-  commit the adjustment as a ledger entry.
-- **Without it** — counts are corrected by editing quantities directly, with no session, no variance
-  report and no audit of the count as an event.
-- **Data** — purgeable: stocktake sessions, lines and ledger entries.
-
----
+[Read the stocktake module reference](MODULES-INVENTORY.md#stocktake).
 
 ## Machines
 
 ### machines
 
-- **What it is** — the machine registry: machines, their operators, usage and documents. Warranty
-  records and consumable pools hang off it.
-- **What it adds** — the Machines console, machine detail, per-machine documents and images, consumables
-  and usage. `MANAGE_MACHINES` is scoped per role, so a maintainer can be narrowed to specific machines.
-  A consumable pool is scoped to **either** one machine or one machine type, never both, so a filament
-  colour can be shared across every printer of a type instead of being re-entered per machine. Each pool
-  also carries a hex swatch for the staff console and its own public/private flag. A public pool appears
-  in the public printing form as material and colour name only — never the hex value, the lot code or
-  the remaining grams — and only while it is active with stock left. With the `machines.certifications`
-  feature switched on, a makerspace defines certification types per machine type and issues grants to
-  memberships; an uncertified member is refused when booking a linked space or requesting work, and an
-  override needs machine-type authority plus a recorded, audited reason. The `certification-coverage`
-  report shows trained members per type.
-- **Booking limit** — machine time bookings are not available. The machine-type `requires_booking`
-  flag is stored and validated but **not yet enforced**, including on the built-in laser/CNC types
-  where it is true. It does not block service requests or job starts. Space bookings remain separate.
-- **Without it** — the whole machine side of the product disappears: no registry, no service queue
-  (which needs machines to point at), no maintenance schedules, no per-machine consumables. A pure tool
-  library runs exactly like this — see the `lending` profile.
-- **Data** — **not separately purgeable**, and the command says why: machine rows host warranty records,
-  inventory-backed consumables and service history, so deleting them piecemeal would orphan other
-  modules. Purge `machine_service` first, then archive and purge the makerspace. Certification grants
-  are training evidence: a type is deactivated, never deleted, and a grant is revoked, never edited.
+[Read the machines module reference](MODULES-WORKSHOPS.md#machines).
 
 ### machine_service
 
-Required by `printing`.
-
-- **What it is** — the service/job queue: a member asks for work on a machine, staff run it.
-- **What it adds** — the `machine_service_requests` workflow: request intake, the staff queue, file
-  uploads, consumption ledgers and the usage entries a finished job produces.
-- **Without it** — machines are a registry you look at, not a queue you work. Jobs are arranged in person
-  or by message; nothing records who ran what, on which machine, using how much material. `printing`
-  cannot be installed while this is off.
-- **Data** — purgeable: service requests, queues, uploads, consumption ledgers and the usage entries they
-  produced. Consumable pools stay — they belong to `machines`.
+[Read the machine_service module reference](MODULES-WORKSHOPS.md#machine_service).
 
 ### printing
 
-**Requires `machine_service`** (installing `printing` pulls it in).
-
-- **What it is** — 3D printing as a machine type on top of the service queue.
-- **What it adds** — the `printing_requests` workflow: print-specific intake, print files, and the
-  printer-facing view of the queue.
-- **Without it** — 3D printers can still be registered as machines and their jobs run through the
-  ordinary service queue; what you lose is the print-specific handling around them.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately; print jobs are
-  service requests and go with `machine_service`.
+[Read the printing module reference](MODULES-WORKSHOPS.md#printing).
 
 ### maintenance
 
-- **What it is** — preventive maintenance schedules and immutable logs of completed maintenance,
-  including reactive repairs. Work orders with status, assignee and priority are not available.
-- **What it adds** — the `maintenance` workflow, the maintenance section of the dashboard, and log
-  documents. Completing a schedule sets its next due date to the recorded completion date plus its
-  interval; a late completion starts a fresh interval. Backdated logs use their recorded date.
-- **Without it** — machines have no maintenance history and nothing schedules preventive work; a broken
-  machine is handled as a service request or out of band.
-- **Data** — purgeable: maintenance schedules, logs and log documents (including uploaded files).
-
----
+[Read the maintenance module reference](MODULES-WORKSHOPS.md#maintenance).
 
 ## Events
 
 ### events
 
-**Requires `membership`** (installing `events` pulls it in): registration needs an active member and
-records the host waiver on the membership.
-
-- **What it is** — event scheduling and registration: one-off events or recurring series, registration
-  with optional approval and waitlists, QR check-in at the door, post-event feedback and attendance
-  certificates, and cross-makerspace collaborative events.
-- **What it adds** — the events console, the public event list, member and staff-side registration,
-  registration approval and waitlist promotion, QR check-in, printable attendee badges, post-event
-  feedback surveys with the attendance certificates they issue, per-member calendar feeds,
-  organization-hosted events, collaborators and host waivers, and attended events on the maker profile.
-- **Without it** — the space runs no events in-app: no public listing, no registrations, no check-in, no
-  feedback or certificates, no calendar feeds, and no attended-event history on member profiles.
-  `charges.events`, `payments.events` and `events.offline_checkin` become inert.
-- **Combined with money** — a paid event (`payment_amount` > 0) records the debt when a registration
-  becomes REGISTERED (at sign-up, on approval with room, or on waitlist promotion — never while pending
-  or waitlisted), under `charges.events`; `payments.events` only adds the card rail. Cancelling the
-  event cancels every still-pending registration charge; settled ones stay for a staff refund.
-- **Data** — purgeable: events and series, registrations (they hold PII and are handled as such),
-  check-in history, station credentials, feedback surveys and responses, attendance certificates and the
-  stored PDFs they name, calendar feeds, and collaboration records. Payment routing on a registration is
-  deliberately left intact, so a receipt stays readable and a charge raised later stays payable.
-
----
+[Read the events module reference](MODULES-WORKSHOPS.md#events).
 
 ## Bookings
 
 ### bookings
 
-**Requires `membership`** (installing `bookings` pulls it in): public self-booking needs an active
-member with an open presence session.
-
-- **What it is** — bookable resources and the bookings against them, including public self-booking.
-- **What it adds** — bookable spaces, booking rules, the admin booking screens, the public booking page,
-  and bookings in member activity.
-- **Without it** — nothing in the system reserves a resource for a time slot; `charges.bookings` and
-  `payments.bookings` become inert.
-- **Combined with other modules** — a priced space records the debt only once a booking is CONFIRMED
-  (instantly, or on approval); a space linked to a machine type is gated by `machines.certifications`
-  while `machines` is installed, and books ungated once it is not.
-- **Data** — purgeable: bookable spaces and their bookings (bookings hold PII).
-
----
+[Read the bookings module reference](MODULES-WORKSHOPS.md#bookings).
 
 ## Membership
 
 ### membership
 
-Required by `events` and `bookings`.
-
-- **What it is** — the community layer: join requests, waivers, referrals, verification, maker profiles,
-  the member directory and member activity.
-- **What it adds** — the join-request queue, member capabilities and memberships in the console, the
-  opt-in maker profile and directory, and per-member activity history.
-  Plans and terms (monthly, yearly or custom-length, priced or free) can be attached to a membership;
-  a beat-less sweep raises one renewal charge per term before it ends when `charges.membership` is on
-  (and attaches an online checkout when `payments.membership` is), and an optional per-makerspace rule
-  stops lapsed members from borrowing — by request, by self-checkout or by a staff handout; returning a
-  tool is never refused. Prospective members can
-  send an invitation request from the public site (throttled, honeypot-guarded, PII encrypted at rest);
-  staff invite or decline it from the same queue as join requests.
-- **Without it** — people can still exist as members and still borrow: staff create walk-in member
-  records, and identity can come from `member_accounts` or an external OIDC provider. What goes is the
-  *enrolment and community* layer — no join requests to approve, no referrals, no profiles, no
-  directory, no member cards, no plans. Waivers stay (they are liability evidence, so publishing,
-  accepting and witnessing one is core), and so do STAFF invitations, end to end: issue, claim,
-  approve, decline. `payments.membership` and `charges.membership` become inert.
-- **Deliberately does not require `member_accounts`.** Identity can come from external OIDC or a staff-created
-  person record, so the two are independent switches.
-- **It decides who may submit a borrow request, and installing it closes account-less requests.** With this
-  module on, submitting requires an active member of the makerspace. With it off, any signed-in account may
-  submit — a request is only a proposal that staff must accept, and waiver acceptance cannot be recorded
-  without a membership row anyway. Turning it ON therefore forces `anonymous_requests_enabled` OFF (audited,
-  never silent): the account-less path bypasses the membership check entirely, so leaving both on would let
-  a stranger walk past the requirement you just switched on. Turning it back off does **not** re-open
-  account-less requests — that is an explicit choice, made with
-  `manage.py set_request_access --mode anyone`.
-- **Member ID cards live here.** A card is a revocable QR credential over one membership (`MemberCard`),
-  issued, reissued, revoked and printed by staff holding `manage_member_cards` (Space Managers by default)
-  and resolvable at a scanner only by `scan_member_cards` — never through the inventory scanner, so an
-  inventory-only role can never turn a QR into a person. The printed name is scoped PII, the photo is a
-  private object stored only with the member's recorded consent, and revoking a card deletes the photo
-  and blanks the name immediately while the redacted row, the revoked QR, the scans and the audit entries
-  stay; a fresh card can then be issued. Revoking the membership revokes its card too. Cards print as one CR80 card or an A4/Letter sheet; nothing rendered is stored.
-- **Data** — purgeable: join requests, member profiles with their projects and imagery, and member cards
-  with their photos (their QR codes are revoked, never deleted). Memberships, waivers and acceptance
-  evidence **stay** — they are core RBAC and liability state.
-
----
+[Read the membership module reference](MODULES-WORKSHOPS.md#membership).
 
 ### member_accounts
 
-Required by `mobile`.
-
-- **What it is** — the member-facing identity ecosystem: self sign-up, and the built-in password, social
-  and phone sign-in.
-- **What it adds** — member registration, the member area, Google/Apple buttons, phone + SMS login.
-- **Without it** — nobody signs themselves up and the member-facing login methods go away. **Staff sign-in
-  is never gated** — a space that could switch off its own staff logins could not be administered — and
-  external identity (generic OIDC) plus the member-domain APIs keep working. Members are then created by
-  staff as walk-in records. `mobile` cannot be installed while this is off.
-- **Deployment-level reading.** Sign-up and social/phone sign-in resolve *before* a makerspace is chosen,
-  so this key is read as "does any live makerspace run it", and it fails **open** on a box with no
-  makerspaces yet — otherwise a fresh install could not bootstrap its first space.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately; user accounts
-  are platform state.
-
----
-
+[Read the member_accounts module reference](MODULES-WORKSHOPS.md#member_accounts).
 
 ## Notifications
 
-Each channel is its own module, so a space that lives in Discord ships no Slack surface at all. Turning a
-channel on never makes it start sending: you still add the webhook or token, and you still enable the
-events you want in the per-feature × per-channel matrix. Turning it off stops delivery but **keeps the
-stored credential**, so re-enabling needs no re-entry.
-
 ### notifications
 
-- **What it is** — the in-app notification inbox and the emitters that feed it.
-- **What it adds** — the inbox, unread state, and the emit path every other module notifies through.
-- **Without it** — no in-app notifications at all; outbound channels that are installed still deliver,
-  because they are gated separately.
-- **Data** — purgeable: in-app notification rows.
+[Read the notifications module reference](MODULES-PLATFORM.md#notifications).
 
 ### email
 
-- **What it is** — outbound email **for this makerspace**.
-- **What it adds** — tenant email delivery using the space's own SMTP credentials.
-- **Without it** — the space sends no tenant email. **Account recovery and email verification still
-  send**: those are platform mail (`makerspace=None`) and are deliberately exempt, or switching a module
-  off could lock people out of their own accounts.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately.
+[Read the email module reference](MODULES-PLATFORM.md#email).
 
 ### telegram
 
-- **What it is** — per-makerspace Telegram group alerts. Outbound only.
-- **What it adds** — the `telegram_alerts` workflow and test alerts. **No accept/reject buttons**: chat is
-  a notification channel, not a decision surface, so an alert names the request and points staff at the
-  console. The webhook route survives but acknowledges and discards every callback, which stops Telegram
-  retrying against a deployment that already ran `setWebhook`.
-- **Without it** — no Telegram alerts. Request decisions are unaffected; they are made in the staff console
-  or `/control/` either way.
-- **Data** — purgeable: Telegram destinations and their chat ids. Delivery logs survive — the record that
-  a message was attempted is history; the credential is the secret.
+[Read the telegram module reference](MODULES-PLATFORM.md#telegram).
 
 ### slack
 
-- **What it is** — per-makerspace Slack alerts through an incoming webhook.
-- **What it adds** — Slack as a destination in the notification matrix.
-- **Without it** — no Slack surface ships at all for this space.
-- **Data** — purgeable: Slack destinations and their stored webhooks (delivery logs survive).
+[Read the slack module reference](MODULES-PLATFORM.md#slack).
 
 ### mattermost
 
-- **What it is** — per-makerspace Mattermost alerts through an incoming webhook.
-- **What it adds** — Mattermost as a destination in the notification matrix.
-- **Without it** — no Mattermost surface ships at all for this space.
-- **Data** — purgeable: Mattermost destinations and their stored webhooks (delivery logs survive).
+[Read the mattermost module reference](MODULES-PLATFORM.md#mattermost).
 
 ### discord
 
-- **What it is** — per-makerspace Discord alerts through an incoming webhook.
-- **What it adds** — Discord as a destination in the notification matrix.
-- **Without it** — no Discord surface ships at all for this space.
-- **Data** — purgeable: Discord destinations and their stored webhooks (delivery logs survive).
+[Read the discord module reference](MODULES-PLATFORM.md#discord).
 
 ### webhook
 
-- **What it is** — per-makerspace **signed JSON webhooks** to systems of your own (an ERP, a Slack bot you
-  wrote, a spreadsheet bridge). Not a chat room, but it sits in the same matrix: a webhook destination
-  receives exactly the notification a room would, as JSON, signed with a per-destination secret.
-- **What it adds** — `webhook` as a destination channel in the notification matrix, with an HTTPS endpoint
-  and a signing secret per destination; `X-SpaceWorks-Signature: t=<unix>,v1=<hex>` is HMAC-SHA256 over
-  `"<t>.<body>"`, plus `X-SpaceWorks-Event` and `X-SpaceWorks-Delivery` headers. Retries and the durable
-  delivery log are the ones every non-email channel already has; a superadmin can re-queue failed
-  deliveries from `/control/`. Verification recipe: `docs/api-client-protocol.md` → "Outbound webhooks".
-- **Without it** — no signed-webhook surface ships for this space. The inbound API-client protocol is
-  unaffected; other systems poll instead of being told.
-- **Data** — purgeable: webhook destinations with their endpoint URLs and signing secrets (delivery logs
-  survive). Endpoint URLs are validated against private and loopback ranges when saved and re-resolved at
-  send time, like every other webhook channel.
-
----
+[Read the webhook module reference](MODULES-PLATFORM.md#webhook).
 
 ## Reports
 
 ### reports
 
-- **What it is** — analytics, the report registry and CSV/XLSX exports.
-- **What it adds** — the `analytics` and `report_export` workflows: a server-provided report catalog,
-  dashboards, accessible charts with table fallbacks, the ledger, problem reports and every registered
-  report. The catalog covers every module either with a substantive report or an explicitly gated row in
-  a composite operational-health report. Every CSV/XLSX export carries provenance (who generated it,
-  when, for which makerspace, which report version and filters) as the first CSV line or a `Provenance`
-  sheet, and staff can schedule a report to be delivered daily, weekly or monthly to a notification
-  destination or a list of email recipients as a short-lived signed download link.
-- **Without it** — no analytics screens, no exports and no scheduled deliveries from the console. It is a **standalone area
-  rather than part of Inventory** on purpose: switching Inventory off would otherwise take the machine
-  and event reports with it.
-- **Data** — closed historical buckets are stored as append-only, non-PII metric rollups; corrections add
-  a revision rather than rewriting history. Automatic evidence retention must finalize its rollup fence
-  first, so it cannot change historical figures. Whole-tenant purge removes the rollups through tenant
-  ownership, and an explicit source-module purge removes that module's derived rollups too. Purging
-  `reports` deletes report schedules and their delivered files (private objects); the rollups stay.
-
----
+[Read the reports module reference](MODULES-PLATFORM.md#reports).
 
 ## Payments
 
 ### payments
 
-**Opt-in.** It was on by default until charge *tracking* moved out from under it: a space that takes
-cash needs none of this module and still keeps a full ledger of what members owe.
-
-- **What it is** — taking money **online**, through Stripe or Razorpay behind one provider seam.
-- **What it adds** — the online rail: checkout, Connect, webhooks, refunds (full or partial, through
-  the same provider seam, as ledger lines that never edit the charge) and (with `mobile`) the in-app
-  payment sheet. With `payments.loans` on, a loan deposit and a capped late fee can be collected
-  online too.
-- **Without it** — money owed is still tracked, listed and reported: the `charges.*` features raise
-  the charge, members see what they owe, and staff settle it in person and record how (cash, UPI,
-  bank transfer, card machine, cheque) in the append-only manual-settlement ledger. What disappears
-  is only the ability to pay by card online.
-- **Installed ≠ charging.** The module being on means the *surfaces* exist. No charge can be created
-  until a Space Manager turns on a `payments.<area>` feature **and** valid credentials resolve.
-- **Data** — **payments are never purged by a module purge.** A charge is the record of money that really
-  changed hands, so receipts stay readable and a pending charge stays payable, waivable and markable
-  paid, keeping the description it was raised under. Only purging the whole makerspace removes them.
-
----
+[Read the payments module reference](MODULES-PLATFORM.md#payments).
 
 ## Mobile apps
 
 ### mobile
 
-Requires `member_accounts`.
-
-- **What it is** — the native-app substrate: attested device sessions, native push and the in-app
-  payment sheet.
-- **What it adds** — device registration and revocation, push delivery (feature `mobile.push`), and
-  PaymentSheet when `payments` is also on.
-- **Without it** — native apps cannot hold a session for this space; the web app is unaffected.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately.
-
----
+[Read the mobile module reference](MODULES-PLATFORM.md#mobile).
 
 ## Backup & custody
 
 ### backup
 
-**On by default** (and backfilled onto every existing makerspace by `backup/0026`, because the key was
-placed in front of surfaces every makerspace already had).
-
-- **What it is** — the makerspace-facing half of backup: a Space Manager's own archives and the keys
-  that decide who can open them.
-- **What it adds** — requesting, listing and downloading makerspace archives; enrolling, verifying,
-  revoking and reactivating archive-recipient `age` keys; and a read-only custody status (archive
-  custody and tenant-exit custody) at `makerspace/<id>/backup-custody`.
-- **Without it** — those routes answer **400** naming `backup`. What it does **not** switch off:
-  **marking a recipient compromised** (security response never waits on a module), and everything
-  deployment-level — the full deployment backup, its scheduled run (which still builds the per-tenant
-  archive of a superadmin-off makerspace), restores, recovery and offsite destinations all cover this
-  makerspace exactly as before.
-- **Coupled to superadmin access** — recipients are the only custody path for a makerspace whose
-  superadmin access is off, so `backup` **cannot be uninstalled while superadmin access is disabled**,
-  and superadmin access **cannot be disabled while `backup` is uninstalled**.
-- **Data** — `purge_module_data backup` deletes only the archives a Space Manager requested ad hoc
-  (finished ones, never one a restore references) and their stored bytes. It keeps archive
-  recipients and their reservations (sealed deployment slices are encrypted to them), custody state
-  and alarm history, run-produced tenant archives and offsite copies — those are the deployment's
-  backup of this makerspace. **Archives are outside the purge guarantee**: a copy someone already
-  downloaded, a deployment archive and an offsite copy are not deleted by any purge.
+[Read the backup module reference](MODULES-PLATFORM.md#backup).
 
 ## Connected devices
 
 ### devices
 
-Opt-in, no dependencies; installed only by the `full`/`everything` profiles.
-
-- **What it is** — device identity for printers and label printers on the space's own network. A
-  device is **not** a staff account: it holds an Ed25519 key, proves possession of it once at
-  enrollment, and then signs every request (protocol in `docs/device-protocol.md`).
-- **What it adds** — staff device enrollment, rename, offline threshold, key rotation and revocation,
-  plus signed heartbeats. With `machines` and `machine_service` installed, staff holding
-  `MANAGE_DEVICES` and management scope for the selected machine can bind a printer and create a
-  command for its explicitly assigned in-progress request. Bounded delivery leases become durable
-  ownership after acknowledgement. Measurements pass through the existing completion/failure workflow.
-  Automatic application defaults off; scoped staff approval supplies the approving User. Charges use
-  current machine pricing, and failed jobs create no charge. Telemetry affects staff display only.
-  Every mutation leaves typed device provenance and an audit row. The server wire contract is in
-  [Printer protocol](device-printer-protocol.md).
-- **Without it** — device routes answer 400 and cannot enroll, authenticate or mutate. Printer routes
-  additionally require both machine modules and answer 400 when either is off. Tombstoning the devices
-  app removes its routes with 404.
-- **Data** — `purge_module_data devices` deletes printer consumption claims, jobs, commands and
-  bindings, then replay nonces, enrollments, device events and identities. Machine workflows and the
-  payment ledger survive. Purging a machine adapter nulls live printer links and retains history;
-  missing targets cannot deliver or finish. Tenant moves retain applied reports and source snapshots,
-  disable bindings and automatic application, cancel commands, clear delivery credentials and turn
-  unprocessed work into inert review. Device keys, enrollments and nonces never travel.
-
-- **Monitoring** - both scheduler topologies check offline state once a minute. Offline/recovery
-  history appears in module operational health. Device alerts have their own notification feature;
-  every channel is opt-in and initially off. The Devices console exposes identity/status/enrollment
-  to device managers. Printer jobs and label delivery controls arrive with their adapter lanes.
-
----
+[Read the devices module reference](MODULES-PLATFORM.md#devices).
 
 ## Updates
 
 ### updates
 
-**On by default.**
-
-- **What it is** — in-app release control: check for a new version, and apply it from the console.
-- **What it adds** — the superadmin update surface and `PlatformUpdateSettings` (current / available / target
-  version).
-- **Without it** — the box is updated by whatever tooling you already use (`git pull` + `docker compose
-  up -d --build`, Ansible, your own pipeline). This is a **deployment-level** key like
-  `member_accounts`, read
-  as "does any live makerspace run it", because the update console is a single-box superadmin surface
-  with no tenant to scope by.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately.
-
----
+[Read the updates module reference](MODULES-PLATFORM.md#updates).
 
 ## Features: the level below a module
 
@@ -633,6 +232,7 @@ in the console rather than a superadmin. A feature is inert while its parent mod
 
 | Feature | Inside | Default | What it does | Without it |
 |---|---|:--:|---|---|
+| `billing.reminders` | `notifications` (needs `email`) | | Email the payer about due and overdue charges using [core billing policy](payment-billing.md), including cash-only charges | No automatic payment reminders; debt and receipts stay visible |
 | `charges.enabled` | — | ● | Master switch for recording money owed | The space charges for nothing: no debt is recorded in any area |
 | `charges.machines` | `machines` (needs `machine_service`) | ● | Record a charge when a priced machine job completes | Machine jobs are free |
 | `charges.bookings` | `bookings` | ● | Record a charge when a paid booking is confirmed | Bookings are free |
@@ -661,73 +261,16 @@ belong to no module: they are standalone capabilities that apply whenever you en
 
 ## Editions
 
-A deployment has one **edition**, set by `SPACEWORKS_EDITION` (setup asks; default `makerspace`). It answers
-"what is this box for" one level above modules: the six core modules are the hardware loan spine and cannot
-be uninstalled, so an events-only or bookings-only installation would otherwise still show a catalogue, a
-borrow flow and a scanner it never uses. The edition **hides** those surfaces and makes their public routes
-answer 404; it does not delete tables, endpoints or data, and every staff endpoint keeps answering so data
-stays recoverable. Frontend bootstrap payloads carry `edition`, and edition-hidden module keys are already
-removed from the `modules` list they return, so the console's tabs and the public site's routes need no
-separate switch.
-
-| Edition | Hidden module keys | Public home |
-|---|---|---|
-| `makerspace` (default) | none | the catalogue |
-| `events` | `public_inventory request_workflow scanner asset_units containers bulk_import stock_transfers qr_print_batches guest_handover procurement stocktake machines machine_service printing maintenance bookings` | the events page |
-| `bookings` | the same set with `bookings` visible and `events` hidden | the bookings page |
-| `organization` | none — a labelling edition: one makerspace row is presented as "the organization" (`branding.display_name`) | the catalogue |
-
-`Event.makerspace` stays the tenancy anchor in every edition (locked 2026-08-19); an organization-first
-install is one `Makerspace` row with an organization label, never a re-anchoring. Turning an edition into a
-genuinely smaller schema (removing the loan apps) is the separate `TOMBSTONED_APPS` axis and a future
-"Option A"; see `docs/INVARIANTS.md` → Editions.
+[Read about editions](MODULES-LIFECYCLE.md#editions).
 
 ## Install profiles
 
-`setup.sh` asks, or pass `--profile`. Every profile is dependency-closed and always includes the six core
-modules.
-
-| Profile | Modules | For |
-|---|---|---|
-| `minimal` | 6 | Core only; nothing published publicly |
-| `workshop` | 15 | A machine shop: machines, service queue, maintenance — deliberately without `member_accounts` |
-| `lending` | 18 | A tool library: the full lending lifecycle, no machines |
-| `recommended` | 21 | Core plus the inventory lifecycle, reports and machines (the default) |
-| `cloud` | 25 | A managed box: everything that runs on a single Django process, no worker or beat |
-| `everything` / `full` | 35 | All modules |
-| `events` | 13 | An events programme: events, notifications, email, member accounts, membership, payments, reports (core is present but hidden by the `events` edition) |
-| `bookings` | 13 | Bookable rooms and resources: bookings, notifications, email, member accounts, membership, payments, reports (core hidden by the `bookings` edition) |
-
-**Installing without a profile** gives you **8 modules**: the six core ones plus `updates` and
-`backup`. Member accounts and mobile apps are opt-in; installing `mobile` also installs its
-`member_accounts` dependency.
+[Read about install profiles](MODULES-LIFECYCLE.md#install-profiles).
 
 ## Deleting a module's data
 
-Uninstalling only hides. If you also want a module's rows *gone*, that is a separate, deliberate second
-step — so that no single command can both hide and destroy:
-
-```bash
-docker compose run --rm --no-deps backend --role management python manage.py purge_module_data bookings --list
-docker compose run --rm --no-deps backend --role management python manage.py purge_module_data bookings --makerspace my-space
-```
-
-- **The module must already be uninstalled.** Purging an installed module is refused.
-- **Superadmin only**, and it asks you to type the makerspace slug back before proceeding.
-- **It cannot be undone.** Uninstall is reversible; this is not.
-- **Payment records are kept** — see [`payments`](#payments).
-- Uploaded files are removed after the database work commits, and your storage quota is credited back
-  only for objects the bucket confirmed it deleted, so the counter can never drift below what you are
-  actually storing.
-
-A module absent from `--list` either owns no data of its own or cannot be purged separately, and the
-command tells you which. [`machines`](#machines) is the notable second case.
+[Read about deleting a module's data](MODULES-LIFECYCLE.md#deleting-a-modules-data).
 
 ## Removing a module from the build entirely
 
-Uninstalling switches a module off for one makerspace; the code still ships. A deployment that will never
-use an area can drop the app itself with `TOMBSTONED_APPS`, and `suggest_tombstones` reads the installed
-modules and names the apps that are safe to remove. The separable apps are `warranty`, `presence`,
-`payments`, `updates`, `events`, `bookings`, `maintenance`, `procurement`, `notifications`,
-`tenant_migration` and `devices`. That is a different axis
-from modules — see **Separability and tombstoning** in `docs/INVARIANTS.md`.
+[Read about removing a module from the build entirely](MODULES-LIFECYCLE.md#removing-a-module-from-the-build-entirely).

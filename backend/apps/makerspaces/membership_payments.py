@@ -48,6 +48,8 @@ def _get_or_create(membership, actor):
                 currency=currency,
                 created_by=actor,
                 subject_label="Membership dues",
+                due_at=(membership.terms.filter(status="active").order_by("-starts_at")
+                        .values_list("starts_at", flat=True).first()),
             )
     except IntegrityError:
         return Payment.objects.get(**lookup)

@@ -20,6 +20,7 @@ from apps.operations.serializers_reports import (
     PaymentReconciliationReportSerializer,
 )
 from apps.operations.serializers_report_catalog import GenericAnalyticsReportSerializer
+from apps.operations.serializers_reports_payments import PaymentCashBookSerializer
 
 ANALYTICS_REPORT_RESPONSE = PolymorphicProxySerializer(
     component_name="AnalyticsReportResponse",
@@ -41,6 +42,7 @@ ANALYTICS_REPORT_RESPONSE = PolymorphicProxySerializer(
         MemberActivityReportSerializer,
         FabLabHealthReportSerializer,
         PaymentReconciliationReportSerializer,
+        PaymentCashBookSerializer,
         GenericAnalyticsReportSerializer,
     ],
     resource_type_field_name=None,

@@ -13,8 +13,13 @@ from apps.payments.subjects import subject_label
 class RefundSerializer(serializers.ModelSerializer):
     class Meta:
         model = Refund
-        fields = ("id", "amount", "currency", "status", "provider", "reason", "method", "reference", "refunded_at", "created_at", "settled_at")
+        fields = ("id", "amount", "currency", "status", "provider", "reason", "method", "reference", "refunded_at", "created_at", "settled_at", "amends", "corrected")
         read_only_fields = fields
+
+    corrected = serializers.SerializerMethodField()
+
+    def get_corrected(self, refund) -> bool:
+        return hasattr(refund, "amended_by")
 
 
 class StaffSettlementSerializer(serializers.ModelSerializer):
@@ -42,12 +47,15 @@ def refunded_total(payment):
     if annotated is not None:
         return annotated
     return sum(
-        (refund.amount for refund in payment.refunds.all() if refund.status == Refund.Status.SUCCEEDED),
+        (refund.amount for refund in payment.refunds.all() if refund.status == Refund.Status.SUCCEEDED
+         and not hasattr(refund, "amended_by")),
         Decimal("0.00"),
     )
 
 
 class PaymentReconciliationSerializer(serializers.ModelSerializer):
+    due_state = serializers.SerializerMethodField()
+    due_date = serializers.SerializerMethodField()
     subject_label = serializers.SerializerMethodField()
     refunded_amount = serializers.SerializerMethodField()
     refunds = RefundSerializer(many=True, read_only=True)
@@ -61,6 +69,7 @@ class PaymentReconciliationSerializer(serializers.ModelSerializer):
             "subject_id",
             "subject_label",
             "status",
+            "due_at", "due_date", "due_state",
             "amount",
             "currency",
             "refunded_amount",
@@ -70,6 +79,14 @@ class PaymentReconciliationSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = fields
+
+    def get_due_state(self, payment) -> str:
+        from apps.payments.due_dates import due_state
+        return due_state(payment)
+
+    def get_due_date(self, payment) -> str | None:
+        from apps.makerspaces.local_time import to_local
+        return to_local(payment.makerspace, payment.due_at).date().isoformat() if payment.due_at else None
 
     @extend_schema_field(StaffSettlementSerializer(allow_null=True))
     def get_settlement(self, payment):
@@ -94,6 +111,7 @@ class PaymentReconciliationSerializer(serializers.ModelSerializer):
 
 
 class PaymentListFilterSerializer(serializers.Serializer):
+    due_state = serializers.ChoiceField(choices=["overdue", "due_today", "upcoming"], required=False)
     for_recording = serializers.BooleanField(required=False, default=False)
     status = serializers.ChoiceField(choices=Payment.Status.choices, required=False)
     subject_type = serializers.ChoiceField(

@@ -105,7 +105,10 @@ def _run_source(makerspace, source, now, local_tz, limit, counts):
             if message is None or not _source_enabled(current, source):
                 counts["skipped"] += 1
             else:
-                emit_notification(current, **asdict(message))
+                if source.dispatch is None:
+                    emit_notification(current, **asdict(message))
+                else:
+                    source.dispatch(current, row, message, now, local_tz)
                 # The existing emitter is deliberately fail-safe and returns no receipt.
                 # This counts dispatch attempts, not proven delivery to a recipient.
                 counts["dispatched"] += 1

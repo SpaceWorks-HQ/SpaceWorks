@@ -1,13 +1,15 @@
 # Shared reminder schedules (research F1)
 
 `operations/reminder_sweeper.py` runs every five minutes in both Celery beat and
-`run_scheduled_tasks --due-only`. No production sources are registered by F1, so
-upgrading does not change notification behaviour. The existing hourly loan return
+`run_scheduled_tasks --due-only`. The `payments.due` consumer is registered explicitly
+and gated on default-OFF `billing.reminders`; see [payment-billing.md](payment-billing.md).
+The existing hourly loan return
 reminder and membership renewal tasks keep their current schedules and semantics.
 
 ## Registering a source
 
-Add a `ReminderSource` explicitly to `operations/reminder_registry.py:REMINDER_SOURCES`.
+Add a `ReminderSource` explicitly in `operations/reminder_registry.py:_production_sources`.
+`REMINDER_SOURCES` is a test override (`None` means production; an empty tuple means none).
 Its module and optional feature must already exist in their canonical registries.
 The sweeper checks both plus the `notifications` module before discovery or claims;
 deployment tombstones are handled by `module_enabled` at the same boundary.
@@ -39,9 +41,11 @@ tenant and check current domain eligibility, policy offsets and due timestamp.
 Return `None` for a cancelled/returned/ineligible subject, disabled offset or stale
 due timestamp. Otherwise return a `ReminderMessage`. The sweeper sends it through
 `notifications.emit.emit_notification`, preserving the staff inbox module gate and
-fail-safe behaviour. This foundation adds no member delivery, matrix event families,
-dues, certifications, booking/event reminders or state transitions. Later consumer
-lanes own their notification matrix/recipient integration (research F2/F3).
+fail-safe behaviour. A source can supply `dispatch(makerspace, reminder, message, now,
+local_tz)` for domain delivery after the same committed claim; the payment consumer
+uses it for owner-only matrix email. Consumer lanes own live recipient revalidation
+and channel policy. Neither the foundation nor the payment consumer changes debt or
+domain state as a reminder side effect.
 
 The runnable **test-only** example is
 `backend/tests/operations/reminder_example.py`; it must never be added to the

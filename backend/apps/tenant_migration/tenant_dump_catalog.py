@@ -62,6 +62,8 @@ class TenantDumpCatalogError(AssertionError):
 # lane/w1-rbac and lane/w1-security. Reminder schedules, makerspace profile fields,
 # and MFA credentials/challenges and staff invitations change the merged catalog.
 # The security models are DROP in portable artifacts; the coordinator pins the digest.
+# w1-payments adds billing policy, Payment.due_at and Refund.amends. The coordinator
+# recomputes this once against the merged model graph (baseline already RECOMPUTE).
 CATALOG_SCHEMA_SHA256 = "RECOMPUTE"
 
 

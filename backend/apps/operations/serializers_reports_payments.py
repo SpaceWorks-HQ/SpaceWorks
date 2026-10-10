@@ -27,3 +27,15 @@ class PaymentReconciliationReportRowSerializer(TypedReportBaseSerializer):
 
 class PaymentReconciliationReportSerializer(ReportRowsFieldMixin):
     typed_rows = PaymentReconciliationReportRowSerializer(many=True)
+
+
+class PaymentCashBookRowSerializer(TypedReportBaseSerializer):
+    currency = serializers.CharField()
+    method = serializers.CharField()
+    collected_amount = serializers.DecimalField(max_digits=20, decimal_places=2)
+    refunded_amount = serializers.DecimalField(max_digits=20, decimal_places=2)
+    net_amount = serializers.DecimalField(max_digits=20, decimal_places=2)
+
+
+class PaymentCashBookSerializer(ReportRowsFieldMixin):
+    typed_rows = PaymentCashBookRowSerializer(many=True)

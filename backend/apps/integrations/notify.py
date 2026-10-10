@@ -17,7 +17,7 @@ from apps.integrations.models import (
     NotificationDeliveryStatus,
     NotificationFeature,
 )
-from apps.integrations.notification_catalog import FEATURE_EVENTS, is_notification_enabled
+from apps.integrations.notification_catalog import FEATURE_EVENTS, is_notification_enabled, receipt_email_default
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +123,10 @@ def _run_guarded(makerspace, feature, event, build, sync, occurred_at=None):
             channel: is_notification_enabled(makerspace, feature, channel)
             for channel in NotificationChannel.values
         }
-        if enabled[NotificationChannel.EMAIL]:
-            for delivery in payload.emails:
+        payer_receipt = (feature == NotificationFeature.PAYMENTS and event == "payment_received"
+                         and receipt_email_default(makerspace))
+        for delivery in payload.emails:
+            if enabled[NotificationChannel.EMAIL] or (payer_receipt and delivery.audience == "requester"):
                 _dispatch_email_delivery(makerspace, event, delivery, sync, delivered, failed)
         # Rendered once for all chat channels: one stored body per event, not one per
         # channel. Falls back to `payload.text` whenever no row is authored.

@@ -20,6 +20,9 @@ import { PaymentRefundDialog } from "./PaymentRefundDialog";
 import { SettlementDialog } from "./SettlementDialog";
 import { Panel } from "./panels/shared";
 import { paymentAccess } from "./paymentAccess";
+import { DUE_OPTIONS, PaymentDueBadge } from "./PaymentDueBadge";
+import { RefundReceiptAmendDialog } from "./RefundReceiptAmendDialog";
+import type { RefundRow } from "./paymentsApi";
 
 type Action = "mark-offline" | "waive";
 
@@ -31,12 +34,14 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
   const queryClient = useQueryClient();
   const [status, setStatus] = useState("pending");
   const [subject, setSubject] = useState("");
+  const [dueState, setDueState] = useState("");
+  const [correctingRefund, setCorrectingRefund] = useState<{ paymentId: number; refund: RefundRow } | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [conflict, setConflict] = useState("");
   const [refundRow, setRefundRow] = useState<PaymentRow | null>(null);
   const payments = useQuery({
-    queryKey: paymentListKey(makerspaceId, status, subject, forRecording),
-    queryFn: () => staffRequest<PaymentRow[]>(paymentListPath(makerspaceId, status, subject, forRecording)),
+    queryKey: paymentListKey(makerspaceId, status, subject, forRecording, dueState),
+    queryFn: () => staffRequest<PaymentRow[]>(paymentListPath(makerspaceId, status, subject, forRecording, dueState)),
   });
   // Marking paid offline is a two-step now: the API requires a receipt, so the click
   // opens the form rather than firing the mutation.
@@ -80,6 +85,7 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
     { key: "subject_label", header: "Subject", sortable: true },
     { key: "subject_type", header: "Type", render: (row) => labelFor(PAYMENT_SUBJECTS, row.subject_type) },
     { key: "status", header: "Status", render: (row) => labelFor(PAYMENT_STATUSES, row.status) },
+    { key: "due_at", header: "Due", render: (row) => <PaymentDueBadge payment={row} /> },
     { key: "amount", header: "Amount", render: (row) => formatMoney(row.amount, row.currency), className: "font-semibold" },
     { key: "refunded_amount", header: "Refunded", render: (row) => Number(row.refunded_amount) > 0 ? formatMoney(row.refunded_amount, row.currency) : "—" },
     {
@@ -114,9 +120,12 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
           ) : null}
           {(row.status === "paid_online" || row.status === "paid_offline") && access(row).refund ? (
             <button className="desk-button" type="button" onClick={() => setRefundRow(row)}>
-              Refund
+              {row.subject_type === "loan_deposit" && row.status === "paid_offline" ? "Release deposit" : "Refund"}
             </button>
           ) : null}
+          {row.refunds?.filter((refund) => refund.provider === "manual" && !refund.corrected).map((refund) =>
+            access(row).refund ? <button key={refund.id} className="desk-button" type="button"
+              onClick={() => setCorrectingRefund({ paymentId: row.id, refund })}>Correct refund #{refund.id}</button> : null)}
         </div>
       ),
     },
@@ -125,9 +134,14 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
   return (
     <Panel title="Payments">
       <div className="mb-3 flex flex-wrap gap-3">
+        <label className="grid gap-1 text-xs text-muted"><span>Due</span>
+          <select className="desk-input" value={dueState} onChange={(event) => { setDueState(event.target.value); if (event.target.value) setStatus("pending"); setSelected([]); }}>
+            <option value="">All due dates</option>{DUE_OPTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+        </label>
         <label className="grid gap-1 text-xs text-muted">
           <span>Status</span>
-          <select className="desk-input" value={status} onChange={(event) => { setStatus(event.target.value); setSelected([]); }}>
+          <select className="desk-input" value={status} onChange={(event) => { setStatus(event.target.value); if (event.target.value !== "pending") setDueState(""); setSelected([]); }}>
             <option value="">All statuses</option>
             {PAYMENT_STATUSES.filter(([value]) => !forRecording || ["pending", "paid_offline"].includes(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -192,9 +206,13 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
           key={refundRow.id}
           makerspaceId={makerspaceId}
           payment={refundRow}
+          releaseDeposit={refundRow.subject_type === "loan_deposit" && refundRow.status === "paid_offline"}
           onClose={() => setRefundRow(null)}
         />
       ) : null}
+      {correctingRefund ? <RefundReceiptAmendDialog makerspaceId={makerspaceId}
+        paymentId={correctingRefund.paymentId} refund={correctingRefund.refund}
+        onClose={() => setCorrectingRefund(null)} /> : null}
     </Panel>
   );
 }

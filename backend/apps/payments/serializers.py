@@ -24,9 +24,14 @@ class MemberRefundSerializer(serializers.Serializer):
     status = serializers.CharField()
     reason = serializers.CharField()
     settled_at = serializers.DateTimeField(allow_null=True)
+    method = serializers.CharField(allow_blank=True)
+    reference = serializers.CharField(allow_blank=True)
+    refunded_at = serializers.DateTimeField(allow_null=True)
 
 
 class MemberPaymentSerializer(serializers.ModelSerializer):
+    due_state = serializers.SerializerMethodField()
+    due_date = serializers.SerializerMethodField()
     subject_label = serializers.SerializerMethodField()
     checkout_url = serializers.SerializerMethodField()
     online_payment_available = serializers.SerializerMethodField()
@@ -44,6 +49,7 @@ class MemberPaymentSerializer(serializers.ModelSerializer):
         # the charge unpayable. The queryset is already scoped to this member.
         fields = (
             "id", "subject_type", "subject_label", "status", "amount", "currency",
+            "due_at", "due_date", "due_state",
             "checkout_url", "online_payment_available", "settlement",
             "refunded_amount", "refunds", "created_at",
         )
@@ -53,7 +59,15 @@ class MemberPaymentSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(MemberRefundSerializer(many=True))
     def get_refunds(self, payment):
-        return MemberRefundSerializer(payment.refunds.all(), many=True).data
+        return MemberRefundSerializer([row for row in payment.refunds.all() if not hasattr(row, "amended_by")], many=True).data
+
+    def get_due_state(self, payment) -> str:
+        from apps.payments.due_dates import due_state
+        return due_state(payment)
+
+    def get_due_date(self, payment) -> str | None:
+        from apps.makerspaces.local_time import to_local
+        return to_local(payment.makerspace, payment.due_at).date().isoformat() if payment.due_at else None
 
     def get_subject_label(self, payment) -> str:
         labels = self.context.get("payment_subject_labels", {})
@@ -134,9 +148,13 @@ class StaffPaymentSerializer(MemberPaymentSerializer):
     # per-row refund query would grow the service queue's query count with its length.
     refunded_amount = None
     refunds = None
+    # Machine-queue summaries do not render aging. Keep local-day lookups on the
+    # ledger/history surfaces whose queries fetch the owning makerspace in bulk.
+    due_state = None
+    due_date = None
 
     class Meta(MemberPaymentSerializer.Meta):
         fields = tuple(
             name for name in MemberPaymentSerializer.Meta.fields
-            if name not in {"refunded_amount", "refunds"}
+            if name not in {"refunded_amount", "refunds", "due_at", "due_date", "due_state"}
         )

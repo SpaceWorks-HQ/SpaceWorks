@@ -50,6 +50,11 @@ def _strategy(kind, groups, totals, *, breakdown=(), ordering=(), limit=None, te
 
 
 STRATEGIES = {
+    "payment-cash-book": _strategy(
+        AggregationKind.GROUP_SUM, ("currency", "method"),
+        ("currency", "method", "collected_amount", "refunded_amount", "net_amount"),
+        ordering=("currency", "method"), text=(("currency", "group and carry"), ("method", "group and carry")),
+    ),
     "summary": _strategy(AggregationKind.SUM, (), SUMMARY_FIELDS),
     "taken-items": _strategy(
         AggregationKind.GROUP_SUM, ("product_id",), ("product", "issued_quantity"),

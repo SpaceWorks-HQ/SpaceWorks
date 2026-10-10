@@ -75,6 +75,7 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, validators=[currency_validator])
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    due_at = models.DateTimeField(null=True, blank=True)
     # Provider-agnostic columns (phase 4). The `stripe_*` columns below are retained as
     # read-only historic, exactly as `MachineServiceRequest.payment_*` was when Payment
     # took over: rows are immutable once terminal, so a migration may only ADD nullable
@@ -104,6 +105,7 @@ class Payment(models.Model):
 
     class Meta:
         indexes = [
+            models.Index(fields=["makerspace", "status", "due_at"], name="payment_ms_status_due_idx"),
             models.Index(
                 fields=["via_makerspace", "member"],
                 name="payment_via_makerspace_member_idx",
@@ -221,8 +223,10 @@ class Payment(models.Model):
     def save(self, *args, **kwargs):
         if self.pk:
             original = type(self).objects.filter(pk=self.pk).values(
-                "status", "amount", "provider", "stripe_provider", "stripe_connected_account_id", "stripe_application_fee_amount", "online_rail"
+                "status", "amount", "provider", "stripe_provider", "stripe_connected_account_id", "stripe_application_fee_amount", "online_rail", "due_at"
             ).first()
+            if original and original["due_at"] != self.due_at:
+                raise ValidationError("A charge due date is immutable.")
             if original and original["status"] != self.Status.PENDING and (
                 original["status"] != self.status or original["amount"] != self.amount
             ):
