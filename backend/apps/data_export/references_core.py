@@ -137,6 +137,8 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("makerspaces.MembershipRequest", "requested_by"),
         ("makerspaces.MembershipRequest", "invited_by"),
         ("makerspaces.MembershipRequest", "decided_by"),
+        ("makerspaces.MembershipRequest", "approved_by"),
+        ("makerspaces.MembershipVouch", "voucher"),
         ("makerspaces.MembershipTerm", "created_by"),
         ("makerspaces.InvitationRequest", "handled_by"),
         ("makerspaces.SubdomainRequest", "requested_by"),

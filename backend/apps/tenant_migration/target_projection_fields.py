@@ -15,6 +15,20 @@ def _default(reason, *, allow_superadmin_override=False):
 
 
 TARGET_FIELD_PROJECTION = {
+    ("makerspaces.MakerspaceMembershipSettings", "join_mode"): TargetField(
+        "approval", allow_superadmin_override=True,
+        reason="Source open or vouch admission cannot grant target membership authority.",
+    ),
+    ("makerspaces.MakerspaceMembershipSettings", "vouch_replaces_approval"): TargetField(
+        False, reason="A target reviewer must authorize admission independently of source vouches.",
+    ),
+    ("makerspaces.MembershipRequest", "state"): TargetField(
+        "canceled", condition=("state", "awaiting_payment"),
+        reason="Unsettled debt travels, but its settlement cannot grant source-authorized membership.",
+    ),
+    ("makerspaces.MembershipRequest", "admission_managed"): TargetField(
+        False, reason="Imported application history never activates a membership on payment.",
+    ),
     ("makerspaces.Makerspace", "frontend_domain"): TargetField(
         None, reason="A source domain must not enter the target credentialed-origin allowlist."
     ),
@@ -132,4 +146,3 @@ TARGET_FIELD_PROJECTION.update(printer_projections(TargetField))
 from .target_projection_7c import label_projections
 
 TARGET_FIELD_PROJECTION.update(label_projections(TargetField))
-

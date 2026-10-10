@@ -79,7 +79,7 @@ def update_payment_settings(payment_settings, changes):
             # Holding this row through validation and save closes the gap where a
             # checkout session could otherwise appear before credential commit.
             locked = (
-                MakerspacePaymentSettings.objects.select_for_update()
+                MakerspacePaymentSettings.objects.select_for_update(of=("self",))
                 .select_related("makerspace")
                 .get(pk=payment_settings.pk)
             )

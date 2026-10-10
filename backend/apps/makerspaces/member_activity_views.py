@@ -11,6 +11,7 @@ from apps.presence.guard import MemberPresenceRequired
 
 
 ERRORS = {
+    400: OpenApiResponse(ErrorSerializer, description="Membership module disabled."),
     401: OpenApiResponse(description="Authentication required."),
     403: OpenApiResponse(ErrorSerializer, description="An active membership is required."),
     404: OpenApiResponse(ErrorSerializer, description="Makerspace not found."),

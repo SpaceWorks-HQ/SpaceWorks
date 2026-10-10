@@ -1,8 +1,8 @@
 # Shared reminder schedules (research F1)
 
 `operations/reminder_sweeper.py` runs every five minutes in both Celery beat and
-`run_scheduled_tasks --due-only`. No production sources are registered by F1, so
-upgrading does not change notification behaviour. The existing hourly loan return
+`run_scheduled_tasks --due-only`. F1 introduced the coordination foundation; the
+membership admission lane registers its payment-deadline consumer. The existing hourly loan return
 reminder and membership renewal tasks keep their current schedules and semantics.
 
 ## Registering a source
@@ -37,16 +37,38 @@ The source owns its query plan, cursor/fairness and future discovery horizon.
 `build(makerspace, reminder, now, local_tz)` must re-read the subject within that
 tenant and check current domain eligibility, policy offsets and due timestamp.
 Return `None` for a cancelled/returned/ineligible subject, disabled offset or stale
-due timestamp. Otherwise return a `ReminderMessage`. The sweeper sends it through
-`notifications.emit.emit_notification`, preserving the staff inbox module gate and
-fail-safe behaviour. This foundation adds no member delivery, matrix event families,
-dues, certifications, booking/event reminders or state transitions. Later consumer
-lanes own their notification matrix/recipient integration (research F2/F3).
+due timestamp. Otherwise return a `ReminderMessage`. A source with no `dispatch`
+callback sends through `notifications.emit.emit_notification`, preserving existing
+staff inbox behaviour. A source may supply `dispatch(makerspace, reminder, message)`
+to use its domain's recipient and notification-family adapter. The sweeper calls it
+only after the fresh tenant module/feature checks; dispatch should recheck subject
+eligibility too. Domain services continue to own state transitions.
 
 The runnable **test-only** example is
 `backend/tests/operations/reminder_example.py`; it must never be added to the
 production registry. It illustrates scoped discovery, live revalidation and local
 time formatting using existing booking rows without implementing booking mail.
+
+## Membership admission payment deadline
+
+`operations/membership_payment_reminders.py` registers `membership.admission_payment`
+under the `membership` module. The initial `awaiting_payment` transition sends the
+applicant's payment notice. This source attempts one further `payment_due` notice
+one day before the request's `expires_at`, through the F3 MEMBERSHIP family and the
+verified applicant User address. The shared `notifications` module gate still applies.
+
+Discovery is bounded and excludes completed/claimed/failed reminder identities, so
+previous applicants cannot starve later requests in a small batch. Build and dispatch
+recheck that the request is awaiting payment, has not expired, and still owns a
+pending charge in the same makerspace for the same applicant. Settled, canceled,
+expired and foreign subjects are skipped. The one-day eligibility window catches
+missed attempts after downtime while the application remains payable.
+
+Admission expiry and recovery after a committed settlement run separately through
+`operations/tasks_admissions.py`, every five minutes in both Celery beat and the
+beat-less runner. Payments commit before activation begins to preserve the lock
+order; an activation failure never reverses received money, and this sweep retries
+eligible settled requests. The reminder source never activates or expires members.
 
 ## Claims and delivery limits
 

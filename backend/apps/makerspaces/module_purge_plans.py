@@ -139,11 +139,11 @@ PLANS = (
     # always the exception; they are now simply the rule.
     ModulePurgePlan(
         "membership",
-        "Join requests, invitation requests, membership plans and terms, and member "
+        "Admission settings, applications and vouches, invitation requests, membership plans and terms, and member "
         "profiles with their projects and imagery. Memberships, waivers and acceptance "
         "evidence stay as core RBAC/liability state.",
         membership_delete,
-        pii_labels=("makerspaces.MemberCard", "makerspaces.InvitationRequest"),
+        pii_labels=("makerspaces.MemberCard", "makerspaces.InvitationRequest", "makerspaces.MembershipRequest"),
         private_keys=membership_private_keys,
         private_key_sizes=membership_private_key_sizes,
         public_image_keys=membership_public_image_keys,

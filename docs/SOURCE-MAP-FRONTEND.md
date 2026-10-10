@@ -7,6 +7,9 @@ The backend and shared device source map is in [SOURCE-MAP.md](SOURCE-MAP.md).
   `staffAccess.ts` `TAB_GROUPS`, which does sidebar grouping AND permission derivation (**not**
   `StaffApp.tsx`; module gating and routing are the separate `staffTabs.ts`); capabilities from
   action-based `staffAccess.ts`; payment reconciliation and platform credential panels.
+  `MakerspaceProfileSettings.tsx` loads/saves the location and hours profile;
+  `MakerspaceHoursEditor.tsx` and `makerspaceProfileForm.ts` own the weekly/exception
+  draft. Profile and payment editors refresh each other's shared currency query.
   `paymentAccess.ts` separates receipt recording from waivers and provider refunds;
   `MembersPanel.tsx` and `panels/OperationsReports.tsx` gate money on finance actions.
   `frontend/src/features/auth/` + `members/MemberAuthPanel.tsx` — provider-config-driven social/member auth.

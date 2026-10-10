@@ -63,7 +63,7 @@ def _apply_account_event(event_id, event_type, account_id, *, event_created):
 
     with transaction.atomic():
         merchant = (
-            MakerspacePaymentSettings.objects.select_for_update()
+            MakerspacePaymentSettings.objects.select_for_update(of=("self",))
             .select_related("makerspace")
             .filter(connect_account_id=account_id)
             .first()

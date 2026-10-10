@@ -38,6 +38,8 @@ JSON_REFERENCE_FIELDS = frozenset(
         # Strict weekday/date/time schema; no account or object references.
         ("makerspaces.Makerspace", "opening_hours"),
         ("makerspaces.MakerspaceRole", "granted_actions"),
+        ("makerspaces.MakerspaceMembershipSettings", "application_schema"),
+        ("makerspaces.MembershipRequest", "application_schema"),
         ("makerspaces.MemberProfile", "interests"),
         ("makerspaces.MemberProfile", "languages"),
         ("makerspaces.MemberProfile", "education"),

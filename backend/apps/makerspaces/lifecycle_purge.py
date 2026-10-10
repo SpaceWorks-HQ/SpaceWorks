@@ -187,6 +187,11 @@ def _delete_object_graph(makerspace):
             registration__in=registrations
         ).delete()
         registrations.delete()
+        # Applications PROTECT their selected plans. Remove module-owned children
+        # before RBAC memberships and the final makerspace cascade collect plans.
+        from apps.makerspaces.module_purge_collectors_membership import membership_delete
+
+        membership_delete(makerspace, cursor)
         MakerspaceMembership.objects.filter(makerspace=makerspace).delete()
         # AuditBatchLeaf.audit_log PROTECTs the audit rows deleted just below, and the
         # batch FK PROTECTs the makerspace itself, so both must go first. Attestation is

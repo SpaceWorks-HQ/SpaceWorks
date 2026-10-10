@@ -1,4 +1,5 @@
 from django.urls import path
+from apps.admin_api.views_membership_admission import AdminMembershipAdmissionView
 
 from apps.admin_api.views_member_capabilities import (
     AdminMembershipCapabilitiesView,
@@ -44,6 +45,7 @@ from apps.admin_api.views_waiver_witness import AdminWitnessWaiverAcceptanceView
 
 
 roster_urlpatterns = [
+    path("makerspaces/<int:makerspace_id>/membership-admission", AdminMembershipAdmissionView.as_view(), name="admin-membership-admission"),
     path("memberships", AdminMembershipRosterView.as_view(), name="admin-memberships-roster"),
     path("membership-requests", AdminMembershipRequestListView.as_view(), name="admin-membership-requests"),
     path("makerspace/<int:makerspace_id>/membership-invitations", AdminInvitationView.as_view(), name="admin-membership-invitations"),

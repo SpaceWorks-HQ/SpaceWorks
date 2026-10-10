@@ -10,6 +10,10 @@ from apps.makerspaces.models import InvitationRequest
 
 def submit_invitation_request(makerspace, *, name, email, phone="", message=""):
     with transaction.atomic():
+        from apps.makerspaces.models import Makerspace
+        from apps.makerspaces.membership_admission_settings import ensure_join_allowed
+        makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+        ensure_join_allowed(makerspace)
         row = InvitationRequest.objects.create(
             makerspace=makerspace,
             name=name,

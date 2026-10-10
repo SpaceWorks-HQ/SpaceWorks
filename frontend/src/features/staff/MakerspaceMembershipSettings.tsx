@@ -5,6 +5,7 @@ import { Badge } from "../../components/ui";
 import type { Makerspace as MakerspaceContract, MembershipPolicyEnum } from "../../generated/api";
 import { staffRequest } from "../../lib/api";
 import type { Makerspace } from "./StaffPanels";
+import { MembershipAdmissionSettings } from "./MembershipAdmissionSettings";
 
 export function MakerspaceMembershipSettings({ makerspace, settings, loading }: {
   makerspace: Makerspace;
@@ -12,6 +13,7 @@ export function MakerspaceMembershipSettings({ makerspace, settings, loading }: 
   loading: boolean;
 }) {
   const queryClient = useQueryClient();
+  const admissionEnabled = (settings?.enabled_modules ?? makerspace.enabled_modules ?? []).includes("membership");
   const membershipPolicy = settings?.membership_policy ?? makerspace.membership_policy ?? "request";
   const referralsEnabled = settings?.referrals_enabled ?? makerspace.referrals_enabled ?? false;
   const [duesAmount, setDuesAmount] = useState(
@@ -52,7 +54,7 @@ export function MakerspaceMembershipSettings({ makerspace, settings, loading }: 
   });
 
   return <>
-    <div className="min-w-0 rounded-md border border-line bg-bg p-4">
+    {admissionEnabled ? <MembershipAdmissionSettings makerspaceId={makerspace.id} /> : <div className="min-w-0 rounded-md border border-line bg-bg p-4">
       <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)] md:items-start">
         <div className="grid min-w-0 max-w-2xl gap-2">
           <div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-semibold text-ink">Membership joining</h3><Badge tone={membershipPolicy === "invite_only" ? "neutral" : "success"}>{membershipPolicyLabel(membershipPolicy)}</Badge></div>
@@ -63,7 +65,7 @@ export function MakerspaceMembershipSettings({ makerspace, settings, loading }: 
           <option value="open">Join instantly</option><option value="request">Request approval</option><option value="invite_only">Invite-only</option>
         </select>
       </div>
-    </div>
+    </div>}
     <div className="min-w-0 rounded-md border border-line bg-bg p-4">
       <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
         <div className="grid min-w-0 max-w-2xl gap-2">

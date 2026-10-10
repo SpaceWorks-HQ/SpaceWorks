@@ -15,9 +15,11 @@ from apps.makerspaces.serializers_memberships import (
     InvitationListSerializer,
 )
 from apps.makerspaces.servability import servable_queryset
+from apps.makerspaces.serializers_admission import AdmissionAnswersSerializer
 
 
-ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer}
+ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer,
+          423: ErrorSerializer, 503: ErrorSerializer}
 
 
 def _claimable_invitations(user):
@@ -37,6 +39,7 @@ def _invitation_payload(invitation):
         "inviter": invitation.invited_by.display_name if invitation.invited_by_id else None,
         "auto_activates": invitation.auto_activate_on_claim,
         "role": invitation.assigned_role.name if invitation.assigned_role_id else None,
+        "is_staff": is_staff_invitation(invitation),
     }
 
 
@@ -60,15 +63,17 @@ class InvitationDiscoveryView(APIView):
 class InvitationClaimView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=None, tags=["Memberships"], responses={200: InvitationClaimOutcomeSerializer, **ERRORS})
+    @extend_schema(request=AdmissionAnswersSerializer, tags=["Memberships"], responses={200: InvitationClaimOutcomeSerializer, **ERRORS})
     def post(self, request, pk):
         if not active_user(request.user):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         invitation = get_object_or_404(_claimable_invitations(request.user), pk=pk)
-        claimed = claim_invitation(request.user, invitation.pk)
+        serializer = AdmissionAnswersSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        claimed = claim_invitation(request.user, invitation.pk, serializer.validated_data.get("application_answers"))
         if isinstance(claimed, MakerspaceMembership):
             outcome = "active"
         else:
-            outcome = "pending_approval"
+            outcome = claimed.state if claimed.state in ("awaiting_vouches", "awaiting_payment") else "pending_approval"
         return Response({"id": invitation.pk, "outcome": outcome})

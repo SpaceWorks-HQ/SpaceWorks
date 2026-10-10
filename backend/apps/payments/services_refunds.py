@@ -47,7 +47,7 @@ def _open_refund(payment, *, amount, reason, actor):
     if amount <= 0:
         raise RefundNotAllowed("Refund amount must be positive.", "refund_amount_invalid")
     with transaction.atomic():
-        locked = Payment.objects.select_for_update().select_related("makerspace").get(pk=payment.pk)
+        locked = Payment.objects.select_for_update(of=("self",)).select_related("makerspace").get(pk=payment.pk)
         if locked.status != Payment.Status.PAID_ONLINE:
             # Offline charges are refunded through the core manual receipt service;
             # a provider cannot send back money it did not collect.
@@ -108,7 +108,7 @@ def settle_refund(refund, *, external_refund_id, status, actor):
     entries with the same meta, whichever one gets there first.
     """
     with transaction.atomic():
-        locked = Refund.objects.select_for_update().select_related("payment__makerspace").get(pk=refund.pk)
+        locked = Refund.objects.select_for_update(of=("self",)).select_related("payment__makerspace").get(pk=refund.pk)
         fields = []
         if external_refund_id and not locked.external_refund_id:
             locked.external_refund_id = external_refund_id

@@ -13,6 +13,7 @@ class Payment(models.Model):
         # subject_id is the `makerspaces.MembershipTerm` pk: the membership pk is already
         # taken by the dues charge above, and one term gets exactly one renewal charge.
         MEMBERSHIP_TERM = "membership_term", "Membership renewal"
+        MEMBERSHIP_REQUEST = "membership_request", "Membership admission"
         # Loan charges (forward plan phase 6). subject_id is the HardwareRequest id, so
         # the one-per-subject constraint gives one deposit and one late fee per loan.
         LOAN_DEPOSIT = "loan_deposit", "Loan deposit"
@@ -154,6 +155,10 @@ class Payment(models.Model):
         self.currency = (self.currency or "").lower()
         currency_validator(self.currency)
         subject_identity_unchanged = self._subject_identity_unchanged()
+        if self.subject_type == self.SubjectType.MEMBERSHIP_REQUEST:
+            from apps.payments.subject_validation import validate_membership_request
+
+            validate_membership_request(self, subject_identity_unchanged)
         if self.subject_type == self.SubjectType.MACHINE_SERVICE_REQUEST and self.subject_id:
             from apps.machines.models import MachineServiceRequest
 

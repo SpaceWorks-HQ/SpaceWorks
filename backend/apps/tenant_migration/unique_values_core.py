@@ -29,6 +29,12 @@ from .unique_values_policy import (
 # named constraints retain their database name. Every entry is intentionally literal:
 # adding a new global uniqueness rule must force a reviewed migration disposition.
 CORE_UNIQUE_RULES = {
+    ("makerspaces.MakerspaceMembershipSettings", "field:makerspace"): _policy(
+        REMAP, "One admission policy follows the remapped tenant reference.",
+    ),
+    ("makerspaces.MembershipVouch", "uniq_membership_request_voucher"): _policy(
+        REMAP, "The immutable vouch follows its remapped request and voucher references.",
+    ),
     ("apiclients.ApiClient", "field:client_id"): _policy(
         UniqueValueDisposition.DROP_ROW,
         "API clients are dropped with their omitted credentials.",

@@ -55,11 +55,11 @@ def test_honeypot_gets_the_same_ack_and_stores_nothing():
     assert AuditLog.objects.filter(action="invitation_request.submitted").count() == 1
 
 
-def test_module_off_answers_404_and_bad_input_400():
+def test_module_off_answers_400_and_bad_input_400():
     space = make_space("invite-off")
     assert submit(space, {"name": "", "email": "nope"}).status_code == 400
     disable_module(space, "membership")
-    assert submit(space).status_code == 404
+    assert submit(space).status_code == 400
     assert not InvitationRequest.objects.exists()
 
 

@@ -17,6 +17,7 @@ from apps.payments.terminal_settlement import (
 )
 from apps.makerspaces.servability import is_servable
 from apps.payments.notifications import notify_payment
+from apps.payments.admission_settlement import resume_admission_after_settlement
 
 
 def apply_webhook_event(
@@ -106,6 +107,7 @@ def apply_webhook_event(
             meta={"stripe_event_id": event_id},
         )
         notify_payment(payment, "payment_received")
+        resume_admission_after_settlement(payment)
         return payment
 
 
@@ -166,6 +168,7 @@ def apply_razorpay_webhook_event(makerspace, event):
             meta={"provider": "razorpay", "event_id": event.event_id},
         )
         notify_payment(payment, "payment_received")
+        resume_admission_after_settlement(payment)
         return payment
 
 

@@ -11,6 +11,7 @@ from rest_framework.exceptions import APIException, NotFound
 from apps.accounts import rbac
 from apps.audit import services as audit
 from apps.payments.models import Payment
+from apps.payments.admission_settlement import resume_admission_after_settlement
 
 # Re-export barrel: these moved to submodules at the 300-line ceiling, but
 # `from apps.payments.reconciliation import X` must keep resolving for every caller.
@@ -155,7 +156,7 @@ def reconcile_payments(
 
     requested_ids = list(payment_ids)
     locked = list(
-        Payment.objects.select_for_update()
+        Payment.objects.select_for_update(of=("self",))
         .select_related("makerspace")
         .filter(makerspace_id=makerspace_id, pk__in=requested_ids)
         .order_by("pk")
@@ -194,6 +195,7 @@ def reconcile_payments(
         audit.record(
             actor, action, makerspace=payment.makerspace, target=payment, meta=meta
         )
+        resume_admission_after_settlement(payment)
         if target_status == Payment.Status.PAID_OFFLINE:
             from apps.payments.notifications import notify_payment
             notify_payment(payment, "payment_received")
@@ -213,7 +215,7 @@ def amend_settlement(*, actor, makerspace_id, payment_id, settlement):
     from apps.payments.models import ManualSettlement
 
     payment = (
-        Payment.objects.select_for_update()
+        Payment.objects.select_for_update(of=("self",))
         .select_related("makerspace")
         .filter(makerspace_id=makerspace_id, pk=payment_id)
         .first()

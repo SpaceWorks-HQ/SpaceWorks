@@ -34,7 +34,7 @@ def bounded(value, limit=160):
 
 
 def notify_family(makerspace, feature, event, subject, *, data, scope=None,
-                  member_id=None, requester_subject=None):
+                  member_id=None, requester_subject=None, admission_request_id=None):
     """Queue one edge; resolve fresh gates, recipients and templates after commit.
 
     subject/requester_subject are immutable bags built by domain adapters. Address
@@ -63,6 +63,14 @@ def notify_family(makerspace, feature, event, subject, *, data, scope=None,
             permitted = membership is None or (
                 membership.status == "active" and membership.receives_notifications
             )
+            if admission_request_id and stream == "membership":
+                from apps.makerspaces.models import MembershipRequest
+                # A returning applicant owns this application even while the old
+                # membership remains revoked. No old debt or community data is sent.
+                permitted = (membership is None or membership.receives_notifications) and MembershipRequest.objects.filter(
+                    pk=admission_request_id, makerspace=makerspace, user_id=member_id,
+                    admission_managed=True, state__in=("requested", "awaiting_vouches", "awaiting_payment", "revoked"),
+                ).exists()
             if recipients.has_selection(makerspace, feature, event, scope):
                 permitted = permitted and recipients.requester_selected(makerspace, feature, event, scope)
             owner_email = (owner.email or "").strip() if owner else ""

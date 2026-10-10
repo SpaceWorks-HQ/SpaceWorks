@@ -20,6 +20,7 @@ SUBJECT_ACTIONS = {
     # unsupported-subject refusal below and NO actor could ever reconcile a renewal --
     # a space collecting renewals in cash had no way to mark one paid.
     Payment.SubjectType.MEMBERSHIP_TERM: rbac.Action.MANAGE_MAKERSPACE,
+    Payment.SubjectType.MEMBERSHIP_REQUEST: rbac.Action.MANAGE_MEMBERS,
     # Loan charges follow the handover job: whoever may issue settles the deposit,
     # whoever may take a return settles the late fee.
     Payment.SubjectType.LOAN_DEPOSIT: rbac.Action.ISSUE_REQUEST,

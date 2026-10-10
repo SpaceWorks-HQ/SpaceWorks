@@ -98,6 +98,11 @@ class MemberPaymentHistoryView(APIView):
     @extend_schema(
         tags=["Payments"],
         summary="List the caller's payment history",
+        description=(
+            "Active memberships and account-only charge owners may read their own history. "
+            "A revoked member reapplying through an approved admission may read only that "
+            "application's pending admission charge; previous membership debt stays refused."
+        ),
         request=None,
         responses={
             200: MemberPaymentSerializer(many=True),

@@ -1,6 +1,10 @@
 from django.urls import path
 
 from apps.makerspaces.config_views import PublicConfigView
+from apps.makerspaces.views_admission import (
+    PublicAdmissionView, MemberAdmissionView, MemberAdmissionExportView,
+    MemberAdmissionCancelView, MemberAdmissionVouchView,
+)
 from apps.makerspaces.views import BootstrapView
 from apps.makerspaces.views_membership_invitations import InvitationClaimView, InvitationDiscoveryView
 from apps.makerspaces.views_memberships import (
@@ -23,6 +27,11 @@ from apps.makerspaces.profile_views import (
     MemberProfileView,
 )
 urlpatterns = [
+    path("public/<slug:makerspace_slug>/membership-admission", PublicAdmissionView.as_view(), name="public-membership-admission"),
+    path("member/makerspaces/<int:makerspace_id>/admission", MemberAdmissionView.as_view(), name="member-admission"),
+    path("member/makerspaces/<int:makerspace_id>/admission/export", MemberAdmissionExportView.as_view(), name="member-admission-export"),
+    path("member/makerspaces/<int:makerspace_id>/admission/<int:request_id>/cancel", MemberAdmissionCancelView.as_view(), name="member-admission-cancel"),
+    path("member/makerspaces/<int:makerspace_id>/admission/<int:request_id>/vouch", MemberAdmissionVouchView.as_view(), name="member-admission-vouch"),
     path("bootstrap", BootstrapView.as_view(), name="tenant-bootstrap"),
     path("config", PublicConfigView.as_view(), name="public-config"),
     path("public/<slug:makerspace_slug>/membership-requests", PublicMembershipRequestView.as_view(), name="public-membership-request"),
