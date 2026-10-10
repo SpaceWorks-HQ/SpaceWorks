@@ -11,6 +11,7 @@ from apps.events.service_payments import (
     create_for_registered_registration,
 )
 from apps.events.services_calendar import calendar_registration_changed
+from apps.makerspaces.guards import require_module_locked
 
 
 def _boundary():
@@ -160,6 +161,7 @@ def promote_registration(registration, *, actor):
 def cancel_registration(registration, *, actor=None):
     services = _boundary()
     event = services._locked_event(registration.event_id)
+    require_module_locked(event.makerspace_id, "events")
     locked = _lock_registration(event, registration.pk)
     if locked.status not in (
         EventRegistration.Status.PENDING_APPROVAL,

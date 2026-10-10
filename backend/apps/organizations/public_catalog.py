@@ -20,7 +20,7 @@ def public_events_for(organization):
             ends_at__gte=timezone.now(),
         )
         .filter(servable_q("makerspace"))
-        .select_related("makerspace")
+        .select_related("makerspace__payment_settings")
         .prefetch_related(
             Prefetch(
                 "organizers",

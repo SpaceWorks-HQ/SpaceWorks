@@ -20,6 +20,7 @@ from apps.events.serializers_admin import (
 )
 from apps.events.views_admin_events import (
     EVENT_ERROR_409,
+    EVENT_VALIDATION_ERROR_SCHEMA,
     _manageable_event,
     _manageable_registration,
     _paginated_response,
@@ -32,7 +33,7 @@ from apps.payments.models import Payment
 
 
 REGISTRATION_ACTION_ERRORS = {
-    400: OpenApiResponse(ErrorSerializer, description='Unexpected request body.'),
+    400: OpenApiResponse(EVENT_VALIDATION_ERROR_SCHEMA, description='Unexpected request body or events module disabled.'),
     401: OpenApiResponse(ErrorSerializer, description='Authentication is required.'),
     403: OpenApiResponse(ErrorSerializer, description='Event management is required.'),
     404: OpenApiResponse(ErrorSerializer, description='Registration not found.'),
@@ -211,6 +212,19 @@ class EventRegistrationPromoteView(_RegistrationActionView):
     @extend_schema(
         tags=['Admin events'],
         summary='Manually promote an approved waitlisted registration',
+        request=EmptyActionSerializer,
+        responses={200: EventRegistrationAdminSerializer, **REGISTRATION_ACTION_ERRORS},
+    )
+    def post(self, request, pk, *args, **kwargs):
+        return self.execute(request, pk)
+
+
+class EventRegistrationCancelView(_RegistrationActionView):
+    operation = staticmethod(services.cancel_registration)
+
+    @extend_schema(
+        tags=['Admin events'],
+        summary='Cancel an event registration and release its pending charge',
         request=EmptyActionSerializer,
         responses={200: EventRegistrationAdminSerializer, **REGISTRATION_ACTION_ERRORS},
     )

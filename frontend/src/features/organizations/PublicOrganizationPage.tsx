@@ -8,6 +8,7 @@ import { SiteFooter } from "../../components/SiteFooter";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { Card, EmptyState, Skeleton } from "../../components/ui";
 import { StructuredApiError } from "../../lib/api";
+import { EventPrice } from "../events/EventPrice";
 import {
   usePublicOrganization,
   usePublicOrganizationEvents,
@@ -89,6 +90,7 @@ export function PublicOrganizationPage() {
                         <p className="mt-2 font-mono text-xs text-muted"><time dateTime={event.starts_at}>{dateRange(event)}</time></p>
                         {event.location ? <p className="mt-1 text-sm text-muted">{event.location}</p> : null}
                         {event.description ? <p className="mt-3 line-clamp-3 text-sm leading-6 text-ink">{event.description}</p> : null}
+                        <dl className="mt-3 text-sm"><EventPrice amount={event.payment_amount} currency={event.currency} /></dl>
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                           <span className="chip chip-available">{event.availability}</span>
                           <Link className="desk-button-primary" to={`/m/${event.host.slug}/events`}>

@@ -18,6 +18,7 @@ from apps.events.views_admin import (
     EventListCreateView,
     EventPublishView,
     EventRegistrationApproveView,
+    EventRegistrationCancelView,
     EventRegistrationListView,
     EventRegistrationMarkAttendedView,
     EventRegistrationPromoteView,
@@ -247,6 +248,11 @@ urlpatterns = [
         'event-registrations/<int:pk>/approve/',
         EventRegistrationApproveView.as_view(),
         name='admin-event-registration-approve',
+    ),
+    path(
+        'event-registrations/<int:pk>/cancel/',
+        EventRegistrationCancelView.as_view(),
+        name='admin-event-registration-cancel',
     ),
     path(
         'event-registrations/<int:pk>/reject/',
