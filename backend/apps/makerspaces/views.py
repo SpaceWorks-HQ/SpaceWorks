@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.platform import bootstrap_payload, resolve_frontend
+from apps.makerspaces.opening_hours_schema import OpeningHoursField
 
 TenantBootstrapSerializer = inline_serializer(
     name="TenantBootstrap",
@@ -23,6 +24,8 @@ TenantBootstrapSerializer = inline_serializer(
                 "slug": serializers.CharField(),
                 "public_code": serializers.CharField(),
                 "location": serializers.CharField(allow_blank=True),
+                "timezone": serializers.CharField(),
+                "opening_hours": OpeningHoursField(),
                 "map_url": serializers.URLField(allow_blank=True),
                 "geofence_enabled": serializers.BooleanField(required=False),
                 "logo_url": serializers.CharField(allow_blank=True, allow_null=True),

@@ -58,7 +58,9 @@ class TenantDumpCatalogError(AssertionError):
 # Re-blessed on integration: phases 11 and 10, the backup lane, Wave-0 offline refunds,
 # the 7a-7d devices chain and the 9a-9e kiosk chain all changed the catalog; recomputed
 # from the merged snapshot.
-CATALOG_SCHEMA_SHA256 = "ff05f1988ee048b26717042c02dbfc23bd46d2731aa3598cd8433e32a0a57a96"
+# Profile fields: reconstructed the prior literal graph and verified its exact
+# digest before adding timezone/country/opening_hours to the reviewed snapshot.
+CATALOG_SCHEMA_SHA256 = "aeeb6888415e55e5943e45565ede8284611833171873845ff0ff4c53173cba5b"
 
 
 def catalog_models(apps_registry=apps):

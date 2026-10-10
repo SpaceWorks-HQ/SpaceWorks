@@ -13,6 +13,7 @@ from apps.admin_api.serializers_makerspace_validation import (
     MakerspaceValidationMixin,
 )
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.opening_hours_schema import OpeningHoursField
 
 
 class MakerspaceSerializer(
@@ -21,6 +22,7 @@ class MakerspaceSerializer(
     serializers.ModelSerializer,
 ):
     theme_config = ThemeConfigField(required=False)
+    opening_hours = OpeningHoursField(read_only=True)
     resource_limit_overrides = serializers.JSONField(required=False)
     frontend_domain = serializers.CharField(
         required=False,
@@ -76,6 +78,9 @@ class MakerspaceSerializer(
             "public_code",
             "slug",
             "location",
+            "timezone",
+            "country",
+            "opening_hours",
             "map_url",
             "geofence_latitude",
             "geofence_longitude",
@@ -138,6 +143,7 @@ class MakerspaceSerializer(
             "updated_at",
         ]
         read_only_fields = [
+            "timezone", "country", "opening_hours",
             "id",
             "public_api_key",
             # Derived from the active API clients' allowed origins

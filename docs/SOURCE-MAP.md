@@ -31,6 +31,12 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
   over `lifecycle_archive.py`, `lifecycle_purge.py` and `lifecycle_storage.py`),
   `models_makerspace_validation.py` owns model clean checks; `theme_validation.py` validates
   the closed theme JSON for control forms and API writes.
+  `profile_validation.py` validates IANA timezone, ISO country and opening-hours JSON;
+  `opening_hours_schema.py` documents the shared hours schema. `local_time.py` owns
+  `local_now`, `to_local`, `local_day_bounds`, `is_open` and `next_open_interval`
+  (aware inputs, UTC half-open bounds; fold/gap policy in its docstring).
+  `admin_api/views_makerspace_profile.py` serves audited, MANAGE_MAKERSPACE-scoped
+  `/admin/makerspace/<id>/profile`; currency uses `MakerspacePaymentSettings.default_currency`.
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
   `models_stations.py` owns shared inert `Station` metadata plus the complete live
   `StationCredential` envelope; `station_credentials.py`, `station_sessions.py`, `station_security.py` and
@@ -279,6 +285,9 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
   `staffAccess.ts` `TAB_GROUPS`, which does sidebar grouping AND permission derivation (**not**
   `StaffApp.tsx`; module gating and routing are the separate `staffTabs.ts`); capabilities from
   action-based `staffAccess.ts`; payment reconciliation and platform credential panels.
+  `MakerspaceProfileSettings.tsx` loads/saves the location and hours profile;
+  `MakerspaceHoursEditor.tsx` and `makerspaceProfileForm.ts` own the weekly/exception
+  draft. Profile and payment editors refresh each other's shared currency query.
   `frontend/src/features/auth/` + `members/MemberAuthPanel.tsx` — provider-config-driven social/member auth.
   `frontend/src/features/printing|bookings|forms|...` — feature slices. `frontend/src/lib/`,
   `components/ui/`, `types/`, `generated/api.ts`.

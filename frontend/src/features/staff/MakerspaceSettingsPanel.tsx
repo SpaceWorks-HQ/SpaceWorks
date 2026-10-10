@@ -14,6 +14,7 @@ import { MakerspaceGeneralSettings } from "./MakerspaceGeneralSettings";
 import { IntegrationHealthPanel } from "./IntegrationHealthPanel";
 import { KioskStationSettings } from "./KioskStationSettings";
 import { MakerspaceLocationSettings } from "./MakerspaceLocationSettings";
+import { MakerspaceProfileSettings } from "./MakerspaceProfileSettings";
 import { MakerspaceMembershipSettings } from "./MakerspaceMembershipSettings";
 import { MakerspacePaymentSettings } from "./MakerspacePaymentSettings";
 import { MakerspacePublicStatsSettings } from "./MakerspacePublicStatsSettings";
@@ -110,6 +111,7 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMak
           loading={settings.isLoading}
         />
         <MakerspaceMembershipSettings makerspace={makerspace} settings={settings.data} loading={settings.isLoading} />
+        {canManageMakerspace ? <MakerspaceProfileSettings makerspaceId={makerspace.id} /> : null}
         <MakerspaceFeatureSettings
           makerspace={makerspace}
           settings={settings.data}

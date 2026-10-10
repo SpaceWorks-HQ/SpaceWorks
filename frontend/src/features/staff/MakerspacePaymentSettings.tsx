@@ -33,7 +33,11 @@ export function MakerspacePaymentSettings({ makerspace }: { makerspace: Makerspa
     if (settings.data) setCurrency(settings.data.default_currency);
   }, [settings.data]);
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey });
+  const refresh = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey }),
+    // Both editors expose the same currency row; refresh its other reader too.
+    queryClient.invalidateQueries({ queryKey: ["makerspace-profile", makerspace.id] }),
+  ]);
   const save = useMutation({
     mutationFn: () =>
       staffRequest<PaymentSettings>(path, {

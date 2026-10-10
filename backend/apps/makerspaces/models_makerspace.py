@@ -14,6 +14,9 @@ from apps.makerspaces.provenance import validate_actor_snapshot
 from apps.makerspaces.request_access import reconcile_enabled_modules
 from apps.makerspaces.models_makerspace_secrets import MakerspaceSecretsMixin
 from apps.makerspaces.models_makerspace_validation import clean_makerspace
+from apps.makerspaces.profile_validation import (
+    default_timezone, validate_country, validate_opening_hours, validate_timezone,
+)
 from apps.makerspaces.validators import (
     validate_presence_presets,
     DEFAULT_PRESENCE_PRESETS,
@@ -65,6 +68,9 @@ class Makerspace(MakerspaceSecretsMixin, models.Model):
         ],
     )
     location = models.CharField(max_length=200, blank=True)
+    timezone = models.CharField(max_length=100, default=default_timezone, validators=[validate_timezone])
+    country = models.CharField(max_length=2, blank=True, default="", validators=[validate_country])
+    opening_hours = models.JSONField(default=dict, blank=True, validators=[validate_opening_hours])
     map_url = models.URLField(blank=True, default="", validators=[validate_google_maps_url])
     geofence_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
     geofence_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-180), MaxValueValidator(180)])
