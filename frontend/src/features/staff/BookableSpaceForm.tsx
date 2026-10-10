@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 
+import { BookableSpaceMachineType } from "./BookableSpaceMachineType";
 import { CustomFormBuilder } from "../forms/CustomFormBuilder";
 import type { CustomFormSchema } from "../forms/customFormTypes";
 import type { BookableSpace, BookableSpacePayload } from "./bookingsApi";
@@ -19,6 +20,7 @@ export const EMPTY_SPACE_FORM: FormValues = {
   payment_amount: "0.00",
   custom_form: null,
   requester_notifications_enabled: null,
+  machine_type: null,
 };
 
 export function valuesForSpace(space: BookableSpace): FormValues {
@@ -35,10 +37,12 @@ export function valuesForSpace(space: BookableSpace): FormValues {
     payment_amount: space.payment_amount,
     custom_form: space.custom_form,
     requester_notifications_enabled: space.requester_notifications_enabled,
+    machine_type: space.machine_type ?? null,
   };
 }
 
-export function BookableSpaceForm({ initialValues = EMPTY_SPACE_FORM, onSubmit, pending, error, submitLabel, disabled = false }: {
+export function BookableSpaceForm({ makerspaceId, initialValues = EMPTY_SPACE_FORM, onSubmit, pending, error, submitLabel, disabled = false }: {
+  makerspaceId?: number;
   initialValues?: FormValues;
   onSubmit: (payload: BookableSpacePayload) => void;
   pending: boolean;
@@ -50,13 +54,17 @@ export function BookableSpaceForm({ initialValues = EMPTY_SPACE_FORM, onSubmit, 
   const set = <K extends keyof FormValues>(key: K, value: FormValues[K]) => setValues((current) => ({ ...current, [key]: value }));
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    onSubmit({
+    const payload: BookableSpacePayload = {
       ...values,
       name: values.name.trim(),
       description: values.description.trim(),
       location: values.location.trim(),
       custom_form: values.custom_form?.length ? values.custom_form : null,
-    });
+    };
+    // An unchanged link must survive editing while Machines is uninstalled.
+    // The server validates machine_type only when the caller actually changes it.
+    if (values.machine_type === initialValues.machine_type) delete payload.machine_type;
+    onSubmit(payload);
   };
   const changeAvailability = (checked: boolean) => setValues((current) => ({
     ...current,
@@ -81,6 +89,7 @@ export function BookableSpaceForm({ initialValues = EMPTY_SPACE_FORM, onSubmit, 
             <option value="other">Other</option>
           </select>
         </label>
+        {makerspaceId !== undefined ? <BookableSpaceMachineType makerspaceId={makerspaceId} value={values.machine_type ?? null} onChange={(value) => set("machine_type", value)} /> : null}
         <label className="grid gap-1 text-sm font-semibold text-ink">Capacity
           <input className="desk-input" type="number" min={0} value={values.capacity} onChange={(event) => set("capacity", Number(event.target.value))} />
           <span className="text-xs font-normal text-muted">Use 0 when no capacity is published.</span>

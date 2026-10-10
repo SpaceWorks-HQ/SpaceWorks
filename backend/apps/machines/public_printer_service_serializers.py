@@ -24,6 +24,7 @@ class PublicPrinterUploadSerializer(serializers.Serializer):
 
 
 class PublicPrinterSubmitSerializer(serializers.Serializer):
+    certification_override_reason = serializers.CharField(required=False, allow_blank=True, max_length=1000, write_only=True)
     website = serializers.CharField(required=False, allow_blank=True)
     queue_id = serializers.IntegerField(required=False, allow_null=True)
     title = serializers.CharField(max_length=200)

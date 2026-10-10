@@ -8,6 +8,8 @@ ROW_POLICIES = {
         RowDisposition.PRESERVE_LIVE,
         "Tenant loan preferences travel; target-owned feature switches still gate renewals and limits.",
     ),
+    # machines.MakerspaceMachineTypePolicy uses the ordinary data projection;
+    # numeric preferences carry no actor or authority grants.
     "operations.ReminderSchedule": RowPolicy(
         RowDisposition.DROP,
         "Source-local reminder coordination is rebuilt by target sources; claims never travel.",

@@ -1,4 +1,5 @@
 from django.utils import timezone
+from apps.makerspaces.local_time import to_local
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
@@ -17,15 +18,14 @@ from apps.maintenance.views_shared import (
     resolve_collection,
     resolve_schedule,
 )
-from apps.hardware_requests.view_helpers import (
-    ERROR_400, ERROR_403, ERROR_404, ERROR_409,
-)
+from apps.accounts import rbac
+from apps.openapi_errors import errors
 from apps.maintenance import services
 from apps.maintenance.models import MaintenanceSchedule
 
 
-SCOPED = {400: ERROR_400, 403: ERROR_403, 404: ERROR_404}
-MUTATION = {**SCOPED, 409: ERROR_409}
+SCOPED = errors(400, 401, 403, 404)
+MUTATION = {**SCOPED, **errors(409, 423)}
 
 
 class MaintenanceScheduleListCreateView(APIView):
@@ -41,14 +41,17 @@ class MaintenanceScheduleListCreateView(APIView):
         machine = resolve_collection(
             request.user, makerspace_id, machine_id, manage=False,
         )
-        queryset = MaintenanceSchedule.objects.filter(machine=machine).order_by(
+        queryset = rbac.scope_by_makerspace(
+            request.user, MaintenanceSchedule.objects.all(),
+            makerspace_field="machine__makerspace_id",
+        ).filter(machine=machine).order_by(
             "next_due", "id",
         )
         paginator = MaintenancePagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
         return page_response(
             paginator, page, MaintenanceScheduleSerializer,
-            context={"today": timezone.localdate()},
+            context={"today": to_local(machine.makerspace, timezone.now()).date()},
         )
 
     @extend_schema(
@@ -68,7 +71,7 @@ class MaintenanceScheduleListCreateView(APIView):
         )
         return Response(
             MaintenanceScheduleSerializer(
-                schedule, context={"today": timezone.localdate()},
+                schedule, context={"today": to_local(machine.makerspace, timezone.now()).date()},
             ).data,
             status=status.HTTP_201_CREATED,
         )
@@ -94,7 +97,7 @@ class MaintenanceScheduleDetailView(APIView):
             schedule, actor=request.user, **serializer.validated_data,
         )
         return Response(MaintenanceScheduleSerializer(
-            schedule, context={"today": timezone.localdate()},
+            schedule, context={"today": to_local(schedule.machine.makerspace, timezone.now()).date()},
         ).data)
 
 
@@ -113,5 +116,5 @@ class MaintenanceScheduleDeactivateView(APIView):
         serializer.is_valid(raise_exception=True)
         schedule = services.deactivate_schedule(schedule, actor=request.user)
         return Response(MaintenanceScheduleSerializer(
-            schedule, context={"today": timezone.localdate()},
+            schedule, context={"today": to_local(schedule.machine.makerspace, timezone.now()).date()},
         ).data)

@@ -98,6 +98,7 @@ class PublicSpaceAvailabilitySerializer(serializers.Serializer):
 
 
 class PublicBookingInputSerializer(serializers.Serializer):
+    certification_override_reason = serializers.CharField(required=False, allow_blank=True, max_length=1000, write_only=True)
     starts_at = serializers.DateTimeField(write_only=True)
     ends_at = serializers.DateTimeField(write_only=True)
     custom_answers = serializers.JSONField(

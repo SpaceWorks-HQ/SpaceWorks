@@ -4,6 +4,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.audit.services import record
+from apps.accounts import rbac
 from apps.machines import access
 from apps.machines.models import Machine
 from apps.makerspaces.guards import require_module
@@ -15,14 +16,18 @@ from apps.maintenance.exceptions import (
 from apps.maintenance.models import MaintenanceLog, MaintenanceSchedule
 
 
-def lock_machine(machine):
-    return Machine.objects.select_for_update().select_related(
-        "makerspace", "machine_type",
-    ).get(pk=machine.pk)
+def lock_machine(machine, actor):
+    row = rbac.scope_by_makerspace(
+        actor, Machine.objects.select_for_update().select_related("makerspace", "machine_type"),
+    ).filter(pk=machine.pk).first()
+    if row is None:
+        raise PermissionDenied()
+    return row
 
 
 def prepare_machine(machine, actor, *, manage):
     require_module(machine.makerspace, "maintenance")
+    require_module(machine.makerspace, "machines")
     # Archived makerspaces are soft-deleted for everyone; reject after the row lock
     # reloads the makerspace so a per-machine operator can't complete an in-flight
     # mutation (and finalize an attachment) during the archive->purge window.

@@ -93,7 +93,7 @@ def _delete_object_graph(makerspace):
     from apps.operations.models import InventoryAdjustment, QrPrintBatch
     from apps.operations.models import StocktakeSession, StockTransfer
     from apps.organizations.models import OrganizationMakerspace
-    from apps.machines.models import Machine, MachineType, MakerspaceMachineTypePricing
+    from apps.machines.models import Machine, MachineType, MakerspaceMachineTypePricing, MakerspaceMachineTypePolicy
     from apps.machines.service_lifecycle import delete_for_makerspace
     from apps.payments.models import Payment, ProcessedStripeEvent, Refund
     from apps.tenant_migration.models import ExternalTenantReference, TenantImportJob
@@ -157,6 +157,7 @@ def _delete_object_graph(makerspace):
         # MachineType (PROTECT makerspace FK) before makerspace.delete().
         Machine.objects.filter(makerspace=makerspace).delete()
         MakerspaceMachineTypePricing.objects.filter(makerspace=makerspace).delete()
+        MakerspaceMachineTypePolicy.objects.filter(makerspace=makerspace).delete()
         MachineType.objects.filter(makerspace=makerspace).delete()
 
         InventoryAsset.objects.filter(makerspace=makerspace).delete()

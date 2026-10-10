@@ -7,6 +7,7 @@ from apps.accounts.models import User
 from apps.integrations import notification_rules
 from apps.integrations import recipients as recipient_selection
 from apps.makerspaces.models import MakerspaceMembership
+from .notifications_machine_scope import reminder_memberships
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def _holds_feature_action(membership, required_action):
     return bool(set(required) & set(rbac.actions_for_membership(membership)))
 
 
-def staff_emails_for_feature(makerspace, feature, event=None, scope=None) -> list[str]:
+def _staff_emails_for_feature(makerspace, feature, event=None, scope=None) -> list[str]:
     try:
         if not getattr(makerspace, "staff_notifications_enabled", True):
             return []
@@ -72,7 +73,7 @@ def staff_emails_for_feature(makerspace, feature, event=None, scope=None) -> lis
         )
 
         memberships = (
-            MakerspaceMembership.objects.filter(
+            reminder_memberships(MakerspaceMembership.objects.all(), makerspace, feature, event).filter(
                 makerspace=makerspace,
                 status="active",
                 receives_notifications=True,
@@ -134,7 +135,7 @@ def staff_emails_for_stream(makerspace, stream, event=None) -> list[str]:
     return staff_emails_for_feature(makerspace, feature, event=event)
 
 
-def staff_user_ids_for_feature(makerspace, feature, event=None, scope=None) -> list[int]:
+def _staff_user_ids_for_feature(makerspace, feature, event=None, scope=None) -> list[int]:
     """Native-push recipients use the same action/mute matrix as staff email."""
     try:
         if not getattr(makerspace, "staff_notifications_enabled", True):
@@ -150,7 +151,7 @@ def staff_user_ids_for_feature(makerspace, feature, event=None, scope=None) -> l
             return []
         stream = _FEATURE_STREAMS.get(feature)
         mutable = bool(stream and event and notification_rules.is_event_mutable(stream, "staff", event))
-        memberships = MakerspaceMembership.objects.filter(
+        memberships = reminder_memberships(MakerspaceMembership.objects.all(), makerspace, feature, event).filter(
             makerspace=makerspace, status="active", receives_notifications=True,
             user__is_active=True, user__access_status=User.AccessStatus.ACTIVE,
         ).exclude(user__is_superuser=True).exclude(
@@ -173,4 +174,25 @@ def staff_user_ids_for_feature(makerspace, feature, event=None, scope=None) -> l
         logger.warning("push_recipient_resolution_failed", extra={
             "makerspace_id": getattr(makerspace, "pk", None), "feature": feature,
         })
+        return []
+
+
+def staff_emails_for_feature(makerspace, feature, event=None, scope=None):
+    from .notifications_machine_scope import filter_reminder_emails
+    try:
+        return filter_reminder_emails(makerspace, feature, event, scope,
+                                     _staff_emails_for_feature(makerspace, feature, event, scope))
+    except Exception:
+        logger.warning("reminder_recipient_resolution_failed", extra={"feature": feature})
+        return []
+
+
+def staff_user_ids_for_feature(makerspace, feature, event=None, scope=None):
+    from .notifications_machine_scope import reminder_staff_ids
+    try:
+        ids = _staff_user_ids_for_feature(makerspace, feature, event, scope)
+        allowed = reminder_staff_ids(makerspace, feature, event, scope)
+        return ids if allowed is None else [pk for pk in ids if pk in allowed]
+    except Exception:
+        logger.warning("reminder_push_recipient_resolution_failed", extra={"feature": feature})
         return []

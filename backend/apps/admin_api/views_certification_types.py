@@ -10,17 +10,20 @@ on click is the failure mode `docs/INVARIANTS.md` calls out under Machine scopin
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.admin_api.serializers_certifications import (
     CertificationTypeSerializer,
+    CertificationTypePageSerializer,
     CertificationTypeUpdateSerializer,
+    certification_type_write,
 )
 from apps.audit import services as audit
 from apps.machines import access
@@ -59,7 +62,8 @@ class CertificationTypeListCreateView(APIView):
         tags=["Admin machines"],
         summary="List certification types in a makerspace",
         request=None,
-        responses={200: CertificationTypeSerializer(many=True), **errors(400, 401, 403, 404)},
+        parameters=[OpenApiParameter("page", int, OpenApiParameter.QUERY, description="Page number (24 rows per page).")],
+        responses={200: CertificationTypePageSerializer, **errors(400, 401, 403, 404)},
     )
     def get(self, request, makerspace_id, *args, **kwargs):
         require_module(_scoped_makerspace(request.user, makerspace_id), "machines")
@@ -75,7 +79,10 @@ class CertificationTypeListCreateView(APIView):
             # object check matters more here than saving a query.
             if access.can_create_machine(request.user, makerspace_id, row.machine_type)
         ]
-        return Response(CertificationTypeSerializer(rows, many=True).data)
+        paginator = PageNumberPagination()
+        paginator.page_size = 24
+        page = paginator.paginate_queryset(rows, request, view=self)
+        return paginator.get_paginated_response(CertificationTypeSerializer(page, many=True).data)
 
     @extend_schema(
         tags=["Admin machines"],
@@ -90,7 +97,9 @@ class CertificationTypeListCreateView(APIView):
     @transaction.atomic
     def post(self, request, makerspace_id, *args, **kwargs):
         makerspace = require_module(_scoped_makerspace(request.user, makerspace_id), "machines")
-        serializer = CertificationTypeSerializer(data=request.data)
+        serializer = CertificationTypeSerializer(
+            data=request.data, context={"request": request, "makerspace_id": makerspace.pk},
+        )
         serializer.is_valid(raise_exception=True)
         machine_type = get_object_or_404(
             MachineType.objects.filter(
@@ -104,9 +113,10 @@ class CertificationTypeListCreateView(APIView):
             raise ValidationError({"machine_type": "Unknown machine type."})
         if not access.can_create_machine(request.user, makerspace_id, machine_type):
             raise PermissionDenied()
-        row = CertificationType.objects.create(
-            makerspace=makerspace, **serializer.validated_data
-        )
+        with certification_type_write():
+            row = CertificationType.objects.create(
+                makerspace=makerspace, **serializer.validated_data
+            )
         audit.record(
             request.user,
             "certification_type.created",
@@ -136,10 +146,11 @@ class CertificationTypeDetailView(APIView):
     def patch(self, request, pk, *args, **kwargs):
         row = _resolved_type(request.user, pk)
         serializer = CertificationTypeUpdateSerializer(
-            row, data=request.data, partial=True
+            row, data=request.data, partial=True, context={"request": request},
         )
         serializer.is_valid(raise_exception=True)
-        row = serializer.save()
+        with certification_type_write():
+            row = serializer.save()
         audit.record(
             request.user,
             "certification_type.updated",
@@ -175,4 +186,3 @@ class CertificationTypeDetailView(APIView):
             meta={"name": row.name},
         )
         return Response(CertificationTypeSerializer(row).data)
-

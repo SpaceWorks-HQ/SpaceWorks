@@ -38,6 +38,7 @@ def test_completion_starts_fresh_interval_and_audits_due_dates(due_offset, monke
         assert audit.makerspace == makerspace
         assert audit.meta == {
             "log_id": log.pk,
+            "anchor": "completion",
             "old_next_due": old_due.isoformat(),
             "new_next_due": schedule.next_due.isoformat(),
             "interval_days": 30,
@@ -53,7 +54,9 @@ def test_backdated_completion_uses_recorded_local_date(zone, expected_due, monke
     performed_at = datetime(2026, 10, 2, 23, 30, tzinfo=dt_timezone.utc)
     monkeypatch.setattr(timezone, "now", lambda: entered_at)
     with timezone.override(zone):
-        _, actor, machine, _ = make_machine_setup("completion-backdated")
+        space, actor, machine, _ = make_machine_setup("completion-backdated")
+        space.timezone = zone
+        space.save(update_fields=["timezone"])
         schedule = services.create_schedule(
             machine, actor=actor, description="Clean", interval_days=7,
             next_due=date(2026, 9, 1),

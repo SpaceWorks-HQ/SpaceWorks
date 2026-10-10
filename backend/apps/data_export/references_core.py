@@ -173,6 +173,8 @@ RELATIONAL_USER_FIELDS = frozenset(
 )
 
 _EXCLUDED_USER_EDGE_REASONS = {
+    # machines.MakerspaceMachineTypePolicy has no accounts.User FKs; its tenant/type
+    # preferences do not expand the portable user closure.
     # operations.ReminderSchedule deliberately has no accounts.User FK: opaque
     # domain subject identities cannot add accounts to the portable user closure.
     ("makerspaces.Station", "created_by"): (

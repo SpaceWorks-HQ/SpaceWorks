@@ -12,6 +12,7 @@ import {
 const emptySchedule = (): ScheduleInput => ({
   description: "",
   interval_days: 30,
+  anchor: "completion",
   next_due: new Date().toISOString().slice(0, 10),
 });
 
@@ -61,6 +62,13 @@ export function MaintenanceSchedules({
           onChange={(event) => change({ ...value, interval_days: Number(event.target.value) })}
           required
         />
+      </label>
+      <label className="eyebrow grid gap-1">
+        Recurrence anchor
+        <select className="desk-input" value={value.anchor ?? "completion"} onChange={(event) => change({ ...value, anchor: event.target.value as ScheduleInput["anchor"] })}>
+          <option value="completion">From completion date</option>
+          <option value="calendar">Fixed calendar (skip missed dates)</option>
+        </select>
       </label>
       <label className="eyebrow grid gap-1">
         Next due
@@ -114,7 +122,7 @@ export function MaintenanceSchedules({
               <div className="min-w-0 flex-1">
                 <strong className="block text-sm text-ink">{schedule.description}</strong>
                 <span className="text-xs text-muted">
-                  Every {schedule.interval_days} days · {formatDate(schedule.next_due)}
+                  Every {schedule.interval_days} days ({schedule.anchor === "calendar" ? "fixed calendar" : "from completion"}) · {formatDate(schedule.next_due)}
                 </span>
               </div>
               <span className={schedule.overdue
@@ -137,6 +145,7 @@ export function MaintenanceSchedules({
                       setEditDraft({
                         description: schedule.description,
                         interval_days: schedule.interval_days,
+                        anchor: schedule.anchor ?? "completion",
                         next_due: schedule.next_due,
                       });
                       setEditing(schedule.id);

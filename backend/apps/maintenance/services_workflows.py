@@ -1,12 +1,14 @@
-from datetime import date, timedelta
+from datetime import date
 
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.audit.services import record
+from apps.accounts import rbac
 from apps.maintenance.exceptions import InactiveMaintenanceSchedule
 from apps.maintenance.models import MaintenanceLog, MaintenanceSchedule
+from apps.maintenance.recurrence import clean_anchor, next_due_after_completion
 from apps.maintenance.notifications import notify_maintenance_lifecycle
 from apps.maintenance.services_shared import (
     apply_idle_transition,
@@ -44,7 +46,7 @@ def log_maintenance(
     machine, *, actor, summary, performed_at=None, cost=None,
     parts_note="", set_idle=False,
 ):
-    machine = lock_machine(machine)
+    machine = lock_machine(machine, actor)
     prepare_machine(machine, actor, manage=False)
     ensure_idle_transition(machine, set_idle)
     values = validate_log_values(
@@ -59,12 +61,13 @@ def log_maintenance(
 
 
 @transaction.atomic
-def create_schedule(machine, *, actor, description, interval_days, next_due):
-    machine = lock_machine(machine)
+def create_schedule(machine, *, actor, description, interval_days, next_due, anchor="completion"):
+    machine = lock_machine(machine, actor)
     prepare_machine(machine, actor, manage=True)
     schedule = MaintenanceSchedule.objects.create(
         machine=machine,
         description=clean_text(description, "description"),
+        anchor=clean_anchor(anchor),
         interval_days=clean_interval(interval_days),
         next_due=_schedule_date(next_due),
         created_by=actor,
@@ -80,17 +83,21 @@ def create_schedule(machine, *, actor, description, interval_days, next_due):
 
 @transaction.atomic
 def update_schedule(schedule, *, actor, **changes):
-    machine = lock_machine(schedule.machine)
+    machine = lock_machine(schedule.machine, actor)
     prepare_machine(machine, actor, manage=True)
-    schedule = MaintenanceSchedule.objects.select_for_update().get(
+    schedule = rbac.scope_by_makerspace(
+        actor, MaintenanceSchedule.objects.select_for_update(), makerspace_field="machine__makerspace_id",
+    ).get(
         pk=schedule.pk, machine=machine,
     )
-    allowed = {"description", "interval_days", "next_due"}
+    allowed = {"description", "interval_days", "next_due", "anchor"}
     unknown = sorted(set(changes) - allowed)
     if unknown:
         raise ValidationError({name: "This field cannot be changed." for name in unknown})
     if not schedule.is_active:
         raise InactiveMaintenanceSchedule("Maintenance schedule is inactive.")
+    if "anchor" in changes:
+        schedule.anchor = clean_anchor(changes["anchor"])
     if "description" in changes:
         schedule.description = clean_text(changes["description"], "description")
     if "interval_days" in changes:
@@ -110,9 +117,11 @@ def update_schedule(schedule, *, actor, **changes):
 
 @transaction.atomic
 def deactivate_schedule(schedule, *, actor):
-    machine = lock_machine(schedule.machine)
+    machine = lock_machine(schedule.machine, actor)
     prepare_machine(machine, actor, manage=True)
-    schedule = MaintenanceSchedule.objects.select_for_update().get(
+    schedule = rbac.scope_by_makerspace(
+        actor, MaintenanceSchedule.objects.select_for_update(), makerspace_field="machine__makerspace_id",
+    ).get(
         pk=schedule.pk, machine=machine,
     )
     if not schedule.is_active:
@@ -133,9 +142,11 @@ def complete_due(
     schedule, *, actor, summary, performed_at=None, cost=None,
     parts_note="", set_idle=False,
 ):
-    machine = lock_machine(schedule.machine)
+    machine = lock_machine(schedule.machine, actor)
     prepare_machine(machine, actor, manage=True)
-    schedule = MaintenanceSchedule.objects.select_for_update().get(
+    schedule = rbac.scope_by_makerspace(
+        actor, MaintenanceSchedule.objects.select_for_update(), makerspace_field="machine__makerspace_id",
+    ).get(
         pk=schedule.pk, machine=machine,
     )
     if not schedule.is_active:
@@ -147,16 +158,14 @@ def complete_due(
     )
     old_due = schedule.next_due
     log = _append_log(machine, actor, values)
-    # A completed service starts a fresh interval, even if several were missed.
-    schedule.next_due = timezone.localdate(log.performed_at) + timedelta(
-        days=schedule.interval_days,
-    )
+    schedule.next_due = next_due_after_completion(schedule, log.performed_at)
     schedule.save(update_fields=["next_due", "updated_at"])
     record(
         actor, "maintenance.schedule_completed",
         makerspace=machine.makerspace, target=schedule,
         meta={
             "log_id": log.pk,
+            "anchor": schedule.anchor,
             "old_next_due": old_due.isoformat(),
             "new_next_due": schedule.next_due.isoformat(),
             "interval_days": schedule.interval_days,

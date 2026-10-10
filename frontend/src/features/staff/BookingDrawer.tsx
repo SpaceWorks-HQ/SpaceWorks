@@ -72,7 +72,7 @@ export function BookingDrawer({ makerspaceId, spaceId, onClose }: {
               <StatusBadge status={space.is_active ? "active" : "inactive"} />
               <span className="text-sm text-muted">{space.effective_requester_notifications_enabled ? "Requester emails on" : "Requester emails off"}</span>
             </div>
-            <BookableSpaceForm
+            <BookableSpaceForm makerspaceId={makerspaceId}
               key={space.updated_at}
               initialValues={valuesForSpace(space)}
               onSubmit={(payload) => update.mutate(payload)}

@@ -1,14 +1,13 @@
 """Certification grant endpoints, split from type administration."""
 
-from datetime import timedelta
-
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 
 from apps.accounts import rbac
@@ -16,9 +15,11 @@ from apps.admin_api.permissions import IsActiveStaff
 from apps.admin_api.serializers_certifications import (
     CertificationGrantCreateSerializer, CertificationGrantRevokeSerializer,
     CertificationGrantSerializer,
+    CertificationGrantPageSerializer,
 )
 from apps.audit import services as audit
 from apps.machines import access
+from apps.machines.certification_grants import issue_grant
 from apps.machines.models import CertificationGrant
 from apps.machines.notifications_certifications import notify_certification
 from apps.makerspaces.guards import require_module
@@ -40,7 +41,8 @@ class CertificationGrantListCreateView(APIView):
         tags=["Admin machines"],
         summary="List grants for a certification type",
         request=None,
-        responses={200: CertificationGrantSerializer(many=True), **errors(400, 401, 403, 404)},
+        parameters=[OpenApiParameter("page", int, OpenApiParameter.QUERY, description="Page number (24 rows per page).")],
+        responses={200: CertificationGrantPageSerializer, **errors(400, 401, 403, 404)},
     )
     def get(self, request, pk, *args, **kwargs):
         row = _resolved_type(request.user, pk)
@@ -49,7 +51,10 @@ class CertificationGrantListCreateView(APIView):
             .select_related("membership__user")
             .order_by("-granted_at", "-pk")
         )
-        return Response(CertificationGrantSerializer(grants, many=True).data)
+        paginator = PageNumberPagination()
+        paginator.page_size = 24
+        page = paginator.paginate_queryset(grants, request, view=self)
+        return paginator.get_paginated_response(CertificationGrantSerializer(page, many=True).data)
 
     @extend_schema(
         tags=["Admin machines"],
@@ -76,28 +81,8 @@ class CertificationGrantListCreateView(APIView):
             # A membership in another makerspace is "unknown" here, never a 403 that
             # confirms it exists elsewhere.
             raise ValidationError({"membership_id": "Unknown membership."})
-        expires_at = data.get("expires_at")
-        if expires_at is None and row.validity_days:
-            expires_at = timezone.now() + timedelta(days=row.validity_days)
-        grant = CertificationGrant.objects.create(
-            certification_type=row,
-            membership=membership,
-            granted_by=request.user,
-            expires_at=expires_at,
-            notes=data.get("notes", ""),
-        )
-        audit.record(
-            request.user,
-            "certification.granted",
-            makerspace=row.makerspace,
-            target=grant,
-            meta={
-                "certification_type_id": row.pk,
-                "membership_id": membership.pk,
-                "expires_at": expires_at.isoformat() if expires_at else None,
-            },
-        )
-        notify_certification(grant, "granted")
+        grant = issue_grant(row, membership, actor=request.user,
+                            expires_at=data.get("expires_at"), notes=data.get("notes", ""))
         return Response(
             CertificationGrantSerializer(grant).data, status=status.HTTP_201_CREATED
         )
@@ -143,9 +128,7 @@ class CertificationGrantRevokeView(APIView):
         grant.revoked_at = timezone.now()
         grant.revoked_by = request.user
         notes = serializer.validated_data.get("notes", "")
-        if notes:
-            grant.notes = notes
-        grant.save(update_fields=["revoked_at", "revoked_by", "notes"])
+        grant.save(update_fields=["revoked_at", "revoked_by"])
         audit.record(
             request.user,
             "certification.revoked",
@@ -159,3 +142,20 @@ class CertificationGrantRevokeView(APIView):
         )
         notify_certification(grant, "revoked")
         return Response(CertificationGrantSerializer(grant).data)
+
+
+class CertificationGrantRenewView(APIView):
+    permission_classes = [IsActiveStaff]
+
+    @extend_schema(tags=["Admin machines"], summary="Renew training with a new grant",
+                   request=CertificationGrantRevokeSerializer,
+                   responses={201: CertificationGrantSerializer, **errors(400, 401, 403, 404, 423)})
+    @transaction.atomic
+    def post(self, request, pk):
+        previous = get_object_or_404(_scoped_grants(request.user), pk=pk)
+        row = _resolved_type(request.user, previous.certification_type_id)
+        serializer = CertificationGrantRevokeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        grant = issue_grant(row, previous.membership, actor=request.user,
+                            notes=serializer.validated_data.get("notes", ""), previous=previous)
+        return Response(CertificationGrantSerializer(grant).data, status=status.HTTP_201_CREATED)

@@ -8,13 +8,23 @@ from apps.operations.reminder_types import (  # noqa: F401 - explicit compatibil
 # No AppConfig hooks or autodiscovery: production consumers register here explicitly.
 from apps.operations.membership_payment_reminders import MEMBERSHIP_PAYMENT_SOURCE
 
+
 def _production_sources():
     from apps.hardware_requests.loan_reminders import LOAN_REMINDER_SOURCES
     from apps.payments.reminders import build_payment_message, discover_payments, dispatch_payment_message
+    from . import reminder_machine_sources as machines
+
     return (MEMBERSHIP_PAYMENT_SOURCE, ReminderSource(
         key="payments.due", module="request_workflow", feature="billing.reminders",
         discover=discover_payments, build=build_payment_message, dispatch=dispatch_payment_message,
-    ), *LOAN_REMINDER_SOURCES)
+    ), *LOAN_REMINDER_SOURCES,
+        ReminderSource("machines.certification_expiry", "machines", machines.discover_certifications,
+                       machines.build_certification, "machines.certification_reminders", machines.dispatch_certification),
+        ReminderSource("machines.certification_digest", "machines", machines.discover_digest,
+                       machines.build_digest, "machines.certification_reminders", machines.dispatch_digest),
+        ReminderSource("maintenance.due", "maintenance", machines.discover_maintenance,
+                       machines.build_maintenance, "maintenance.reminders", machines.dispatch_maintenance),
+    )
 
 
 # Tests can override production registrations; an empty tuple disables all sources.

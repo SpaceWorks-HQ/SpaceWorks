@@ -50,7 +50,7 @@ export function BookingsPanel({ makerspaceId }: { makerspaceId: number }) {
       <DataTable ordering={list.values.ordering} onOrderingChange={(value) => list.setFilter("ordering", value)} columns={columns(setSelectedId)} data={spaces.data?.results ?? []} loading={spaces.isLoading} skeletonCols={5} emptyTitle="No bookable spaces" emptyDescription="Create a space to start accepting bookings." />
       {spaces.data ? <div className="mt-3 flex items-center justify-between gap-2"><span className="font-mono text-xs text-muted">Page {page} - {spaces.data.count} total</span><div className="flex gap-2"><button className="desk-button" type="button" disabled={!spaces.data.previous} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button><button className="desk-button" type="button" disabled={!spaces.data.next} onClick={() => setPage((value) => value + 1)}>Next</button></div></div> : null}
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Create bookable space" size="xl">
-        <BookableSpaceForm
+        <BookableSpaceForm makerspaceId={makerspaceId}
           onSubmit={(payload) => create.mutate(payload, { onSuccess: (space) => { setCreateOpen(false); setSelectedId(space.id); } })}
           pending={create.isPending}
           error={create.error?.message}

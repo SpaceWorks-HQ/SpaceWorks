@@ -79,6 +79,7 @@ DATASET_SPECS = {
     "machines.MachineOperator": ("machines/operators.csv", P(("machine__makerspace",))),
     "machines.MachineServiceRequest": ("machine_service/requests.csv", P(("makerspace",))),
     "machines.CertificationGrant": ("machines/certification_grants.csv", P(("certification_type__makerspace",))),
+    "machines.MakerspaceMachineTypePolicy": ("machines/type_policies.csv", P(("makerspace",))),
     "machines.CertificationType": ("machines/certification_types.csv", P(("makerspace",))),
     "machines.MachineType": ("machines/types.csv", P(("makerspace",), include_global_if_unowned=True)),
     "machines.MachineUsageEntry": ("machines/usage_entries.csv", P(("machine__makerspace",))),

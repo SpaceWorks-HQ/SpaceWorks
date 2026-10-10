@@ -47,7 +47,7 @@ def test_staff_api_creates_grants_and_revokes_with_audit():
     type_id = created.data["id"]
 
     listed = client.get(reverse("admin-certification-types", args=[space.pk]))
-    assert [row["id"] for row in listed.data] == [type_id]
+    assert [row["id"] for row in listed.data["results"]] == [type_id]
 
     granted = client.post(
         reverse("admin-certification-type-grants", args=[type_id]),
@@ -106,7 +106,7 @@ def test_staff_api_hides_and_refuses_types_for_unlinked_machine_types():
     client = _client(manager)
 
     listed = client.get(reverse("admin-certification-types", args=[space.pk]))
-    assert [row["id"] for row in listed.data] == [laser_certification.pk]
+    assert [row["id"] for row in listed.data["results"]] == [laser_certification.pk]
 
     refused = client.patch(
         reverse(

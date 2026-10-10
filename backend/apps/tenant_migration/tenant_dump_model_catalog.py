@@ -45,7 +45,7 @@ PROJECTED_MODEL_LABELS = frozenset(
     machines.MachineConsumableAdjustment machines.MachineConsumablePool
     machines.MachineDocument machines.MachineErrorLog machines.MachineServiceRequest
     machines.MachineType machines.MachineUsageEntry
-    machines.MakerspaceMachineTypePricing machines.ServiceBucket machines.ServiceQueue
+    machines.MakerspaceMachineTypePricing machines.MakerspaceMachineTypePolicy machines.ServiceBucket machines.ServiceQueue
     machines.ServiceRequestConsumption machines.ServiceRequestFile
     maintenance.MaintenanceLog maintenance.MaintenanceLogDocument
     maintenance.MaintenanceSchedule makerspaces.Makerspace

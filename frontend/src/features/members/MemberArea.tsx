@@ -11,6 +11,7 @@ import { MemberAuthPanel } from "./MemberAuthPanel";
 import { InvitationRequestForm } from "./InvitationRequestForm";
 import { JoinMembershipCta } from "./JoinMembershipCta";
 import { presenceStartLocation } from "./geolocation";
+import { MemberCertifications } from "./MemberCertifications";
 import { MemberActivityPanel, type MemberActivity } from "./MemberActivity";
 import { MemberDues, MemberHistory, MemberNotices, MemberTerm } from "./MemberDashboardSections";
 import { PartnerEvents } from "./PartnerEvents";
@@ -128,6 +129,7 @@ export function MemberArea() {
       <section className={`desk-panel ${presence.data?.active ? "border-success" : "border-secondary"} p-5`}><h2 className="title-panel">Presence</h2><p className="mt-1 text-sm text-muted">{presence.data?.active ? <>Active until <span className="font-mono">{new Date(presence.data.session?.expires_at ?? "").toLocaleTimeString()}</span></> : "No active session."}</p><button className="desk-button-secondary mt-4" disabled={start.isPending || end.isPending || (!presence.data?.active && !bootstrap.data)} onClick={() => presence.data?.active ? end.mutate() : start.mutate()}>{presence.data?.active ? "End presence" : "Start 2-hour presence"}</button></section>
       {/* Notices first: they are the reason to open a dashboard at all. */}
       {activity.data ? <MemberNotices notices={activity.data.notices} /> : null}
+      {membership?.membership_status === "active" && (bootstrap.data?.modules ?? []).includes("machines") ? <MemberCertifications key={makerspaceId} makerspaceId={makerspaceId} /> : null}
       {activity.data ? <MemberActivityPanel activity={activity.data} makerspaceId={makerspaceId} makerspaceSlug={resolvedSlug} /> : null}
       {activity.data ? <MemberTerm term={activity.data.membership_term} /> : null}
       {activity.data ? <MemberDues dues={activity.data.membership_dues} /> : null}

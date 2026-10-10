@@ -44,6 +44,9 @@ MEMBER_CLAIM_ROUTES = {
         "claim waiver acceptance must be witnessed by authenticated staff"
     ),
     **_options("member-waiver-accept"),
+    ("member-certifications", "GET"): ReadOnly(tenant=ID),
+    ("member-certifications", "HEAD"): ReadOnly(tenant=ID),
+    **_options("member-certifications"),
     ("member-activity", "GET"): LocallyFiltered(tenant=ID),
     ("member-activity", "HEAD"): LocallyFiltered(tenant=ID),
     **_options("member-activity"),

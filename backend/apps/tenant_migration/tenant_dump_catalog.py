@@ -75,6 +75,8 @@ class TenantDumpCatalogError(AssertionError):
 # Merge lane/w2-loans with integration/2026-10 (including lane/w1-payments,
 # lane/w1-membership, lane/w6-platform, lane/w5-lists and lane/w5-theme).
 # The coordinator recomputes the digest for the combined loan and policy graph.
+# Merge lane/w2-machines with integration/2026-10 (including lane/w2-loans);
+# the coordinator recomputes the combined machine, maintenance and loan catalog.
 CATALOG_SCHEMA_SHA256 = "RECOMPUTE"
 
 

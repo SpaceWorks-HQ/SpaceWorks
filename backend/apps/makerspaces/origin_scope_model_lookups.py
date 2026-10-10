@@ -1,6 +1,11 @@
 """Static model-backed origin scopes, split from request resolution logic."""
 
 BASE_MODEL_LOOKUPS = {
+    "admin-certification-members": ("machines.CertificationType", "makerspace_id"),
+    "admin-certification-type-detail": ("machines.CertificationType", "makerspace_id"),
+    "admin-certification-type-grants": ("machines.CertificationType", "makerspace_id"),
+    "admin-certification-grant-revoke": ("machines.CertificationGrant", "certification_type__makerspace_id"),
+    "admin-certification-grant-renew": ("machines.CertificationGrant", "certification_type__makerspace_id"),
     'admin-kiosk-replay-detail': ('hardware_requests.ReplayCommand', 'makerspace_id'),
     'admin-kiosk-replay-resolve': ('hardware_requests.ReplayCommand', 'makerspace_id'),
     'admin-kiosk-station-detail': ('makerspaces.Station', 'makerspace_id'),

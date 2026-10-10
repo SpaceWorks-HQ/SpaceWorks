@@ -16,6 +16,7 @@ export type MaintenanceSchedule = {
   machine_id: number;
   description: string;
   interval_days: number;
+  anchor?: "completion" | "calendar";
   next_due: string;
   is_active: boolean;
   created_by_id: number | null;
@@ -43,6 +44,7 @@ export type MaintenancePage<T> = {
 export type ScheduleInput = {
   description: string;
   interval_days: number;
+  anchor?: "completion" | "calendar";
   next_due: string;
 };
 export type LogInput = {

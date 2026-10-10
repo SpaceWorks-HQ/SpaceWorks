@@ -91,6 +91,7 @@ class PublicMachineServiceSubmitView(APIView):
             description=data.get("description", ""),
             source_link=data.get("source_link", ""),
             capability_payload=data.get("capability_payload"),
+            certification_override_reason=data.get("certification_override_reason", ""),
         )
         return Response(
             PublicMachineServiceSubmitResponseSerializer(service_request).data,

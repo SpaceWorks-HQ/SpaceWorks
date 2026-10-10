@@ -190,6 +190,7 @@ export function MachinesPanel({
         <MachineTypePage
           makerspaceId={makerspaceId}
           canManage={canManage}
+          canConfigureMachineTypes={canConfigureMachineTypes}
           machineServiceEnabled={machineServiceEnabled}
           printingEnabled={printingEnabled}
           reportsEnabled={reportsEnabled}

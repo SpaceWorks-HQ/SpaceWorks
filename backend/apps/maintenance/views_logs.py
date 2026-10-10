@@ -16,15 +16,14 @@ from apps.maintenance.views_shared import (
     require_machine_access,
     resolve_collection,
 )
-from apps.hardware_requests.view_helpers import (
-    ERROR_400, ERROR_403, ERROR_404, ERROR_409,
-)
+from apps.accounts import rbac
+from apps.openapi_errors import errors
 from apps.maintenance import services
 from apps.maintenance.models import MaintenanceLog, MaintenanceSchedule
 
 
-SCOPED = {400: ERROR_400, 403: ERROR_403, 404: ERROR_404}
-MUTATION = {**SCOPED, 409: ERROR_409}
+SCOPED = errors(400, 401, 403, 404)
+MUTATION = {**SCOPED, **errors(409, 423)}
 
 
 class MaintenanceLogListCreateView(APIView):
@@ -40,7 +39,9 @@ class MaintenanceLogListCreateView(APIView):
         machine = resolve_collection(
             request.user, makerspace_id, machine_id, manage=False,
         )
-        queryset = MaintenanceLog.objects.filter(machine=machine).prefetch_related(
+        queryset = rbac.scope_by_makerspace(
+            request.user, MaintenanceLog.objects.all(), makerspace_field="machine__makerspace_id",
+        ).filter(machine=machine).prefetch_related(
             "documents",
         ).order_by("-performed_at", "-id")
         paginator = MaintenancePagination()
@@ -52,8 +53,10 @@ class MaintenanceLogListCreateView(APIView):
         summary="Record completed machine maintenance",
         description=(
             "When schedule_id is supplied, complete that schedule and set its next due "
-            "date to the local date of performed_at plus interval_days. performed_at "
-            "defaults to now; backdated entries use their recorded completion date."
+            "date according to its recurrence anchor. Completion anchors add interval_days "
+            "to the makerspace-local date of performed_at; calendar anchors advance the "
+            "previous due date by whole intervals past completion. performed_at defaults "
+            "to now; backdated entries use their recorded completion date."
         ),
         request=MaintenanceLogWriteSerializer,
         responses={201: MaintenanceLogSerializer, **MUTATION},
@@ -68,7 +71,10 @@ class MaintenanceLogListCreateView(APIView):
         schedule_id = data.pop("schedule_id", None)
         if schedule_id is not None:
             schedule = get_object_or_404(
-                MaintenanceSchedule.objects.filter(machine=machine),
+                rbac.scope_by_makerspace(
+                    request.user, MaintenanceSchedule.objects.all(),
+                    makerspace_field="machine__makerspace_id",
+                ).filter(machine=machine),
                 pk=schedule_id,
             )
             require_machine_access(request.user, machine, manage=True)
@@ -79,7 +85,10 @@ class MaintenanceLogListCreateView(APIView):
             log = services.log_maintenance(
                 machine, actor=request.user, **data,
             )
-        log = MaintenanceLog.objects.prefetch_related("documents").get(pk=log.pk)
+        log = rbac.scope_by_makerspace(
+            request.user, MaintenanceLog.objects.prefetch_related("documents"),
+            makerspace_field="machine__makerspace_id",
+        ).get(pk=log.pk)
         return Response(
             MaintenanceLogSerializer(log).data,
             status=status.HTTP_201_CREATED,

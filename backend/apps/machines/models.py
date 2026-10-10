@@ -13,6 +13,7 @@ from .models_service import (
 # Training/certification records. String FK references throughout, so import order
 # relative to MachineType below does not matter.
 from .models_certifications import CertificationGrant, CertificationType
+from .models_policy import MakerspaceMachineTypePolicy
 from .printing_cutover_models import PrintingCutoverRepair, PrintingCutoverState
 
 # Role -> machine/type scope links. Imported here so Django registers them with this app;
@@ -48,6 +49,7 @@ __all__ = [
     "MachineUsageEntry",
     "MachineUsageEntryQuerySet",
     "MakerspaceMachineTypePricing",
+    "MakerspaceMachineTypePolicy",
     "PrintingCutoverRepair",
     "PrintingCutoverState",
     "RoleMachineScope",

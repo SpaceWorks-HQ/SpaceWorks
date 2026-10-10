@@ -11,6 +11,10 @@ task, management command and cron endpoint delegate policy-backed loans to these
 same F1 sources. Spaces without a loan-policy row retain their existing single
 overdue reminder.
 
+Wave 2 also registers opt-in certification expiry/digest and maintenance consumers;
+see [machine-training-maintenance.md](machine-training-maintenance.md). Upgrading
+leaves these features and their external notification channels off.
+
 ## Registering a source
 
 Add a `ReminderSource` explicitly in `operations/reminder_registry.py:_production_sources`.
@@ -55,6 +59,8 @@ transitions; reminders never change debt or domain state as a side effect.
 Borrower-only email uses `requires_notifications=False`: turning off a staff
 inbox does not suppress borrower duty mail. Email still respects its own module
 and matrix/mute settings. Staff escalation keeps the notifications gate.
+The default emitter adds no member delivery or matrix event families; domain
+consumers own those through their dispatch callbacks.
 
 The runnable **test-only** example is
 `backend/tests/operations/reminder_example.py`; it must never be added to the
