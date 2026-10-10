@@ -1,8 +1,11 @@
+from decimal import Decimal
+
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.payments.models import Payment
 from apps.payments.subjects import subject_label
+from apps.payments.serializers_reconciliation import refunded_total
 
 
 class MemberSettlementSerializer(serializers.Serializer):
@@ -18,6 +21,7 @@ class MemberPaymentSerializer(serializers.ModelSerializer):
     checkout_url = serializers.SerializerMethodField()
     online_payment_available = serializers.SerializerMethodField()
     settlement = serializers.SerializerMethodField()
+    refunded_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -27,8 +31,11 @@ class MemberPaymentSerializer(serializers.ModelSerializer):
         # the charge unpayable. The queryset is already scoped to this member.
         fields = (
             "id", "subject_type", "subject_label", "status", "amount", "currency",
-            "checkout_url", "online_payment_available", "settlement", "created_at",
+            "checkout_url", "online_payment_available", "settlement", "refunded_amount", "created_at",
         )
+
+    def get_refunded_amount(self, payment) -> Decimal:
+        return refunded_total(payment)
 
     def get_subject_label(self, payment) -> str:
         labels = self.context.get("payment_subject_labels", {})

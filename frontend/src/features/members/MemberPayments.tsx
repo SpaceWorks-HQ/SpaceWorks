@@ -1,6 +1,7 @@
-import type { MemberPayment } from "../../generated/api";
+import type { MemberPayment as GeneratedMemberPayment } from "../../generated/api";
 
-export type { MemberPayment };
+// Additive API field until the coordinator regenerates the OpenAPI client.
+export type MemberPayment = GeneratedMemberPayment & { refunded_amount?: string | number };
 
 export function MemberPaymentRows({
   payments,
@@ -58,6 +59,9 @@ export function MemberPaymentRows({
                 {payment.settlement.method.replace(/_/g, " ")}
               </span>
             </>
+          ) : null}
+          {Number(payment.refunded_amount ?? 0) > 0 ? (
+            <> · <span className="text-muted">Refunded {Number(payment.refunded_amount).toFixed(2)} {(payment.currency ?? "").toUpperCase()}</span></>
           ) : null}
         </li>
       ))}

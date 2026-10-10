@@ -14,7 +14,7 @@ from django.db.models.functions import Coalesce
 
 from apps.operations.report_registry import ReportResult
 from apps.operations.report_scope import scoped_ids
-from apps.payments.models import ManualSettlement, Payment
+from apps.payments.models import ManualSettlement, Payment, Refund
 
 FIELDS = (
     "currency",
@@ -28,6 +28,7 @@ FIELDS = (
     "payment_count",
     "amount_total",
     "outstanding_amount",
+    "refunded_amount",
 )
 
 
@@ -59,7 +60,13 @@ def build_payment_reconciliation(
     # from" for both rails. Currencies are never combined -- `currency` stays a grouping
     # key, so a space taking both INR and USD gets one row per currency, never a total
     # that silently adds them.
+    money = DecimalField(max_digits=20, decimal_places=2)
     queryset = queryset.annotate(
+        refund_total=Coalesce(
+            Subquery(Refund.objects.filter(payment_id=OuterRef("pk"), status=Refund.Status.SUCCEEDED)
+                     .order_by().values("payment_id").annotate(total=Sum("amount")).values("total")[:1]),
+            Value(0), output_field=money,
+        ),
         settlement_method=Case(
             When(
                 status=Payment.Status.PAID_OFFLINE,
@@ -85,12 +92,12 @@ def build_payment_reconciliation(
         "makerspace_id", "currency", "subject_type", "status", "settlement_method"
     ]
     fields = (("makerspace_id",) + FIELDS) if aggregate else FIELDS
-    money = DecimalField(max_digits=20, decimal_places=2)
     rows = (
         queryset.values(*group_fields)
         .annotate(
             payment_count=Count("pk"),
             amount_total=Sum("amount"),
+            refunded_amount=Sum("refund_total"),
             outstanding_amount=Sum(
                 Case(
                     When(status=Payment.Status.PENDING, then="amount"),

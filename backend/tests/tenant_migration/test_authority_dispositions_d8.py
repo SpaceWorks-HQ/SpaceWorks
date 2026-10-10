@@ -200,7 +200,7 @@ EXPECTED = dict(
         ),
         *_fields(
             "payments.Refund",
-            "status amount currency provider reason",
+            "status amount currency provider reason method reference refunded_at",
             D.PRESERVE,
         ),
         *_fields("payments.Refund", "external_refund_id", D.RESET),

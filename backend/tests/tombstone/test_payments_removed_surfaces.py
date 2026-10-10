@@ -115,6 +115,7 @@ def test_the_sidebar_offers_no_payment_entry():
         "/api/v1/admin/makerspace/1/payments/2/mark-offline",
         "/api/v1/admin/makerspace/1/payments/2/waive",
         "/api/v1/admin/makerspace/1/payments/2/amend-settlement",
+        "/api/v1/admin/makerspace/1/payments/2/refund-offline",
         "/api/v1/admin/makerspace/1/payments/bulk/mark-offline",
         "/api/v1/member/makerspaces/1/payments",
         "/api/v1/member/archived-payments",

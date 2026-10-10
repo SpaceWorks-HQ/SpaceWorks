@@ -17,32 +17,14 @@ from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
 from django.utils import timezone
-from rest_framework.exceptions import APIException
 
 from apps.audit import services as audit
+from apps.payments.exceptions_refunds import RefundNotAllowed, RefundProviderFailure
 from apps.payments.models import Payment, Refund
 from apps.payments.providers import PaymentsUnavailable, RefundRequest, get_provider
 from apps.payments.resolution import source_for_payment
 
 logger = logging.getLogger(__name__)
-
-
-class RefundNotAllowed(APIException):
-    status_code = 400
-
-    def __init__(self, detail, code="refund_not_allowed"):
-        self.detail = {"detail": detail, "code": code}
-
-
-class RefundProviderFailure(APIException):
-    status_code = 502
-
-    def __init__(self, refund):
-        self.detail = {
-            "detail": "The payment provider rejected the refund.",
-            "code": "refund_provider_failed",
-            "refund_id": refund.pk,
-        }
 
 
 def refund_payment(payment, *, amount, reason, actor):
@@ -66,8 +48,8 @@ def _open_refund(payment, *, amount, reason, actor):
     with transaction.atomic():
         locked = Payment.objects.select_for_update().select_related("makerspace").get(pk=payment.pk)
         if locked.status != Payment.Status.PAID_ONLINE:
-            # Offline and waived charges took no money through a provider, so there is
-            # nothing a provider can send back; staff correct those in the till.
+            # Offline charges are refunded through the core manual receipt service;
+            # a provider cannot send back money it did not collect.
             raise RefundNotAllowed(
                 "Only payments settled online can be refunded through the provider.",
                 "refund_not_online",

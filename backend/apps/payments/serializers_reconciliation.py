@@ -12,8 +12,19 @@ from apps.payments.subjects import subject_label
 class RefundSerializer(serializers.ModelSerializer):
     class Meta:
         model = Refund
-        fields = ("id", "amount", "currency", "status", "reason", "created_at", "settled_at")
+        fields = ("id", "amount", "currency", "status", "provider", "reason", "method", "reference", "refunded_at", "created_at", "settled_at")
         read_only_fields = fields
+
+
+def refunded_total(payment):
+    """Use the list annotation, or prefetched succeeded lines for a single payment."""
+    annotated = getattr(payment, "refunded_amount", None)
+    if annotated is not None:
+        return annotated
+    return sum(
+        (refund.amount for refund in payment.refunds.all() if refund.status == Refund.Status.SUCCEEDED),
+        Decimal("0.00"),
+    )
 
 
 class PaymentReconciliationSerializer(serializers.ModelSerializer):
@@ -45,14 +56,7 @@ class PaymentReconciliationSerializer(serializers.ModelSerializer):
         )
 
     def get_refunded_amount(self, payment) -> Decimal:
-        # `list_payments` annotates this; a single freshly reconciled row computes it.
-        annotated = getattr(payment, "refunded_amount", None)
-        if annotated is not None:
-            return annotated
-        return sum(
-            (refund.amount for refund in payment.refunds.all() if refund.status == Refund.Status.SUCCEEDED),
-            Decimal("0.00"),
-        )
+        return refunded_total(payment)
 
 
 class PaymentListFilterSerializer(serializers.Serializer):

@@ -56,7 +56,7 @@ def stripe_space(slug, monkeypatch, responses):
     return makerspace, staff
 
 
-def paid_deposit(makerspace, staff, *, status=Payment.Status.PAID_ONLINE, amount="10.00"):
+def paid_deposit(makerspace, staff, *, status=Payment.Status.PAID_ONLINE, amount="10.00", intent="pi_1"):
     request = make_accepted_request(makerspace, make_product(makerspace), 1)
     payment = Payment.objects.create(
         makerspace=makerspace,
@@ -68,7 +68,7 @@ def paid_deposit(makerspace, staff, *, status=Payment.Status.PAID_ONLINE, amount
         created_by=staff,
         subject_label="Loan deposit",
     )
-    Payment.objects.filter(pk=payment.pk).update(status=status, stripe_payment_intent_id="pi_1")
+    Payment.objects.filter(pk=payment.pk).update(status=status, stripe_payment_intent_id=intent)
     payment.refresh_from_db()
     return payment
 
