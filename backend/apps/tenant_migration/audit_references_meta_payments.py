@@ -9,7 +9,7 @@ from .audit_references_targets import AuditReference, AuditReferenceDisposition
 
 R = AuditReferenceDisposition.REMAP
 
-_REFUND_ACTIONS = ("payment.refund_requested", "payment.refunded", "payment.refund_failed", "payment.refund_recorded")
+_REFUND_ACTIONS = ("payment.refund_requested", "payment.refunded", "payment.refund_failed", "payment.refund_recorded", "payment.refund_amended")
 _LOAN_ACTIONS = ("loan.deposit_raised", "loan.late_fee_raised")
 
 
@@ -25,6 +25,7 @@ _SETTLEMENT_ACTIONS = ("payment.paid_offline", "payment.settlement_amended")
 
 
 PAYMENT_AUDIT_EDGES = {
+    **_edges("payments.Refund", [("payment.refund_amended", "amends_id")]),
     **_edges(
         "payments.ManualSettlement",
         [(action, "settlement_id") for action in _SETTLEMENT_ACTIONS],

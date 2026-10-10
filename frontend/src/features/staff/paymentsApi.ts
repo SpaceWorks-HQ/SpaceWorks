@@ -10,6 +10,7 @@ export const PAYMENT_SUBJECTS = [
   // Every `Payment.SubjectType`: a renewal or loan charge filtered as "All subjects" only
   // could not be found on its own, and rendered with a raw enum label.
   ["membership_term", "Membership renewal"],
+  ["membership_request", "Membership admission"],
   ["loan_deposit", "Loan deposit"],
   ["loan_late_fee", "Late return fee"],
 ] as const;
@@ -38,6 +39,8 @@ export type RefundRow = {
   method?: string;
   reference?: string;
   refunded_at?: string | null;
+  amends?: number | null;
+  corrected?: boolean;
 };
 
 export type PaymentRow = {
@@ -46,6 +49,9 @@ export type PaymentRow = {
   subject_id: number;
   subject_label: string;
   status: (typeof PAYMENT_STATUSES)[number][0];
+  due_at?: string | null;
+  due_date?: string | null;
+  due_state?: "" | "upcoming" | "due_today" | "overdue";
   amount: string;
   currency: string;
   refunded_amount: string;
@@ -66,15 +72,16 @@ export type StaffSettlement = {
   corrected: boolean;
 };
 
-export function paymentListKey(makerspaceId: number, status: string, subject: string, forRecording = false) {
-  return ["payments", makerspaceId, status, subject, forRecording] as const;
+export function paymentListKey(makerspaceId: number, status: string, subject: string, forRecording = false, dueState = "") {
+  return ["payments", makerspaceId, status, subject, forRecording, dueState] as const;
 }
 
-export function paymentListPath(makerspaceId: number, status: string, subject: string, forRecording = false) {
+export function paymentListPath(makerspaceId: number, status: string, subject: string, forRecording = false, dueState = "") {
   const query = new URLSearchParams();
   if (forRecording) query.set("for_recording", "true");
   if (status) query.set("status", status);
   if (subject) query.set("subject_type", subject);
+  if (dueState) query.set("due_state", dueState);
   const suffix = query.toString();
   return `/admin/makerspace/${makerspaceId}/payments${suffix ? `?${suffix}` : ""}`;
 }
@@ -131,6 +138,7 @@ export function invalidatePaymentViews(queryClient: QueryClient, makerspaceId: n
   queryClient.invalidateQueries({ queryKey: ["payments", makerspaceId] });
   queryClient.invalidateQueries({ queryKey: ["operations-report", "payment-reconciliation"] });
   queryClient.invalidateQueries({ queryKey: ["dashboard", makerspaceId] });
+  queryClient.invalidateQueries({ queryKey: ["operations-report", "payment-cash-book"] });
 }
 
 export function refundPayment(
@@ -148,17 +156,23 @@ export type RefundReceipt = { method: string; reference: string; refunded_at: st
 
 export function recordOfflineRefund(
   makerspaceId: number, paymentId: number,
-  body: { amount: string; reason: string; receipt: RefundReceipt },
+  body: { amount: string; reason: string; receipt: RefundReceipt }, releaseDeposit = false,
 ) {
-  return staffRequest<PaymentRow>(`/admin/makerspace/${makerspaceId}/payments/${paymentId}/refund-offline`, {
+  return staffRequest<PaymentRow>(`/admin/makerspace/${makerspaceId}/payments/${paymentId}/${releaseDeposit ? "release-deposit" : "refund-offline"}`, {
     method: "POST", body: JSON.stringify(body),
+  });
+}
+
+export function amendRefund(makerspaceId: number, paymentId: number, refundId: number, receipt: RefundReceipt) {
+  return staffRequest<PaymentRow>(`/admin/makerspace/${makerspaceId}/payments/${paymentId}/refunds/${refundId}/amend`, {
+    method: "POST", body: JSON.stringify({ receipt }),
   });
 }
 
 /** Amount still refundable: the payment minus every pending or succeeded refund. */
 export function remainingRefundable(row: Pick<PaymentRow, "amount" | "refunds">) {
   const counted = (row.refunds ?? [])
-    .filter((refund) => refund.status !== "failed")
+    .filter((refund) => refund.status !== "failed" && !refund.corrected)
     .reduce((total, refund) => total + Number(refund.amount), 0);
   return Math.max(0, Math.round((Number(row.amount) - counted) * 100) / 100);
 }
@@ -166,6 +180,7 @@ export function remainingRefundable(row: Pick<PaymentRow, "amount" | "refunds">)
 // One readable sentence per backend code (`services_refunds.RefundNotAllowed` and
 // `RefundProviderFailure`); anything else falls back to the API's own detail text.
 const REFUND_ERRORS: Record<string, string> = {
+  deposit_not_returned: "Close the loan through its return workflow before recording a deposit release.",
   refund_not_online: "Only payments settled online can be refunded through the provider. Use Record refund for an offline payment.",
   refund_not_offline: "Only payments settled offline can have an offline refund recorded.",
   refund_exceeds_balance: "That amount is more than the remaining refundable balance of this payment.",

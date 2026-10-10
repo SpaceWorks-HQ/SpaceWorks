@@ -44,6 +44,9 @@ class Refund(models.Model):
     # Financial slip/reference only, never a member's contact details or free-text PII.
     reference = models.CharField(max_length=64, blank=True, default="")
     refunded_at = models.DateTimeField(null=True, blank=True)
+    amends = models.OneToOneField(
+        "self", null=True, blank=True, on_delete=models.CASCADE, related_name="amended_by",
+    )
     external_refund_id = models.CharField(max_length=255, null=True, blank=True)
     # Staff-authored, short, shown on the receipt. Financial metadata: never a person's
     # contact details or free-form PII -- the same rule as `Payment.subject_label`.
@@ -80,9 +83,11 @@ class Refund(models.Model):
         return f"Refund {self.pk} ({self.status}) on payment {self.payment_id}"
 
     @classmethod
-    def counted_total(cls, payment, *, exclude_pk=None):
+    def counted_total(cls, payment, *, exclude_pk=None, replacing=None):
         """Sum of refunds that hold or have returned money on `payment`."""
-        rows = cls.objects.filter(payment=payment, status__in=cls.COUNTED_STATUSES)
+        rows = cls.objects.filter(payment=payment, status__in=cls.COUNTED_STATUSES, amended_by__isnull=True)
+        if replacing is not None:
+            rows = rows.exclude(pk=replacing)
         if exclude_pk is not None:
             rows = rows.exclude(pk=exclude_pk)
         return rows.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -97,6 +102,13 @@ class Refund(models.Model):
                 raise ValidationError("A manual refund needs method and refund date.")
             if self.status != self.Status.SUCCEEDED or self.external_refund_id is not None:
                 raise ValidationError("A manual refund records money already returned.")
+        if self.amends_id:
+            previous = type(self).objects.filter(pk=self.amends_id).first()
+            if (not previous or self.provider != self.Provider.MANUAL or
+                    previous.provider != self.Provider.MANUAL or
+                    previous.payment_id != self.payment_id or previous.amount != self.amount or
+                    previous.currency != self.currency or self.amends_id == self.pk):
+                raise ValidationError("A correction must replace the same manual refund amount and currency.")
         if self.status in self.COUNTED_STATUSES and self.payment_id:
             payment = Payment.objects.filter(pk=self.payment_id).only("amount", "currency", "status").first()
             if payment and self.currency != payment.currency:
@@ -104,7 +116,8 @@ class Refund(models.Model):
             if payment and self.provider == self.Provider.MANUAL and payment.status != Payment.Status.PAID_OFFLINE:
                 raise ValidationError("Only offline-settled payments accept manual refunds.")
             if payment is not None and (
-                self.counted_total(payment, exclude_pk=self.pk) + self.amount > payment.amount
+                self.counted_total(payment, exclude_pk=self.pk, replacing=self.amends_id)
+                + self.amount > payment.amount
             ):
                 raise ValidationError({"amount": "Refunds exceed the payment amount."})
 

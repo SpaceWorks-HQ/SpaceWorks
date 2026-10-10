@@ -24,6 +24,9 @@ import { Pagination } from "../../components/ui/Pagination";
 import { ListViewControls } from "./ListViewControls";
 import { Panel } from "./panels/shared";
 import { paymentAccess } from "./paymentAccess";
+import { DUE_OPTIONS, PaymentDueBadge } from "./PaymentDueBadge";
+import { RefundReceiptAmendDialog } from "./RefundReceiptAmendDialog";
+import type { RefundRow } from "./paymentsApi";
 
 type Action = "mark-offline" | "waive";
 
@@ -33,17 +36,17 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
   const forRecording = !isSuperadmin && !actorActions.includes("view_finance");
   const access = (row: PaymentRow) => paymentAccess(actorActions, isSuperadmin, row);
   const queryClient = useQueryClient();
-  const list = useUrlListState({ status: "pending", subject_type: "", ordering: "-created_at", page: "1" });
+  const list = useUrlListState({ status: "pending", subject_type: "", due_state: "", ordering: "due_at", page: "1" });
   const status = list.values.status;
   const subject = list.values.subject_type;
-  const setStatus = (value: string) => list.setFilter("status", value);
-  const setSubject = (value: string) => list.setFilter("subject_type", value);
+  const dueState = list.values.due_state;
+  const [correctingRefund, setCorrectingRefund] = useState<{ paymentId: number; refund: RefundRow } | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [conflict, setConflict] = useState("");
   const [refundRow, setRefundRow] = useState<PaymentRow | null>(null);
   const payments = useQuery({
-    queryKey: [...paymentListKey(makerspaceId, status, subject, forRecording), list.page, list.values.ordering],
-    queryFn: () => staffRequest<Paginated<PaymentRow>>(paymentListPath(makerspaceId, status, subject, forRecording) + `${status || subject || forRecording ? "&" : "?"}page=${list.page}&ordering=${encodeURIComponent(list.values.ordering)}`),
+    queryKey: [...paymentListKey(makerspaceId, status, subject, forRecording, dueState), list.page, list.values.ordering],
+    queryFn: () => staffRequest<Paginated<PaymentRow>>(paymentListPath(makerspaceId, status, subject, forRecording, dueState) + `${status || subject || forRecording || dueState ? "&" : "?"}page=${list.page}&ordering=${encodeURIComponent(list.values.ordering)}`),
   });
   useEffect(() => { setSelected([]); }, [makerspaceId, list.query]);
   // Marking paid offline is a two-step now: the API requires a receipt, so the click
@@ -88,6 +91,7 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
     { key: "subject_label", header: "Subject" },
     { key: "subject_type", header: "Type", render: (row) => labelFor(PAYMENT_SUBJECTS, row.subject_type) },
     { key: "status", header: "Status", render: (row) => labelFor(PAYMENT_STATUSES, row.status) },
+    { key: "due_at", header: "Due", render: (row) => <PaymentDueBadge payment={row} /> },
     { key: "amount", header: "Amount", render: (row) => formatMoney(row.amount, row.currency), className: "font-semibold" },
     { key: "refunded_amount", header: "Refunded", render: (row) => Number(row.refunded_amount) > 0 ? formatMoney(row.refunded_amount, row.currency) : "—" },
     {
@@ -122,9 +126,12 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
           ) : null}
           {(row.status === "paid_online" || row.status === "paid_offline") && access(row).refund ? (
             <button className="desk-button" type="button" onClick={() => setRefundRow(row)}>
-              Refund
+              {row.subject_type === "loan_deposit" && row.status === "paid_offline" ? "Release deposit" : "Refund"}
             </button>
           ) : null}
+          {row.refunds?.filter((refund) => refund.provider === "manual" && !refund.corrected).map((refund) =>
+            access(row).refund ? <button key={refund.id} className="desk-button" type="button"
+              onClick={() => setCorrectingRefund({ paymentId: row.id, refund })}>Correct refund #{refund.id}</button> : null)}
         </div>
       ),
     },
@@ -132,18 +139,23 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
 
   return (
     <Panel title="Payments">
-      <ListViewControls state={list} makerspaceId={makerspaceId} entity="payments" search={false} sorts={[["-created_at", "Newest"], ["created_at", "Oldest"], ["amount", "Amount ascending"], ["-amount", "Amount descending"]]} />
+      <ListViewControls state={list} makerspaceId={makerspaceId} entity="payments" search={false} sorts={[["due_at", "Due date"], ["-due_at", "Due date descending"], ["-created_at", "Newest"], ["created_at", "Oldest"], ["amount", "Amount ascending"], ["-amount", "Amount descending"]]} />
       <div className="mb-3 flex flex-wrap gap-3">
+        <label className="grid gap-1 text-xs text-muted"><span>Due</span>
+          <select className="desk-input" value={dueState} onChange={(event) => { list.update({ due_state: event.target.value, ...(event.target.value ? { status: "pending" } : {}) }); }}>
+            <option value="">All due dates</option>{DUE_OPTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+        </label>
         <label className="grid gap-1 text-xs text-muted">
           <span>Status</span>
-          <select className="desk-input" value={status} onChange={(event) => { setStatus(event.target.value); setSelected([]); }}>
+          <select className="desk-input" value={status} onChange={(event) => { list.update({ status: event.target.value, ...(event.target.value !== "pending" ? { due_state: "" } : {}) }); }}>
             <option value="">All statuses</option>
             {PAYMENT_STATUSES.filter(([value]) => !forRecording || ["pending", "paid_offline"].includes(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
         <label className="grid gap-1 text-xs text-muted">
           <span>Subject</span>
-          <select className="desk-input" value={subject} onChange={(event) => { setSubject(event.target.value); setSelected([]); }}>
+          <select className="desk-input" value={subject} onChange={(event) => { list.setFilter("subject_type", event.target.value); }}>
             <option value="">All subjects</option>
             {PAYMENT_SUBJECTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -202,9 +214,13 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
           key={refundRow.id}
           makerspaceId={makerspaceId}
           payment={refundRow}
+          releaseDeposit={refundRow.subject_type === "loan_deposit" && refundRow.status === "paid_offline"}
           onClose={() => setRefundRow(null)}
         />
       ) : null}
+      {correctingRefund ? <RefundReceiptAmendDialog makerspaceId={makerspaceId}
+        paymentId={correctingRefund.paymentId} refund={correctingRefund.refund}
+        onClose={() => setCorrectingRefund(null)} /> : null}
     </Panel>
   );
 }

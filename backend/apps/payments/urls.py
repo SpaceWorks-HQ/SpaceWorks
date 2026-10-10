@@ -9,7 +9,8 @@ who take it at the desk. Only the routes that actually talk to a provider live i
 from django.urls import path
 
 from apps.payments.views_member import ArchivedPaymentDiscoveryView
-from apps.payments.views_refunds_offline import PaymentOfflineRefundView
+from apps.payments.views_billing import BillingSettingsView
+from apps.payments.views_refunds_offline import PaymentOfflineRefundView, PaymentDepositReleaseView, PaymentRefundAmendView
 from apps.payments.views_reconciliation import (
     PaymentBulkMarkOfflineView,
     PaymentBulkWaiveView,
@@ -20,6 +21,9 @@ from apps.payments.views_reconciliation import (
 )
 
 urlpatterns = [
+    path("admin/makerspace/<int:makerspace_id>/billing-settings", BillingSettingsView.as_view(), name="payment-billing-settings"),
+    path("admin/makerspace/<int:makerspace_id>/payments/<int:payment_id>/release-deposit", PaymentDepositReleaseView.as_view(), name="payment-deposit-release"),
+    path("admin/makerspace/<int:makerspace_id>/payments/<int:payment_id>/refunds/<int:refund_id>/amend", PaymentRefundAmendView.as_view(), name="payment-refund-amend"),
     path("admin/makerspace/<int:makerspace_id>/payments/<int:payment_id>/refund-offline", PaymentOfflineRefundView.as_view(), name="payment-reconciliation-refund-offline"),
     path(
         "member/archived-payments",

@@ -161,3 +161,13 @@ def test_source_freeze_blocks_saved_view_writes_but_leaves_reads_available():
         assert response.status_code == 423
     assert SavedView.objects.get(pk=created.data["id"]).name == "Low stock"
     assert not AuditLog.objects.filter(action__in=["saved_view.updated", "saved_view.deleted"]).exists()
+
+
+def test_payment_due_filters_survive_saved_view_round_trip():
+    space = make_space("saved-payment-due")
+    owner = make_member("saved-payment-due-owner", space)
+    client = authenticated_client(owner)
+    state = {"status": "pending", "due_state": "overdue", "ordering": "due_at", "page": "2"}
+    created = client.post(url(space), payload(name="Overdue charges", entity="payments", state=state), format="json")
+    assert created.status_code == 201, created.data
+    assert client.get(url(space, created.data["id"])).data["state"] == state

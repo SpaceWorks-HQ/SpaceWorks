@@ -1,5 +1,6 @@
 """Existing domain edges emit once after commit; timers are left to F1."""
 
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -16,7 +17,7 @@ from apps.integrations.staff_notifications import staff_emails_for_feature, staf
 from apps.machines.models import Machine
 from apps.machines.service_consumable_pools import correct_pool, create_pool
 from apps.makerspaces import membership_services
-from apps.makerspaces.models import MakerspaceRole, MembershipRequest
+from apps.makerspaces.models import MakerspaceRole, MembershipRequest, MembershipTerm, MakerspaceMembership
 from apps.payments.models import Payment, Refund
 from apps.payments.reconciliation import mark_offline, waive
 from apps.payments.services import create_payment
@@ -38,13 +39,22 @@ def captured_events(monkeypatch):
     return events
 
 
+def payment_term(space, member):
+    from tests.makerspaces.test_membership_plans import plan
+    now = timezone.now()
+    return MembershipTerm.objects.create(
+        membership=MakerspaceMembership.objects.get(makerspace=space, user=member),
+        plan=plan(space), starts_at=now, ends_at=now + timedelta(days=30),
+    )
+
+
 def test_charge_creation_and_offline_settlement_emit_only_after_commit(monkeypatch, django_capture_on_commit_callbacks):
     space, manager, member, _row = family_world("f3-charge-edge")
     events = captured_events(monkeypatch)
     with django_capture_on_commit_callbacks(execute=True):
         with transaction.atomic():
             payment = create_payment(makerspace=space, member=member, created_by=manager,
-                                     subject_type="membership_term", subject_id=999,
+                                     subject_type="membership_term", subject_id=payment_term(space, member).pk,
                                      amount=Decimal("20.00"), currency="usd")
             assert events == []
     assert events == [("payments", "charge_raised")]
@@ -89,9 +99,10 @@ def test_waiver_does_not_emit_payment_received(monkeypatch, django_capture_on_co
 @pytest.mark.parametrize("provider", ["stripe", "razorpay"])
 def test_late_online_receipt_emits_once_when_waiver_becomes_real_payment(monkeypatch, django_capture_on_commit_callbacks, provider):
     from apps.payments.providers.base import WebhookEvent
-    space, _manager, member, _pending = family_world(f"f3-late-{provider}")
+    space, manager, member, _pending = family_world(f"f3-late-{provider}")
     payment = Payment.objects.create(
-        makerspace=space, member=member, subject_type="membership_term", subject_id=993,
+        makerspace=space, member=member, created_by=manager,
+        subject_type="membership_term", subject_id=payment_term(space, member).pk,
         amount="20.00", currency="usd", status="waived", provider=provider,
         stripe_payment_intent_id="pi_f3_late", external_order_id="order_f3_late",
     )
@@ -116,8 +127,8 @@ def test_late_online_receipt_emits_once_when_waiver_becomes_real_payment(monkeyp
 def test_successful_refund_emits_once_and_pending_or_failed_do_not(monkeypatch, django_capture_on_commit_callbacks):
     space, manager, _member, payment = family_world("f3-refund")
     # Terminal row at creation avoids bypassing the immutable payment trigger.
-    paid = Payment.objects.create(makerspace=space, member=manager, subject_type="membership_term",
-                                  subject_id=777, amount="20.00", currency="usd", status="paid_online")
+    paid = Payment.objects.create(makerspace=space, member=manager, created_by=manager, subject_type="membership_term",
+                                  subject_id=payment_term(space, manager).pk, amount="20.00", currency="usd", status="paid_online")
     refund = Refund.objects.create(payment=paid, amount="5.00", currency="usd", provider="stripe", created_by=manager)
     events = captured_events(monkeypatch)
     with django_capture_on_commit_callbacks(execute=True):
@@ -134,8 +145,8 @@ def test_successful_refund_emits_once_and_pending_or_failed_do_not(monkeypatch, 
 def test_offline_refund_emits_after_receipt_transaction(monkeypatch, django_capture_on_commit_callbacks):
     from apps.payments.services_refunds_offline import record_offline_refund
     space, manager, member, _payment = family_world("f3-manual-refund")
-    paid = Payment.objects.create(makerspace=space, member=member, subject_type="membership_term",
-                                  subject_id=888, amount="10.00", currency="usd", status="paid_offline")
+    paid = Payment.objects.create(makerspace=space, member=member, created_by=manager, subject_type="membership_term",
+                                  subject_id=payment_term(space, member).pk, amount="10.00", currency="usd", status="paid_offline")
     events = captured_events(monkeypatch)
     with django_capture_on_commit_callbacks(execute=True):
         refund = record_offline_refund(paid, actor=manager, amount="5.00", reason="Deposit release",
@@ -225,7 +236,7 @@ def test_type_only_notification_scope_excludes_other_machine_types():
 
 
 @pytest.mark.parametrize("feature,event", [
-    ("payments", "charge_raised"), ("members", "declined"),
+    ("members", "declined"),
     ("stock", "low_stock"), ("certifications", "granted"),
 ])
 def test_each_family_module_off_suppresses_delivery(monkeypatch, django_capture_on_commit_callbacks, feature, event):

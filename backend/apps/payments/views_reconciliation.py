@@ -24,6 +24,7 @@ from apps.payments.serializers_reconciliation import (
 )
 from apps.makerspaces.servability import servable_queryset
 from apps.payments.subjects import resolve_subject_labels
+from apps.payments.schemas_billing import PAYMENT_FILTER_ERROR
 
 ERRORS = {
     400: OpenApiResponse(ErrorSerializer, description="Invalid payment request."),
@@ -47,8 +48,10 @@ class PaymentListView(APIView):
             OpenApiParameter("status", OpenApiTypes.STR, enum=Payment.Status.values),
             OpenApiParameter("subject_type", OpenApiTypes.STR, enum=Payment.SubjectType.values),
             OpenApiParameter("for_recording", OpenApiTypes.BOOL),
+            OpenApiParameter("due_state", OpenApiTypes.STR, enum=["overdue", "due_today", "upcoming"]),
         ],
-        responses={200: PaymentListResponseSerializer, **ERRORS},
+        responses={200: PaymentListResponseSerializer, **ERRORS,
+                   400: OpenApiResponse(PAYMENT_FILTER_ERROR)},
     )
     def get(self, request, makerspace_id):
         filters = PaymentListFilterSerializer(data=request.query_params)
@@ -68,7 +71,10 @@ class PaymentListView(APIView):
             makerspace_id=makerspace_id,
             **filters.validated_data,
         )
-        queryset = order_list(queryset, request.query_params, {"created_at", "amount", "status", "subject_type"}, "-created_at")
+        ordering = request.query_params.get("ordering", "due_at")
+        if ordering != "due_at":
+            queryset = order_list(queryset, request.query_params,
+                                  {"created_at", "amount", "status", "subject_type", "due_at"}, "due_at")
         pager = StaffListPagination()
         rows = pager.paginate_queryset(queryset, request, view=self)
         context = {

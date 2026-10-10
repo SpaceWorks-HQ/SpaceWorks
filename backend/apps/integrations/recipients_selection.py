@@ -51,7 +51,8 @@ FEATURE_MODULES = {
     NotificationFeature.MAINTENANCE: "maintenance",
     NotificationFeature.MEMBERS: "membership",
     NotificationFeature.DEVICES: "devices",
-    NotificationFeature.PAYMENTS: "payments",
+    # Ledger messages work without the separable online rail.
+    NotificationFeature.PAYMENTS: "request_workflow",
     NotificationFeature.STOCK: "procurement",
     NotificationFeature.CERTIFICATIONS: "machines",
 }

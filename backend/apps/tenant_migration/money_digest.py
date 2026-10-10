@@ -55,6 +55,7 @@ def money_fingerprint(makerspace_id, *, using="default"):
             "status",
             "amount",
             "currency",
+            "due_at",
             "provider",
             "online_rail",
             "external_order_id",
@@ -86,7 +87,7 @@ def money_fingerprint(makerspace_id, *, using="default"):
     # Omit the empty key to preserve fingerprints from captures with no refunds.
     refunds = list(Refund.objects.using(using).filter(payment__makerspace_id=makerspace_id)
                    .order_by("pk").values("id", "payment_id", "amount", "currency", "status",
-                                           "provider", "method", "reference", "refunded_at", "settled_at"))
+                                           "provider", "method", "reference", "refunded_at", "settled_at", "amends_id"))
     if refunds:
         payload["refunds"] = [{key: str(value) for key, value in row.items()} for row in refunds]
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()

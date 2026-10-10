@@ -63,7 +63,7 @@ def build_payment_reconciliation(
     money = DecimalField(max_digits=20, decimal_places=2)
     queryset = queryset.annotate(
         refund_total=Coalesce(
-            Subquery(Refund.objects.filter(payment_id=OuterRef("pk"), status=Refund.Status.SUCCEEDED)
+            Subquery(Refund.objects.filter(payment_id=OuterRef("pk"), status=Refund.Status.SUCCEEDED, amended_by__isnull=True)
                      .order_by().values("payment_id").annotate(total=Sum("amount")).values("total")[:1]),
             Value(0), output_field=money,
         ),

@@ -8,28 +8,18 @@ from apps.accounts import rbac
 from apps.audit import services as audit
 from apps.payments.exceptions_refunds import RefundNotAllowed
 from apps.payments.models import Payment, Refund
-from apps.payments.reconciliation_authority import SUBJECT_ACTIONS, _require_record_authority
 from apps.payments.serializers_refunds_offline import PaymentOfflineRefundSerializer
 
 
 def offline_refund_queryset(actor):
-    """One RBAC scope for both endpoint reads and the service's locked query.
-
-    Finance grants cover this makerspace; existing subject grants keep their scope.
-    Subject-only machine staff are checked under the payment lock before any refund.
-    """
-    allowed = rbac.scope_by_action(
+    """Manual money-out requires RECORD_PAYMENT, including after rail removal."""
+    return rbac.scope_by_action(
         actor, rbac.Action.RECORD_PAYMENT, Payment.objects.all(), field="makerspace_id",
     )
-    for subject, action in SUBJECT_ACTIONS.items():
-        allowed = allowed | rbac.scope_by_action(
-            actor, action, Payment.objects.filter(subject_type=subject), field="makerspace_id",
-        )
-    return allowed
 
 
 @transaction.atomic
-def record_offline_refund(payment, *, amount, reason, receipt, actor):
+def record_offline_refund(payment, *, amount, reason, receipt, actor, release_deposit=False):
     # Validate here as well as at HTTP: direct service callers must supply a receipt.
     payload = PaymentOfflineRefundSerializer(data={
         "amount": amount, "reason": reason, "receipt": receipt,
@@ -42,7 +32,14 @@ def record_offline_refund(payment, *, amount, reason, receipt, actor):
     )
     if locked is None:
         raise NotFound("Payment not found.")
-    _require_record_authority(actor, [locked])
+    if release_deposit:
+        from apps.hardware_requests.models import HardwareRequest
+        closed = rbac.scope_by_action(
+            actor, rbac.Action.RECORD_PAYMENT, HardwareRequest.objects.all(), field="makerspace_id",
+        ).filter(pk=locked.subject_id, makerspace_id=locked.makerspace_id,
+                 status__in=[HardwareRequest.Status.RETURNED, HardwareRequest.Status.CLOSED_WITH_ISSUE])
+        if locked.subject_type != Payment.SubjectType.LOAN_DEPOSIT or not closed.exists():
+            raise RefundNotAllowed("A deposit can be released after the loan closes.", "deposit_not_returned")
     if locked.status != Payment.Status.PAID_OFFLINE:
         raise RefundNotAllowed("Only offline-settled payments accept a manual refund.", "refund_not_offline")
     if Refund.counted_total(locked) + data["amount"] > locked.amount:
@@ -61,3 +58,33 @@ def record_offline_refund(payment, *, amount, reason, receipt, actor):
     from apps.payments.notifications import notify_payment
     notify_payment(locked, "refund_issued", refund=refund)
     return refund
+
+
+@transaction.atomic
+def amend_offline_refund(payment, *, refund_id, receipt, actor):
+    """Correct metadata, not the amount of money actually returned."""
+    from apps.payments.serializers_refunds_offline import ManualRefundReceiptSerializer
+    payload = ManualRefundReceiptSerializer(data=receipt)
+    payload.is_valid(raise_exception=True)
+    locked = offline_refund_queryset(actor).select_for_update().filter(
+        pk=payment.pk, makerspace_id=payment.makerspace_id,
+    ).first()
+    if locked is None:
+        raise NotFound("Payment not found.")
+    previous = rbac.scope_by_action(
+        actor, rbac.Action.RECORD_PAYMENT, Refund.objects.all(), field="payment__makerspace_id",
+    ).filter(
+        pk=refund_id, payment=locked, provider=Refund.Provider.MANUAL, amended_by__isnull=True,
+    ).first()
+    if previous is None:
+        raise NotFound("Effective manual refund not found.")
+    replacement = Refund.objects.create(
+        payment=locked, amount=previous.amount, currency=previous.currency,
+        provider=Refund.Provider.MANUAL, status=Refund.Status.SUCCEEDED,
+        reason=previous.reason, created_by=actor, settled_at=previous.settled_at,
+        amends=previous, **payload.validated_data,
+    )
+    audit.record(actor, "payment.refund_amended", makerspace=locked.makerspace, target=locked,
+                 meta={"payment_id": locked.pk, "refund_id": replacement.pk,
+                       "amends_id": previous.pk, "method": replacement.method})
+    return replacement

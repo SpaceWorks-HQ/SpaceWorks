@@ -52,6 +52,7 @@ def _get_or_create(booking, created_by):
                 currency=currency,
                 created_by=created_by,
                 subject_label=booking.space.name,
+                due_at=booking.starts_at,
             )
     except IntegrityError:
         return Payment.objects.get(**lookup)

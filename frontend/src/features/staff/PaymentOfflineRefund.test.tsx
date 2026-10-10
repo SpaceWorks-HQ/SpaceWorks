@@ -65,8 +65,8 @@ describe("Offline refunds", () => {
 
   it("offers a refund action for a paid-offline loan deposit in the staff ledger", async () => {
     mount(false);
-    fireEvent.click(await screen.findByRole("button", { name: "Refund" }));
-    expect(screen.getByRole("button", { name: "Record refund" })).toBeVisible();
-    expect(screen.getByText(/money already returned/)).toBeVisible();
+    fireEvent.click(await screen.findByRole("button", { name: "Release deposit" }));
+    expect(screen.getByRole("button", { name: "Record deposit release" })).toBeVisible();
+    expect(screen.getByText(/deposit money handed back/)).toBeVisible();
   });
 });

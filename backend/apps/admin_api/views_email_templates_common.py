@@ -50,7 +50,7 @@ STREAM_MODULES = {
     "maintenance": "maintenance",
     "membership": "membership",
     "devices": "devices",
-    "payments": "payments",
+    # Payments is a core ledger stream: cash-only spaces can edit receipts/reminders.
     "stock": "procurement",
     "certifications": "machines",
 }

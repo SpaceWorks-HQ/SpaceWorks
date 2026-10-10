@@ -15,8 +15,16 @@ verification/error helpers in `views_social_helpers.py`. `integrations/health.py
 read-only scheduler control page lives in `operations/admin_scheduling.py`.
 The shared reminder foundation is `operations/models_reminders.py`,
 `reminder_registry.py`, `reminder_services.py`, `reminder_sweeper.py` and
-`tasks_reminders.py`; `membership_payment_reminders.py` registers the first
-consumer for F3 membership payment-due notices.
+`tasks_reminders.py`; `membership_payment_reminders.py` registers the admission
+payment-deadline consumer for F3 membership notices. The explicit `payments.due`
+consumer in `payments/reminders.py` uses durable claims for owner-only email.
+Core due dates and billing policy live in `payments/due_dates.py`, `models_billing.py`
+and `views_billing.py`; manual receipt corrections/release reuse
+`services_refunds_offline.py` and `views_refunds_offline.py`.
+`operations/reports_cash_book.py` owns effective manual money-in/out totals.
+`payments/schemas_billing.py` documents typed business errors and DRF field-validation
+responses. The module guide links into `MODULES-INVENTORY.md`, `MODULES-WORKSHOPS.md`,
+`MODULES-PLATFORM.md` and `MODULES-LIFECYCLE.md` to keep each reference below the file ceiling.
 Queries use `accounts/rbac.py:scope_for_scheduled_work`; see
 [reminder-schedules.md](reminder-schedules.md) for UTC, claims and migration rules.
 Platform monitoring uses `admin_api/views_platform_monitoring.py` and its schema sibling;

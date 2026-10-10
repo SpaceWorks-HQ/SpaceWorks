@@ -11,6 +11,11 @@ def _legacy(key, fields, *, exportable=True, summary=False, chart_hint="bar"):
 
 
 EXISTING_REPORT_DEFINITIONS = (
+    ReportDefinition(
+        "payment-cash-book", "apps.operations.reports_cash_book.build_payment_cash_book",
+        ("currency", "method", "collected_amount", "refunded_amount", "net_amount"),
+        required_action=rbac.Action.VIEW_FINANCE, title="Cash book",
+    ),
     _legacy("summary", (), exportable=False, summary=True, chart_hint="stats"),
     _legacy("taken-items", ("product", "issued_quantity")),
     _legacy("active-loans", ("id", "requester", "status", "issued_at"), chart_hint="line"),
@@ -42,10 +47,11 @@ EXISTING_REPORT_DEFINITIONS = (
         ),
         required_action=rbac.Action.VIEW_FINANCE, title="Payment reconciliation",
         chart_hint="stacked_bar",
-        # v3 adds the succeeded refund total; v2 split settled money by method, so the
+        # v4 counts effective refund correction heads; v3 added succeeded refund
+        # totals; v2 split settled money by method, so the
         # column set and the row grain both changed. Deliberately NOT module-gated -- a
         # space with the payments module uninstalled still tracks and settles money, and
         # this is where it reconciles the cash box.
-        version=3,
+        version=4,
     ),
 )

@@ -9,7 +9,6 @@ from datetime import timedelta
 
 from django.db.models import CharField, F
 from django.db.models.functions import Cast
-from django.utils import timezone
 
 from apps.accounts import rbac
 from apps.makerspaces.models import MembershipRequest
@@ -68,10 +67,10 @@ def build_payment_message(makerspace, reminder, now, local_tz):
     )
 
 
-def dispatch_payment_message(makerspace, reminder, message):
+def dispatch_payment_message(makerspace, reminder, message, now, local_tz):
     from apps.makerspaces.membership_admission_notifications import notify_admission
 
-    request = _current_request(makerspace, reminder, timezone.now())
+    request = _current_request(makerspace, reminder, now)
     if request is not None:
         notify_admission(request, "payment_due")
 

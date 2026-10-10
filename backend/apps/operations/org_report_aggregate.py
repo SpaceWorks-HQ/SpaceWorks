@@ -14,6 +14,8 @@ def aggregate_rows(report_key, rows_by_space, *, limit):
     if strategy.limit_semantics is LimitSemantics.PER_SPACE_THEN_GLOBAL:
         source = [(space_id, rows[:limit]) for space_id, rows in rows_by_space]
     rows = [row for _space_id, space_rows in source for row in space_rows]
+    if report_key == "payment-cash-book":
+        return _group_sum(rows, ("currency", "method"), ("collected_amount", "refunded_amount", "net_amount"), limit)
     if report_key == "summary":
         return [_summed(rows, strategy.total_fields)] if rows else []
     if report_key == "qr-scans":

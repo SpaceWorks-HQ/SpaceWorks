@@ -69,6 +69,9 @@ class TenantDumpCatalogError(AssertionError):
 # lane/w5-theme); the coordinator recomputes the digest for the merged lanes.
 # Merge lane/w1-membership with integration/2026-10 (including lane/w6-platform,
 # lane/w5-lists and lane/w5-theme); the coordinator recomputes the merged digest.
+# Merge lane/w1-payments with integration/2026-10 (including lane/w1-membership,
+# lane/w6-platform, lane/w5-lists and lane/w5-theme). Billing policy, Payment.due_at
+# and Refund.amends change the catalog; the coordinator recomputes the merged digest.
 CATALOG_SCHEMA_SHA256 = "RECOMPUTE"
 
 

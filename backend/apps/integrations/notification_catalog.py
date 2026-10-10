@@ -50,7 +50,7 @@ FEATURE_EVENTS = {
                 "renewal_due", "lapsed", "renewal_failed", "awaiting_payment", "payment_due"),
     F.API_ACCESS: ("api_key_request_resolved",),
     F.DEVICES: ("offline", "recovered"),
-    F.PAYMENTS: ("charge_raised", "payment_due_soon", "payment_overdue",
+    F.PAYMENTS: ("charge_raised", "payment_due_soon", "payment_due_today", "payment_overdue",
                  "payment_received", "refund_issued", "payment_failed"),
     F.STOCK: ("low_stock", "procurement_received"),
     F.CERTIFICATIONS: ("granted", "revoked", "expiring", "expired"),
@@ -109,3 +109,15 @@ def is_notification_enabled(makerspace, feature, channel):
     if override is not None:
         return override
     return default_state(feature, channel)
+
+
+def receipt_email_default(makerspace):
+    """Only the payer's receipt defaults on; an explicit matrix OFF still wins."""
+    try:
+        override = NotificationPreference.objects.filter(
+            makerspace=makerspace, feature=F.PAYMENTS, channel=C.EMAIL,
+        ).values_list("enabled", flat=True).first()
+        return True if override is None else bool(override)
+    except Exception:
+        logger.warning("receipt_preference_lookup_failed", extra={"makerspace_id": makerspace.pk})
+        return False

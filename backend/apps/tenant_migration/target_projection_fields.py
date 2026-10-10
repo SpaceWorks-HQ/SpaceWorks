@@ -31,6 +31,9 @@ TARGET_FIELD_PROJECTION = {
     ("makerspaces.MembershipRequest", "admission_managed"): TargetField(
         False, reason="Imported application history never activates a membership on payment.",
     ),
+    ("payments.MakerspaceBillingSettings", "reminder_days_before"): TargetField([], reason="Target staff choose mail offsets."),
+    ("payments.MakerspaceBillingSettings", "reminder_days_after"): TargetField([], reason="Target staff choose mail offsets."),
+    ("payments.MakerspaceBillingSettings", "max_reminders"): TargetField(0, reason="Target staff explicitly enable automatic reminders."),
     ("makerspaces.Makerspace", "frontend_domain"): TargetField(
         None, reason="A source domain must not enter the target credentialed-origin allowlist."
     ),

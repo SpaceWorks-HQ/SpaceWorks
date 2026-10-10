@@ -30,10 +30,12 @@ export function PaymentRefundDialog({
   makerspaceId,
   payment,
   onClose,
+  releaseDeposit = false,
 }: {
   makerspaceId: number;
   payment: PaymentRow;
   onClose: () => void;
+  releaseDeposit?: boolean;
 }) {
   const queryClient = useQueryClient();
   const remaining = remainingRefundable(payment);
@@ -53,7 +55,7 @@ export function PaymentRefundDialog({
       ? recordOfflineRefund(makerspaceId, payment.id, {
         amount: amount.trim(), reason: reason.trim(),
         receipt: { method, reference: reference.trim(), refunded_at: new Date(refundedAt).toISOString() },
-      })
+      }, releaseDeposit)
       : refundPayment(makerspaceId, payment.id, { amount: amount.trim(), reason: reason.trim() }),
     onSuccess: () => {
       invalidatePaymentViews(queryClient, makerspaceId);
@@ -74,7 +76,7 @@ export function PaymentRefundDialog({
     <Modal
       open
       onClose={onClose}
-      title={`Refund payment ${formatMoney(payment.amount, payment.currency)}`}
+      title={`${releaseDeposit ? "Release deposit" : "Refund payment"} ${formatMoney(payment.amount, payment.currency)}`}
       footer={(
         <div className="desk-actions flex flex-wrap justify-end gap-2">
           <button className="desk-button" type="button" disabled={mutation.isPending} onClick={onClose}>
@@ -86,7 +88,7 @@ export function PaymentRefundDialog({
             form="payment-refund-form"
             disabled={mutation.isPending || remaining <= 0}
           >
-            {mutation.isPending ? "Refunding…" : offline ? "Record refund" : "Send refund"}
+            {mutation.isPending ? "Refunding…" : releaseDeposit ? "Record deposit release" : offline ? "Record refund" : "Send refund"}
           </button>
         </div>
       )}
@@ -105,7 +107,7 @@ export function PaymentRefundDialog({
       >
         {offline ? (
           <>
-            <p className="text-sm text-muted">Record money already returned, including a deposit release. This creates a permanent receipt.</p>
+            <p className="text-sm text-muted">{releaseDeposit ? "After closing the loan, record the deposit money handed back to the borrower." : "Record money already returned."} This creates a permanent receipt.</p>
             <Field label="Refund method">
               <select className="desk-input" value={method} onChange={(event) => setMethod(event.target.value)}>
                 {SETTLEMENT_METHODS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -163,6 +165,7 @@ function RefundList({ refunds }: { refunds: PaymentRow["refunds"] }) {
               {refund.status}
             </Badge>
             <span className="text-xs text-muted">
+              {refund.corrected ? "Replaced receipt · " : refund.amends ? "Corrected receipt · " : ""}
               {new Date(refund.created_at).toLocaleString()}
               {refund.reason ? ` · ${refund.reason}` : ""}
               {refund.method ? ` · ${refund.method.replace(/_/g, " ")}` : ""}

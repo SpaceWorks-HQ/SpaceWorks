@@ -1,5 +1,5 @@
 from django.db.models import Count, IntegerField, OuterRef, Q, Subquery
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiResponse, OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import NotFound
@@ -24,6 +24,9 @@ from apps.payments.serializers import (
 from apps.payments.services import PaymentRailConflict, create_checkout_url
 from apps.payments.subjects import resolve_subject_labels
 from apps.payments.reconciliation import with_refunds
+from apps.payments.due_dates import order_by_due
+from apps.payments.serializers_reconciliation import PaymentListFilterSerializer
+from apps.payments.schemas_billing import PAYMENT_FILTER_ERROR
 
 
 class ArchivedPaymentDiscoveryView(APIView):
@@ -103,9 +106,11 @@ class MemberPaymentHistoryView(APIView):
             "A revoked member reapplying through an approved admission may read only that "
             "application's pending admission charge; previous membership debt stays refused."
         ),
+        parameters=[OpenApiParameter("due_state", str, enum=["overdue", "due_today", "upcoming"])],
         request=None,
         responses={
             200: MemberPaymentSerializer(many=True),
+            400: OpenApiResponse(PAYMENT_FILTER_ERROR),
             401: OpenApiResponse(ErrorSerializer, description="Authentication required."),
             403: OpenApiResponse(ErrorSerializer, description="No active membership and no charge here."),
         },
@@ -116,9 +121,15 @@ class MemberPaymentHistoryView(APIView):
                 {"detail": "An active membership or an existing charge is required."},
                 status=403,
             )
-        rows = list(
-            with_refunds(member_payment_queryset(request.user, makerspace_id)).order_by("-created_at")
-        )
+        filters = PaymentListFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        queryset = with_refunds(member_payment_queryset(request.user, makerspace_id).select_related("makerspace"))
+        # Collaborative charges use their OWNING space's local day, not this page's zone.
+        state = filters.validated_data.get("due_state")
+        rows = list(order_by_due(queryset))
+        if state:
+            from apps.payments.due_dates import due_state
+            rows = [row for row in rows if due_state(row) == state]
         return Response(
             MemberPaymentSerializer(
                 rows,

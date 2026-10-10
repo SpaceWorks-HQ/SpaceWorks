@@ -34,4 +34,4 @@ class ReminderSource:
     feature: str | None = None
     # A domain dispatcher runs after the live tenant gate check. None keeps the
     # foundation's staff-inbox emitter for sources that already use it.
-    dispatch: Callable[[Makerspace, ReminderSchedule, ReminderMessage], None] | None = None
+    dispatch: Callable[[Makerspace, ReminderSchedule, ReminderMessage, datetime, tzinfo], None] | None = None

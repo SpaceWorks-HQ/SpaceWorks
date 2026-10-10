@@ -18,7 +18,7 @@ class SavedViewSerializer(serializers.ModelSerializer):
         if len(value) > 20:
             raise serializers.ValidationError("At most 20 list-state keys are allowed.")
         # Values are filter snapshots, never navigation URLs or executable actions.
-        allowed = {"id", "q", "search", "ordering", "page", "status", "subject_type", "archived", "low_stock", "role", "state", "starts_at", "ends_at", "action", "actor", "targetType", "targetId", "start", "end", "history", "pendingPage", "acceptedPage", "activePage", "historyPage", "requestPage", "requestState", "requestOrdering"}
+        allowed = {"id", "q", "search", "ordering", "page", "status", "subject_type", "due_state", "archived", "low_stock", "role", "state", "starts_at", "ends_at", "action", "actor", "targetType", "targetId", "start", "end", "history", "pendingPage", "acceptedPage", "activePage", "historyPage", "requestPage", "requestState", "requestOrdering"}
         if set(value) - allowed:
             raise serializers.ValidationError("Unsupported list-state key.")
         return value

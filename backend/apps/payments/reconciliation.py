@@ -37,7 +37,7 @@ class PaymentConflict(APIException):
         }
 
 
-def list_payments(*, actor, makerspace_id, status=None, subject_type=None, for_recording=False):
+def list_payments(*, actor, makerspace_id, status=None, subject_type=None, for_recording=False, due_state=None):
     queryset = rbac.scope_by_action(
         actor,
         rbac.Action.RECORD_PAYMENT if for_recording else rbac.Action.VIEW_FINANCE,
@@ -50,16 +50,24 @@ def list_payments(*, actor, makerspace_id, status=None, subject_type=None, for_r
         queryset = queryset.filter(status=status)
     if subject_type:
         queryset = queryset.filter(subject_type=subject_type)
-    return with_refunds(queryset).order_by("-created_at", "-pk")
+    from apps.makerspaces.models import Makerspace
+    from apps.payments.due_dates import filter_due, order_by_due
+    makerspace = rbac.scope_by_action(
+        actor, rbac.Action.RECORD_PAYMENT if for_recording else rbac.Action.VIEW_FINANCE,
+        Makerspace.objects.all(), field="pk",
+    ).filter(pk=makerspace_id).first()
+    if makerspace is None:
+        raise NotFound("Makerspace not found.")
+    return order_by_due(with_refunds(filter_due(queryset, makerspace, due_state)))
 
 
 def with_refunds(queryset):
     """Annotate the money actually sent back and prefetch the refund lines."""
     from apps.payments.models import Refund
 
-    return queryset.prefetch_related("refunds").annotate(
+    return queryset.prefetch_related("refunds__amended_by").annotate(
         refunded_amount=Coalesce(
-            Sum("refunds__amount", filter=Q(refunds__status=Refund.Status.SUCCEEDED)),
+            Sum("refunds__amount", filter=Q(refunds__status=Refund.Status.SUCCEEDED, refunds__amended_by__isnull=True)),
             Value(Decimal("0.00")),
             output_field=DecimalField(max_digits=12, decimal_places=2),
         )

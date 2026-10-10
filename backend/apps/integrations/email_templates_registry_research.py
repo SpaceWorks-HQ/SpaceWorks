@@ -8,7 +8,7 @@ from .email_templates_registry_helpers import EmailTemplateRegistryEntry, bag
 
 
 FAMILY_EVENTS = {
-    "payments": ("charge_raised", "payment_due_soon", "payment_overdue",
+    "payments": ("charge_raised", "payment_due_soon", "payment_due_today", "payment_overdue",
                  "payment_received", "refund_issued", "payment_failed"),
     "membership": ("approved", "declined", "renewal_due", "lapsed", "renewal_failed", "awaiting_payment", "payment_due"),
     "stock": ("low_stock", "procurement_received"),
@@ -44,6 +44,7 @@ STAFF_TEXT = {
 REQUESTER_TEXT = {
     "payments": "Your payment #{{ subject.id }}: {{ event_name }}. "
                 "Amount: {{ subject.amount }} {{ subject.currency }}. "
+                "{% if subject.due_date %}Due: {{ subject.due_date }}. {% endif %}"
                 "Review your payment history at {{ makerspace.name }}.",
     "membership": "Your membership at {{ makerspace.name }}: {{ event_name }}.",
     "certifications": "Your certification {{ subject.name }} at {{ makerspace.name }}: "
@@ -70,8 +71,8 @@ def build_entries():
                     sample.update(schedule=bag(id=12, next_due="2026-11-10"),
                                   machine=bag(name="Laser cutter"))
                 if stream == "payments" and audience == "requester":
-                    names += ["subject.amount", "subject.currency"]
-                    sample["subject"] = bag(id=12, status="pending", amount="25.00", currency="USD")
+                    names += ["subject.amount", "subject.currency", "subject.due_date"]
+                    sample["subject"] = bag(id=12, status="pending", amount="25.00", currency="USD", due_date="2026-11-10")
                 text = STAFF_TEXT[stream] if audience == "staff" else REQUESTER_TEXT[stream]
                 entries[(stream, audience, event)] = EmailTemplateRegistryEntry(
                     label=event.replace("_", " ").capitalize(),

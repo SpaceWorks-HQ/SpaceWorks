@@ -29,6 +29,8 @@ class FeatureDefinition:
 
 
 FEATURE_DEFINITIONS = (
+    FeatureDefinition("billing.reminders", "notifications", "Payment reminders",
+                      "Email the payer about due and overdue charges, including cash-only charges."),
     FeatureDefinition("staff.invitations", None, "Staff invitations",
                       "Invite staff with a single-use email link.", default_enabled=True),
     FeatureDefinition("security.staff_mfa_required", None, "Require MFA for staff",

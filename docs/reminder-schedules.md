@@ -2,12 +2,15 @@
 
 `operations/reminder_sweeper.py` runs every five minutes in both Celery beat and
 `run_scheduled_tasks --due-only`. F1 introduced the coordination foundation; the
-membership admission lane registers its payment-deadline consumer. The existing hourly loan return
+membership admission lane registers its payment-deadline consumer. The `payments.due`
+consumer is registered explicitly and gated on default-OFF `billing.reminders`;
+see [payment-billing.md](payment-billing.md). The existing hourly loan return
 reminder and membership renewal tasks keep their current schedules and semantics.
 
 ## Registering a source
 
-Add a `ReminderSource` explicitly to `operations/reminder_registry.py:REMINDER_SOURCES`.
+Add a `ReminderSource` explicitly in `operations/reminder_registry.py:_production_sources`.
+`REMINDER_SOURCES` is a test override (`None` means production; an empty tuple means none).
 Its module and optional feature must already exist in their canonical registries.
 The sweeper checks both plus the `notifications` module before discovery or claims;
 deployment tombstones are handled by `module_enabled` at the same boundary.
@@ -39,10 +42,12 @@ tenant and check current domain eligibility, policy offsets and due timestamp.
 Return `None` for a cancelled/returned/ineligible subject, disabled offset or stale
 due timestamp. Otherwise return a `ReminderMessage`. A source with no `dispatch`
 callback sends through `notifications.emit.emit_notification`, preserving existing
-staff inbox behaviour. A source may supply `dispatch(makerspace, reminder, message)`
-to use its domain's recipient and notification-family adapter. The sweeper calls it
-only after the fresh tenant module/feature checks; dispatch should recheck subject
-eligibility too. Domain services continue to own state transitions.
+staff inbox behaviour. A source may supply `dispatch(makerspace, reminder, message,
+now, local_tz)` to use its domain recipient and notification-family adapter after
+the same committed claim. The sweeper calls it only after fresh tenant module/feature
+checks; dispatch rechecks live subject eligibility and channel policy. The payment
+consumer uses it for owner-only matrix email. Domain services continue to own state
+transitions; reminders never change debt or domain state as a side effect.
 
 The runnable **test-only** example is
 `backend/tests/operations/reminder_example.py`; it must never be added to the
