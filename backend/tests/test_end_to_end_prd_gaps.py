@@ -79,12 +79,12 @@ def test_api_client_scope_metadata_is_persisted():
         makerspace=makerspace,
         allowed_origins=["https://reports.test"],
         client_type="server",
-        scopes=["reports:read"],
+        scopes=["public:read"],
         rate_limit_tier="trusted",
     )
 
     assert client.client_type == "server"
-    assert client.scopes == ["reports:read"]
+    assert client.scopes == ["public:read"]
     assert client.rate_limit_tier == "trusted"
 
 
@@ -111,4 +111,3 @@ def test_individual_mode_manual_direct_handout_requires_asset_scan():
 
     assert response.status_code == 400
     assert "asset QR" in str(response.data)
-

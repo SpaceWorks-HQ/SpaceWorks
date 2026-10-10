@@ -119,7 +119,7 @@ def test_valid_issue_still_returns_raw_secret_and_persists_client():
         makerspace=makerspace,
         allowed_origins=["https://valid.example.com"],
         client_type="server",
-        scopes=["reports:read"],
+        scopes=["public:read"],
         rate_limit_tier="trusted",
     )
 
@@ -127,5 +127,5 @@ def test_valid_issue_still_returns_raw_secret_and_persists_client():
     assert raw_secret
     assert client.get_secret() == raw_secret
     assert client.allowed_origins == ["https://valid.example.com"]
-    assert client.scopes == ["reports:read"]
+    assert client.scopes == ["public:read"]
     assert client.rate_limit_tier == "trusted"

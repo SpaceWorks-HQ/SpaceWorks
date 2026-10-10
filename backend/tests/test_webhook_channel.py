@@ -38,7 +38,7 @@ def _destination(space, **overrides):
 def _log(space, dest, **fields):
     return NotificationDeliveryLog.objects.create(
         makerspace=space, channel="webhook", destination=dest, destination_label=dest.label,
-        feature=NotificationFeature.HARDWARE_REQUESTS, event="request.accepted",
+        feature=NotificationFeature.HARDWARE_REQUESTS, event="accepted",
         text_body="Request #12 accepted", payload={"request_id": 12}, **fields,
     )
 
@@ -69,15 +69,20 @@ def test_delivery_posts_signed_json_and_marks_sent(monkeypatch):
     assert sent["url"] == "https://hooks.example.org/spaceworks"
     body = json.loads(sent["payload"])
     assert body == {
-        "id": log.pk, "event": "request.accepted", "feature": "hardware_requests",
+        "id": log.pk, "event": "accepted", "feature": "hardware_requests",
         "makerspace_id": space.pk, "text": "Request #12 accepted", "data": {"request_id": 12},
         "created_at": log.created_at.isoformat(),
+        "structured": {
+            "version": 1, "event": "hardware_requests.accepted",
+            "ids": {"request_id": 12}, "makerspace": {"id": space.pk},
+            "occurred_at": log.created_at.isoformat(),
+        },
     }
     header = sent["headers"][webhooks.SIGNATURE_HEADER]
     t, v1 = header.split(",")
     ts = int(t[2:])
     assert v1 == "v1=" + hmac.new(SECRET.encode(), f"{ts}.".encode() + sent["payload"], hashlib.sha256).hexdigest()
-    assert sent["headers"][webhooks.EVENT_HEADER] == "request.accepted"
+    assert sent["headers"][webhooks.EVENT_HEADER] == "accepted"
     assert sent["headers"][webhooks.DELIVERY_HEADER] == str(log.pk)
 
 

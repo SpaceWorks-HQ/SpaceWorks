@@ -48,7 +48,11 @@ def _notify_makerspace(
             )
         )
         return LifecyclePayload(
-            text=staff["text_body"], emails=emails, context=context
+            text=staff["text_body"], emails=emails, context=context,
+            data={
+                "event_id": event.pk, "series_id": event.series_id,
+                "registration_id": registration.pk if registration else None,
+            },
         )
 
     return notify_lifecycle(

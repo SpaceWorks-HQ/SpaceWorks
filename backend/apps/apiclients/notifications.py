@@ -1,51 +1,44 @@
-import logging
+"""API-access notices use the same matrix, module gates, quotas and logs as loans."""
 
-from apps.integrations.email import send_makerspace_email
-from apps.integrations.telegram import send_message
-
-logger = logging.getLogger(__name__)
+from apps.apiclients.models import ApiKeyRequest
+from apps.integrations.notify import EmailDelivery, LifecyclePayload, notify_lifecycle
 
 
-def notify_api_key_request_resolved(api_key_request):
-    status = api_key_request.status
+def notify_api_key_request_resolved(api_key_request, *, sync=False):
+    request_id = api_key_request.pk
     makerspace = api_key_request.makerspace
-    requester = api_key_request.requester
-    label = api_key_request.label
 
-    subject = f"{makerspace.name} API access request {status}"
-    body = (
-        f"Your API access request '{label}' for {makerspace.name} was {status}."
-    )
-    if api_key_request.resolution_note:
-        body = f"{body}\n\nNote: {api_key_request.resolution_note}"
-    body = f"{body}\n\nNo API secret is included in this notification."
-
-    try:
-        if requester and requester.email:
-            send_makerspace_email(
-                makerspace,
-                subject,
-                body,
-                [requester.email],
+    def build():
+        row = ApiKeyRequest.objects.select_related("requester").get(
+            pk=request_id, makerspace=makerspace
+        )
+        subject = f"{makerspace.name} API access request {row.status}"
+        body = f"Your API access request '{row.label}' for {makerspace.name} was {row.status}."
+        if row.resolution_note:
+            body = f"{body}\n\nNote: {row.resolution_note}"
+        body = f"{body}\n\nNo API secret is included in this notification."
+        emails = ()
+        if row.requester and row.requester.email:
+            emails = (EmailDelivery(
+                to_email=row.requester.email,
+                subject=subject,
+                text_body=body,
                 stream="api",
-                event="api_key_request_resolved",
+                mute_event="api_key_request_resolved",
                 audience="requester",
-            )
-    except Exception:
-        logger.warning(
-            "api_key_request_email_notification_failed",
-            extra={"api_key_request_id": api_key_request.pk},
-            exc_info=True,
+                target="requester",
+            ),)
+        return LifecyclePayload(
+            text=f"API access request #{row.pk} '{row.label}' was {row.status}.",
+            emails=emails,
+            data={"api_key_request_id": row.pk},
+            staff_channels_enabled=makerspace.staff_notifications_enabled,
         )
 
-    try:
-        send_message(
-            makerspace,
-            f"API access request '{label}' was {status} for {requester or 'requester'}.",
-        )
-    except Exception:
-        logger.warning(
-            "api_key_request_telegram_notification_failed",
-            extra={"api_key_request_id": api_key_request.pk},
-            exc_info=True,
-        )
+    return notify_lifecycle(
+        makerspace,
+        feature="api_access",
+        event="api_key_request_resolved",
+        build=build,
+        sync=sync,
+    )

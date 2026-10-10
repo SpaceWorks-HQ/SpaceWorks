@@ -37,7 +37,7 @@ export type ApiClientScopeCatalog = {
 };
 
 const browserClientScopes = new Set([
-  "legacy:v1", "public:read", "public:write", "public:*", "admin:read", "reports:read",
+  "legacy:v1", "public:read", "public:write", "public:*",
 ]);
 const browserScopeLockReason = "Browser clients may only use public/read scopes.";
 

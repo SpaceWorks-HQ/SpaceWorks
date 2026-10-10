@@ -80,7 +80,9 @@ def notify_loan_charge(request, event, payment):
         request.makerspace,
         feature="hardware_requests",
         event=event,
-        build=lambda: LifecyclePayload(text=text, emails=()),
+        build=lambda: LifecyclePayload(
+            text=text, data={"request_id": request.pk, "payment_id": payment.pk},
+        ),
     )
 
 
@@ -125,7 +127,9 @@ def _notify(
             .get(pk=request_id)
         )
         emails = _email_deliveries(row, requester_key, staff_event)
-        return LifecyclePayload(text=text_builder(row), emails=emails)
+        return LifecyclePayload(
+            text=text_builder(row), emails=emails, data={"request_id": row.pk},
+        )
 
     return notify_lifecycle(
         request.makerspace,

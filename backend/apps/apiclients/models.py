@@ -114,6 +114,13 @@ class ApiClient(models.Model):
             raise ValidationError(
                 {"scopes": "At least one API-client scope is required."}
             )
+        # Every issuance path (including host-side tools) shares the supported catalog.
+        from apps.apiclients.scope_grants import validate_grantable_scopes
+
+        try:
+            issued_scopes = validate_grantable_scopes(issued_scopes, privileged=True)
+        except ValueError as exc:
+            raise ValidationError({"scopes": str(exc)}) from exc
         obj = cls(
             label=label,
             makerspace=makerspace,

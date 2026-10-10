@@ -53,7 +53,7 @@ def send_member_verified(membership):
     )
 
 
-def _staff_payload(makerspace, event, context):
+def _staff_payload(makerspace, event, context, data):
     # Streams and features differ by name for membership alone (`membership` vs
     # `members`), so the render call spells the stream out rather than reusing the feature.
     staff = render(makerspace, "membership", "staff", event, context)
@@ -68,7 +68,7 @@ def _staff_payload(makerspace, event, context):
         for recipient in staff_emails_for_feature(makerspace, "members", event=event)
     )
     return LifecyclePayload(
-        text=staff["text_body"], emails=emails, context=context
+        text=staff["text_body"], emails=emails, context=context, data=data,
     )
 
 
@@ -82,6 +82,7 @@ def notify_membership_request_pending(request, *, sync=False):
             row.makerspace,
             "request_pending",
             membership_context(row.makerspace, "request_pending", request=row),
+            {"membership_request_id": row.pk},
         )
 
     return notify_lifecycle(
@@ -105,6 +106,7 @@ def notify_member_joined(membership, *, sync=False):
             row.makerspace,
             "member_joined",
             membership_context(row.makerspace, "member_joined", user=row.user),
+            {"membership_id": row.pk},
         )
 
     return notify_lifecycle(

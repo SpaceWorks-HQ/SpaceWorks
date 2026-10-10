@@ -2,9 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 
 import { staffRequest } from "../../lib/api";
 
+export const notificationsUnreadQueryKey = (makerspaceId: number | undefined) =>
+  ["notifications-unread", makerspaceId] as const;
+
 export function useUnreadNotifications(makerspaceId: number | undefined, enabled: boolean) {
   const query = useQuery({
-    queryKey: ["notifications-unread", makerspaceId],
+    queryKey: notificationsUnreadQueryKey(makerspaceId),
     queryFn: () => staffRequest<{ count: number }>(`/notifications/makerspace/${makerspaceId}/unread-count`),
     enabled: enabled && Boolean(makerspaceId),
     refetchInterval: 60_000,
