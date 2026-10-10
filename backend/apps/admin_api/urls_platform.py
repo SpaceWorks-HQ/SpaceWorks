@@ -21,6 +21,16 @@ from apps.backup.views_archives import (
     DeploymentArchiveListCreateView,
     MakerspaceArchiveListCreateView,
 )
+from apps.backup.views_custody import MakerspaceBackupCustodyView
+from apps.backup.views_offsite import (
+    BackupArchiveRehydrateView,
+    BackupDestinationDetailView,
+    BackupDestinationListCreateView,
+    BackupDestinationProbeView,
+    BackupDestinationPushView,
+    BackupDestinationRetireView,
+    BackupDestinationUploadListView,
+)
 from apps.backup.views_restore import (
     PlatformBackupSettingsView,
     RestoreDecisionView,
@@ -75,6 +85,14 @@ urlpatterns = [
         DeploymentArchiveListCreateView.as_view(),
         name="admin-deployment-backups",
     ),
+    path("platform/backup-destinations", BackupDestinationListCreateView.as_view(), name="admin-backup-destinations"),
+    path("platform/backup-destinations/push", BackupDestinationPushView.as_view(), name="admin-backup-destination-push"),
+    path("platform/backup-destinations/<int:destination_id>", BackupDestinationDetailView.as_view(), name="admin-backup-destination"),
+    path("platform/backup-destinations/<int:destination_id>/retire", BackupDestinationRetireView.as_view(), name="admin-backup-destination-retire"),
+    path("platform/backup-destinations/<int:destination_id>/test", BackupDestinationProbeView.as_view(), name="admin-backup-destination-probe"),
+    path("platform/backup-destinations/<int:destination_id>/uploads", BackupDestinationUploadListView.as_view(), name="admin-backup-destination-uploads"),
+    path("platform/backups/<uuid:archive_id>/rehydrate", BackupArchiveRehydrateView.as_view(), name="admin-backup-archive-rehydrate"),
+    path("makerspace/<int:makerspace_id>/backup-custody", MakerspaceBackupCustodyView.as_view(), name="admin-makerspace-backup-custody"),
     path(
         "makerspace/<int:makerspace_id>/backups",
         MakerspaceArchiveListCreateView.as_view(),

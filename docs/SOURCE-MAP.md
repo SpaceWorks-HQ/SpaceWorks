@@ -107,7 +107,14 @@ read-only scheduler control page lives in `operations/admin_scheduling.py`.
   `artifact_protocol.py`/`promotion.py`/`reconciliation.py` own staged upload and the single availability
   transaction. `services.py` is the stable barrel over archive/access/lease/run lifecycle modules;
   `models_runs.py` + `runs.py` own scheduled-run cohort and coverage proofs, while `services_runs.py`
-  orchestrates their serialized builds. `archive_metadata.py` owns stable build/settings manifest facts;
+  orchestrates their serialized builds. Offsite destinations: `models_offsite.py` (destination +
+  upload journal), `offsite_client.py` (S3 byte primitives), `offsite_enqueue.py` (eligibility + journal rows), `offsite_push.py` (fan-out + read-back
+  verification), `offsite_retention.py`, `offsite_reverify.py` (periodic re-read), `offsite_restore.py` (create-only rehydration),
+  `tasks_offsite.py`, `views_offsite.py`, `services_offsite.py` (shared API/admin retirement and probes)
+  and the `fetch_offsite_archive` command. `views_recipients.py` explicitly re-exports enrollment and
+  lifecycle views; `views_recipients_common.py` owns their scoped lookups and error contracts. `module_gate.py` owns
+  the `backup` module key; `views_custody.py` is its read-only custody status.
+  `archive_metadata.py` owns stable build/settings manifest facts;
   `backup_control_preflight.py` remains the E9b restore validator behind the `restore_preflight.py`
   compatibility surface. Archive builder, `restore_diff`, the global quarantine
   `middleware.py` + `route_policy.py`, `recovery.py`, `object_restore.py`,

@@ -9,6 +9,7 @@ from apps.audit import services as audit
 from .activation_integrity import state_matches_flag
 from .custody import RECIPIENT_FLOOR, with_makerspace_custody_lock
 from .models import B1ActivationState
+from .module_gate import BACKUP_MODULE_KEY
 
 
 access_switch_committed = Signal()
@@ -16,6 +17,10 @@ access_switch_committed = Signal()
 
 class ActivationStateInvariantError(RuntimeError):
     """The access flag and durable activation row cannot be changed safely."""
+
+
+class ActivationModuleRequiredError(ActivationStateInvariantError):
+    """Disabling superadmin access needs the `backup` module's custody surfaces."""
 
 
 class ActivationRecipientFloorError(ActivationStateInvariantError):
@@ -51,6 +56,10 @@ def set_superadmin_access(custody, *, enabled, actor):
         if before != B1ActivationState.State.ON:
             raise ActivationStateInvariantError(
                 f"Cannot disable superadmin access from activation state {before!r}."
+            )
+        if BACKUP_MODULE_KEY not in set(makerspace.enabled_modules or []):
+            raise ActivationModuleRequiredError(
+                "Superadmin access cannot be disabled while the backup module is not installed."
             )
         if custody.verified_recipient_count() < RECIPIENT_FLOOR:
             raise ActivationRecipientFloorError(

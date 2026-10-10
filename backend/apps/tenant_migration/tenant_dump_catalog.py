@@ -55,10 +55,9 @@ class TenantDumpCatalogError(AssertionError):
 # Re-blessed again for `TenantDumpCapture.money_fingerprint_sha256`, which binds a
 # capture to the tenant's unsettled money so publication can refuse a dump the source
 # has since moved past.
-# Re-blessed for phase 11 (EvidencePhoto.consumption_state, the abandoned-upload policy
-# fields, the DROP-disposition EvidenceAbandonedUploadReceipt) and phase 10's two
-# omitted (DROP) audit verification-run models.
-CATALOG_SCHEMA_SHA256 = "db999358f4f62b9ed15fd06833872d513ce4594a951604b39bff7783dd7737d6"
+# Re-blessed on integration: phase 11, phase 10 and the backup lane (offsite
+# destination models) all changed the catalog; recomputed from the merged snapshot.
+CATALOG_SCHEMA_SHA256 = "db7f193ba521eadef3159b1cb4dc757881cf9d37f25171462a16a9ede686a719"
 
 
 def catalog_models(apps_registry=apps):

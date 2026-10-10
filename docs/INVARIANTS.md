@@ -2280,6 +2280,38 @@ Load-bearing details that carried over unchanged:
 
 ## Backup, restore and tenant migration (Phase 5A/5B and Lane D D1-D4/D6 built)
 
+### Offsite destinations and the `backup` module (lane backup, 2026-10-09)
+
+- **An offsite copy is `bytes_verified`, never "restorable".** `offsite_push` streams the primary
+  ciphertext to each active `BackupDestination`, re-hashes it on the way, then streams the remote
+  object back and compares size + SHA-256 with the artifact ledger (or the archive row when no ledger
+  exists). HEAD/ETag are not proofs. The platform cannot open a sealed slice or a tenant archive, so no
+  surface may describe a verified copy as restorable.
+- **A destination outage never fails a backup.** The push runs after the build has released
+  `deployment_operation_lock`, holds no row lock during I/O, touches no `BackupRun`/`BackupArchive`
+  state, and backs a journal row off `5 min × 2^attempts` capped at 6 h.
+- **Pushed:** every deployment archive and every run-produced tenant archive. **Not pushed:** ad hoc
+  Space-Manager archives. Destinations are platform-held only (a tenant cannot register its own).
+- **Verified copies are re-read every 30 days** (`offsite_reverify`). A digest mismatch returns the
+  row to `pending` for a fresh upload and is audited `backup.offsite_copy_corrupted`; a transport
+  failure only records its code. This is byte integrity, not a restore drill.
+- **Retention never removes the newest verified copy** per destination (and per tenant), whatever its
+  age. Retiring a destination wipes its credentials and keeps the journal.
+- **Credentials** are Fernet under `API_CLIENT_ENC_KEY` via `makerspaces.secrets`, write-only in API and
+  `/control/`, never in audit meta or logs. `fetch_offsite_archive` reads them from a mode-0600 file,
+  never argv/env, and its output still goes through `import-backup.sh`'s signature preflight.
+- **Rehydration is create-only.** A verified copy is fetched and checked locally, then written to the
+  archive's own locator with `If-None-Match: *`; it never overwrites a present primary object.
+- **The `backup` module gates tenant surfaces only.** Recipient compromise and every deployment surface
+  are never gated. `backup` cannot be uninstalled while superadmin access is off, and superadmin access
+  cannot be switched off while `backup` is uninstalled. Its purge deletes only ad hoc tenant archives.
+- **Never hand a `StreamingBody` to `put_object`.** `create_final_from_staging` did, so against a real
+  store (botocore 1.43, MinIO) promotion raised `io.UnsupportedOperation` — outside its caught
+  exception types — because botocore seeks the body for checksums and, over http, reads it to sign
+  the payload. Every promotion test mocked the primitive, so nothing noticed. It now spools staging to a
+  private temporary file and puts that; `tests/backup/test_storage_promotion_real_store.py` runs it
+  against the harness MinIO.
+
 ### The SHAPE a projected model must have (catalog-driven, 2026-09-03)
 
 Being classified is not the same as being importable. Two shapes break a tenant move

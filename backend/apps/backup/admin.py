@@ -147,3 +147,6 @@ for model in (
     # AlreadyRegistered at import time.
 ):
     admin.site.register(model, ReadOnlyBackupAdmin)
+
+
+from apps.backup import admin_offsite  # noqa: E402,F401  (registers the offsite admins)

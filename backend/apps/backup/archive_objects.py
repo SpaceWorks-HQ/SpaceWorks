@@ -22,6 +22,8 @@ NON_OBJECT_KEY_FIELDS = frozenset({
     ("audit.AuditSigningKeyRotation", "new_key"),
     ("audit.AuditSigningKeyRotation", "old_key"),
     ("backup.RestoreRollbackObject", "module_key"),
+    # An encrypted offsite-destination credential, not an object pointer.
+    ("backup.BackupDestination", "secret_access_key"),
     # Logical identity strings, not object-store pointers: the occurrence key names a
     # position within a recurring series, and the rollup keys name which metric a row
     # holds. Nothing is stored in a bucket for any of them.

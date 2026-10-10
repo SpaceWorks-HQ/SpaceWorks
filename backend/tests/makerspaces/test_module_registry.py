@@ -155,14 +155,16 @@ def test_modules_are_opt_in_and_a_new_makerspace_gets_approved_defaults():
     # baseline; only updates remains default-enabled.
     POST_LEGACY_KEYS = {
         "notifications", "email", "slack", "mattermost", "discord", "webhook",
-        "payments", "member_accounts", "mobile", "updates",
+        "payments", "member_accounts", "mobile", "updates", "backup",
     }
 
     # Only updates remains default-on. Member accounts and mobile are opt-in together
     # because mobile depends on member accounts. `payments` joined them when charge
     # TRACKING moved out from under it: the module now buys the online rail alone, so a
     # cash-taking space needs none of it and still keeps a full ledger of money owed.
-    DEFAULT_ON_KEYS = {"updates"}
+    # `backup` is default-on for the same reason: its key fronts surfaces every space
+    # already had, and recipient enrolment is the only road to a superadmin-off space.
+    DEFAULT_ON_KEYS = {"updates", "backup"}
 
     assert set(DEFAULT_ENABLED_MODULES) == module_registry.core_module_keys() | DEFAULT_ON_KEYS
     assert default_enabled_modules() == DEFAULT_ENABLED_MODULES
@@ -226,8 +228,9 @@ def test_registry_is_internally_consistent():
     # 24 at the registry's introduction, plus `email` (plan A5), plus the three
     # per-channel notification keys `slack`/`mattermost`/`discord`, plus the four
     # phase-3 keys placed in front of previously ungated substrate: `payments`,
-    # `member_accounts`, `mobile` and `updates`.
-    assert len(module_registry.MODULES) == 33
+    # `member_accounts`, `mobile` and `updates`, plus `backup` (makerspace archive and
+    # custody surfaces, 2026-10-09).
+    assert len(module_registry.MODULES) == 34
     assert len(module_registry.BY_KEY) == len(module_registry.MODULES)
     for definition in module_registry.MODULES:
         assert definition.label and definition.description and definition.app_label

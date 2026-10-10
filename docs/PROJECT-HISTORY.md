@@ -45,6 +45,14 @@
   `role_id: null` on approve/invite; members could not see their own term. Paid + invite-only and
   free + vouch are pinned end to end. Pay-before-activation, vouch-before-activation, referral limits
   and a `closed` policy are owner decisions, not built.
+- **2026-10-09 — backup completeness (lane `backup`).** Offsite/online destinations: platform-held
+  S3-compatible targets with encrypted credentials, a verified upload journal (read-back against the
+  artifact ledger), bounded-backoff retry that never fails a backup, per-destination retention keeping
+  the newest copy, create-only rehydration into the primary and `fetch_offsite_archive` for a fresh host.
+  The makerspace-facing surfaces moved behind a default-on `backup` module (compromise and deployment
+  surfaces never gated). Fixed retention-purge starvation, a crashing rollback-copy sweep, and
+  create-only promotion, which could not run against a real S3 store (it streamed a non-seekable body
+  into `put_object`; every test had mocked it).
 
 - **2026-09-04 — forward plan phase 6: money and membership depth.** Refunds as immutable ledger lines
   over `paid_online` charges, settled through the provider seam and its webhooks; `payments.loans` raises a

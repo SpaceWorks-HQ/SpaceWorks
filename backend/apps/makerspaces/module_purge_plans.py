@@ -49,6 +49,10 @@ from apps.makerspaces.module_purge_collectors import (
     telegram_destinations_delete,
     webhook_destinations_delete,
 )
+from apps.makerspaces.module_purge_collectors_backup import (
+    backup_delete,
+    backup_private_keys,
+)
 from apps.makerspaces.module_purge_collectors_reports import (
     reports_delete,
     reports_private_keys,
@@ -183,6 +187,14 @@ PLANS = (
         "Metric rollups stay (retention fence).",
         reports_delete,
         private_keys=reports_private_keys,
+    ),
+    ModulePurgePlan(
+        "backup",
+        "Space-Manager-requested makerspace archives and their stored bytes. Archive "
+        "recipients, custody state, run-produced and offsite archives stay. Archives are "
+        "outside the purge guarantee: downloaded and offsite copies are not deleted.",
+        backup_delete,
+        private_keys=backup_private_keys,
     ),
     ModulePurgePlan("stocktake", "Stocktake sessions, lines and ledger entries.", stocktake_delete),
     ModulePurgePlan("stock_transfers", "Stock transfers and their lines.", stock_transfers_delete),

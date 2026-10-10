@@ -54,6 +54,18 @@ describe("BackupRestorePanel", () => {
       { method: "PATCH", body: JSON.stringify({ retention_days: 45 }) },
     ));
   });
+
+  it("hides makerspace archives when the backup module is off but keeps the deployment section", async () => {
+    staffRequest.mockImplementation((path: string) => {
+      if (path === "/admin/platform/backup-settings") return Promise.resolve({ automatic_backups_enabled: false, retention_days: 30, last_scheduled_at: null, last_success_at: null, last_error: "" });
+      return Promise.resolve([]);
+    });
+    withQueryClient(<BackupRestorePanel makerspaceId={7} isSuperadmin tenantBackupsEnabled={false} />);
+    expect(await screen.findByRole("button", { name: "Create full deployment archive" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Create makerspace archive" })).toBeNull();
+    expect(screen.getByText(/backup module is not installed/i)).toBeVisible();
+    expect(staffRequest).not.toHaveBeenCalledWith("/admin/makerspace/7/backups");
+  });
 });
 
 describe("RecoveryQuarantinePanel", () => {

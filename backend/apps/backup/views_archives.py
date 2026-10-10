@@ -17,7 +17,9 @@ from apps.backup.serializers import (
     BackupDownloadSerializer,
 )
 from apps.backup.tasks import run_backup_archive_task
-from apps.backup.views_common import AUTH_ERRORS, NOT_FOUND, VALIDATION_ERROR
+from apps.backup.module_gate import BACKUP_MODULE_KEY
+from apps.backup.views_common import AUTH_ERRORS, MODULE_OFF, NOT_FOUND, VALIDATION_ERROR
+from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
 
 
@@ -50,9 +52,9 @@ class MakerspaceArchiveListCreateView(APIView):
 
     def _makerspace(self, request, makerspace_id):
         require_action(request.user, rbac.Action.MANAGE_MAKERSPACE, makerspace_id)
-        return get_object_or_404(Makerspace, pk=makerspace_id)
+        return require_module(get_object_or_404(Makerspace, pk=makerspace_id), BACKUP_MODULE_KEY)
 
-    @extend_schema(tags=["Backup"], summary="List makerspace backup archives", responses={200: BackupArchiveSerializer(many=True), 404: NOT_FOUND, **AUTH_ERRORS})
+    @extend_schema(tags=["Backup"], summary="List makerspace backup archives", responses={200: BackupArchiveSerializer(many=True), 400: MODULE_OFF, 404: NOT_FOUND, **AUTH_ERRORS})
     def get(self, request, makerspace_id):
         makerspace = self._makerspace(request, makerspace_id)
         rows = BackupArchive.objects.filter(
@@ -66,7 +68,7 @@ class MakerspaceArchiveListCreateView(APIView):
         )[:30]
         return Response(BackupArchiveSerializer(rows, many=True).data)
 
-    @extend_schema(tags=["Backup"], summary="Request an age-encrypted makerspace backup", request=BackupArchiveCreateSerializer, responses={202: BackupArchiveSerializer, 404: NOT_FOUND, 503: OpenApiResponse(description="The backup worker is unavailable."), **AUTH_ERRORS})
+    @extend_schema(tags=["Backup"], summary="Request an age-encrypted makerspace backup", request=BackupArchiveCreateSerializer, responses={202: BackupArchiveSerializer, 400: MODULE_OFF, 404: NOT_FOUND, 503: OpenApiResponse(description="The backup worker is unavailable."), **AUTH_ERRORS})
     def post(self, request, makerspace_id):
         makerspace = self._makerspace(request, makerspace_id)
         archive = services.create_archive(
@@ -88,6 +90,7 @@ class BackupDownloadUrlView(APIView):
                 return Response({"detail": "Superadmin access is required."}, status=403)
         else:
             require_action(request.user, rbac.Action.MANAGE_MAKERSPACE, archive.makerspace_id)
+            require_module(archive.makerspace, BACKUP_MODULE_KEY)
         token, expires_at = services.issue_download_token(archive, request.user)
         url = request.build_absolute_uri(reverse("backup-archive-download", args=(archive.pk, token)))
         return Response({"url": url, "expires_at": expires_at, "purge_warning": ARCHIVE_PURGE_WARNING})

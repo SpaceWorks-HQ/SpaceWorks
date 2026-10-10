@@ -661,6 +661,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.backup.tasks.reconcile_backup_artifacts_task",
         "schedule": crontab(minute="*/5"),
     },
+    # Offsite destinations: enqueue, push+verify and prune. Never under the backup
+    # operation lock, and an outage only backs the journal row off.
+    "push-offsite-backups": {
+        "task": "apps.backup.tasks.push_offsite_backups_task",
+        "schedule": crontab(minute="*/5"),
+    },
     "purge-expired-backup-archives": {
         "task": "apps.backup.tasks.purge_expired_backup_archives_task",
         "schedule": crontab(hour=3, minute=55),

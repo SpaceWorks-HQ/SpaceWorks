@@ -69,20 +69,51 @@ def consume_download_token(archive_id, raw):
 
 
 def purge_expired_archives(limit=100):
+    """Delete managed bytes of archives past retention.
+
+    Rows already marked EXPIRED (kept because a restore references them) are excluded:
+    re-selecting them every run let 100 of them starve every newer expired archive of
+    pruning forever. Non-terminal rows are never pruned underneath a running build.
+    """
     archives = list(
-        BackupArchive.objects.filter(expires_at__lte=timezone.now()).order_by("pk")[:limit]
+        BackupArchive.objects.filter(
+            expires_at__lte=timezone.now(),
+            status__in=(BackupArchive.Status.AVAILABLE, BackupArchive.Status.FAILED),
+        ).order_by("expires_at", "pk")[:limit]
     )
     deleted = 0
     for archive in archives:
         if not storage.delete_archive(archive.object_key):
             continue
+        # Single archives use a per-attempt directory; compound artifacts use one
+        # file. Keep the row retryable until both staging layouts are gone.
+        if not storage.delete_archive_prefix(f"backup-archives/staging/{archive.pk}/"):
+            continue
+        if not storage.delete_archive(storage.staging_locator(archive.pk)):
+            continue
+        if archive.staging_object_key and not storage.delete_archive(archive.staging_object_key):
+            continue
         ledger = BackupArtifactLedger.objects.filter(pk=archive.pk).first()
+        if ledger and ledger.staging_locator and not storage.delete_archive(ledger.staging_locator):
+            continue
         if ledger and ledger.state in {
             BackupArtifactLedger.State.AVAILABLE,
             BackupArtifactLedger.State.SUPERSEDED,
         }:
             mark_managed_bytes_deleted(ledger.artifact_id)
-        if archive.restores.exists():
+        kept = archive.restores.exists()
+        audit.record(
+            None,
+            "backup.archive_pruned",
+            makerspace=archive.makerspace,
+            target=archive,
+            meta={
+                "scope": archive.scope,
+                "row_kept_for_restore_history": kept,
+                "archives_outside_purge_guarantee": True,
+            },
+        )
+        if kept:
             archive.status = BackupArchive.Status.EXPIRED
             archive.size_bytes = 0
             archive.download_token_digest = ""

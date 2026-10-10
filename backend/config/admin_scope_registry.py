@@ -92,6 +92,7 @@ GLOBAL_ADMIN_MODELS = {
     "backup.backupartifactcomponent", "backup.backupcomponentrecipient",
     "backup.b1restoreoperationstate", "backup.b1restorecomponentstate",
     "backup.b1reservationentry", "backup.b1fencecontinuity",
+    "backup.backupdestination", "backup.backupdestinationupload",
     "encryption.piiglobalwritefence",
     "token_blacklist.blacklistedtoken",
     "token_blacklist.outstandingtoken",

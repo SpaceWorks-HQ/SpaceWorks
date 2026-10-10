@@ -30,6 +30,7 @@ export const openApiTags = [
   "Audit verification",
   "Auth",
   "Backup",
+  "Backup destinations",
   "Backup recipients",
   "Backup recovery",
   "Bulk import",
@@ -373,8 +374,15 @@ export const openApiPaths = [
   "/api/v1/admin/organizations/{id}/memberships/",
   "/api/v1/admin/organizations/{organization_id}/analytics/{report_key}",
   "/api/v1/admin/organized-events/",
+  "/api/v1/admin/platform/backup-destinations",
+  "/api/v1/admin/platform/backup-destinations/push",
+  "/api/v1/admin/platform/backup-destinations/{destination_id}",
+  "/api/v1/admin/platform/backup-destinations/{destination_id}/retire",
+  "/api/v1/admin/platform/backup-destinations/{destination_id}/test",
+  "/api/v1/admin/platform/backup-destinations/{destination_id}/uploads",
   "/api/v1/admin/platform/backup-settings",
   "/api/v1/admin/platform/backups",
+  "/api/v1/admin/platform/backups/{archive_id}/rehydrate",
   "/api/v1/admin/platform/email-settings",
   "/api/v1/admin/platform/payment-settings",
   "/api/v1/admin/platform/restores",
@@ -597,6 +605,8 @@ export type ActiveLoansReportRow = {
   "status": string;
   "issued_at": string | null;
 };
+
+export type AddressingStyleEnum = "auto" | "path" | "virtual";
 
 export type AdminMembership = {
   "id": number;
@@ -986,6 +996,59 @@ export type BackupArchive = {
 };
 
 export type BackupArchiveStatusEnum = "pending" | "running" | "promoting" | "available" | "failed" | "expired";
+
+export type BackupCustody = {
+  "superadmin_access_enabled": boolean;
+  "verified_recipient_count": number;
+  "archive_custody": CustodyState | null;
+  "tenant_exit_custody": CustodyState | null;
+};
+
+export type BackupDestination = {
+  "id": number;
+  "name": string;
+  "kind": BackupDestinationKindEnum;
+  "endpoint_url"?: string;
+  "bucket": string;
+  "region"?: string;
+  "prefix"?: string;
+  "addressing_style"?: AddressingStyleEnum;
+  "access_key_id"?: string;
+  "secret_access_key"?: string;
+  "credentials_set": boolean;
+  "enabled"?: boolean;
+  "retention_days"?: number;
+  "created_at": string;
+  "updated_at": string;
+  "retired_at": string | null;
+  "last_success_at": string | null;
+  "last_error_code": string;
+};
+
+export type BackupDestinationKindEnum = "s3";
+
+export type BackupDestinationUpload = {
+  "id": number;
+  "destination": string;
+  "archive_id_snapshot": string;
+  "scope_snapshot": string;
+  "makerspace_id_snapshot": number | null;
+  "archive_completed_at_snapshot": string;
+  "expected_size_bytes": number;
+  "expected_sha256": string;
+  "integrity_source": IntegritySourceEnum;
+  "remote_locator": string;
+  "state": BackupDestinationUploadStateEnum;
+  "attempts": number;
+  "next_attempt_at": string;
+  "uploaded_at": string | null;
+  "verified_at": string | null;
+  "expires_at": string;
+  "deleted_at": string | null;
+  "last_error_code": string;
+};
+
+export type BackupDestinationUploadStateEnum = "pending" | "uploading" | "bytes_verified" | "abandoned" | "deleted";
 
 export type BackupDownload = {
   "url": string;
@@ -1421,6 +1484,13 @@ export type CreateToolQr = {
   "asset_id"?: number;
 };
 
+export type CustodyState = {
+  "state": string;
+  "reason_code": string;
+  "entered_at": string | null;
+  "cleared_at": string | null;
+};
+
 export type CutoverOutcome = {
   "message": string;
   "receipt"?: ReceiptEnvelope;
@@ -1506,6 +1576,11 @@ export type DeploymentIdentity = {
   "public_key": string;
   "fingerprint": string;
   "age_recipient": string;
+};
+
+export type DestinationProbe = {
+  "ok": boolean;
+  "error_code": string;
 };
 
 export type DestinationScope = {
@@ -2368,6 +2443,8 @@ export type IntegrationWorkerHealth = {
   "last_seen"?: string | null;
   "stale"?: boolean;
 };
+
+export type IntegritySourceEnum = "artifact_ledger" | "archive_row";
 
 export type IntervalEnum = "monthly" | "yearly" | "custom_days";
 
@@ -4306,6 +4383,27 @@ export type PatchedAssignOperator = {
   "access_level"?: string;
 };
 
+export type PatchedBackupDestination = {
+  "id"?: number;
+  "name"?: string;
+  "kind"?: BackupDestinationKindEnum;
+  "endpoint_url"?: string;
+  "bucket"?: string;
+  "region"?: string;
+  "prefix"?: string;
+  "addressing_style"?: AddressingStyleEnum;
+  "access_key_id"?: string;
+  "secret_access_key"?: string;
+  "credentials_set"?: boolean;
+  "enabled"?: boolean;
+  "retention_days"?: number;
+  "created_at"?: string;
+  "updated_at"?: string;
+  "retired_at"?: string | null;
+  "last_success_at"?: string | null;
+  "last_error_code"?: string;
+};
+
 export type PatchedBookableSpaceBookingRules = {
   "min_booking_duration_minutes"?: number;
   "max_booking_duration_minutes"?: number;
@@ -5815,6 +5913,10 @@ export type Refund = {
 };
 
 export type RefundStatusEnum = "pending" | "succeeded" | "failed";
+
+export type Rehydrate = {
+  "destination": number;
+};
 
 export type RejectRequest = {
   "reason": string;

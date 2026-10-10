@@ -54,7 +54,7 @@ core modules cannot be uninstalled at all.
 **Notifications**: [notifications](#notifications) · [email](#email) · [telegram](#telegram) ·
 [slack](#slack) · [mattermost](#mattermost) · [discord](#discord) · [webhook](#webhook) — **Reports**: [reports](#reports) —
 **Payments**: [payments](#payments) — **Accounts**: [member_accounts](#member_accounts) —
-**Mobile apps**: [mobile](#mobile) — **Updates**: [updates](#updates)
+**Mobile apps**: [mobile](#mobile) — **Backup & custody**: [backup](#backup) — **Updates**: [updates](#updates)
 
 ---
 
@@ -540,6 +540,35 @@ Requires `member_accounts`.
 
 ---
 
+## Backup & custody
+
+### backup
+
+**On by default** (and backfilled onto every existing makerspace by `backup/0026`, because the key was
+placed in front of surfaces every makerspace already had).
+
+- **What it is** — the makerspace-facing half of backup: a Space Manager's own archives and the keys
+  that decide who can open them.
+- **What it adds** — requesting, listing and downloading makerspace archives; enrolling, verifying,
+  revoking and reactivating archive-recipient `age` keys; and a read-only custody status (archive
+  custody and tenant-exit custody) at `makerspace/<id>/backup-custody`.
+- **Without it** — those routes answer **400** naming `backup`. What it does **not** switch off:
+  **marking a recipient compromised** (security response never waits on a module), and everything
+  deployment-level — the full deployment backup, its scheduled run (which still builds the per-tenant
+  archive of a superadmin-off makerspace), restores, recovery and offsite destinations all cover this
+  makerspace exactly as before.
+- **Coupled to superadmin access** — recipients are the only custody path for a makerspace whose
+  superadmin access is off, so `backup` **cannot be uninstalled while superadmin access is disabled**,
+  and superadmin access **cannot be disabled while `backup` is uninstalled**.
+- **Data** — `purge_module_data backup` deletes only the archives a Space Manager requested ad hoc
+  (finished ones, never one a restore references) and their stored bytes. It keeps archive
+  recipients and their reservations (sealed deployment slices are encrypted to them), custody state
+  and alarm history, run-produced tenant archives and offsite copies — those are the deployment's
+  backup of this makerspace. **Archives are outside the purge guarantee**: a copy someone already
+  downloaded, a deployment archive and an offsite copy are not deleted by any purge.
+
+---
+
 ## Updates
 
 ### updates
@@ -631,6 +660,16 @@ modules.
 
 **Installing without a profile** gives you **7 modules**: the six core ones plus `updates`
 (`payments` became opt-in when charge tracking moved out from under it). Member accounts and mobile apps are opt-in; installing `mobile` also installs its
+| `workshop` | 15 | A machine shop: machines, service queue, maintenance — deliberately without `member_accounts` |
+| `lending` | 18 | A tool library: the full lending lifecycle, no machines |
+| `recommended` | 21 | Core plus the inventory lifecycle, reports and machines (the default) |
+| `cloud` | 25 | A managed box: everything that runs on a single Django process, no worker or beat |
+| `everything` / `full` | 34 | All modules |
+| `events` | 12 | An events programme: events, notifications, email, member accounts, membership, payments, reports (core is present but hidden by the `events` edition) |
+| `bookings` | 12 | Bookable rooms and resources: bookings, notifications, email, member accounts, membership, payments, reports (core hidden by the `bookings` edition) |
+
+**Installing without a profile** gives you **8 modules**: the six core ones plus `updates` and
+`backup`. Member accounts and mobile apps are opt-in; installing `mobile` also installs its
 `member_accounts` dependency.
 
 ## Deleting a module's data

@@ -175,4 +175,8 @@ OMITTED_MODELS = {
     "backup.B1RestoreComponentState": "Deployment-local opaque-slice restore state.",
     "backup.B1ReservationEntry": "Deployment-local restore reservation and fence facts.",
     "backup.B1FenceContinuity": "Deployment-local fence-continuity proof journal.",
+    "backup.BackupDestination": "Platform offsite destination with encrypted credentials.",
+    "backup.BackupDestinationUpload": (
+        "Deployment offsite upload journal; archives are outside the purge guarantee."
+    ),
 }

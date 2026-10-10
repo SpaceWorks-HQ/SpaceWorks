@@ -28,6 +28,7 @@ RELATIONAL_USER_FIELDS = frozenset(
         ("backup.ArchiveCustodyAlarmDelivery", "recipient_user"),
         ("backup.TenantExitCustodyAlarmDelivery", "recipient_user"),
         ("backup.RestoreOperation", "requested_by"),
+        ("backup.BackupDestination", "created_by"),
         ("data_export.DataExportJob", "requested_by"),
         ("data_export.DataExportJob", "download_issued_to"),
         ("apiclients.ApiClient", "created_by"),

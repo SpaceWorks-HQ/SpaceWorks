@@ -123,6 +123,10 @@ def _notifications(space, client):
     )
 
 
+def _backup(space, client):
+    return client.get(reverse("admin-makerspace-backups", args=[space.pk]))
+
+
 def _telegram(space, client):
     return client.post(
         reverse("telegram-test-alert"),
@@ -135,6 +139,7 @@ def _telegram(space, client):
 # skip instead of silently pretending the registry entry has a contract probe.
 PROBES = {
     "asset_units": _inventory_probe("asset_units"),
+    "backup": _backup,
     "bookings": _bookings,
     "bulk_import": _inventory_probe("bulk_import"),
     "containers": _inventory_probe("containers"),

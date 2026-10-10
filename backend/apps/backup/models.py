@@ -208,3 +208,4 @@ from .models_restore_reservations import (  # noqa: E402,F401
     B1RestoreOperationState,
 )
 from .models_runs import BackupRun, BackupRunCoverage  # noqa: E402,F401
+from .models_offsite import BackupDestination, BackupDestinationUpload  # noqa: E402,F401
