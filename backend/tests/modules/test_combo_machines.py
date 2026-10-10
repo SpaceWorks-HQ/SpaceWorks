@@ -115,3 +115,43 @@ def test_dashboard_print_tiles_follow_the_printing_module():
     assert response.status_code == 200
     assert response.data["pending_prints"] == 0
     assert response.data["active_prints"] == 0
+
+
+def test_staff_can_link_a_bookable_space_to_a_machine_type_and_it_gates_bookings():
+    """B7: the link that makes certification gating reach a booking is editable."""
+    from apps.audit.models import AuditLog
+    from apps.bookings.models import BookableSpace
+    from apps.machines.models import MachineType
+
+    space = cert._space("combo-space-link")
+    manager = make_member("combo-space-link-mgr", space)
+    client = authenticated_client(manager)
+    laser = cert._machine_type(space)
+    cert._certification(space, laser, name="Laser induction")
+    foreign = MachineType.objects.create(
+        makerspace=make_space("combo-space-link-other"), slug="other-laser", name="Theirs"
+    )
+
+    created = client.post(
+        f"/api/v1/admin/makerspaces/{space.pk}/spaces/",
+        {"name": "Laser bay", "machine_type": laser.pk},
+        format="json",
+    )
+    assert created.status_code == 201, created.data
+    assert created.data["machine_type"] == laser.pk
+    room = BookableSpace.objects.get(pk=created.data["id"])
+    member, _ = cert._member(space, "combo-space-link-member")
+    with pytest.raises(PermissionDenied):
+        cert._book(room, member)
+
+    probe = client.patch(f"/api/v1/admin/spaces/{room.pk}/", {"machine_type": foreign.pk}, format="json")
+    assert probe.status_code == 400 and "machine_type" in probe.data
+    cleared = client.patch(f"/api/v1/admin/spaces/{room.pk}/", {"machine_type": None}, format="json")
+    assert cleared.status_code == 200 and cleared.data["machine_type"] is None
+    assert AuditLog.objects.filter(
+        action="booking.space_updated", meta__changed_fields=["machine_type"]
+    ).exists()
+
+    uninstall_module(space, "machines")
+    refused = client.patch(f"/api/v1/admin/spaces/{room.pk}/", {"machine_type": laser.pk}, format="json")
+    assert refused.status_code == 400 and "machines is disabled" in str(refused.data)
