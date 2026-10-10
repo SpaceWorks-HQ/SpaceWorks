@@ -54,7 +54,8 @@ def test_logging_and_completion_are_audited_and_atomic(monkeypatch):
         cost=Decimal("5.00"), parts_note="New belt",
     )
     schedule.refresh_from_db()
-    assert schedule.next_due == due + timedelta(days=30)
+    next_due = timezone.localdate(log.performed_at) + timedelta(days=30)
+    assert schedule.next_due == next_due
     assert log.cost == Decimal("5.00")
     assert set(
         AuditLog.objects.filter(
@@ -75,7 +76,7 @@ def test_logging_and_completion_are_audited_and_atomic(monkeypatch):
             schedule, actor=manager, summary="Should roll back",
         )
     schedule.refresh_from_db()
-    assert schedule.next_due == due + timedelta(days=30)
+    assert schedule.next_due == next_due
     assert MaintenanceLog.objects.count() == before
 
 
