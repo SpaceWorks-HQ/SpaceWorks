@@ -17,9 +17,35 @@ from apps.events.services_calendar_feeds import issue_or_rotate_feed
 from apps.machines.models import MachineServiceRequest, MachineType, ServiceQueue
 from apps.makerspaces.models import MakerspaceMembership
 from apps.makerspaces.module_install import uninstall_module
-from tests.return_helpers import authenticated_client, make_member, make_space
+from tests.return_helpers import authenticated_client, make_member, make_product, make_space
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.mark.parametrize("edition", ["events", "bookings"])
+@pytest.mark.parametrize("route", ["detail", "stats"])
+def test_editions_hide_public_inventory_detail_and_stats(settings, edition, route):
+    """I5: edition hiding covers detail/statistics as well as the catalogue."""
+    space = make_space(f"combo-inventory-{edition}-{route}")
+    space.public_inventory_enabled = True
+    space.public_stats_enabled = True
+    space.save(update_fields=["public_inventory_enabled", "public_stats_enabled"])
+    product = make_product(space, name="Public torque wrench", is_public=True)
+    url = (
+        reverse("public-inventory-detail", args=[space.slug, product.pk])
+        if route == "detail"
+        else reverse("public-makerspace-stats", args=[space.slug])
+    )
+    client = APIClient()
+
+    settings.SPACEWORKS_EDITION = "makerspace"
+    control = client.get(url)
+    assert control.status_code == 200, control.data
+    settings.SPACEWORKS_EDITION = edition
+    assert client.get(url).status_code == 404
+    # Returning the edition restores the same records without reinstalling modules.
+    settings.SPACEWORKS_EDITION = "makerspace"
+    assert client.get(url).status_code == 200
 
 
 def _public_routes(space):
