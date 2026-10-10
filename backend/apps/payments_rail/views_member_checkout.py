@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.payments import stripe_client
 from apps.payments.availability import online_payments_enabled_for
+from apps.payments.checkout_expiry import live_checkout_url
 from apps.payments.member_scope import member_payment_queryset
 from apps.payments.models import Payment
 from apps.payments.serializers import CheckoutUrlSerializer
@@ -29,7 +30,13 @@ class MemberPaymentCheckoutView(APIView):
         tags=["Payments"],
         summary="Generate a Checkout link for the caller's pending payment",
         request=None,
-        responses={200: CheckoutUrlSerializer, 404: OpenApiResponse(ErrorSerializer), 503: OpenApiResponse(ErrorSerializer)},
+        responses={
+            200: CheckoutUrlSerializer,
+            401: OpenApiResponse(ErrorSerializer, description="Authentication required."),
+            404: OpenApiResponse(ErrorSerializer, description="No pending charge of yours here."),
+            409: OpenApiResponse(ErrorSerializer, description="`payment_rail_conflict`: the charge uses the native rail."),
+            503: OpenApiResponse(ErrorSerializer, description="`payments_unavailable`: no live online rail for this charge."),
+        },
     )
     def post(self, request, makerspace_id, payment_id):
         payment = member_payment_queryset(request.user, makerspace_id).filter(
@@ -38,8 +45,9 @@ class MemberPaymentCheckoutView(APIView):
         ).first()
         if payment is None:
             raise NotFound()
-        if payment.stripe_checkout_url:
-            return Response({"checkout_url": payment.stripe_checkout_url})
+        # Either rail's live page; an expired one falls through and is regenerated.
+        if live := live_checkout_url(payment):
+            return Response({"checkout_url": live})
         # A charge can exist with no rail behind it (cash-only space, or the rail switched
         # off after the debt was raised). Refuse rather than mint a link the space cannot
         # honour; the member settles this one at the desk.

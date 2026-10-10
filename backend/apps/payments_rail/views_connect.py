@@ -41,6 +41,7 @@ from apps.payments.models import (
     StripeConnectOAuthState,
 )
 from apps.payments.services import apply_connect_webhook_event
+from apps.payments.views import WEBHOOK_RESPONSES
 from apps.payments.stripe_client import (
     PaymentsUnavailable,
     StripeWebhookSignatureError,
@@ -266,11 +267,9 @@ class StripeConnectWebhookView(APIView):
         summary="Receive a platform Stripe Connect webhook",
         auth=[],
         request=None,
-        responses={
-            200: OpenApiResponse(description="Verified event acknowledged."),
-            400: OpenApiResponse(description="Invalid signature or configuration."),
-            404: OpenApiResponse(description="Stripe Connect is dormant."),
-        },
+        # Same `{"detail"}` body and outcomes as the per-space webhooks; 404 here means
+        # Stripe Connect is dormant (self-host).
+        responses=WEBHOOK_RESPONSES,
     )
     def post(self, request):
         if is_self_host():

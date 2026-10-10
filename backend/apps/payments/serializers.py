@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -13,11 +15,25 @@ class MemberSettlementSerializer(serializers.Serializer):
     reference = serializers.CharField()
 
 
+class MemberRefundSerializer(serializers.Serializer):
+    """Money sent back on the member's own charge. Never names the staff member."""
+
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    currency = serializers.CharField()
+    status = serializers.CharField()
+    reason = serializers.CharField()
+    settled_at = serializers.DateTimeField(allow_null=True)
+
+
 class MemberPaymentSerializer(serializers.ModelSerializer):
     subject_label = serializers.SerializerMethodField()
     checkout_url = serializers.SerializerMethodField()
     online_payment_available = serializers.SerializerMethodField()
     settlement = serializers.SerializerMethodField()
+    # The receipt for money sent back. `Refund.reason` was always meant to be shown on
+    # the receipt, yet the payer had no way to see that a refund existed at all.
+    refunded_amount = serializers.SerializerMethodField()
+    refunds = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -27,15 +43,30 @@ class MemberPaymentSerializer(serializers.ModelSerializer):
         # the charge unpayable. The queryset is already scoped to this member.
         fields = (
             "id", "subject_type", "subject_label", "status", "amount", "currency",
-            "checkout_url", "online_payment_available", "settlement", "created_at",
+            "checkout_url", "online_payment_available", "settlement",
+            "refunded_amount", "refunds", "created_at",
         )
+
+    def get_refunded_amount(self, payment) -> Decimal:
+        return sum(
+            (row.amount for row in payment.refunds.all() if row.status == "succeeded"),
+            Decimal("0.00"),
+        )
+
+    @extend_schema_field(MemberRefundSerializer(many=True))
+    def get_refunds(self, payment):
+        return MemberRefundSerializer(payment.refunds.all(), many=True).data
 
     def get_subject_label(self, payment) -> str:
         labels = self.context.get("payment_subject_labels", {})
         return subject_label(payment, labels)
 
     def get_checkout_url(self, payment) -> str:
-        return payment.stripe_checkout_url if payment.status == Payment.Status.PENDING else ""
+        # Either rail: a Razorpay link lives only in the generic column, and reading the
+        # Stripe one alone hid every live Razorpay link from the member who owed it.
+        from apps.payments.checkout_expiry import live_checkout_url
+
+        return live_checkout_url(payment)
 
     def get_online_payment_available(self, payment) -> bool:
         """Whether offering to pay online is honest for this charge.
@@ -76,6 +107,12 @@ def _effective_settlement(payment):
     return ManualSettlement.effective_for(payment)
 
 
+class WebhookResponseSerializer(serializers.Serializer):
+    """Every provider webhook answers `{"detail": ...}`, acknowledged or refused."""
+
+    detail = serializers.CharField()
+
+
 class CheckoutUrlSerializer(serializers.Serializer):
     checkout_url = serializers.URLField()
 
@@ -93,6 +130,15 @@ class ArchivedPaymentSummarySerializer(serializers.Serializer):
 
 
 class StaffPaymentSerializer(MemberPaymentSerializer):
-    # Amount and currency moved onto the member serializer, so staff inherit them.
+    # Amount and currency moved onto the member serializer, so staff inherit them. The
+    # refund lines are NOT inherited: this serializer renders one embedded summary per
+    # machine-service row, staff read refunds on the reconciliation list instead, and a
+    # per-row refund query would grow the service queue's query count with its length.
+    refunded_amount = None
+    refunds = None
+
     class Meta(MemberPaymentSerializer.Meta):
-        fields = MemberPaymentSerializer.Meta.fields
+        fields = tuple(
+            name for name in MemberPaymentSerializer.Meta.fields
+            if name not in {"refunded_amount", "refunds"}
+        )

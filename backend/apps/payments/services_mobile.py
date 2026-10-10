@@ -3,6 +3,7 @@ from django.db import transaction
 from apps.audit import services as audit
 from apps.payments import stripe_client
 from apps.payments.connect import refresh_connected_account
+from apps.payments.money import to_minor_units
 from apps.payments.models import (
     MakerspacePaymentSettings,
     Payment,
@@ -56,7 +57,10 @@ def create_mobile_intent(payment_id, *, actor):
         if payment.provider == Payment.Provider.UNCLAIMED:
             _claim_provider(payment)
         source = source_for_payment(payment)
-        if source is None or not source.publishable_key:
+        # The native PaymentSheet is Stripe-only. A Razorpay source carries the Razorpay
+        # key secret in `secret_key`, so without the vendor check below this sent that
+        # secret to Stripe as an API key. Raising here also rolls back the claim above.
+        if source is None or source.vendor != Payment.Provider.STRIPE or not source.publishable_key:
             raise stripe_client.PaymentsUnavailable(
                 'Mobile payments are not configured.'
             )
@@ -131,7 +135,7 @@ def _validate_connect_source(payment, merchant):
 
 def _intent_params(payment):
     params = {
-        'amount': int(payment.amount * 100),
+        'amount': to_minor_units(payment.amount, payment.currency),
         'currency': payment.currency,
         'automatic_payment_methods': {'enabled': True},
         'metadata': {

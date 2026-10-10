@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.audit import services as audit
+from apps.payments.checkout_expiry import forget_closed_checkout
 from apps.payments.models import (
     MakerspacePaymentSettings,
     Payment,
@@ -81,17 +82,7 @@ def apply_webhook_event(
         if not _record_once(makerspace, event_id):
             return None
         if event_type == "checkout.session.expired":
-            payment.stripe_checkout_session_expired_at = timezone.now()
-            payment.stripe_checkout_session_id = None
-            payment.stripe_checkout_url = ""
-            payment.save(
-                update_fields=[
-                    "stripe_checkout_session_expired_at",
-                    "stripe_checkout_session_id",
-                    "stripe_checkout_url",
-                    "updated_at",
-                ]
-            )
+            payment.save(update_fields=[*forget_closed_checkout(payment), "updated_at"])
             audit.record(
                 None,
                 "payment.checkout_expired",

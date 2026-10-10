@@ -7,6 +7,11 @@ export const PAYMENT_SUBJECTS = [
   ["booking", "Booking"],
   ["event_registration", "Event registration"],
   ["makerspace_membership", "Membership dues"],
+  // Every `Payment.SubjectType`: a renewal or loan charge filtered as "All subjects" only
+  // could not be found on its own, and rendered with a raw enum label.
+  ["membership_term", "Membership renewal"],
+  ["loan_deposit", "Loan deposit"],
+  ["loan_late_fee", "Late return fee"],
 ] as const;
 
 export const PAYMENT_STATUSES = [
@@ -41,8 +46,20 @@ export type PaymentRow = {
   currency: string;
   refunded_amount: string;
   refunds: RefundRow[];
+  // The standing manual receipt for a `paid_offline` charge, else null. Mirrors
+  // `serializers_reconciliation.StaffSettlementSerializer`.
+  settlement?: StaffSettlement | null;
   created_at: string;
   updated_at: string;
+};
+
+export type StaffSettlement = {
+  id: number;
+  method: string;
+  reference: string;
+  received_at: string;
+  recorded_at: string;
+  corrected: boolean;
 };
 
 export function paymentListKey(makerspaceId: number, status: string, subject: string) {
@@ -89,6 +106,20 @@ export function reconcilePayment(
     method: "POST",
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
+}
+
+/** Replace the receipt on an offline-settled charge. The old one stays in the ledger. */
+export function amendSettlement(makerspaceId: number, paymentId: number, settlement: Settlement) {
+  return staffRequest<PaymentRow>(
+    `/admin/makerspace/${makerspaceId}/payments/${paymentId}/amend-settlement`,
+    { method: "POST", body: JSON.stringify({ settlement }) },
+  );
+}
+
+export function settlementLabel(settlement: StaffSettlement) {
+  const method = SETTLEMENT_METHODS.find(([key]) => key === settlement.method)?.[1]
+    ?? settlement.method.replace(/_/g, " ");
+  return settlement.reference ? `${method} · ${settlement.reference}` : method;
 }
 
 export function invalidatePaymentViews(queryClient: QueryClient, makerspaceId: number) {

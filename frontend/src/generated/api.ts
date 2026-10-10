@@ -3172,12 +3172,10 @@ export type ManagedPolicyMarker = {
 };
 
 export type ManualSettlement = {
-  "method": ManualSettlementMethodEnum;
+  "method": Method2edEnum;
   "reference"?: string;
   "received_at": string;
 };
-
-export type ManualSettlementMethodEnum = "cash" | "upi" | "bank_transfer" | "card_machine" | "cheque" | "other";
 
 export type Measurement883Enum = "count" | "grams";
 
@@ -3413,6 +3411,8 @@ export type MemberPayment = {
   "checkout_url": string;
   "online_payment_available": boolean;
   "settlement": MemberSettlement | null;
+  "refunded_amount": number;
+  "refunds": Array<MemberRefund>;
   "created_at": string;
 };
 
@@ -3436,6 +3436,14 @@ export type MemberPrintActivity = {
   "queue_position": number | null;
   "queue_approved_ahead": number | null;
   "queue_awaiting_review_ahead": number | null;
+};
+
+export type MemberRefund = {
+  "amount": string;
+  "currency": string;
+  "status": string;
+  "reason": string;
+  "settled_at": string | null;
 };
 
 export type MemberRequestHistory = {
@@ -3584,6 +3592,8 @@ export type MemberWaiverResponse = {
   "body"?: string;
   "version"?: string;
 };
+
+export type Method2edEnum = "cash" | "upi" | "bank_transfer" | "card_machine" | "cheque" | "other";
 
 export type MigrationExportCreate = {
   "approval_id": string;
@@ -4773,6 +4783,7 @@ export type PaymentReconciliation = {
   "currency": string;
   "refunded_amount": number;
   "refunds": Array<Refund>;
+  "settlement": StaffSettlement | null;
   "created_at": string;
   "updated_at": string;
 };
@@ -6289,6 +6300,15 @@ export type StaffPaymentSummary = {
   "currency": string;
 };
 
+export type StaffSettlement = {
+  "id": number;
+  "method": Method2edEnum;
+  "reference": string;
+  "received_at": string;
+  "recorded_at": string;
+  "corrected": boolean;
+};
+
 export type StageEnum = "requested" | "claimed" | "preflight" | "quiesced" | "db_restoring" | "objects_restoring" | "validating" | "completed" | "restored_quarantined" | "rolling_back" | "failed" | "aborted";
 
 export type State31eEnum = "active" | "expired" | "revoked" | "redeemed";
@@ -6850,6 +6870,10 @@ export type WarrantyUpsert = {
   "warranty_expires_on"?: string | null;
   "vendor_name"?: string;
   "vendor_contact"?: string;
+};
+
+export type WebhookResponse = {
+  "detail": string;
 };
 
 export type WitnessWaiverResponse = {

@@ -130,6 +130,31 @@ def test_preflight_refuses_pending_live_checkout():
         )
 
 
+def test_preflight_refuses_a_pending_row_with_a_live_native_intent():
+    """A PaymentIntent the member can still confirm in the app is a live rail too."""
+    space = make_space("preflight-live-intent")
+    user = make_user("preflight-live-intent-user")
+    with enabled_encryption():
+        get_or_create_active_dek(space.pk)
+        Payment.objects.bulk_create(
+            [
+                Payment(
+                    makerspace=space,
+                    subject_type=Payment.SubjectType.BOOKING,
+                    subject_id=998,
+                    amount=Decimal("10.00"),
+                    currency="usd",
+                    created_by=user,
+                    online_rail=Payment.OnlineRail.NATIVE_PAYMENT_INTENT,
+                    stripe_payment_intent_id="pi_live_native",
+                )
+            ]
+        )
+        assert_check(
+            "unresolved_live_checkout", lambda: run_source_preflight(space)
+        )
+
+
 def test_healthy_preflight_reports_each_bucket_storage_mode(monkeypatch):
     space = make_space("preflight-healthy")
     with enabled_encryption(), storage_modes(monkeypatch):

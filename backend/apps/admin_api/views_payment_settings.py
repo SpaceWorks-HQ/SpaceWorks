@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -54,7 +55,10 @@ class MakerspacePaymentSettingsView(APIView):
         request=MakerspacePaymentSettingsSerializer,
         responses={
             200: MakerspacePaymentSettingsSerializer,
-            400: OpenApiResponse(description="Invalid payment settings."),
+            400: OpenApiResponse(
+                OpenApiTypes.OBJECT,
+                description="Field errors, including a credential change blocked by a live session.",
+            ),
             403: PaymentSettingsErrorSerializer,
             404: PaymentSettingsErrorSerializer,
         },

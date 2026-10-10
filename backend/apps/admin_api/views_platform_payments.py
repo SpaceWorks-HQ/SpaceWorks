@@ -3,12 +3,13 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics
 
 from apps.admin_api.permissions import IsActiveSuperAdmin
-from apps.admin_api.serializers_payments import PlatformStripeConnectSettingsSerializer
+from apps.admin_api.serializers_payments import (
+    PlatformStripeConnectSettingsSerializer,
+)
 from apps.audit import services as audit
 from apps.makerspaces.domain_verification import is_self_host
 from apps.openapi_errors import errors
 from apps.payments.models import PlatformStripeConnectSettings
-
 
 _SELF_HOST = "Self-hosted deployment: Stripe Connect is a managed-only surface."
 

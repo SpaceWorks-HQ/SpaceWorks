@@ -1,9 +1,9 @@
 from cryptography.fernet import InvalidToken
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import transaction
-from django.utils import timezone
 
 from apps.payments import stripe_client
+from apps.payments.checkout_expiry import forget_closed_checkout
 
 
 RAW_CREDENTIAL_FIELDS = ("stripe_secret_key", "stripe_webhook_secret")
@@ -134,17 +134,7 @@ def _potentially_live_sessions_exist(
 
     if persist_closed:
         for payment in confirmed_closed:
-            payment.stripe_checkout_session_expired_at = timezone.now()
-            payment.stripe_checkout_session_id = None
-            payment.stripe_checkout_url = ""
-            payment.save(
-                update_fields=[
-                    "stripe_checkout_session_expired_at",
-                    "stripe_checkout_session_id",
-                    "stripe_checkout_url",
-                    "updated_at",
-                ]
-            )
+            payment.save(update_fields=[*forget_closed_checkout(payment), "updated_at"])
     return False
 
 def validate_platform_credential_changes(
