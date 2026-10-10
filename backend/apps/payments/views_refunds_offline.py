@@ -20,7 +20,7 @@ class PaymentOfflineRefundView(APIView):
     @extend_schema(
         tags=["Payments"], summary="Record an offline refund or release a cash loan deposit",
         description=(
-            "Requires active staff and the payment subject's reconciliation authority. "
+            "Requires active staff and record_payment or the payment subject's scoped authority. "
             "Records money already returned on a paid_offline charge, fully or partially, "
             "with method, optional financial reference and refunded_at. The receipt is "
             "append-only and audited; all pending/succeeded refunds share one balance. "
@@ -31,7 +31,7 @@ class PaymentOfflineRefundView(APIView):
             200: PaymentReconciliationSerializer,
             400: OpenApiResponse(ErrorSerializer, description="Invalid receipt, status or refund balance."),
             401: OpenApiResponse(ErrorSerializer, description="Authentication required."),
-            403: OpenApiResponse(ErrorSerializer, description="Subject authority or active status required."),
+            403: OpenApiResponse(ErrorSerializer, description="Record payment or scoped subject authority and active status required."),
             404: OpenApiResponse(ErrorSerializer, description="Payment not found in the permitted makerspace."),
         },
     )

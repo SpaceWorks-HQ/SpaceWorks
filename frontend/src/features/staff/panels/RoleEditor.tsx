@@ -7,9 +7,12 @@ import { createRole, updateRole, type Capability, type StaffRole } from "./roles
 import { RoleMachineScopeEditor } from "./RoleMachineScopeEditor";
 
 const presets: { label: string; actions: string[] }[] = [
-  { label: "Space Manager", actions: ["view_inventory", "edit_inventory", "manage_qr", "accept_request", "reject_request", "assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence", "manage_printing", "manage_machines", "view_audit", "manage_events", "manage_bookings", "manage_makerspace"] },
+  { label: "Space Manager", actions: ["view_inventory", "edit_inventory", "manage_qr", "accept_request", "reject_request", "assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence", "manage_printing", "manage_machines", "view_audit", "manage_events", "manage_bookings", "manage_makerspace", "manage_members", "view_finance", "record_payment", "manage_devices", "manage_member_cards"] },
   { label: "Inventory Manager", actions: ["view_inventory", "edit_inventory", "manage_qr", "accept_request", "reject_request", "assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence", "view_audit"] },
   { label: "Machine Manager", actions: ["manage_machines"] },
+  { label: "Membership Coordinator", actions: ["manage_members"] },
+  { label: "Treasurer", actions: ["view_finance", "record_payment"] },
+  { label: "Front-desk cashier", actions: ["record_payment", "view_inventory", "assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence", "collect_service_request"] },
   { label: "Front Desk", actions: ["view_inventory", "assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence"] },
 ];
 
@@ -65,7 +68,7 @@ export function RoleEditor({ msId, role, capabilities, actorActions, isSuperadmi
     <Modal open onClose={onClose} title={role ? `Edit ${role.name}` : "New role"} size="xl" footer={<div className="desk-actions flex justify-end gap-2"><button className="desk-button-ghost" type="button" disabled={save.isPending} onClick={onClose}>Cancel</button><button className="desk-button-primary" type="button" disabled={disabled} onClick={() => save.mutate()}>{save.isPending ? "Saving..." : "Save role"}</button></div>}>
       <div className="grid gap-4 text-sm">
         {role?.is_protected ? <p className="rounded-md border border-line bg-surface p-3 text-muted">Protected default — cannot be deleted; core capabilities are locked.</p> : null}
-        {!role ? <div className="grid gap-2"><span className="eyebrow">Start from</span><div className="flex flex-wrap gap-2">{presets.map((preset) => <button className="desk-button-ghost" key={preset.label} type="button" onClick={() => applyPreset(preset.actions)}>{preset.label}</button>)}</div></div> : null}
+        {!role ? <div className="grid gap-2"><span className="eyebrow">Start from</span><div className="flex flex-wrap gap-2">{presets.map((preset) => <button className="desk-button-ghost" key={preset.label} type="button" onClick={() => { setName(preset.label); applyPreset(preset.actions); }}>{preset.label}</button>)}</div></div> : null}
         <label className="grid gap-1"><span className="eyebrow">Name</span><input className="desk-input w-full" value={name} onChange={(event) => setName(event.target.value)} /></label>
         {nameError ? <p className="text-sm text-danger">{nameError}</p> : null}
         {actionsError ? <p className="text-sm text-danger">{actionsError}</p> : null}

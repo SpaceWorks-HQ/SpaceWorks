@@ -17,11 +17,11 @@ _FEATURE_ACTIONS = {
     "events": rbac.Action.MANAGE_EVENTS,
     "bookings": rbac.Action.MANAGE_BOOKINGS,
     "maintenance": rbac.Action.MANAGE_MACHINES,
-    "members": rbac.Action.MANAGE_MAKERSPACE,
+    "members": rbac.Action.MANAGE_MEMBERS,
     "api_access": rbac.Action.MANAGE_MAKERSPACE,
     "devices": rbac.Action.MANAGE_DEVICES,
-    # Existing finance list authority; w1-rbac will introduce VIEW_FINANCE.
-    "payments": rbac.Action.MANAGE_MAKERSPACE,
+    # Match the ledger read authority, including delegated finance roles.
+    "payments": rbac.Action.VIEW_FINANCE,
     "stock": (rbac.Action.EDIT_INVENTORY, rbac.Action.MANAGE_PRINTING),
     "certifications": rbac.Action.MANAGE_MACHINES,
 }

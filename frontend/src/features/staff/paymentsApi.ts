@@ -66,12 +66,13 @@ export type StaffSettlement = {
   corrected: boolean;
 };
 
-export function paymentListKey(makerspaceId: number, status: string, subject: string) {
-  return ["payments", makerspaceId, status, subject] as const;
+export function paymentListKey(makerspaceId: number, status: string, subject: string, forRecording = false) {
+  return ["payments", makerspaceId, status, subject, forRecording] as const;
 }
 
-export function paymentListPath(makerspaceId: number, status: string, subject: string) {
+export function paymentListPath(makerspaceId: number, status: string, subject: string, forRecording = false) {
   const query = new URLSearchParams();
+  if (forRecording) query.set("for_recording", "true");
   if (status) query.set("status", status);
   if (subject) query.set("subject_type", subject);
   const suffix = query.toString();

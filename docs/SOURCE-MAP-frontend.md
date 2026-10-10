@@ -1,6 +1,6 @@
-# Frontend source map
+# SpaceWorks frontend source map
 
-Part of the [SpaceWorks source map](SOURCE-MAP.md).
+The backend and shared device source map is in [SOURCE-MAP.md](SOURCE-MAP.md).
 
 - `frontend/src/features/inventory/` — public catalog/detail/self-checkout + `ProductCard`/
   `AvailabilityBadge`. `frontend/src/features/staff/` — staff console panels; grouped nav via
@@ -10,6 +10,8 @@ Part of the [SpaceWorks source map](SOURCE-MAP.md).
   `MakerspaceProfileSettings.tsx` loads/saves the location and hours profile;
   `MakerspaceHoursEditor.tsx` and `makerspaceProfileForm.ts` own the weekly/exception
   draft. Profile and payment editors refresh each other's shared currency query.
+  `paymentAccess.ts` separates receipt recording from waivers and provider refunds;
+  `MembersPanel.tsx` and `panels/OperationsReports.tsx` gate money on finance actions.
   `frontend/src/features/auth/` + `members/MemberAuthPanel.tsx` — provider-config-driven social/member auth.
   `frontend/src/features/printing|bookings|forms|...` — feature slices. `frontend/src/lib/`,
   `components/ui/`, `types/`, `generated/api.ts`.
@@ -40,4 +42,3 @@ Part of the [SpaceWorks source map](SOURCE-MAP.md).
 Tenant branding lives in `frontend/src/lib/brandColours.ts` (AA checks) and
 `useTenantBranding.ts` (page-scoped variables). `lib/theme.ts` owns the browser theme preference;
 `components/SupportContact.tsx` renders safe tenant support links.
-

@@ -204,12 +204,16 @@ def test_disabled_before_commit_suppresses_even_enabled_matrix(monkeypatch, djan
 
 
 def test_finance_fallback_matches_existing_finance_list_action():
+    from tests.rbac_f6_helpers import custom_actor
+
     space, manager, _member, _payment = family_world("f3-finance")
     make_member("f3-inventory", space, membership_role=MakerspaceMembership.Role.INVENTORY_MANAGER)
-    assert staff_emails_for_feature(space, "payments", event="charge_raised") == [manager.email]
-    assert staff_user_ids_for_feature(space, "payments", event="charge_raised") == [manager.pk]
+    treasurer = custom_actor(space, [rbac.Action.VIEW_FINANCE], "treasurer")
+    custom_actor(space, [rbac.Action.RECORD_PAYMENT], "cashier")
+    assert staff_emails_for_feature(space, "payments", event="charge_raised") == [manager.email, treasurer.email]
+    assert staff_user_ids_for_feature(space, "payments", event="charge_raised") == [manager.pk, treasurer.pk]
     from apps.integrations.staff_notifications import _FEATURE_ACTIONS
-    assert _FEATURE_ACTIONS["payments"] == rbac.Action.MANAGE_MAKERSPACE
+    assert _FEATURE_ACTIONS["payments"] == rbac.Action.VIEW_FINANCE
 
 
 def test_choice_migration_matches_all_runtime_fields():

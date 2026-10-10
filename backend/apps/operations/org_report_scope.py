@@ -28,6 +28,7 @@ from apps.organizations.models import (
 ORGANIZATION_REPORT_ACTIONS = frozenset({
     rbac.Action.VIEW_AUDIT,
     rbac.Action.MANAGE_MAKERSPACE,
+    rbac.Action.VIEW_FINANCE,
 })
 EXCLUDED_ORGANIZATION_REPORT_KEYS = frozenset({
     # Tenant accountability data: never flattened across an organization's spaces.

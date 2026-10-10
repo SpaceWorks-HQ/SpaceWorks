@@ -72,7 +72,7 @@ def witness_waiver_acceptance(actor, membership_id):
             actor=actor,
             makerspace_id=makerspace_id,
             allowed_actions=frozenset(
-                {rbac.Action.MANAGE_MAKERSPACE, rbac.Action.ISSUE_DIRECT_LOAN}
+                {rbac.Action.MANAGE_MEMBERS, rbac.Action.MANAGE_MAKERSPACE, rbac.Action.ISSUE_DIRECT_LOAN}
             ),
         )
         makerspace, locked_actor = authority.makerspace, authority.actor

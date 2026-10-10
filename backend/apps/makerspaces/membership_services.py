@@ -3,6 +3,7 @@
 from django.db import IntegrityError, transaction
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
+from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.audit import services as audit
 from apps.makerspaces import role_services
@@ -234,6 +235,9 @@ def _approve_request(actor, request, assigned_role):
     with transaction.atomic():
         makerspace = Makerspace.objects.select_for_update().get(pk=request.makerspace_id)
         request = MembershipRequest.objects.select_for_update(of=("self",)).select_related("user").get(pk=request.pk)
+        if (request.assigned_role_id and request.assigned_role.granted_actions
+                and not rbac.can(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk)):
+            raise PermissionDenied("Managing staff invitations requires makerspace administration.")
         if request.state not in (MembershipRequest.State.REQUESTED, MembershipRequest.State.INVITED):
             raise ValidationError({"detail": "This membership request is no longer open."})
         if not _approvable_user(request.user):

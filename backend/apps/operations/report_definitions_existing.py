@@ -40,7 +40,7 @@ EXISTING_REPORT_DEFINITIONS = (
             "currency", "subject_type", "status", "settlement_method",
             "payment_count", "amount_total", "outstanding_amount", "refunded_amount",
         ),
-        required_action=rbac.Action.MANAGE_MAKERSPACE, title="Payment reconciliation",
+        required_action=rbac.Action.VIEW_FINANCE, title="Payment reconciliation",
         chart_hint="stacked_bar",
         # v3 adds the succeeded refund total; v2 split settled money by method, so the
         # column set and the row grain both changed. Deliberately NOT module-gated -- a

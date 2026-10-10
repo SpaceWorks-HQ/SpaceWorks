@@ -27,6 +27,21 @@ SUBJECT_ACTIONS = {
 }
 
 
+def _require_record_authority(actor, payments):
+    """Finance staff record cash across domains; existing domain staff keep their scope.
+
+    Waives and online refunds still use _require_subject_authority. A receipt records
+    money moved in person, whereas those actions change debt or send provider money.
+    """
+    ids = {payment.pk for payment in payments}
+    allowed = set(rbac.scope_by_action(
+        actor, rbac.Action.RECORD_PAYMENT, Payment.objects.filter(pk__in=ids),
+        field="makerspace_id",
+    ).values_list("pk", flat=True))
+    remaining = [payment for payment in payments if payment.pk not in allowed]
+    _require_subject_authority(actor, remaining)
+
+
 def _require_subject_authority(actor, payments):
     for subject_type, action in SUBJECT_ACTIONS.items():
         ids = [payment.pk for payment in payments if payment.subject_type == subject_type]

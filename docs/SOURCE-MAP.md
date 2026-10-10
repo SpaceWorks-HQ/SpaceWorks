@@ -47,6 +47,10 @@ Queries use `accounts/rbac.py:scope_for_scheduled_work`; see
   `StationCredential` envelope; `station_credentials.py`, `station_sessions.py`, `station_security.py` and
   `station_throttles.py` own reusable rotation/reveal/disable, signing, PIN/origin and throttle mechanics
   without importing event policy.
+  `role_services.py` re-exports `role_authority.py` (locked grant validation),
+  `role_crud.py` (audited role mutations), and `role_assignments.py` (staff and community
+  role assignment). The RBAC vocabulary remains in `accounts/rbac_actions.py`.
+  The tenant-migration authority guard scans the split role-authority/assignment modules.
   Phase 9b kiosk Stations: `models_station_leases.py` (`StationOperatorLease`, `StationSessionRevocation`),
   `kiosk_station_services.py` (scanner/handover lifecycle + PIN session), `station_operator_leases.py`
   (lease issue/resolve/narrow/revoke), `station_views_admin.py`/`station_views_public.py`/`station_urls.py`

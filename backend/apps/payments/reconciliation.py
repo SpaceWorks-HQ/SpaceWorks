@@ -17,6 +17,7 @@ from apps.payments.models import Payment
 from apps.payments.reconciliation_authority import (  # noqa: F401
     SUBJECT_ACTIONS,
     _require_machine_scope,
+    _require_record_authority,
     _require_subject_authority,
 )
 from apps.payments.reconciliation_rail import _expire_checkout_best_effort  # noqa: F401
@@ -35,13 +36,15 @@ class PaymentConflict(APIException):
         }
 
 
-def list_payments(*, actor, makerspace_id, status=None, subject_type=None):
+def list_payments(*, actor, makerspace_id, status=None, subject_type=None, for_recording=False):
     queryset = rbac.scope_by_action(
         actor,
-        rbac.Action.MANAGE_MAKERSPACE,
+        rbac.Action.RECORD_PAYMENT if for_recording else rbac.Action.VIEW_FINANCE,
         Payment.objects.select_related("makerspace"),
         field="makerspace_id",
     ).filter(makerspace_id=makerspace_id)
+    if for_recording:
+        queryset = queryset.filter(status__in=[Payment.Status.PENDING, Payment.Status.PAID_OFFLINE])
     if status:
         queryset = queryset.filter(status=status)
     if subject_type:
@@ -161,7 +164,10 @@ def reconcile_payments(
     if len(by_id) != len(requested_ids):
         raise NotFound("Payment not found.")
 
-    _require_subject_authority(actor, locked)
+    if target_status == Payment.Status.PAID_OFFLINE:
+        _require_record_authority(actor, locked)
+    else:
+        _require_subject_authority(actor, locked)
     terminal_ids = [payment.pk for payment in locked if payment.status != Payment.Status.PENDING]
     if terminal_ids:
         raise PaymentConflict(terminal_ids)
@@ -214,7 +220,7 @@ def amend_settlement(*, actor, makerspace_id, payment_id, settlement):
     )
     if payment is None or payment.status != Payment.Status.PAID_OFFLINE:
         raise NotFound("Settled payment not found.")
-    _require_subject_authority(actor, [payment])
+    _require_record_authority(actor, [payment])
     current = ManualSettlement.effective_for(payment)
     if current is None:
         raise NotFound("This payment has no settlement to correct.")

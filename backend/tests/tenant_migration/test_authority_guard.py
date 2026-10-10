@@ -25,6 +25,15 @@ def test_mechanically_discovered_authority_inputs_are_explicit():
     assert discover_exported_authority_fields() <= set(DECLARED_AUTHORITY_FIELDS)
 
 
+def test_locked_role_authority_modules_remain_in_the_scan():
+    from apps.tenant_migration.authority_guards import APPS_DIR, AUTHORIZATION_SOURCES
+
+    assert {
+        APPS_DIR / "makerspaces" / "role_authority.py",
+        APPS_DIR / "makerspaces" / "role_assignments.py",
+    } <= set(AUTHORIZATION_SOURCES)
+
+
 def test_declared_relational_and_discriminator_authority_inputs():
     required = {
         ("makerspaces.MakerspaceMembership", "role"),

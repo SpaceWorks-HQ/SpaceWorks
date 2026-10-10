@@ -94,6 +94,7 @@ class PaymentReconciliationSerializer(serializers.ModelSerializer):
 
 
 class PaymentListFilterSerializer(serializers.Serializer):
+    for_recording = serializers.BooleanField(required=False, default=False)
     status = serializers.ChoiceField(choices=Payment.Status.choices, required=False)
     subject_type = serializers.ChoiceField(
         choices=Payment.SubjectType.choices, required=False
