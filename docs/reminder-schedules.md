@@ -85,7 +85,8 @@ deletion, since deleting them would permit duplicate dispatch.
 Due timestamps must be aware. Stored timestamps and comparisons are normalized to
 UTC; offsets are elapsed seconds, including across daylight-saving changes.
 `run_reminder_sweep(tz_resolver=...)` accepts a makerspace-to-timezone-name or tzinfo
-hook for F4; without it, the timezone is `settings.TIME_ZONE`. The timezone only
+hook for source policy overrides; without it, `makerspaces.local_time.to_local`
+supplies the makerspace profile's timezone. The timezone only
 affects source policy/rendering, never the persisted instant.
 
 Reminder rows contain no payload, address or User FK and contribute no accounts to

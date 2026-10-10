@@ -135,7 +135,7 @@ urlpatterns = [
     path("control/", admin.site.urls),
     path("api/", include("apps.inventory.urls")),          # existing, unchanged
     # Versioned alias of the public routes. Namespaced so it does NOT collide with the
-    # unnamespaced names above â€” reverse("public-inventory") stays /api/public/...,
+    # unnamespaced names above — reverse("public-inventory") stays /api/public/...,
     # while /api/v1/public/... is reachable directly (and via "v1:public-inventory").
     path("api/v1/", include(("apps.inventory.urls", "inventory"), namespace="v1")),
     path("api/v1/", include("apps.makerspaces.urls")),

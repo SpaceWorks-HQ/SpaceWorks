@@ -11,6 +11,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts import rbac
+from apps.makerspaces.local_time import to_local
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.platform import feature_enabled, module_enabled
 from apps.notifications.emit import emit_notification
@@ -27,7 +28,8 @@ def run_reminder_sweep(*, now=None, limit=None, tz_resolver=None):
     """A limit per tenant/source keeps busy tenants from starving their neighbours.
 
     tz_resolver(makerspace) returns a ZoneInfo name or tzinfo; only presentation/source
-    policy uses it. Due instants, offsets and comparisons always use UTC. Frozen and
+    policy uses it; by default the makerspace local-time service supplies its zone.
+    Due instants, offsets and comparisons always use UTC. Frozen and
     not-restored tenants reach the gate so they are counted, rather than filtered out.
     """
     sources = reminder_registry.registered_sources()
@@ -48,7 +50,7 @@ def run_reminder_sweep(*, now=None, limit=None, tz_resolver=None):
             ) as should_process:
                 if not should_process:
                     continue
-                name = tz_resolver(makerspace) if tz_resolver else settings.TIME_ZONE
+                name = tz_resolver(makerspace) if tz_resolver else to_local(makerspace, now).tzinfo
                 local_tz = ZoneInfo(name) if isinstance(name, str) else name
                 if not isinstance(local_tz, tzinfo):
                     raise ValueError("Reminder timezone resolver must return a timezone.")

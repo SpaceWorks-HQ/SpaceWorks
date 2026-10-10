@@ -204,6 +204,8 @@ def test_dispatch_failure_is_terminal_and_does_not_retry(monkeypatch):
 def test_default_and_optional_timezone_resolvers_keep_utc_instants(monkeypatch, settings):
     now = timezone.now()
     space = make_space("sweep-timezone")
+    space.timezone = "Asia/Tokyo"
+    space.save(update_fields=["timezone"])
     _booking(space, now)
     seen = []
 
@@ -217,7 +219,7 @@ def test_default_and_optional_timezone_resolvers_keep_utc_instants(monkeypatch, 
     settings.TIME_ZONE = "Asia/Kolkata"
     reminder_sweeper.run_reminder_sweep(now=now)
     reminder_sweeper.run_reminder_sweep(now=now, tz_resolver=lambda _: ZoneInfo("America/New_York"))
-    assert seen == [(timedelta(0), "Asia/Kolkata"), (timedelta(0), "America/New_York")]
+    assert seen == [(timedelta(0), "Asia/Tokyo"), (timedelta(0), "America/New_York")]
     assert ReminderSchedule.objects.get(makerspace=space).due_at == now
 
 

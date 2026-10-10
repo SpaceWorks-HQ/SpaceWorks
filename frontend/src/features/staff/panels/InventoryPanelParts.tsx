@@ -37,7 +37,7 @@ export function ItemModal({ title, open, onClose, form, setForm, categories, inc
         {includeQuantities ? <div className="grid gap-2 sm:grid-cols-2"><Field label="Total quantity"><input className="desk-input" type="number" min="0" value={form.total_quantity} onChange={(e) => setForm((c) => ({ ...c, total_quantity: e.target.value }))} /></Field><Field label="Available quantity"><input className="desk-input" type="number" min="0" value={form.available_quantity} onChange={(e) => setForm((c) => ({ ...c, available_quantity: e.target.value }))} /></Field></div> : null}
         <div className="grid gap-2 sm:grid-cols-3"><label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.is_public} onChange={(e) => setForm((c) => ({ ...c, is_public: e.target.checked }))} /> Public</label><label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.public_self_checkout_enabled} onChange={(e) => setForm((c) => ({ ...c, public_self_checkout_enabled: e.target.checked }))} /> Self checkout</label><label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.show_public_count} onChange={(e) => setForm((c) => ({ ...c, show_public_count: e.target.checked }))} /> Show count</label></div>
         <Field label="Public visibility"><select className="desk-input" value={form.public_availability_mode} onChange={(e) => setForm((c) => ({ ...c, public_availability_mode: e.target.value }))}><option value="status_only">Status only</option><option value="exact_count">Exact count</option><option value="hidden">Hidden</option></select></Field>
-        {includeQuantities ? <p className="text-xs text-muted">A photo can be added after saving â€” the item opens for editing so you can upload one.</p> : null}
+        {includeQuantities ? <p className="text-xs text-muted">A photo can be added after saving — the item opens for editing so you can upload one.</p> : null}
         {children}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
       </div>
@@ -172,7 +172,7 @@ export function LendingHistory({ productId }: { productId: number }) {
         <ul className="grid gap-1 text-sm text-muted">
           {recent.map((entry) => (
             <li key={entry.id}>
-              {entry.username} Ã¢â‚¬â€ {entry.quantity} on {formatDate(entry.issued_at)}
+              {entry.username} — {entry.quantity} on {formatDate(entry.issued_at)}
               <AttributionLine acceptedBy={entry.accepted_by} issuedBy={entry.issued_by} />
             </li>
           ))}

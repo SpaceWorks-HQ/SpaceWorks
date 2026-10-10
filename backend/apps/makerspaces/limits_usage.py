@@ -184,7 +184,7 @@ def add_storage(makerspace, size_bytes) -> None:
         if locked.storage_bytes_used + size_bytes > limit:
             raise serializers.ValidationError(
                 {
-                    "limit": "You've reached the free storage limit for this space Ã¢â‚¬â€ ask the operator to raise it or self-host."
+                    "limit": "You've reached the free storage limit for this space — ask the operator to raise it or self-host."
                 },
                 code="limit_reached",
             )
@@ -262,7 +262,7 @@ def check_quota(makerspace, key, *, adding=1) -> None:
     if current + adding > limit:
         resource = RESOURCE_LABELS.get(key, key.replace("_", " "))
         message = (
-            f"You've reached the free {resource} limit for this space Ã¢â‚¬â€ "
+            f"You've reached the free {resource} limit for this space — "
             "ask the operator to raise it or self-host."
         )
         raise serializers.ValidationError(

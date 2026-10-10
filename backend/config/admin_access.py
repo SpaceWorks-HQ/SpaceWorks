@@ -146,7 +146,7 @@ class SuperuserOnlyModelAdmin(AdminSourceGateMixin):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         # A plain (non-autocomplete) FK ModelChoiceField builds its options from the
-        # target model's default manager, NOT the target admin's get_queryset â€” so a
+        # target model's default manager, NOT the target admin's get_queryset — so a
         # makerspace FK widget (e.g. ApiClient/ToBuyItem add/change forms) would still
         # list and let a superadmin target a hard-hidden makerspace. Scope every
         # makerspace FK widget to visible makerspaces to close that hard-hide bypass.
