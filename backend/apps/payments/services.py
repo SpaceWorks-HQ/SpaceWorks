@@ -6,6 +6,8 @@ handlers, so `from apps.payments.services import X` keeps resolving for every ca
 
 import logging
 
+from django.db import transaction
+
 from apps.audit import services as audit
 # Re-exported, not used here: tests and callers reach it through this barrel.
 from apps.makerspaces.platform import member_payment_return_url  # noqa: F401
@@ -29,6 +31,7 @@ from apps.payments.services_webhooks import (  # noqa: F401
 logger = logging.getLogger(__name__)
 
 
+@transaction.atomic
 def create_payment(
     *, makerspace, subject_type, subject_id, member, amount, currency, created_by,
     via_makerspace=None, subject_label="",
@@ -83,6 +86,8 @@ def create_payment(
             "via_makerspace_id": via_makerspace.pk if via_makerspace else None,
         },
     )
+    from apps.payments.notifications import notify_payment
+    notify_payment(payment, "charge_raised")
     return payment
 
 

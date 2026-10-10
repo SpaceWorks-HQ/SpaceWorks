@@ -17,6 +17,11 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
     makerspace = instance.machine.makerspace
 
     def build():
+        from apps.integrations.recipients import feature_available
+        from apps.makerspaces.servability import is_servable
+        makerspace.refresh_from_db()
+        if not is_servable(makerspace) or not feature_available(makerspace, "maintenance"):
+            raise ValueError("Maintenance notifications are unavailable.")
         schedule = None
         log = None
         if is_schedule:

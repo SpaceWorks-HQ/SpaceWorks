@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
@@ -5,6 +6,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
 
+from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.audit import services as audit
 from apps.makerspaces.guards import require_module
@@ -23,6 +25,30 @@ from apps.procurement.views_common import (
 )
 
 
+def _procurement_scope(actor):
+    return rbac.makerspaces_for_actions(
+        actor, rbac.Action.EDIT_INVENTORY, rbac.Action.MANAGE_PRINTING,
+        rbac.Action.MANAGE_MAKERSPACE,
+    )
+
+
+def _scoped_items(actor):
+    scope = _procurement_scope(actor)
+    rows = ToBuyItem.objects.all()
+    return rows if scope is rbac.ALL else rows.filter(makerspace_id__in=scope)
+
+
+def _scoped_makerspace(actor, pk):
+    # Identity visibility preserves the existing empty-list/403 contract for
+    # local handover staff. Organization-derived procurement authority also counts.
+    scope = rbac.resolve_scope(actor)
+    actions = _procurement_scope(actor)
+    if scope is not rbac.ALL:
+        scope = rbac.ALL if actions is rbac.ALL else scope | actions
+    rows = Makerspace.objects.all()
+    return get_object_or_404(rows if scope is rbac.ALL else rows.filter(pk__in=scope), pk=pk)
+
+
 @extend_schema(tags=["Procurement"])
 class ToBuyListCreateView(generics.ListCreateAPIView):
     serializer_class = ToBuyItemSerializer
@@ -31,9 +57,14 @@ class ToBuyListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         makerspace_id = self.kwargs["makerspace_id"]
-        require_module(get_object_or_404(Makerspace, pk=makerspace_id), MODULE_KEY)
+        scope = _procurement_scope(self.request.user)
+        if scope is not rbac.ALL and makerspace_id not in scope:
+            # The list contract is an empty result outside procurement authority.
+            # No foreign makerspace or item is queried to produce that answer.
+            return ToBuyItem.objects.none()
+        require_module(_scoped_makerspace(self.request.user, makerspace_id), MODULE_KEY)
         limit = list_limit(self.request)
-        queryset = access.scope_items(ToBuyItem.objects.all(), self.request.user, makerspace_id)
+        queryset = access.scope_items(_scoped_items(self.request.user), self.request.user, makerspace_id)
         queryset = apply_status_filter(queryset, self.request)
         return receipt_queryset_related(queryset).order_by("-created_at", "-id")[:limit]
 
@@ -51,7 +82,7 @@ class ToBuyListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         makerspace_id = self.kwargs["makerspace_id"]
-        makerspace = get_object_or_404(Makerspace, pk=makerspace_id)
+        makerspace = _scoped_makerspace(self.request.user, makerspace_id)
         require_module(makerspace, MODULE_KEY)
         if not access.can_use(self.request.user, makerspace_id):
             raise PermissionDenied()
@@ -87,10 +118,10 @@ class ToBuyDetailView(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ["get", "patch", "delete", "head", "options"]
 
     def get_queryset(self):
-        makerspace_id = ToBuyItem.objects.filter(
+        makerspace_id = _scoped_items(self.request.user).filter(
             pk=self.kwargs.get("pk")
         ).values_list("makerspace_id", flat=True).first()
-        queryset = receipt_queryset_related(ToBuyItem.objects.all())
+        queryset = receipt_queryset_related(_scoped_items(self.request.user))
         if makerspace_id is None:
             return queryset.none()
         return access.scope_items(
@@ -104,7 +135,7 @@ class ToBuyDetailView(generics.RetrieveUpdateDestroyAPIView):
         require_module(obj.makerspace, MODULE_KEY)
         return get_object_or_404(
             access.scope_items(
-                receipt_queryset_related(ToBuyItem.objects.all()),
+                receipt_queryset_related(_scoped_items(self.request.user)),
                 self.request.user,
                 obj.makerspace_id,
             ),
@@ -127,7 +158,20 @@ class ToBuyDetailView(generics.RetrieveUpdateDestroyAPIView):
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
 
+    @transaction.atomic
     def perform_update(self, serializer):
+        # Re-read the status under the lock: concurrent PATCHes must observe one
+        # received edge, and its audit/write must commit before any alert is sent.
+        serializer.instance = get_object_or_404(
+            _scoped_items(self.request.user).select_for_update(), pk=serializer.instance.pk,
+        )
+        # Recheck the CURRENT stream/type as well as the requested new values.
+        # Otherwise a concurrent retag could let a stale serializer move another
+        # team's item back into this actor's scope and emit its received alert.
+        get_object_or_404(access.scope_items(
+            _scoped_items(self.request.user), self.request.user, serializer.instance.makerspace_id,
+        ), pk=serializer.instance.pk)
+        require_module(serializer.instance.makerspace, MODULE_KEY)
         self._assert_can_manage(serializer.instance)
         machine_type = serializer.validated_data.get(
             "machine_type", serializer.instance.machine_type
@@ -161,6 +205,9 @@ class ToBuyDetailView(generics.RetrieveUpdateDestroyAPIView):
             makerspace=item.makerspace,
             target=item,
         )
+        if previous_status != item.status and item.status == ToBuyItem.Status.RECEIVED:
+            from apps.procurement.notifications import notify_stock
+            notify_stock(item, "procurement_received")
 
     def perform_destroy(self, instance):
         self._assert_can_manage(instance)

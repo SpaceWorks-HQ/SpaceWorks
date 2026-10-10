@@ -5,6 +5,8 @@ DOMAIN_ID_FIELDS = frozenset({
     "registration_id", "machine_id", "schedule_id", "maintenance_log_id",
     "membership_request_id", "membership_id", "api_key_request_id",
     "machine_service_request_id",
+    "refund_id", "to_buy_item_id", "pool_id", "certification_grant_id",
+    "certification_type_id",
 })
 
 

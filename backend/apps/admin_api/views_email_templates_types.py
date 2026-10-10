@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from apps.admin_api.permissions import IsActiveStaff
 from apps.audit import services as audit
 from apps.integrations.models import MachineTypeEmailTemplate
+from apps.openapi_errors import errors
 
 from .views_email_templates_common import (
     EmailTemplateDetailSerializer,
@@ -29,7 +30,7 @@ class MachineTypeEmailTemplateDetailView(TypeTemplateMixin, APIView):
     permission_classes = [IsActiveStaff]
     http_method_names = ["get", "patch", "head", "options"]
 
-    @extend_schema(responses={200: EmailTemplateDetailSerializer})
+    @extend_schema(responses={200: EmailTemplateDetailSerializer, **errors(400, 401, 403, 404)})
     def get(self, request, makerspace_id, stream, audience, key, machine_type_id, *args, **kwargs):
         makerspace, machine_type = self._resolve_template(
             request, makerspace_id, stream, audience, key, machine_type_id
@@ -38,7 +39,8 @@ class MachineTypeEmailTemplateDetailView(TypeTemplateMixin, APIView):
             _type_detail_payload(makerspace, machine_type, stream, audience, key)
         ).data)
 
-    @extend_schema(request=EmailTemplateUpdateSerializer, responses={200: EmailTemplateDetailSerializer})
+    @extend_schema(request=EmailTemplateUpdateSerializer,
+                   responses={200: EmailTemplateDetailSerializer, **errors(400, 401, 403, 404)})
     def patch(self, request, makerspace_id, stream, audience, key, machine_type_id, *args, **kwargs):
         makerspace, machine_type = self._resolve_template(
             request, makerspace_id, stream, audience, key, machine_type_id
@@ -65,7 +67,8 @@ class MachineTypeEmailTemplateResetView(TypeTemplateMixin, APIView):
     permission_classes = [IsActiveStaff]
     http_method_names = ["post", "options"]
 
-    @extend_schema(request=None, responses={200: EmailTemplateDetailSerializer})
+    @extend_schema(request=None,
+                   responses={200: EmailTemplateDetailSerializer, **errors(400, 401, 403, 404)})
     def post(self, request, makerspace_id, stream, audience, key, machine_type_id, *args, **kwargs):
         makerspace, machine_type = self._resolve_template(
             request, makerspace_id, stream, audience, key, machine_type_id

@@ -16,6 +16,9 @@ class EmailTemplate(models.Model):
         # differ here, and existing EmailLog rows already carry `membership`.
         MEMBERSHIP = "membership", "Membership"
         DEVICES = "devices", "Devices"
+        PAYMENTS = "payments", "Payments"
+        STOCK = "stock", "Stock and procurement"
+        CERTIFICATIONS = "certifications", "Certifications"
 
     class Audience(models.TextChoices):
         REQUESTER = "requester", "Requester"

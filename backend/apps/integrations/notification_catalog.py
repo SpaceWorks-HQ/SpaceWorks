@@ -43,10 +43,17 @@ FEATURE_EVENTS = {
     F.MAINTENANCE: (
         "schedule_created", "schedule_updated", "schedule_deactivated", "logged",
         "schedule_completed",
+        "due_soon", "overdue",
     ),
-    F.MEMBERS: ("request_pending", "member_joined"),
+    # request_pending is the existing application-received event; keep its stable key.
+    F.MEMBERS: ("request_pending", "member_joined", "approved", "declined",
+                "renewal_due", "lapsed", "renewal_failed"),
     F.API_ACCESS: ("api_key_request_resolved",),
     F.DEVICES: ("offline", "recovered"),
+    F.PAYMENTS: ("charge_raised", "payment_due_soon", "payment_overdue",
+                 "payment_received", "refund_issued", "payment_failed"),
+    F.STOCK: ("low_stock", "procurement_received"),
+    F.CERTIFICATIONS: ("granted", "revoked", "expiring", "expired"),
 }
 
 # Exact default on/off per (feature, channel). Preserves today's behavior: hardware/printing
@@ -64,6 +71,9 @@ DEFAULT_CHANNEL_STATE = {
     # Preserve the old resolution email + Telegram default, now mutable and metered.
     F.API_ACCESS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
     F.DEVICES: {channel: False for channel in C.values},
+    F.PAYMENTS: {channel: False for channel in C.values},
+    F.STOCK: {channel: False for channel in C.values},
+    F.CERTIFICATIONS: {channel: False for channel in C.values},
 }
 
 

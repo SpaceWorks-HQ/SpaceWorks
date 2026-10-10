@@ -33,6 +33,9 @@ SELECTABLE_FEATURES = frozenset(
         NotificationFeature.MAINTENANCE,
         NotificationFeature.MEMBERS,
         NotificationFeature.DEVICES,
+        NotificationFeature.PAYMENTS,
+        NotificationFeature.STOCK,
+        NotificationFeature.CERTIFICATIONS,
     }
 )
 
@@ -48,6 +51,9 @@ FEATURE_MODULES = {
     NotificationFeature.MAINTENANCE: "maintenance",
     NotificationFeature.MEMBERS: "membership",
     NotificationFeature.DEVICES: "devices",
+    NotificationFeature.PAYMENTS: "payments",
+    NotificationFeature.STOCK: "procurement",
+    NotificationFeature.CERTIFICATIONS: "machines",
 }
 
 
