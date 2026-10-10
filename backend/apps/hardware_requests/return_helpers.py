@@ -1,9 +1,11 @@
 from collections import Counter
 
+from django.db import transaction
 from django.utils import timezone
 
 from apps.audit import services as audit
 from apps.boxes.models import QrCode, QrScanEvent
+from apps.hardware_requests import loan_payments
 from apps.hardware_requests.models import (
     HardwareRequest,
     HardwareRequestItemAsset,
@@ -223,6 +225,10 @@ def finalize_return_status(locked, actor):
     locked.closed_by = actor
     locked.closed_at = timezone.now()
     locked.save(update_fields=["status", "closed_by", "closed_at", "updated_at"])
+    # Every return surface reaches this finalizer. Payments run only after the
+    # return commits, so provider or ledger failures cannot undo a physical return.
+    request_id = locked.pk
+    transaction.on_commit(lambda: loan_payments.on_request_closed(request_id, actor))
     if has_issue:
         return "request.closed_with_issue"
     return "request.returned"

@@ -164,6 +164,10 @@
   transitions (atomic + row-locked + audited; also `assign_box`/`issue_request`/`return_items`);
   `permissions.py`, `exceptions.py` (workflow→HTTP map + `ErrorSerializer._EXCEPTION_MAP`),
   `notifications.py` (Telegram seam), public submit/verify/status views, `send_return_reminders` command.
+  `self_checkout_workflow.py` re-exports the issue and return services from `self_checkout_issue.py`
+  and `self_checkout_returns.py`, with shared evidence checks in `self_checkout_evidence.py`.
+  All return paths use `return_helpers.finalize_return_status`, which schedules the post-commit
+  loan charge seam in `loan_payments.py` only when the request closes.
 - `backend/apps/payments/` — immutable multi-subject Payment authority, per-space raw credentials + managed
   Stripe Connect resolution, checkout/webhook settlement, reconciliation, native PaymentSheet intents.
 - `backend/apps/printing/` — **TOMBSTONED** (Project B): only an `AppConfig` and an empty `models.py`, kept

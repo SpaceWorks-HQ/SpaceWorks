@@ -1,4 +1,4 @@
-"""Loan deposits and late fees: the payments boundary for reviewed hardware loans.
+"""Loan deposits and late fees: the payments boundary for hardware loans.
 
 Mirrors `apps/makerspaces/membership_payments.py`. Every entry point swallows payment
 failures, because a provider outage must never stop a handover or a return. The
@@ -111,7 +111,9 @@ def on_request_closed(request_id, actor, now=None):
         request = HardwareRequest.objects.select_related("makerspace").get(pk=request_id)
         if request.status not in CLOSED_STATUSES:
             return None
-        fee = raise_late_fee(request, actor, now or timezone.now())
+        # Use the recorded return time: delayed post-commit work must not add late
+        # days after the borrower has already handed the tool back.
+        fee = raise_late_fee(request, actor, now or request.closed_at or timezone.now())
         # A deposit nobody paid secures nothing once the loan is over, whether or not a
         # fee was raised -- the fee is its own charge. A PAID deposit stays on the
         # ledger for staff to refund (or keep against the fee) through the refund path.
