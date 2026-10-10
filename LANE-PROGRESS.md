@@ -53,7 +53,11 @@ The brief was "online cloud services — all conditions", in two steps:
 12. **OIDC unlink.** An `oidc:<slug>` identity can now be unlinked.
 13. **Hosting tests.** DNS failure shapes and probe 503s.
 
-## Mid-flight (uncommitted, tests running)
+## Mid-flight verification (2026-10-10 continuation)
+
+All four items below exist in the tree, including the scheduler admin side-effect import,
+`GLOBAL_ADMIN_MODELS` entry and the named tests/docs. No database tests are running in
+this sandbox; earlier results below belong to the previous session.
 
 - `PeriodicTaskRun` read-only `/control/` page (`apps/operations/admin_scheduling.py`), its
   `GLOBAL_ADMIN_MODELS` entry, and `tests/test_scheduler_control_visibility.py`.
@@ -61,6 +65,38 @@ The brief was "online cloud services — all conditions", in two steps:
   request audited; self-host provisioning refused.
 - `tests/payments/test_connect_webhook_signatures.py`.
 - Docs: a `PROJECT-HISTORY.md` entry and an `INVARIANTS.md` "Cloud-completeness rules" block.
+
+## Continuation completed (unstaged, 2026-10-10)
+
+- Sanitized malformed FCM/APNs replies, OIDC streamed reads and Unicode Apple nonces;
+  bounded OIDC reads and response cleanup. Added provider regression tests.
+- Added domain-change before/after audit, corrected the self-host subdomain approval
+  error, and closed pubsub on a failed subscription.
+- Completed social/phone/OIDC/push/config error schemas; split social views and chat
+  health into domain siblings, keeping the existing import and verification seams.
+- Added SMS/native-push health, platform SMTP fallback status, missing control-sidebar
+  links, platform configuration labels, and Skipped email filtering with its reason.
+- Extended production env guards to cloud and all backend services; overlay and example
+  guards added, observability documented in all three examples.
+- Completed host updater single-box readiness/image selection and local behavioral
+  rollback/lock/provider-failure coverage; GHCR listing/deletion retry coverage.
+- Completed the tenant payment control-form audit, inside the existing credential
+  transaction, with rollback/privacy coverage (payments-lane merge hotspot).
+- Added coverage for hosting cache/suffix conditions, phone quotas/cooldown/throttles,
+  push registration failures, permissions, probes, optional identity caches, scheduler
+  concurrency and secret-free provider/queue diagnostics.
+- Static checks: TypeScript build/type checking, Python AST/global-name inspection,
+  Bash syntax and `git diff --check` reported no errors. All touched files are <=300
+  lines. ENV_SURFACE and its reference both match exactly 247 names; no registry edits
+  were necessary. Instruction twins remain byte-identical; generated API files untouched.
+- Detailed completion notes: `docs/cloud-completeness.md`. Exact created/modified file
+  inventory, test IDs, skipped owner/account-dependent work and merge risks:
+  `LANE-CLOUD-HANDOFF.md`.
+
+Coordinator must run all new/modified test files listed in `LANE-CLOUD-HANDOFF.md` and
+regenerate the API artifacts. This sandbox has no Django/pytest dependencies, Docker or Postgres.
+`codex doctor` was checked: config resolution and provider reachability failed here;
+an independent Codex CLI review is unavailable in this sandbox.
 
 ## Tests actually run (`./scripts/dev.sh test ... -p no:randomly`)
 

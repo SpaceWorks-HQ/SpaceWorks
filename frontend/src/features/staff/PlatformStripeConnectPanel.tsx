@@ -73,6 +73,10 @@ export function PlatformStripeConnectPanel() {
       <p className="text-sm text-muted">
         Platform credentials authorize direct charges into each makerspace&apos;s connected account.
       </p>
+      {settings.data ? <p className="mt-2 text-sm text-muted">
+        {settings.data.stripe_secret_key_set && settings.data.stripe_connect_client_id.trim()
+          ? "Connect credentials configured" : "Not configured"}
+      </p> : null}
       <div className="mt-4 rounded-md border border-line bg-surface p-3">
         <div className="grid gap-2 sm:grid-cols-2">
           <Field label="Platform publishable key"><input className="desk-input" type="password" autoComplete="new-password" placeholder={settings.data?.stripe_publishable_key_set ? "Platform publishable key set" : undefined} value={publishableKey} onChange={(event) => setPublishableKey(event.target.value)} /></Field>

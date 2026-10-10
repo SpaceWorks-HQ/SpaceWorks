@@ -21,6 +21,7 @@ from apps.audit import services as audit
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.origin_scope import origin_scoped_makerspace_id
 from apps.makerspaces.servability import servable_queryset
+from apps.openapi_errors import errors
 
 
 @extend_schema(tags=["Admin makerspaces"], summary="List or create makerspaces")
@@ -88,7 +89,10 @@ class MakerspaceListCreateView(generics.ListCreateAPIView):
         )
 
 
-@extend_schema(tags=["Admin makerspaces"], summary="Retrieve or update a makerspace")
+@extend_schema(
+    tags=["Admin makerspaces"], summary="Retrieve or update a makerspace",
+    responses={200: MakerspaceSerializer, **errors(400, 401, 403, 404)},
+)
 class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = MakerspaceSerializer
     permission_classes = [IsActiveStaff]
@@ -119,6 +123,7 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
                 pk=serializer.instance.pk
             )
             previous_features = list(serializer.instance.enabled_features)
+            previous_domain = serializer.instance.frontend_domain
             previous_geofence = {
                 "enabled": serializer.instance.geofence_enabled,
                 "configured": serializer.instance.geofence_effective,
@@ -133,6 +138,14 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
                 makerspace=instance,
                 target=instance,
             )
+            if previous_domain != instance.frontend_domain:
+                audit.record(
+                    self.request.user,
+                    "makerspace.frontend_domain_changed",
+                    makerspace=instance,
+                    target=instance,
+                    meta={"before": previous_domain, "after": instance.frontend_domain},
+                )
             if previous_features != instance.enabled_features:
                 audit.record(
                     self.request.user,

@@ -222,9 +222,9 @@ class Command(BaseCommand):
             except Exception as exc:  # noqa: BLE001 - one failing task must not stop the rest
                 with transaction.atomic():
                     row = PeriodicTaskRun.objects.select_for_update().get(name=name)
-                    row.last_error = str(exc)[:500]
+                    row.last_error = type(exc).__name__
                     row.save(update_fields=["last_error"])
-                self.stderr.write(self.style.ERROR(f"failed {name}: {exc}"))
+                self.stderr.write(self.style.ERROR(f"failed {name}: {type(exc).__name__}"))
                 continue
 
             with transaction.atomic():

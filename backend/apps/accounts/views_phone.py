@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts import audit_events
+from apps.openapi_errors import errors
 from apps.accounts.auth_cookies import set_refresh_cookies
 from apps.accounts.authentication import SpaceWorksJWTAuthentication
 from apps.accounts.serializers import user_payload
@@ -209,7 +210,7 @@ class PhoneUnlinkView(APIView):
     @extend_schema(
         tags=["Auth"],
         summary="Unlink the phone number",
-        responses={200: PhoneStatusSerializer},
+        responses={200: PhoneStatusSerializer, **errors(401, 403)},
     )
     def delete(self, request):
         user = request.user

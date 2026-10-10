@@ -84,4 +84,21 @@ describe("IntegrationHealthPanel", () => {
 
     expect(await screen.findByText("No chat or webhook rooms are configured.")).toBeInTheDocument();
   });
+
+  it("shows SMS configuration and a scoped native-push failure", async () => {
+    staffRequest.mockResolvedValue({
+      ...health,
+      sms: { status: "ok", configured: false },
+      native_push: {
+        status: "warn", configured: true, enabled: false, failed: 1,
+        last_failure: { error: "notification_delivery_failed:PushProviderError", at: recent },
+      },
+    });
+    const { container } = renderPanel();
+    expect(await screen.findByText("SMS")).toBeInTheDocument();
+    expect(screen.getByText("Native push")).toBeInTheDocument();
+    expect(screen.getByText("Disabled for this makerspace")).toBeInTheDocument();
+    expect(screen.getByText(/Last delivery failed:.*PushProviderError/)).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
 });

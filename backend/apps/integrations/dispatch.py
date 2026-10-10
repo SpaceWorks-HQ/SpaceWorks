@@ -190,7 +190,10 @@ def _enqueue(log_id):
                 log.status = EmailLog.Status.FAILED
                 log.error = sanitize_email_error(exc)
                 log.save(update_fields=["status", "error", "updated_at"])
-        logger.exception("email_enqueue_failed", extra={"email_log_id": log_id})
+        logger.error(
+            "email_enqueue_failed",
+            extra={"email_log_id": log_id, "error_class": type(exc).__name__},
+        )
 
 
 def _deliver(log):

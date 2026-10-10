@@ -1,10 +1,13 @@
 import json
+import logging
 
 import jwt
 import requests
 import urllib3
 from django.conf import settings
 from django.core.cache import cache
+
+logger = logging.getLogger(__name__)
 
 
 class SocialTokenError(Exception):
@@ -51,18 +54,23 @@ def _key_for_kid(provider, url, kid, *, refresh):
         if item.get("kid") == kid and item.get("kty") == "RSA":
             try:
                 return jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(item))
-            except (ValueError, TypeError) as exc:
+            except (ValueError, TypeError, jwt.PyJWTError) as exc:
                 raise SocialTokenError("Invalid provider signing key.") from exc
     return None
 
 
 def _fetch_jwks(provider, url, *, refresh):
     cache_key = f"social-jwks:{provider}"
-    if not refresh:
-        cached = cache.get(cache_key)
-        if isinstance(cached, list):
-            return cached
+    response = None
     try:
+        if not refresh:
+            try:
+                cached = cache.get(cache_key)
+            except Exception:
+                logger.warning("social_jwks_cache_read_failed")
+                cached = None
+            if isinstance(cached, list) and all(isinstance(key, dict) for key in cached):
+                return cached
         response = requests.get(
             url,
             timeout=settings.SOCIAL_AUTH_JWKS_TIMEOUT_SECONDS,
@@ -83,8 +91,12 @@ def _fetch_jwks(provider, url, *, refresh):
         if not isinstance(data, dict):
             raise ValueError
         keys = data.get("keys")
-        if not isinstance(keys, list) or len(keys) > 16:
+        if not isinstance(keys, list) or len(keys) > 16 or not all(isinstance(key, dict) for key in keys):
             raise ValueError
+        try:
+            cache.set(cache_key, keys, settings.SOCIAL_AUTH_JWKS_CACHE_SECONDS)
+        except Exception:
+            logger.warning("social_jwks_cache_write_failed")
     except (
         requests.RequestException,
         # `response.raw.read` is urllib3, below requests' exception wrapping: a read
@@ -95,5 +107,10 @@ def _fetch_jwks(provider, url, *, refresh):
         TypeError,
     ) as exc:
         raise SocialProviderUnavailable("Identity provider is unavailable.") from exc
-    cache.set(cache_key, keys, settings.SOCIAL_AUTH_JWKS_CACHE_SECONDS)
+    finally:
+        if response is not None and hasattr(response, "close"):
+            try:
+                response.close()
+            except Exception:
+                logger.warning("social_jwks_response_close_failed")
     return keys

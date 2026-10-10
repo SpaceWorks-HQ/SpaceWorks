@@ -59,3 +59,17 @@ def test_a_space_manager_cannot_open_it():
     response = _client(manager).get(reverse(URL))
 
     assert response.status_code in {302, 403, 404}
+
+
+def test_sidebar_has_every_platform_integration_and_the_scheduler():
+    from config.unfold import UNFOLD
+
+    labels = {
+        str(item["title"])
+        for group in UNFOLD["SIDEBAR"]["navigation"]
+        for item in group["items"]
+    }
+    assert {
+        "Platform SMS", "Platform push", "Login methods", "Social sign-in",
+        "OIDC providers", "Scheduled task runs",
+    } <= labels

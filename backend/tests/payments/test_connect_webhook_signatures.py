@@ -72,3 +72,12 @@ def test_a_correctly_signed_but_stale_event_is_refused():
 
     assert response.status_code == 400
     assert response.data == GENERIC_ERROR
+
+
+def test_empty_secret_is_the_same_generic_error():
+    platform = PlatformStripeConnectSettings.load()
+    platform.set_stripe_webhook_secret("")
+    platform.save()
+    response = _post(_signature(int(time.time())))
+    assert response.status_code == 400
+    assert response.data == GENERIC_ERROR

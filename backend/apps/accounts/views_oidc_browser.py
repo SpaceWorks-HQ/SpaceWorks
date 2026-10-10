@@ -1,4 +1,5 @@
 from django.conf import settings
+from apps.openapi_errors import errors
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -65,6 +66,7 @@ class OidcBrowserStartView(APIView):
             403: OpenApiResponse(ErrorSerializer),
             404: OpenApiResponse(ErrorSerializer),
             503: OpenApiResponse(ErrorSerializer),
+            **errors(429),
         },
     )
     def post(self, request, slug):
@@ -106,6 +108,7 @@ class OidcBrowserCallbackView(APIView):
             403: OpenApiResponse(ErrorSerializer),
             409: OpenApiResponse(ErrorSerializer),
             503: OpenApiResponse(ErrorSerializer),
+            **errors(429),
         },
     )
     def post(self, request):

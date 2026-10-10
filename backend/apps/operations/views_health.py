@@ -18,7 +18,7 @@ class HealthView(APIView):
         request=None,
         responses={
             200: HealthSerializer,
-            **errors(503, e503="The recovery gate is closed: the database is unreachable or a restore is running."),
+            **errors(400, 401, 503, e503="The recovery gate is closed: the database is unreachable or a restore is running."),
         },
     )
     def get(self, request, *args, **kwargs):
@@ -36,7 +36,7 @@ class ReadinessView(APIView):
         responses={
             200: ReadinessSerializer,
             **errors(
-                503,
+                400, 401, 503,
                 e503="Not ready: host marker, database identity, migrations, fences or PII keys failed.",
             ),
         },

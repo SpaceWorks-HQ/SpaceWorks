@@ -9,6 +9,7 @@ from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.integrations import health as integration_health
 from apps.makerspaces.servability import servable_queryset
+from apps.openapi_errors import errors
 
 
 class HealthStatusSerializer(serializers.Serializer):
@@ -57,6 +58,9 @@ class IntegrationHealthSerializer(serializers.Serializer):
     smtp = IntegrationConfiguredHealthSerializer()
     telegram = IntegrationConfiguredHealthSerializer()
     worker = IntegrationWorkerHealthSerializer()
+    chat_destinations = serializers.DictField()
+    sms = IntegrationConfiguredHealthSerializer()
+    native_push = serializers.DictField()
 
 
 @extend_schema(
@@ -64,6 +68,7 @@ class IntegrationHealthSerializer(serializers.Serializer):
     summary="Get makerspace integration health",
     responses={
         200: IntegrationHealthSerializer,
+        **errors(401),
         403: OpenApiResponse(description="Not allowed to manage this makerspace."),
         404: OpenApiResponse(description="Makerspace not found."),
     },

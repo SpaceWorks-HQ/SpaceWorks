@@ -112,6 +112,7 @@ class LiveStreamView(APIView):
         responses={
             (200, "text/event-stream"): OpenApiTypes.STR,
             401: OpenApiResponse(description="Not signed in."),
+            403: OpenApiResponse(description="Account access is restricted."),
             503: OpenApiResponse(
                 description="No usable Redis (unset, misconfigured or unreachable); poll instead."
             ),
@@ -122,10 +123,16 @@ class LiveStreamView(APIView):
         if client is None:
             return _unavailable("Live updates are not available on this deployment.")
         channels = subscribed_channels(request.user)
+        pubsub = None
         try:
             pubsub = client.pubsub()
             pubsub.subscribe(*channels)
         except Exception:
+            if pubsub is not None:
+                try:
+                    pubsub.close()
+                except Exception:
+                    logger.warning("live_stream_close_failed")
             logger.warning("live_subscribe_failed", extra={"user_id": request.user.pk})
             return _unavailable("Live updates are temporarily unavailable.")
         deadline = time.monotonic() + getattr(settings, "LIVE_MAX_STREAM_SECONDS", MAX_STREAM_SECONDS)
