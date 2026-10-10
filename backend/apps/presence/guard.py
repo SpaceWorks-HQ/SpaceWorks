@@ -60,6 +60,8 @@ def require_active_member(user, makerspace):
     because a staffer observed the person.
 
     Returns the same shape with `session=None`, because this half never looked for one.
+    Advance bookings also use this identity/membership/waiver guard; presence is
+    established separately when the member arrives.
     Keeping it as the single implementation of the membership and waiver rules is the
     point: two copies would drift, and the copy that drifted would be an auth rule.
     """
@@ -100,7 +102,7 @@ def require_active_member_presence(user, makerspace):
     about why.
 
     Member-facing hardware and facility surfaces call this as a bare precondition --
-    self-checkout, staff direct handout, public booking, and the two public
+    self-checkout, staff direct handout, and the two public
     machine-service surfaces. Public request submission also calls it while the
     membership module is enabled; with that module off, the staff-reviewed proposal
     path uses `require_active_account` instead. A deployment that does not ship check-in

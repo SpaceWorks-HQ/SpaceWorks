@@ -6,6 +6,7 @@ import { staffRequest } from "../../lib/api";
 import { MakerspaceBrandingSettings } from "./MakerspaceBrandingSettings";
 import { MakerspaceBookingRulesSettings } from "./MakerspaceBookingRulesSettings";
 import { MakerspaceBookingSettings } from "./MakerspaceBookingSettings";
+import { MakerspaceReminderSettings } from "./MakerspaceReminderSettings";
 import { MakerspaceCustomDomainSettings } from "./MakerspaceCustomDomainSettings";
 import { MakerspaceEmailSettings } from "./MakerspaceEmailSettings";
 import { MakerspaceFilamentSettings } from "./MakerspaceFilamentSettings";
@@ -221,6 +222,7 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMak
           </div>
         </div>
         <MakerspaceBookingSettings makerspace={makerspace} settings={settings.data} loading={settings.isLoading} />
+        <MakerspaceReminderSettings makerspace={makerspace} settings={settings.data} loading={settings.isLoading} />
         {enabledModules.includes("bookings") ? (
           <MakerspaceBookingRulesSettings makerspace={makerspace} />
         ) : null}

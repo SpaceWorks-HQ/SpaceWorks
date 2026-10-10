@@ -15,7 +15,9 @@ verification/error helpers in `views_social_helpers.py`. `integrations/health.py
 read-only scheduler control page lives in `operations/admin_scheduling.py`.
 The shared reminder foundation is `operations/models_reminders.py`,
 `reminder_registry.py`, `reminder_services.py`, `reminder_sweeper.py` and
-`tasks_reminders.py`; consumer registrations are explicit and initially empty.
+`tasks_reminders.py`; contracts live in `reminder_types.py`. Explicit event and booking
+consumers live in `events/reminders.py` and `bookings/reminders.py`, sharing
+requester delivery and fair batch discovery in `operations/reminder_members.py`.
 Queries use `accounts/rbac.py:scope_for_scheduled_work`; see
 [reminder-schedules.md](reminder-schedules.md) for UTC, claims and migration rules.
 Platform monitoring uses `admin_api/views_platform_monitoring.py` and its schema sibling;
@@ -268,5 +270,14 @@ Staff list preferences live in `operations/models_saved_views.py`, `serializers_
 and entity authority live in `admin_api/list_options.py` and `staff_list_scope.py`.
 Saved-view audit targets travel as inert source provenance in
 `tenant_migration/audit_references_targets.py`, including after a preference is deleted.
+Booking service windows live in `bookings/services_schedule.py` (F4 hours, buffers and cutoff);
+`services_transitions.py` owns audited booking completion/cancellation behind explicit compatibility
+exports. Member booking history and self-cancel are in `bookings/views_member.py`.
+Staff booking lists, creation/member choices and actions live in the separate
+`views_admin_booking_list.py`, `views_admin_booking_create.py` and `views_admin_booking_actions.py`
+modules behind the `views_admin_bookings.py` barrel.
+Booking editors get only machine type IDs/names from `bookings/views_admin_machine_types.py`,
+under `MANAGE_BOOKINGS`; this does not grant Machines-console authority.
+
 Booking-space and event handlers use explicit `views_admin_spaces.py` / `views_admin_events.py`
 barrels over the corresponding `views_admin_space_list/detail.py` and `views_admin_event_list/detail.py`.

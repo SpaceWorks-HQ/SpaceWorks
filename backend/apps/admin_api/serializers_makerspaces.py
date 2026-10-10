@@ -14,6 +14,7 @@ from apps.admin_api.serializers_makerspace_validation import (
 )
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.opening_hours_schema import OpeningHoursField
+from apps.makerspaces.reminder_policy import validate_reminder_lead_hours
 
 
 class MakerspaceSerializer(
@@ -23,6 +24,14 @@ class MakerspaceSerializer(
 ):
     theme_config = ThemeConfigField(required=False)
     opening_hours = OpeningHoursField(read_only=True)
+    event_reminder_lead_hours = serializers.ListField(
+        child=serializers.IntegerField(min_value=1, max_value=8760),
+        max_length=100, required=False, validators=[validate_reminder_lead_hours],
+    )
+    booking_reminder_lead_hours = serializers.ListField(
+        child=serializers.IntegerField(min_value=1, max_value=8760),
+        max_length=100, required=False, validators=[validate_reminder_lead_hours],
+    )
     resource_limit_overrides = serializers.JSONField(required=False)
     frontend_domain = serializers.CharField(
         required=False,
@@ -99,6 +108,8 @@ class MakerspaceSerializer(
             "archive_custody_state",
             "staff_notifications_enabled",
             "booking_requester_notifications_enabled",
+            "event_reminder_lead_hours",
+            "booking_reminder_lead_hours",
             "logo_key",
             "logo_url",
             "cover_image_key",

@@ -60,10 +60,7 @@ def test_booking_submission_enforces_all_gate_states_and_snapshots_member():
     assert response.status_code == 403 and response.data["code"] == "waiver_acceptance_required"
 
     accept_waiver(membership)
-    response = authenticated_client(user).post(url, booking_payload(), format="json")
-    assert response.status_code == 403 and response.data["code"] == "presence_required"
-
-    presence_services.start_session(user, space, 60)
+    # Booking is a plan to attend: no open presence session is required.
     response = authenticated_client(user).post(url, booking_payload(), format="json")
     assert response.status_code == 201
     booking = bookable.bookings.get()

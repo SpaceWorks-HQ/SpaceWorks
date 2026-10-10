@@ -35,6 +35,8 @@ class MemberEventRegistrationActivitySerializer(serializers.Serializer):
     starts_at = serializers.DateTimeField()
     ends_at = serializers.DateTimeField()
     status = serializers.CharField()
+    cancellation_cutoff_at = serializers.DateTimeField()
+    can_cancel = serializers.BooleanField()
     waitlist_position = serializers.IntegerField(allow_null=True)
     feedback_available = serializers.BooleanField()
     feedback_path = serializers.CharField(allow_null=True)

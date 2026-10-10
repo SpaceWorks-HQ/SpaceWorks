@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVectorField
 from django.db import models
@@ -73,6 +73,7 @@ class Event(models.Model):
         validators=[MinValueValidator(0)],
     )
     registration_requires_approval = models.BooleanField(default=False)
+    cancellation_cutoff_hours = models.PositiveIntegerField(null=True, blank=True, validators=[MaxValueValidator(8760)])
     registration_cutoff_at = models.DateTimeField(null=True, blank=True)
     registration_cutoff_lead_minutes = models.PositiveIntegerField(
         null=True,

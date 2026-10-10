@@ -16,7 +16,7 @@ from tests.member_submission import active_member_client
 pytestmark = pytest.mark.django_db
 
 SPACE_FIELDS = set(PUBLIC_BOOKABLE_SPACE_FIELDS)
-AVAILABILITY_FIELDS = {'public_token', 'starts_at', 'ends_at', 'availability'}
+AVAILABILITY_FIELDS = {'public_token', 'starts_at', 'ends_at', 'availability', 'timezone', 'opening_intervals'}
 INTERVAL_FIELDS = {'starts_at', 'ends_at', 'booker_name'}
 FORBIDDEN_KEYS = {
     'id',

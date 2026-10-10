@@ -16,6 +16,7 @@ export type EventSeriesPayload = {
   payment_amount: string;
   registration_requires_approval: boolean;
   registration_cutoff_lead_minutes: number | null;
+  cancellation_cutoff_hours?: number | null;
   is_public: boolean;
   recurrence_timezone: string;
   dtstart_local_date: string;

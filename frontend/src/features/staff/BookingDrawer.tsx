@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { ConfirmDialog, DetailDrawer, EmptyState, Skeleton, StatusBadge } from "../../components/ui";
 import { CustomAnswersView } from "../forms/CustomAnswersView";
 import { BookableSpaceForm, valuesForSpace } from "./BookableSpaceForm";
+import { StaffBookingForm } from "./StaffBookingForm";
 import {
   useBookableSpace,
   useBookingAction,
@@ -73,6 +74,7 @@ export function BookingDrawer({ makerspaceId, spaceId, onClose }: {
               <span className="text-sm text-muted">{space.effective_requester_notifications_enabled ? "Requester emails on" : "Requester emails off"}</span>
             </div>
             <BookableSpaceForm
+              makerspaceId={makerspaceId}
               key={space.updated_at}
               initialValues={valuesForSpace(space)}
               onSubmit={(payload) => update.mutate(payload)}
@@ -83,6 +85,7 @@ export function BookingDrawer({ makerspaceId, spaceId, onClose }: {
             />
             {space.is_active ? <button className="desk-button-danger w-fit" type="button" onClick={() => setConfirmDeactivate(true)}>Deactivate space</button> : <p className="text-sm text-muted">This space is inactive and read-only.</p>}
             <section aria-labelledby="space-bookings-title">
+              {space.is_active ? <StaffBookingForm makerspaceId={makerspaceId} space={space} /> : null}
               <div className="mb-3">
                 <h3 id="space-bookings-title" className="title-section">Bookings <span className="font-mono">({bookings.data?.count ?? 0})</span></h3>
                 <p className="mt-1 text-xs text-muted">Contact details and custom answers are staff-only.</p>

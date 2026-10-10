@@ -59,6 +59,7 @@ export function PublicBookingsPage() {
             <SpaceWorksBadge />
             <Link className="desk-button-ghost" to={tenantPath()}>Inventory</Link>
             {modules.has("events") ? <Link className="desk-button-ghost" to={tenantPath("events")}>Events</Link> : null}
+            <Link className="desk-button-ghost" to={tenantPath("member")}>My bookings</Link>
             <ThemeToggle />
           </div>
         </div>

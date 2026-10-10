@@ -1,13 +1,16 @@
 # Shared reminder schedules (research F1)
 
 `operations/reminder_sweeper.py` runs every five minutes in both Celery beat and
-`run_scheduled_tasks --due-only`. No production sources are registered by F1, so
-upgrading does not change notification behaviour. The existing hourly loan return
+`run_scheduled_tasks --due-only`. F1 supplies the coordination primitives; E3/B10 now register event and booking
+consumers explicitly. The existing hourly loan return
 reminder and membership renewal tasks keep their current schedules and semantics.
 
 ## Registering a source
 
-Add a `ReminderSource` explicitly to `operations/reminder_registry.py:REMINDER_SOURCES`.
+Add a `ReminderSource` explicitly to `operations/reminder_registry.py:_production_sources`.
+Runtime-active checks guard the lazy imports, so operations still loads when a domain
+app is tombstoned. `REMINDER_SOURCES=None` selects these production sources; a tuple
+is an exact override used by isolated source tests.
 Its module and optional feature must already exist in their canonical registries.
 The sweeper checks both plus the `notifications` module before discovery or claims;
 deployment tombstones are handled by `module_enabled` at the same boundary.
@@ -37,11 +40,16 @@ The source owns its query plan, cursor/fairness and future discovery horizon.
 `build(makerspace, reminder, now, local_tz)` must re-read the subject within that
 tenant and check current domain eligibility, policy offsets and due timestamp.
 Return `None` for a cancelled/returned/ineligible subject, disabled offset or stale
-due timestamp. Otherwise return a `ReminderMessage`. The sweeper sends it through
-`notifications.emit.emit_notification`, preserving the staff inbox module gate and
-fail-safe behaviour. This foundation adds no member delivery, matrix event families,
-dues, certifications, booking/event reminders or state transitions. Later consumer
-lanes own their notification matrix/recipient integration (research F2/F3).
+due timestamp. Otherwise return a `ReminderMessage`. With no `dispatch` callback the sweeper uses
+`notifications.emit.emit_notification`, preserving the staff inbox gate. Sources may
+provide an explicit `dispatch(makerspace, schedule, message)` callback for the existing
+notification matrix. E3/B10 do this for requester-only email: they never create a shared
+staff notice or send the member body to a chat room. Both re-read live status and member
+eligibility immediately before dispatch. No reminder changes domain state.
+Callbacks return `NotificationResult` (or `None` for an ineligible subject). Delivery failures
+mark the schedule FAILED; suppressed deliveries count as skipped, rather than dispatched.
+Both remain terminal under F1's at-most-once contract. The staff emitter has no delivery
+receipt, so sources without a callback still count dispatch attempts.
 
 The runnable **test-only** example is
 `backend/tests/operations/reminder_example.py`; it must never be added to the
@@ -99,3 +107,34 @@ Full deployment backup/restore retains the database coordination rows as usual.
 `REMINDER_SWEEP_BATCH_SIZE` defaults to 200 and must be positive. Cadence is fixed at
 five minutes in both scheduler surfaces, with a parity test. No new endpoint or
 generated frontend/OpenAPI artifact is needed for this internal foundation.
+
+## Event and booking consumers (E3/B10)
+
+`events/reminders.py` discovers published events with REGISTERED members;
+`bookings/reminders.py` discovers CONFIRMED bookings. Each domain revalidates tenant,
+status, start instant, enabled lead offset and active member account before sending.
+Events use durable `registered_via_makerspace` provenance (legacy null means venue),
+so a collaborative attendee receives only their own routed reminder.
+The live User email is used instead of supplied contact text. Revoked membership,
+restricted/suspended account, member opt-out and requester selection suppress mail.
+
+Makerspace settings `event_reminder_lead_hours` and `booking_reminder_lead_hours` default
+to `[24]`; `[]` disables. Policies accept up to 100 distinct whole hours from 1 to 8760.
+The existing staff settings PATCH exposes both lists with explicit OpenAPI array schemas.
+The notification matrix `events.reminder` / `bookings.reminder` events, editable requester
+email templates, requester recipient selection, email module and quotas all apply. Existing booking
+requester-email overrides also govern booking reminders. Events keep their existing
+email default OFF until staff enable the events email cell. Reminder mail uses the
+makerspace local timezone, including DST; elapsed lead offsets remain UTC instants.
+Confirmed registrations in the member ICS feed carry matching DISPLAY VALARM components;
+cancelled, tentative and public feed components carry no member alarm.
+
+Discovery covers upcoming starts within the longest lead horizon and catches overdue
+steps until the start. Subjects enter discovery batches only when an unfinished step
+is due now; a future second offset cannot hold a batch after the first step completes
+and starve later attendees. All offsets are scheduled on first discovery.
+One missed step is dispatched at most once; policies
+and due timestamps do not reset completed claims. Production subject identities include
+the UTC start instant, so rescheduling creates a new occurrence while preserving the
+old committed claim. A reminder suppressed after a claim is terminal, consistent with
+F1's at-most-once guarantee.

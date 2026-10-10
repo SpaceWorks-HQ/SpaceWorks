@@ -13,6 +13,15 @@ def _same(label, names, disposition, reason):
 
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
+    *_same('bookings.BookableSpace',
+           'buffer_before_minutes buffer_after_minutes cancellation_cutoff_hours', D.PRESERVE,
+           'Tenant booking windows and member cancellation policy travel under target module gates.'),
+    *_same('events.Event', 'cancellation_cutoff_hours', D.PRESERVE,
+           'The event cancellation deadline is a portable scheduling policy.'),
+    *_same('events.EventSeries', 'cancellation_cutoff_hours', D.PRESERVE,
+           'The recurring event cancellation deadline is a portable scheduling policy.'),
+    *_same('makerspaces.Makerspace', 'event_reminder_lead_hours booking_reminder_lead_hours', D.PRESERVE,
+           'Tenant reminder timing travels; target channel and recipient gates still apply.'),
     *_same("operations.SavedView", "shared state", D.RESET,
            "Target publication and filter identifiers must be authorized anew."),
     *_same(

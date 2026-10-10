@@ -19,8 +19,8 @@ function rangeLabel(startsAt: string, endsAt: string) {
   return `${format.format(new Date(startsAt))} – ${format.format(inclusiveEnd)}`;
 }
 
-function intervalLabel(startsAt: string, endsAt: string) {
-  const format = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+function intervalLabel(startsAt: string, endsAt: string, timeZone?: string) {
+  const format = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone });
   return `${format.format(new Date(startsAt))} – ${format.format(new Date(endsAt))}`;
 }
 
@@ -51,6 +51,10 @@ export function AvailabilityCalendar({ makerspaceSlug, publicToken }: {
           <button className="desk-button-ghost mt-2" type="button" onClick={() => availability.refetch()}>Retry</button>
         </div>
       ) : null}
+      {availability.data?.opening_intervals ? <div className="mt-3 text-sm text-muted">
+        <p className="font-semibold">Opening times ({availability.data.timezone})</p>
+        {availability.data.opening_intervals.length === 0 ? <p>The makerspace is closed in this window.</p> : <ul>{availability.data.opening_intervals.map((interval) => <li key={interval.starts_at}>{intervalLabel(interval.starts_at, interval.ends_at, availability.data.timezone)}</li>)}</ul>}
+      </div> : null}
       {availability.data?.availability === null ? (
         <p className="mt-3 text-sm text-muted">Availability is not published. You may still submit your selected time for the makerspace to check.</p>
       ) : null}
@@ -61,7 +65,7 @@ export function AvailabilityCalendar({ makerspaceSlug, publicToken }: {
         <ul className="mt-3 grid gap-2">
           {availability.data.availability.map((interval) => (
             <li className="rounded-lg border border-success bg-success/15 px-3 py-2 text-sm text-ink" key={interval.starts_at + interval.ends_at}>
-              <time className="font-mono" dateTime={interval.starts_at}>{intervalLabel(interval.starts_at, interval.ends_at)}</time>
+              <time className="font-mono" dateTime={interval.starts_at}>{intervalLabel(interval.starts_at, interval.ends_at, availability.data.timezone)}</time>
               {interval.booker_name !== null ? <span className="ml-2 font-semibold">{interval.booker_name}</span> : null}
             </li>
           ))}

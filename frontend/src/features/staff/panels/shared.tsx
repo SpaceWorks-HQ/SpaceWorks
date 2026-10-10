@@ -28,6 +28,8 @@ export type Makerspace = {
   superadmin_access_enabled?: boolean;
   staff_notifications_enabled?: boolean;
   booking_requester_notifications_enabled?: boolean;
+  event_reminder_lead_hours?: number[];
+  booking_reminder_lead_hours?: number[];
   public_stats_enabled?: boolean;
   public_stats_show_holder_names?: boolean;
   public_print_status_lookup_policy?: "token_only" | "email_unverified";

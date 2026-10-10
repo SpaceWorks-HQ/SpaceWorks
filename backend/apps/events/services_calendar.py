@@ -226,11 +226,15 @@ def render_public_series_calendar(series):
 
 
 def render_member_calendar(makerspace, registrations):
+    from apps.events.calendar_alarms import add_member_alarms
+
     calendar = _calendar(f"{makerspace.name} - My events")
     for registration in registrations.select_related("event").order_by(
         "event__starts_at", "pk"
     ):
-        calendar.add_component(
-            _event_component(registration.event, registration=registration)
-        )
+        component = _event_component(registration.event, registration=registration)
+        if (registration.status == EventRegistration.Status.REGISTERED
+                and registration.event.status == Event.Status.PUBLISHED):
+            add_member_alarms(component, makerspace, registration.event.title)
+        calendar.add_component(component)
     return calendar.to_ical()

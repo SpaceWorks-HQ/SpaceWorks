@@ -35,7 +35,7 @@ PUBLIC_EVENT_REGISTRATION_ERRORS = {
     **PUBLIC_EVENT_ERRORS,
     401: OpenApiResponse(ErrorSerializer, description='Authentication is required.'),
     403: OpenApiResponse(ErrorSerializer, description='Active membership and current waiver acceptance are required.'),
-    409: OpenApiResponse(ErrorSerializer, description='Event state conflict.'),
+    409: OpenApiResponse(ErrorSerializer, description='Event state conflict or cancelled paid registration cannot be reused.'),
 }
 
 

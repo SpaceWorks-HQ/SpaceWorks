@@ -5,9 +5,12 @@ from apps.bookings.views_public import (
     PublicBookingSubmissionView,
     PublicSpaceAvailabilityView,
 )
+from apps.bookings.views_member import MemberBookingCancelView, MemberBookingListView
 
 
 urlpatterns = [
+    path('<slug:makerspace_slug>/my-bookings/', MemberBookingListView.as_view(), name='member-booking-list'),
+    path('<slug:makerspace_slug>/my-bookings/<uuid:public_token>/cancel/', MemberBookingCancelView.as_view(), name='member-booking-cancel'),
     path(
         '<slug:makerspace_slug>/spaces/',
         PublicBookableSpaceListView.as_view(),

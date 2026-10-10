@@ -25,7 +25,7 @@ EVENT_FIELDS = frozenset(
     {'title', 'description', 'starts_at', 'ends_at', 'location',
      'location_kind', 'custom_form', 'capacity', 'is_public', 'payment_amount',
      'registration_requires_approval', 'registration_cutoff_at',
-     'registration_cutoff_lead_minutes', 'timezone_name'}
+     'registration_cutoff_lead_minutes', 'cancellation_cutoff_hours', 'timezone_name'}
 )
 INHERITABLE_FIELDS = EVENT_FIELDS | {"image_key"}
 
@@ -72,7 +72,7 @@ def create_event(
     capacity, is_public, location_kind=Event.LocationKind.OTHER, custom_form=None,
     payment_amount=0, registration_requires_approval=False,
     registration_cutoff_at=None, registration_cutoff_lead_minutes=None,
-    timezone_name=None,
+    timezone_name=None, cancellation_cutoff_hours=None,
 ):
     locked_space = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
     require_module_locked(locked_space, "events")
@@ -89,6 +89,7 @@ def create_event(
         capacity=capacity,
         payment_amount=payment_amount,
         registration_requires_approval=registration_requires_approval,
+        cancellation_cutoff_hours=cancellation_cutoff_hours,
         registration_cutoff_at=registration_cutoff_at,
         registration_cutoff_lead_minutes=registration_cutoff_lead_minutes,
         is_public=is_public,

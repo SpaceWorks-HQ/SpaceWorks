@@ -4,6 +4,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.events.capacity import spots_left
+from apps.events.cancellation_policy import member_can_cancel
 from apps.events.exceptions import CapacityConflict, EventInvalidTransition
 from apps.events.models import Event, EventAttendanceCertificate, EventRegistration
 from apps.events.service_payments import (
@@ -158,11 +159,15 @@ def promote_registration(registration, *, actor):
 
 
 @transaction.atomic
-def cancel_registration(registration, *, actor=None):
+def cancel_registration(registration, *, actor=None, member_cancel=False):
     services = _boundary()
     event = services._locked_event(registration.event_id)
     require_module_locked(event.makerspace_id, "events")
     locked = _lock_registration(event, registration.pk)
+    if member_cancel and (
+        actor is None or locked.member_id != actor.pk or not member_can_cancel(locked)
+    ):
+        raise EventInvalidTransition("The member cancellation deadline has passed.")
     if locked.status not in (
         EventRegistration.Status.PENDING_APPROVAL,
         EventRegistration.Status.REGISTERED,
