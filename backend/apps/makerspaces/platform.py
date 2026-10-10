@@ -4,7 +4,8 @@ from django.conf import settings
 
 from apps.inventory import public_image_storage
 from apps.integrations.email import email_enabled
-from apps.makerspaces.models import Makerspace, default_branding_config, default_theme_config
+from apps.makerspaces.models import Makerspace, default_branding_config
+from apps.makerspaces.theme_validation import public_theme_config
 from apps.makerspaces.servability import is_servable, servable_queryset
 from apps.makerspaces.capabilities import FEATURE_MODULES, FEATURES
 from apps.makerspaces.module_registry import is_frontend_exposed, module_available, module_workflows
@@ -171,8 +172,7 @@ def bootstrap_payload(makerspace):
 
     modules = sorted(key for key in available_modules(makerspace) if is_frontend_exposed(key))
     features = sorted(key for key, definition in FEATURES.items() if definition.frontend_exposed and feature_enabled(makerspace, key))
-    theme = default_theme_config()
-    theme.update(makerspace.theme_config or {})
+    theme = public_theme_config(makerspace.theme_config)
     logo_url = public_image_storage.public_url(makerspace.logo_key) or theme.get("logo_url") or ""
     cover_image_url = public_image_storage.public_url(makerspace.cover_image_key) or ""
     branding = default_branding_config()

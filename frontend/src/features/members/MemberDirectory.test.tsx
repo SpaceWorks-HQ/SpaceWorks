@@ -20,4 +20,16 @@ describe("MemberDirectory", () => {
     expect(memberRequest).toHaveBeenCalledWith("/member/makerspaces/3/directory/2");
   });
   it("shows a list error", async () => { vi.mocked(memberRequest).mockRejectedValue(new Error("Directory unavailable")); show(); expect(await screen.findByRole("alert")).toHaveTextContent("Directory unavailable"); });
+  it("gives nested identity cards a neutral profile base instead of stacking tints", async () => {
+    vi.mocked(memberRequest).mockImplementation(async (path) => path.endsWith("/2")
+      ? { institution: "Neutral profile", bio: "Maker bio", interests: [], languages: [], education: [], achievements: [], projects: [{ id: 2, title: "Mint project", description: "Project details", links: [], image_url: null }] }
+      : { members: [{ membership_id: 2, display_name: "Maker", headline: "Robots", avatar_url: null }], hidden_count: 0 });
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: /Maker/ }));
+    const profile = (await screen.findByText("Neutral profile")).parentElement;
+    expect(profile).toHaveClass("desk-panel");
+    expect(profile).not.toHaveClass("bg-secondary/10");
+    expect(profile?.parentElement).not.toHaveClass("bg-secondary/15");
+    expect(screen.getByText("Mint project").closest("article")).toHaveClass("bg-success/15");
+  });
 });

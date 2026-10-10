@@ -103,7 +103,7 @@ export function PublicInventoryPage() {
                   onChange={(event) => setSearchInput(event.target.value)}
                 />
               </Field>
-              <button className="desk-button-primary" type="submit">
+              <button className="desk-button-secondary" type="submit">
                 Search
               </button>
               {query ? (

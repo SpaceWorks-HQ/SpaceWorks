@@ -235,7 +235,7 @@ export function PublicSelfCheckoutPage() {
             </div>
 
             <button
-              className="desk-button-primary mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50"
+              className="desk-button-secondary mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!canScan || loanMutation.isPending}
               type="button"
               onClick={() => setScannerOpen(true)}

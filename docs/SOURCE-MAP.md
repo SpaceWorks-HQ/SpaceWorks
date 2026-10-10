@@ -35,7 +35,9 @@ Queries use `accounts/rbac.py:scope_for_scheduled_work`; see
   `module_registry_validation.py`, so add a module to the catalogue), `platform.py` (origin helpers), `limits.py` (fair-use quotas), `lifecycle.py` (archive/purge barrel
   over `lifecycle_archive.py`, `lifecycle_purge.py` and `lifecycle_storage.py`),
   `models_makerspace_validation.py` owns model clean checks; `theme_validation.py` validates
-  the closed theme JSON for control forms and API writes.
+  the closed theme JSON for control forms and API writes; `theme_contrast.py` owns
+  the shared WCAG contract. `theme_validation.public_theme_config` sanitizes bootstrap
+  colours while retaining independently valid logo and mode values.
   `profile_validation.py` validates IANA timezone, ISO country and opening-hours JSON;
   `opening_hours_schema.py` documents the shared hours schema. `local_time.py` owns
   `local_now`, `to_local`, `local_day_bounds`, `is_open` and `next_open_interval`

@@ -9,6 +9,7 @@ from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.admin_api.permissions import IsActiveStaff
 from apps.admin_api import settings_audit
+from apps.admin_api.serializers_theme import MAKERSPACE_WRITE_ERRORS
 from apps.admin_api.serializers_makerspaces import (
     MakerspaceSerializer,
     MakerspaceSwitcherSerializer,
@@ -26,7 +27,7 @@ from apps.makerspaces.servability import servable_queryset
 from apps.openapi_errors import errors
 
 
-_INVALID = OpenApiResponse(description="Field validation errors, keyed by field.")
+_INVALID = MAKERSPACE_WRITE_ERRORS[400]
 _NOT_FOUND = OpenApiResponse(
     description=(
         "Makerspace not found, archived, not active, hidden from superadmins, or outside "

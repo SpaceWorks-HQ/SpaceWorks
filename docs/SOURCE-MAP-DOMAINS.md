@@ -88,9 +88,10 @@ Continued from [SOURCE-MAP.md](SOURCE-MAP.md); paths are relative to the reposit
   `publicOrganizationsApi.ts` owns their TanStack Query keys and public API calls. Staff profile,
   membership, invitation and event-organizer controls remain under `frontend/src/features/staff/`.
 
-Tenant branding lives in `frontend/src/lib/brandColours.ts` (AA checks) and
-`useTenantBranding.ts` (page-scoped variables). `lib/theme.ts` owns the browser theme preference;
-`components/SupportContact.tsx` renders safe tenant support links.
+Tenant branding lives in `frontend/src/lib/brandColours.ts` (WCAG checks and
+light/dark palette derivation) and `useTenantBranding.ts` (page-scoped variables).
+See [SOURCE-MAP-FRONTEND.md](SOURCE-MAP-FRONTEND.md) for the theme settings preview,
+shared component styles, browser theme preference and tenant support links.
 
 ## Connected device monitoring (phase 7d lane)
 

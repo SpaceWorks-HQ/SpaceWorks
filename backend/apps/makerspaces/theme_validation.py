@@ -5,6 +5,8 @@ import re
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 
+from apps.makerspaces.theme_contrast import contrast_failures
+
 
 THEME_KEYS = frozenset({"mode", "primary_color", "accent_color", "logo_url"})
 HEX_COLOR = re.compile(r"#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\Z")
@@ -26,7 +28,38 @@ def validate_theme_config(value):
             if len(item) > 2048:
                 raise ValidationError("Logo URL must be at most 2048 characters.")
             URLValidator(schemes=["https", "http"])(item)
-    # Contrast depends on the rendered light/dark text and surfaces. The client
-    # checks those actual tokens and falls back per colour; do not reject brands
-    # that are usable in only one mode at the storage boundary.
+    failures = contrast_failures(value)
+    if failures:
+        raise ValidationError([
+            f"{item['mode']}: {item['pair']} is {item['ratio']:.2f}:1; "
+            f"requires {item['minimum']}:1. Choose a lighter or darker primary colour."
+            for item in failures
+        ], code="theme_contrast")
     return value
+
+
+def public_theme_config(value):
+    """Fallback colours without dropping a valid legacy logo or theme mode."""
+    from apps.makerspaces.models import default_theme_config
+
+    theme = default_theme_config()
+    if not isinstance(value, dict):
+        return theme
+    # Preserve independently valid presentation keys even if restored colours
+    # are unsafe. Validation here never writes back into the tenant's row.
+    for key in ("mode", "logo_url"):
+        if key not in value:
+            continue
+        try:
+            validate_theme_config({key: value[key]})
+        except ValidationError:
+            continue
+        theme[key] = value[key]
+    palette = {key: value[key] for key in ("primary_color", "accent_color") if key in value}
+    try:
+        validate_theme_config(palette)
+    except ValidationError:
+        pass
+    else:
+        theme.update(palette)
+    return theme

@@ -71,7 +71,7 @@ export function PublicEvidenceUpload({
               const file = event.target.files?.[0];
               if (file) handleFile(file);
             }}
-            className="block min-h-11 w-full text-sm text-muted file:mr-3 file:min-h-11 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-2 file:text-sm file:font-semibold file:text-on-accent disabled:opacity-60"
+            className="block min-h-11 w-full text-sm text-muted file:mr-3 file:min-h-11 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-on-secondary disabled:opacity-60"
           />
         </label>
         {cameraSupported ? (

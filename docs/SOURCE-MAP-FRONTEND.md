@@ -39,6 +39,10 @@ The backend and shared device source map is in [SOURCE-MAP.md](SOURCE-MAP.md).
   `publicOrganizationsApi.ts` owns their TanStack Query keys and public API calls. Staff profile,
   membership, invitation and event-organizer controls remain under `frontend/src/features/staff/`.
 
-Tenant branding lives in `frontend/src/lib/brandColours.ts` (AA checks) and
-`useTenantBranding.ts` (page-scoped variables). `lib/theme.ts` owns the browser theme preference;
+Tenant branding lives in `frontend/src/lib/brandColours.ts` (WCAG maths, both-mode
+foreground/interaction/ink/tint derivation) and `useTenantBranding.ts` (page-scoped
+variables). `features/staff/MakerspaceThemeSettings.tsx` owns the live contrast preview
+and audited settings PATCH. `src/styles/components.css` owns the shared component
+layer and opaque secondary tint utilities; `src/index.css` owns product tokens, fonts
+and base styles. `lib/theme.ts` owns browser theme preference;
 `components/SupportContact.tsx` renders safe tenant support links.
