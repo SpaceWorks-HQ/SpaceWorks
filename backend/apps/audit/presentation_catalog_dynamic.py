@@ -50,6 +50,8 @@ DYNAMIC_EXACT_ACTIONS = frozenset({
     "member.profile_image_updated",
     "membership.approved",
     "membership.joined",
+    "membership.left",
+    "membership.revoked",
     "organization.created",
     "organization.link_created",
     "organization.link_updated",

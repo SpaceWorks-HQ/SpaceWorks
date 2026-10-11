@@ -107,9 +107,8 @@ def require_current_term(makerspace, membership):
         return
 
     terms = MembershipTerm.objects.filter(membership=membership)
-    if not terms.exists() or terms.filter(
-        status=MembershipTerm.Status.ACTIVE, ends_at__gt=timezone.now()
-    ).exists():
+    from apps.makerspaces.membership_renewals import current_terms
+    if not terms.exists() or current_terms(membership):
         return
     from apps.presence.guard import MemberPresenceRequired
 

@@ -49,7 +49,9 @@ def test_current_all_active_tree_has_a_complete_claim_matrix(settings):
     # routes (card, photo, preview) from forward plan phase 5 — all Refused. Plus the
     # public invitation-request route from forward plan phase 6 (Refused: 88 -> 89).
     # Delegated member verification is a separate member route; claim sessions are refused.
-    assert len(validate_claim_route_matrix()) == 90
+    # Wave 1 added seven security and five admission routes; this lane adds nine
+    # account/subject-export routes. All account mutations refuse bounded claims.
+    assert len(validate_claim_route_matrix()) == 111
 
 
 def test_unclassified_runtime_lookup_fails_closed_and_middleware_stays_out():

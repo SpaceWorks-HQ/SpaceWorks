@@ -238,6 +238,10 @@ in the console rather than a superadmin. A feature is inert while its parent mod
 | `charges.bookings` | `bookings` | ● | Record a charge when a paid booking is confirmed | Bookings are free |
 | `charges.events` | `events` | ● | Record a charge when a registration for a paid event is confirmed | Registration is free |
 | `charges.membership` | `membership` | ● | Record dues and renewal charges | Dues are not recorded |
+| `membership.auto_renew` | `membership` | | Open the next term after renewal settlement, with plan timing/retries/grace | Manual renewal terms remain available |
+| `membership.lifecycle_mail` | `membership` | | Send renewal lifecycle mail to the member | No automated lifecycle mail |
+| `membership.self_service` | `membership` | | Edit own contact fields, revoke sessions and cancel/leave | Staff manage membership changes |
+| `membership.self_export` | `membership` | | Request a private personal ZIP/JSON export | No member export surface |
 | `charges.loans` | `request_workflow` | ● | Record loan deposits and late fees (amounts are set in payment settings) | Lateness is recorded but never charged |
 | `payments.enabled` | `payments` | ● | Master switch for all online payments | Every `payments.<area>` switch below is inert |
 | `payments.machines` | `machines` | | Card rail for machine-job charges | Charges are still recorded and settled offline |

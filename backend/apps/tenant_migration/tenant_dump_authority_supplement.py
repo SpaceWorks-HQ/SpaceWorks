@@ -13,6 +13,19 @@ def _same(label, names, disposition, reason):
 
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
+    *_same("makerspaces.MembershipTerm", "renewed_from", D.PRESERVE,
+           "Renewal provenance travels through the remapped predecessor, preventing duplicate extensions."),
+    *_same("makerspaces.MembershipPlan",
+           "auto_renew reminder_days_before reminder_days_after", D.RESET,
+           "Target staff opt in to automated renewal and lifecycle mail."),
+    *_same("makerspaces.MembershipPlan", "renewal_open_days renewal_grace_days renewal_retries", D.PRESERVE,
+           "Renewal timing is inert policy until target staff enable automation."),
+    *_same("makerspaces.MembershipTerm", "renewal_attempts renewal_retry_at", D.RESET,
+           "Checkout retries are source-local delivery coordination."),
+    *_same("makerspaces.MembershipTerm", "grace_until", D.PRESERVE,
+           "The source member's promised grace boundary travels as historical coverage."),
+    *_same("makerspaces.MakerspaceMembership", "renewal_cancelled_at", D.PRESERVE,
+           "A member's decision not to renew must survive migration."),
     *_same("operations.SavedView", "shared state", D.RESET,
            "Target publication and filter identifiers must be authorized anew."),
     *_same(

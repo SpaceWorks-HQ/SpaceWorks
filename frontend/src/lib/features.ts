@@ -10,6 +10,10 @@ export type FeatureDefinition = {
 // parses this file and fails if the two drift, so keep the shape (one object literal
 // per line, keys in this order) that the guard reads.
 export const FEATURE_DEFINITIONS: readonly FeatureDefinition[] = [
+  { key: "membership.auto_renew", parent_module: "membership", label: "Automatic membership renewal" },
+  { key: "membership.lifecycle_mail", parent_module: "membership", label: "Membership lifecycle mail" },
+  { key: "membership.self_service", parent_module: "membership", label: "Member account self-service" },
+  { key: "membership.self_export", parent_module: "membership", label: "Member data export" },
   { key: "billing.reminders", parent_module: "notifications", label: "Payment reminders" },
   { key: "staff.invitations", parent_module: null, label: "Staff invitations" },
   { key: "security.staff_mfa_required", parent_module: null, label: "Require MFA for staff" },

@@ -17,6 +17,7 @@ from .presentation_catalog_dynamic import (
 from .presentation_catalog_hardware import ENTRIES as _HARDWARE
 from .presentation_catalog_machines import ENTRIES as _MACHINES
 from .presentation_catalog_makerspaces import ENTRIES as _MAKERSPACES
+from .presentation_catalog_member_account import ENTRIES as _MEMBER_ACCOUNT
 from .presentation_catalog_migration import ENTRIES as _MIGRATION
 from .presentation_catalog_payments import ENTRIES as _PAYMENTS
 from .presentation_catalog_platform import ENTRIES as _PLATFORM
@@ -41,7 +42,7 @@ def _compose(*fragments):
 
 PRESENTATION_CATALOG = _compose(
     _ACCOUNTS, _MAKERSPACES, _HARDWARE, _MACHINES, _COMMUNITY, _MIGRATION, _PAYMENTS,
-    _PLATFORM,
+    _PLATFORM, _MEMBER_ACCOUNT,
 )
 
 

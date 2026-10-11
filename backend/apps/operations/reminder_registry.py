@@ -14,8 +14,9 @@ from apps.operations.reminder_types import (  # noqa: F401 - explicit compatibil
 from apps.operations.membership_payment_reminders import MEMBERSHIP_PAYMENT_SOURCE
 
 def _production_sources():
+    from apps.makerspaces.membership_renewal_reminders import MEMBERSHIP_RENEWAL_SOURCE
     from apps.payments.reminders import build_payment_message, discover_payments, dispatch_payment_message
-    return (MEMBERSHIP_PAYMENT_SOURCE, ReminderSource(
+    return (MEMBERSHIP_PAYMENT_SOURCE, MEMBERSHIP_RENEWAL_SOURCE, ReminderSource(
         key="payments.due", module="request_workflow", feature="billing.reminders",
         discover=discover_payments, build=build_payment_message, dispatch=dispatch_payment_message,
     ))

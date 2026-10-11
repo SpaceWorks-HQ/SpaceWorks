@@ -15,6 +15,11 @@ def _default(reason, *, allow_superadmin_override=False):
 
 
 TARGET_FIELD_PROJECTION = {
+    ("makerspaces.MembershipPlan", "auto_renew"): TargetField(False, reason="Target staff enable automatic renewal."),
+    ("makerspaces.MembershipPlan", "reminder_days_before"): TargetField([], reason="Target staff choose mail offsets."),
+    ("makerspaces.MembershipPlan", "reminder_days_after"): TargetField([], reason="Target staff choose mail offsets."),
+    ("makerspaces.MembershipTerm", "renewal_attempts"): TargetField(0, reason="Retry attempts belong to the source checkout."),
+    ("makerspaces.MembershipTerm", "renewal_retry_at"): TargetField(None, reason="Source checkout retry must not run on the target."),
     ("operations.SavedView", "shared"): TargetField(False, reason="Imported preferences require target-authorized publication."),
     ("operations.SavedView", "state"): TargetField({}, reason="Source filter identifiers must not address target rows."),
     ("makerspaces.MakerspaceMembershipSettings", "join_mode"): TargetField(

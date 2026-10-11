@@ -14,6 +14,8 @@ class MembershipPlanSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "interval", "custom_days", "amount", "currency", "is_active",
             "created_at", "updated_at",
+            "auto_renew", "renewal_open_days", "renewal_grace_days", "renewal_retries",
+            "reminder_days_before", "reminder_days_after",
         ]
         # `makerspace` comes from the URL, never the body: accepting it would let a
         # manager in one space price memberships in another.
@@ -25,6 +27,12 @@ class MembershipPlanSerializer(serializers.ModelSerializer):
         return value.lower()
 
     def validate(self, attrs):
+        for name in ("reminder_days_before", "reminder_days_after"):
+            values = attrs.get(name, [])
+            if not isinstance(values, list) or len(values) > 10 or any(
+                type(day) is not int or not 1 <= day <= 365 for day in values
+            ):
+                raise serializers.ValidationError({name: "Use up to ten day offsets between 1 and 365."})
         interval = attrs.get("interval", getattr(self.instance, "interval", None))
         custom_days = attrs.get("custom_days", getattr(self.instance, "custom_days", None))
         if interval == MembershipPlan.Interval.CUSTOM_DAYS:

@@ -58,7 +58,8 @@ describe("MembershipPlansSection", () => {
       "/admin/makerspaces/7/membership-plans",
       {
         method: "POST",
-        body: JSON.stringify({ name: "Yearly", interval: "yearly", custom_days: null, amount: "300", currency: "usd", is_active: true }),
+        body: JSON.stringify({ name: "Yearly", interval: "yearly", custom_days: null, amount: "300", currency: "usd", is_active: true,
+          auto_renew: false, renewal_open_days: 7, renewal_grace_days: 0, renewal_retries: 0, reminder_days_before: [1, 7, 14], reminder_days_after: [] }),
       },
     ));
 

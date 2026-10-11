@@ -123,6 +123,17 @@ Redis backs the cache (rate limits, nonces, verified hosts), the Celery broker a
 
 ## Upload limits and evidence retention
 
+Personal subject exports reuse the tenant export limits and private bucket above;
+this feature introduces no new environment variables. Signed links use the browser
+storage endpoint and expire no later than the archive retention boundary.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `DATA_EXPORT_DEADLINE_SECONDS` | `900` | Maximum worker build time for tenant and personal exports. |
+| `DATA_EXPORT_PAGE_SIZE` | `500` | Database iterator batch size for export rows. |
+| `DATA_EXPORT_RETENTION_SECONDS` | `604800` | Archive retention (seven days), including personal ZIPs. |
+| `DATA_EXPORT_DOWNLOAD_TTL_SECONDS` | `300` | Maximum personal signed-link lifetime (five minutes). |
+
 | Variable | Default | Notes |
 |---|---|---|
 | `EVIDENCE_ABANDONED_UPLOAD_CLEANUP_ENABLED` | `False` | Deployment switch for deleting upload slots no workflow consumed; each makerspace must also opt in. |
