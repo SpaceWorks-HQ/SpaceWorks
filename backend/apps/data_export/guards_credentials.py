@@ -6,6 +6,7 @@ Split out of ``guards`` (which sat at the 300-line ceiling).
 import re
 
 from .credentials_7b import PRINTER_NON_CREDENTIAL
+from .credentials_wp3 import WP3_NON_CREDENTIAL
 from .types import Omitted
 
 CREDENTIAL_NAME = re.compile(
@@ -27,6 +28,7 @@ REVIEWED_NON_CREDENTIAL = {
     ): "Expiry timestamp for the rotation grace window; the secret itself is omitted.",
 }
 REVIEWED_NON_CREDENTIAL.update(PRINTER_NON_CREDENTIAL)
+REVIEWED_NON_CREDENTIAL.update(WP3_NON_CREDENTIAL)
 
 
 def validate_credentials(fields=None):
@@ -41,4 +43,3 @@ def validate_credentials(fields=None):
         if isinstance(disposition, Omitted) or (label, field_name) in REVIEWED_NON_CREDENTIAL:
             continue
         raise RegistryError(f"credential-like field not omitted: {fidelity} {label}.{field_name}")
-

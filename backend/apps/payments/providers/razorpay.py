@@ -192,6 +192,7 @@ class RazorpayProvider:
         return WebhookEvent(
             event_id=event_id,
             is_paid=event_type in PAID_EVENTS,
+            is_failed=event_type == "payment.failed",
             order_id=link.get("id") or order.get("id") or payment.get("order_id") or "",
             payment_id=payment.get("id") or refund.get("payment_id") or "",
             metadata=link.get("notes") or payment.get("notes") or order.get("notes") or {},

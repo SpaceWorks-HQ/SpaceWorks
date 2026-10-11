@@ -144,9 +144,14 @@ def dispatch_email(
         # so the stored row stays redacted while delivery uses the real content.
         log.text_body = text_body
         log.html_body = html_body
+        log._timing_ineligible = True
     if platform_minimized:
         log.to_email = to_email
         log.subject = subject
+    if persist_body and makerspace is not None:
+        from apps.integrations.timing_dispatch import defer_log
+        if defer_log(log, kind='email'):
+            return log
     if sync:
         return _deliver(log)
     transaction.on_commit(lambda lid=log.id: _enqueue(lid))
@@ -173,4 +178,3 @@ def _enqueue(log_id):
             "email_enqueue_failed",
             extra={"email_log_id": log_id, "error_class": type(exc).__name__},
         )
-

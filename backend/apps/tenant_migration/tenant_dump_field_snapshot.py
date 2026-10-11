@@ -241,6 +241,11 @@ from .catalog_7c import LABEL_FIELD_NAMES
 
 FIRST_PARTY_FIELD_NAMES.update(LABEL_FIELD_NAMES)
 
+from .catalog_wp3 import WP3_FIELD_NAMES, WP3_EXTRA_FIELDS
+FIRST_PARTY_FIELD_NAMES.update(WP3_FIELD_NAMES)
+for _label, _names in WP3_EXTRA_FIELDS.items():
+    FIRST_PARTY_FIELD_NAMES[_label] |= _names
+
 AUTO_CREATED_FIELD_NAMES = {
     'auth.Group_permissions': frozenset('group id permission'.split()),
     'accounts.User_groups': frozenset('group id user'.split()),

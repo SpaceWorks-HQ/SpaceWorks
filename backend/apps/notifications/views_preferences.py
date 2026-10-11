@@ -30,7 +30,7 @@ def save_preference(user, space, data, *, unsubscribe=False):
     with tenant_write(space.pk):
         rbac.scope_notification_policy(MemberNotificationPreference.objects.all(), makerspace_id=space.pk).update_or_create(
             user=user, makerspace=space, feature=data["feature"], channel=data["channel"],
-            defaults={"enabled": data["enabled"]},
+            defaults={key: data[key] for key in ("enabled", "daily_digest") if key in data},
         )
         audit.record(
             user, "notification.unsubscribed" if unsubscribe else "notification.preference_updated",
@@ -55,6 +55,8 @@ class MemberPreferenceView(APIView):
         data = serializer.validated_data
         if data["enabled"] and not channel_available(space, data["feature"], data["channel"]):
             raise ValidationError({"channel": "This family/channel is disabled by the makerspace."})
+        if data.get("daily_digest") and (data["channel"] != "email" or not feature_enabled(space, "notifications.digests")):
+            raise ValidationError({"daily_digest": "Daily digests are disabled or this is not an email channel."})
         save_preference(request.user, space, data)
         return Response({"cells": preference_cells(space, request.user)})
 

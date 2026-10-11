@@ -134,7 +134,7 @@ PLANS = (
     ),
     ModulePurgePlan(
         "notifications", "In-app notification rows.", notifications_delete,
-        pii_labels=("notifications.NotificationInboxRow",),
+        pii_labels=("notifications.NotificationInboxRow", "notifications.MemberBroadcast"),
     ),
     # No plan lists payments any more -- see ModulePurgePlan above. Membership dues were
     # always the exception; they are now simply the rule.

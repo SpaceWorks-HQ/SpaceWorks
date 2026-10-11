@@ -14,6 +14,9 @@ def _build(entries):
 
 
 AUTHORITY_FIELD_OVERRIDES = _build(AUTHORITY_ENTRIES)
+from .catalog_wp3 import wp3_authority
+AUTHORITY_FIELD_OVERRIDES.update(wp3_authority(authority, D))
+
 NON_MODEL_AUTHORITY_INPUTS = {
     "target_native_app_registrations": authority(D.RESET, "Use exact target configuration."),
     "target_api_client_approvals": authority(D.RESET, "Fresh artifact-bound host approval only."),

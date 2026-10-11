@@ -204,6 +204,9 @@ FEATURE_DEFINITIONS = (
         default_enabled=False,
     ),
 )
+from .capability_definitions_wp3 import wp3_features
+FEATURE_DEFINITIONS += wp3_features(FeatureDefinition)
+
 FEATURES = {definition.key: definition for definition in FEATURE_DEFINITIONS}
 # A feature's parent/required modules are validated against the module registry
 # rather than a hand-kept set, so adding a module can no longer leave a valid

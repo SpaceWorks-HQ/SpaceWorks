@@ -17,7 +17,9 @@ def _production_sources():
     from apps.separability.registry import runtime_active
     from . import reminder_machine_sources as machines
 
-    sources = [MEMBERSHIP_PAYMENT_SOURCE, MEMBERSHIP_RENEWAL_SOURCE, ReminderSource(
+    from apps.integrations.reminders_deferred import DEFERRED_SOURCE
+
+    sources = [DEFERRED_SOURCE, MEMBERSHIP_PAYMENT_SOURCE, MEMBERSHIP_RENEWAL_SOURCE, ReminderSource(
         key="payments.due", module="request_workflow", feature="billing.reminders",
         discover=discover_payments, build=build_payment_message, dispatch=dispatch_payment_message,
     ), *LOAN_REMINDER_SOURCES]

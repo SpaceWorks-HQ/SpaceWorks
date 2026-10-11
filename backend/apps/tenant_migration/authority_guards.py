@@ -34,6 +34,7 @@ APPS_DIR = Path(project_apps.__file__).resolve().parent
 AUTHORIZATION_SOURCES = (
     APPS_DIR / "accounts" / "rbac.py",
     APPS_DIR / "accounts" / "rbac_notifications.py",
+    APPS_DIR / "accounts" / "rbac_bookings.py",
     APPS_DIR / "accounts" / "rbac_actions.py",
     APPS_DIR / "accounts" / "rbac_memberships.py",
     APPS_DIR / "accounts" / "rbac_borrowers.py",

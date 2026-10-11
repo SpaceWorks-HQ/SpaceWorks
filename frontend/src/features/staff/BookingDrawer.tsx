@@ -39,7 +39,8 @@ function actionLabel(action: BookingAction) {
   }[action];
 }
 
-export function BookingDrawer({ makerspaceId, spaceId, onClose }: {
+export function BookingDrawer({ makerspaceId, spaceId, onClose, recurringEnabled = false }: {
+  recurringEnabled?: boolean;
   makerspaceId: number;
   spaceId: number;
   onClose: () => void;
@@ -85,7 +86,7 @@ export function BookingDrawer({ makerspaceId, spaceId, onClose }: {
             />
             {space.is_active ? <button className="desk-button-danger w-fit" type="button" onClick={() => setConfirmDeactivate(true)}>Deactivate space</button> : <p className="text-sm text-muted">This space is inactive and read-only.</p>}
             <section aria-labelledby="space-bookings-title">
-              {space.is_active ? <StaffBookingForm makerspaceId={makerspaceId} space={space} /> : null}
+              {space.is_active ? <StaffBookingForm recurringEnabled={recurringEnabled} makerspaceId={makerspaceId} space={space} /> : null}
               <div className="mb-3">
                 <h3 id="space-bookings-title" className="title-section">Bookings <span className="font-mono">({bookings.data?.count ?? 0})</span></h3>
                 <p className="mt-1 text-xs text-muted">Contact details and custom answers are staff-only.</p>

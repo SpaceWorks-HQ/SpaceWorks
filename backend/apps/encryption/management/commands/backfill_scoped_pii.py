@@ -10,6 +10,7 @@ from apps.encryption.registry import all_fields, fields_for_label, makerspace_id
 
 
 FILTERS = {
+    "notifications.MemberBroadcast": {"makerspace_id": None},
     "notifications.NotificationInboxRow": {"makerspace_id": None},
     "hardware_requests.HardwareRequest": {"makerspace_id": None},
     "events.EventRegistration": {"event__makerspace_id": None},

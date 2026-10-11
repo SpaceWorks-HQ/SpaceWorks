@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.db.models import Q
 
+from apps.accounts import rbac
 from apps.audit import services as audit
 from apps.payments.checkout_expiry import forget_closed_checkout
 from apps.payments.models import Payment
@@ -41,6 +42,8 @@ def apply_webhook_event(
         "checkout.session.async_payment_succeeded",
         "checkout.session.expired",
         "payment_intent.succeeded",
+        "payment_intent.payment_failed",
+        "checkout.session.async_payment_failed",
     }:
         return None
     if event_type == "checkout.session.completed" and _value(
@@ -53,11 +56,12 @@ def apply_webhook_event(
             "checkout.session.completed",
             "checkout.session.async_payment_succeeded",
             "checkout.session.expired",
+            "checkout.session.async_payment_failed",
         }
         else None
     )
     intent_id = _value(obj, "payment_intent") or (
-        _value(obj, "id") if event_type == "payment_intent.succeeded" else None
+        _value(obj, "id") if event_type in {"payment_intent.succeeded", "payment_intent.payment_failed"} else None
     )
     if not session_id and not intent_id:
         return None
@@ -67,9 +71,9 @@ def apply_webhook_event(
             identifiers |= Q(stripe_checkout_session_id=session_id)
         if intent_id:
             identifiers |= Q(stripe_payment_intent_id=intent_id)
-        payments = Payment.objects.select_for_update().filter(
-            makerspace=makerspace, stripe_provider=provider
-        )
+        payments = rbac.scope_notification_policy(
+            Payment.objects.select_for_update(), makerspace_id=makerspace.pk,
+        ).filter(provider=Payment.Provider.STRIPE, stripe_provider=provider)
         if connected_account_id is not None:
             payments = payments.filter(
                 stripe_connected_account_id=connected_account_id
@@ -79,6 +83,9 @@ def apply_webhook_event(
             return None
         if not _record_once(makerspace, event_id):
             return None
+        if event_type in {"payment_intent.payment_failed", "checkout.session.async_payment_failed"}:
+            from apps.payments.failure_notifications import record_payment_failure
+            return record_payment_failure(payment, event_id=event_id, provider="stripe")
         if event_type == "checkout.session.expired":
             payment.save(update_fields=[*forget_closed_checkout(payment), "updated_at"])
             audit.record(
@@ -129,7 +136,7 @@ def apply_razorpay_webhook_event(makerspace, event):
         return None
     if event.refund_id:
         return apply_razorpay_refund_event(makerspace, event)
-    if not event.is_paid:
+    if not event.is_paid and not event.is_failed:
         # Non-payment events are not recorded: claiming their id would make a later
         # genuine settlement carrying the same delivery id read as a duplicate.
         return None
@@ -142,8 +149,8 @@ def apply_razorpay_webhook_event(makerspace, event):
         if not identifiers:
             return None
         payment = (
-            Payment.objects.select_for_update()
-            .filter(makerspace=makerspace, provider=Payment.Provider.RAZORPAY)
+            rbac.scope_notification_policy(Payment.objects.select_for_update(), makerspace_id=makerspace.pk)
+            .filter(provider=Payment.Provider.RAZORPAY)
             .filter(identifiers)
             .first()
         )
@@ -151,6 +158,9 @@ def apply_razorpay_webhook_event(makerspace, event):
             return None
         if not _record_once(makerspace, event.event_id, Payment.Provider.RAZORPAY):
             return None
+        if event.is_failed:
+            from apps.payments.failure_notifications import record_payment_failure
+            return record_payment_failure(payment, event_id=event.event_id, provider="razorpay")
         if payment.status != Payment.Status.PENDING:
             return handle_razorpay_paid_after_terminal(
                 payment,

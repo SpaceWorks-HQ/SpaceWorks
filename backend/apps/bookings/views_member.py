@@ -20,6 +20,8 @@ from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.guards import require_module_for_servable
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.presence.guard import require_active_account
+from apps.bookings.serializers_reschedule import BookingRescheduleSerializer
+from apps.bookings.services_reschedule import reschedule_booking
 
 
 ERRORS = {
@@ -35,11 +37,11 @@ def own_bookings(request, slug):
     makerspace = get_public_makerspace(slug)
     require_module_for_servable(makerspace, 'bookings')
     require_active_account(request.user, makerspace)
-    return rbac.scope_by_makerspace(
+    return rbac.scope_personal_bookings(
         request.user,
         Booking.objects.select_related('space__makerspace').filter(
             space__makerspace=makerspace, member=request.user,
-        ), makerspace_field='space__makerspace_id',
+        ), makerspace_id=makerspace.pk,
     )
 
 
@@ -84,3 +86,21 @@ class MemberBookingCancelView(APIView):
         body.is_valid(raise_exception=True)
         cancelled = cancel_booking(booking, actor=request.user, member_cancel=True)
         return Response(MemberBookingSerializer(cancelled).data)
+
+
+class MemberBookingRescheduleView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [MemberPrincipalRateThrottle]
+    throttle_scope = 'booking_submit'
+
+    @extend_schema(tags=['Member bookings'], request=BookingRescheduleSerializer,
+                   responses={200: MemberBookingSerializer, **ERRORS,
+                              409: OpenApiResponse(ErrorSerializer, description='Cutoff, state or slot conflict.'),
+                              423: OpenApiResponse(ErrorSerializer, description='Tenant frozen.'),
+                              503: OpenApiResponse(ErrorSerializer, description='Tenant gate unavailable.')})
+    def post(self, request, makerspace_slug, public_token):
+        booking = get_object_or_404(own_bookings(request, makerspace_slug), public_token=public_token)
+        serializer = BookingRescheduleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        moved = reschedule_booking(booking, actor=request.user, **serializer.validated_data)
+        return Response(MemberBookingSerializer(moved).data)

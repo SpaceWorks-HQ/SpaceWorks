@@ -165,7 +165,9 @@ def approve_booking(booking, *, actor):
     ):
         raise BookingConflict('This space is already booked for that time.')
     locked.status = Booking.Status.CONFIRMED
-    locked.save(update_fields=['status'])
+    locked.calendar_sequence += 1
+    locked.calendar_updated_at = timezone.now()
+    locked.save(update_fields=['status', 'calendar_sequence', 'calendar_updated_at'])
     _audit(
         space,
         actor,
@@ -192,7 +194,9 @@ def reject_booking(booking, *, actor):
             f'Cannot transition booking from {locked.status} to rejected.'
         )
     locked.status = Booking.Status.REJECTED
-    locked.save(update_fields=['status'])
+    locked.calendar_sequence += 1
+    locked.calendar_updated_at = timezone.now()
+    locked.save(update_fields=['status', 'calendar_sequence', 'calendar_updated_at'])
     _audit(
         space,
         actor,

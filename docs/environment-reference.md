@@ -12,6 +12,11 @@ is correct off-box, shown below.
 Defaults are the expressions in `backend/config/settings.py`; "read outside `settings.py`"
 means a command, script or app module reads it directly (setup, build, host orchestration).
 
+WP3 quiet hours, digest times and bounce signing credentials are tenant settings,
+not environment variables. Booking ICS uses the existing
+`THROTTLE_EVENT_CALENDAR_FEED_TOKEN` (120/hour) and `THROTTLE_EVENT_CALENDAR_FEED_IP`
+(300/hour) budgets with separate booking cache keys; see the delivery reference.
+
 ## Core Django and hosting
 
 Read by every backend process. `ALLOWED_HOSTS`, `SECRET_KEY` and the proxy posture must be set for any off-box deployment.

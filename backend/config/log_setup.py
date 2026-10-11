@@ -27,10 +27,23 @@ _STANDARD_RECORD_ATTRS = frozenset(
 
 
 class RequestIdFilter(logging.Filter):
-    """Stamp the bound request id (or ``-``) on every record so formatters can rely on it."""
+    """Attach request identity and redact calendar capabilities before formatting."""
 
     def filter(self, record):
         record.request_id = get_request_id() or "-"
+        # Django logs 4xx responses inside the handler, before middleware unwinds
+        # and replaces request.path for Gunicorn. Cover those earlier records too.
+        from apps.events.middleware import redact_calendar_feed_uri
+        message = record.getMessage()
+        redacted = redact_calendar_feed_uri(message)
+        if redacted != message:
+            record.msg, record.args = redacted, ()
+        request = getattr(record, 'request', None)
+        if request is not None:
+            rendered = str(request)
+            redacted_request = redact_calendar_feed_uri(rendered)
+            if redacted_request != rendered:
+                record.request = redacted_request
         return True
 
 

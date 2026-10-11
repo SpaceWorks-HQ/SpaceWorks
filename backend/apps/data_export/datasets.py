@@ -167,6 +167,9 @@ def _columns(fidelity, label):
 
 
 DATASETS = {}
+from .datasets_wp3 import wp3_dataset_specs
+DATASET_SPECS.update(wp3_dataset_specs(P))
+
 _MODEL_KEYSETS = {
     "evidence.EvidenceObjectRetentionState": ("evidence_id",),
     "evidence.EvidenceRetentionPolicy": ("makerspace_id",),

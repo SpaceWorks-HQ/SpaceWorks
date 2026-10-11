@@ -4,7 +4,11 @@ import { staffRequest } from "../../lib/api";
 import type { CustomAnswers } from "../forms/customFormTypes";
 import { bookingKeys, type Booking, type Paginated } from "./bookingsApi";
 
+export type RecurringBookingResult = { occurrences: { occurrence: number; booking_id: number | null; status: string; detail: string; starts_at: string; ends_at: string }[] };
+
 export type StaffBookingPayload = {
+  count?: number;
+  interval_weeks?: number;
   member_id: number;
   starts_at: string;
   ends_at: string;
@@ -31,8 +35,8 @@ export function useBookingEligibleMembers(spaceId: number, page: number) {
 export function useStaffCreateBooking(makerspaceId: number, spaceId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: StaffBookingPayload) => staffRequest<Booking>(
-      `/admin/spaces/${spaceId}/bookings/`, { method: "POST", body: JSON.stringify(payload) },
+    mutationFn: (payload: StaffBookingPayload) => staffRequest<Booking | RecurringBookingResult>(
+      `/admin/spaces/${spaceId}/${payload.count ? "recurring-bookings" : "bookings"}/`, { method: "POST", body: JSON.stringify(payload) },
     ),
     onSuccess: async () => {
       await Promise.all([

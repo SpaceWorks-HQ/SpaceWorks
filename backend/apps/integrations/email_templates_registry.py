@@ -10,6 +10,7 @@ from .email_templates_registry_helpers import (
     bag,
 )
 from .email_templates_registry_fablab import build_entries as _build_fablab_entries
+from .email_templates_registry_wp3 import build_entries as _build_wp3_entries
 from .email_templates_registry_devices import build_entries as _build_device_entries
 from .email_templates_registry_research import build_entries as _build_research_entries
 from .email_templates_registry_defaults import (
@@ -185,6 +186,7 @@ REGISTRY = {
     **_build_fablab_entries(EmailTemplateRegistryEntry, bag, _label),
     **_build_device_entries(),
     **_build_research_entries(),
+    **_build_wp3_entries(),
 }
 
 
