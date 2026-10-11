@@ -200,7 +200,8 @@ def test_term_expiry_never_changes_the_membership_status():
 def test_front_desk_staff_cannot_see_or_decide_membership():
     makerspace = space("actors-front-desk")
     desk = make_handout_member("actors-front-desk-staff", makerspace)
-    join = membership_services.request_membership(user("actors-front-desk-joiner"), makerspace)
+    joiner = user("actors-front-desk-joiner")
+    join = membership_services.request_membership(joiner, makerspace)
     client = _client(desk)
 
     before_audits = AuditLog.objects.filter(makerspace=makerspace).count()
@@ -215,7 +216,7 @@ def test_front_desk_staff_cannot_see_or_decide_membership():
         assert response.status_code == 403
         assert set(response.data) == {"detail"}
     assert MembershipRequest.objects.get(pk=join.id).state == MembershipRequest.State.REQUESTED
-    assert not MakerspaceMembership.objects.filter(makerspace=makerspace, user=join.user).exists()
+    assert not MakerspaceMembership.objects.filter(makerspace=makerspace, user=joiner).exists()
     assert AuditLog.objects.filter(makerspace=makerspace).count() == before_audits
 
 
