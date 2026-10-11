@@ -35,7 +35,7 @@ def discover(makerspace, now, limit, local_tz):
     today = to_local(makerspace, now).date()
     # Discovery is capped across kinds by the sweeper; drain overdue work first.
     for kind in ("overdue", "due_soon"):
-        rows = unfinished(schedules(makerspace), makerspace, SOURCE, kind,
+        rows = unfinished(schedules(makerspace).exclude(trigger="usage"), makerspace, SOURCE, kind,
                           Concat(Cast("pk", CharField()), Value(":"), Cast("next_due", CharField())))
         window = policy_window(
             makerspace, "reminder_lead_days" if kind == "due_soon" else "grace_days", "machine__machine_type_id",
@@ -55,7 +55,7 @@ def build(makerspace, reminder, now, local_tz):
     if reminder.kind not in ("due_soon", "overdue") or reminder.offset_seconds != 0:
         return None
     pk, day = reminder.subject.split(":", 1)
-    schedule = schedules(makerspace).filter(pk=pk, next_due=day).first()
+    schedule = schedules(makerspace).exclude(trigger="usage").filter(pk=pk, next_due=day).first()
     if schedule is None or reminder_time(makerspace, schedule, reminder.kind) != reminder.due_at:
         return None
     if reminder.kind == "due_soon" and schedule.next_due < to_local(makerspace, now).date():
@@ -66,5 +66,6 @@ def build(makerspace, reminder, now, local_tz):
 
 def dispatch(makerspace, reminder, message):
     pk, day = reminder.subject.split(":", 1)
-    schedule = schedules(makerspace).get(pk=pk, next_due=day)
-    notify_maintenance_lifecycle(schedule, message.event)
+    schedule = schedules(makerspace).exclude(trigger="usage").filter(pk=pk, next_due=day).first()
+    if schedule:
+        notify_maintenance_lifecycle(schedule, message.event)

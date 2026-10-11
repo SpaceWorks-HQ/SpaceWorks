@@ -115,6 +115,7 @@ export function StaffTabContent({
           key={makerspaceKey}
           makerspaceId={activeMakerspace.id}
           canManage={canManageMachines}
+          enabledFeatures={activeMakerspace.enabled_features ?? []}
           canConfigureMachineTypes={canConfigureMachineTypes}
           maintenanceEnabled={activeMakerspace.enabled_modules?.includes("maintenance") ?? false}
           machineServiceEnabled={activeMakerspace.enabled_modules?.includes("machine_service") ?? false}
@@ -169,7 +170,7 @@ export function StaffTabContent({
           canEditInventory={canEditInventory}
         />
       ) : null}
-      {activeTab === "stocktake" && canEditInventory ? <StocktakePanel key={makerspaceKey} makerspace={activeMakerspace} isSuperadmin={isSuperadmin} /> : null}
+      {activeTab === "stocktake" && canEditInventory ? <StocktakePanel key={makerspaceKey} makerspace={activeMakerspace} isSuperadmin={isSuperadmin} canConfigure={canManageMakerspace} /> : null}
       {activeTab === "containers" && canManageQr ? <ContainersPanel key={makerspaceKey} makerspace={activeMakerspace} canEditInventory={canEditInventory} /> : null}
       {activeTab === "ledger" ? (
         <Ledger

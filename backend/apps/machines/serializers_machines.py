@@ -125,6 +125,8 @@ class MachineSerializer(serializers.ModelSerializer):
             'status',
             'firmware_version',
             'camera_feed_url',
+            'status_since',
+            'public_fields',
             'type_payload',
             'image_url',
             'warranty_status',
@@ -142,6 +144,7 @@ class MachineSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'makerspace',
+            'status_since',
             'status',
             'is_public',
             'is_active',

@@ -3,6 +3,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 
 import { Card, EmptyState } from "../../components/ui";
 import { FilePicker, TextArea, TextInput } from "./PublicPrintRequestParts";
+import type { TypeIntake } from "../inventory/MachineIntakeForm";
 import type { PublicFilamentPool } from "./publicApi";
 
 export type FormState = {
@@ -52,6 +53,7 @@ export function groupPoolsByMaterial(
 type PrintDetailsFormProps = {
   form: FormState;
   updateField: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+  catalogue?: TypeIntake;
   poolsQuery: UseQueryResult<PublicFilamentPool[], Error>;
   modelFiles: File[];
   setModelFiles: Dispatch<SetStateAction<File[]>>;
@@ -69,6 +71,7 @@ export function PrintDetailsForm({
   form,
   updateField,
   poolsQuery,
+  catalogue,
   modelFiles,
   setModelFiles,
   screenshotFiles,
@@ -114,6 +117,10 @@ export function PrintDetailsForm({
             value={form.preferredSettings}
             onChange={(value) => updateField("preferredSettings", value)}
           />
+          {catalogue?.materials.length ? <div className="grid gap-3 md:grid-cols-2">
+            <label className="grid gap-1 text-sm">Material<select className="desk-input" value={form.material} onChange={event => { updateField("material", event.target.value); updateField("color", ""); updateField("consumablePoolId", ""); }}><option value="">No preference</option>{catalogue.materials.map(material => <option key={material.name}>{material.name}</option>)}</select></label>
+            <label className="grid gap-1 text-sm">Colour<select className="desk-input" value={form.color} required={Boolean(form.material)} onChange={event => updateField("color", event.target.value)}><option value="">Choose a colour</option>{catalogue.materials.find(m => m.name === form.material)?.colours.map(c => <option key={c}>{c}</option>)}</select></label>
+          </div> : null}
           <div className="grid gap-4 md:grid-cols-2">
             {noAvailablePools ? (
               <div>
@@ -131,9 +138,11 @@ export function PrintDetailsForm({
                 <select
                   className="desk-input w-full"
                   value={form.consumablePoolId}
-                  onChange={(event) =>
-                    updateField("consumablePoolId", event.target.value)
-                  }
+                  onChange={(event) => {
+                    updateField("consumablePoolId", event.target.value);
+                    const pool = poolsQuery.data?.find(row => String(row.id) === event.target.value);
+                    if (pool) { updateField("material", pool.material); updateField("color", pool.color); }
+                  }}
                 >
                   <option value="">No preference</option>
                   {groupPoolsByMaterial(poolsQuery.data ?? []).map(([material, pools]) => (

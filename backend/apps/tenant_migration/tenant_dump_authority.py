@@ -6,6 +6,7 @@ from .tenant_dump_authority_entries import AUTHORITY_ENTRIES
 from .tenant_dump_modules import MODULE_AUTHORITY_ENTRIES
 from .target_projection_w7_events import EVENT_AUTHORITY_ENTRIES
 from .catalog_wp3 import wp3_authority
+from .authority_wp4 import AUTHORITY_ENTRIES as WP4_AUTHORITY_ENTRIES
 
 def _build(entries):
     result = {}
@@ -21,6 +22,7 @@ AUTHORITY_FIELD_OVERRIDES = _build((
     *EVENT_AUTHORITY_ENTRIES,
     *MODULE_AUTHORITY_ENTRIES,
     *wp3_authority(authority, D).items(),
+    *WP4_AUTHORITY_ENTRIES,
 ))
 NON_MODEL_AUTHORITY_INPUTS = {
     "target_native_app_registrations": authority(D.RESET, "Use exact target configuration."),

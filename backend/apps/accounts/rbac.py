@@ -33,6 +33,7 @@ from .rbac_memberships import (
     membership_role,
 )
 from .rbac_borrowers import scope_by_borrower
+from .rbac_catalogue import scope_public_catalogue, scope_verified_tenant
 from .rbac_organizations import (
     _org_actions_for,
     _organization_authority_memberships,

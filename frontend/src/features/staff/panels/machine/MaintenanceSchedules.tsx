@@ -1,3 +1,4 @@
+import { MaintenanceMeterFields } from "./MaintenanceMeterFields";
 import { useState } from "react";
 
 import { ConfirmDialog, EmptyState } from "../../../../components/ui";
@@ -17,9 +18,10 @@ const emptySchedule = (): ScheduleInput => ({
 });
 
 export function MaintenanceSchedules({
-  makerspaceId, machineId, schedules, canEdit, retired, onComplete,
+  makerspaceId, machineId, schedules, canEdit, retired, onComplete, metersEnabled = false,
 }: {
   makerspaceId: number;
+  metersEnabled?: boolean;
   machineId: number;
   schedules: MaintenanceSchedule[];
   canEdit: boolean;
@@ -63,6 +65,7 @@ export function MaintenanceSchedules({
           required
         />
       </label>
+      {metersEnabled ? <MaintenanceMeterFields value={value} change={change} /> : null}
       <label className="eyebrow grid gap-1">
         Recurrence anchor
         <select className="desk-input" value={value.anchor ?? "completion"} onChange={(event) => change({ ...value, anchor: event.target.value as ScheduleInput["anchor"] })}>
@@ -122,7 +125,8 @@ export function MaintenanceSchedules({
               <div className="min-w-0 flex-1">
                 <strong className="block text-sm text-ink">{schedule.description}</strong>
                 <span className="text-xs text-muted">
-                  Every {schedule.interval_days} days ({schedule.anchor === "calendar" ? "fixed calendar" : "from completion"}) · {formatDate(schedule.next_due)}
+                  {schedule.trigger !== "days" && schedule.trigger ? `Usage: ${[schedule.usage_hours && `${schedule.usage_hours} hours`, schedule.job_count && `${schedule.job_count} jobs`].filter(Boolean).join(" or ")}. ` : ""}
+                  {schedule.trigger !== "usage" ? `Every ${schedule.interval_days} days (${schedule.anchor === "calendar" ? "fixed calendar" : "from completion"}) · ${formatDate(schedule.next_due)}` : "Resets when maintenance is completed."}
                 </span>
               </div>
               <span className={schedule.overdue
@@ -131,7 +135,7 @@ export function MaintenanceSchedules({
                   ? "rounded-md bg-accent/15 px-2 py-1 text-xs font-semibold text-ink"
                   : "rounded-md bg-surface px-2 py-1 text-xs font-semibold text-muted"}
               >
-                {schedule.overdue ? "Overdue" : schedule.is_active ? "Due as scheduled" : "Inactive"}
+                {schedule.overdue ? "Maintenance due" : schedule.is_active ? schedule.trigger === "usage" ? "Within usage threshold" : "Due as scheduled" : "Inactive"}
               </span>
               {canEdit && schedule.is_active && !retired ? (
                 <div className="flex gap-2">
@@ -144,6 +148,7 @@ export function MaintenanceSchedules({
                     onClick={() => {
                       setEditDraft({
                         description: schedule.description,
+                        trigger: schedule.trigger, usage_hours: schedule.usage_hours, job_count: schedule.job_count,
                         interval_days: schedule.interval_days,
                         anchor: schedule.anchor ?? "completion",
                         next_due: schedule.next_due,

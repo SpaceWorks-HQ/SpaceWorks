@@ -61,6 +61,7 @@ class InventoryProductAdminSerializer(serializers.ModelSerializer):
             "manufacturer", "model", "sku", "barcode", "supplier",
             "reorder_point", "reorder_quantity", "kit_components",
             "description",
+            "borrowing_terms",
             "image_key",
             "image_url",
             "tracking_mode",

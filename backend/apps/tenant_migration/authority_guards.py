@@ -24,6 +24,7 @@ from apps.data_export.models import EXPORTED_MODEL_FIELDS
 
 from .target_projection import TARGET_FIELD_PROJECTION
 from .tenant_dump_authority_loans import LOAN_AUTHORITY_FIELDS
+from .authority_wp4 import AUTHORITY_FIELDS as WP4_AUTHORITY_FIELDS
 
 
 class AuthorityRegistryError(AssertionError):
@@ -33,6 +34,7 @@ class AuthorityRegistryError(AssertionError):
 APPS_DIR = Path(project_apps.__file__).resolve().parent
 AUTHORIZATION_SOURCES = (
     APPS_DIR / "accounts" / "rbac.py",
+    APPS_DIR / "accounts" / "rbac_catalogue.py",
     APPS_DIR / "accounts" / "rbac_notifications.py",
     APPS_DIR / "accounts" / "rbac_bookings.py",
     APPS_DIR / "accounts" / "rbac_actions.py",
@@ -56,6 +58,7 @@ SCANNED_MODEL_LABELS = frozenset({
 
 
 EXPLICIT_AUTHORITY_FIELDS = {
+    **WP4_AUTHORITY_FIELDS,
     **LOAN_AUTHORITY_FIELDS,
     ("machines.MakerspaceMachineTypePolicy", "makerspace"): "Tenant boundary for reminder policy; preserved data does not grant staff authority.",
     ("machines.MakerspaceMachineTypePolicy", "machine_type"): "Remapped type boundary for reminder policy, never an authorization scope grant.",

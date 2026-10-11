@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 
 class PublicPrinterQueueSerializer(serializers.Serializer):
+    machine_type_id = serializers.IntegerField()
     id = serializers.IntegerField()
     name = serializers.CharField()
     description = serializers.CharField()

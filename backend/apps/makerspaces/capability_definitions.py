@@ -7,6 +7,7 @@ from apps.makerspaces.module_registry import MODULE_KEYS
 from .capability_definitions_modules import module_family_features
 from .capability_definitions_w7_events import event_features
 from .capability_definitions_wp3 import wp3_features
+from .capability_definitions_wp4 import definitions as wp4_definitions
 
 
 @dataclass(frozen=True)
@@ -211,6 +212,7 @@ FEATURE_DEFINITIONS = (
 FEATURE_DEFINITIONS += event_features(FeatureDefinition)
 FEATURE_DEFINITIONS += module_family_features(FeatureDefinition)
 FEATURE_DEFINITIONS += wp3_features(FeatureDefinition)
+FEATURE_DEFINITIONS += wp4_definitions(FeatureDefinition)
 FEATURES = {definition.key: definition for definition in FEATURE_DEFINITIONS}
 # A feature's parent/required modules are validated against the module registry
 # rather than a hand-kept set, so adding a module can no longer leave a valid

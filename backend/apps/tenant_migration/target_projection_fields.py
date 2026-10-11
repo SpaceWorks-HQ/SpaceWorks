@@ -162,3 +162,6 @@ TARGET_FIELD_PROJECTION.update(label_projections(TargetField))
 
 from .target_projection_wp3 import wp3_projections
 TARGET_FIELD_PROJECTION.update(wp3_projections(TargetField))
+
+from .projection_wp4 import FIELD_PROJECTION
+TARGET_FIELD_PROJECTION.update(FIELD_PROJECTION)

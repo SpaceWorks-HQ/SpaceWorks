@@ -10,14 +10,14 @@ type StocktakeLine = {
   id: number;
   product: number | null;
   asset: number | null;
-  expected_quantity: number;
+  expected_quantity: number | null;
   counted_quantity: number;
-  variance_quantity: number;
+  variance_quantity: number | null;
   condition: string;
   container: number | null;
   notes: string;
 };
-type StocktakeDetail = StocktakeRow & { lines: StocktakeLine[] };
+type StocktakeDetail = StocktakeRow & { blind?: boolean; lines: StocktakeLine[] };
 type ProductOption = { id: number; name: string; tracking_mode: string };
 type ContainerOption = { id: number; label: string; location?: string };
 type AssetOption = { id: number; asset_tag: string; serial_number: string; status: string };
@@ -129,7 +129,7 @@ export function CountSection({ makerspace, stocktakeId }: { makerspace: Makerspa
             <span>Asset</span>
             <select className="desk-input" value={assetId} disabled={!productId || assets.isLoading} onChange={(event) => setAssetId(event.target.value)}>
               <option value="">Select asset</option>
-              {assets.data?.results.map((asset) => <option key={asset.id} value={asset.id}>{asset.asset_tag} ({asset.status})</option>)}
+              {assets.data?.results.map((asset) => <option key={asset.id} value={asset.id}>{asset.asset_tag}{detail.data?.blind ? "" : ` (${asset.status})`}</option>)}
             </select>
           </label>
         ) : (
@@ -184,9 +184,9 @@ export function CountSection({ makerspace, stocktakeId }: { makerspace: Makerspa
                   <tr key={line.id} className="border-t border-line">
                     <td className="py-1"><span className="block max-w-48 break-words">{line.asset ? assetName(line.asset) : productName(line.product)}</span></td>
                     <td>{containerName(line.container)}</td>
-                    <td className="font-mono">{line.expected_quantity}</td>
+                    <td className="font-mono">{line.expected_quantity ?? "Hidden"}</td>
                     <td className="font-mono">{line.counted_quantity}</td>
-                    <td className={line.variance_quantity === 0 ? "font-mono text-muted" : "font-mono text-danger"}>{line.variance_quantity}</td>
+                    <td className={line.variance_quantity === 0 ? "font-mono text-muted" : "font-mono text-danger"}>{line.variance_quantity ?? "Hidden"}</td>
                     <td>{line.condition}</td>
                     <td><span className="block max-w-56 break-words">{line.notes || "-"}</span></td>
                   </tr>

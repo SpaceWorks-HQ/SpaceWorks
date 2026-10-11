@@ -39,7 +39,9 @@ class OverdueMaintenanceListView(generics.ListAPIView):
         query = rbac.scope_by_action(actor, action, MaintenanceSchedule.objects.all(),
                                      field="machine__makerspace_id")
         scope = role_scope.manage_scope_for(actor, space.pk)
-        return query.filter(machine__makerspace=space, is_active=True, next_due__lt=timezone.localdate()).filter(
+        from .meters import due_queryset
+        query = due_queryset(query.filter(machine__makerspace=space, is_active=True), timezone.localdate())
+        return query.filter(
             role_scope.scope_q_for(scope, machine_id_paths=("machine_id",),
                                    type_id_paths=("machine__machine_type_id",)),
         ).select_related("machine").order_by("next_due", "pk")

@@ -167,6 +167,7 @@ def maintenance_delete(makerspace, cursor):
         MaintenanceLog,
         MaintenanceLogDocument,
         MaintenanceSchedule,
+        MaintenanceCalendarFeed,
     )
     documents, document_labels = _delete(
         MaintenanceLogDocument.objects.filter(log__machine__makerspace=makerspace)
@@ -177,8 +178,10 @@ def maintenance_delete(makerspace, cursor):
     schedules, schedule_labels = _delete(
         MaintenanceSchedule.objects.filter(machine__makerspace=makerspace)
     )
+    feeds, feed_labels = _delete(MaintenanceCalendarFeed.objects.filter(makerspace=makerspace))
     return _counts(
-        model_labels=document_labels | log_labels | schedule_labels,
+        model_labels=document_labels | log_labels | schedule_labels | feed_labels,
+        calendar_feeds=feeds,
         documents=documents,
         logs=logs,
         schedules=schedules,

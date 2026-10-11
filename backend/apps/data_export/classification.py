@@ -14,6 +14,7 @@ from .classification_platform import OMITTED_MODELS as _PLATFORM_OMITTED_MODELS
 from .classification_modules import EXPORTED_MODEL_FIELDS as _MODULE_FIELDS
 from .classification_w7_events import extend_event_export_fields
 from .classification_wp3 import WP3_EXPORTED_FIELDS, WP3_OMITTED_MODELS
+from .classification_wp4 import exported_fields, OMITTED_MODELS as WP4_OMITTED
 
 EXPORTED_MODEL_FIELDS = {
     **_DOMAIN_EXPORTED_MODEL_FIELDS,
@@ -26,7 +27,11 @@ EXPORTED_MODEL_FIELDS = {
 extend_event_export_fields(EXPORTED_MODEL_FIELDS)
 EXPORTED_MODEL_FIELDS["bookings.Booking"] += " calendar_sequence calendar_updated_at"
 EXPORTED_MODEL_FIELDS["notifications.MemberNotificationPreference"] += " daily_digest"
-OMITTED_MODELS = {**_PLATFORM_OMITTED_MODELS, **DEVICE_OMITTED_MODELS, **WP3_OMITTED_MODELS}
+EXPORTED_MODEL_FIELDS = exported_fields(EXPORTED_MODEL_FIELDS)
+OMITTED_MODELS = {
+    **_PLATFORM_OMITTED_MODELS, **DEVICE_OMITTED_MODELS,
+    **WP3_OMITTED_MODELS, **WP4_OMITTED,
+}
 EXPORTED_MODELS = frozenset(EXPORTED_MODEL_FIELDS)
 
 NOT_TENANT_MODELS = {

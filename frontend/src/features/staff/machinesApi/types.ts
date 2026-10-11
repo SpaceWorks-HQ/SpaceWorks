@@ -27,6 +27,8 @@ export type MachineTypeCapabilityConfig = {
 };
 
 export type Machine = {
+  public_fields?: string[];
+  status_since?: string;
   id: number;
   makerspace: number;
   machine_type: MachineType;

@@ -1,3 +1,4 @@
+import { PublicMachineDisclosure } from "./PublicMachineDisclosure";
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -17,7 +18,8 @@ import { MachinePublicSettings } from "../MachinePublicSettings";
 const MACHINE_STATUSES: MachineStatus[] = ["idle", "running", "reserved", "maintenance", "offline"];
 type MachineForm = Pick<Machine, "name" | "location" | "notes" | "firmware_version" | "camera_feed_url">;
 
-export function OverviewTab({ machine, makerspaceId, canManageMachines, canEdit, canOperate, canRetire, canUnretire }: {
+export function OverviewTab({ machine, makerspaceId, canManageMachines, canEdit, canOperate, canRetire, canUnretire, publicDetailsEnabled = false }: {
+  publicDetailsEnabled?: boolean;
   machine: Machine;
   makerspaceId: number;
   canManageMachines: boolean;
@@ -74,6 +76,7 @@ export function OverviewTab({ machine, makerspaceId, canManageMachines, canEdit,
 
   return (
     <div className="grid gap-5">
+      {canEdit && publicDetailsEnabled ? <PublicMachineDisclosure id={machine.id} makerspaceId={makerspaceId} fields={machine.public_fields ?? []} /> : null}
       {canEdit ? (
         <section className="grid gap-3">
           <h3 className="title-section">Machine photo</h3>

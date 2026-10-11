@@ -12,7 +12,12 @@ from apps.operations.views_report_schedules import (
     ReportScheduleRunNowView,
 )
 
+from .views_stocktake_discipline import StocktakePolicyView, StocktakeScheduleListView, StocktakeScheduleDetailView
+
 urlpatterns = [
+    path("admin/makerspace/<int:makerspace_id>/stocktake-policy", StocktakePolicyView.as_view(), name="stocktake-policy"),
+    path("admin/makerspace/<int:makerspace_id>/stocktake-schedules", StocktakeScheduleListView.as_view(), name="stocktake-schedules"),
+    path("admin/makerspace/<int:makerspace_id>/stocktake-schedules/<int:pk>", StocktakeScheduleDetailView.as_view(), name="stocktake-schedule-detail"),
     path("admin/makerspaces/<int:makerspace_id>/saved-report-views", SavedReportViewListCreateView.as_view(), name="saved-report-views"),
     path("admin/makerspaces/<int:makerspace_id>/saved-report-views/<int:pk>", SavedReportViewDetailView.as_view(), name="saved-report-view-detail"),
     path("admin/search", StaffSearchView.as_view(), name="admin-search"),

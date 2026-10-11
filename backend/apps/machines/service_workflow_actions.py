@@ -37,7 +37,7 @@ def submit(bucket_or_machine, requester, *, requester_name, contact_email, conta
         target = _locked_submission_target(bucket_or_machine) if isinstance(bucket_or_machine, ServiceQueue) else _locked_submission_machine(bucket_or_machine)
         makerspace = target.makerspace
         machine_type = target.machine_type if isinstance(target, ServiceQueue) else target.machine_type
-        _validate_capability_payload(machine_type, capability_payload or {})
+        _validate_capability_payload(machine_type, capability_payload or {}, makerspace)
         # Certification gating. Only for a member-attributed submission: an anonymous or
         # staff-entered request is somebody asking staff to run the machine, which is not
         # the member operating it, so there is nothing to have been trained for.

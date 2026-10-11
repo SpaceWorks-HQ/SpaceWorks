@@ -6,6 +6,7 @@ import json
 from django.db import transaction
 from django.db.models import Q
 from rest_framework.exceptions import NotFound, ValidationError
+from apps.accounts import rbac
 
 from apps.machines.metering import ConsumablePoolUnit
 from apps.machines.models import (
@@ -28,8 +29,7 @@ def _kernel_queues(makerspace):
     printer_type = resolve_global_printer_type()
     if printer_type is None:
         return ServiceQueue.objects.none()
-    return ServiceQueue.objects.filter(
-        makerspace=makerspace,
+    return rbac.scope_verified_tenant(ServiceQueue.objects.all(), makerspace).filter(
         is_active=True,
         machine_type=printer_type,
     )
@@ -48,9 +48,8 @@ def _eligible_public_pools(makerspace):
         | Q(machine__machine_type=printer_type)
         | Q(machine__isnull=True, machine_type__isnull=True)
     )
-    return MachineConsumablePool.objects.filter(
+    return rbac.scope_verified_tenant(MachineConsumablePool.objects.all(), makerspace).filter(
         serves_printers,
-        makerspace=makerspace,
         is_active=True,
         is_public=True,
         remaining_grams__gt=0,
@@ -111,12 +110,22 @@ def _kernel_payload(queue, data):
         ).first()
         if pool is None:
             raise ValidationError({"consumable_pool_id": "Invalid or inactive consumable pool."})
-    config = queue.machine_type.capability_config
+    from .material_catalogue import config_for, catalogue
+    config = config_for(queue.makerspace, queue.machine_type)
+    if not config["accepted_materials"] or not config["accepted_colours"]:
+        raise ValidationError({"material": "This makerspace has no accepted materials."})
     material, color = data.get("material", ""), data.get("color", "")
     if pool:
         material, color = material or pool.material, color or pool.color
     no_preference = pool is None and not material and not color
-    payload = {"requested_material": material or config["accepted_materials"][0], "requested_color": color or config["accepted_colours"][0], "quantity": data.get("quantity", 1), "project_brief": data.get("project_brief", "")}
+    material = material or config["accepted_materials"][0]
+    if not color:
+        colours = next((row["colours"] for row in catalogue(queue.makerspace, queue.machine_type)
+                        if row["name"].casefold() == material.casefold()), [])
+        if not colours:
+            raise ValidationError({"material": "Select an accepted material with available colours."})
+        color = colours[0]
+    payload = {"requested_material": material, "requested_color": color, "quantity": data.get("quantity", 1), "project_brief": data.get("project_brief", "")}
     if no_preference:
         payload["no_filament_preference"] = True
     if data.get("estimated_filament_grams") not in (None, Decimal("0"), 0):

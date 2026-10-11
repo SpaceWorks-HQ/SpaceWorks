@@ -52,3 +52,6 @@ FK_POLICIES = {
 DROPPED_NOTIFICATION_RECIPIENT_KINDS = frozenset(
     {"role", "requester", "members", "user"}
 )
+
+from .projection_wp4 import FK_POLICIES as WP4_FK_POLICIES
+FK_POLICIES.update(WP4_FK_POLICIES)

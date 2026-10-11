@@ -12,7 +12,7 @@ from apps.integrations.staff_notifications import staff_emails_for_feature
 from apps.maintenance.models import MaintenanceLog, MaintenanceSchedule
 
 
-def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=False):
+def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=False, due_reason=""):
     is_schedule = isinstance(instance, MaintenanceSchedule)
     object_id = instance.pk
     makerspace = instance.machine.makerspace
@@ -51,7 +51,7 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
             event_name,
             schedule=schedule,
             log=log,
-            next_steps=MAINTENANCE_REQUESTER_BODIES.get(event_name, ""),
+            next_steps=due_reason or MAINTENANCE_REQUESTER_BODIES.get(event_name, ""),
         )
         # The machine is what makes per-machine routing work on both sides: a chat room
         # scoped to the laser (or to every 3D printer) matches on it, and a recipient rule
@@ -65,11 +65,12 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
             context,
             machine_type=machine.machine_type,
         )
+        text_body = f"{due_reason}\n\n{staff['text_body']}" if due_reason else staff["text_body"]
         emails = tuple(
             EmailDelivery(
                 to_email=recipient,
                 subject=staff["subject"],
-                text_body=staff["text_body"],
+                text_body=text_body,
                 audience="staff",
                 stream="maintenance",
             )
@@ -80,7 +81,7 @@ def notify_maintenance_lifecycle(instance, event_name, *, log_id=None, sync=Fals
         # This text is also the no-ChatTemplate chat fallback and the native-push body.
         # A maintenance type override intentionally gives all three channels one wording.
         return LifecyclePayload(
-            text=staff["text_body"],
+            text=text_body,
             emails=emails,
             scope=scope,
             context=context,

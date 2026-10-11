@@ -201,3 +201,11 @@ _EXCLUDED_USER_EDGE_REASONS = {
 
 RELATIONAL_USER_FIELDS |= frozenset({("notifications.MemberBroadcast", "created_by"), ("bookings.BookingCalendarFeed", "user")})
 _EXCLUDED_USER_EDGE_REASONS[("bookings.BookingCalendarFeed", "user")] = "Source-bound calendar authority is excluded from portable closure."
+
+# WP4 policies, schedules and materials have no User FKs. Personal watches and
+# feed credentials are explicitly omitted, but their actor edges remain classified.
+RELATIONAL_USER_FIELDS |= frozenset({("inventory.InventoryWatch", "user"), ("maintenance.MaintenanceCalendarFeed", "user")})
+_EXCLUDED_USER_EDGE_REASONS.update({
+    ("inventory.InventoryWatch", "user"): "Source delivery subscription is omitted.",
+    ("maintenance.MaintenanceCalendarFeed", "user"): "Source bearer feed credential is omitted.",
+})

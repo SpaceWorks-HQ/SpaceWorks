@@ -24,7 +24,7 @@ FEATURE_EVENTS = {
         "submitted", "accepted", "rejected", "issued", "partially_returned",
         "returned", "closed_with_issue", "return_reminder",
         "deposit_raised", "late_fee_raised",
-        "overdue_escalated",
+        "overdue_escalated", "back_available",
     ),
     F.PRINTING: (
         "submitted", "accepted", "started", "rejected", "completed", "failed",
