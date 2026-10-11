@@ -6,9 +6,13 @@ import { staffRequest } from "../../../lib/api";
 import { EvidenceUpload } from "../panels/EvidenceUpload";
 import { DialogError, submit } from "./shared";
 import type { DialogProps } from "./types";
+import { KitChecklistCapture, useKitChecklist } from "../../inventory/KitChecklist";
+import { featureEnabled } from "../../../lib/features";
 
 export function IssueDialog({ row, makerspace, onClose }: DialogProps) {
   const queryClient = useQueryClient();
+  const kits = useKitChecklist(`/admin/makerspace/${makerspace.id}/kit-checklist-preview`,
+    { request_id: row.id, phase: "issue" }, featureEnabled(makerspace.enabled_features ?? [], "loans.kit_checklist"));
   const [evidenceId, setEvidenceId] = useState<number | null>(null);
   const [remark, setRemark] = useState("");
   const [assetInputs, setAssetInputs] = useState<Record<string, string>>({});
@@ -29,6 +33,7 @@ export function IssueDialog({ row, makerspace, onClose }: DialogProps) {
           evidence_id: evidenceId,
           remark: remark.trim(),
           asset_qr_payloads: assetQrPayloads,
+          kit_checklist: kits.counts,
         }),
       }),
     onSuccess: () => {
@@ -36,7 +41,7 @@ export function IssueDialog({ row, makerspace, onClose }: DialogProps) {
       onClose();
     },
   });
-  const canSubmit = Boolean(evidenceId) && assetQrPayloads.length === requiredAssetCount;
+  const canSubmit = Boolean(evidenceId) && assetQrPayloads.length === requiredAssetCount && kits.ready;
 
   return (
     <DetailDrawer open title={`Issue request #${row.id}`} onClose={onClose}>
@@ -90,6 +95,7 @@ export function IssueDialog({ row, makerspace, onClose }: DialogProps) {
           </div>
         ) : null}
         <DialogError error={mutation.error} />
+        <KitChecklistCapture checklist={kits} />
         <div className="desk-actions flex flex-wrap justify-end gap-2">
           <button className="desk-button" type="button" onClick={onClose}>
             Cancel

@@ -104,6 +104,9 @@ def _checkout_box(qr, *, require_public=True):
         "box": box,
         "is_archived": False,
         "available_quantity__gte": 1,
+        # Individual assets were issued in the pass above. Remaining units may
+        # live outside this container and must not enter the quantity-only pass.
+        "tracking_mode": TrackingMode.QUANTITY,
     }
     if require_public:
         product_filters.update(
@@ -119,10 +122,6 @@ def _checkout_box(qr, *, require_public=True):
         if issued_quantities:
             return box.label, dict(issued_quantities), issued_asset_ids, box
         raise RequestValidationError("Box has no public self-checkout items.")
-    if any(product.tracking_mode == TrackingMode.INDIVIDUAL for product in products):
-        raise RequestValidationError(
-            "Individual-tracked products require a scanned asset QR."
-        )
     for product in products:
         _issue_product(product, 1)
         issued_quantities[product] += 1

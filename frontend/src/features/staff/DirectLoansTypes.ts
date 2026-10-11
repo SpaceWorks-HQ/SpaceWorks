@@ -1,5 +1,6 @@
 import type { DirectLoanResolution } from "./DirectLoanReturnModal";
 import type { ClaimableMember } from "./MemberClaimCodes";
+import type { KitCount } from "../inventory/KitChecklist";
 
 export type ProductOption = {
   id: number;
@@ -20,7 +21,7 @@ export type DirectLoanMember = ClaimableMember;
 export type DirectLoanMemberResponse = DirectLoanMember[] | { results: DirectLoanMember[] };
 export type LineDraft = { key: number; productId: string; quantity: string };
 export type ScannedPayload = { payload: string; label: string };
-export type ReturnLoanPayload = { loanId: number; evidenceId: number; notes: string; qrPayload: string; resolutions: DirectLoanResolution[] };
+export type ReturnLoanPayload = { loanId: number; evidenceId: number; notes: string; qrPayload: string; resolutions: DirectLoanResolution[]; kitChecklist?: KitCount[] };
 export type QrResolveResponse = {
   target:
     | { type: "product"; id: number; name: string }

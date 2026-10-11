@@ -29,6 +29,7 @@ from apps.hardware_requests.workflow_utils import constraint_name, locked_reques
 from apps.inventory import availability
 from apps.makerspaces.loan_policy import loan_days
 from apps.makerspaces.models import Makerspace
+from apps.hardware_requests import kit_checklists as kits
 
 
 def assign_box(actor, request, box_code):
@@ -84,7 +85,7 @@ def assign_box(actor, request, box_code):
         return locked
 
 
-def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None, rejects=None):
+def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None, rejects=None, kit_checklist=None):
     asset_qr_payloads = list(asset_qr_payloads or [])
     # rejects: [{"item_id", "broken", "disposition"}] - units rejected as broken at
     # handover, either sent to the needs-fix shelf or scrapped out of inventory.
@@ -157,8 +158,9 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
         issue_individual_assets(actor, locked, asset_qr_payloads)
         availability.enforce_request_borrow_limits(locked, rejects_by_item)
         availability.issue_items(locked, rejects_by_item)
+        checklist = kits.record_issue(actor, locked, assigned_box, kit_checklist)
         locked.issue_evidence = evidence
-        locked.issue_remark = remark
+        locked.issue_remark = kits.checklist_remark(remark, checklist)
         locked.issued_by = actor
         locked.issued_at = timezone.now()
         if locked.return_due_at is None:

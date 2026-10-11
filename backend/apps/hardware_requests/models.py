@@ -79,6 +79,7 @@ class HardwareRequest(ScopedPiiModelMixin, models.Model):
         related_name="issued_request",
     )
     issue_remark = models.TextField(blank=True)
+    box_issue_checklist = models.JSONField(default=list, blank=True)
     closed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -146,6 +147,7 @@ class HardwareRequest(ScopedPiiModelMixin, models.Model):
 
 
 class HardwareRequestItem(models.Model):
+    issue_checklist = models.JSONField(default=list, blank=True)
     request = models.ForeignKey(
         HardwareRequest,
         on_delete=models.CASCADE,

@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import generics
 from apps.admin_api.list_options import ListIdentityFilter, StableOrderingFilter
@@ -32,6 +33,9 @@ from apps.makerspaces.guards import require_module
 
 
 @extend_schema_view(
+    post=extend_schema(request=InventoryProductAdminCreateSerializer,
+                       responses={201: InventoryProductAdminSerializer,
+                                  **{code: ErrorSerializer for code in (400, 401, 403, 404)}}),
     get=extend_schema(
         parameters=[
             *LIST_PARAMETERS[:2],
@@ -68,6 +72,7 @@ class InventoryListCreateView(generics.ListCreateAPIView):
         qs = rbac.scope_by_action(self.request.user, rbac.Action.VIEW_INVENTORY, InventoryProduct.objects.filter(makerspace_id=makerspace_id))
         return apply_inventory_list_filters(qs, self.request.query_params)
 
+    @transaction.atomic
     def perform_create(self, serializer):
         makerspace_id = self.kwargs["makerspace_id"]
         require_module(makerspace_id, "staff_admin")
@@ -85,7 +90,8 @@ class InventoryListCreateView(generics.ListCreateAPIView):
         )
 
 
-@extend_schema(tags=["Admin inventory"], summary="Retrieve or update inventory product")
+@extend_schema(tags=["Admin inventory"], summary="Retrieve or update inventory product",
+               responses={200: InventoryProductAdminSerializer, **{code: ErrorSerializer for code in (400, 401, 403, 404)}})
 class InventoryDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = InventoryProductAdminSerializer
     permission_classes = [IsActiveStaff]
@@ -104,6 +110,12 @@ class InventoryDetailView(generics.RetrieveUpdateAPIView):
         )
         return rbac.scope_by_action(self.request.user, action, InventoryProduct.objects.select_related("makerspace", "box"))
 
+    def get_object(self):
+        product = super().get_object()
+        require_module(product.makerspace, "staff_admin")
+        return product
+
+    @transaction.atomic
     def perform_update(self, serializer):
         _assert_box_in_makerspace(
             serializer.validated_data.get("box"), serializer.instance.makerspace_id

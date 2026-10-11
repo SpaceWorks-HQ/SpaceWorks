@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.makerspaces.models import Makerspace
+from apps.inventory.kit_validators import validate_kit_definition
 
 
 def generate_box_code():
@@ -34,6 +35,7 @@ class Box(models.Model):
     label = models.CharField(max_length=200)
     location = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
+    kit_components = models.JSONField(default=list, blank=True, validators=[validate_kit_definition])
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

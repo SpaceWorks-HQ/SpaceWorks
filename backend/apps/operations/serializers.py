@@ -12,6 +12,7 @@ from apps.operations.serializers_health import (
 from apps.boxes.models import Box, QrCode
 from apps.boxes.serializers import BoxSerializer, QrCodeSerializer
 from apps.inventory.models import InventoryAsset, InventoryProduct
+from apps.inventory.kit_serializers import KitDefinitionField
 from apps.operations.models import (
     InventoryAdjustment,
     QrPrintBatch,
@@ -244,6 +245,7 @@ class InventoryAdjustmentSerializer(serializers.ModelSerializer):
 
 
 class ContainerMoveSerializer(serializers.Serializer):
+    kit_components = KitDefinitionField(required=False)
     parent_id = serializers.IntegerField(required=False, allow_null=True)
     label = serializers.CharField(required=False)
     location = serializers.CharField(required=False, allow_blank=True)

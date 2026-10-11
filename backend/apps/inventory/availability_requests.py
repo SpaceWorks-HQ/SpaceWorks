@@ -1,3 +1,4 @@
+from apps.inventory.availability_stock import save_stock_change
 from django.db import connection
 
 from apps.inventory.availability_types import InsufficientStock
@@ -44,7 +45,7 @@ def reserve_for_request(request):
 
         product.available_quantity -= quantity
         product.reserved_quantity += quantity
-        product.save(
+        save_stock_change(product,
             update_fields=[
                 "available_quantity",
                 "reserved_quantity",
@@ -134,7 +135,7 @@ def issue_items(request, rejects_by_item=None):
         elif broken:
             product.needs_fix_quantity += broken
             update_fields.append("needs_fix_quantity")
-        product.save(update_fields=update_fields)
+        save_stock_change(product, update_fields=update_fields)
 
         item.issued_quantity = issued
         item.needs_fix_quantity = 0 if disposition == REJECT_REMOVE else broken
@@ -152,7 +153,7 @@ def repair_from_needs_fix(product, quantity):
         )
     locked.needs_fix_quantity -= quantity
     locked.available_quantity += quantity
-    locked.save(update_fields=["needs_fix_quantity", "available_quantity", "updated_at"])
+    save_stock_change(locked, update_fields=["needs_fix_quantity", "available_quantity", "updated_at"])
     return locked
 
 def move_available_to_needs_fix(product, quantity):
@@ -166,7 +167,7 @@ def move_available_to_needs_fix(product, quantity):
         )
     locked.available_quantity -= quantity
     locked.needs_fix_quantity += quantity
-    locked.save(update_fields=["available_quantity", "needs_fix_quantity", "updated_at"])
+    save_stock_change(locked, update_fields=["available_quantity", "needs_fix_quantity", "updated_at"])
     return locked
 
 def scrap_from_needs_fix(product, quantity):
@@ -180,7 +181,7 @@ def scrap_from_needs_fix(product, quantity):
         )
     locked.needs_fix_quantity -= quantity
     locked.total_quantity -= quantity
-    locked.save(update_fields=["needs_fix_quantity", "total_quantity", "updated_at"])
+    save_stock_change(locked, update_fields=["needs_fix_quantity", "total_quantity", "updated_at"])
     return locked
 
 
@@ -217,7 +218,7 @@ def return_items(request, resolutions):
         product.available_quantity += returned
         product.damaged_quantity += damaged
         product.lost_quantity += missing
-        product.save(
+        save_stock_change(product,
             update_fields=[
                 "issued_quantity",
                 "available_quantity",

@@ -6,6 +6,7 @@ import { evidenceErrorText } from "../evidenceUi";
 import { EvidenceUpload } from "./EvidenceUpload";
 import { BoxCodeField, FormFooter, ShelfLine, submitForm } from "./QueuesModalShared";
 import type { AssetReturnOutcome, FormModalProps, ReturnRequestValues } from "./QueuesModalTypes";
+import { KitChecklistCapture, useKitChecklist } from "../../inventory/KitChecklist";
 
 type PendingOutcome = AssetReturnOutcome | "pending";
 
@@ -20,6 +21,10 @@ export function ReturnRequestModal({ row, open, pending, error, onClose, onSubmi
   const [validationError, setValidationError] = useState("");
   const [issueUrl, setIssueUrl] = useState("");
   const [issueError, setIssueError] = useState("");
+  const finalResolutions = buildFinalResolutions();
+  const kits = useKitChecklist(`/admin/makerspace/${makerspaceId}/kit-checklist-preview`,
+    { request_id: row?.id, phase: "return", resolutions: finalResolutions },
+    open && Boolean(row?.has_kit_checklist) && finalResolutions.length > 0 && !overReturnError(row, finalResolutions));
 
   useEffect(() => {
     if (!open || !row) {
@@ -85,6 +90,7 @@ export function ReturnRequestModal({ row, open, pending, error, onClose, onSubmi
         <label className="grid gap-1 text-sm"><span className="font-medium text-ink">Remark</span><textarea className="desk-input min-h-20 w-full resize-y" value={remark} disabled={pending} onChange={(event) => setRemark(event.target.value)} /></label>
         <ReturnItems row={row} resolutions={resolutions} assetOutcomes={assetOutcomes} pending={pending} onQuantityChange={updateResolution} onAssetOutcomeChange={updateAssetOutcome} />
         <ErrorText message={validationError || error} />
+        <KitChecklistCapture checklist={kits} />
       </form>
     </Modal>
   );
@@ -92,12 +98,13 @@ export function ReturnRequestModal({ row, open, pending, error, onClose, onSubmi
   function submitReturn() {
     if (evidenceId === null) return setValidationError("Upload a return photo before submitting.");
     if (!remark.trim()) return setValidationError("Return remark is required.");
+    if (!kits.ready) return setValidationError("Complete the kit checklist before returning.");
     const finalResolutions = buildFinalResolutions();
     if (finalResolutions.length === 0) return setValidationError("Resolve at least one item.");
     if (finalResolutions.some((resolution) => resolution.returned < 0 || resolution.damaged < 0 || resolution.missing < 0)) return setValidationError("Resolution quantities cannot be negative.");
     const overReturn = overReturnError(row, finalResolutions);
     if (overReturn) return setValidationError(overReturn);
-    onSubmit({ evidenceId, boxCode: boxCode.trim(), remark: remark.trim(), resolutions: finalResolutions });
+    onSubmit({ evidenceId, boxCode: boxCode.trim(), remark: remark.trim(), resolutions: finalResolutions, kitChecklist: kits.counts });
   }
 
   function buildFinalResolutions(): ReturnRequestValues["resolutions"] {

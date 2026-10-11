@@ -21,9 +21,10 @@ from apps.makerspaces.guards import require_feature, require_feature_locked
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.servability import is_servable
 from apps.makerspaces.loan_policy import loan_days
+from apps.hardware_requests import kit_checklists as kits
 
 
-def checkout_tool(makerspace, requester, payload, *, evidence_id, remark=""):
+def checkout_tool(makerspace, requester, payload, *, evidence_id, remark="", kit_checklist=None):
     # Gate on the feature and on servability BEFORE touching evidence. Promotion moved
     # out of the transaction so its row locks never span S3 I/O, and moving the evidence
     # work up with it put it ahead of the feature check -- so a makerspace with
@@ -66,7 +67,8 @@ def checkout_tool(makerspace, requester, payload, *, evidence_id, remark=""):
             return_due_at=due_at,
         )
         hardware_request.issue_evidence = evidence
-        hardware_request.issue_remark = str(remark or "").strip()
+        checklist = kits.record_issue(requester, hardware_request, container, kit_checklist)
+        hardware_request.issue_remark = kits.checklist_remark(str(remark or "").strip(), checklist)
         hardware_request.save(update_fields=["issue_evidence", "issue_remark", "updated_at"])
         loan = PublicToolLoan.objects.create(
             makerspace=makerspace,
@@ -114,5 +116,4 @@ def qr_has_active_loan(makerspace, qr):
         .filter(Q(qr_code=qr) | Q(qr_ids__contains=[qr.id]))
         .exists()
     )
-
 

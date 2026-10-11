@@ -2,6 +2,7 @@ from django.db import transaction
 from django.utils.text import slugify
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from apps.accounts import rbac
 
 from apps.inventory import public_image_storage
 from apps.inventory.models import (
@@ -12,6 +13,8 @@ from apps.inventory.models import (
 )
 from apps.makerspaces import limits
 from apps.makerspaces.models import Makerspace
+from apps.inventory.kit_serializers import KitDefinitionField
+from apps.makerspaces.guards import require_feature, require_module_locked
 
 QUANTITY_BUCKET_FIELDS = (
     "total_quantity",
@@ -30,12 +33,22 @@ CREATE_PROTECTED_BUCKET_FIELDS = (
 
 
 class InventoryProductAdminSerializer(serializers.ModelSerializer):
+    kit_components = KitDefinitionField(required=False)
     category = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(),
         allow_null=True,
         required=False,
     )
     image_url = serializers.SerializerMethodField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        if request:
+            for name in ("box", "category"):
+                field = self.fields[name]
+                field.queryset = rbac.scope_by_action(request.user, rbac.Action.EDIT_INVENTORY,
+                                                     field.queryset)
 
     class Meta:
         model = InventoryProduct
@@ -45,6 +58,8 @@ class InventoryProductAdminSerializer(serializers.ModelSerializer):
             "box",
             "category",
             "name",
+            "manufacturer", "model", "sku", "barcode", "supplier",
+            "reorder_point", "reorder_quantity", "kit_components",
             "description",
             "image_key",
             "image_url",
@@ -128,6 +143,9 @@ class InventoryProductAdminCreateSerializer(InventoryProductAdminSerializer):
         if makerspace is None:
             makerspace = Makerspace.objects.get(pk=validated_data["makerspace_id"])
         with transaction.atomic():
+            makerspace = require_module_locked(makerspace, "staff_admin")
+            if validated_data.get("kit_components"):
+                require_feature(makerspace, "loans.kit_checklist")
             limits.check_quota(makerspace, "products", adding=1)
             return super().create(validated_data)
 
@@ -151,6 +169,10 @@ class InventoryProductAdminUpdateSerializer(InventoryProductAdminSerializer):
 
     def update(self, instance, validated_data):
         with transaction.atomic():
+            space = require_module_locked(instance.makerspace_id, "staff_admin")
+            instance = InventoryProduct.objects.select_for_update().get(pk=instance.pk)
+            if "kit_components" in validated_data:
+                require_feature(space, "loans.kit_checklist")
             if validated_data.get("is_archived") is False and instance.is_archived:
                 limits.check_quota(instance.makerspace, "products", adding=1)
             return super().update(instance, validated_data)

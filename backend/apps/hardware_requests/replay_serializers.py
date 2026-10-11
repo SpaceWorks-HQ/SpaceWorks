@@ -62,14 +62,19 @@ class ReplayEnvelopeSerializer(serializers.Serializer):
         return attrs
 
 
-def _bound_payload(value, depth=0):
+def _bound_payload(value, depth=0, field=None):
     if depth > 8 or (isinstance(value, str) and len(value) > 4000):
         raise ReplayFailure("invalid_command")
     if isinstance(value, (list, dict)):
-        if len(value) > 100:
+        limit = 3550 if depth == 1 and field == "kit_checklist" and isinstance(value, list) else 100
+        if len(value) > limit:
             raise ReplayFailure("invalid_command")
-        for item in value.values() if isinstance(value, dict) else value:
-            _bound_payload(item, depth + 1)
+        if isinstance(value, dict):
+            for key, item in value.items():
+                _bound_payload(item, depth + 1, key)
+        else:
+            for item in value:
+                _bound_payload(item, depth + 1)
 
 
 class ReplayResultSerializer(serializers.Serializer):

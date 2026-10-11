@@ -15,6 +15,7 @@ import {
   valuesAreValid,
 } from "./shared";
 import type { DialogProps, ReturnValues } from "./types";
+import { KitChecklistCapture, useKitChecklist } from "../../inventory/KitChecklist";
 
 export function ReturnDialog({ row, makerspace, onClose }: DialogProps) {
   const queryClient = useQueryClient();
@@ -44,6 +45,8 @@ export function ReturnDialog({ row, makerspace, onClose }: DialogProps) {
     .map(({ item, parsed }) => ({ item_id: item.id, ...parsed }))
     .filter((resolution) => resolution.returned + resolution.damaged + resolution.missing > 0);
   const hasInvalidRow = rows.some((returnRow) => !returnRow.valid);
+  const kits = useKitChecklist(`/admin/makerspace/${makerspace.id}/kit-checklist-preview`,
+    { request_id: row.id, phase: "return", resolutions }, Boolean(row.has_kit_checklist) && resolutions.length > 0 && !hasInvalidRow);
   const mutation = useMutation({
     mutationFn: () =>
       staffRequest(`/admin/requests/${row.id}/return`, {
@@ -53,6 +56,7 @@ export function ReturnDialog({ row, makerspace, onClose }: DialogProps) {
           box_code: boxCode.trim(),
           remark: remark.trim(),
           resolutions,
+          kit_checklist: kits.counts,
         }),
       }),
     onSuccess: () => {
@@ -60,7 +64,7 @@ export function ReturnDialog({ row, makerspace, onClose }: DialogProps) {
       onClose();
     },
   });
-  const canSubmit = Boolean(evidenceId) && Boolean(remark.trim()) && resolutions.length > 0 && !hasInvalidRow;
+  const canSubmit = Boolean(evidenceId) && Boolean(remark.trim()) && resolutions.length > 0 && !hasInvalidRow && kits.ready;
 
   useEffect(() => {
     setEvidenceId(null);
@@ -130,6 +134,7 @@ export function ReturnDialog({ row, makerspace, onClose }: DialogProps) {
           />
         </label>
         <DialogError error={mutation.error} />
+        <KitChecklistCapture checklist={kits} />
         <div className="desk-actions flex flex-wrap justify-end gap-2">
           <button className="desk-button" type="button" onClick={onClose}>
             Cancel

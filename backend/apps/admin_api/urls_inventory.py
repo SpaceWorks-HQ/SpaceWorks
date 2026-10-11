@@ -1,9 +1,12 @@
 from django.urls import path
 
 from apps.admin_api import views
+from apps.inventory.reorder_views import ReorderSuggestionsView, ReorderDraftView
 
 
 urlpatterns = [
+    path("makerspace/<int:makerspace_id>/inventory/reorder-suggestions", ReorderSuggestionsView.as_view(), name="admin-reorder-suggestions"),
+    path("makerspace/<int:makerspace_id>/inventory/reorder-draft", ReorderDraftView.as_view(), name="admin-reorder-draft"),
     path(
         "makerspace/<int:makerspace_id>/inventory",
         views.InventoryListCreateView.as_view(),

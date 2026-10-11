@@ -10,6 +10,9 @@ import { useUrlListState } from "../../../lib/useUrlListState";
 import { Pagination } from "../../../components/ui/Pagination";
 import { SavedViewsMenu } from "../SavedViewsMenu";
 import { ImageUploader } from "../ImageUploader";
+import { KitDefinitionEditor } from "../../inventory/KitChecklist";
+import { featureEnabled } from "../../../lib/features";
+import { ReorderSuggestions } from "./ReorderSuggestions";
 import { ChainOfCustodyBlock } from "./LoanTimeline";
 import { invalidateInventoryViews } from "../queryInvalidation";
 import { categoryResults, Panel, type CategoryListResponse, type Makerspace, useStaffGet } from "./shared";
@@ -35,6 +38,7 @@ import {
 
 export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = false }: { makerspace: Makerspace; canViewAudit?: boolean; canUseToBuy?: boolean }) {
   const queryClient = useQueryClient();
+  const kitEnabled = featureEnabled(makerspace.enabled_features ?? [], "loans.kit_checklist");
   const list = useUrlListState({ id: "", q: "", ordering: "name", page: "1", archived: "false", low_stock: "false" });
   const search = list.values.q;
   const setSearch = (value: string) => list.setFilter("q", value);
@@ -77,6 +81,7 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
   useEffect(() => { setSelectedIds([]); }, [makerspace.id, list.query]);
   const categories = useStaffGet<CategoryListResponse>(["categories", makerspace.id], `/admin/makerspace/${makerspace.id}/categories`);
   const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["reorder-suggestions", makerspace.id] });
     invalidateInventoryViews(queryClient, makerspace.id, makerspace.slug);
     queryClient.invalidateQueries({ queryKey: ["categories", makerspace.id] });
   };
@@ -186,7 +191,7 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
   const categoryRows = categoryResults(categories.data);
   const openEdit = (product: AdminProduct) => {
     setEditing(product);
-    setForm(formFromProduct(product));
+    setForm({ ...formFromProduct(product), ...(kitEnabled ? { kit_components: product.kit_components ?? [] } : {}) });
     setAdjustForm(emptyAdjust);
   };
   const columns: DataTableColumn<AdminProduct>[] = [
@@ -213,6 +218,7 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
   ];
   return (
     <Panel title="Inventory">
+      <ReorderSuggestions key={makerspace.id} makerspaceId={makerspace.id} canProcure={canUseToBuy} />
       <div className="grid gap-3">
         <FilterBar
           value={search}
@@ -239,8 +245,11 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
         {bulkQrMessage ? <p className="text-sm text-muted">{bulkQrMessage}</p> : null}
         {exportInventory.error ? <p className="text-sm text-danger">{exportInventory.error instanceof Error ? exportInventory.error.message : "Could not export inventory."}</p> : null}
       </div>
-      <ItemModal title="Add item" open={addOpen} onClose={() => setAddOpen(false)} form={form} setForm={setForm} categories={categoryRows} includeQuantities pending={create.isPending} error={create.error?.message} onSubmit={() => create.mutate()} />
+      <ItemModal title="Add item" open={addOpen} onClose={() => setAddOpen(false)} form={form} setForm={setForm} categories={categoryRows} includeQuantities pending={create.isPending} error={create.error?.message} onSubmit={() => create.mutate()}>
+        {kitEnabled ? <KitDefinitionEditor value={form.kit_components ?? []} onChange={(value) => setForm((current) => ({ ...current, kit_components: value }))} /> : null}
+      </ItemModal>
       <ItemModal title={editing?.name ?? "Edit item"} open={Boolean(editing)} onClose={() => setEditing(null)} form={form} setForm={setForm} categories={categoryRows} pending={update.isPending} error={update.error?.message} onSubmit={() => update.mutate()}>
+        {kitEnabled ? <KitDefinitionEditor value={form.kit_components ?? []} onChange={(value) => setForm((current) => ({ ...current, kit_components: value }))} /> : null}
         {editing ? <div className="border-t border-line pt-3"><ImageUploader endpoint={`/admin/inventory/${editing.id}/image`} currentUrl={editing.image_url} label="Item photo" onChanged={invalidate} /></div> : null}
         {editing ? <QuantityAdjust product={editing} form={adjustForm} setForm={setAdjustForm} pending={adjust.isPending} error={adjust.error?.message} onSubmit={() => adjust.mutate()} /> : null}
         {editing ? <QrHistory title="Product QR history" queryKey={["product-qr-history", editing.id]} path={`/admin/inventory/${editing.id}/qr-history`} /> : null}

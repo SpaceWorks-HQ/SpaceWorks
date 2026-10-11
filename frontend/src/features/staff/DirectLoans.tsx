@@ -1,3 +1,5 @@
+import { KitChecklistCapture, useKitChecklist } from "../inventory/KitChecklist";
+import { featureEnabled } from "../../lib/features";
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -88,11 +90,22 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
     path: `/admin/makerspace/${makerspace.id}/direct-loans`,
     resetKey: String(makerspace.id),
   });
+  const pastedQrPayloads = qrPayloads.split("\n").map((value) => value.trim()).filter(Boolean);
+  const validManualLines = lineRows.filter((line) => {
+    const product = productById.get(Number(line.productId));
+    return Boolean(product) && product?.tracking_mode !== "individual" && Number(line.quantity) > 0;
+  });
+  const kits = useKitChecklist(`/admin/makerspace/${makerspace.id}/kit-checklist-preview`,
+    { phase: "issue", qr_payloads: Array.from(new Set([...scanned.map((item) => item.payload), ...pastedQrPayloads])),
+      items: validManualLines.map((line) => ({ product_id: Number(line.productId), quantity: Number(line.quantity) })),
+      container_id: containerId ? Number(containerId) : null },
+    featureEnabled(makerspace.enabled_features ?? [], "loans.kit_checklist") && Boolean(containerId || scanned.length || pastedQrPayloads.length || validManualLines.length));
   const issue = useMutation({
     mutationFn: () =>
       staffRequest(`/admin/makerspace/${makerspace.id}/direct-loans`, {
         method: "POST",
         body: JSON.stringify({
+          kit_checklist: kits.counts,
           borrower_id: Number(borrowerId),
           evidence_id: issueEvidenceId as number,
           remark: issueRemark.trim(),
@@ -120,18 +133,13 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
       setIssueUploadKey((key) => key + 1);
     },
   });
-  const pastedQrPayloads = qrPayloads.split("\n").map((value) => value.trim()).filter(Boolean);
-  const validManualLines = lineRows.filter((line) => {
-    const product = productById.get(Number(line.productId));
-    return Boolean(product) && product?.tracking_mode !== "individual" && Number(line.quantity) > 0;
-  });
   const hasIssueContent =
     validManualLines.length > 0 || scanned.length > 0 || pastedQrPayloads.length > 0 || Boolean(containerId);
   const canIssue =
     Boolean(borrowerId) &&
     hasIssueContent &&
     issueEvidenceId !== null &&
-    !issue.isPending;
+    !issue.isPending && kits.ready;
   const addLine = () => {
     setLineRows((rows) => [...rows, { key: nextLineKey, productId: "", quantity: "1" }]);
     setNextLineKey((key) => key + 1);
@@ -234,6 +242,7 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
           remark={issueRemark}
           onRemarkChange={setIssueRemark}
         />
+        <KitChecklistCapture checklist={kits} />
         {issueEvidenceId === null ? <p className="mt-3 text-sm text-muted">Upload an issue photo before issuing.</p> : null}
         {!hasIssueContent ? <p className="mt-3 text-sm text-muted">Add at least one item, QR payload, or container before issuing.</p> : null}
         <button className="desk-button-primary mt-3" disabled={!canIssue} onClick={() => issue.mutate()}>

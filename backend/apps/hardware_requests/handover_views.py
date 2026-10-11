@@ -76,6 +76,7 @@ class IssueRequestView(APIView):
             serializer.validated_data["remark"],
             asset_qr_payloads=serializer.validated_data["asset_qr_payloads"],
             rejects=serializer.validated_data["rejects"],
+            kit_checklist=serializer.validated_data["kit_checklist"],
         )
         return Response(AdminRequestSerializer(updated).data)
 
@@ -104,6 +105,7 @@ class ReturnRequestView(APIView):
             serializer.validated_data["remark"],
             serializer.validated_data["box_code"],
             serializer.validated_data["resolutions"],
+            kit_checklist=serializer.validated_data["kit_checklist"],
         )
         return Response(AdminRequestSerializer(updated).data)
 

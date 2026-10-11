@@ -6,8 +6,10 @@ import { WarrantySection } from "../WarrantySection";
 import { invalidateContainerViews } from "../queryInvalidation";
 import { Panel, type Makerspace, useStaffGet } from "./shared";
 import { QrImage } from "./QrImage";
+import { featureEnabled } from "../../../lib/features";
+import { KitDefinitionEditor, type KitComponent } from "../../inventory/KitChecklist";
 
-type Container = { id: number; code?: string; label: string; location?: string; is_active?: boolean };
+type Container = { id: number; code?: string; label: string; location?: string; is_active?: boolean; kit_components?: KitComponent[] };
 type Contents = {
   products: { id: number; name: string; available_quantity: number; tracking_mode: string }[];
   assets: { id: number; asset_tag: string; product: string; status: string }[];
@@ -26,7 +28,7 @@ export function ContainersPanel({ makerspace, canEditInventory }: { makerspace: 
       {containers.error instanceof Error ? <p className="text-sm text-danger">{containers.error.message}</p> : null}
       <div className="grid gap-2">
         {containers.data?.results?.map((container) => (
-          <ContainerRow key={container.id} container={container} makerspaceId={makerspace.id} canEditInventory={canEditInventory} />
+          <ContainerRow key={container.id} container={container} makerspaceId={makerspace.id} canEditInventory={canEditInventory} kitEnabled={featureEnabled(makerspace.enabled_features ?? [], "loans.kit_checklist")} />
         ))}
         {!containers.isLoading && !containers.error && !containers.data?.results?.length ? (
           <p className="text-sm text-muted">No containers yet. Create one in QR tools.</p>
@@ -36,13 +38,14 @@ export function ContainersPanel({ makerspace, canEditInventory }: { makerspace: 
   );
 }
 
-function ContainerRow({ container, makerspaceId, canEditInventory }: { container: Container; makerspaceId: number; canEditInventory: boolean }) {
+function ContainerRow({ container, makerspaceId, canEditInventory, kitEnabled }: { container: Container; makerspaceId: number; canEditInventory: boolean; kitEnabled: boolean }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [panel, setPanel] = useState<"contents" | "history" | null>(null);
   const [label, setLabel] = useState(container.label);
   const [location, setLocation] = useState(container.location ?? "");
   const [isActive, setIsActive] = useState(container.is_active ?? true);
+  const [components, setComponents] = useState(container.kit_components ?? []);
 
   const contents = useStaffGet<Contents>(["container-contents", container.id], `/admin/containers/${container.id}/contents`, panel === "contents");
   const history = useStaffGet<History>(["container-history", container.id], `/admin/containers/${container.id}/history`, panel === "history");
@@ -51,7 +54,8 @@ function ContainerRow({ container, makerspaceId, canEditInventory }: { container
     mutationFn: () =>
       staffRequest(`/admin/containers/${container.id}/move`, {
         method: "POST",
-        body: JSON.stringify({ label: label.trim(), location: location.trim(), is_active: isActive }),
+        body: JSON.stringify({ label: label.trim(), location: location.trim(), is_active: isActive,
+          ...(kitEnabled ? { kit_components: components } : {}) }),
       }),
     onSuccess: () => {
       setEditing(false);
@@ -83,6 +87,7 @@ function ContainerRow({ container, makerspaceId, canEditInventory }: { container
         </div>
       ) : null}
       {saveError ? <p className="mt-2 text-danger">{saveError}</p> : null}
+      {editing && kitEnabled ? <KitDefinitionEditor value={components} onChange={setComponents} /> : null}
 
       {panel === "contents" ? (
         <div className="mt-3 grid gap-2 rounded-md border border-line bg-bg p-2">

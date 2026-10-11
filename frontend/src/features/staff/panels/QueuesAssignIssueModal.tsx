@@ -6,10 +6,11 @@ import { staffRequest } from "../../../lib/api";
 import { EvidenceUpload } from "./EvidenceUpload";
 import { BoxCodeField, FormFooter, ShelfLine, submitForm } from "./QueuesModalShared";
 import type { AssignIssueValues, FormModalProps } from "./QueuesModalTypes";
+import { KitChecklistCapture, useKitChecklist } from "../../inventory/KitChecklist";
 
 type ScannedAsset = { payload: string; label: string };
 
-export function AssignIssueModal({ row, open, pending, error, onClose, onSubmit, makerspaceId }: FormModalProps<AssignIssueValues> & { makerspaceId: number }) {
+export function AssignIssueModal({ row, open, pending, error, onClose, onSubmit, makerspaceId, kitEnabled = false }: FormModalProps<AssignIssueValues> & { makerspaceId: number; kitEnabled?: boolean }) {
   const [boxCode, setBoxCode] = useState(row?.assigned_box?.code ?? "");
   const [evidenceId, setEvidenceId] = useState<number | null>(null);
   const [remark, setRemark] = useState("Issued from staff app.");
@@ -17,6 +18,9 @@ export function AssignIssueModal({ row, open, pending, error, onClose, onSubmit,
   const [scanned, setScanned] = useState<ScannedAsset[]>([]);
   const [showScanner, setShowScanner] = useState(false);
   const [validationError, setValidationError] = useState("");
+  const rejectList = Object.entries(rejects).filter(([, value]) => value.broken > 0).map(([itemId, value]) => ({ item_id: Number(itemId), ...value }));
+  const kits = useKitChecklist(`/admin/makerspace/${makerspaceId}/kit-checklist-preview`,
+    { request_id: row?.id, phase: "issue", box_code: boxCode.trim(), rejects: rejectList }, open && Boolean(row) && kitEnabled && Boolean(boxCode.trim()));
 
   const requiredScans = (row?.items ?? []).filter((item) => item.requires_asset_qr).reduce((sum, item) => sum + item.accepted_quantity, 0);
 
@@ -74,6 +78,7 @@ export function AssignIssueModal({ row, open, pending, error, onClose, onSubmit,
         <IssueItems row={row} pending={pending} rejects={rejects} setBroken={setBroken} setDisposition={setDisposition} />
         {showScanner ? <QrScanner onScan={handleScan} onClose={() => setShowScanner(false)} /> : null}
         <ErrorText message={validationError || error} />
+        <KitChecklistCapture checklist={kits} />
       </form>
     </Modal>
   );
@@ -81,11 +86,11 @@ export function AssignIssueModal({ row, open, pending, error, onClose, onSubmit,
   function submitAssign() {
     if (!boxCode.trim()) return setValidationError("Box QR code is required.");
     if (evidenceId === null) return setValidationError("Upload an issue photo before issuing.");
+    if (!kits.ready) return setValidationError("Complete the kit checklist before issuing.");
     const overflow = (row?.items ?? []).find((item) => (rejects[item.id]?.broken ?? 0) > item.accepted_quantity);
     if (overflow) return setValidationError(`Can't reject more than ${overflow.accepted_quantity} of ${overflow.product_name}.`);
     if (scanned.length !== requiredScans) return setValidationError(`Scan exactly ${requiredScans} asset QR code(s) for the individually-tracked items (scanned ${scanned.length}).`);
-    const rejectList = Object.entries(rejects).filter(([, value]) => value.broken > 0).map(([itemId, value]) => ({ item_id: Number(itemId), broken: value.broken, disposition: value.disposition }));
-    onSubmit({ boxCode: boxCode.trim(), evidenceId, remark, rejects: rejectList, assetQrPayloads: scanned.map((item) => item.payload) });
+    onSubmit({ boxCode: boxCode.trim(), evidenceId, remark, rejects: rejectList, assetQrPayloads: scanned.map((item) => item.payload), kitChecklist: kits.counts });
   }
 }
 

@@ -215,6 +215,12 @@ def validate_user_edges(user_edges=USER_EDGES):
 # reviewable act: the guard below still demands EXACT equality, so any JSON field that is
 # neither declared in JSON_FIELDS nor listed here still fails discovery.
 NON_REFERENCE_JSON_FIELDS = frozenset({
+    # Opaque component UUIDs, labels and numeric counts; no model references.
+    ("inventory.InventoryProduct", "kit_components"),
+    ("boxes.Box", "kit_components"),
+    ("hardware_requests.HardwareRequest", "box_issue_checklist"),
+    ("hardware_requests.HardwareRequestItem", "issue_checklist"),
+    ("hardware_requests.ReturnEvent", "kit_checklist"),
     # Inert filter snapshots; identity filters are not live relation edges. Reset
     # on tenant import so source identifiers never address unrelated target rows.
     ("operations.SavedView", "state"),

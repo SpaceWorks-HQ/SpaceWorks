@@ -29,6 +29,7 @@ from apps.inventory import availability
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.request_access import require_current_term
 from apps.presence.guard import require_active_member_presence
+from apps.hardware_requests import kit_checklists as kits
 
 
 def issue_direct_loan(
@@ -41,6 +42,7 @@ def issue_direct_loan(
     qr_payloads,
     items,
     container_id=None,
+    kit_checklist=None,
 ):
     # The lapsed-term rule is about the BORROWER, not about who hands the tool over.
     require_current_term(
@@ -161,7 +163,8 @@ def issue_direct_loan(
             issued_by=actor,
         )
         request.issue_evidence = evidence
-        request.issue_remark = str(remark or "").strip()
+        checklist = kits.record_issue(actor, request, loan_container, kit_checklist)
+        request.issue_remark = kits.checklist_remark(str(remark or "").strip(), checklist)
         request.save(update_fields=["issue_evidence", "issue_remark", "updated_at"])
         audit.record(
             actor,

@@ -95,6 +95,10 @@ class ToBuyItem(models.Model):
         on_delete=models.SET_NULL,
         related_name="low_stock_to_buy_items",
     )
+    source_product = models.ForeignKey(
+        "inventory.InventoryProduct", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="reorder_drafts",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

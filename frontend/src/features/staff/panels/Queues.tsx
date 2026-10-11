@@ -25,6 +25,7 @@ import {
 } from "./QueuesModals";
 import { RequestListSkeleton } from "./QueuesSkeleton";
 import { AcceptRequestModal } from "./QueuesAcceptModal";
+import { featureEnabled } from "../../../lib/features";
 
 export type RequestItem = {
   id: number;
@@ -44,6 +45,7 @@ export type RequestItem = {
 };
 export type HardwareRequest = {
   id: number;
+  has_kit_checklist?: boolean;
   status: string;
   requester_username: string;
   requester_display?: string;
@@ -159,7 +161,7 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
     if (rejectRow) void runAction(`/admin/requests/${rejectRow.id}/reject`, { reason: values.reason });
   };
   const submitReturn = (values: ReturnRequestValues) => {
-    if (returnRow) void runAction(`/admin/requests/${returnRow.id}/return`, { evidence_id: values.evidenceId, box_code: values.boxCode, remark: values.remark, resolutions: values.resolutions });
+    if (returnRow) void runAction(`/admin/requests/${returnRow.id}/return`, { evidence_id: values.evidenceId, box_code: values.boxCode, remark: values.remark, resolutions: values.resolutions, kit_checklist: values.kitChecklist ?? [] });
   };
   const submitAssignIssue = async (values: AssignIssueValues) => {
     if (!assignIssueRow) return;
@@ -170,7 +172,7 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
       boxAssigned = true;
       await action.mutateAsync({
         path: `/admin/requests/${assignIssueRow.id}/issue`,
-        body: { evidence_id: values.evidenceId, remark: values.remark, rejects: values.rejects, asset_qr_payloads: values.assetQrPayloads },
+        body: { evidence_id: values.evidenceId, remark: values.remark, rejects: values.rejects, asset_qr_payloads: values.assetQrPayloads, kit_checklist: values.kitChecklist ?? [] },
       });
       closeModals();
     } catch (error) {
@@ -206,7 +208,7 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
       <AcceptRequestModal row={acceptRow} open={Boolean(acceptRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitAccept} />
       <ReturnDueModal row={dueRow} defaultValue={dueRow?.return_due_at ? localDateTimeValue(dueRow.return_due_at) : localDateTimeValue(defaultDueDate(Number(defaultLoanDays) || 7).toISOString())} open={Boolean(dueRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitReturnDue} />
       <RejectRequestModal row={rejectRow} open={Boolean(rejectRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitReject} />
-      <AssignIssueModal row={assignIssueRow} open={Boolean(assignIssueRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitAssignIssue} makerspaceId={makerspace.id} />
+      <AssignIssueModal row={assignIssueRow} open={Boolean(assignIssueRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitAssignIssue} makerspaceId={makerspace.id} kitEnabled={featureEnabled(makerspace.enabled_features ?? [], "loans.kit_checklist")} />
       <ReturnRequestModal row={returnRow} open={Boolean(returnRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitReturn} makerspaceId={makerspace.id} />
     </div>
   );
@@ -275,4 +277,3 @@ function localDateTimeValue(value: string) {
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
-

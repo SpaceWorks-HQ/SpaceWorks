@@ -1,7 +1,7 @@
+from apps.inventory.availability_stock import save_stock_change
 from django.db import connection, transaction
-from django.db.models import Count
 
-from apps.inventory.models import InventoryAsset, InventoryProduct, TrackingMode
+from apps.inventory.models import InventoryProduct
 from apps.inventory.availability_types import InsufficientStock
 
 
@@ -32,7 +32,7 @@ def adjust_quantities(
             + locked.lost_quantity
             + locked.needs_fix_quantity
         )
-        locked.save(
+        save_stock_change(locked,
             update_fields=[
                 "available_quantity",
                 "damaged_quantity",
@@ -133,7 +133,7 @@ def move_available_to_triage_bucket(product, quantity, *, outcome, reason, actor
         + locked.lost_quantity
         + locked.needs_fix_quantity
     )
-    locked.save(
+    save_stock_change(locked,
         update_fields=[
             "available_quantity",
             "needs_fix_quantity",
@@ -186,7 +186,7 @@ def issue_available(product, quantity):
         )
     product.available_quantity -= quantity
     product.issued_quantity += quantity
-    product.save(update_fields=["available_quantity", "issued_quantity", "updated_at"])
+    save_stock_change(product, update_fields=["available_quantity", "issued_quantity", "updated_at"])
 
 
 def return_to_available(product, quantity):
@@ -203,82 +203,7 @@ def return_to_available(product, quantity):
         )
     product.issued_quantity -= quantity
     product.available_quantity += quantity
-    product.save(update_fields=["issued_quantity", "available_quantity", "updated_at"])
+    save_stock_change(product, update_fields=["issued_quantity", "available_quantity", "updated_at"])
 
 
-def transfer_available_quantity(source_product, destination_product, quantity):
-    """Move available quantity from one product row to another.
-
-    Stock-transfer workflows use this for quantity-tracked moves where the
-    destination may be another container or another makerspace. Keeping the
-    available/total bucket math here preserves the inventory availability
-    invariant that no bucket can go below zero.
-    """
-    if not connection.in_atomic_block:
-        raise RuntimeError(
-            "transfer_available_quantity must be called inside transaction.atomic()."
-        )
-    quantity = int(quantity)
-    if quantity <= 0:
-        raise InsufficientStock("Transfer quantity must be positive.")
-    if source_product.pk == destination_product.pk:
-        return source_product, destination_product
-
-    ids = sorted([source_product.pk, destination_product.pk])
-    locked = {
-        product.pk: product
-        for product in InventoryProduct.objects.select_for_update()
-        .filter(pk__in=ids)
-        .order_by("pk")
-    }
-    source = locked[source_product.pk]
-    destination = locked[destination_product.pk]
-    if source.available_quantity < quantity or source.total_quantity < quantity:
-        raise InsufficientStock(
-            f"Insufficient stock for product {source.pk}: "
-            f"requested {quantity}, available {source.available_quantity}."
-        )
-
-    source.available_quantity -= quantity
-    source.total_quantity -= quantity
-    destination.available_quantity += quantity
-    destination.total_quantity += quantity
-    source.save(update_fields=["available_quantity", "total_quantity", "updated_at"])
-    destination.save(
-        update_fields=["available_quantity", "total_quantity", "updated_at"]
-    )
-    return source, destination
-
-
-def apply_stocktake_delta(product, *, delta_available=0, delta_damaged=0, delta_lost=0):
-    """Apply signed deltas to available/damaged/lost for a stocktake variance,
-    recompute total_quantity as the sum of all buckets, and save. Caller must
-    hold the product row lock inside transaction.atomic(). Refuses to make
-    available/damaged/lost negative (raises InsufficientStock)."""
-    if not connection.in_atomic_block:
-        raise RuntimeError(
-            "apply_stocktake_delta must be called inside transaction.atomic()."
-        )
-    product.available_quantity += delta_available
-    product.damaged_quantity += delta_damaged
-    product.lost_quantity += delta_lost
-    if min(product.available_quantity, product.damaged_quantity, product.lost_quantity) < 0:
-        raise InsufficientStock("Stocktake adjustment would make inventory negative.")
-    product.total_quantity = (
-        product.available_quantity
-        + product.reserved_quantity
-        + product.issued_quantity
-        + product.damaged_quantity
-        + product.lost_quantity
-        + product.needs_fix_quantity
-    )
-    product.save(
-        update_fields=[
-            "available_quantity",
-            "damaged_quantity",
-            "lost_quantity",
-            "total_quantity",
-            "updated_at",
-        ]
-    )
-
+from .availability_transfers import apply_stocktake_delta, transfer_available_quantity

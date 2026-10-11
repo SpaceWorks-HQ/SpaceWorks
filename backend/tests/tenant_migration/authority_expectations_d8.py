@@ -266,3 +266,7 @@ from .authority_expectations_integration import INTEGRATION_EXPECTED
 
 EXPECTED.update(INTEGRATION_EXPECTED)
 
+
+from .authority_expectations_research import RESEARCH_EXPECTED
+
+EXPECTED.update(RESEARCH_EXPECTED)
