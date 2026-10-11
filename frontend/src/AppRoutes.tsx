@@ -21,6 +21,7 @@ const PublicMachinesPage = lazy(() => import("./features/inventory/PublicMachine
 const PublicSelfCheckoutPage = lazy(() => import("./features/inventory/PublicSelfCheckoutPage").then((m) => ({ default: m.PublicSelfCheckoutPage })));
 const ArchivedPayments = lazy(() => import("./features/members/ArchivedPayments").then((m) => ({ default: m.ArchivedPayments })));
 const MemberArea = lazy(() => import("./features/members/MemberArea").then((m) => ({ default: m.MemberArea })));
+const MemberAccountPage = lazy(() => import("./features/members/MemberAccountPage").then((m) => ({ default: m.MemberAccountPage })));
 const PublicPrintRequestPage = lazy(() => import("./features/printing/PublicPrintRequestPage").then((m) => ({ default: m.PublicPrintRequestPage })));
 const PublicOrganizationPage = lazy(() => import("./features/organizations/PublicOrganizationPage").then((m) => ({ default: m.PublicOrganizationPage })));
 const OrganizationInvitationRedeemPage = lazy(() => import("./features/organizations/OrganizationInvitationRedeemPage").then((m) => ({ default: m.OrganizationInvitationRedeemPage })));
@@ -76,6 +77,7 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
       <Route path="/bookings" element={<PublicBookingsPage />} />
       <Route path="/print" element={<PublicPrintRequestPage />} />
       <Route path="/member" element={<MemberArea />} />
+      <Route path="/member/account" element={<MemberAccountPage />} />
       <Route path="/stats" element={<PublicStatsPage />} />
       <Route path="/about" element={<AboutPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -100,7 +102,9 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
       <Route path="/m/:slug/admin/*" element={<StaffApp />} />
       <Route path="/m/:slug/print" element={<PublicPrintRequestPage />} />
       <Route path="/m/:slug/member" element={<MemberArea />} />
+      <Route path="/m/:slug/member/account" element={<MemberAccountPage />} />
       <Route path="/member" element={<MemberArea />} />
+      <Route path="/member/account" element={<MemberAccountPage />} />
       <Route path="/m/:slug/stats" element={<PublicStatsPage />} />
       <Route path="/m/:slug/kiosk/:stationToken" element={<KioskStationPage />} />
       <Route path="/kiosk/:slug" element={<PublicDeskKioskPage />} />

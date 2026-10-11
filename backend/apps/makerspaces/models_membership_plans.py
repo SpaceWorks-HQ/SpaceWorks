@@ -14,9 +14,13 @@ effect an expired term can have is the per-makerspace opt-in
 through the existing who-may-submit rule -- no new access state.
 """
 from django.conf import settings
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import F, Q
+
+
+def default_renewal_reminders():
+    return [14, 7, 1]
 
 
 class MembershipPlan(models.Model):
@@ -39,7 +43,14 @@ class MembershipPlan(models.Model):
     # ISO 4217 lowercase, the way `payments.Payment.currency` stores it.
     currency = models.CharField(max_length=3, default="usd")
     is_active = models.BooleanField(default=True)
+    auto_renew = models.BooleanField(default=False)
+    renewal_open_days = models.PositiveSmallIntegerField(default=7, validators=[MaxValueValidator(365)])
+    renewal_grace_days = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(365)])
+    renewal_retries = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(3)])
+    reminder_days_before = models.JSONField(default=default_renewal_reminders, blank=True)
+    reminder_days_after = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -101,6 +112,14 @@ class MembershipTerm(models.Model):
         related_name="created_membership_terms",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+
+    renewed_from = models.OneToOneField(
+        "self", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="next_term",
+    )
+    renewal_attempts = models.PositiveSmallIntegerField(default=0)
+    renewal_retry_at = models.DateTimeField(null=True, blank=True)
+    grace_until = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [

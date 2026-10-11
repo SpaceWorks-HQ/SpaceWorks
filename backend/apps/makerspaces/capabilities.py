@@ -29,6 +29,10 @@ class FeatureDefinition:
 
 
 FEATURE_DEFINITIONS = (
+    FeatureDefinition("membership.auto_renew", "membership", "Automatic membership renewal"),
+    FeatureDefinition("membership.lifecycle_mail", "membership", "Membership lifecycle mail"),
+    FeatureDefinition("membership.self_service", "membership", "Member account self-service"),
+    FeatureDefinition("membership.self_export", "membership", "Member data export"),
     FeatureDefinition("billing.reminders", "notifications", "Payment reminders",
                       "Email the payer about due and overdue charges, including cash-only charges."),
     FeatureDefinition("loans.renewals", "request_workflow", "Loan renewals",

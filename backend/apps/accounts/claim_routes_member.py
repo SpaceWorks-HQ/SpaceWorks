@@ -16,6 +16,33 @@ def _options(name):
 
 
 MEMBER_CLAIM_ROUTES = {
+    **{(name, method): Refused("claim sessions cannot manage admission applications")
+       for name, methods in (
+           ("member-admission", ("GET", "HEAD")),
+           ("member-admission-export", ("GET", "HEAD")),
+           ("member-admission-cancel", ("POST",)),
+           ("member-admission-vouch", ("POST",)),
+       ) for method in methods},
+    **{(name, "OPTIONS"): AnonymousRead() for name in (
+        "member-admission", "member-admission-export", "member-admission-cancel", "member-admission-vouch",
+    )},
+    **{(name, method): Refused("claim sessions cannot manage an account or end membership")
+       for name, methods in (
+           ("member-account-profile", ("GET", "HEAD", "PATCH")),
+           ("member-account-sessions", ("GET", "HEAD")),
+           ("member-account-session-detail", ("DELETE",)),
+           ("member-account-membership", ("GET", "HEAD")),
+           ("member-account-cancel", ("POST",)),
+           ("member-account-leave", ("POST",)),
+           ("member-subject-export-list", ("GET", "HEAD", "POST")),
+           ("member-subject-export-detail", ("GET", "HEAD")),
+           ("member-subject-export-download", ("POST",)),
+       ) for method in methods},
+    **{(name, "OPTIONS"): AnonymousRead() for name in (
+        "member-account-profile", "member-account-sessions", "member-account-session-detail",
+        "member-account-membership", "member-account-cancel", "member-account-leave",
+        "member-subject-export-list", "member-subject-export-detail", "member-subject-export-download",
+    )},
     ("member-archived-payments", "GET"): Refused(
         "tenantless archived-payment discovery cannot satisfy single tenancy",
         ownership=RowOwnership.MIXED_REFUSED,

@@ -49,6 +49,9 @@ TASK_EXEMPTIONS = {
 
 
 TASK_TENANT_RESOLVERS = {
+    "apps.data_export.subject_tasks.run_subject_export_task": (
+        "data_export.DataExportJob", 0, "makerspace_id"
+    ),
     "apps.admin_api.tasks.process_bulk_import_job": (
         "admin_api.BulkImportJob", 0, "makerspace_id"
     ),
@@ -68,6 +71,9 @@ TASK_TENANT_RESOLVERS = {
 
 
 TASK_INTERNAL_PARTICIPANTS = {
+    "apps.data_export.subject_tasks.sweep_subject_exports_task": (
+        "Queued personal exports use separate skip-and-count tenant boundaries."
+    ),
     "apps.operations.tasks_admissions.sweep_membership_admissions_task": (
         "Admission expiry and committed-settlement recovery gate each tenant before writes."
     ),
@@ -121,6 +127,7 @@ TASK_INTERNAL_PARTICIPANTS = {
 
 
 FANOUT_GATE_PARTICIPANTS = {
+    "apps.data_export.subject_tasks.sweep_subject_exports_task": "Personal export recovery gates each tenant.",
     "apps.makerspaces.membership_admission_payments.sweep_admissions": (
         "Admission expiry and settlement retries use separate skip-and-count tenant boundaries."
     ),
@@ -143,7 +150,7 @@ FANOUT_GATE_PARTICIPANTS = {
         "Overdue loan reminders."
     ),
     "apps.makerspaces.tasks.refresh_github_contributions_task": "GitHub profile refresh.",
-    "apps.makerspaces.membership_plan_services.run_membership_renewals": (
+    "apps.makerspaces.membership_renewals.run_membership_renewals": (
         "Membership term expiry and renewal charges."
     ),
     "apps.operations.report_schedule_services.run_report_schedules": "Due scheduled report deliveries.",

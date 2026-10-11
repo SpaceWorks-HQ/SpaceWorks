@@ -35,7 +35,7 @@ class SpaceWorksRefreshToken(_GenerationBoundToken, RefreshToken):
 
     @classmethod
     @transaction.atomic
-    def for_user(cls, user):
+    def for_user(cls, user, *, web_session=True):
         # A credential change also locks User. Hold that same lock through both
         # verification and minting so an unenrolled login cannot pick up the new
         # credential's version between these reads without proving its factor.
@@ -57,4 +57,10 @@ class SpaceWorksRefreshToken(_GenerationBoundToken, RefreshToken):
         if row:
             token["mfa_version"] = str(row.version)
         token["auth_generation"] = current_auth_generation()
+        if web_session:
+            from apps.accounts.web_sessions import create_session
+            from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+
+            create_session(user, token)
+            OutstandingToken.objects.filter(jti=token["jti"]).update(token=str(token))
         return token

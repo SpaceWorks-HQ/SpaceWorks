@@ -3,14 +3,14 @@
 Renewal charges are raised through `apps.payments.services.create_payment` with subject
 type `MEMBERSHIP_TERM` and the term pk as subject id, so the Payment table's one-row-per-
 subject constraint is what guarantees "exactly one renewal charge per term". A payment
-failure is logged and skipped -- it never stops the sweep and never touches the term --
-mirroring `membership_payments.py`: dues are a boundary the membership must not depend on.
+failure never rolls back a recorded debt. Optional automation tracks bounded retries,
+promised grace and one successor behind the compatibility exports at the end of this file.
 """
 import logging
 from datetime import timedelta
 
 from dateutil.relativedelta import relativedelta
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -20,7 +20,7 @@ from apps.makerspaces.models import MakerspaceMembership, MembershipPlan, Member
 
 logger = logging.getLogger(__name__)
 
-# Deliberately not a plan attribute: a single window keeps the sweep one query.
+# Compatibility window for plans that have not opted in to automation.
 RENEWAL_WINDOW = timedelta(days=7)
 
 
@@ -61,7 +61,7 @@ def create_term(actor, membership, plan, starts_at=None):
             membership=membership,
             plan=plan,
             starts_at=starts_at,
-            ends_at=term_end(plan, starts_at),
+            ends_at=term_end(plan, _local_start(makerspace, starts_at)),
             created_by=actor,
         )
         audit.record(
@@ -72,6 +72,11 @@ def create_term(actor, membership, plan, starts_at=None):
             meta={"membership_id": membership.pk, "plan_id": plan.pk, "term_id": term.pk},
         )
     return term
+
+
+def _local_start(makerspace, starts_at):
+    from apps.makerspaces.local_time import to_local
+    return to_local(makerspace, starts_at)
 
 
 def cancel_term(actor, term):
@@ -126,107 +131,7 @@ def _cancel_pending_renewal(makerspace, term, actor):
         logger.exception("membership_renewal_cancel_failed", extra={"term_id": term.pk})
 
 
-def run_membership_renewals(*, now=None, limit=200):
-    """Expire terms past `ends_at`, then raise one renewal charge per term in the window."""
-    from apps.tenant_migration.gate_runtime import fanout_tenant_write
 
-    now = now or timezone.now()
-    counts = {"expired": 0, "charged": 0, "skipped": 0, "failed": 0}
-    due = MembershipTerm.objects.filter(
-        status=MembershipTerm.Status.ACTIVE, ends_at__lte=now
-    ).select_related("membership")[:limit]
-    for term in due:
-        with fanout_tenant_write(
-            term.membership.makerspace_id, operation="membership_term_expiry", counts=counts
-        ) as should_process:
-            if not should_process:
-                continue
-            _expire(term)
-            counts["expired"] += 1
-    renewable = (
-        MembershipTerm.objects.filter(
-            status=MembershipTerm.Status.ACTIVE,
-            ends_at__gt=now,
-            ends_at__lte=now + RENEWAL_WINDOW,
-            renewal_payment__isnull=True,
-            membership__status="active",
-        )
-        .select_related("membership__user", "membership__makerspace", "plan")
-        .order_by("ends_at", "pk")[:limit]
-    )
-    for term in renewable:
-        with fanout_tenant_write(
-            term.membership.makerspace_id, operation="membership_renewal", counts=counts
-        ) as should_process:
-            if not should_process:
-                continue
-            counts[_raise_renewal(term)] += 1
-    return counts
-
-
-def _expire(term):
-    with transaction.atomic():
-        term.status = MembershipTerm.Status.EXPIRED
-        term.save(update_fields=["status"])
-        audit.record(
-            None,
-            "membership.term_expired",
-            makerspace=term.membership.makerspace,
-            target=term,
-            meta={"membership_id": term.membership_id, "term_id": term.pk},
-        )
-
-
-def _raise_renewal(term):
-    """One charge, or a logged skip. Returns the counter to bump."""
-    from apps.payments.availability import (
-        charge_tracking_enabled,
-        online_payments_enabled,
-    )
-    from apps.payments.models import Payment
-    from apps.payments.services import create_checkout, create_payment
-
-    makerspace = term.membership.makerspace
-    plan = term.plan
-    if plan.amount <= 0 or not charge_tracking_enabled(makerspace, "membership"):
-        return "skipped"
-    lookup = {
-        "makerspace": makerspace,
-        "subject_type": Payment.SubjectType.MEMBERSHIP_TERM,
-        "subject_id": term.pk,
-    }
-    try:
-        with transaction.atomic():
-            try:
-                payment = create_payment(
-                    **lookup,
-                    member=term.membership.user,
-                    amount=plan.amount,
-                    currency=plan.currency,
-                    created_by=term.membership.user,
-                    subject_label=f"Membership renewal: {plan.name}",
-                    due_at=term.ends_at,
-                )
-            except IntegrityError:
-                # A previous run raised the charge but lost the race to record it.
-                payment = Payment.objects.get(**lookup)
-            MembershipTerm.objects.filter(pk=term.pk).update(renewal_payment=payment)
-            audit.record(
-                None,
-                "membership.renewal_raised",
-                makerspace=makerspace,
-                target=term,
-                meta={
-                    "membership_id": term.membership_id,
-                    "term_id": term.pk,
-                    "payment_id": payment.pk,
-                },
-            )
-            if payment.status == Payment.Status.PENDING and online_payments_enabled(
-                makerspace, "membership"
-            ):
-                create_checkout(payment)
-    except Exception:  # noqa: BLE001 - one failing charge must not stop the sweep
-        logger.exception("membership_renewal_charge_failed", extra={"term_id": term.pk})
-        return "failed"
-    return "charged"
+# Explicit compatibility exports for the scheduled seam.
+from .membership_renewals import run_membership_renewals, _expire
+from .membership_renewal_charges import raise_renewal as _raise_renewal

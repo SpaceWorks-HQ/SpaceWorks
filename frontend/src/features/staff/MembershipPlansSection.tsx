@@ -16,6 +16,7 @@ import {
 } from "./membershipPlansApi";
 import { formatMoney } from "./paymentsApi";
 import { Panel } from "./panels/shared";
+import { MembershipRenewalFields, emptyRenewal, planRenewal, renewalInput, validateRenewal } from "./MembershipRenewalFields";
 
 type PlanForm = {
   name: string;
@@ -68,12 +69,14 @@ export function MembershipPlansSection({ makerspaceId }: { makerspaceId: number 
   const [editing, setEditing] = useState<MembershipPlan | null>(null);
   const [form, setForm] = useState<PlanForm>(EMPTY);
   const [problem, setProblem] = useState<string | null>(null);
+  const [renewal, setRenewal] = useState(emptyRenewal);
   const refresh = () => client.invalidateQueries({ queryKey: membershipPlanKeys.plans(makerspaceId) });
   const save = useMutation({
-    mutationFn: () => (editing ? updatePlan(editing.id, toInput(form)) : createPlan(makerspaceId, toInput(form))),
+    mutationFn: () => (editing ? updatePlan(editing.id, { ...toInput(form), ...renewalInput(renewal) }) : createPlan(makerspaceId, { ...toInput(form), ...renewalInput(renewal) })),
     onSuccess: () => {
       setEditing(null);
       setForm(EMPTY);
+      setRenewal(emptyRenewal);
       refresh();
     },
   });
@@ -86,18 +89,20 @@ export function MembershipPlansSection({ makerspaceId }: { makerspaceId: number 
     setProblem(null);
   };
   const submit = () => {
-    const next = validatePlanForm(form);
+    const next = validatePlanForm(form) ?? validateRenewal(renewal);
     setProblem(next);
     if (!next) save.mutate();
   };
   const startEdit = (plan: MembershipPlan) => {
     setEditing(plan);
     setForm(toForm(plan));
+    setRenewal(planRenewal(plan));
     setProblem(null);
   };
   const cancelEdit = () => {
     setEditing(null);
     setForm(EMPTY);
+    setRenewal(emptyRenewal);
     setProblem(null);
   };
   const error = problem ?? (save.error ? planErrorText(save.error, "Could not save the plan.") : null)
@@ -167,6 +172,7 @@ export function MembershipPlansSection({ makerspaceId }: { makerspaceId: number 
           </button>
           {editing ? <button className="desk-button" type="button" onClick={cancelEdit}>Cancel</button> : null}
         </div>
+        <MembershipRenewalFields value={renewal} onChange={(value) => { setRenewal(value); setProblem(null); }} />
       </form>
       {error ? <p className="mt-2 text-sm text-danger" role="alert">{error}</p> : null}
     </Panel>

@@ -27,42 +27,46 @@ def revoke_membership(actor, membership, reason=""):
         actor_is_superadmin = actor.is_superuser or actor.role == User.Role.SUPERADMIN
         if not actor_is_superadmin and rbac.Action.MANAGE_MAKERSPACE in rbac.actions_for_membership(membership):
             raise PermissionDenied("Only a superadmin can revoke a makerspace manager.")
-        changed = membership.status != "revoked"
-        if changed:
-            membership.status = "revoked"
-            membership.revoked_at = timezone.now()
-            membership.revoked_by = actor
-            membership.revocation_reason = reason or ""
-        membership.can_refer = False
-        membership.can_verify = False
-        membership.save()
-        if changed:
-            audit.record(actor, "membership.revoked", makerspace=makerspace, target=membership,
-                         meta={"reason": membership.revocation_reason})
-            from apps.makerspaces.membership_payments import cancel_for_membership
+        return _revoke_locked(actor, membership, makerspace, reason)
 
-            cancel_for_membership(membership, actor)
-            from apps.makerspaces.membership_admission_payments import cancel_for_admitted_member
-            cancel_for_admitted_member(actor, membership)
-            # Everything else the membership carried that acts on its behalf goes with it:
-            # the ID card (a live credential bearing their name and face) and any term with
-            # its pending renewal charge.
-            from apps.makerspaces.member_card_services import revoke_for_membership
-            from apps.makerspaces.membership_plan_services import cancel_terms_for_membership
 
-            revoke_for_membership(actor, membership)
-            cancel_terms_for_membership(actor, membership)
+def _revoke_locked(actor, membership, makerspace, reason, *, self_leave=False):
+    """Shared cleanup; caller holds tenant/member locks and authorizes its intent."""
+    changed = membership.status != "revoked"
+    if changed:
+        membership.status = "revoked"
+        membership.revoked_at = timezone.now()
+        membership.revoked_by = actor
+        membership.revocation_reason = reason or ""
+    membership.can_refer = False
+    membership.can_verify = False
+    membership.save()
+    if changed:
+        audit.record(actor, "membership.left" if self_leave else "membership.revoked",
+                     makerspace=makerspace, target=membership,
+                     meta={"reason": membership.revocation_reason})
+        from apps.makerspaces.membership_payments import cancel_for_membership
+        from apps.makerspaces.membership_admission_payments import cancel_for_admitted_member
+        from apps.makerspaces.member_card_services import revoke_for_membership
+        from apps.makerspaces.membership_plan_services import cancel_terms_for_membership
+
+        cancel_for_membership(membership, actor)
+        cancel_for_admitted_member(actor, membership)
+        revoke_for_membership(actor, membership)
+        cancel_terms_for_membership(actor, membership)
+        # Voluntary departure is not a conduct finding against the vouchers.
+        if not self_leave:
             from apps.makerspaces.membership_vouching import flag_vouchers
             flag_vouchers(actor, membership)
-        from apps.presence.services import end_sessions_for_membership
-        end_sessions_for_membership(actor, membership)
-        for row in MembershipRequest.objects.select_for_update().filter(
-            makerspace=makerspace, user=membership.user,
-            state__in=["requested", "invited", "awaiting_vouches", "awaiting_payment"],
-        ):
-            from apps.makerspaces.membership_admission_payments import close_admission
-            close_admission(actor, row, "revoked")
-        return membership
+    from apps.presence.services import end_sessions_for_membership
+    end_sessions_for_membership(actor, membership)
+    for row in MembershipRequest.objects.select_for_update().filter(
+        makerspace=makerspace, user=membership.user,
+        state__in=["requested", "invited", "awaiting_vouches", "awaiting_payment"],
+    ):
+        from apps.makerspaces.membership_admission_payments import close_admission
+        close_admission(actor, row, "revoked")
+    return membership
 
 
 def revoke_request(actor, request, reason=""):

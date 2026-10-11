@@ -80,6 +80,7 @@ class MakerspaceMembership(models.Model):
         null=True, blank=True, validators=[validate_actor_snapshot]
     )
     revocation_reason = models.TextField(blank=True)
+    renewal_cancelled_at = models.DateTimeField(null=True, blank=True)
     waiver_accepted_at = models.DateTimeField(null=True, blank=True)
     waiver_version_accepted = models.CharField(max_length=64, null=True, blank=True)
     accepted_waiver = models.ForeignKey(

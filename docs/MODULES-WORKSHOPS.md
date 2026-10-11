@@ -134,6 +134,11 @@ Required by `events` and `bookings`.
   tool is never refused. Prospective members can
   send an invitation request from the public site (throttled, honeypot-guarded, PII encrypted at rest);
   staff invite or decline it from the same queue as join requests.
+  Optional [renewal and account features](member-account-renewals.md) add local-day
+  renewal opening, bounded checkout retries, promised grace, owner-only lifecycle
+  emails, profile/session management, voluntary cancel/leave and personal ZIP/JSON
+  exports. All four switches start off; account/export routes additionally require
+  `member_accounts`. Grace delays borrowing lapse and never auto-revokes a member.
 - **Without it** — people can still exist as members and still borrow: staff create walk-in member
   records, and identity can come from `member_accounts` or an external OIDC provider. What goes is the
   *enrolment and community* layer — no join requests to approve, no referrals, no profiles, no
@@ -181,5 +186,4 @@ Required by `mobile`.
   are platform state.
 
 ---
-
 

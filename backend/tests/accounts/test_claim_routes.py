@@ -49,9 +49,9 @@ def test_current_all_active_tree_has_a_complete_claim_matrix(settings):
     # routes (card, photo, preview) from forward plan phase 5 — all Refused. Plus the
     # public invitation-request route from forward plan phase 6 (Refused: 88 -> 89).
     # Delegated member verification is a separate member route; claim sessions are refused.
-    # MFA adds five auth routes, admission adds two public/member routes, and
-    # machine history plus loan renewal add two more private member routes.
-    assert len(validate_claim_route_matrix()) == 99
+    # MFA, admission, machine history, loan renewal and the member account /
+    # subject-export routes each carry an explicit claim policy.
+    assert len(validate_claim_route_matrix()) == 111
 
 
 def test_member_loan_renewal_has_an_audited_owner_scoped_claim_policy():

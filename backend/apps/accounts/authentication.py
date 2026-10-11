@@ -82,6 +82,8 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
             raise PermissionDenied("Member sessions cannot access staff APIs.")
         grant_id = token.get("device_grant_id")
         if grant_id is None:
+            from apps.accounts.web_sessions import validate_session
+            validate_session(user, token)
             if request.headers.get("X-Makerspace-Id") is not None:
                 raise PermissionDenied("Native makerspace selection requires a device grant.")
             _assert_source_gate(request)

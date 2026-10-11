@@ -56,6 +56,9 @@ class LogoutView(APIView):
                 except TokenError:
                     refresh = SpaceWorksRefreshToken(cookie)
                 refresh.blacklist()
+                if refresh.get("sid"):
+                    from apps.accounts.web_sessions import revoke_session
+                    revoke_session(actor, refresh["sid"])
             except TokenError:
                 pass
         audit_events.record_auth_event(

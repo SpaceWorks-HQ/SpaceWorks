@@ -32,6 +32,12 @@ def _is_superadmin(actor):
     return actor.is_superuser or actor.role == actor.Role.SUPERADMIN
 
 
+def _staff_jobs(actor):
+    return rbac.scope_by_action(
+        actor, rbac.Action.MANAGE_MAKERSPACE, DataExportJob.objects.all(),
+    ).exclude(fidelity="SUBJECT")
+
+
 class DataExportListCreateView(APIView):
     permission_classes = (IsActiveStaff,)
 
@@ -42,7 +48,7 @@ class DataExportListCreateView(APIView):
     )
     def get(self, request, makerspace_id):
         _authorized_makerspace(request.user, makerspace_id)
-        jobs = DataExportJob.objects.filter(makerspace_id=makerspace_id)
+        jobs = _staff_jobs(request.user).filter(makerspace_id=makerspace_id)
         if not _is_superadmin(request.user):
             jobs = jobs.filter(fidelity="REDACTED")
         jobs = jobs[:20]
@@ -87,7 +93,7 @@ class DataExportDetailView(APIView):
     def get(self, request, makerspace_id, job_id):
         _authorized_makerspace(request.user, makerspace_id)
         job = get_object_or_404(
-            DataExportJob, pk=job_id, makerspace_id=makerspace_id
+            _staff_jobs(request.user), pk=job_id, makerspace_id=makerspace_id
         )
         if job.fidelity == "PORTABLE" and not _is_superadmin(request.user):
             return Response(
@@ -114,7 +120,7 @@ class DataExportDownloadUrlView(APIView):
     def post(self, request, makerspace_id, job_id):
         _authorized_makerspace(request.user, makerspace_id)
         job = get_object_or_404(
-            DataExportJob, pk=job_id, makerspace_id=makerspace_id
+            _staff_jobs(request.user), pk=job_id, makerspace_id=makerspace_id
         )
         if job.fidelity == "PORTABLE" and not _is_superadmin(request.user):
             return Response(

@@ -11,8 +11,11 @@ LIFECYCLE_EXEMPTIONS = {
 
 
 OBJECT_MUTATION_PARTICIPANTS = {
-    "apps.data_export.services._fail_job": "Called only by the task-resolved run_export_job lifecycle.",
-    "apps.data_export.services._finalize_job": "Called only by the task-resolved run_export_job lifecycle.",
+    "apps.data_export.subject_services.run_subject_export": (
+        "The subject task or recovery sweep holds subject_boundary through archive upload and finalization."
+    ),
+    "apps.data_export.services._fail_job": "Called within the tenant export or scoped personal-export lifecycle boundary.",
+    "apps.data_export.services._finalize_job": "Called within the tenant export or scoped personal-export lifecycle boundary.",
     "apps.data_export.services.run_export_job": (
         "The export task resolves and holds the tenant gate for this lifecycle."
     ),
@@ -81,4 +84,3 @@ OBJECT_MUTATION_PARTICIPANTS = {
         "the authenticated late source-gate assertion; the kiosk view also asserts it."
     ),
 }
-

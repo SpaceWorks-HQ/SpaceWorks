@@ -10,6 +10,7 @@ R = AuditReferenceDisposition.REMAP
 S = AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT
 
 _TERM_ACTIONS = (
+    "membership.renewed",
     "membership.term_created",
     "membership.term_cancelled",
     "membership.term_expired",

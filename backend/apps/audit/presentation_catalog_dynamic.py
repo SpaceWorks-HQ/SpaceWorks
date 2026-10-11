@@ -52,6 +52,8 @@ DYNAMIC_EXACT_ACTIONS = frozenset({
     "membership.joined",
     "notification.preference_updated",
     "notification.unsubscribed",
+    "membership.left",
+    "membership.revoked",
     "organization.created",
     "organization.link_created",
     "organization.link_updated",

@@ -748,7 +748,8 @@ module was switched off. Module gates are **additive `AND`s** — `refer_members
 and never an access state: a `MembershipTerm` expiring changes neither `MakerspaceMembership.status` nor
 `User.access_status`; the only effect is the per-makerspace opt-in `lapsed_members_cannot_borrow`, enforced
 solely by `request_access.require_current_term` AFTER the who-may-submit rule has admitted the member
-("active" = `status=active AND ends_at > now`, so it does not depend on the hourly sweep), and a member who
+("current" = `status=active AND starts_at <= now` with expiry or promised grace still ahead,
+so it does not depend on the hourly sweep), and a member who
 has never held a term is untouched. **It is called on every path that HANDS a member a tool** — request
 submission, self-checkout and its issue-evidence presign, and staff direct handout — and on no path that
 takes one back: a lapsed member can always return. (It had one call site, request submission, until
@@ -757,10 +758,17 @@ missing from the settings serializer, so the console toggle never rendered.) It 
 `membership` module is off, since plans are that module's. Bookings, events and machine service are not
 borrowing and are not covered. One renewal charge per term, raised only by
 `membership_plan_services.run_membership_renewals` as `Payment(subject_type=membership_term,
-subject_id=term.pk)` inside the 7-day window and only when `charge_tracking_enabled(ms, "membership")` —
-the debt is recorded first and a checkout is attached second, only when `online_payments_enabled` — and
-the Payment unique constraint is the idempotency, a payment failure is logged and never touches the term,
-and settlement does not auto-open the next term (staff do). An `InvitationRequest` is a lead, not authority:
+subject_id=term.pk)` inside the manual plan's 7-day window or the opted-in plan's local-day
+renewal window, only when `charge_tracking_enabled(ms, "membership")`. Debt commits before
+checkout creation; checkout retries reuse that debt. Optional `membership.auto_renew` plus
+the plan's `auto_renew` opens exactly one successor after settlement/waiver, or without
+charge tracking for a free renewal. `renewed_from` is one-to-one and remapped on import.
+Promised `grace_until` survives policy changes and import; expiry never auto-revokes.
+Cancellation stops renewal in the current lifecycle; a fresh audited admission resets it.
+Owner-only lifecycle mail and subject exports require their separate opt-in features.
+Personal export row ownership intersects tenant RBAC and uses the reviewed export field
+classification; staff tenant-export routes and runners refuse personal jobs.
+An `InvitationRequest` is a lead, not authority:
 name/email/phone are scoped source PII (encrypted at rest, purged with `membership`, `(PRESERVE, DROP)` in
 tenant dumps), the public endpoint answers the same 202 to real and honeypotted submissions, and "Invite"
 only ever calls `membership_services.invite_membership`, inheriting the role non-escalation and the

@@ -78,6 +78,9 @@ def _activate_membership(actor, makerspace, user, role, *, request=None, source,
             membership.revoked_at = None
             membership.revoked_by = None
             membership.revocation_reason = ""
+            # A fresh admission is a new membership lifecycle. The previous
+            # departure must not silently disable every term staff attach later.
+            membership.renewal_cancelled_at = None
             # A revoked row may predate the delegation-clearing revoke path.
             # Reactivation must never restore referral or verifier authority.
             membership.can_refer = False

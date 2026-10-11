@@ -8,6 +8,22 @@
 
 ## Current source map (real paths)
 
+Member renewal automation lives in `makerspaces/membership_renewals.py`, with the
+record-first charge seam in `membership_renewal_charges.py`, F1 reminder discovery
+in `membership_renewal_reminders.py` and owner-only F3 mail in
+`membership_renewal_notifications.py`. `membership_plan_services.py` keeps its
+explicit compatibility exports. `membership_self_service.py` owns cancel/leave;
+`self_service_access.py` applies owned-membership RBAC and module/feature checks.
+Account profile/session routes use `accounts/views_self_service.py`, serializers
+and schemas in the matching siblings, and `web_sessions.py` for stable browser
+JWT lineage over the existing token ledger. Subject export routes/jobs live in
+`data_export/subject_views.py`, `subject_services.py` and `subject_tasks.py`;
+`subject_selectors.py` proves row ownership while `subject_archive.py` reuses the
+existing field classification. `subject_boundary.py` reuses source-gate boundaries.
+Frontend account controls live in `features/members/MemberAccount*.tsx` with
+`memberAccountApi.ts`; staff plan controls use `MembershipRenewalFields.tsx`.
+See [member-account-renewals.md](member-account-renewals.md) for policy and limits.
+
 Cloud surfaces: `accounts/views_social.py` explicitly exports the nonce/login views in
 `views_social_login.py` and identity management in `views_social_identities.py`, with shared
 verification/error helpers in `views_social_helpers.py`. `integrations/health.py` explicitly exports

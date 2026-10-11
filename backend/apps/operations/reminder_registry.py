@@ -11,12 +11,13 @@ REMINDER_SOURCES: tuple[ReminderSource, ...] | None = None
 
 def _production_sources():
     from apps.hardware_requests.loan_reminders import LOAN_REMINDER_SOURCES
+    from apps.makerspaces.membership_renewal_reminders import MEMBERSHIP_RENEWAL_SOURCE
     from apps.operations.membership_payment_reminders import MEMBERSHIP_PAYMENT_SOURCE
     from apps.payments.reminders import build_payment_message, discover_payments, dispatch_payment_message
     from apps.separability.registry import runtime_active
     from . import reminder_machine_sources as machines
 
-    sources = [MEMBERSHIP_PAYMENT_SOURCE, ReminderSource(
+    sources = [MEMBERSHIP_PAYMENT_SOURCE, MEMBERSHIP_RENEWAL_SOURCE, ReminderSource(
         key="payments.due", module="request_workflow", feature="billing.reminders",
         discover=discover_payments, build=build_payment_message, dispatch=dispatch_payment_message,
     ), *LOAN_REMINDER_SOURCES]

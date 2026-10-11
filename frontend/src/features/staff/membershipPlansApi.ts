@@ -18,6 +18,12 @@ export type MembershipPlan = {
   amount: string;
   currency: string;
   is_active: boolean;
+  auto_renew?: boolean;
+  renewal_open_days?: number;
+  renewal_grace_days?: number;
+  renewal_retries?: number;
+  reminder_days_before?: number[];
+  reminder_days_after?: number[];
   created_at: string;
   updated_at: string;
 };

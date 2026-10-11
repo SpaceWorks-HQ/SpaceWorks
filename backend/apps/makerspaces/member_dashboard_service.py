@@ -142,11 +142,9 @@ def membership_term(membership):
     from apps.makerspaces.models import MembershipTerm
 
     terms = MembershipTerm.objects.filter(membership=membership).select_related("plan")
-    current = (
-        terms.filter(status=MembershipTerm.Status.ACTIVE, ends_at__gt=timezone.now())
-        .order_by("-ends_at", "-pk")
-        .first()
-    )
+    from apps.makerspaces.membership_renewals import current_terms
+    covered = current_terms(membership)
+    current = max(covered, key=lambda term: (term.ends_at, term.pk), default=None)
     shown = current or terms.order_by("-ends_at", "-pk").first()
     if shown is None:
         return None

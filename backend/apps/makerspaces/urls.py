@@ -1,4 +1,7 @@
 from django.urls import path
+from apps.data_export.urls_subject import urlpatterns as subject_export_patterns
+from apps.accounts.views_self_service import AccountProfileView, AccountSessionListView, AccountSessionDetailView
+from apps.makerspaces.views_self_service import MemberAccountMembershipView, MemberCancelRenewalView, MemberLeaveView
 
 from apps.makerspaces.config_views import PublicConfigView
 from apps.makerspaces.views_admission import (
@@ -27,6 +30,13 @@ from apps.makerspaces.profile_views import (
     MemberProfileView,
 )
 urlpatterns = [
+    *subject_export_patterns,
+    path("member/makerspaces/<int:makerspace_id>/account/profile", AccountProfileView.as_view(), name="member-account-profile"),
+    path("member/makerspaces/<int:makerspace_id>/account/sessions", AccountSessionListView.as_view(), name="member-account-sessions"),
+    path("member/makerspaces/<int:makerspace_id>/account/sessions/<str:session_id>", AccountSessionDetailView.as_view(), name="member-account-session-detail"),
+    path("member/makerspaces/<int:makerspace_id>/account/membership", MemberAccountMembershipView.as_view(), name="member-account-membership"),
+    path("member/makerspaces/<int:makerspace_id>/account/cancel", MemberCancelRenewalView.as_view(), name="member-account-cancel"),
+    path("member/makerspaces/<int:makerspace_id>/account/leave", MemberLeaveView.as_view(), name="member-account-leave"),
     path("public/<slug:makerspace_slug>/membership-admission", PublicAdmissionView.as_view(), name="public-membership-admission"),
     path("member/makerspaces/<int:makerspace_id>/admission", MemberAdmissionView.as_view(), name="member-admission"),
     path("member/makerspaces/<int:makerspace_id>/admission/export", MemberAdmissionExportView.as_view(), name="member-admission-export"),

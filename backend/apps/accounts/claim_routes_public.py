@@ -25,6 +25,7 @@ PUBLIC_CLAIM_ROUTES = {
     ('member-booking-list', 'OPTIONS'): AnonymousRead(),
     ('member-booking-cancel', 'POST'): Allowed(tenant=SLUG, audited=True),
     ('member-booking-cancel', 'OPTIONS'): AnonymousRead(),
+    **_anonymous("public-membership-admission"),
     **_anonymous("public-machines"),
     ("public-machine-service-request-submit", "POST"): Allowed(
         tenant=BODY_OBJECT, audited=True

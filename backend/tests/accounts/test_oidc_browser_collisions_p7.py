@@ -165,9 +165,11 @@ def test_oidc_transition_revokes_claim_session_and_every_refresh(monkeypatch):
     assert harness.member.is_walk_in is False
     assert harness.member.email_verified_at is not None
     assert harness.claim.revoked_at is not None
-    outstanding = OutstandingToken.objects.filter(user=harness.member)
+    outstanding = OutstandingToken.objects.filter(user=harness.member).exclude(token="")
     assert outstanding.exists()
     assert BlacklistedToken.objects.filter(token__in=outstanding).count() == outstanding.count() - 1
+    markers = OutstandingToken.objects.filter(user=harness.member, token="")
+    assert markers.filter(blacklistedtoken__isnull=True).count() == 1
 
 
 def test_claim_session_can_bind_only_its_own_walk_in(monkeypatch):

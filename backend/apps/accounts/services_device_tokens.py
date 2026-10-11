@@ -36,7 +36,7 @@ def issue_device_token_pair(user, grant, *, family=None):
 
     assert_token_issuance_allowed(user)
     family = family or DeviceRefreshFamily.objects.create(grant=grant, user=user)
-    refresh = SpaceWorksRefreshToken.for_user(user)
+    refresh = SpaceWorksRefreshToken.for_user(user, web_session=False)
     refresh["device_grant_id"] = str(grant.pk)
     refresh["device_family_id"] = str(family.pk)
     raw = str(refresh)

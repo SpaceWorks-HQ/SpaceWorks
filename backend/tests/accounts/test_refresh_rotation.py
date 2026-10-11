@@ -62,7 +62,10 @@ def test_concurrent_refresh_rotation_mints_one_usable_descendant(
 
     winner = next(response for response in responses if response.status_code == 200)
     descendant = winner.cookies["refresh_token"].value
-    assert OutstandingToken.objects.filter(user=user).count() == 2
+    # A stable non-credential session marker is independent of the two rotating
+    # refresh credentials. Both the winner's old access and replacement survive.
+    assert OutstandingToken.objects.filter(user=user).exclude(token="").count() == 2
+    assert OutstandingToken.objects.filter(user=user, token="").count() == 1
     monkeypatch.setattr(
         SpaceWorksTokenRefreshSerializer,
         "token_class",

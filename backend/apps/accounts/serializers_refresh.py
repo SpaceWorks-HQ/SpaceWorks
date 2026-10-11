@@ -46,14 +46,18 @@ class SpaceWorksTokenRefreshSerializer(TokenRefreshSerializer):
                 )
             from apps.accounts.mfa_policy import assert_verified
             assert_verified(user, refresh)
+            from apps.accounts.web_sessions import validate_session
+            validate_session(user, refresh, lock=True)
             return user
 
         def mint_replacement(refresh, _user):
-            data = {"access": str(refresh.access_token)}
             refresh.set_jti()
             refresh.set_exp()
             refresh.set_iat()
+            from apps.accounts.web_sessions import extend_session
+            extend_session(_user, refresh)
             refresh.outstand()
+            data = {"access": str(refresh.access_token)}
             data["refresh"] = str(refresh)
             return data
 
