@@ -27,6 +27,7 @@ _DISABLE_ACCESS_SEQUENCE = (
 class MakerspaceMutationMixin:
     @transaction.atomic
     def create(self, validated_data):
+        install_profile_id = validated_data.pop("install_profile_id", None)
         public_display_name = validated_data.pop("public_display_name", None)
         if public_display_name is not None:
             branding = default_branding_config()
@@ -45,9 +46,15 @@ class MakerspaceMutationMixin:
             )
         with with_makerspace_custody_lock(instance.pk) as custody:
             instance = custody.makerspace
+        if install_profile_id is not None:
+            from apps.makerspaces.space_pack_services import apply_saved_profile
+            apply_saved_profile(self.context["request"].user, instance, install_profile_id)
+            instance.refresh_from_db()
         return instance
 
     def update(self, instance, validated_data):
+        if "install_profile_id" in validated_data:
+            raise serializers.ValidationError({"install_profile_id": "Choose a profile only when creating a makerspace."})
         missing = object()
         telegram_bot_token = validated_data.pop("telegram_bot_token", missing)
         smtp_password = validated_data.pop("smtp_password", missing)

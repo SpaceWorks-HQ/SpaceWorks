@@ -6,6 +6,7 @@ from apps.makerspaces.admin_images import MakerspaceImageAdminMixin
 from apps.makerspaces.admin_lifecycle_actions import MakerspaceLifecycleActionsMixin
 from apps.makerspaces.admin_subdomains import SubdomainRequestAdmin
 from apps.makerspaces.admin_archive_requests import MakerspaceArchiveRequestAdmin
+from apps.makerspaces.admin_space_packs import SpacePackProfileAdmin  # noqa: F401
 from apps.makerspaces.admin_imports import (  # noqa: F401
     ImportedUserReconciliationAdmin,
     PendingImportedMembershipAdmin,

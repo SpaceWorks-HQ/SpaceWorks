@@ -21,6 +21,7 @@ class MakerspaceSerializer(
     MakerspaceMutationMixin,
     serializers.ModelSerializer,
 ):
+    install_profile_id = serializers.IntegerField(required=False, write_only=True, min_value=1)
     theme_config = ThemeConfigField(required=False)
     opening_hours = OpeningHoursField(read_only=True)
     resource_limit_overrides = serializers.JSONField(required=False)
@@ -73,6 +74,7 @@ class MakerspaceSerializer(
     class Meta:
         model = Makerspace
         fields = [
+            "install_profile_id",
             "id",
             "name",
             "public_code",

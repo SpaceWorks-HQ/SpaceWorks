@@ -15,6 +15,7 @@ GLOBAL_MODELS = {
 }
 
 OMITTED_MODELS = {
+    "makerspaces.SpacePackProfile": "Deployment-global configuration preset, never tenant-owned or tenant authority.",
     "accounts.UserMFA": "Platform MFA credentials never become target authority.",
     "accounts.MFAChallenge": "Transient first-factor authentication proof.",
     "accounts.StaffInvitation": "Deployment-local bearer authorization grant; target staff re-invite.",

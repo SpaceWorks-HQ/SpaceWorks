@@ -37,6 +37,7 @@ export function staffPayload(form: StaffForm) {
 
 export function makerspacePayload(form: MakerspaceForm) {
   return {
+    ...(form.install_profile_id ? { install_profile_id: form.install_profile_id } : {}),
     name: form.name.trim(),
     public_code: form.public_code.trim(),
     slug: form.slug.trim(),

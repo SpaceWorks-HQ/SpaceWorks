@@ -1,4 +1,3 @@
-from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
@@ -7,13 +6,12 @@ from rest_framework.views import APIView
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.admin_api.serializers_loan_policy import ReturnPolicySerializer
-from apps.audit import services as audit
 from apps.hardware_requests.exceptions import ErrorSerializer
-from apps.makerspaces.guards import require_module, require_module_locked
+from apps.makerspaces.guards import require_module
 from apps.makerspaces.models_loan_policy import MakerspaceLoanPolicy
 from apps.makerspaces.servability import servable_queryset
 
-ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer}
+ERRORS = {code: ErrorSerializer for code in (400, 401, 403, 404, 423, 503)}
 
 
 class ReturnPolicyView(APIView):
@@ -35,18 +33,6 @@ class ReturnPolicyView(APIView):
                    responses={200: ReturnPolicySerializer, **ERRORS})
     def patch(self, request, makerspace_id):
         makerspace = self._makerspace(request, makerspace_id)
-        with transaction.atomic():
-            makerspace = require_module_locked(makerspace, "request_workflow")
-            policy = MakerspaceLoanPolicy.for_makerspace(makerspace)
-            before = {key: value for key, value in ReturnPolicySerializer(policy).data.items() if key != "id"}
-            serializer = ReturnPolicySerializer(policy, data=request.data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            policy = serializer.save()
-            # Keep old API clients/settings coherent with the policy's default period.
-            makerspace.default_loan_days = policy.default_loan_days
-            makerspace.save(update_fields=["default_loan_days"])
-            audit.record(request.user, "makerspace.return_policy_updated", makerspace=makerspace,
-                         target=policy, meta={"before": before, "after": {
-                             key: value for key, value in serializer.data.items() if key != "id"
-                         }})
-        return Response(serializer.data)
+        from apps.makerspaces.loan_policy_settings import update_loan_policy
+        policy = update_loan_policy(request.user, makerspace, request.data)
+        return Response(ReturnPolicySerializer(policy).data)

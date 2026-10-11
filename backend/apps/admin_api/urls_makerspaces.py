@@ -4,9 +4,12 @@ from apps.admin_api import views
 from apps.admin_api.views_hosting import MakerspaceProvisionSubdomainView
 from apps.admin_api.views_subdomain_requests import SubdomainRequestListCreateView
 from apps.admin_api.views_makerspace_profile import MakerspaceProfileView
+from apps.admin_api.views_space_packs import SpacePackView, SpacePackProfileListView
 
 
 urlpatterns = [
+    path("makerspace/<int:makerspace_id>/space-pack", SpacePackView.as_view(), name="admin-space-pack"),
+    path("space-pack-profiles", SpacePackProfileListView.as_view(), name="admin-space-pack-profiles"),
     path("makerspace/<int:makerspace_id>/profile", MakerspaceProfileView.as_view(), name="admin-makerspace-profile"),
     path("makerspaces", views.MakerspaceListCreateView.as_view(), name="admin-makerspaces"),
     path("makerspaces/<int:pk>", views.MakerspaceDetailView.as_view(), name="admin-makerspace"),
