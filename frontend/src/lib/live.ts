@@ -42,6 +42,8 @@ const KIND_KEY_HINTS: Array<[RegExp, string[]]> = [
 // any kind, in addition to the domain keys the kind names. There is no `audit.appended`.
 export function keyMatchesKind(queryKey: readonly unknown[], kind: string): boolean {
   const flat = JSON.stringify(queryKey).toLowerCase();
+  // Setup progress is derived from inventory, invitations and makerspace settings.
+  if (queryKey[0] === "setup-state" && /^(inventory|product|staff|invitation|makerspace)/.test(kind)) return true;
   if (flat.includes("audit")) return true;
   for (const [pattern, hints] of KIND_KEY_HINTS) {
     if (pattern.test(kind)) return hints.some((hint) => flat.includes(hint));

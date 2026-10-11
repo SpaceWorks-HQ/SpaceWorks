@@ -5,6 +5,7 @@ from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 
+from apps.accounts import rbac
 from apps.audit import services as audit
 from apps.evidence.responses import storage_unavailable_response
 from apps.evidence.storage import StorageUnavailable
@@ -19,8 +20,11 @@ from apps.makerspaces.member_card_services import active_qr
 from apps.makerspaces.models import MemberCard
 from apps.makerspaces.profile_views import MemberProfileBaseView
 from apps.makerspaces.throttles import MemberImagePresignThrottle
+from apps.makerspaces.member_card_own_serializer import OwnMemberCardSerializer
 
 ERRORS = {
+    400: OpenApiResponse(description="Membership module disabled or invalid input."),
+    401: OpenApiResponse(description="Authentication required."),
     403: OpenApiResponse(description="An active membership is required."),
     404: OpenApiResponse(description="No card has been issued to this membership."),
 }
@@ -52,7 +56,9 @@ def snapshot_for(card, *, watermark=""):
 class OwnMemberCardMixin(MemberProfileBaseView):
     def card(self, request, makerspace_id):
         membership = self.membership(request, makerspace_id)
-        card = MemberCard.objects.select_related("makerspace", "membership__assigned_role").filter(
+        card = rbac.scope_by_makerspace(
+            request.user, MemberCard.objects.select_related("makerspace", "membership__assigned_role"),
+        ).filter(
             membership=membership, revoked_at__isnull=True
         ).first()
         if card is None:
@@ -62,9 +68,11 @@ class OwnMemberCardMixin(MemberProfileBaseView):
 
 class MemberCardOwnView(OwnMemberCardMixin):
     @extend_schema(tags=["Member profile"], summary="Read my member card", request=None,
-                   responses={200: MemberCardSerializer, **ERRORS})
+                   responses={200: OwnMemberCardSerializer, **ERRORS})
     def get(self, request, makerspace_id):
-        return Response(MemberCardSerializer(self.card(request, makerspace_id)).data)
+        response = Response(OwnMemberCardSerializer(self.card(request, makerspace_id)).data)
+        response["Cache-Control"] = "no-store"
+        return response
 
     @extend_schema(tags=["Member profile"], summary="Set the name printed on my card",
                    request=MemberCardOwnUpdateSerializer, responses={200: MemberCardSerializer, **ERRORS})

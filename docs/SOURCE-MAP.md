@@ -34,6 +34,10 @@ payment visibility. `features/discovery/` owns URL filters, calendar rendering a
 tenant-zone date boundaries (`calendarDates.ts`); `features/bookings/SpaceDiscoveryCalendar.tsx`
 reads published busy intervals through the existing availability API.
 
+Wave 5 member PWA/offline-card entry points are indexed in
+`docs/SOURCE-MAP-CLIENT.md`; toast/undo, setup progress and dashboard drill-down
+entry points are indexed in `docs/SOURCE-MAP-CONSOLES.md`.
+
 Cloud surfaces: `accounts/views_social.py` explicitly exports the nonce/login views in
 `views_social_login.py` and identity management in `views_social_identities.py`, with shared
 verification/error helpers in `views_social_helpers.py`. `integrations/health.py` explicitly exports

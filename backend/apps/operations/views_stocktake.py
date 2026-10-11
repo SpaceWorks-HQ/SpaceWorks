@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
+from rest_framework.exceptions import ValidationError
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -31,7 +32,7 @@ STOCKTAKE_ERROR_RESPONSES = {
 
 
 @extend_schema_view(
-    get=extend_schema(tags=["Stocktake"], summary="List stocktakes", request=None, responses={200: StocktakeSerializer(many=True), **STOCKTAKE_ERROR_RESPONSES}),
+    get=extend_schema(tags=["Stocktake"], summary="List stocktakes", request=None, parameters=[OpenApiParameter("status", str, enum=list(StocktakeSession.Status.values))], responses={200: StocktakeSerializer(many=True), **STOCKTAKE_ERROR_RESPONSES}),
     post=extend_schema(tags=["Stocktake"], summary="Create stocktake", request=StocktakeCreateSerializer, responses={201: StocktakeSerializer, **STOCKTAKE_ERROR_RESPONSES}),
 )
 class StocktakeListCreateView(generics.ListCreateAPIView):
@@ -44,10 +45,20 @@ class StocktakeListCreateView(generics.ListCreateAPIView):
         makerspace_id = self.kwargs["makerspace_id"]
         require_module(makerspace_id, "stocktake")
         require_action(self.request.user, rbac.Action.VIEW_INVENTORY, makerspace_id)
-        return StocktakeSession.objects.filter(makerspace_id=makerspace_id).prefetch_related("lines").order_by("-started_at")
+        queryset = rbac.scope_by_action(self.request.user, rbac.Action.VIEW_INVENTORY, StocktakeSession.objects.all()).filter(makerspace_id=makerspace_id)
+        status_value = self.request.query_params.get("status", "")
+        if status_value:
+            if status_value not in StocktakeSession.Status.values:
+                raise ValidationError({"status": "Unknown stocktake status."})
+            queryset = queryset.filter(status=status_value)
+        return queryset.prefetch_related("lines").order_by("-started_at")
 
     def create(self, request, *args, **kwargs):
-        makerspace = get_object_or_404(Makerspace, pk=self.kwargs["makerspace_id"])
+        makerspace = get_object_or_404(
+            rbac.scope_by_visibility_or_action(
+                request.user, rbac.Action.EDIT_INVENTORY, Makerspace.objects.all(), field="id",
+            ), pk=self.kwargs["makerspace_id"],
+        )
         require_module(makerspace, "stocktake")
         require_action(request.user, rbac.Action.EDIT_INVENTORY, makerspace.id)
         serializer = StocktakeCreateSerializer(data=request.data)

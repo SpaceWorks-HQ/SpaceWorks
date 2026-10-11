@@ -111,6 +111,11 @@ function renderPanel(
 beforeEach(() => staffRequest.mockReset());
 
 describe("MachinesPanel index and per-type subpages", () => {
+  it("opens a module-off dashboard queue without fetching the unrelated machine workspace", () => {
+    renderPanel({}, { maintenanceEnabled: false }, "/admin/machines?work_queue=maintenance_overdue");
+    expect(screen.getByRole("alert")).toHaveTextContent("module is disabled");
+    expect(staffRequest).not.toHaveBeenCalled();
+  });
   it("shows delegated maintenance recipients only when the switch is enabled", async () => {
     renderPanel({}, { maintenanceEnabled: true });
     expect(screen.queryByRole("heading", { name: "Who gets notified" })).not.toBeInTheDocument();

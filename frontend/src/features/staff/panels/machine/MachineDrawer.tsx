@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { DetailDrawer, EmptyState, Skeleton, StatusBadge } from "../../../../components/ui";
@@ -24,7 +25,8 @@ export function MachineDrawer({
   maintenanceEnabled: boolean;
   onClose: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<MachineTab>("Overview");
+  const [params] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<MachineTab>(params.get("detail_tab") === "Maintenance" && maintenanceEnabled ? "Maintenance" : "Overview");
   const machine = useQuery({
     queryKey: machineKeys.detail(machineId),
     queryFn: () => getMachine(machineId),

@@ -57,3 +57,19 @@ Printer adapter and label-command controls require the sibling 7b/7c lanes and a
 sharing; `CommandPalette.tsx` supplies keyboard navigation and scoped entity discovery.
 Palette hits use an optional scoped list ID filter for inventory, members and requests;
 the list controls clear it, while event, machine and booking hits open their drawers.
+
+`components/ui/toastStore.ts` and `ToastHost.tsx` own accessible async feedback;
+`panels/useInventoryArchive.ts` supplies compensating archive/unarchive calls,
+retires superseded undo actions and serializes changes to an item. `lib/api/client.ts`
+clears private notifications when authentication changes; `lib/live.ts` invalidates
+derived setup progress for inventory, invitation and makerspace changes.
+`panels/dashboardLinks.ts` maps tiles into URL filters; `DashboardMachineQueue.tsx`
+uses existing print queues and `maintenance/views_overdue.py` for scoped maintenance.
+`MachinesPanel.tsx` selects the dashboard queue before mounting the fleet workspace;
+disabled queues hide cached rows as well as stopping their queries.
+`SetupChecklist.tsx` derives progress through `admin_api/views_setup_state.py` and
+remembers dismissal per user/makerspace/browser. `StocktakeCountSection.tsx` owns
+the counting editor; `QueuesDisplay.tsx` owns request action and history presentation.
+`Inventory.tsx`, `Queues.tsx` and `StocktakePanel.tsx` are explicit public export
+barrels over `InventoryWorkspace.tsx`, `RequestQueues.tsx` and
+`StocktakeSessionPanel.tsx`, preserving imports while keeping each file below the ceiling.

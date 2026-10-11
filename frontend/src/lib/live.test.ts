@@ -32,6 +32,9 @@ describe("parseSseChunk", () => {
 });
 
 describe("keyMatchesKind", () => {
+  it.each(["inventory.created", "staff.invited", "makerspace.updated", "makerspace.capabilities_changed"])("refreshes setup progress after %s", kind => {
+    expect(keyMatchesKind(["setup-state", 7], kind)).toBe(true);
+  });
   it("maps request changes onto request, loan and inventory keys but not machines", () => {
     expect(keyMatchesKind(["pending-requests", 3], "request.accepted")).toBe(true);
     expect(keyMatchesKind(["direct-loans", 3], "request.issued")).toBe(true);
@@ -51,6 +54,7 @@ describe("keyMatchesKind", () => {
   });
   it("invalidates everything for an unknown kind", () => {
     expect(keyMatchesKind(["anything"], "totally.new")).toBe(true);
+    expect(keyMatchesKind(["setup-state", 7], "totally.new")).toBe(true);
   });
 });
 

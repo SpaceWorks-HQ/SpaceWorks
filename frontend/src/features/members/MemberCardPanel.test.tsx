@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StructuredApiError } from "../../lib/api";
 import { expectNoA11yViolations } from "../../test/axe";
 import { MemberCardPanel } from "./MemberCardPanel";
+import { readOfflineCard, saveOfflineCard } from "./memberCard/offlineCard";
 
 const { memberRequest, memberRequestBlob } = vi.hoisted(() => ({
   memberRequest: vi.fn(),
@@ -37,10 +38,9 @@ const card = {
   updated_at: "2026-08-20T10:00:00Z",
 };
 
-function renderPanel() {
-  const client = new QueryClient({
+function renderPanel(client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
+  })) {
   return render(
     <QueryClientProvider client={client}>
       <MemberCardPanel makerspaceId={5} />
@@ -55,12 +55,27 @@ function chooseFile() {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   memberRequest.mockReset();
   memberRequestBlob.mockReset();
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200 }) as unknown as Response));
 });
+afterEach(() => { window.history.replaceState(null, "", "/"); localStorage.clear(); });
 
 describe("MemberCardPanel", () => {
+  it.each([400, 401, 403])("erases saved and retained QR data when a refetch refuses access with %s", async status => {
+    window.history.replaceState(null, "", "/member");
+    const qr = "data:image/png;base64,eA==";
+    saveOfflineCard({ id: card.id, name: card.printed_name, number: 103, space: "Forge", qr, savedAt: "2026-10-11T00:00:00Z" });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(["member", "member-card", 5], { ...card, qr_image: qr });
+    memberRequest.mockRejectedValue(new StructuredApiError(status, { detail: "Card access refused." }));
+    renderPanel(client);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Card access refused.");
+    expect(screen.queryByRole("img", { name: "Your member card QR" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save card for offline use" })).not.toBeInTheDocument();
+    expect(readOfflineCard()).toBeNull();
+  });
   it("tells a member with no card to ask the front desk", async () => {
     memberRequest.mockRejectedValue(new StructuredApiError(404, { detail: "Not found." }));
 

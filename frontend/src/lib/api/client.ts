@@ -1,5 +1,7 @@
 import { removeStorage } from "../safeStorage";
 import { configuredApiUrl } from "../runtimeConfig";
+import { clearOfflineCards, rememberOfflineCardOwner } from "../../features/members/memberCard/offlineCard";
+import { clearToasts } from "../../components/ui/toastStore";
 
 export const API_URL = configuredApiUrl();
 
@@ -9,6 +11,7 @@ const ACCESS_TOKEN_KEY = "makerspace.access";
 const REFRESH_CSRF_HEADER = "X-Refresh-CSRF";
 let runtimePublishableKey = (import.meta.env.VITE_PUBLIC_API_KEY ?? "").trim();
 let accessToken = "";
+let toastOwner: string | undefined;
 let accessRefreshPromise: Promise<boolean> | null = null;
 const tenantPublishableKeys = new Map<string, string>();
 // The tenant most recently bootstrapped in this session. Member and status requests
@@ -76,11 +79,16 @@ function canRefreshAfterUnauthorized(path: string) {
 }
 
 export function setAccessToken(token: string) {
+  const owner = rememberOfflineCardOwner(token);
+  if (!owner || owner !== toastOwner) clearToasts();
+  toastOwner = owner;
   accessToken = token;
   cleanupLegacyAccessToken();
 }
 
 export function clearAccessToken() {
+  clearToasts();
+  toastOwner = undefined;
   accessToken = "";
   cleanupLegacyAccessToken();
 }
@@ -125,6 +133,7 @@ export async function logout(): Promise<void> {
       },
     });
   } finally {
+    clearOfflineCards();
     clearAccessToken();
   }
 }

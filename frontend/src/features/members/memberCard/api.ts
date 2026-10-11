@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { memberRequest, memberRequestBlob } from "../../../lib/api";
-import type { MemberCard } from "../../staff/panels/memberCards/types";
+import type { MemberCard as StaffCard } from "../../staff/panels/memberCards/types";
 
-export type { MemberCard };
+export type MemberCard = StaffCard & { qr_image?: string | null };
 
 type PhotoPresign = {
   object_key: string;

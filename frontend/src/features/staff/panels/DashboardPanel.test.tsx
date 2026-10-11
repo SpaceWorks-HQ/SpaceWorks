@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 
 import { expectNoA11yViolations } from "../../../test/axe";
 import { DashboardPanel } from "./DashboardPanel";
@@ -25,10 +26,12 @@ function renderPanel(canManageMakerspace = false) {
   });
   return render(
     <QueryClientProvider client={client}>
+      <MemoryRouter>
       <DashboardPanel
         makerspace={makerspace}
         canManageMakerspace={canManageMakerspace}
       />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -67,5 +70,15 @@ describe("DashboardPanel scope mode", () => {
     expect(screen.getByText("Pending payments")).toBeVisible();
     expect(screen.getByText("Maintenance overdue")).toBeVisible();
     await expectNoA11yViolations(container);
+  });
+  it("links only to permitted module-enabled lists with dashboard URL filters", async () => {
+    staffRequest.mockResolvedValue({ scope_mode: "full", low_stock: 2, pending_prints: 3 });
+    render(<QueryClientProvider client={new QueryClient()}><MemoryRouter>
+      <DashboardPanel makerspace={{ ...makerspace, enabled_modules: ["staff_admin", "machines"] }}
+        canManageMakerspace={false} allowedTabs={["inventory", "machines"]} />
+    </MemoryRouter></QueryClientProvider>);
+    expect(await screen.findByRole("link", { name: "Out of stock: 2. View list" })).toHaveAttribute("href", "/m/forge/admin/inventory?out_of_stock=true&archived=all");
+    expect(screen.queryByRole("link", { name: /Pending prints/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Pending requests/ })).not.toBeInTheDocument();
   });
 });

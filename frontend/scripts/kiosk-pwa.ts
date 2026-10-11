@@ -20,7 +20,7 @@ export function kioskPwa(): Plugin {
           else {
             const url = relative(output, path).replace(/\\/g, "/");
             if (url === "index.html" || /\.(?:js|css|woff2?|ttf|otf|png|jpe?g|gif|svg|webp|ico|wasm)$/.test(url)) {
-              if (url === "config.js" || url === "sw.js") continue;
+              if (url === "config.js" || url === "sw.js" || url === "member-sw.js") continue;
               entries.push({ url: `/${url}`, revision: createHash("sha256").update(await readFile(path)).digest("hex") });
             }
           }
