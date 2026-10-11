@@ -106,6 +106,8 @@ def apply_webhook_event(
             target=payment,
             meta={"stripe_event_id": event_id},
         )
+        from apps.payments.documents import issue_receipt
+        issue_receipt(payment)
         notify_payment(payment, "payment_received")
         resume_admission_after_settlement(payment)
         return payment
@@ -167,6 +169,8 @@ def apply_razorpay_webhook_event(makerspace, event):
             target=payment,
             meta={"provider": "razorpay", "event_id": event.event_id},
         )
+        from apps.payments.documents import issue_receipt
+        issue_receipt(payment)
         notify_payment(payment, "payment_received")
         resume_admission_after_settlement(payment)
         return payment

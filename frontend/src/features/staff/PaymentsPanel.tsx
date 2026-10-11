@@ -27,6 +27,7 @@ import { paymentAccess } from "./paymentAccess";
 import { DUE_OPTIONS, PaymentDueBadge } from "./PaymentDueBadge";
 import { RefundReceiptAmendDialog } from "./RefundReceiptAmendDialog";
 import type { RefundRow } from "./paymentsApi";
+import { PaymentDocuments } from "../payments/PaymentDocuments";
 
 type Action = "mark-offline" | "waive";
 
@@ -139,6 +140,7 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
 
   return (
     <Panel title="Payments">
+      {!forRecording ? <PaymentDocuments key={makerspaceId} makerspaceId={makerspaceId} audience="staff" /> : null}
       <ListViewControls state={list} makerspaceId={makerspaceId} entity="payments" search={false} sorts={[["due_at", "Due date"], ["-due_at", "Due date descending"], ["-created_at", "Newest"], ["created_at", "Oldest"], ["amount", "Amount ascending"], ["-amount", "Amount descending"]]} />
       <div className="mb-3 flex flex-wrap gap-3">
         <label className="grid gap-1 text-xs text-muted"><span>Due</span>

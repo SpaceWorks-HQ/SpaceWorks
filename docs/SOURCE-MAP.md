@@ -35,6 +35,16 @@ The shared reminder foundation is `operations/models_reminders.py`,
 payment-deadline consumer for F3 membership notices. Loan borrower/staff sources
 are registered explicitly alongside these payment consumers. The explicit `payments.due`
 consumer in `payments/reminders.py` uses durable claims for owner-only email.
+Receipt and credit-note snapshots live in `payments/models_documents.py`; `documents.py`
+allocates the shared tenant sequence in the settlement/refund transaction. `document_pdf.py`
+renders snapshots, `document_delivery.py` owns payer-only mail and signed grants, and
+`views_documents.py` rechecks payment ownership or active VIEW_FINANCE authority at download.
+The finance registry is `operations/report_definitions_finance.py`; `reports_finance_sources.py`
+selects dated ledger rows, `reports_finance.py` builds local-period revenue/cash summaries,
+and `reports_accounting.py` builds the balanced CSV journal. `report_date_ranges.py`
+distinguishes calendar filters from rolling scheduler instants. Frontend document access is
+`features/payments/PaymentDocuments.tsx`, policy editing is `staff/BillingDocumentsSettings.tsx`,
+and report presentation is `staff/panels/OperationsReportsFinance.tsx`.
 Core due dates and billing policy live in `payments/due_dates.py`, `models_billing.py`
 and `views_billing.py`; manual receipt corrections/release reuse
 `services_refunds_offline.py` and `views_refunds_offline.py`.

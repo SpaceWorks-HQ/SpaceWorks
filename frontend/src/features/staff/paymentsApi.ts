@@ -135,6 +135,10 @@ export function settlementLabel(settlement: StaffSettlement) {
 }
 
 export function invalidatePaymentViews(queryClient: QueryClient, makerspaceId: number) {
+  queryClient.invalidateQueries({ queryKey: ["payment-documents", "staff", makerspaceId] });
+  for (const key of ["payments-ledger", "revenue-over-time", "cash-book", "accounting-journal"]) {
+    queryClient.invalidateQueries({ queryKey: ["operations-report", key] });
+  }
   queryClient.invalidateQueries({ queryKey: ["payments", makerspaceId] });
   queryClient.invalidateQueries({ queryKey: ["operations-report", "payment-reconciliation"] });
   queryClient.invalidateQueries({ queryKey: ["dashboard", makerspaceId] });

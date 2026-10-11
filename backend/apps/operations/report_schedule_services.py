@@ -148,7 +148,7 @@ def schedule_inputs(schedule, now):
             makerspace=schedule.makerspace if schedule.report_key in {"member-retention", "membership-revenue"} else None,
         )
     report_filters = {}
-    if schedule.report_key == "payment-reconciliation":
+    if schedule.report_key in {"payment-reconciliation", "payments-ledger", "revenue-over-time", "cash-book", "accounting-journal"}:
         report_filters = {key: filters[key] for key in PAYMENT_FILTER_KEYS if filters.get(key)}
     if schedule.report_key == "member-retention" and filters.get("months"):
         report_filters["months"] = filters["months"]

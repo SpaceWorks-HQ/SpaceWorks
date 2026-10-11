@@ -17,13 +17,29 @@ from apps.payments.schemas_billing import BILLING_POLICY_ERROR
 
 
 class BillingSettingsSerializer(serializers.ModelSerializer):
+    account_codes = serializers.JSONField(required=False)
     reminder_days_before = serializers.ListField(child=serializers.IntegerField(min_value=1, max_value=365), max_length=20)
     reminder_days_after = serializers.ListField(child=serializers.IntegerField(min_value=1, max_value=365), max_length=20)
     max_reminders = serializers.IntegerField(min_value=0, max_value=20)
 
     class Meta:
         model = MakerspaceBillingSettings
-        fields = ("payment_terms_days", "reminder_days_before", "reminder_days_after", "max_reminders")
+        fields = ("payment_terms_days", "reminder_days_before", "reminder_days_after", "max_reminders",
+                  "number_prefix", "legal_name", "address", "tax_id", "footer", "account_codes")
+
+    def validate_account_codes(self, value):
+        from django.core.exceptions import ValidationError
+        from apps.payments.models_billing import validate_account_codes
+        try:
+            validate_account_codes(value)
+        except ValidationError as exc:
+            raise serializers.ValidationError(exc.messages)
+        return value
+
+    def validate_number_prefix(self, value):
+        if any(ord(char) < 32 or char in "/\\" for char in value):
+            raise serializers.ValidationError("Use a prefix without control characters or slashes.")
+        return value
 
     def validate(self, attrs):
         for name in ("reminder_days_before", "reminder_days_after"):
@@ -44,7 +60,7 @@ class BillingSettingsView(APIView):
             request.user, rbac.Action.MANAGE_MAKERSPACE, servable_queryset(), field="pk",
         ), pk=makerspace_id)
 
-    @extend_schema(tags=["Payments"], summary="Read core billing terms and reminder policy",
+    @extend_schema(tags=["Payments"], summary="Read billing, receipt and accounting policy",
                    description="Requires manage_makerspace. No payments module or credentials required; billing.reminders is a separate opt-in.",
                    responses={200: BillingSettingsSerializer, **ERRORS})
     def get(self, request, makerspace_id):
@@ -54,7 +70,7 @@ class BillingSettingsView(APIView):
         ).filter(makerspace=space).first()
         return Response(BillingSettingsSerializer(policy or MakerspaceBillingSettings(makerspace=space)).data)
 
-    @extend_schema(tags=["Payments"], summary="Change core billing terms and reminder policy",
+    @extend_schema(tags=["Payments"], summary="Change billing, receipt and accounting policy",
                    description="Requires manage_makerspace. Terms apply only to new charges. Reminders require billing.reminders, notifications and email; no online rail required.",
                    request=BillingSettingsSerializer, responses={200: BillingSettingsSerializer, **ERRORS})
     @transaction.atomic

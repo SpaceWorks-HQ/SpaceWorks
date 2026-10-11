@@ -48,6 +48,12 @@ SUPPLEMENTAL_AUTHORITY_ENTRIES = (
            "The source member's promised grace boundary travels as historical coverage."),
     *_same("makerspaces.MakerspaceMembership", "renewal_cancelled_at", D.PRESERVE,
            "A member's decision not to renew must survive migration."),
+    *_same("payments.PaymentDocument", "id makerspace payment settlement refund reverses issued_by", D.PRESERVE,
+           "Core financial document relations follow the imported ledger identities."),
+    *_same("payments.PaymentDocument", "sequence number kind issuer payer_label payer_type lines amount currency settlement_method settlement_reference money_at issued_at tax_breakdown", D.PRESERVE,
+           "Issued snapshots are immutable financial history."),
+    *_same("payments.MakerspaceBillingSettings", "number_prefix legal_name address tax_id footer account_codes next_document_number", D.PRESERVE,
+           "The numbering counter and billing presentation travel with issued documents; mail permissions do not."),
     *_same("operations.SavedView", "shared state", D.RESET,
            "Target publication and filter identifiers must be authorized anew."),
     *_same(

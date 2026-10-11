@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { downloadStaffFile } from "../../../lib/api";
 import { ReportSchedules } from "./ReportSchedules";
 import { Panel } from "./shared";
-import { reportFormats, type ReportCatalog, type ReportKey } from "./operationsReportsConfig";
+import { reportFormats, reportGrain, type ReportCatalog, type ReportKey } from "./operationsReportsConfig";
 
 type ReportEntry = ReportCatalog["results"][number];
 
@@ -35,8 +35,7 @@ export function OperationsReportExports({
 }) {
   const exportReport = useMutation({
     mutationFn: ({ report, format }: { report: string; format: "csv" | "xlsx" }) => {
-      const grains = reports.find((definition) => definition.key === report)?.grains ?? ["day"];
-      const exportGrain = grains.includes(grain) ? grain : grains[0] ?? "day";
+      const exportGrain = reportGrain(reports.find((definition) => definition.key === report), grain);
       const params = new URLSearchParams();
       if (report === "member-retention" && filters.months) params.set("months", filters.months);
       if (report === "payment-reconciliation") {

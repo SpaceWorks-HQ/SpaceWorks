@@ -32,7 +32,7 @@ PREVIEW_PARAMETERS = [
     *DATE_RANGE_PARAMETERS,
     *PAYMENT_FILTER_PARAMETERS,
     *RETENTION_PARAMETERS,
-    OpenApiParameter("grain", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["day", "month"]),
+    OpenApiParameter("grain", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["day", "week", "month"]),
 ]
 
 
@@ -46,6 +46,10 @@ def _export_format(request, definition=None):
 
 FILTER_SERIALIZERS = {
     "member-retention": RetentionFilterSerializer,
+    "payments-ledger": PaymentReportFilterSerializer,
+    "revenue-over-time": PaymentReportFilterSerializer,
+    "cash-book": PaymentReportFilterSerializer,
+    "accounting-journal": PaymentReportFilterSerializer,
     "payment-reconciliation": PaymentReportFilterSerializer,
     "audit-trail": AuditReportFilterSerializer,
 }

@@ -46,9 +46,9 @@ def test_billing_defaults_and_policy_audit_do_not_rewrite_existing_charges():
     url = reverse("payment-billing-settings", args=[space.pk])
     original = client.get(url)
     assert original.status_code == 200
-    assert original.data == {"payment_terms_days": 0, "reminder_days_before": [3],
+    assert {key: original.data[key] for key in ("payment_terms_days", "reminder_days_before", "reminder_days_after", "max_reminders")} == {"payment_terms_days": 0, "reminder_days_before": [3],
                              "reminder_days_after": [7], "max_reminders": 2}
-    assert not MakerspaceBillingSettings.objects.filter(makerspace=space).exists()
+    assert MakerspaceBillingSettings.objects.get(makerspace=space).next_document_number == 2
     response = client.patch(url, {"payment_terms_days": 14, "max_reminders": 4}, format="json")
     assert response.status_code == 200
     entry = AuditLog.objects.get(makerspace=space, action="payment.billing_policy_updated")

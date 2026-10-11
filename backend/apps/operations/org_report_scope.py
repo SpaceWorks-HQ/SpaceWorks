@@ -31,6 +31,9 @@ ORGANIZATION_REPORT_ACTIONS = frozenset({
     rbac.Action.VIEW_FINANCE,
 })
 EXCLUDED_ORGANIZATION_REPORT_KEYS = frozenset({
+    # Financial detail and accounting custody stay tenant-local. Different local
+    # calendars also make a combined revenue/cash period misleading.
+    "payments-ledger", "accounting-journal", "revenue-over-time", "cash-book",
     # Tenant accountability data: never flattened across an organization's spaces.
     "audit-trail",
     # Cohort anniversaries and month-end plan projections stay tenant-local; distinct

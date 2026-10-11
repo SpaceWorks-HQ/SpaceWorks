@@ -180,7 +180,7 @@ class ReportExportView(APIView):
             *DATE_RANGE_PARAMETERS,
             *PAYMENT_FILTER_PARAMETERS,
             *RETENTION_PARAMETERS,
-            OpenApiParameter("grain", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["day", "month"]),
+            OpenApiParameter("grain", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["day", "week", "month"]),
         ],
         responses=EXPORT_RESPONSES,
     )
@@ -209,7 +209,7 @@ class AggregateReportExportView(APIView):
             *DATE_RANGE_PARAMETERS,
             *PAYMENT_FILTER_PARAMETERS,
             *RETENTION_PARAMETERS,
-            OpenApiParameter("grain", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["day", "month"]),
+            OpenApiParameter("grain", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["day", "week", "month"]),
         ],
         responses=EXPORT_RESPONSES,
     )

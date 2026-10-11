@@ -35,6 +35,8 @@ FEATURE_DEFINITIONS = (
     FeatureDefinition("membership.self_export", "membership", "Member data export"),
     FeatureDefinition("reports.saved_views", "reports", "Saved report views",
                       "Save personal report filters and publish makerspace views.", default_enabled=True),
+    FeatureDefinition("billing.documents", None, "Receipt documents",
+                      "Numbered receipts and credit notes from the core ledger.", default_enabled=True),
     FeatureDefinition("billing.reminders", "notifications", "Payment reminders",
                       "Email the payer about due and overdue charges, including cash-only charges."),
     FeatureDefinition("loans.renewals", "request_workflow", "Loan renewals",

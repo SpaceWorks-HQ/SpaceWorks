@@ -108,6 +108,7 @@ def settle_refund(refund, *, external_refund_id, status, actor):
     entries with the same meta, whichever one gets there first.
     """
     with transaction.atomic():
+        Payment.objects.select_for_update().get(pk=refund.payment_id)
         locked = Refund.objects.select_for_update(of=("self",)).select_related("payment__makerspace").get(pk=refund.pk)
         fields = []
         if external_refund_id and not locked.external_refund_id:
@@ -136,6 +137,8 @@ def settle_refund(refund, *, external_refund_id, status, actor):
             meta={"payment_id": locked.payment_id, "refund_id": locked.pk, "amount": str(locked.amount)},
         )
         if status == Refund.Status.SUCCEEDED:
+            from apps.payments.documents import issue_credit_note
+            issue_credit_note(locked, actor=actor)
             from apps.payments.notifications import notify_payment
             notify_payment(locked.payment, "refund_issued", refund=locked)
         return locked

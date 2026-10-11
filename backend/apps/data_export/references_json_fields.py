@@ -50,6 +50,10 @@ JSON_REFERENCE_FIELDS = frozenset(
         ("makerspaces.MemberProject", "links"),
         # Bounded integer day offsets; no embedded account or object references.
         ("payments.MakerspaceBillingSettings", "reminder_days_before"),
+        ("payments.MakerspaceBillingSettings", "account_codes"),
+        ("payments.PaymentDocument", "issuer"),
+        ("payments.PaymentDocument", "lines"),
+        ("payments.PaymentDocument", "tax_breakdown"),
         ("payments.MakerspaceBillingSettings", "reminder_days_after"),
         ("tenant_migration.ExternalTenantReference", "snapshot"),
     }

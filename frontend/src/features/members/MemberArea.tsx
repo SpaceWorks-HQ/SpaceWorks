@@ -143,7 +143,7 @@ export function MemberArea() {
     {/* OUTSIDE the membership branch. A loan deposit is raised against a borrower, who
         needs an active account rather than a membership -- nesting this meant the person
         who owed the money was the one person who could not see it. */}
-    {payments.data?.length ? <section className="desk-panel p-5"><h2 className="title-panel">Payments</h2><MemberPaymentRows payments={payments.data} checkoutPaymentId={generatePaymentLink.isPending ? generatePaymentLink.variables : undefined} onCheckout={(paymentId) => generatePaymentLink.mutate(paymentId)} /></section> : null}
+    {payments.data?.length ? <section className="desk-panel p-5"><h2 className="title-panel">Payments</h2><MemberPaymentRows makerspaceId={makerspaceId} payments={payments.data} checkoutPaymentId={generatePaymentLink.isPending ? generatePaymentLink.variables : undefined} onCheckout={(paymentId) => generatePaymentLink.mutate(paymentId)} /></section> : null}
     {memberships.data && resolvedSlug && makerspaceId >= 0 ? <MemberReferrals
       canRefer={membership?.membership_status === "active" && membership.can_refer}
       referralsEnabled={membership?.membership_status === "active" && membership.referrals_enabled}
