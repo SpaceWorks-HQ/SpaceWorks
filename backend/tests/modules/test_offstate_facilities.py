@@ -242,7 +242,7 @@ def test_events_off_leaves_the_core_loan_spine_working():
     _run_loan_spine("facilities-no-events", CORE | {"bookings"})
 
 
-def test_bookings_either_declares_membership_or_works_when_membership_is_off():
+def test_bookings_works_when_membership_is_off():
     """A standalone module must remain usable unless its dependency is made explicit."""
     space = _space("facilities-bookings-no-membership", "bookings")
     bookable, response = _post_booking(
@@ -250,10 +250,9 @@ def test_bookings_either_declares_membership_or_works_when_membership_is_off():
         _client(_account("facilities-bookings-no-membership-account")),
     )
 
-    standalone = "membership" not in BY_KEY["bookings"].requires_modules
-    assert not standalone or response.status_code == 201, response.data
-    if standalone:
-        assert bookable.bookings.count() == 1
+    assert "membership" not in BY_KEY["bookings"].requires_modules
+    assert response.status_code == 201, response.data
+    assert bookable.bookings.count() == 1
 
 
 def test_events_either_declares_membership_or_works_when_membership_is_off():

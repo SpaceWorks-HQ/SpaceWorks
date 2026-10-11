@@ -453,7 +453,7 @@ route through it. `/auth/me` + `/auth/login` carry typed effective `actions` per
 membership/role-assignment APIs enforce non-escalation (can't grant a role you don't hold; can't touch a
 MANAGE_MAKERSPACE target/role) with makerspace-first lock ordering.
 
-**`apps/makerspaces/module_registry.py` is the single source of truth for module keys.** All 33
+**`apps/makerspaces/module_registry.py` is the single source of truth for module keys.** All 35
 `ModuleDefinition`s live there (`key`, `label`, `description`, `app_label`, `enforcement`, `group`,
 `requires_modules`, `default_enabled`, `is_core`, `frontend_exposed`, `frontend_workflows`), and the
 lists that used to be hand-kept in parallel now **derive** from it: `models.DEFAULT_ENABLED_MODULES`,
@@ -477,7 +477,7 @@ deployment on upgrade (the `0050`/`0051` backfill reasoning, expressed in the re
 migration). `member_accounts`, `mobile` and `payments` once carried it too and are now opt-in for new
 makerspaces (existing rows kept them through `0057`). Everything else is off, and a new makerspace
 installs core plus whatever profile the operator chose (`minimal` 6 / `workshop` 15 / `lending` 18 /
-`recommended` 21 / `cloud` 25 / `events` 12 / `bookings` 13 / `everything` = `full` 35 — pinned by
+`recommended` 21 / `cloud` 25 / `events` 12 / `bookings` 12 / `everything` = `full` 35 — pinned by
 `tests/modules/test_combo_profiles.py`).
 `ModuleDefinition.default_enabled` defaults to **False** and core must not set it (core is on by
 definition; two sources for one fact is the drift the registry exists to remove) — so `updates` and
@@ -516,8 +516,19 @@ and `setup_instance --profile` (env `SETUP_MODULE_PROFILE`, default `recommended
 Core modules are **added back by `_canonical_modules`, not rejected** — no caller has to carry the core
 set and no otherwise-valid save fails on a row that lost one. Because `public_inventory` is core, the
 module can no longer express "private makerspace"; the existing `Makerspace.public_inventory_enabled`
-switch does, and the **minimal profile turns it off** so a minimal install publishes nothing until the
-operator opts in.
+catalogue switch does. `public_site_enabled` independently controls directory publication,
+embed-key validation and public machine listings; its migration copies the previous catalogue flag.
+The **minimal profile turns both off** until the operator opts in.
+
+**Per-space module families.** `loans.enabled` is a default-on feature under `staff_admin`.
+Turning it off hides loan tabs, bootstrap loan modules/workflows and loan dashboard counters,
+and refuses the public catalogue and new borrowing with 400. It never uninstalls core or changes
+loan rows. Retained-loan policies, charge tracking and payment rails remain independent.
+`public_landing_page` selects an available family; auto chooses the first available
+catalogue/events/bookings/machines/membership surface. Bookings has no membership dependency:
+active accounts may book, while existing memberships retain waiver and active-status obligations.
+Advance booking does not require presence. Events also has no membership dependency: members
+remain the default audience, with account/invite admission behind the opt-in event features.
 
 **Disabling a module is race-safe under the row lock, never at the form.** `require_module` at a view
 boundary reads an **unlocked** row, so a concurrent uninstall can commit in the window between that check

@@ -20,7 +20,7 @@ from apps.bookings.serializers_public import (
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.guards import require_module_for_servable
 from apps.makerspaces.lookup import get_public_makerspace
-from apps.presence.guard import require_active_member
+from apps.bookings.access import require_booking_account
 
 
 LOOSE_ERROR_SCHEMA = {'type': 'object', 'additionalProperties': {}}
@@ -33,7 +33,7 @@ PUBLIC_BOOKING_ERRORS = {
 PUBLIC_BOOKING_SUBMISSION_ERRORS = {
     **PUBLIC_BOOKING_ERRORS,
     401: OpenApiResponse(ErrorSerializer, description='Authentication is required.'),
-    403: OpenApiResponse(ErrorSerializer, description='Active membership and waiver acceptance are required.'),
+    403: OpenApiResponse(ErrorSerializer, description='Active account and any existing membership waiver acceptance are required.'),
     409: OpenApiResponse(ErrorSerializer, description='Booking conflict.'),
     423: OpenApiResponse(ErrorSerializer, description='Tenant frozen for migration.'),
     503: OpenApiResponse(ErrorSerializer, description='Tenant write gate unavailable.'),
@@ -151,7 +151,7 @@ class PublicBookingSubmissionView(APIView):
             _public_spaces(makerspace),
             public_token=public_token,
         )
-        require_active_member(request.user, makerspace)
+        require_booking_account(request.user, makerspace)
 
         if not isinstance(request.data, Mapping):
             raise serializers.ValidationError({'non_field_errors': ['Expected an object.']})

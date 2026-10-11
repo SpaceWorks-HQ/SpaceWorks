@@ -11,6 +11,7 @@ from apps.makerspaces.capabilities import FEATURE_MODULES, FEATURES
 from apps.makerspaces.module_registry import is_frontend_exposed, module_available, module_workflows
 from apps.makerspaces.request_access import ANYONE, effective_policy
 from apps.separability.registry import runtime_active
+from apps.makerspaces.loan_visibility import LOAN_MODULES, LOAN_FEATURES
 
 # Derived from the module registry, which also decides frontend exposure: an
 # internal master switch declares frontend_exposed=False and is dropped from both
@@ -151,6 +152,8 @@ def feature_enabled(makerspace, key):
     # archived checks and only the new lifecycle states fail closed here.
     if not is_servable(makerspace, allow_archived=True):
         return False
+    if key in LOAN_FEATURES and not feature_enabled(makerspace, "loans.enabled"):
+        return False
     definition = FEATURES.get(key)
     if definition is None or key not in set(makerspace.enabled_features or []):
         return False
@@ -171,6 +174,8 @@ def bootstrap_payload(makerspace):
     from apps.makerspaces.editions import current_edition
 
     modules = sorted(key for key in available_modules(makerspace) if is_frontend_exposed(key))
+    if not feature_enabled(makerspace, "loans.enabled"):
+        modules = [key for key in modules if key not in LOAN_MODULES]
     features = sorted(key for key, definition in FEATURES.items() if definition.frontend_exposed and feature_enabled(makerspace, key))
     theme = public_theme_config(makerspace.theme_config)
     logo_url = public_image_storage.public_url(makerspace.logo_key) or theme.get("logo_url") or ""
@@ -184,6 +189,8 @@ def bootstrap_payload(makerspace):
     } | {
         workflow for feature in features for workflow in FEATURE_WORKFLOWS.get(feature, [])
     })
+    if not feature_enabled(makerspace, "loans.enabled"):
+        workflows = [key for key in workflows if key not in {"staff_inventory", "staff_requests"}]
     makerspace_payload = {
         "id": makerspace.id,
         "name": makerspace.name,
@@ -196,6 +203,9 @@ def bootstrap_payload(makerspace):
         "logo_url": logo_url,
         "cover_image_url": cover_image_url,
         "public_stats_enabled": makerspace.public_stats_enabled,
+        "public_site_enabled": makerspace.public_site_enabled,
+        "public_inventory_enabled": makerspace.public_inventory_enabled,
+        "public_landing_page": makerspace.public_landing_page,
         "membership_policy": makerspace.membership_policy,
     }
     # Emitted ONLY for the opt-in `anyone` policy, following the `/api/v1/config`

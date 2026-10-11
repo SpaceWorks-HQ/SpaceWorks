@@ -265,3 +265,6 @@ THIRD_PARTY_FIELD_NAMES = {
 }
 
 UNMANAGED_FIELD_NAMES = {}
+
+from .tenant_dump_modules import MODULE_FIELD_NAMES
+FIRST_PARTY_FIELD_NAMES["makerspaces.Makerspace"] |= MODULE_FIELD_NAMES

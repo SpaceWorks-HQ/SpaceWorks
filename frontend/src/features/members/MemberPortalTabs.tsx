@@ -7,9 +7,10 @@ export type MemberTab = typeof MEMBER_TABS[number];
 export function memberTabs(modules: string[]) {
   return MEMBER_TABS.filter((tab) => {
     if (["overview", "payments", "account"].includes(tab)) return true;
+    if (tab === "bookings") return modules.includes("bookings");
     if (!modules.includes("membership")) return false;
     if (tab === "loans") return modules.includes("request_workflow");
-    if (tab === "bookings" || tab === "events") return modules.includes(tab);
+    if (tab === "events") return modules.includes(tab);
     return true;
   });
 }

@@ -19,6 +19,8 @@ import { readStorage, removeStorage, writeStorage } from "../../lib/safeStorage"
 //                     suppressed. Gating the log would hide the evidence it exists to show.
 //   * `emailtemplates` -- gated per stream by the server; the hardware and printing
 //                     streams are always present, so the tab always has content.
+const LOAN_TABS = new Set(["requests", "inventory", "categories", "needsfix", "ledger", "accountability", "warranty", "direct", "containers", "transfers", "stocktake", "bulk", "qr", "scanner"]);
+
 const TAB_MODULES: Record<string, string[]> = {
   direct: ["public_inventory"],
   notifications: ["notifications"],
@@ -101,6 +103,8 @@ export function filterTabsByEnabledModules(tabs: readonly string[], makerspace?:
   if (!modules) return shipped;
   const enabled = new Set(modules);
   return shipped.filter((tabName) => {
+    if (LOAN_TABS.has(tabName) && !(tabName === "warranty" && enabled.has("machines")) && makerspace.enabled_features !== undefined
+      && !featureEnabled(makerspace.enabled_features, "loans.enabled")) return false;
     if (tabName === "direct") {
       return featureEnabled(makerspace.enabled_features ?? [], "inventory.self_checkout");
     }

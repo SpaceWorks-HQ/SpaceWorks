@@ -117,11 +117,9 @@ MODULES = (
     ModuleDefinition(
         "events", "Events", "Event scheduling and registrations.", "events", GUARD, group=GROUP_EVENTS,
     ),
-    # Requires `membership`: public self-booking calls `require_active_member_presence`, so
-    # without a MakerspaceMembership row the catalogue lists and the booking mutation dies.
+    # Self-booking accepts active accounts and preserves existing membership waivers.
     ModuleDefinition(
         "bookings", "Bookings", "Resource booking and public self-booking.", "bookings", GUARD, group=GROUP_BOOKINGS,
-        requires_modules=("membership",),
     ),
     ModuleDefinition(
         "maintenance", "Maintenance", "Maintenance schedules and work orders.",

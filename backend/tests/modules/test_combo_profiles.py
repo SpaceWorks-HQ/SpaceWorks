@@ -17,7 +17,7 @@ from apps.makerspaces.module_registry import (
 
 PUBLISHED_PROFILE_SIZES = {
     "minimal": 6, "workshop": 15, "lending": 18, "recommended": 21, "cloud": 25,
-    "everything": 35, "full": 35, "events": 12, "bookings": 13,
+    "everything": 35, "full": 35, "events": 12, "bookings": 12,
 }
 
 
@@ -41,6 +41,6 @@ def test_each_profile_has_its_published_size_and_is_dependency_closed(profile):
 def test_the_published_module_dependencies():
     assert module_dependencies() == {
         "printing": ("machine_service",),
-        "bookings": ("membership",),
+        "maintenance": ("machines",),
         "mobile": ("member_accounts",),
     }

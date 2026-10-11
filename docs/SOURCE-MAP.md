@@ -16,6 +16,9 @@ live in `frontend/src/features/inventory/PublicEventDetailPage.tsx` and
 `frontend/src/features/events/`; staff ticketing uses `eventTicketingApi.ts` and the
 `EventInvitesPanel`, `EventTicketsPanel` and `EventPromosPanel` components.
 
+[Module families and public-site settings](SOURCE-MAP-MODULE-FAMILIES.md) maps the
+WP2 loan/public-site gates, compatibility splits, family dashboards and routing.
+
 Member renewal automation lives in `makerspaces/membership_renewals.py`, with the
 record-first charge seam in `membership_renewal_charges.py`, F1 reminder discovery
 in `membership_renewal_reminders.py` and owner-only F3 mail in

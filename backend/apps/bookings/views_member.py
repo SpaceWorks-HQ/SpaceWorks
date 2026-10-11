@@ -35,11 +35,11 @@ def own_bookings(request, slug):
     makerspace = get_public_makerspace(slug)
     require_module_for_servable(makerspace, 'bookings')
     require_active_account(request.user, makerspace)
-    return rbac.scope_by_makerspace(
+    return rbac.scope_by_borrower(
         request.user,
         Booking.objects.select_related('space__makerspace').filter(
             space__makerspace=makerspace, member=request.user,
-        ), makerspace_field='space__makerspace_id',
+        ), makerspace=makerspace, owner_field='member', field='space__makerspace_id',
     )
 
 

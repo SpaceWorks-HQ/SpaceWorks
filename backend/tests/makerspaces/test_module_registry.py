@@ -270,3 +270,8 @@ def test_printing_dependency_is_registry_data_not_a_hardcoded_branch():
 def test_maintenance_dependency_matches_its_machine_owned_surfaces():
     assert module_registry.module_dependencies()["maintenance"] == ("machines",)
     assert module_registry.with_dependencies({"maintenance"}) == {"maintenance", "machines"}
+
+
+def test_bookings_never_installs_community_membership():
+    assert module_registry.BY_KEY["bookings"].requires_modules == ()
+    assert module_registry.with_dependencies({"bookings"}) == {"bookings"}
