@@ -14,6 +14,7 @@ export const FEATURE_DEFINITIONS: readonly FeatureDefinition[] = [
   { key: "membership.lifecycle_mail", parent_module: "membership", label: "Membership lifecycle mail" },
   { key: "membership.self_service", parent_module: "membership", label: "Member account self-service" },
   { key: "membership.self_export", parent_module: "membership", label: "Member data export" },
+  { key: "reports.saved_views", parent_module: "reports", label: "Saved report views" },
   { key: "billing.reminders", parent_module: "notifications", label: "Payment reminders" },
   { key: "loans.renewals", parent_module: "request_workflow", label: "Loan renewals" },
   { key: "loans.limits", parent_module: "request_workflow", label: "Borrow limits" },

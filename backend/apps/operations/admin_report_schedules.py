@@ -35,6 +35,7 @@ class ReportScheduleAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
         "makerspace", "report_key", "filters", "grain", "format", "cadence", "next_run_at",
         "last_run_at", "is_active", "destination", "recipient_emails", "created_by",
         "created_at", "updated_at",
+        "condition", "recipient_roles", "recipient_actions",
     )
     fields = readonly_fields
     inlines = (ReportDeliveryInline,)

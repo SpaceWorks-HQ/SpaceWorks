@@ -223,6 +223,11 @@ NON_REFERENCE_JSON_FIELDS = frozenset({
     # Export inputs (dates, day window, payment enums) and staff-entered emails; no ids.
     ("operations.ReportSchedule", "filters"),
     ("operations.ReportSchedule", "recipient_emails"),
+    ("operations.ReportSchedule", "condition"),
+    # Slugs and action enums are tenant-local selector labels, never source IDs;
+    # the entire schedule is DROP on tenant import.
+    ("operations.ReportSchedule", "recipient_roles"),
+    ("operations.ReportSchedule", "recipient_actions"),
 })
 
 

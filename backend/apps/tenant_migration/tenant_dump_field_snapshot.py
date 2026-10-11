@@ -136,7 +136,7 @@ FIRST_PARTY_FIELD_NAMES = {
     'operations.PeriodicTaskRun': frozenset('id last_error last_run_at name'.split()),
     'operations.ReportMetricRollup': frozenset('bucket_start checksum computed_at dimension_key dimensions grain id makerspace metric_key report_key revision sample_count source_cutoff source_module value'.split()),
     'operations.ReportRollupCursor': frozenset('id last_error_code last_success_at makerspace rolled_through source_module updated_at'.split()),
-    'operations.ReportSchedule': frozenset('cadence created_at created_by destination filters format grain id is_active last_run_at makerspace next_run_at recipient_emails report_key updated_at'.split()),
+    'operations.ReportSchedule': frozenset('cadence condition created_at created_by destination filters format grain id is_active last_run_at makerspace next_run_at recipient_actions recipient_emails recipient_roles report_key updated_at'.split()),
     'operations.ReportDelivery': frozenset('created_at error expires_at id object_key schedule status'.split()),
     'operations.StockTransfer': frozenset('applied_at created_at created_by destination_container destination_makerspace id makerspace reason source_container source_makerspace status'.split()),
     'operations.StockTransferLine': frozenset('asset from_status id notes product quantity to_status transfer'.split()),

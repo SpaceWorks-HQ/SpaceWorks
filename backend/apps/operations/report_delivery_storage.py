@@ -45,5 +45,9 @@ def signed_download_url(object_key):
 
 
 def delete_report_object(object_key):
-    """Best-effort: the evidence helper logs and swallows a failed delete."""
-    storage.delete_object(object_key)
+    """Report cleanup success so an expired delivery can retry a failed delete."""
+    try:
+        storage.delete_object_strict(object_key)
+    except StorageUnavailable:
+        return False
+    return True

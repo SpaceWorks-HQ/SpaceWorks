@@ -33,6 +33,8 @@ FEATURE_DEFINITIONS = (
     FeatureDefinition("membership.lifecycle_mail", "membership", "Membership lifecycle mail"),
     FeatureDefinition("membership.self_service", "membership", "Member account self-service"),
     FeatureDefinition("membership.self_export", "membership", "Member data export"),
+    FeatureDefinition("reports.saved_views", "reports", "Saved report views",
+                      "Save personal report filters and publish makerspace views.", default_enabled=True),
     FeatureDefinition("billing.reminders", "notifications", "Payment reminders",
                       "Email the payer about due and overdue charges, including cash-only charges."),
     FeatureDefinition("loans.renewals", "request_workflow", "Loan renewals",

@@ -16,6 +16,7 @@ export function OperationsReportExports({
   onSelect,
   reportsBase,
   dateSuffix,
+  filters = {},
   grain,
   aggregate,
   makerspaceId,
@@ -26,17 +27,27 @@ export function OperationsReportExports({
   onSelect: (key: ReportKey) => void;
   reportsBase: string;
   dateSuffix: string;
+  filters?: { months?: string; status?: string; subject_type?: string };
   grain: string;
   aggregate: boolean;
   makerspaceId: number;
   reportsEnabled: boolean;
 }) {
   const exportReport = useMutation({
-    mutationFn: ({ report, format }: { report: string; format: "csv" | "xlsx" }) =>
-      downloadStaffFile(
-        `${reportsBase}/${report}/export?format=${format}${dateSuffix}&grain=${encodeURIComponent(grain)}`,
+    mutationFn: ({ report, format }: { report: string; format: "csv" | "xlsx" }) => {
+      const grains = reports.find((definition) => definition.key === report)?.grains ?? ["day"];
+      const exportGrain = grains.includes(grain) ? grain : grains[0] ?? "day";
+      const params = new URLSearchParams();
+      if (report === "member-retention" && filters.months) params.set("months", filters.months);
+      if (report === "payment-reconciliation") {
+        if (filters.status) params.set("status", filters.status);
+        if (filters.subject_type) params.set("subject_type", filters.subject_type);
+      }
+      return downloadStaffFile(
+        `${reportsBase}/${report}/export?format=${format}${dateSuffix}&grain=${encodeURIComponent(exportGrain)}${params.size ? `&${params}` : ""}`,
         `${aggregate ? "all-makerspaces-" : ""}${report}.${format}`,
-      ),
+      );
+    },
   });
 
   return (

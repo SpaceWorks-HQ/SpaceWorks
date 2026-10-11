@@ -15,6 +15,7 @@ from apps.operations.report_registry import (
     REPORT_DEFINITIONS,
 )
 from apps.operations.report_exports import _csv_response, _xlsx_cell, _xlsx_response
+from apps.operations.report_condition_metrics import condition_metrics
 from apps.operations.report_exports_provenance import (
     actor_label,
     build_provenance,
@@ -28,6 +29,7 @@ from apps.operations.report_request_contract import (
     DATE_RANGE_PARAMETERS,
     PAYMENT_FILTER_PARAMETERS,
     PREVIEW_PARAMETERS,
+    RETENTION_PARAMETERS,
     _export_format,
     _grain_param,
     _report_filters,
@@ -80,7 +82,8 @@ class AnalyticsView(APIView):
         _require_source_modules(makerspace, definition.required_modules)
         return Response(reports.report_data(
             report_key, makerspace.id,
-            limit=_limit_param(request), date_range=_date_range(request),
+            actor=request.user,
+            limit=_limit_param(request), date_range=_date_range(request, makerspace if report_key in {"member-retention", "membership-revenue"} else None),
             report_filters=_report_filters(request, report_key), grain=_grain_param(request, definition),
         ))
 
@@ -159,6 +162,7 @@ class AggregateAnalyticsView(APIView):
         definition = reports.validate_report_key(report_key, deployment_aggregate=True)
         return Response(reports.report_data(
             report_key, limit=_limit_param(request), date_range=_date_range(request),
+            actor=request.user,
             report_filters=_report_filters(request, report_key),
             grain=_grain_param(request, definition),
         ))
@@ -175,6 +179,7 @@ class ReportExportView(APIView):
             OpenApiParameter("format", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["csv", "xlsx"]),
             *DATE_RANGE_PARAMETERS,
             *PAYMENT_FILTER_PARAMETERS,
+            *RETENTION_PARAMETERS,
             OpenApiParameter("grain", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["day", "month"]),
         ],
         responses=EXPORT_RESPONSES,
@@ -203,6 +208,7 @@ class AggregateReportExportView(APIView):
             OpenApiParameter("format", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["csv", "xlsx"]),
             *DATE_RANGE_PARAMETERS,
             *PAYMENT_FILTER_PARAMETERS,
+            *RETENTION_PARAMETERS,
             OpenApiParameter("grain", OpenApiTypes.STR, OpenApiParameter.QUERY, enum=["day", "month"]),
         ],
         responses=EXPORT_RESPONSES,
@@ -222,11 +228,15 @@ def _export_response(request, definition, makerspace_id):
     file can tell what subset it is without the URL that produced it.
     """
     fmt = _export_format(request, definition)
-    date_range = _date_range(request)
+    local_space = None
+    if makerspace_id is not None and definition.key in {"member-retention", "membership-revenue"}:
+        local_space = _makerspace_for_report_view(request.user, makerspace_id, definition.key)
+    date_range = _date_range(request, local_space)
     report_filters = _report_filters(request, definition.key)
     grain = _grain_param(request, definition)
     rows = reports.report_rows(
         definition.key, makerspace_id, date_range=date_range,
+        actor=request.user,
         report_filters=report_filters, grain=grain,
     )
     provenance = build_provenance(
@@ -257,4 +267,5 @@ def _catalog_entry(definition, *, available, reason):
         "aggregate_supported": definition.key in STRATEGIES,
         "allowed_formats": list(definition.allowed_formats),
         "schedulable": definition.schedulable, "previewable": definition.previewable,
+        "condition_metrics": list(condition_metrics(definition)),
     }

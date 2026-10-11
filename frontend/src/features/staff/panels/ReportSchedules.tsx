@@ -84,6 +84,10 @@ export function ReportSchedules({ makerspaceId, reports }: { makerspaceId: numbe
                 {schedule.filters?.window_days ? ` · last ${schedule.filters.window_days} days` : ""}
                 {destinationLabel(schedule.destination) ? ` · ${destinationLabel(schedule.destination)}` : ""}
                 {schedule.recipient_emails.length ? ` · ${schedule.recipient_emails.join(", ")}` : ""}
+                {schedule.recipient_roles?.length ? ` · roles: ${schedule.recipient_roles.join(", ")}` : ""}
+                {schedule.recipient_actions?.length ? ` · actions: ${schedule.recipient_actions.join(", ")}` : ""}
+                {schedule.condition?.non_empty ? " · non-empty only" : ""}
+                {schedule.condition?.metric ? ` · ${schedule.condition.metric} ${schedule.condition.operator} ${schedule.condition.value} ${schedule.condition.currency ?? ""}` : ""}
               </p>
               <p className="text-xs text-muted">Next run {when(schedule.next_run_at)} · last run {when(schedule.last_run_at)}</p>
               {schedule.last_delivery?.download_url ? (

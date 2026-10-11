@@ -3,6 +3,7 @@
 from apps.operations.report_definitions_audit import AUDIT_REPORT_DEFINITIONS
 from apps.operations.report_definitions_coverage import COVERAGE_REPORT_DEFINITIONS
 from apps.operations.report_definitions_existing import EXISTING_REPORT_DEFINITIONS
+from apps.operations.report_definitions_membership import MEMBERSHIP_REPORT_DEFINITIONS
 from apps.operations.report_types import (
     ReportDefinition,
     ReportNotExportable,
@@ -13,6 +14,7 @@ from apps.operations.report_types import (
 
 REPORT_DEFINITIONS = (
     *EXISTING_REPORT_DEFINITIONS, *COVERAGE_REPORT_DEFINITIONS, *AUDIT_REPORT_DEFINITIONS,
+    *MEMBERSHIP_REPORT_DEFINITIONS,
 )
 REPORT_REGISTRY = {definition.key: definition for definition in REPORT_DEFINITIONS}
 REPORT_KEYS = [definition.key for definition in REPORT_DEFINITIONS]

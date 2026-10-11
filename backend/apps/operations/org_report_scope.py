@@ -33,6 +33,9 @@ ORGANIZATION_REPORT_ACTIONS = frozenset({
 EXCLUDED_ORGANIZATION_REPORT_KEYS = frozenset({
     # Tenant accountability data: never flattened across an organization's spaces.
     "audit-trail",
+    # Cohort anniversaries and month-end plan projections stay tenant-local; distinct
+    # members and local-time snapshots cannot be flattened into one organization KPI.
+    "member-retention", "membership-revenue",
     # Unique borrowers can span makerspaces, while the duration averages do not
     # expose the sample counts needed to combine them without bias.
     "loan-throughput",

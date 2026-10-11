@@ -22,14 +22,20 @@ from apps.operations.views_report_helpers import _makerspace_for_catalog
 
 ERROR_RESPONSES = {
     400: OpenApiResponse(ReportErrorSerializer, description="Invalid schedule or module disabled."),
+    401: OpenApiResponse(ReportErrorSerializer, description="Authentication required."),
     403: OpenApiResponse(ReportErrorSerializer, description="Permission denied."),
     404: OpenApiResponse(ReportErrorSerializer, description="Makerspace or schedule not found."),
+    423: OpenApiResponse(ReportErrorSerializer, description="Tenant writes are frozen."),
+    503: OpenApiResponse(ReportErrorSerializer, description="Tenant write gate unavailable."),
 }
 
 
 def _scoped_schedule(user, pk):
     """Resolve a schedule through the RBAC scope of ITS report's action (404 otherwise)."""
-    report_key = ReportSchedule.objects.filter(pk=pk).values_list("report_key", flat=True).first()
+    visible = ReportSchedule.objects.none()
+    for action in {definition.required_action for definition in REPORT_DEFINITIONS}:
+        visible = visible | rbac.scope_by_action(user, action, ReportSchedule.objects.all())
+    report_key = visible.filter(pk=pk).values_list("report_key", flat=True).first()
     if report_key is None:
         raise Http404
     definition = REPORT_REGISTRY.get(report_key)
@@ -74,8 +80,11 @@ class ReportScheduleListCreateView(generics.ListCreateAPIView):
             definition.key for definition in REPORT_DEFINITIONS
             if rbac.can(self.request.user, definition.required_action, makerspace.id)
         ]
+        rows = ReportSchedule.objects.none()
+        for action in {REPORT_REGISTRY[key].required_action for key in keys}:
+            rows = rows | rbac.scope_by_action(self.request.user, action, ReportSchedule.objects.all())
         return (
-            ReportSchedule.objects.filter(makerspace=makerspace, report_key__in=keys)
+            rows.filter(makerspace=makerspace, report_key__in=keys)
             .select_related("destination", "created_by")
             .order_by("-created_at", "-id")
         )

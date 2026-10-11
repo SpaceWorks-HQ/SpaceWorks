@@ -83,6 +83,11 @@ class ReportSchedule(models.Model):
         null=True, blank=True, on_delete=models.SET_NULL, related_name="report_schedules",
     )
     recipient_emails = models.JSONField(default=list, blank=True, validators=[validate_recipient_emails])
+    condition = models.JSONField(default=dict, blank=True, validators=[validate_schedule_filters])
+    # Tenant-local role slugs, not addresses or source database IDs. Schedules are
+    # dropped on portable import; recipient authority is always resolved live.
+    recipient_roles = models.JSONField(default=list, blank=True)
+    recipient_actions = models.JSONField(default=list, blank=True)
     # The run re-checks that this person still holds the report's action: a schedule must
     # not keep disclosing a report its creator can no longer open.
     created_by = models.ForeignKey(

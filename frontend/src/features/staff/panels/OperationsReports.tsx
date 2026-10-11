@@ -10,15 +10,11 @@ import { OperationsReportsPrinterService } from "./OperationsReportsPrinterServi
 import { OperationsReportsCoverage } from "./OperationsReportsCoverage";
 import { OperationsReportExports } from "./OperationsReportExports";
 import { Panel, type Makerspace, useStaffGet } from "./shared";
-import {
-  loadSavedReportViews,
-  newSavedViewId,
-  reportTitle,
-  savedViewsStorageKey,
-  type ReportCatalog,
-  type ReportKey,
-  type SavedReportView,
-} from "./operationsReportsConfig";
+import { type ReportCatalog, type ReportKey } from "./operationsReportsConfig";
+import { ServerReportViews } from "./ServerReportViews";
+import { SelectedReportPreview } from "./SelectedReportPreview";
+import type { ReportViewState } from "./reportViewsApi";
+import { PAYMENT_STATUSES, PAYMENT_SUBJECTS } from "../paymentsApi";
 
 type Summary = {
   products: number; assets: number; active_loans: number;
@@ -48,11 +44,10 @@ export function OperationsReports({
   const [endDate, setEndDate] = useState("");
   const [grain, setGrain] = useState("day");
   const [selectedReport, setSelectedReport] = useState<ReportKey>("most-lent");
-  const [presetName, setPresetName] = useState("");
-  const [savedViews, setSavedViews] = useState<SavedReportView[]>(loadSavedReportViews);
-  useEffect(() => {
-    window.localStorage.setItem(savedViewsStorageKey, JSON.stringify(savedViews));
-  }, [savedViews]);
+  const [columns, setColumns] = useState<string[]>([]);
+  const [months, setMonths] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [paymentSubject, setPaymentSubject] = useState("");
   const aggregate = isSuperadmin && allMakerspaces;
   const scopeKey = aggregate ? "all" : makerspace.id;
   const analyticsBase = aggregate ? "/admin/analytics" : `/admin/makerspace/${makerspace.id}/analytics`;
@@ -75,35 +70,22 @@ export function OperationsReports({
   const summary = useStaffGet<Summary>(["operations-report", "summary", scopeKey, startDate, endDate], `${analyticsBase}/summary?${dateQuery}`, hardwareEnabled);
 
   const scopeLabel = aggregate ? "all makerspaces" : makerspace.name;
-  const currentScope: SavedReportView["scope"] = aggregate ? "all" : `makerspace:${makerspace.id}`;
   const makerspaceName = (id: number) => makerspaces.find((space) => space.id === id)?.name ?? `#${id}`;
-  const availableExports = reportsEnabled
-    ? catalogEntries.filter((report) => report.exportable && report.available !== false)
-    : [];
-  const saveCurrentView = () => {
-    const name = presetName.trim() || `${reportTitle(selectedReport, catalogEntries)} - ${scopeLabel}`;
-    const view: SavedReportView = {
-      id: newSavedViewId(),
-      name,
-      startDate,
-      endDate,
-      scope: currentScope,
-      scopeLabel,
-      selectedReport,
-    };
-    setSavedViews((existing) => [view, ...existing.filter((item) => item.name !== name)].slice(0, 12));
-    setPresetName("");
+  const availableExports = reportsEnabled ? catalogEntries.filter((report) => report.exportable && report.available !== false) : [];
+  const selected = catalogEntries.find((report) => report.key === selectedReport);
+  const effectiveGrain = (selected?.grains ?? ["day"]).includes(grain) ? grain : selected?.grains[0] ?? "day";
+  const savedState: ReportViewState = {
+    report_key: selectedReport, grain: effectiveGrain, columns,
+    filters: { ...(startDate ? { start: startDate } : {}), ...(endDate ? { end: endDate } : {}),
+      ...(months && selectedReport === "member-retention" ? { months: Number(months) } : {}),
+      ...(selectedReport === "payment-reconciliation" && paymentStatus ? { status: paymentStatus } : {}),
+      ...(selectedReport === "payment-reconciliation" && paymentSubject ? { subject_type: paymentSubject } : {}) },
   };
-
-  const applySavedView = (view: SavedReportView) => {
-    setStartDate(view.startDate);
-    setEndDate(view.endDate);
-    setSelectedReport(view.selectedReport);
-    setAllMakerspaces(view.scope === "all" && isSuperadmin);
-  };
-
-  const removeSavedView = (id: string) => {
-    setSavedViews((existing) => existing.filter((view) => view.id !== id));
+  const applyView = (state: ReportViewState) => {
+    setStartDate(state.filters.start ?? ""); setEndDate(state.filters.end ?? "");
+    setSelectedReport(state.report_key); setGrain(state.grain); setColumns(state.columns);
+    setMonths(state.filters.months ? String(state.filters.months) : "");
+    setPaymentStatus(state.filters.status ?? ""); setPaymentSubject(state.filters.subject_type ?? "");
   };
 
   return (
@@ -131,7 +113,7 @@ export function OperationsReports({
             </label>
             <label className="eyebrow grid gap-1">
               <span>Report</span>
-              <select className="desk-input" value={selectedReport} onChange={(event) => setSelectedReport(event.target.value as ReportKey)}>
+              <select className="desk-input" value={selectedReport} onChange={(event) => { setSelectedReport(event.target.value as ReportKey); setColumns([]); }}>
                 {!catalogEntries.length ? <option value={selectedReport}>{catalog.isLoading ? "Loading reports..." : "No reports available"}</option> : null}
                 {catalogEntries.map((report) => (
                   <option key={report.key} value={report.key} disabled={report.available === false}>
@@ -142,8 +124,8 @@ export function OperationsReports({
             </label>
             <label className="eyebrow grid gap-1">
               <span>Grain</span>
-              <select className="desk-input" value={grain} onChange={(event) => setGrain(event.target.value)}>
-                <option value="day">Day</option><option value="month">Month</option>
+              <select className="desk-input" value={effectiveGrain} onChange={(event) => setGrain(event.target.value)}>
+                {(selected?.grains ?? ["day"]).map((value) => <option key={value} value={value}>{value}</option>)}
               </select>
             </label>
             {isSuperadmin ? (
@@ -160,39 +142,13 @@ export function OperationsReports({
           </div>
         </div>
         {catalog.error ? <p className="mt-3 text-sm text-danger">{catalog.error instanceof Error ? catalog.error.message : "Could not load report catalog."}</p> : null}
-        <div className="mt-4 space-y-3 border-t border-line pt-3">
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="eyebrow grid min-w-48 gap-1">
-              <span>View name</span>
-              <input
-                className="desk-input"
-                value={presetName}
-                onChange={(event) => setPresetName(event.target.value)}
-                placeholder={`${reportTitle(selectedReport)} - ${scopeLabel}`}
-              />
-            </label>
-            <button className="desk-button-primary" type="button" onClick={saveCurrentView}>
-              Save view
-            </button>
-          </div>
-          {savedViews.length ? (
-            <div className="flex flex-wrap gap-2">
-              {savedViews.map((view) => (
-                <div key={view.id} className="flex items-center gap-1 rounded-md border border-line bg-bg px-2 py-1">
-                  <button className="desk-button-ghost justify-start text-left" type="button" onClick={() => applySavedView(view)}>
-                    {view.name}
-                  </button>
-                  <span className="text-xs text-muted">
-                    {reportTitle(view.selectedReport, catalogEntries)} / {view.scopeLabel}
-                  </span>
-                  <button className="desk-button-danger" type="button" onClick={() => removeSavedView(view.id)} aria-label={`Remove ${view.name}`}>
-                    x
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        {selectedReport === "member-retention" ? <label className="eyebrow grid gap-1 mt-3">Retention months (blank: 3, 6, 12)<input className="desk-input" type="number" min={1} max={120} value={months} onChange={(event) => setMonths(event.target.value)} /></label> : null}
+        {selectedReport === "payment-reconciliation" ? <div className="flex flex-wrap gap-2 mt-3">
+          <label className="eyebrow grid gap-1">Report payment status<select className="desk-input" value={paymentStatus} onChange={(event) => setPaymentStatus(event.target.value)}><option value="">All statuses</option>{PAYMENT_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="eyebrow grid gap-1">Report charge type<select className="desk-input" value={paymentSubject} onChange={(event) => setPaymentSubject(event.target.value)}><option value="">All types</option>{PAYMENT_SUBJECTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        </div> : null}
+        {!aggregate && reportsEnabled && (makerspace.enabled_features ?? []).includes("reports.saved_views") ?
+          <ServerReportViews key={makerspace.id} makerspaceId={makerspace.id} state={savedState} fields={selected?.fields ?? []} onColumns={setColumns} onApply={applyView} /> : null}
         {!printingOnly && hardwareEnabled ? (
           <DataState loading={summary.isLoading} error={summary.error} empty={!summary.data}>
             <StatCards
@@ -233,15 +189,17 @@ export function OperationsReports({
       <OperationsReportExports
         reports={availableExports}
         selectedReport={selectedReport}
-        onSelect={setSelectedReport}
+        onSelect={(key) => { setSelectedReport(key); setColumns([]); }}
         reportsBase={reportsBase}
         dateSuffix={dateSuffix}
-        grain={grain}
+        filters={{ months, status: paymentStatus, subject_type: paymentSubject }}
+        grain={effectiveGrain}
         aggregate={aggregate}
         makerspaceId={makerspace.id}
         reportsEnabled={reportsEnabled}
       />
 
+      <SelectedReportPreview report={selected} analyticsBase={analyticsBase} scopeKey={scopeKey} start={startDate} end={endDate} grain={effectiveGrain} columns={columns} months={months} filters={savedState.filters} />
       <OperationsReportsHardware analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} enabled={hardwareEnabled} aggregate={aggregate} makerspaceName={makerspaceName} />
       <OperationsReportsCoverage catalog={catalogEntries} analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} grain={grain} aggregate={aggregate} makerspaceName={makerspaceName} />
       <OperationsReportsMembers makerspaceId={makerspace.id} aggregate={aggregate} startDate={startDate} endDate={endDate} enabled={hardwareEnabled} />

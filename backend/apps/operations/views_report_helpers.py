@@ -17,11 +17,11 @@ def _require_source_modules(makerspace, modules):
         require_module(makerspace, module)
 
 
-def _date_range(request):
-    return date_range_from_dates(_date_param(request, "start"), _date_param(request, "end"))
+def _date_range(request, makerspace=None):
+    return date_range_from_dates(_date_param(request, "start"), _date_param(request, "end"), makerspace=makerspace)
 
 
-def date_range_from_dates(start, end):
+def date_range_from_dates(start, end, *, makerspace=None):
     """Inclusive calendar dates -> the half-open aware datetime range every builder takes.
 
     Shared by the export views and the scheduled-report runner so a schedule's stored
@@ -29,8 +29,16 @@ def date_range_from_dates(start, end):
     """
     if start and end and start > end:
         raise ValidationError({"end": "End date must be on or after start date."})
-    start_dt = timezone.make_aware(datetime.combine(start, time.min)) if start else None
-    end_dt = timezone.make_aware(datetime.combine(end + timedelta(days=1), time.min)) if end else None
+    try:
+        if makerspace is not None:
+            from apps.makerspaces.local_time import local_day_bounds
+            start_dt = local_day_bounds(makerspace, start)[0] if start else None
+            end_dt = local_day_bounds(makerspace, end)[1] if end else None
+        else:
+            start_dt = timezone.make_aware(datetime.combine(start, time.min)) if start else None
+            end_dt = timezone.make_aware(datetime.combine(end + timedelta(days=1), time.min)) if end else None
+    except (OverflowError, ValueError) as exc:
+        raise ValidationError({"end" if end else "start": "Date range exceeds the supported calendar."}) from exc
     return (start_dt, end_dt) if start_dt or end_dt else None
 
 
@@ -38,7 +46,10 @@ def _date_param(request, name):
     raw = (request.query_params.get(name) or "").strip()
     if not raw:
         return None
-    parsed = parse_date(raw)
+    try:
+        parsed = parse_date(raw)
+    except ValueError:
+        parsed = None
     if parsed is None:
         raise ValidationError({name: "Use YYYY-MM-DD."})
     return parsed

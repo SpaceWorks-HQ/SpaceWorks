@@ -89,6 +89,10 @@ stored credential**, so re-enabling needs no re-entry.
   when, for which makerspace, which report version and filters) as the first CSV line or a `Provenance`
   sheet, and staff can schedule a report to be delivered daily, weekly or monthly to a notification
   destination or a list of email recipients as a short-lived signed download link.
+  Counts-only membership cohorts and recurring-plan MRR/ARR use local months and require
+  `membership`; MRR requires `VIEW_FINANCE`. Server report views save filters and columns,
+  with manager-authorized sharing. Schedules can require non-empty rows or a metric
+  threshold, and role/action recipients resolve current authority at send time.
 - **Without it** — no analytics screens, no exports and no scheduled deliveries from the console. It is a **standalone area
   rather than part of Inventory** on purpose: switching Inventory off would otherwise take the machine
   and event reports with it.
@@ -96,7 +100,8 @@ stored credential**, so re-enabling needs no re-entry.
   a revision rather than rewriting history. Automatic evidence retention must finalize its rollup fence
   first, so it cannot change historical figures. Whole-tenant purge removes the rollups through tenant
   ownership, and an explicit source-module purge removes that module's derived rollups too. Purging
-  `reports` deletes report schedules and their delivered files (private objects); the rollups stay.
+  `reports` deletes saved report views, schedules and their delivered files (private objects);
+  other staff-list preferences and the rollups stay.
 
 ---
 
@@ -218,4 +223,3 @@ Opt-in, no dependencies; installed only by the `full`/`everything` profiles.
 - **Data** — `purge_module_data` reports it stores no data of its own to purge separately.
 
 ---
-

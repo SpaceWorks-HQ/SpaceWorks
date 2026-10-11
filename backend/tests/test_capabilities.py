@@ -23,3 +23,15 @@ from tests.capabilities_behavior import (
     test_membership_without_builtin_member_accounts_is_valid,
     test_frontend_feature_definitions_match_the_backend,
 )
+
+
+@pytest.mark.django_db
+def test_saved_report_views_default_on_but_require_reports():
+    from apps.makerspaces.platform import feature_enabled
+    from tests.return_helpers import make_space
+    from tests.module_helpers import disable_module
+
+    space = make_space("saved-report-feature")
+    assert feature_enabled(space, "reports.saved_views")
+    disable_module(space, "reports")
+    assert not feature_enabled(space, "reports.saved_views")
