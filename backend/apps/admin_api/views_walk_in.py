@@ -68,7 +68,7 @@ class WalkInMemberCreateView(APIView):
         tags=["Admin memberships"],
         summary="Create a walk-in member record",
         request=WalkInMemberCreateSerializer,
-        responses={201: PolymorphicProxySerializer(component_name="WalkInAdmissionOutcome", serializers=[DirectLoanMemberSerializer, WalkInAdmissionOutcomeSerializer], resource_type_field_name=None), **ERRORS},
+        responses={201: PolymorphicProxySerializer(component_name="WalkInAdmissionResult", serializers=[DirectLoanMemberSerializer, WalkInAdmissionOutcomeSerializer], resource_type_field_name=None), **ERRORS},
     )
     def post(self, request, makerspace_id):
         makerspace = _makerspace_for_action(

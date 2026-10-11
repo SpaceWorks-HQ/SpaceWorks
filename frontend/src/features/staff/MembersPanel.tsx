@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Field } from "../../components/ui";
 import type {
   AdminMembership,
-  PaginatedAdminMembershipList,
+  MembershipListResponse,
   PatchedMembershipCapabilities,
 } from "../../generated/api";
 import { StructuredApiError, staffRequest } from "../../lib/api";
@@ -47,7 +47,7 @@ export function MembersPanel({ makerspaceId, membershipEnabled, canManageMakersp
   const [decision, setDecision] = useState<{ id: number; kind: "member" | "request"; title: string } | null>(null);
   const roster = useQuery({
     queryKey: [...key, "roster", list.query],
-    queryFn: () => staffRequest<PaginatedAdminMembershipList>(`/admin/memberships?makerspace_id=${makerspaceId}&page=${rosterPage}&${new URLSearchParams({ q: list.values.q, status: list.values.status, ordering: list.values.ordering, id: list.values.id })}`),
+    queryFn: () => staffRequest<MembershipListResponse>(`/admin/memberships?makerspace_id=${makerspaceId}&page=${rosterPage}&${new URLSearchParams({ q: list.values.q, status: list.values.status, ordering: list.values.ordering, id: list.values.id })}`),
   });
   const requests = useQuery({
     queryKey: [...key, "requests", requestPage, membershipEnabled, list.values.requestState, list.values.requestOrdering],

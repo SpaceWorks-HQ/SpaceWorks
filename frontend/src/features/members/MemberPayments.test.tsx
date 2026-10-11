@@ -10,6 +10,8 @@ const base: MemberPayment = {
   status: "paid_online",
   amount: "10.00",
   currency: "usd",
+  due_date: null,
+  due_state: "none",
   checkout_url: "",
   online_payment_available: true,
   settlement: null,
@@ -26,9 +28,9 @@ describe("MemberPaymentRows", () => {
         payments={[{
           ...base,
           refunds: [
-            { amount: "4.00", currency: "usd", status: "succeeded", reason: "returned early", settled_at: "2026-10-02T10:00:00Z" },
-            { amount: "1.00", currency: "usd", status: "pending", reason: "", settled_at: null },
-            { amount: "2.00", currency: "usd", status: "failed", reason: "", settled_at: "2026-10-02T11:00:00Z" },
+            { amount: "4.00", currency: "usd", status: "succeeded", reason: "returned early", settled_at: "2026-10-02T10:00:00Z", method: "", reference: "", refunded_at: null },
+            { amount: "1.00", currency: "usd", status: "pending", reason: "", settled_at: null, method: "", reference: "", refunded_at: null },
+            { amount: "2.00", currency: "usd", status: "failed", reason: "", settled_at: "2026-10-02T11:00:00Z", method: "", reference: "", refunded_at: null },
           ],
         }]}
       />,

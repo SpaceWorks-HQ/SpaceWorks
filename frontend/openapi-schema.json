@@ -34831,7 +34831,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/WalkInAdmissionOutcome"
+                                    "$ref": "#/components/schemas/WalkInAdmissionResult"
                                 }
                             }
                         },
@@ -97461,6 +97461,29 @@
                 }
             },
             "WalkInAdmissionOutcome": {
+                "type": "object",
+                "properties": {
+                    "user_id": {
+                        "type": "integer"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "username": {
+                        "type": "string"
+                    },
+                    "admission_request": {
+                        "$ref": "#/components/schemas/AdmissionRequest"
+                    }
+                },
+                "required": [
+                    "admission_request",
+                    "display_name",
+                    "user_id",
+                    "username"
+                ]
+            },
+            "WalkInAdmissionResult": {
                 "oneOf": [
                     {
                         "$ref": "#/components/schemas/DirectLoanMember"

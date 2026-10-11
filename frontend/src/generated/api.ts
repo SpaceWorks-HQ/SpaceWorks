@@ -9360,7 +9360,14 @@ export type WaiverPublish = {
   "clear"?: boolean;
 };
 
-export type WalkInAdmissionOutcome = DirectLoanMember | WalkInAdmissionOutcome;
+export type WalkInAdmissionOutcome = {
+  "user_id": number;
+  "display_name": string;
+  "username": string;
+  "admission_request": AdmissionRequest;
+};
+
+export type WalkInAdmissionResult = DirectLoanMember | WalkInAdmissionOutcome;
 
 export type WalkInMemberCreate = {
   "display_name": string;

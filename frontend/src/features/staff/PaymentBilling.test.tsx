@@ -40,7 +40,7 @@ describe("Billing due dates and refunds", () => {
   });
 
   it("filters member rows without recomputing dates in the browser timezone", () => {
-    const payment: MemberPayment = { ...row, refunded_amount: 0, checkout_url: "", online_payment_available: false, settlement: null };
+    const payment: MemberPayment = { ...row, due_date: row.due_date ?? null, due_state: row.due_state ?? "none", refunded_amount: 0, refunds: [], checkout_url: "", online_payment_available: false, settlement: null };
     render(<MemberPaymentRows payments={[payment, { ...payment, id: 42, subject_label: "Future fee", due_state: "upcoming", due_date: "2026-10-15" }]} onCheckout={vi.fn()} />);
     fireEvent.change(screen.getByRole("combobox", { name: "Payment due dates" }), { target: { value: "overdue" } });
     expect(screen.getByText("Overdue · 2026-10-10")).toBeVisible();

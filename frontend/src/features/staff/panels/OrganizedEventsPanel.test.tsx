@@ -15,6 +15,7 @@ vi.mock("../../../lib/api", async () => {
 const event: EventAdmin = {
   id: 73,
   offline_checkin_enabled: false,
+  cancellation_cutoff_hours: null,
   makerspace_id: 19,
   series_summary: null,
   series_revision: null,
