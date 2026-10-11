@@ -14,9 +14,13 @@ class ReportViewStateSerializer(serializers.Serializer):
     grain = serializers.CharField(required=False, max_length=8)
     columns = serializers.ListField(child=serializers.CharField(max_length=80), max_length=100, default=list)
 
-    def validate(self, attrs):
-        if set(self.initial_data) - set(self.fields):
+    def to_internal_value(self, data):
+        # Nested serializers receive raw data here, before DRF drops unknown keys.
+        if isinstance(data, dict) and set(data) - set(self.fields):
             raise serializers.ValidationError("Unknown report-state key.")
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
         current = getattr(self.root, "instance", None)
         if current is not None:
             attrs = {**current.state, **attrs}

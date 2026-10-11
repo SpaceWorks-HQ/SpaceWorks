@@ -55,7 +55,7 @@ def _post(client, rows):
     )
 
 
-def test_requeue_moves_only_failed_rows_audits_and_enqueues(monkeypatch):
+def test_requeue_moves_only_failed_rows_audits_and_enqueues(monkeypatch, django_capture_on_commit_callbacks):
     space = make_space("requeue-action")
     failed = _log(space, NotificationDeliveryStatus.FAILED, "notification_delivery_failed:Timeout")
     sent = _log(space, NotificationDeliveryStatus.SENT)
@@ -65,7 +65,8 @@ def test_requeue_moves_only_failed_rows_audits_and_enqueues(monkeypatch):
     client = Client()
     force_mfa_login(client, _superadmin("requeue-super"))
 
-    response = _post(client, [failed, sent, skipped])
+    with django_capture_on_commit_callbacks(execute=True):
+        response = _post(client, [failed, sent, skipped])
 
     assert response.status_code == 200
     assert enqueued == [failed.pk]
@@ -80,7 +81,7 @@ def test_requeue_moves_only_failed_rows_audits_and_enqueues(monkeypatch):
     assert audits.get().meta == {"channel": "slack", "event": "request.accepted", "attempts": 4}
 
 
-def test_requeue_with_the_broker_down_leaves_the_row_failed(monkeypatch):
+def test_requeue_with_the_broker_down_leaves_the_row_failed(monkeypatch, django_capture_on_commit_callbacks):
     from apps.integrations import tasks
 
     space = make_space("requeue-broker-down")
@@ -93,7 +94,8 @@ def test_requeue_with_the_broker_down_leaves_the_row_failed(monkeypatch):
     client = Client()
     force_mfa_login(client, _superadmin("requeue-broker-super"))
 
-    response = _post(client, [failed])
+    with django_capture_on_commit_callbacks(execute=True):
+        response = _post(client, [failed])
 
     assert response.status_code == 200
     failed.refresh_from_db()

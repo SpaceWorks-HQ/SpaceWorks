@@ -4,14 +4,14 @@ import pytest
 from django.utils import timezone
 
 from apps.integrations.models import EmailLog
-from apps.machines.models import Machine, MachineServiceRequest, MachineType
+from apps.machines.models import Machine, MachineServiceRequest, MachineType, ServiceQueue
 from apps.operations.models import StocktakeSession
 from tests.return_helpers import authenticated_client, make_member, make_product, make_space
 
 pytestmark = pytest.mark.django_db
 
 
-def test_print_type_drilldown_includes_assigned_machine_only_jobs_without_slug_collision():
+def test_print_type_drilldown_includes_queue_jobs_without_slug_collision():
     space = make_space("ux-assigned-print")
     space.enabled_modules = sorted(set(space.enabled_modules) | {"machines", "machine_service", "printing"})
     space.save(update_fields=["enabled_modules"])
@@ -21,7 +21,8 @@ def test_print_type_drilldown_includes_assigned_machine_only_jobs_without_slug_c
     wanted = None
     for kind in (printer, collision):
         machine = Machine.objects.create(makerspace=space, machine_type=kind, name=kind.name)
-        row = MachineServiceRequest.objects.create(makerspace=space, requester=actor,
+        queue = ServiceQueue.objects.create(makerspace=space, machine_type=kind, name=kind.name)
+        row = MachineServiceRequest.objects.create(makerspace=space, requester=actor, queue=queue,
             requester_name=actor.username, title=kind.name, status="in_progress", assigned_machine=machine)
         if kind.pk == printer.pk:
             wanted = row

@@ -10,4 +10,6 @@ def test_send_return_reminders_task_runs_service_in_eager_mode(monkeypatch):
     )
 
     assert send_return_reminders_task() == result
-    assert send_return_reminders_task.delay().get() == result
+    eager = send_return_reminders_task.delay()
+    assert eager.successful()
+    assert eager.result == result

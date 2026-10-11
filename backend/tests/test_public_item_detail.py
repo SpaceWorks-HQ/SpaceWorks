@@ -76,7 +76,7 @@ def test_detail_module_off_is_400_and_reenable_restores_same_item(suffix):
 
     response = client.get(url)
     assert response.status_code == 400
-    assert response.data == {"module": ["public_inventory is disabled for this makerspace."]}
+    assert response.data == {"module": "public_inventory is disabled for this makerspace."}
 
     space.enabled_modules = original
     space.save(update_fields=["enabled_modules"])
@@ -157,7 +157,7 @@ def test_public_search_preserves_prefix_phrase_and_typo_matching(query):
     assert [row["id"] for row in response.data["results"]] == [product.pk]
 
 
-def test_public_inventory_openapi_documents_errors_and_list_shaped_module_field():
+def test_public_inventory_openapi_documents_errors_and_scalar_module_field():
     from django.urls import path
     from drf_spectacular.generators import SchemaGenerator
     from apps.inventory.views import PublicInventoryDetailView
@@ -171,5 +171,4 @@ def test_public_inventory_openapi_documents_errors_and_list_shaped_module_field(
     assert "requestBody" not in operation
     error_ref = operation["responses"]["400"]["content"]["application/json"]["schema"]["$ref"].split("/")[-1]
     error = schema["components"]["schemas"][error_ref]
-    assert error["properties"]["module"]["type"] == "array"
-    assert error["properties"]["module"]["items"]["type"] == "string"
+    assert error["properties"]["module"]["type"] == "string"

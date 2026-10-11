@@ -75,8 +75,8 @@ def test_shared_view_never_grants_access_to_an_entity_and_module_off_is_400():
     client = authenticated_client(reader)
     assert client.get(url(space, row.pk)).status_code == 403
     assert client.get(url(space) + "?entity=payments").status_code == 403
-    disable_module(space, "staff_admin")
-    assert client.get(url(space) + "?entity=inventory").status_code == 400
+    disable_module(space, "events")
+    assert authenticated_client(manager).get(url(space) + "?entity=events").status_code == 400
 
 
 @pytest.mark.parametrize("state", [{"url": "https://evil.test"}, {"q": "x" * 251}, {"q": {"nested": True}}])

@@ -15,6 +15,7 @@ from apps.integrations.email_templates_registry import (
     validate_email_template_strings,
 )
 from apps.integrations.email_templates_registry_fablab import FABLAB_STREAM_KEYS
+from apps.integrations.email_templates_registry_research import FAMILY_EVENTS, REQUESTER_EVENTS
 from apps.integrations.models import EmailTemplate
 from apps.makerspaces.models import Makerspace
 
@@ -26,10 +27,8 @@ def test_registry_declares_all_send_path_keys():
         *{("printing", "requester", key) for key in PRINTING_REQUESTER_KEYS},
         *{("printing", "staff", key) for key in PRINTING_STAFF_KEYS},
         ("devices", "staff", "offline"), ("devices", "staff", "recovered"),
-        # The four FabLab streams cover both audiences for every event (24 x 2 = 48;
-        # events 11, bookings 6, maintenance 5, membership 2). Derived from the same
-        # table the registry builds from, so this stays a guard against a key existing
-        # with no send path rather than a number to bump.
+        # FabLab lifecycle and reminder entries cover both audiences. Keep the
+        # complete key-set assertion while accepting the intentionally merged families.
         *{
             (stream, audience, key)
             for stream, keys in FABLAB_STREAM_KEYS.items()
@@ -38,7 +37,14 @@ def test_registry_declares_all_send_path_keys():
         },
     }
 
-    assert len(REGISTRY) == 27 + 48 + 2
+    expected |= {
+        (stream, "staff", key)
+        for stream, keys in FAMILY_EVENTS.items() for key in keys
+    } | {
+        (stream, "requester", key)
+        for stream, keys in REQUESTER_EVENTS.items() for key in keys
+    } | {("membership", audience, "broadcast") for audience in ("requester", "staff")}
+    assert len(REGISTRY) == len(expected)
     assert all_send_keys() == expected
 
 

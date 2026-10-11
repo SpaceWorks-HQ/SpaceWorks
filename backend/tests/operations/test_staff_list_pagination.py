@@ -62,7 +62,7 @@ def test_request_queue_sorts_ties_stably_and_refuses_other_tenants():
     actor = make_member("queue-pages-manager", space)
     requests = [HardwareRequest.objects.create(makerspace=space, requester=actor,
                                                requested_for="drill", status="pending_approval") for _ in range(26)]
-    HardwareRequest.objects.create(makerspace=foreign, requested_for="drill", status="pending_approval")
+    HardwareRequest.objects.create(makerspace=foreign, requester=make_member("queue-foreign", foreign), requested_for="drill", status="pending_approval")
     client = authenticated_client(actor)
     url = f"/api/v1/admin/makerspace/{space.pk}/pending-requests"
     first = client.get(url, {"ordering": "status", "search": "drill"})
@@ -129,9 +129,9 @@ def test_bookable_spaces_and_booking_id_filter_work_beyond_page_one():
     assert first.data["count"] == 26
     assert [row["id"] for row in first.data["results"] + second.data["results"]] == [room.pk for room in reversed(rooms)]
     now = timezone.now()
-    bookings = [Booking.objects.create(space=rooms[0], starts_at=now + timedelta(hours=index),
+    bookings = [Booking.objects.create(space=rooms[0], name="Borrower", email="borrower@example.test", phone="1234567890", starts_at=now + timedelta(hours=index),
                                         ends_at=now + timedelta(hours=index + 1)) for index in range(26)]
-    foreign_booking = Booking.objects.create(space=foreign_room, starts_at=now, ends_at=now + timedelta(hours=1))
+    foreign_booking = Booking.objects.create(space=foreign_room, name="Foreign borrower", email="foreign@example.test", phone="1234567890", starts_at=now, ends_at=now + timedelta(hours=1))
     path = f"/api/v1/admin/spaces/{rooms[0].pk}/bookings/"
     assert len(client.get(path).data["results"]) == 24
     selected = client.get(path, {"booking_id": bookings[-1].pk})

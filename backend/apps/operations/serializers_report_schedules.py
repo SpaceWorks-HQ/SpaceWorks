@@ -33,9 +33,13 @@ class ReportScheduleFiltersSerializer(serializers.Serializer):
     subject_type = serializers.ChoiceField(choices=Payment.SubjectType.choices, required=False)
     months = serializers.IntegerField(required=False, min_value=1, max_value=120)
 
-    def validate(self, attrs):
-        if set(self.initial_data) - set(self.fields):
+    def to_internal_value(self, data):
+        # Nested serializers receive raw data here, before DRF drops unknown keys.
+        if isinstance(data, dict) and set(data) - set(self.fields):
             raise serializers.ValidationError("Unknown report filter.")
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
         if attrs.get("window_days") and (attrs.get("start") or attrs.get("end")):
             raise serializers.ValidationError("Use either window_days or start/end, not both.")
         if attrs.get("start") and attrs.get("end") and attrs["start"] > attrs["end"]:

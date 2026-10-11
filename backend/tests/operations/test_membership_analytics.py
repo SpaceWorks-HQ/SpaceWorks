@@ -93,7 +93,7 @@ def test_mrr_normalizes_yearly_plans_keeps_currencies_separate_and_counts_member
     term(space, euro, "Euro", start, end, amount="60", currency="eur")
     excluded = term(space, waived, "Waived", start, end, amount="100")
     Payment.objects.create(makerspace=space, subject_type="membership_term", subject_id=excluded.pk,
-                           member=waived.user, amount=100, currency="usd", status="waived")
+                           member=waived.user, created_by=monthly.user, amount=100, currency="usd", status="waived")
     term(space, monthly, "Custom", start, end, amount="999", interval="custom_days")
     result = build_membership_revenue(space.pk, date_range=(at("2026-02-01"), at("2026-03-01")), now=at("2026-04-01"))
     rows = {row["currency"]: row for row in result.records}

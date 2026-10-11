@@ -93,7 +93,9 @@ def email_template_type_scope(actor, makerspace_id, stream):
     stream disappears entirely. Same mixed-role rule as the dashboard's non-machine
     counters and `procurement.access.machine_type_scope`.
     """
-    if stream not in MACHINE_BEARING_STREAMS:
+    # Certification notices are type-scoped too. Until they support type overrides,
+    # a narrowed manager cannot change the wording for the whole makerspace.
+    if stream not in MACHINE_BEARING_STREAMS | {"certifications"}:
         return None
     if not rbac.can(actor, rbac.Action.MANAGE_MACHINES, makerspace_id):
         return None

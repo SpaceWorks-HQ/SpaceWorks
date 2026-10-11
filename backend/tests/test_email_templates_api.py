@@ -89,7 +89,7 @@ def test_inventory_manager_sees_only_hardware_and_cannot_touch_printing():
 
     listed = client.get(list_url(makerspace))
     assert listed.status_code == 200
-    assert streams(listed) == {"hardware"}
+    assert streams(listed) == {"hardware", "stock"}
 
     printing_url = detail_url(makerspace, "printing", "requester", "submitted")
     assert client.get(printing_url).status_code == 404
@@ -127,7 +127,7 @@ def test_print_manager_sees_only_printing_and_cannot_touch_hardware():
 
     listed = client.get(list_url(makerspace))
     assert listed.status_code == 200
-    assert streams(listed) == {"printing"}
+    assert streams(listed) == {"printing", "stock"}
 
     hardware_url = detail_url(makerspace, "hardware", "requester", "request_received")
     assert client.get(hardware_url).status_code == 404
@@ -148,9 +148,12 @@ def test_space_manager_and_superadmin_see_both_streams_and_can_patch():
         listed = client.get(list_url(makerspace))
         assert listed.status_code == 200
         # A space manager holds every stream's action (MANAGE_DEVICES included since phase
-        # 7a), so they see all seven. The narrower roles below pin the per-stream scoping.
+        # 7a), so they see every enabled stream. The narrower roles below pin the per-stream scoping.
         assert streams(listed) == {
             "hardware",
+            "payments",
+            "stock",
+            "certifications",
             "printing",
             "events",
             "bookings",

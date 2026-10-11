@@ -32,7 +32,7 @@ def seed(space, suffix):
     now = timezone.now()
     event = Event.objects.create(makerspace=space, title="Laser workshop", starts_at=now, ends_at=now + timedelta(hours=1))
     room = BookableSpace.objects.create(makerspace=space, name="Laser room")
-    booking = Booking.objects.create(space=room, name="Private Person", email="private@example.test", starts_at=now, ends_at=now + timedelta(hours=1))
+    booking = Booking.objects.create(space=room, name="Private Person", email="private@example.test", phone="+15551234567", starts_at=now, ends_at=now + timedelta(hours=1))
     return manager, {"inventory": product.pk, "requests": request.pk, "events": event.pk, "bookings": booking.pk,
                      "members": manager.makerspace_memberships.get(makerspace=space).pk}
 
@@ -82,8 +82,10 @@ def test_search_limits_each_entity_and_omits_disabled_modules():
     client = authenticated_client(manager)
     response = client.get(url(space, limit=2))
     assert len([hit for hit in response.data["results"] if hit["entity"] == "inventory"]) == 2
-    disable_module(space, "staff_admin")
-    assert not any(hit["entity"] == "inventory" for hit in client.get(url(space)).data["results"])
+    from apps.makerspaces.module_install import ModuleInstallError
+    with pytest.raises(ModuleInstallError, match="core module"):
+        disable_module(space, "staff_admin")
+    assert len([hit for hit in client.get(url(space, limit=2)).data["results"] if hit["entity"] == "inventory"]) == 2
 
 
 @pytest.mark.parametrize("query", ["q=x", "q=" + "x" * 101, "q=laser&limit=11", "q=laser&limit=0", "q=laser&makerspace_id=bad"])

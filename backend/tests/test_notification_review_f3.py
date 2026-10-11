@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.audit.models import AuditLog
+from apps.hardware_requests.models import HardwareRequest
 from apps.integrations import notify
 from apps.integrations.destinations import _matches
 from apps.integrations.models import NotificationPreference
@@ -35,6 +36,7 @@ pytestmark = pytest.mark.django_db
 
 def test_charge_audit_failure_rolls_back_debt_and_notification(monkeypatch, django_capture_on_commit_callbacks):
     space, manager, member, _payment = family_world("f3-review-charge")
+    loan = HardwareRequest.objects.create(makerspace=space, requester=member)
     emails, channels = capture_delivery(monkeypatch)
     NotificationPreference.objects.create(makerspace=space, feature="payments", channel="email", enabled=True)
 
@@ -45,9 +47,9 @@ def test_charge_audit_failure_rolls_back_debt_and_notification(monkeypatch, djan
     with django_capture_on_commit_callbacks(execute=True):
         with pytest.raises(RuntimeError, match="Audit unavailable"):
             create_payment(makerspace=space, member=member, created_by=manager,
-                           subject_type="membership_term", subject_id=991,
+                           subject_type="loan_deposit", subject_id=loan.pk,
                            amount=Decimal("20.00"), currency="usd")
-    assert not Payment.objects.filter(makerspace=space, subject_id=991).exists()
+    assert Payment.objects.filter(makerspace=space).count() == 1
     assert emails == [] and channels == []
 
 
@@ -57,6 +59,7 @@ def test_revoke_locks_only_grant_and_replay_preserves_first_actor(monkeypatch, d
     _user, membership = _member(space, "f3-review-cert-owner")
     grant = CertificationGrant.objects.create(
         certification_type=_certification(space, machine_type), membership=membership,
+        notes="Original training",
     )
     client = authenticated_client(manager)
     events = []
@@ -72,9 +75,20 @@ def test_revoke_locks_only_grant_and_replay_preserves_first_actor(monkeypatch, d
     assert first.status_code == 200, first.data
     assert second.status_code == 400, second.data
     # This exercises the SQL on the HTTP path, including its related-object joins.
-    assert any('FOR UPDATE OF "machines_certificationgrant"' in row["sql"] for row in queries)
+    import re
+    lock_queries = [row["sql"] for row in queries if "FOR UPDATE OF" in row["sql"]]
+    assert lock_queries
+    grant_locks = []
+    for sql in lock_queries:
+        root = re.search(r'FROM "machines_certificationgrant"(?: ([A-Z]\d+))?', sql)
+        if root:
+            alias = root.group(1) or '"machines_certificationgrant"'
+            locked = sql.split("FOR UPDATE OF ", 1)[1].strip()
+            grant_locks.append(locked == alias)
+    assert grant_locks and all(grant_locks)
     grant.refresh_from_db()
-    assert grant.notes == "First decision" and grant.revoked_by_id == manager.pk
+    assert grant.notes == "Original training" and grant.revoked_by_id == manager.pk
+    assert AuditLog.objects.get(makerspace=space, action="certification.revoked").meta["notes"] == "First decision"
     assert AuditLog.objects.filter(makerspace=space, action="certification.revoked").count() == 1
     assert events == [("certifications", "revoked")]
 
@@ -177,9 +191,9 @@ def test_owner_restriction_before_commit_suppresses_own_payment_email(monkeypatc
 
 def test_zero_amount_is_rendered_and_blank_owner_email_is_skipped(monkeypatch, django_capture_on_commit_callbacks):
     from apps.accounts.models import User
-    space, _manager, owner, _payment = family_world("f3-review-zero")
-    payment = Payment.objects.create(makerspace=space, member=owner, subject_type="loan_deposit",
-                                     subject_id=992, amount=Decimal("0.00"), currency="usd")
+    space, _manager, owner, payment = family_world("f3-review-zero")
+    # Exercise the adapter snapshot with zero without inserting an invalid zero debt.
+    payment.amount = Decimal("0.00")
     NotificationPreference.objects.create(makerspace=space, feature="payments", channel="email", enabled=True)
     emails, _channels = capture_delivery(monkeypatch)
     with django_capture_on_commit_callbacks(execute=True):

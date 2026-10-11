@@ -12,6 +12,7 @@ from apps.makerspaces.models import (
     MakerspaceMembership,
     MakerspaceRole,
     MembershipPlan,
+    MembershipRequest,
     MembershipTerm,
 )
 from apps.operations.reports_payments import build_payment_reconciliation
@@ -53,6 +54,10 @@ def add_payment(space, actor, subject_type, subject_id, amount, currency="usd", 
         subject_id = MembershipTerm.objects.create(
             membership=MakerspaceMembership.objects.get(makerspace=space, user=actor),
             plan=plan, starts_at=now - timedelta(days=30), ends_at=now + timedelta(days=1),
+        ).pk
+    elif subject_type == Payment.SubjectType.MEMBERSHIP_REQUEST:
+        subject_id = MembershipRequest.objects.create(
+            makerspace=space, user=actor, invite_email=actor.email, state="awaiting_payment",
         ).pk
     elif subject_type in Payment.LOAN_SUBJECT_TYPES:
         subject_id = HardwareRequest.objects.create(

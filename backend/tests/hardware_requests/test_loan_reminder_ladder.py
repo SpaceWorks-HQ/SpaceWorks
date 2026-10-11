@@ -9,6 +9,7 @@ from apps.hardware_requests.models import HardwareRequest
 from apps.hardware_requests.services_return_reminders import run_return_reminders
 from apps.hardware_requests import workflow
 from apps.notifications.models import Notification
+from apps.integrations.models import NotificationPreference
 from apps.operations.models import ReminderSchedule
 from apps.operations.reminder_services import schedule_reminders
 from apps.operations.reminder_sweeper import run_reminder_sweep
@@ -59,6 +60,9 @@ def test_escalation_emits_f3_staff_event_once_without_borrower_copy(mailoutbox, 
     due = timezone.now() - timedelta(days=3)
     space, member, _, _, _, policy, _ = setup_loan("escalate", due_at=due)
     staff = make_member("escalation-staff", space)
+    # This scenario verifies email/inbox delivery; it configures no Telegram destination.
+    NotificationPreference.objects.create(makerspace=space, feature="hardware_requests",
+                                          channel="telegram", enabled=False)
     policy.loan_reminder_offsets_hours = []
     policy.loan_escalate_overdue_days = 3
     policy.save()

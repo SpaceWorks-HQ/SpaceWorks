@@ -14,7 +14,15 @@ from apps.makerspaces.models import Makerspace
 from apps.integrations.lifecycle_data import lifecycle_data
 
 
+def space():
+    makerspace = Makerspace(pk=7, slug="adapter-space", name="Adapter space")
+    makerspace.refresh_from_db = Mock()
+    return makerspace
+
+
 def capture(monkeypatch, module):
+    # These tests isolate subject snapshots; restore-state queries have separate coverage.
+    monkeypatch.setattr("apps.backup.not_restored.is_not_restored", lambda pk: False)
     monkeypatch.setattr(module, "notify_lifecycle", lambda makerspace, **kwargs: kwargs["build"]())
     if hasattr(module, "render"):
         monkeypatch.setattr(module, "render", lambda *args, **kwargs: {"text_body": "Staff update"})
@@ -26,12 +34,15 @@ def return_row(monkeypatch, model, row):
     query = Mock()
     query.get.return_value = row
     query.prefetch_related.return_value = query
+    query.filter.return_value = query
+    query.select_related.return_value = query
+    monkeypatch.setattr(model.objects, "all", Mock(return_value=query))
     monkeypatch.setattr(model.objects, "select_related", Mock(return_value=query))
 
 
 def test_hardware_adapter_identifies_request_and_charge(monkeypatch):
     capture(monkeypatch, hardware)
-    row = NS(pk=12, makerspace=NS(), makerspace_id=7, status="accepted")
+    row = NS(pk=12, makerspace=space(), makerspace_id=7, status="accepted", requester_id=None)
     return_row(monkeypatch, hardware.HardwareRequest, row)
     monkeypatch.setattr(hardware, "_email_deliveries", lambda *args: ())
     payload = hardware.notify_request_accepted(row)
@@ -45,7 +56,7 @@ def test_booking_adapter_identifies_booking_and_space(monkeypatch):
     context = {"email": "private@example.test"}
     monkeypatch.setattr(bookings, "bookings_context", lambda *args, **kwargs: context)
     monkeypatch.setattr(bookings, "_effective_toggle", lambda row: False)
-    row = NS(pk=21, space_id=22, space=NS(makerspace=NS()))
+    row = NS(pk=21, space_id=22, space=NS(makerspace=space()), member_id=None)
     return_row(monkeypatch, bookings.Booking, row)
     payload = bookings.notify_booking_status(row, "confirmed")
     assert payload.context == context
@@ -57,19 +68,20 @@ def test_event_adapter_identifies_occurrence_series_and_registration(monkeypatch
     monkeypatch.setattr(events, "events_context", lambda *args, **kwargs: {"name": "Private registrant"})
     row = NS(pk=31, series_id=32)
     return_row(monkeypatch, events.Event, row)
-    monkeypatch.setattr(events.EventRegistration.objects, "get", lambda **kwargs: NS(pk=33))
-    payload = events._notify_makerspace(31, NS(), "registration_approved", 33, sync=True)
+    monkeypatch.setattr(events.EventRegistration.objects, "get", lambda **kwargs: NS(pk=33, member_id=None))
+    payload = events._notify_makerspace(31, space(), "registration_approved", 33, sync=True)
     assert payload.data == {"event_id": 31, "series_id": 32, "registration_id": 33}
 
 
 def test_maintenance_adapter_identifies_machine_schedule_and_completion_log(monkeypatch):
     capture(monkeypatch, maintenance)
-    machine = NS(pk=41, makerspace=NS(), machine_type=NS(), machine_type_id=42)
+    makerspace = space()
+    machine = NS(pk=41, makerspace=makerspace, machine_type=NS(), machine_type_id=42)
     schedule = maintenance.MaintenanceSchedule(pk=43)
-    schedule.machine = Machine(pk=41, makerspace=Makerspace(pk=7))
+    schedule.machine = Machine(pk=41, makerspace=makerspace)
     # The adapter only reads the actual model to distinguish schedule from log.
     return_row(monkeypatch, maintenance.MaintenanceSchedule, NS(pk=43, machine=machine))
-    monkeypatch.setattr(maintenance.MaintenanceLog.objects, "get", lambda **kwargs: NS(pk=44))
+    return_row(monkeypatch, maintenance.MaintenanceLog, NS(pk=44))
     monkeypatch.setattr(maintenance, "maintenance_context", lambda *args, **kwargs: {})
     payload = maintenance.notify_maintenance_lifecycle(schedule, "schedule_completed", log_id=44)
     assert payload.data == {"machine_id": 41, "schedule_id": 43, "maintenance_log_id": 44}
@@ -78,7 +90,7 @@ def test_maintenance_adapter_identifies_machine_schedule_and_completion_log(monk
 def test_membership_adapters_identify_request_and_membership(monkeypatch):
     capture(monkeypatch, members)
     monkeypatch.setattr(members, "membership_context", lambda *args, **kwargs: {"email": "private@example.test"})
-    row = NS(pk=51, makerspace=NS(), user=NS())
+    row = NS(pk=51, makerspace=space(), user=NS(), user_id=None)
     return_row(monkeypatch, members.MembershipRequest, row)
     assert members.notify_membership_request_pending(row).data == {"membership_request_id": 51}
     return_row(monkeypatch, members.MakerspaceMembership, row)
@@ -89,7 +101,7 @@ def test_printing_adapter_identifies_kernel_request(monkeypatch):
     from apps.machines.models import MachineServiceRequest
 
     capture(monkeypatch, printing)
-    row = NS(pk=61, makerspace=NS())
+    row = NS(pk=61, makerspace=space(), member_id=None, requester_id=None)
     return_row(monkeypatch, MachineServiceRequest, row)
     monkeypatch.setattr(printing, "_is_printer_request", lambda row: True)
     monkeypatch.setattr(printing, "_requester_render", lambda *args: (None, None))

@@ -72,6 +72,7 @@ def test_problems_exclude_hidden_even_when_superadmin_is_a_manager_there():
 
 def test_usage_is_scoped_and_honors_managed_overrides(settings):
     settings.PLATFORM_DOMAIN_SUFFIX = ".space.example"
+    settings.INFRA_HOSTS = [*settings.INFRA_HOSTS, "testserver"]
     space, other = make_space("own"), make_space("other")
     space.resource_limit_overrides = {"products": 50, "storage": 1024, "email": None}
     space.storage_bytes_used = 512
@@ -79,7 +80,7 @@ def test_usage_is_scoped_and_honors_managed_overrides(settings):
     DailyNotificationCounter.objects.create(makerspace=space, day=timezone.now().date(), channel="telegram", count=3)
     DailyNotificationCounter.objects.create(makerspace=other, day=timezone.now().date(), channel="telegram", count=20)
     client = authenticated_client(make_member("usage-manager", space))
-    response = client.get(usage_url(space))
+    response = client.get(usage_url(space), HTTP_HOST="testserver")
     assert response.status_code == 200
     assert response.data["managed"] is True
     resources = {row["key"]: row for row in response.data["resources"]}
@@ -88,13 +89,14 @@ def test_usage_is_scoped_and_honors_managed_overrides(settings):
     assert resources["products"]["limit"] == 50
     assert resources["email"]["limit"] is None
     assert resources["telegram"]["used"] == 3
-    assert client.get(usage_url(other)).status_code == 404
+    assert client.get(usage_url(other), HTTP_HOST="testserver").status_code == 404
     reader = make_member("usage-inventory", space, MakerspaceMembership.Role.INVENTORY_MANAGER)
-    assert authenticated_client(reader).get(usage_url(space)).status_code == 403
+    assert authenticated_client(reader).get(usage_url(space), HTTP_HOST="testserver").status_code == 403
 
 
 def test_usage_rejects_archived_hidden_and_foreign_origin(settings):
     settings.PLATFORM_DOMAIN_SUFFIX = ".space.example"
+    settings.INFRA_HOSTS = [*settings.INFRA_HOSTS, "testserver"]
     space = make_space("origin-own")
     other = make_space("origin-other")
     other.frontend_domain = "other.example.com"
@@ -102,17 +104,17 @@ def test_usage_rejects_archived_hidden_and_foreign_origin(settings):
     other.save(update_fields=["frontend_domain", "frontend_domain_status"])
     user = operator()
     client = authenticated_client(user)
-    assert client.get(usage_url(space), HTTP_ORIGIN="https://other.example.com").status_code == 403
-    assert client.get(DASHBOARD, HTTP_ORIGIN="https://other.example.com").status_code == 403
-    assert client.get(PROBLEMS, HTTP_ORIGIN="https://other.example.com").status_code == 403
+    assert client.get(usage_url(space), HTTP_HOST="testserver", HTTP_ORIGIN="https://other.example.com").status_code == 403
+    assert client.get(DASHBOARD, HTTP_HOST="testserver", HTTP_ORIGIN="https://other.example.com").status_code == 403
+    assert client.get(PROBLEMS, HTTP_HOST="testserver", HTTP_ORIGIN="https://other.example.com").status_code == 403
     space.superadmin_access_enabled = False
     space.save(update_fields=["superadmin_access_enabled"])
-    assert client.get(usage_url(space)).status_code == 404
+    assert client.get(usage_url(space), HTTP_HOST="testserver").status_code == 404
     manager = make_member("own-manager", space)
-    assert authenticated_client(manager).get(usage_url(space)).status_code == 200
+    assert authenticated_client(manager).get(usage_url(space), HTTP_HOST="testserver").status_code == 200
     space.archived_at = timezone.now()
     space.save(update_fields=["archived_at"])
-    assert authenticated_client(manager).get(usage_url(space)).status_code == 404
+    assert authenticated_client(manager).get(usage_url(space), HTTP_HOST="testserver").status_code == 404
 
 
 def test_self_host_usage_has_no_limits(settings):

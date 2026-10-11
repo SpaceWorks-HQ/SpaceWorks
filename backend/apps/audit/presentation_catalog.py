@@ -21,6 +21,7 @@ from .presentation_catalog_member_account import ENTRIES as _MEMBER_ACCOUNT
 from .presentation_catalog_migration import ENTRIES as _MIGRATION
 from .presentation_catalog_payments import ENTRIES as _PAYMENTS
 from .presentation_catalog_platform import ENTRIES as _PLATFORM
+from .presentation_catalog_merged import ENTRIES as _MERGED
 from .presentation_catalog_types import AuditPresentation, P
 
 # Closed name -> callable registry for target links. Phase 10 ships no resolver: a link
@@ -42,7 +43,7 @@ def _compose(*fragments):
 
 PRESENTATION_CATALOG = _compose(
     _ACCOUNTS, _MAKERSPACES, _HARDWARE, _MACHINES, _COMMUNITY, _MIGRATION, _PAYMENTS,
-    _PLATFORM, _MEMBER_ACCOUNT,
+    _PLATFORM, _MEMBER_ACCOUNT, _MERGED,
 )
 
 

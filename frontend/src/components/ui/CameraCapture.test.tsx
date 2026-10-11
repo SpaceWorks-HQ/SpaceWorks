@@ -19,7 +19,7 @@ function installGetUserMedia(getUserMedia: ReturnType<typeof vi.fn> | undefined)
 function makeStream(stop = vi.fn()) {
   return {
     stop,
-    stream: { getTracks: () => [{ stop }] } as unknown as MediaStream,
+    stream: { getTracks: () => [{ stop }], getVideoTracks: () => [{ stop }] } as unknown as MediaStream,
   };
 }
 

@@ -93,7 +93,9 @@ def printing_context(print_request, status_url, public_token):
     }
 
 
-def render(makerspace, stream, audience, key, context, *, machine_type=None):
+def render(makerspace, stream, audience, key, context, *, machine_type=None, use_tz=None):
+    # use_tz=False is for contexts already localized to a resolved UTC offset;
+    # a second template conversion would lose that offset during a DST fold.
     # is_active=False means "use the built-in default for this event" (the original
     # HardwareEmailTemplate semantic), NOT "suppress the email" — lifecycle notifications
     # always send, so a toggled-off custom row falls through to the registry default below.
@@ -112,7 +114,7 @@ def render(makerspace, stream, audience, key, context, *, machine_type=None):
                     override.subject,
                     override.text_body,
                     override.html_body,
-                    context,
+                    context, use_tz=use_tz,
                 )
             except Exception:
                 logger.warning(
@@ -140,7 +142,7 @@ def render(makerspace, stream, audience, key, context, *, machine_type=None):
 
     if row is not None:
         try:
-            return _render_strings(row.subject, row.text_body, row.html_body, context)
+            return _render_strings(row.subject, row.text_body, row.html_body, context, use_tz=use_tz)
         except Exception:
             logger.warning(
                 "email_template_render_failed",
@@ -157,7 +159,7 @@ def render(makerspace, stream, audience, key, context, *, machine_type=None):
         entry.default_subject,
         entry.default_text,
         entry.default_html,
-        context,
+        context, use_tz=use_tz,
     )
 
 
@@ -168,13 +170,13 @@ def render_preview(stream, audience, key, subject, text_body, html_body):
     return _render_strings(subject, text_body, html_body, entry.sample_context)
 
 
-def _render_strings(subject, text_body, html_body, context):
+def _render_strings(subject, text_body, html_body, context, *, use_tz=None):
     return {
-        "subject": _render_string(subject, context).strip(),
-        "text_body": _render_string(text_body, context),
-        "html_body": _render_string(html_body, context) if html_body else "",
+        "subject": _render_string(subject, context, use_tz=use_tz).strip(),
+        "text_body": _render_string(text_body, context, use_tz=use_tz),
+        "html_body": _render_string(html_body, context, use_tz=use_tz) if html_body else "",
     }
 
 
-def _render_string(value, context):
-    return Template(value or "").render(Context(context, autoescape=True))
+def _render_string(value, context, *, use_tz=None):
+    return Template(value or "").render(Context(context, autoescape=True, use_tz=use_tz))
