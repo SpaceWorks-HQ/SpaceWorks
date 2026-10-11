@@ -58,23 +58,22 @@ SECTIONS = {
         show_public_count public_availability_mode""", "name", "public_inventory", "edit_inventory"),
 }
 
-# These two models are omitted from tenant dumps because they govern live delivery.
-# Packs explicitly carry the space-wide matrix/mutes only: no destinations,
-# recipients, member preferences, tokens, URLs or scope bindings.
-PACK_ONLY_CONFIGURATION_MODELS = frozenset({
-    "integrations.NotificationPreference", "integrations.EmailNotificationMute",
-})
-
 
 def assert_pack_classification():
     """Fail closed if a section drifts beyond its reviewed configuration subset."""
-    from .classification import EXPORTED_MODEL_FIELDS, OMITTED_MODELS
+    from apps.encryption.registry import ALL_FIELDS
 
+    from .classification import EXPORTED_MODEL_FIELDS
+
+    pii_models = {field.model_label for field in ALL_FIELDS}
     for spec in SECTIONS.values():
-        if spec.model in PACK_ONLY_CONFIGURATION_MODELS:
-            assert spec.model in OMITTED_MODELS
-        else:
-            assert set(spec.fields) <= set(EXPORTED_MODEL_FIELDS[spec.model].split())
+        assert not spec.model.startswith((
+            "accounts.", "payments.", "evidence.", "audit.", "hardware_requests.",
+        ))
+        assert spec.model not in pii_models
+        # Notification defaults and mutes now travel in tenant exports too, but
+        # packs retain only their reviewed space-wide configuration fields.
+        assert set(spec.fields) <= set(EXPORTED_MODEL_FIELDS[spec.model].split())
     assert set(SETTINGS_FIELDS + HOURS_FIELDS) <= set(
         EXPORTED_MODEL_FIELDS["makerspaces.Makerspace"].split()
     )

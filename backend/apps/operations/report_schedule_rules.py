@@ -21,9 +21,13 @@ class ReportConditionSerializer(serializers.Serializer):
     value = serializers.DecimalField(max_digits=20, decimal_places=6, required=False)
     currency = serializers.RegexField(r"^[a-z]{3}$", required=False)
 
-    def validate(self, attrs):
-        if set(self.initial_data) - set(self.fields):
+    def to_internal_value(self, data):
+        # Nested serializers receive raw data here, before DRF drops unknown keys.
+        if isinstance(data, dict) and set(data) - set(self.fields):
             raise serializers.ValidationError("Unknown condition key.")
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
         metric_keys = {"metric", "operator", "value"}
         present = metric_keys & attrs.keys()
         if present and present != metric_keys:

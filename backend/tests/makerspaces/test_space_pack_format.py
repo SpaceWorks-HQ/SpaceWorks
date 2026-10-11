@@ -3,7 +3,7 @@ import pytest
 
 from apps.data_export.classification import EXPORTED_MODEL_FIELDS, OMITTED_MODELS
 from apps.data_export.space_pack_configuration import (
-    HOURS_FIELDS, PACK_ONLY_CONFIGURATION_MODELS, SECTIONS, SETTINGS_FIELDS, assert_pack_classification,
+    HOURS_FIELDS, SECTIONS, SETTINGS_FIELDS, assert_pack_classification,
 )
 from apps.encryption.registry import ALL_FIELDS
 from apps.makerspaces.space_pack_format import PackError, canonical, open_pack, seal
@@ -45,10 +45,8 @@ def test_pack_projection_is_a_reviewed_subset_of_data_export_without_pii_or_mone
     assert not fields & {"user", "member", "uploaded_by", "created_by", "updated_by", "actor", "object_key", "storage_location", "box", "public_token"}
     assert not any("quantity" in field for field in fields)
     for spec in SECTIONS.values():
-        if spec.model in PACK_ONLY_CONFIGURATION_MODELS:
-            assert spec.model in OMITTED_MODELS
-        else:
-            assert set(spec.fields) <= set(EXPORTED_MODEL_FIELDS[spec.model].split())
+        assert spec.model not in OMITTED_MODELS
+        assert set(spec.fields) <= set(EXPORTED_MODEL_FIELDS[spec.model].split())
     assert not set(SETTINGS_FIELDS + HOURS_FIELDS) & {"name", "slug", "public_api_key", "smtp_password", "telegram_group_chat_id", "frontend_domain"}
 
 

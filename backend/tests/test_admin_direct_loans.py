@@ -780,9 +780,7 @@ def test_direct_loan_rejects_product_qr_for_individual_tracked_product():
     )
 
     assert response.status_code == 400
-    assert response.data["detail"] == (
-        "Individual-tracked products require a scanned asset QR."
-    )
+    assert response.data["detail"] == "Individual-tracked products require a scanned asset QR."
     assert PublicToolLoan.objects.count() == 0
     product.refresh_from_db()
     assert product.available_quantity == 3
@@ -846,9 +844,7 @@ def test_direct_loan_rejects_box_qr_fallback_for_individual_tracked_product():
     )
 
     assert response.status_code == 400
-    assert response.data["detail"] == (
-        "Individual-tracked products require a scanned asset QR."
-    )
+    assert response.data["detail"] == "Box has no public self-checkout items."
     assert PublicToolLoan.objects.count() == 0
     product.refresh_from_db()
     assert product.available_quantity == 1

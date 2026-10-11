@@ -4,7 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import timedelta
 from threading import Barrier
-from uuid import uuid4
 
 import pytest
 from django.core.exceptions import ValidationError
@@ -12,7 +11,6 @@ from django.db import close_old_connections, connection
 from django.utils import timezone
 
 from apps.accounts import rbac
-from apps.backup.models import B1RestoreComponentState
 from apps.bookings.models import BookableSpace, Booking
 from apps.makerspaces.models import Makerspace
 from apps.notifications.models import Notification
@@ -100,11 +98,8 @@ def test_not_restored_tenant_reaches_the_gate_and_is_counted():
     booking = _booking(pending, now)
     row, = _schedule(pending, booking, now)
     _booking(live, now)
-    B1RestoreComponentState.objects.create(
-        operation_id=uuid4(), artifact_id=uuid4(), capture_id=uuid4(), component_id=uuid4(),
-        makerspace_id_snapshot=pending.pk, ciphertext_sha256="a" * 64,
-        state=B1RestoreComponentState.State.PENDING,
-    )
+    from tests.backup.test_not_restored_state_e7 import _operation, _component
+    _component(_operation(), pending.pk)
     assert reminder_sweeper.run_reminder_sweep(now=now) == {
         "dispatched": 1, "skipped": 1, "failed": 0,
     }

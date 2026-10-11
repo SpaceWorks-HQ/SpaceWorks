@@ -44471,7 +44471,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Update refused; reason identifies the failed setting, module gate or host-state check."
                     }
                 }
             },
@@ -44530,7 +44530,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Update refused; reason identifies the failed setting, module gate or host-state check."
                     }
                 }
             }
@@ -44573,7 +44573,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Update refused; reason identifies the failed setting, module gate or host-state check."
                     }
                 }
             }
@@ -44636,7 +44636,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Update refused; reason identifies the failed setting, module gate or host-state check."
                     }
                 }
             }
@@ -44678,7 +44678,7 @@
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Update refused; reason identifies the failed setting, module gate or host-state check."
                     }
                 }
             }
@@ -56148,18 +56148,10 @@
                 ],
                 "requestBody": {
                     "content": {
-                        "type": {
+                        "application/json": {
                             "schema": {
                                 "type": "object",
-                                "additionalProperties": {},
-                                "description": "Unspecified request body"
-                            }
-                        },
-                        "additionalProperties": {
-                            "schema": {
-                                "type": "object",
-                                "additionalProperties": {},
-                                "description": "Unspecified request body"
+                                "additionalProperties": false
                             }
                         }
                     }

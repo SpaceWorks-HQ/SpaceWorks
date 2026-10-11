@@ -7,6 +7,27 @@ cannot say which call site wrote it. ``presentation_discovery`` keeps this exact
 
 # Literal actions whose metadata is built at runtime somewhere.
 NON_LITERAL_META_ACTIONS = frozenset({
+    "backup.destination_created",
+    "backup.destination_probed",
+    "backup.destination_updated",
+    "evidence.abandoned_upload_deleted",
+    "kiosk.online_command_executed",
+    "kiosk.operator_lease_issued",
+    "kiosk.operator_lease_revoked",
+    "kiosk.replay_claimed",
+    "kiosk.replay_failed",
+    "kiosk.replay_prepared",
+    "kiosk.replay_resolved",
+    "kiosk.replay_succeeded",
+    "kiosk.station_created",
+    "kiosk.station_disabled",
+    "kiosk.station_pin_failed",
+    "kiosk.station_pin_revealed",
+    "kiosk.station_pin_rotated",
+    "kiosk.station_session_started",
+    "kiosk.work_package_issued",
+    "platform.update_settings_updated",
+
     "audit.signing_key_rotation_aborted",
     "audit.signing_key_rotation_completed",
     "audit.signing_key_rotation_failed",
@@ -36,6 +57,17 @@ NON_LITERAL_META_ACTIONS = frozenset({
 
 # Every constant a resolvable dynamic action (``a if x else b``) can produce.
 DYNAMIC_EXACT_ACTIONS = frozenset({
+    "backup.destination_created",
+    "backup.destination_updated",
+    "booking.feed_created",
+    "booking.feed_rotated",
+    "certification.granted",
+    "certification.renewed",
+    "saved_view.shared",
+    "saved_view.unshared",
+    "staff.invitation_resent",
+    "staff.invitation_revoked",
+
     "event.calendar_feed_created",
     "event.calendar_feed_rotated",
     "event.collaboration_accepted",
@@ -84,6 +116,15 @@ DYNAMIC_EXACT_ACTIONS = frozenset({
 # Reviewed namespaces for call sites that take the action from a parameter, an
 # attribute or an f-string (path relative to backend/apps -> denied prefixes).
 WRAPPER_SITE_PREFIXES = {
+    "devices/services_events.py": ("devices.",),
+    "devices/services_label_events.py": ("devices.",),
+    "devices/services_printer_events.py": ("devices.",),
+    "evidence/services_upload.py": ("evidence.upload_url_issued", "kiosk.evidence_upload_issued"),
+    "makerspaces/membership_admission.py": (
+        "membership.awaiting_vouches", "membership.awaiting_payment",
+        "membership.requested", "membership.vouches_satisfied",
+        "membership.canceled", "membership.expired", "membership.revoked",
+    ),
     "accounts/audit_events.py": ("auth.",),
     "accounts/services_claim.py": ("member.claim_code_",),
     "admin_api/views_assets.py": ("inventory.asset_needs_fix_",),

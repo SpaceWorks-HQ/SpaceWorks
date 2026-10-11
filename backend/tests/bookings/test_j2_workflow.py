@@ -85,8 +85,11 @@ def test_instant_and_approval_modes_have_distinct_overlap_behavior():
         services.approve_booking(second, actor=None)
     second.refresh_from_db()
     assert second.status == Booking.Status.PENDING
+    cancelled = services.cancel_booking(second, actor=None)
+    assert cancelled.status == Booking.Status.CANCELLED
+    assert AuditLog.objects.get(action='booking.cancelled').target_id == str(second.pk)
     with pytest.raises(BookingInvalidTransition):
-        services.cancel_booking(second, actor=None)
+        services.cancel_booking(cancelled, actor=None)
 
 
 def test_approval_and_rejection_revalidate_state_and_audit_transitions():

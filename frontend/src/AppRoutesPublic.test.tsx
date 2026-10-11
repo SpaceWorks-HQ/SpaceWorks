@@ -8,7 +8,7 @@ import { expectNoA11yViolations } from "./test/axe";
 
 const state = vi.hoisted(() => ({ mode: "central" as "single" | "central", request: vi.fn(), bootstrap: {
   makerspace: { slug: "lab", name: "Lab", logo_url: "/logo.png" },
-  branding: { display_name: "Community Lab", welcome_body: "Make things together." }, theme: {}, modules: ["public_inventory", "request_workflow"], edition: "makerspace",
+  branding: { display_name: "Community Lab", welcome_body: "Make things together." }, theme: {}, features: ["loans.enabled"], modules: ["public_inventory", "request_workflow"], edition: "makerspace",
 } }));
 vi.mock("./lib/tenant", () => ({
   useTenant: () => ({ mode: state.mode, slug: "lab", modules: new Set(state.bootstrap.modules), bootstrap: state.bootstrap }),
@@ -30,7 +30,7 @@ function show(path: string) {
     <MemoryRouter initialEntries={[path]}><AppRoutes mode={state.mode} landing={<p>Directory</p>} /></MemoryRouter>
   </QueryClientProvider>);
 }
-beforeEach(() => { state.mode = "central"; state.bootstrap.edition = "makerspace"; state.request.mockReset(); });
+beforeEach(() => { state.mode = "central"; state.bootstrap.edition = "makerspace"; state.bootstrap.modules = ["public_inventory", "request_workflow"]; state.request.mockReset(); });
 
 it.each(["central", "single"] as const)("opens a public item directly in %s routing mode", async (mode) => {
   state.mode = mode;
@@ -79,8 +79,9 @@ it("routes a single-space member tab without a slug", async () => {
   expect(await screen.findByRole("heading", { name: "Member tab bookings" })).toBeVisible();
 });
 
-it.each(["events", "bookings"])("keeps the %s edition home canonical on the space's home URL", async (edition) => {
+it.each(["events", "bookings"])("keeps the %s family home canonical on the space's home URL", async (edition) => {
   state.bootstrap.edition = edition;
+  state.bootstrap.modules = [edition];
   state.request.mockResolvedValue([]);
   show("/m/lab");
   expect(await screen.findByRole("heading", { name: edition === "events" ? "Upcoming events" : "Book a makerspace" })).toBeVisible();

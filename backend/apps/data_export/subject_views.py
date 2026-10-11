@@ -90,7 +90,7 @@ class SubjectExportListView(SubjectExportBaseView):
         return paginator.get_paginated_response(SubjectExportSerializer(page, many=True).data)
 
     @extend_schema(tags=["Member account"], summary="Request a personal ZIP/JSON data export",
-                   request={"type": "object", "additionalProperties": False},
+                   request={"application/json": {"type": "object", "additionalProperties": False}},
                    responses={202: SubjectExportSerializer, **ERRORS})
     def post(self, request, makerspace_id):
         space = self.makerspace(request, makerspace_id)

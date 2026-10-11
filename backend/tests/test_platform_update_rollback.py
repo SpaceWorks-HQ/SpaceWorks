@@ -73,8 +73,14 @@ def test_rollback_refuses_unavailable_unverified_and_compound_snapshots(restore_
     row, archive, actor = restore_point
     for field, value in changes.items():
         setattr(archive, field, value)
-    archive.save()
-    with patch("apps.backup.restore_services.request_restore") as restore:
+    if "expires_at" in changes:
+        # Available archive expiry is immutable; simulate elapsed retention instead.
+        archive.refresh_from_db()
+        expiry_time = archive.expires_at + timedelta(seconds=1)
+    else:
+        archive.save()
+        expiry_time = timezone.now()
+    with patch("apps.updates.rollback.timezone.now", return_value=expiry_time), patch("apps.backup.restore_services.request_restore") as restore:
         response = post(actor, payload(row))
     assert response.status_code == 400 and response.data["reason"] == reason
     restore.assert_not_called()

@@ -1,5 +1,7 @@
 """Borrower-only delivery and F3 staff escalation through the existing matrix."""
 
+from datetime import timezone as datetime_timezone
+
 from apps.integrations.email_templates import hardware_context, render
 from apps.integrations.email_templates_registry import bag
 from django.utils import timezone
@@ -13,14 +15,18 @@ def deliver_loan_reminder(makerspace, loan, reminder, message, local_tz):
         context = hardware_context(loan, staff=reminder.kind == "escalation")
         values = {key: value for key, value in vars(context["request"]).items() if key != "_frozen"}
         # Preserve the documented datetime type for existing editable date filters.
-        values["return_due_at"] = loan.return_due_at.astimezone(local_tz)
+        due = loan.return_due_at.astimezone(local_tz)
+        # Django omits T/O at an ambiguous ZoneInfo wall time. The UTC instant has
+        # already selected the fold, so retain its resolved offset and zone label.
+        values["return_due_at"] = due.replace(tzinfo=datetime_timezone(due.utcoffset(), due.tzname()))
+        context["now"] = timezone.now().astimezone(local_tz)
         context["request"] = bag(**values)
         if reminder.kind == "escalation":
             context["staff_summary"] = message.body
         staff = reminder.kind == "escalation"
         audience = "staff" if staff else "requester"
         with timezone.override(local_tz):
-            rendered = render(makerspace, "hardware", audience, "return_reminder", context)
+            rendered = render(makerspace, "hardware", audience, "return_reminder", context, use_tz=False)
         if not staff:
             # Include the zone/UTC offset explicitly even when a custom template's
             # date format omits it, especially for an ambiguous DST due time.

@@ -186,6 +186,10 @@ def test_scoped_authority_matrix_and_dead_coordinates():
         assert {row["audience"] for row in maintenance} == {"staff"}
         assert all(row["can_edit_space_default"] is False for row in maintenance)
         assert "printing" not in {row["stream"] for row in response.data}
+        assert "certifications" not in {row["stream"] for row in response.data}
+        assert client_for(actor).get(detail_url(
+            makerspace, "certifications", "staff", "granted"
+        )).status_code == 404
         assert client_for(actor).get(detail_url(
             makerspace, "maintenance", "staff", "logged"
         )).status_code == 404
@@ -248,7 +252,7 @@ def test_plain_print_manager_and_legacy_exempt_members_keep_space_access():
 
     printing = client_for(plain_print).get(list_url(makerspace))
     assert printing.status_code == 200
-    assert {row["stream"] for row in printing.data} == {"printing"}
+    assert {row["stream"] for row in printing.data} == {"printing", "stock"}
     assert all(row["can_edit_space_default"] is True for row in printing.data)
     for actor in (legacy, superadmin):
         response = client_for(actor).get(list_url(makerspace))

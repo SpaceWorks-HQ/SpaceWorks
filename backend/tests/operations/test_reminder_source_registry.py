@@ -13,7 +13,7 @@ def test_core_registry_import_does_not_load_tombstoned_consumers(monkeypatch):
     reloaded = importlib.reload(reminder_registry)
     assert {source.key for source in reloaded.registered_sources()} == {
         "membership.admission_payment", "membership.renewal", "payments.due", "loans.return", "loans.escalation",
-        "inventory.back_available", "stocktake.scheduled",
+        "inventory.back_available", "stocktake.scheduled", "notifications.deferred",
     }
 
 

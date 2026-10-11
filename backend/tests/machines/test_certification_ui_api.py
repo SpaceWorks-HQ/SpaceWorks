@@ -13,6 +13,7 @@ from apps.machines.certifications import require_certification
 from apps.machines.models import CertificationGrant, MakerspaceMachineTypePolicy, Machine
 from tests.machines.certification_helpers import _space, _machine_type, _manager, _member, _certification, _book, _bookable, _submit
 from tests.module_helpers import disable_module
+from tests.return_helpers import make_member
 
 pytestmark = pytest.mark.django_db
 
@@ -115,10 +116,12 @@ def test_exact_expiry_blocks_booking_and_service_gate_like_a_missing_grant(monke
 def test_policy_is_tenant_local_and_requires_space_manager_identity():
     from apps.accounts.rbac import Action
     space, kind, trainer, _, _, _ = setup("ui-policy")
-    manager, _ = _manager(space, "ui-space-manager", actions=(Action.MANAGE_MAKERSPACE,))
+    manager = make_member("ui-space-manager", space)
+    delegate, _ = _manager(space, "ui-policy-delegate", actions=(Action.MANAGE_MAKERSPACE,))
     other, other_kind, _, _, _, _ = setup("ui-policy-other")
     path = reverse("admin-machine-type-policy", args=[space.pk, kind.pk])
     assert client(trainer).put(path, {"cert_reminder_days": 7}, format="json").status_code == 403
+    assert client(delegate).put(path, {"cert_reminder_days": 7}, format="json").status_code == 403
     result = client(manager).put(path, {"cert_reminder_days": 7, "reminder_lead_days": 0, "grace_days": 2}, format="json")
     assert result.status_code == 200
     assert MakerspaceMachineTypePolicy.objects.get(makerspace=space).cert_reminder_days == 7

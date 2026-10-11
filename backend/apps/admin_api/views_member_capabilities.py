@@ -41,6 +41,11 @@ def _membership_for_verifier(actor, pk):
         ),
         relation="makerspace",
     ).values("makerspace_id")
+    if actor.is_superuser or actor.role == "superadmin":
+        # Global actors already have manager scope in visible spaces. In a hidden
+        # space only their membership's role may authorize verification; a
+        # delegation flag must not restore withheld global authority.
+        delegate_scope = delegate_scope.none()
     return get_object_or_404(
         MakerspaceMembership.objects.select_related("makerspace", "user", "assigned_role").filter(
             Q(makerspace_id__in=manager_scope) | Q(makerspace_id__in=delegate_scope)

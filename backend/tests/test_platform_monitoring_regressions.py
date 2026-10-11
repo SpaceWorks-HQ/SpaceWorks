@@ -118,14 +118,15 @@ def test_hidden_copy_error_and_destination_rollup_do_not_leak():
 
 def test_usage_custom_origin_accepts_only_own_manager_and_space(settings):
     settings.PLATFORM_DOMAIN_SUFFIX = ".space.example"
+    settings.INFRA_HOSTS = [*settings.INFRA_HOSTS, "testserver"]
     space = make_space("scoped-usage")
     space.frontend_domain = "scoped.example.com"
     space.frontend_domain_status = "verified"
     space.save(update_fields=["frontend_domain", "frontend_domain_status"])
     other = make_space("unrelated-usage")
     client = authenticated_client(make_member("scoped-manager", space))
-    assert client.get(usage_url(space), HTTP_ORIGIN="https://scoped.example.com").status_code == 200
-    assert client.get(usage_url(other), HTTP_ORIGIN="https://scoped.example.com").status_code == 403
+    assert client.get(usage_url(space), HTTP_HOST="testserver", HTTP_ORIGIN="https://scoped.example.com").status_code == 200
+    assert client.get(usage_url(other), HTTP_HOST="testserver", HTTP_ORIGIN="https://scoped.example.com").status_code == 403
 
 
 def test_monitoring_still_works_when_updater_is_disabled():

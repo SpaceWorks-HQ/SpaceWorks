@@ -1,4 +1,4 @@
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from django.db import transaction
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -21,16 +21,20 @@ def _require_updates_module():
 
 
 _MODULE_OFF = "The updates module is not run by any live makerspace."
+UPDATE_REFUSAL_RESPONSE = OpenApiResponse(
+    UpdateRefusalSerializer,
+    description="Update refused; reason identifies the failed setting, module gate or host-state check.",
+)
 
 
 @extend_schema_view(
     get=extend_schema(
-        responses={200: PlatformUpdateSettingsSerializer, **errors(401, 403), 400: UpdateRefusalSerializer}
+        responses={200: PlatformUpdateSettingsSerializer, **errors(401, 403), 400: UPDATE_REFUSAL_RESPONSE}
     ),
     patch=extend_schema(
         responses={
             200: PlatformUpdateSettingsSerializer,
-            **errors(401, 403), 400: UpdateRefusalSerializer,
+            **errors(401, 403), 400: UPDATE_REFUSAL_RESPONSE,
         }
     ),
 )
@@ -76,7 +80,7 @@ class PlatformUpdateSettingsView(generics.RetrieveUpdateAPIView):
     request=None,
     responses={
         status.HTTP_202_ACCEPTED: PlatformUpdateSettingsSerializer,
-        **errors(401, 403), 400: UpdateRefusalSerializer,
+        **errors(401, 403), 400: UPDATE_REFUSAL_RESPONSE,
     },
 )
 class PlatformUpdateRequestView(APIView):

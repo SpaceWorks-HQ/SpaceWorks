@@ -37,7 +37,7 @@ ENTRIES = (
       )),
     P("evidence.retention_policy_updated", "Evidence retention policy updated",
       ("new_effective_days", "old_effective_days", "override_cleared")),
-    P("evidence.upload_url_issued", "Evidence upload url issued", ("surface", "type")),
+    P("evidence.upload_url_issued", "Evidence upload url issued"),
     P("evidence.viewed", "Evidence viewed"),
     P("inventory.asset_moved_makerspace", "Inventory asset moved makerspace",
       (

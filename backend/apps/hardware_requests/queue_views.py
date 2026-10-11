@@ -69,8 +69,8 @@ class PendingRequestsView(generics.ListAPIView):
 
     def get_queryset(self):
         makerspace_id = self.kwargs["makerspace_id"]
-        require_module(makerspace_id, "request_workflow")
-        _require_action(self.request.user, rbac.Action.ACCEPT_REQUEST, makerspace_id)
+        makerspace = _require_action(self.request.user, rbac.Action.ACCEPT_REQUEST, makerspace_id)
+        require_module(makerspace, "request_workflow")
         return (
             rbac.scope_by_action(self.request.user, rbac.Action.ACCEPT_REQUEST, request_queryset())
             .filter(
@@ -98,8 +98,8 @@ class AcceptedRequestsView(generics.ListAPIView):
 
     def get_queryset(self):
         makerspace_id = self.kwargs["makerspace_id"]
-        require_module(makerspace_id, handover_surface_module(self.request))
-        _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
+        makerspace = _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
+        require_module(makerspace, handover_surface_module(self.request))
         return (
             rbac.scope_by_action(self.request.user, rbac.Action.ISSUE_REQUEST, request_queryset())
             .filter(
@@ -127,8 +127,8 @@ class ActiveLoansView(generics.ListAPIView):
 
     def get_queryset(self):
         makerspace_id = self.kwargs["makerspace_id"]
-        require_module(makerspace_id, handover_surface_module(self.request))
-        _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
+        makerspace = _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
+        require_module(makerspace, handover_surface_module(self.request))
         return (
             rbac.scope_by_action(self.request.user, rbac.Action.ISSUE_REQUEST, request_queryset())
             .filter(
@@ -163,8 +163,8 @@ class RequestHistoryView(generics.ListAPIView):
 
     def get_queryset(self):
         makerspace_id = self.kwargs["makerspace_id"]
-        require_module(makerspace_id, handover_surface_module(self.request))
-        _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
+        makerspace = _require_action(self.request.user, rbac.Action.ISSUE_REQUEST, makerspace_id)
+        require_module(makerspace, handover_surface_module(self.request))
         return (
             rbac.scope_by_action(self.request.user, rbac.Action.ISSUE_REQUEST, request_queryset())
             .filter(
@@ -188,5 +188,6 @@ class RequestHistoryView(generics.ListAPIView):
 
 
 def _require_action(user, action, makerspace_id):
+    # Reuse the authorized tenant for the module check instead of fetching it twice.
     scoped = rbac.scope_by_action(user, action, Makerspace.objects.all(), field="id")
-    get_object_or_404(scoped, pk=makerspace_id)
+    return get_object_or_404(scoped, pk=makerspace_id)

@@ -6,8 +6,8 @@ registration impossible and made a collaborating space's member unable to regist
 Physical attendance is established instead by the staff-scanned QR check-in, which is
 stronger evidence than a self-declared session.
 
-What must NOT change is every other flow that asks the same question. Those are hardware
-and facility actions where "is this member physically here right now" is the point, so
+What must NOT change is each physical handover flow. Those are hardware
+actions where "is this member physically here right now" is the point, so
 `require_active_member_presence` keeps its session requirement and keeps its callers.
 """
 
@@ -227,7 +227,7 @@ def test_both_guards_share_one_waiver_rule(guard):
         guard(user, space)
 
 
-# --- the nine invocations that must not have moved ---------------------------------
+# --- physical handover invocations that must not have moved ---------------------------------
 
 
 @pytest.mark.parametrize(
@@ -236,15 +236,14 @@ def test_both_guards_share_one_waiver_rule(guard):
         "apps.hardware_requests.self_checkout_views",
         "apps.hardware_requests.direct_loan_workflow",
         "apps.hardware_requests.public_views",
-        "apps.bookings.views_public",
     ],
 )
-def test_hardware_and_facility_surfaces_still_bind_the_presence_guard(module_path):
+def test_hardware_surfaces_still_bind_the_presence_guard(module_path):
     """Asserts on the resolved function object, not on source text.
 
     Paired with `test_require_active_member_presence_still_requires_a_session`, which
     proves that object still demands a session, this is what stops the refactor from
-    silently relaxing self-checkout, direct handout, hardware requests or bookings.
+    silently relaxing self-checkout, direct handout or hardware requests.
 
     **The two machine-service surfaces deliberately left this list** -- see
     `test_machine_request_surfaces_bind_the_membership_aware_guard` below, which holds them
@@ -258,6 +257,17 @@ def test_hardware_and_facility_surfaces_still_bind_the_presence_guard(module_pat
         require_active_member_presence
     )
     assert not hasattr(module, "require_active_member")
+
+
+def test_advance_bookings_bind_account_and_existing_member_waiver_guards():
+    from apps.bookings import access, views_public
+    from apps.presence.guard import require_active_account
+
+    # Booking ahead needs an account, and existing members still owe their waiver.
+    assert views_public.require_booking_account is access.require_booking_account
+    assert access.require_active_account is require_active_account
+    assert access.require_active_member is require_active_member
+    assert not hasattr(access, "require_active_member_presence")
 
 
 @pytest.mark.parametrize(

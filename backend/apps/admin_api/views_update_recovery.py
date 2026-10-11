@@ -4,9 +4,9 @@ from rest_framework.views import APIView
 
 from apps.admin_api.permissions import IsActiveSuperAdmin
 from apps.admin_api.serializers_platform_updates import (
-    PlatformUpdateSettingsSerializer, UpdateRefusalSerializer, UpdateRollbackSerializer,
+    PlatformUpdateSettingsSerializer, UpdateRollbackSerializer,
 )
-from apps.admin_api.views_platform_updates import _require_updates_module
+from apps.admin_api.views_platform_updates import UPDATE_REFUSAL_RESPONSE, _require_updates_module
 from apps.backup.serializers import RestoreOperationSerializer
 from apps.openapi_errors import errors
 from apps.updates.recovery import recover_stuck_update
@@ -19,7 +19,7 @@ class PlatformUpdateRecoverView(APIView):
 
     @extend_schema(
         tags=["Platform"], summary="Recover a timed-out update after proving the host lock is free",
-        request=None, responses={200: PlatformUpdateSettingsSerializer, **errors(401, 403), 400: UpdateRefusalSerializer},
+        request=None, responses={200: PlatformUpdateSettingsSerializer, **errors(401, 403), 400: UPDATE_REFUSAL_RESPONSE},
         description="Idempotent once recovered. Refuses module_disabled, update_not_stuck and host_operation_active.",
     )
     def post(self, request):
@@ -34,7 +34,7 @@ class PlatformUpdateRollbackView(APIView):
     @extend_schema(
         tags=["Platform"], summary="Queue confirmed rollback to the recorded pre-update restore point",
         request=UpdateRollbackSerializer,
-        responses={202: RestoreOperationSerializer, **errors(401, 403), 400: UpdateRefusalSerializer},
+        responses={202: RestoreOperationSerializer, **errors(401, 403), 400: UPDATE_REFUSAL_RESPONSE},
         description=(
             "The privileged host uses the existing restore supervisor and previous immutable images. "
             "Requires archive_id, confirm_version and confirm_data_loss. Refusals carry a reason: "

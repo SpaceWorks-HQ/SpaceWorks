@@ -8,7 +8,7 @@ from apps.accounts.models import User
 from apps.audit.models import AuditLog
 from apps.bookings import services
 from apps.bookings.exceptions import BookingInvalidTransition
-from apps.bookings.models import BookableSpace, Booking
+from apps.bookings.models import BookableSpace
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 
 pytestmark = pytest.mark.django_db
@@ -186,6 +186,7 @@ def test_booking_rules_api_scopes_updates_and_general_patch():
         'booking_lead_time_minutes',
         'max_booking_advance_days',
         'approval_mode',
+        'buffer_before_minutes', 'buffer_after_minutes', 'cancellation_cutoff_hours',
     }
     response = client.patch(
         rules_url,

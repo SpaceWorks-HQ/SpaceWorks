@@ -39,7 +39,7 @@ function DialogHarness({
 
 beforeEach(() => {
   const track = { stop: vi.fn() };
-  const stream = { getTracks: () => [track] } as unknown as MediaStream;
+  const stream = { getTracks: () => [track], getVideoTracks: () => [track] } as unknown as MediaStream;
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
     value: { getUserMedia: vi.fn().mockResolvedValue(stream) },

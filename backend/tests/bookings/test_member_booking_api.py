@@ -58,9 +58,11 @@ def test_own_upcoming_and_past_history_never_matches_shared_contact_fields():
     tenant, room, user, client = setup()
     mine = book(room, user)
     other, _ = member(tenant, 'another')
-    other.email = user.email
-    other.save(update_fields=['email'])
-    book(room, other, starts_at=mine.starts_at + timedelta(hours=2))
+    other_booking = book(room, other, starts_at=mine.starts_at + timedelta(hours=2))
+    # Accounts have unique verified emails; historical booking contacts may still match.
+    other_booking.email = user.email
+    other_booking.phone = user.phone
+    other_booking.save(update_fields=['email', 'phone'])
     past = Booking.objects.create(space=room, member=user, name='Mine', email=user.email, phone=user.phone,
                                   starts_at=timezone.now() - timedelta(days=2),
                                   ends_at=timezone.now() - timedelta(days=1), status='completed')

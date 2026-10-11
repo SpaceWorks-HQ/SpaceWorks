@@ -57,7 +57,7 @@ def add_payment(space, actor, subject_type, subject_id, amount, currency="usd", 
         ).pk
     elif subject_type == Payment.SubjectType.MEMBERSHIP_REQUEST:
         subject_id = MembershipRequest.objects.create(
-            makerspace=space, user=actor, kind=MembershipRequest.Kind.REQUEST,
+            makerspace=space, user=actor, invite_email=actor.email, kind=MembershipRequest.Kind.REQUEST,
             state=MembershipRequest.State.AWAITING_PAYMENT, admission_managed=True,
         ).pk
     elif subject_type in Payment.LOAN_SUBJECT_TYPES:

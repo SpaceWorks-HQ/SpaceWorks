@@ -7,6 +7,7 @@ from apps.audit.models import AuditLog
 from apps.integrations.models import NotificationPreference
 from apps.integrations.notify import EmailDelivery, LifecyclePayload, notify_lifecycle
 from apps.makerspaces.models import MakerspaceMembership, MakerspaceRole
+from apps.makerspaces.roles import ensure_default_roles
 from apps.notifications.inbox import InboxDelivery
 from apps.notifications.models import MemberNotificationPreference, Notification, NotificationInboxRow
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user
@@ -20,6 +21,7 @@ def enable(space):
 
 
 def member(name, space):
+    ensure_default_roles(space)
     user = make_user(name, role=User.Role.REQUESTER, access_status=User.AccessStatus.ACTIVE)
     MakerspaceMembership.objects.create(
         makerspace=space, user=user, role=MakerspaceMembership.Role.CUSTOM,
